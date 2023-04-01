@@ -1,13 +1,25 @@
+import os
 import futu as ft
 import pandas as pd
+import pandas as pd
+from dotenv import load_dotenv
 
-class data:
+
+
+class data():
     
-    def data_futu(code,start,end,host,port):
+    def __init__(self):
+        load_dotenv()
+        self.futu_username = os.getenv("FUTU_USER_ID")
+        self.futu_password = os.getenv("FUTU_PWD")
+        self.futu_host = os.getenv("FUTU_HOST")
+        self.futu_port = os.getenv("FUTU_PORT")
+    
+    def futu_quote(self,code,start,end):
         # connect to Futu API
-        quote_ctx = ft.OpenQuoteContext(host='127.0.0.1', port=11111)
+        quote_ctx = ft.OpenQuoteContext(host=self.futu_host, port=self.futu_port)
 
-        # set the stock code and time range
+        # set the stock code and time ran   ge
         code = 'HK.00700'  # Tencent stock code
         start = '2001-01-01'
         end = '2022-03-18'
@@ -22,8 +34,23 @@ class data:
         df = pd.DataFrame(data)
 
         return df
+    
+    def futu_holding(self):
+        
+        
+        trd_ctx = ft.OpenSecTradeContext(filter_trdmarket = ft.Trd_Market.US, host=self.futu_host, port=self.futu_port, security_firm = ft.SecurityFirm.FUTUSECURITIES)
+        ret, df = trd_ctx.position_list_query()
+        if ret == ft.RET_OK:
+            return df
+        else:
+            print('position_list_query error: ', df)
+        trd_ctx.close()  # Close the current connection
 
 # print the DataFrame
 if __name__ == "__main__":
-    print(data.data_futu('HK.00700',"2001-01-01","2022-03-18","127.0.0.1",11111))
+    obj = data()
+    print(obj.futu_host,obj.futu_port)
 
+    print(obj.futu_quote('HK.00700',"2001-01-01","2022-03-18"))
+
+    print(obj.futu_holding())

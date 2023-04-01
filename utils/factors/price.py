@@ -70,7 +70,7 @@ class price(perf):
         
         # Select first two columns and rename them
         self.df = self.df[self.df.columns[0:2]]
-        self.df = self.df.rename(columns=dict(zip(df.columns.tolist(),["datetime","adjclose"])))
+        self.df = self.df.rename(columns=dict(zip(self.df.columns.tolist(),["datetime","adjclose"])))
         # Calculate change in price, moving average, moving standard deviation and z-score
         self.df['chg'] = self.df.adjclose.pct_change()
         self.df['ma'] = self.df.adjclose.rolling(timeframe).mean()
