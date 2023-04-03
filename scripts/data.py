@@ -67,5 +67,9 @@ if __name__ == "__main__":
     data = glassnode.get_historical_data('BTC', '2020-05-11', '2021-04-03')
     print(data)
     
+ 
+    
+    
+    
 
 
