@@ -8,7 +8,6 @@ import futu
 import requests
 import os
 from dotenv import load_dotenv
-import datetime as dt
 import time
 import pandas as pd
 
