@@ -12,7 +12,7 @@ The metrics include:
 import pandas as pd
 import numpy as np
 
-class performance:
+class Performance:
     
     
     # assume that 0.05bps 
@@ -62,7 +62,7 @@ class performance:
         return calmar_ratio
     
     def get_buy_hold_total_return(self):
-        total_return = self.data['buy_hold_cumu']][-1]
+        total_return = self.data['buy_hold_cumu'][-1]
         return total_return
     
     def get_buy_hold_get_annualized_return(self):

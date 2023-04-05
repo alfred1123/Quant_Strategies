@@ -2,6 +2,8 @@
 This script is for retrieving data from different sources of API.
 1. Futu OpenD
 2. Glassnode
+
+future updates: turn retreiving data function to recursive for memoization and caching
 '''
 
 import futu
@@ -10,6 +12,7 @@ import os
 from dotenv import load_dotenv
 import time
 import pandas as pd
+from functools import lru_cache
 
 # Create a class for retrieving data from Futu OpenD
 class FutuOpenD:
@@ -24,6 +27,7 @@ class FutuOpenD:
         self.quote_ctx = futu.OpenQuoteContext(host=self.__host, port=self.__port)
         
     # retrieve historical data for stock quotes from Futu OpenD
+    @lru_cache(maxsize=32)
     def get_historical_data(self, symbol, start_date, end_date, resolution = 'K_DAY'):
         """_summary_
 
@@ -49,6 +53,7 @@ class Glassnode:
         self.__api_key = os.getenv('GLASSNODE_API_KEY')
         # self.__api_url = os.getenv('GLASSNODE_API_URL')
         
+    @lru_cache(maxsize=32)    
     def get_historical_price(self, symbol, start_date, end_date, resolution='24h'):
         """_summary_
          Args:
@@ -79,13 +84,20 @@ class Glassnode:
 
 # print the DataFrame
 if __name__ == "__main__":
+    
+    # start = time.time()
     # futu_opend = FutuOpenD()
-    # data = futu_opend.get_historical_data('HK.00700', '2021-01-01', '2021-01-31', 'K_DAY')
+    # data = futu_opend.get_historical_data('HK.00700', '2021-01-01', '2023-04-05', 'K_DAY')
+    # end = time.time()
+    # print(end - start)
     # print(data.columns)
     
     
+    start = time.time()
     glassnode = Glassnode()
     data = glassnode.get_historical_price('BTC', '2020-05-11', '2021-04-03')
+    end = time.time()
+    print(end - start)
     print(data.columns)
     
  
