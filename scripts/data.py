@@ -24,9 +24,21 @@ class FutuOpenD:
         self.quote_ctx = futu.OpenQuoteContext(host=self.__host, port=self.__port)
         
     # retrieve historical data for stock quotes from Futu OpenD
-    def get_historical_data(self, symbol, start_date, end_date):
+    def get_historical_data(self, symbol, start_date, end_date, resolution = 'K_DAY'):
+        """_summary_
+
+        Args:
+            symbol (str): stock symbol 
+            start_date (str): start of date range
+            end_date (str): end of date range
+            resolution (str): resolution of data (K_YEAR, K_QUARTER, K_MONTH, K_WEEK, K_DAY, K_60M, K_30M, K_15M, K_5M, K_3M, K_1M)
+
+        Returns:
+            DataFrame: historical data
+            columns: ['code', 'time_key', 'open', 'close', 'high', 'low', 'pe_ratio', 'turnover_rate', 'volume', 'turnover', 'change_rate', 'last_close']
+        """
         with self.quote_ctx:
-            ret, data, page_req_key = self.quote_ctx.request_history_kline(symbol, start=start_date, end=end_date, autype=futu.AuType.QFQ)
+            ret, data, page_req_key = self.quote_ctx.request_history_kline(symbol, start=start_date, end=end_date, ktype=resolution, autype=futu.AuType.QFQ)
             
         return data
 
@@ -35,15 +47,25 @@ class Glassnode:
     def __init__(self) -> None:
         load_dotenv()
         self.__api_key = os.getenv('GLASSNODE_API_KEY')
-        self.__api_url = os.getenv('GLASSNODE_API_URL')
-        print(type(self.__api_key), type(self.__api_url))
+        # self.__api_url = os.getenv('GLASSNODE_API_URL')
         
-    def get_historical_data(self, symbol, start_date, end_date):
+    def get_historical_price(self, symbol, start_date, end_date, resolution='24h'):
+        """_summary_
+         Args:
+            symbol (str): stock symbol 
+            start_date (str): start of date range
+            end_date (str): end of date range
+            resolution (str): resolution of data (1month, 1w, 24h, 1h, 10m)
+            
+
+        Returns:
+            DataFrame: historical data
+            columns: ['t', 'v']
+        """
         # set time to download
         since = int(time.mktime(time.strptime(start_date, "%Y-%m-%d"))) # 2020 May 11
         # since = 1646092800 # 2022 Mar 1
         until = int(time.mktime(time.strptime(end_date, "%Y-%m-%d"))) 
-        resolution = "1h"
 
         res = requests.get("https://api.glassnode.com/v1/metrics/market/price_usd_close",
                            params={"a": "BTC", "s": since, "u": until, "api_key": self.__api_key, "i": resolution})
@@ -58,13 +80,13 @@ class Glassnode:
 # print the DataFrame
 if __name__ == "__main__":
     # futu_opend = FutuOpenD()
-    # data = futu_opend.get_historical_data('HK.00700', '2021-01-01', '2021-01-31')
-    # print(data)
+    # data = futu_opend.get_historical_data('HK.00700', '2021-01-01', '2021-01-31', 'K_DAY')
+    # print(data.columns)
     
     
     glassnode = Glassnode()
-    data = glassnode.get_historical_data('BTC', '2020-05-11', '2021-04-03')
-    print(data)
+    data = glassnode.get_historical_price('BTC', '2020-05-11', '2021-04-03')
+    print(data.columns)
     
  
     

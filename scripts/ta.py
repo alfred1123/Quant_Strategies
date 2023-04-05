@@ -47,9 +47,8 @@ class TechnicalAnalysis:
     def get_bollinger_band(self, period, threshold, column='Close'):
         sma = self.data[column].rolling(window=period).mean()
         rstd = self.data[column].rolling(window=period).std()
-        upper_band = sma + rstd * threshold
-        lower_band = sma - rstd * threshold
-        return upper_band, lower_band
+        z = (self.data[column] - sma) / rstd
+        return z
     
     # k is the fast stochastic oscillator, d is the slow stochastic oscillator
     def get_stochastic_oscillator(self, period):
@@ -57,4 +56,4 @@ class TechnicalAnalysis:
         low = self.data['Low'].rolling(window=period).min()
         k = 100 * (self.data['Close'] - low) / (high - low)
         d = k.rolling(window=period).mean()
-        return k, d
+        return d
