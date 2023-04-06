@@ -2,6 +2,7 @@
 This script is used to calculate the technical analysis indicators for the stock
 for different factors of the stock
 '''
+
 import pandas as pd
 
 
@@ -10,8 +11,6 @@ class TechnicalAnalysis:
     # need to check!!!!!
     def __init__(self, data) -> None:
         self.data = data
-        self.data['Date'] = pd.to_datetime(self.data['Date'])
-        self.data.set_index('Date', inplace=True)
         
     def get_sma(self, period, column='Close'):
         """_summary_
@@ -84,7 +83,7 @@ class TechnicalAnalysis:
         signal = macd.ewm(span=period3, adjust=False).mean()
         return macd, signal
     
-    def get_bollinger_band(self, period, threshold, column='Close'):
+    def get_bollinger_band(self, period, column='Close'):
         
         """_summary_
         Args:
@@ -110,6 +109,7 @@ class TechnicalAnalysis:
         Returns:
             _type_: oscillator moving average
         """
+        
         high = self.data['High'].rolling(window=period).max()
         low = self.data['Low'].rolling(window=period).min()
         k = 100 * (self.data['Close'] - low) / (high - low)

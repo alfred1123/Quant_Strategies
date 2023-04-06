@@ -8,6 +8,12 @@ import numpy as np
 
 class Parameters_Optimization:
     
-    def __init__(self):
-        pass
+    def __init__(self,data):
+        self.data = data
+        self.data['Date'] = pd.to_datetime(self.data['Date'])
+        self.data.set_index('Date', inplace=True)
+        
+        
+        
+        
     

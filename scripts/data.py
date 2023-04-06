@@ -35,7 +35,7 @@ class FutuOpenD:
             symbol (str): stock symbol 
             start_date (str): start of date range
             end_date (str): end of date range
-            resolution (str): resolution of data (K_YEAR, K_QUARTER, K_MONTH, K_WEEK, K_DAY, K_60M, K_30M, K_15M, K_5M, K_3M, K_1M)
+            resolution (str): resolution of data, Defaults to 'K_DAY'. (K_YEAR, K_QUARTER, K_MONTH, K_WEEK, K_DAY, K_60M, K_30M, K_15M, K_5M, K_3M, K_1M)
 
         Returns:
             DataFrame: historical data
@@ -56,11 +56,12 @@ class Glassnode:
     @lru_cache(maxsize=32)    
     def get_historical_price(self, symbol, start_date, end_date, resolution='24h'):
         """_summary_
+        
          Args:
             symbol (str): stock symbol 
             start_date (str): start of date range
             end_date (str): end of date range
-            resolution (str): resolution of data (1month, 1w, 24h, 1h, 10m)
+            resolution (str): resolution of data, Defaults to '24h'(1month, 1w, 24h, 1h, 10m)
             
 
         Returns:
@@ -74,7 +75,6 @@ class Glassnode:
 
         res = requests.get("https://api.glassnode.com/v1/metrics/market/price_usd_close",
                            params={"a": "BTC", "s": since, "u": until, "api_key": self.__api_key, "i": resolution})
-        print(since, until)
         df = pd.read_json(res.text, convert_dates=['t'])
         
         return df

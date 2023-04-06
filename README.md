@@ -18,6 +18,7 @@ Main Goal of this project is to find strategies higher than 1.5 Sharpe and Calma
 
 ### **Future Development**:
 - add parameter optimization functions
+- enhance code efficiency for api request by changing to recursive functions
 - create script for trading real-time on bybit, binance and futu
 - create a bot on telegram or discord for trading messages
 - explore ways of continuous deployment on cloud
