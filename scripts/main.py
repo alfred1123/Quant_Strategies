@@ -8,8 +8,7 @@ and calculates performance metrics.
 
 from data import FutuOpenD, Glassnode
 from ta import TechnicalAnalysis
-# from perf import Performance
-from test import Performance
+from perf import Performance
 import pandas as pd
 import numpy as np
 import time
@@ -42,6 +41,8 @@ df.rename(columns={'t':'datetime', 'v_x':'price', 'v_y':'factor'}, inplace=True)
 
 
 ### TECHNICAL ANALYSIS ###
+
+# Think about do we need to load data to ta or only as an interface or static menthod
 
 period = 1200
 signal = 1.75
@@ -78,7 +79,6 @@ perf = Performance(ta.data, 365*24, ta.get_bollinger_band, strategy, period, sig
 
 print(perf.get_strategy_performance())
 print(perf.get_buy_hold_performance())
-perf.data.to_csv('perf.csv')
 
 ### Parameters Optimization ###
 
