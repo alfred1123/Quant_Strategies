@@ -17,9 +17,9 @@ class Performance:
     
     
     # assume that 0.05bps 
-    def __init__(self, data, trading_periods, indicator_func, strategy_func, mv_period, signal) -> None:
+    def __init__(self, data, trading_period, indicator_func, strategy_func, mv_period, signal) -> None:
         self.data = data
-        self.trading_periods = trading_periods
+        self.trading_period = trading_period
         self.indicator_func = indicator_func
         self.strategy_func = strategy_func
         self.mv_period = mv_period
@@ -53,11 +53,11 @@ class Performance:
     
     # take account that nan leading zeros
     def get_annualized_return(self):
-        annualized_return = self.data.loc[self.window:len(self.data)-1,'pnl'].mean() * self.trading_periods
+        annualized_return = self.data.loc[self.window:len(self.data)-1,'pnl'].mean() * self.trading_period
         return annualized_return
         
     def get_sharpe_ratio(self):
-        sharpe_ratio = self.data.loc[self.window:len(self.data)-1,'pnl'].mean() / self.data.loc[self.window:len(self.data)-1,'pnl'].std() * np.sqrt(self.trading_periods)
+        sharpe_ratio = self.data.loc[self.window:len(self.data)-1,'pnl'].mean() / self.data.loc[self.window:len(self.data)-1,'pnl'].std() * np.sqrt(self.trading_period)
         return sharpe_ratio
     
     def get_max_drawdown(self):
@@ -73,11 +73,11 @@ class Performance:
         return total_return
     
     def get_buy_hold_get_annualized_return(self):
-        annualized_return = self.data.loc[self.window:len(self.data)-1,'buy_hold'].mean() * self.trading_periods
+        annualized_return = self.data.loc[self.window:len(self.data)-1,'buy_hold'].mean() * self.trading_period
         return annualized_return
     
     def get_buy_hold_sharpe_ratio(self):
-        sharpe_ratio = self.data.loc[self.window:len(self.data)-1,'buy_hold'].mean() / self.data.loc[self.window:len(self.data)-1,'buy_hold'].std() * np.sqrt(self.trading_periods)
+        sharpe_ratio = self.data.loc[self.window:len(self.data)-1,'buy_hold'].mean() / self.data.loc[self.window:len(self.data)-1,'buy_hold'].std() * np.sqrt(self.trading_period)
         return sharpe_ratio
     
     def get_buy_hold_max_drawdown(self):
