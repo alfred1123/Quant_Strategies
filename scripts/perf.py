@@ -17,22 +17,19 @@ class Performance:
     
     
     # assume that 0.05bps 
-    def __init__(self, data, trading_period, indicator_func, strategy_func, mv_period, signal) -> None:
+    def __init__(self, data, trading_period, indicator_func, strategy_func, window, signal) -> None:
         self.data = data
         self.trading_period = trading_period
         self.indicator_func = indicator_func
         self.strategy_func = strategy_func
-        self.mv_period = mv_period
+        self.window = window
         self.signal = signal
         
         # strategy daily performance
         self.data['chg'] = self.data['price'].pct_change()
-        self.data['indicator'] = self.indicator_func(self.mv_period)
+        self.data['indicator'] = self.indicator_func(self.window)
         self.data['position'] = self.strategy_func(self.data['indicator'], self.signal)
-        self.data['position_x1'] = self.data['position'].shift(1)
-        
-        # window still take account of other not leading np.nan values that will need to be fixed
-        self.window = self.data['position_x1'].isnull().sum()  
+        self.data['position_x1'] = self.data['position'].shift(1)  
 
         self.data['trade'] = abs(self.data['position_x1'] - self.data['position'])
         self.data['pnl'] = self.data['position_x1']*self.data['chg'] - self.data['trade']*0.00005

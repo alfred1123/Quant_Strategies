@@ -8,7 +8,7 @@ import numpy as np
 import itertools
 from perf import Performance
 
-class Parameters_Optimization:
+class ParametersOptimization:
     
     def __init__(self, data, trading_period, indicator_func, strategy_func):
         self.data = data
@@ -22,10 +22,10 @@ class Parameters_Optimization:
     # the argument parameters should be in the form of a tuples
     # the function will return the optimized parameters
     
-    def optimized_parameters(self, indicator_tuple:tuple, strategy_tuple:tuple):
-        for mv_period, signal in list(itertools.product(indicator_tuple, strategy_tuple))
-            perf = Performance(self.data, self.trading_period, self.indicator_func, self.strategy_func, mv_period, signal)
-            yield mv_period, signal, perf.get_sharpe_ratio()
+    def optimize(self, indicator_tuple:tuple, strategy_tuple:tuple):
+        for window, signal in list(itertools.product(indicator_tuple, strategy_tuple)):
+            perf = Performance(self.data, self.trading_period, self.indicator_func, self.strategy_func, window, signal)
+            yield (window, signal, perf.get_sharpe_ratio())
             
         
     

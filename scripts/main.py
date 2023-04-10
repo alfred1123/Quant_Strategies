@@ -44,7 +44,8 @@ df.rename(columns={'t':'datetime', 'v_x':'price', 'v_y':'factor'}, inplace=True)
 
 # Think about do we need to load data to ta or only as an interface or static menthod
 
-period = 1200
+trading_period = 365*24
+window = 1200
 signal = 1.75
 # period1 = 12
 # period2 = 26
@@ -74,13 +75,13 @@ def strategy(data_col, signal):
 
 ### Perf ###
 
-# perf = Performance(ta.data,365*24)
-perf = Performance(ta.data, 365*24, ta.get_bollinger_band, strategy, period, signal)
+perf = Performance(ta.data, trading_period, ta.get_bollinger_band, strategy, window, signal)
 
 print(perf.get_strategy_performance())
 print(perf.get_buy_hold_performance())
 
 ### Parameters Optimization ###
+
 
 
 ### plot ###
