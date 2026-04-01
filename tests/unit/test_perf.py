@@ -52,6 +52,11 @@ class TestStrategyMetrics:
         ret = perf.get_total_return()
         assert np.isfinite(ret)
 
+    def test_annualized_return_is_scalar(self, sample_ohlc_df):
+        perf = _make_performance(sample_ohlc_df)
+        ret = perf.get_annualized_return()
+        assert isinstance(ret, (int, float, np.floating))
+
     def test_sharpe_is_scalar(self, sample_ohlc_df):
         perf = _make_performance(sample_ohlc_df)
         sharpe = perf.get_sharpe_ratio()
@@ -81,9 +86,24 @@ class TestBuyHoldMetrics:
         ret = perf.get_buy_hold_total_return()
         assert np.isfinite(ret)
 
+    def test_buy_hold_annualized_return_is_scalar(self, sample_ohlc_df):
+        perf = _make_performance(sample_ohlc_df)
+        ret = perf.get_buy_hold_annualized_return()
+        assert isinstance(ret, (int, float, np.floating))
+
+    def test_buy_hold_sharpe_ratio_is_scalar(self, sample_ohlc_df):
+        perf = _make_performance(sample_ohlc_df)
+        sharpe = perf.get_buy_hold_sharpe_ratio()
+        assert np.isfinite(sharpe) or np.isnan(sharpe)
+
     def test_buy_hold_max_drawdown_non_negative(self, sample_ohlc_df):
         perf = _make_performance(sample_ohlc_df)
         assert perf.get_buy_hold_max_drawdown() >= 0
+
+    def test_buy_hold_calmar_ratio_is_scalar(self, sample_ohlc_df):
+        perf = _make_performance(sample_ohlc_df)
+        calmar = perf.get_buy_hold_calmar_ratio()
+        assert isinstance(calmar, (int, float, np.floating))
 
     def test_buy_hold_performance_returns_series(self, sample_ohlc_df):
         perf = _make_performance(sample_ohlc_df)

@@ -15,6 +15,7 @@ Run backtest-style code from `src/` (imports are relative to that package, e.g. 
 
 - Prefer **pandas/numpy** idioms already used in existing modules; match style of neighboring code (naming, plotting libs).
 - Keep changes **focused**: extend existing functions/classes rather than duplicating logic.
+- **Testing**: After any change to `src/`, review and update the corresponding unit tests in `tests/unit/` and integration tests in `tests/integration/`. New functions or classes must have unit tests. Run `python -m pytest tests/ -v` and confirm all tests pass before considering the change complete.
 - **Secrets**: API keys and env live in `.env` (gitignored) at the project root. Never commit credentials or paste them into source files.
 - **README**: After any change that affects usage, setup, CLI options, directory structure, data sources, or dependencies, review and update `README.md` to keep it accurate.
 

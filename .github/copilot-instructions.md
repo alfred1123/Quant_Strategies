@@ -41,6 +41,7 @@ cd src && python main.py          # Run backtest
 ## Conventions
 
 - Keep changes **focused** — extend existing functions/classes rather than duplicating logic.
+- **Testing**: After any change to `src/`, review and update the corresponding unit tests in `tests/unit/` and integration tests in `tests/integration/`. New functions or classes must have unit tests. Run `python -m pytest tests/ -v` and confirm all tests pass before considering the change complete.
 - **Secrets**: API keys live in `.env` (gitignored) at the project root. Never commit credentials.
 - `env/` is gitignored — always recreate via `setup.sh` or `requirements.txt`.
 - New dependencies go in `requirements.txt`.

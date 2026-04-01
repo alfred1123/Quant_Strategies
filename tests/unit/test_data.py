@@ -77,16 +77,17 @@ class TestGlassnode:
             Glassnode()
 
 
-@pytest.mark.skip(reason="FutuOpenD tests hang — load_dotenv re-injects real .env; needs mock isolation fix")
 class TestFutuOpenD:
+    @patch("data.load_dotenv", lambda *a, **kw: None)
     @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
     @patch("data.futu.OpenQuoteContext")
     def test_init_loads_env(self, mock_ctx):
         from data import FutuOpenD
-        futu = FutuOpenD()
-        assert futu._FutuOpenD__host == "127.0.0.1"
-        assert futu._FutuOpenD__port == 11111
+        futu_src = FutuOpenD()
+        assert futu_src._FutuOpenD__host == "127.0.0.1"
+        assert futu_src._FutuOpenD__port == 11111
 
+    @patch("data.load_dotenv", lambda *a, **kw: None)
     @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
     @patch("data.futu.OpenQuoteContext")
     def test_get_historical_data_calls_api(self, mock_ctx_cls):
@@ -98,12 +99,13 @@ class TestFutuOpenD:
         mock_ctx.__exit__ = MagicMock(return_value=False)
 
         from data import FutuOpenD
-        futu = FutuOpenD()
-        futu.get_historical_data.cache_clear()
-        result = futu.get_historical_data("HK.00700", "2021-01-01", "2021-01-31")
+        futu_src = FutuOpenD()
+        futu_src.get_historical_data.cache_clear()
+        result = futu_src.get_historical_data("HK.00700", "2021-01-01", "2021-01-31")
 
         assert isinstance(result, pd.DataFrame)
 
+    @patch("data.load_dotenv", lambda *a, **kw: None)
     @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
     @patch("data.futu.OpenQuoteContext")
     def test_get_historical_data_raises_on_error(self, mock_ctx_cls):
@@ -114,13 +116,13 @@ class TestFutuOpenD:
         mock_ctx.__exit__ = MagicMock(return_value=False)
 
         from data import FutuOpenD
-        futu = FutuOpenD()
-        futu.get_historical_data.cache_clear()
+        futu_src = FutuOpenD()
+        futu_src.get_historical_data.cache_clear()
         with pytest.raises(RuntimeError, match="Futu API error"):
-            futu.get_historical_data("HK.00700", "2021-01-01", "2021-01-31")
+            futu_src.get_historical_data("HK.00700", "2021-01-01", "2021-01-31")
 
+    @patch("data.load_dotenv", lambda *a, **kw: None)
     def test_init_raises_without_env_vars(self, monkeypatch):
-        monkeypatch.setattr("data.load_dotenv", lambda *a, **kw: None)
         monkeypatch.delenv("FUTU_HOST", raising=False)
         monkeypatch.delenv("FUTU_PORT", raising=False)
         from data import FutuOpenD
