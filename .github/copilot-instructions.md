@@ -18,6 +18,19 @@
 - Imports in `scripts/bt/` are **relative** to that package (e.g. `from data import Glassnode`).
 - Run tests with `python -m pytest tests/ -v` from project root.
 
+## Logging
+
+- Every module uses `import logging` and `logger = logging.getLogger(__name__)` at the top.
+- Logging format and level are configured **once** in `scripts/bt/log_config.py`. Do **not** call `logging.basicConfig()` anywhere else.
+- **Entry points only** (`main.py`, `app.py`) call `setup_logging()` from `log_config`:
+  ```python
+  from log_config import setup_logging
+  setup_logging()            # INFO level
+  setup_logging(debug=True)  # DEBUG level
+  ```
+- Library modules (`data.py`, `ta.py`, `perf.py`, `strat.py`, `param_opt.py`) **never** call `basicConfig` or `setup_logging` — they only use `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`.
+- Do **not** use `print()` for status output — use the logger at the appropriate level.
+
 ## Build and Test
 
 ```bash

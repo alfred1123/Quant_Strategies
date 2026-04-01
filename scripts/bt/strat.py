@@ -1,7 +1,12 @@
 # we will be storing all the strategies here before we move them to the main file
 # we will need a unique name for each strategy wtih ID
 
+import logging
+
 import numpy as np
+
+logger = logging.getLogger(__name__)
+
 
 class Strategy:
     

@@ -5,6 +5,7 @@ Launch:
     cd scripts/bt && streamlit run app.py
 """
 
+import logging
 import sys
 import os
 
@@ -20,7 +21,11 @@ from data import YahooFinance, AlphaVantage
 from ta import TechnicalAnalysis
 from strat import Strategy
 from perf import Performance
+from log_config import setup_logging
 from param_opt import ParametersOptimization
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 # ── Registry of available indicators and strategies ─────────────────
 
@@ -114,6 +119,7 @@ def fetch_data(symbol, start, end):
 try:
     df = fetch_data(symbol, start_date, end_date)
 except Exception as exc:
+    logger.error("Failed to fetch data for %s: %s", symbol, exc)
     st.error(f"Failed to fetch data: {exc}")
     st.stop()
 

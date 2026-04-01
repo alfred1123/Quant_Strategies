@@ -11,6 +11,7 @@ BybitData class moved to backup/deco/ — platform decommissioned.
 """
 
 import os
+import logging
 import time
 from functools import lru_cache
 
@@ -18,6 +19,8 @@ import futu
 import pandas as pd
 import requests
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 
 class FutuOpenD:
@@ -54,7 +57,9 @@ class FutuOpenD:
                 ktype=resolution, autype=futu.AuType.QFQ,
             )
         if ret != 0:
+            logger.error("Futu API error (ret=%s): %s", ret, data)
             raise RuntimeError(f"Futu API error (ret={ret}): {data}")
+        logger.info("FutuOpenD: fetched %d rows for %s", len(data), symbol)
         return data
 
 
@@ -94,6 +99,7 @@ class Glassnode:
         )
         res.raise_for_status()
         df = pd.read_json(res.text, convert_dates=['t'])
+        logger.info("Glassnode: fetched %d rows for %s", len(df), symbol)
         return df
 
 
@@ -177,11 +183,13 @@ class AlphaVantage:
             params.update(extra_params)
         data = self._request(params)
         if ts_key not in data:
+            logger.error("AlphaVantage response missing '%s': %s", ts_key, data)
             raise ValueError(f"AlphaVantage error: {data.get('Error Message', data)}")
         rows = [
             {"t": date, "v": float(vals[close_field])}
             for date, vals in data[ts_key].items()
         ]
+        logger.info("AlphaVantage: fetched %d rows for %s", len(rows), symbol)
         return pd.DataFrame(rows)
 
     def _request(self, params):
@@ -234,15 +242,21 @@ class YahooFinance:
                 break
             except Exception as exc:
                 last_err = exc
+                logger.warning("YahooFinance attempt %d/%d failed for '%s': %s",
+                               attempt, self.MAX_RETRIES, symbol, exc)
                 if attempt < self.MAX_RETRIES:
                     time.sleep(self.RETRY_DELAY * attempt)
         else:
+            logger.error("YahooFinance exhausted %d retries for '%s'",
+                         self.MAX_RETRIES, symbol)
             raise RuntimeError(
                 f"Yahoo Finance failed after {self.MAX_RETRIES} attempts "
                 f"for '{symbol}': {last_err}"
             ) from last_err
 
         if hist.empty:
+            logger.error("YahooFinance returned no data for '%s' (%s to %s)",
+                         symbol, start_date, end_date)
             raise ValueError(
                 f"Yahoo Finance returned no data for '{symbol}' "
                 f"({start_date} to {end_date})"
@@ -253,6 +267,8 @@ class YahooFinance:
             "v": hist["Close"].values,
         })
         df["v"] = df["v"].astype(float)
+        logger.info("YahooFinance: fetched %d rows for %s (%s to %s)",
+                    len(df), symbol, start_date, end_date)
         return df.reset_index(drop=True)
 
 

@@ -20,6 +20,14 @@ Run backtest-style code from `scripts/bt/` (imports are relative to that package
 - **Secrets**: API keys and env live in `scripts/.env` (gitignored). Never commit credentials or paste them into source files.
 - **README**: After any change that affects usage, setup, CLI options, directory structure, data sources, or dependencies, review and update `README.md` to keep it accurate.
 
+## Logging
+
+- Every module uses `import logging` and `logger = logging.getLogger(__name__)` at the top.
+- Logging format and level are configured **once** in `scripts/bt/log_config.py` (`setup_logging()`). Do **not** call `logging.basicConfig()` anywhere else.
+- **Entry points only** (`main.py`, `app.py`) call `from log_config import setup_logging; setup_logging()`.
+- Library modules **never** call `setup_logging` — they only emit via `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`.
+- Do **not** use `print()` for status output — use the logger at the appropriate level.
+
 ## Safety
 
 - Scripts may touch **live trading** or exchange APIs. Treat order placement and production paths as **high risk**; confirm intent before suggesting automated execution or destructive operations.

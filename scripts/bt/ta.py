@@ -3,14 +3,23 @@ This script is used to calculate the technical analysis indicators for the stock
 for different factors of the stock
 '''
 
+import logging
+
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 class TechnicalAnalysis:
     
     # need to check!!!!!
     def __init__(self, data) -> None:
+        if 'factor' not in data.columns:
+            logger.error("DataFrame missing required 'factor' column, got: %s",
+                         list(data.columns))
+            raise ValueError("DataFrame must contain a 'factor' column")
         self.data = data
+        logger.debug("TechnicalAnalysis initialized with %d rows", len(data))
         
     def get_sma(self, period):
         """_summary_

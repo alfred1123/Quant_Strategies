@@ -9,14 +9,20 @@ The metrics include:
 5. Calmar Ratio
 '''
 
+import logging
+
 import pandas as pd
 import numpy as np
-import time
+
+logger = logging.getLogger(__name__)
+
 
 class Performance:
     
     
-    # assume that 0.05bps 
+    # 5 bps (0.05%) transaction cost per unit of turnover
+    TRANSACTION_COST = 0.0005
+
     def __init__(self, data, trading_period, indicator_func, strategy_func, window, signal) -> None:
         self.data = data
         self.trading_period = trading_period
@@ -24,6 +30,9 @@ class Performance:
         self.strategy_func = strategy_func
         self.window = window
         self.signal = signal
+
+        logger.debug("Computing performance: window=%s, signal=%s, "
+                     "trading_period=%s", window, signal, trading_period)
         
         # strategy daily performance
         self.data['chg'] = self.data['price'].pct_change()
@@ -32,7 +41,7 @@ class Performance:
         self.data['position_x1'] = self.data['position'].shift(1)  
 
         self.data['trade'] = abs(self.data['position'] - self.data['position_x1'])
-        self.data['pnl'] = self.data['position_x1']*self.data['chg'] - self.data['trade']*0.0005
+        self.data['pnl'] = self.data['position_x1']*self.data['chg'] - self.data['trade']*self.TRANSACTION_COST
         self.data['cumu'] = self.data['pnl'].cumsum()
         self.data['dd'] = self.data['cumu'].cummax() - self.data['cumu']
         
@@ -54,7 +63,12 @@ class Performance:
         return annualized_return
         
     def get_sharpe_ratio(self):
-        sharpe_ratio = self.data.loc[self.window:len(self.data)-1,'pnl'].mean() / self.data.loc[self.window:len(self.data)-1,'pnl'].std() * np.sqrt(self.trading_period)
+        pnl = self.data.loc[self.window:len(self.data)-1, 'pnl']
+        std = pnl.std()
+        if std == 0 or np.isnan(std):
+            logger.warning("Sharpe ratio undefined (zero or NaN std for pnl)")
+            return np.nan
+        sharpe_ratio = pnl.mean() / std * np.sqrt(self.trading_period)
         return sharpe_ratio
     
     def get_max_drawdown(self):
@@ -62,7 +76,11 @@ class Performance:
         return max_drawdown
     
     def get_calmar_ratio(self):
-        calmar_ratio = self.data.loc[self.window:len(self.data)-1,'pnl'].mean() / self.data['dd'].max()
+        max_dd = self.data['dd'].max()
+        if max_dd == 0 or np.isnan(max_dd):
+            logger.warning("Calmar ratio undefined (zero or NaN max drawdown)")
+            return np.nan
+        calmar_ratio = self.data.loc[self.window:len(self.data)-1,'pnl'].mean() / max_dd
         return calmar_ratio
     
     def get_buy_hold_total_return(self):
@@ -74,7 +92,12 @@ class Performance:
         return annualized_return
     
     def get_buy_hold_sharpe_ratio(self):
-        sharpe_ratio = self.data.loc[self.window:len(self.data)-1,'buy_hold'].mean() / self.data.loc[self.window:len(self.data)-1,'buy_hold'].std() * np.sqrt(self.trading_period)
+        bh = self.data.loc[self.window:len(self.data)-1, 'buy_hold']
+        std = bh.std()
+        if std == 0 or np.isnan(std):
+            logger.warning("Buy-hold Sharpe ratio undefined (zero or NaN std)")
+            return np.nan
+        sharpe_ratio = bh.mean() / std * np.sqrt(self.trading_period)
         return sharpe_ratio
     
     def get_buy_hold_max_drawdown(self):
@@ -82,7 +105,11 @@ class Performance:
         return max_drawdown
     
     def get_buy_hold_calmar_ratio(self):
-        calmar_ratio = self.data.loc[self.window:len(self.data)-1,'buy_hold'].mean() / self.data['buy_hold_dd'].max()
+        max_dd = self.data['buy_hold_dd'].max()
+        if max_dd == 0 or np.isnan(max_dd):
+            logger.warning("Buy-hold Calmar ratio undefined (zero or NaN max drawdown)")
+            return np.nan
+        calmar_ratio = self.data.loc[self.window:len(self.data)-1,'buy_hold'].mean() / max_dd
         return calmar_ratio
     
     def get_strategy_performance(self):
