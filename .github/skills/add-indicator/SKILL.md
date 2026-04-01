@@ -62,8 +62,9 @@ Add a pipeline test in [tests/integration/test_backtest_pipeline.py](../../tests
 def test_<name>_momentum_pipeline(self, synthetic_market_data):
     df = synthetic_market_data.copy()
     ta = TechnicalAnalysis(df)
+    # Use 365 for crypto, 252 for equity
     perf = Performance(
-        ta.data, 252, ta.get_<name>, Strategy.momentum_const_signal, <window>, <signal>
+        ta.data, 365, ta.get_<name>, Strategy.momentum_const_signal, <window>, <signal>
     )
     result = perf.get_strategy_performance()
     assert isinstance(result, pd.Series)

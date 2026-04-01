@@ -1,7 +1,7 @@
 ---
 name: run-optimization
 description: 'Run parameter optimization grid search for a backtest strategy. Use when tuning indicator windows and signal thresholds to find optimal Sharpe ratio. Produces heatmap visualization.'
-argument-hint: 'Indicator, strategy, window range, signal range'
+argument-hint: 'Indicator, strategy, symbol, window range, signal range'
 ---
 
 # Run Parameter Optimization
@@ -15,73 +15,133 @@ argument-hint: 'Indicator, strategy, window range, signal range'
 
 ### 1. Prepare data
 
+**Preferred source: YahooFinance** (free, no API key, 10+ years daily data).
+
 ```python
-from data import Glassnode
+from data import YahooFinance
 from ta import TechnicalAnalysis
 from strat import Strategy
 from param_opt import ParametersOptimization
 import pandas as pd
 import numpy as np
 
-glassnode = Glassnode()
-price = glassnode.get_historical_price('<symbol>', '<start>', '<end>', '<resolution>')
-factor = glassnode.get_historical_price('<symbol>', '<start>', '<end>', '<resolution>')
-df = pd.merge(price, factor, how='inner', on='t')
-df.rename(columns={'t': 'datetime', 'v_x': 'price', 'v_y': 'factor'}, inplace=True)
+yf = YahooFinance()
+price = yf.get_historical_price('<symbol>', '<start>', '<end>')
+
+df = pd.DataFrame({
+    'datetime': price['t'],
+    'price':    price['v'],
+    'factor':   price['v'],
+})
+```
+
+**Symbols**: equities (`AAPL`), crypto (`BTC-USD`), ETFs (`SPY`), indices (`^GSPC`).
+
+**Alternative sources** (require API keys):
+```python
+from data import AlphaVantage  # Free tier: 25 req/day, ~100 days only
+from data import Glassnode     # On-chain crypto metrics
 ```
 
 ### 2. Define parameter grid
 
 Choose ranges based on data resolution:
 
-| Resolution | Window range | Signal range |
-|---|---|---|
-| 10m bars | `range(0, 50000, 1000)` | `np.arange(0, 2.5, 0.25)` |
-| 1h bars | `range(0, 8000, 200)` | `np.arange(0, 2.5, 0.25)` |
-| Daily bars | `range(0, 500, 10)` | `np.arange(0, 2.5, 0.25)` |
+| Resolution | Window range | Signal range | `trading_period` |
+|---|---|---|---|
+| Daily bars (equity) | `range(5, 105, 5)` | `np.arange(0.25, 2.75, 0.25)` | `252` |
+| Daily bars (crypto) | `range(5, 105, 5)` | `np.arange(0.25, 2.75, 0.25)` | `365` |
+| 1h bars (crypto) | `range(0, 8000, 200)` | `np.arange(0, 2.5, 0.25)` | `365 * 24` |
+| 10m bars (crypto) | `range(0, 50000, 1000)` | `np.arange(0, 2.5, 0.25)` | `365 * 24 * 6` |
 
-Calculate `trading_period` = number of bars per year for the resolution.
+**Important:** Crypto markets trade 24/7/365 — use `365` (not `252`). `252` is for equity markets only.
 
-### 3. Run grid search
+`trading_period` = number of bars per year (used to annualize Sharpe ratio).
+
+### 3. Run single backtest (optional, for baseline)
 
 ```python
 ta = TechnicalAnalysis(df)
-trading_period = 365 * 24 * 6  # adjust for resolution
+trading_period = 365  # crypto (24/7/365); use 252 for equities
 
+from perf import Performance
+perf = Performance(df, trading_period, ta.get_bollinger_band,
+                   Strategy.momentum_const_signal, 20, 1.0)
+print(perf.get_strategy_performance())
+print(perf.get_buy_hold_performance())
+perf.data.to_csv('../../results/perf_<symbol>_<indicator>.csv', index=False)
+```
+
+### 4. Run grid search
+
+```python
 opt = ParametersOptimization(
     ta.data, trading_period,
     ta.get_bollinger_band,          # indicator function
-    Strategy.momentum_const_signal  # strategy function
+    Strategy.momentum_const_signal, # strategy function
 )
 
-window_list = tuple(range(0, 50000, 1000))
-signal_list = tuple(np.arange(0, 2.5, 0.25))
+window_list = tuple(range(5, 105, 5))
+signal_list = tuple(np.arange(0.25, 2.75, 0.25))
 
-results = pd.DataFrame(opt.optimize(window_list, signal_list))
-results.rename(columns={0: 'window', 1: 'signal', 2: 'sharpe'}, inplace=True)
+results = pd.DataFrame(
+    opt.optimize(window_list, signal_list),
+    columns=['window', 'signal', 'sharpe'],
+)
+results.to_csv('../../results/opt_<symbol>_<indicator>.csv', index=False)
+
+best = results.loc[results['sharpe'].idxmax()]
+print(f"Best: window={int(best['window'])}, signal={best['signal']:.2f}, "
+      f"Sharpe={best['sharpe']:.4f}")
 ```
 
-### 4. Visualize
+### 5. Visualize
+
+Use `matplotlib.use('Agg')` to save to file (no GUI needed):
 
 ```python
-import seaborn as sns
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 pivot = results.pivot(index='window', columns='signal', values='sharpe')
-sns.heatmap(pivot, annot=True, fmt='.2f', cmap='Greens')
-plt.title('Sharpe Ratio Heatmap')
-plt.show()
+plt.figure(figsize=(12, 8))
+sns.heatmap(pivot, annot=True, fmt='.2f', cmap='RdYlGn', center=0)
+plt.title('<Symbol> <Indicator> — Sharpe Ratio Heatmap')
+plt.xlabel('Signal Threshold')
+plt.ylabel('Indicator Window')
+plt.tight_layout()
+plt.savefig('../../results/heatmap_<symbol>_<indicator>.png', dpi=150)
 ```
 
-### 5. Interpret results
+### 6. Interpret results
 
 - Look for **stable regions** (clusters of high Sharpe), not isolated peaks.
 - Best `(window, signal)` pair = highest Sharpe in a stable region.
 - Sharpe > 1.5 and Calmar > 1.0 are target thresholds.
-- Beware of overfitting on narrow parameter peaks.
+- Beware of overfitting on narrow parameter peaks — an isolated bright cell surrounded by low values is suspicious.
+- **Bollinger + momentum** works well because z-scores are centered around 0, matching the ±signal thresholds.
+- **SMA + momentum** on raw prices doesn't work — prices are always positive, so `signal < 2.5` always triggers long. Use Bollinger z-score or RSI instead.
+
+### 7. Run from command line
+
+```bash
+cd scripts/backtest && python main.py
+```
+
+**Output files** (saved to `results/`):
+
+| File | Contents |
+|------|----------|
+| `perf_<symbol>_<indicator>.csv` | Daily PnL, cumulative returns, drawdown, positions |
+| `opt_<symbol>_<indicator>.csv` | All grid search results (window, signal, sharpe) |
+| `heatmap_<symbol>_<indicator>.png` | Sharpe ratio heatmap |
 
 ## Available combinations
 
 **Indicators**: `get_sma`, `get_ema`, `get_rsi`, `get_bollinger_band`, `get_stochastic_oscillator`
 
 **Strategies**: `momentum_const_signal`, `reversion_const_signal`
+
+**Data sources**: `YahooFinance` (preferred), `AlphaVantage`, `Glassnode`, `FutuOpenD`

@@ -1,12 +1,13 @@
 '''
-Collects data from FutuOpenD and Glassnode
-performs technical analysis on factors of underlying
-create trading strategy on position base on technical analysis
-and calculates performance metrics.
+Backtest pipeline: fetch data, compute indicators, run strategy,
+measure performance, and optimize parameters via grid search.
+
+Usage:
+    cd scripts/backtest && python main.py
 '''
 
 
-from data import FutuOpenD, Glassnode, AlphaVantage, YahooFinance
+from data import YahooFinance
 from ta import TechnicalAnalysis
 from perf import Performance
 from param_opt import ParametersOptimization
@@ -14,8 +15,9 @@ from strat import Strategy
 import pandas as pd
 import numpy as np
 import time
+import matplotlib
+matplotlib.use('Agg')  # non-interactive backend — saves to file instead of plt.show()
 import matplotlib.pyplot as plt
-import plotly.express as px
 import seaborn as sns
 
 pd.set_option('display.max_rows', None)
@@ -24,100 +26,84 @@ pd.set_option('display.width', 1000)
 
 
 start = time.time()
+
 ### DATA ###
+# Yahoo Finance — free, no API key, 10+ years of daily data
+yf = YahooFinance()
+price = yf.get_historical_price('BTC-USD', '2016-01-01', '2026-04-01')
 
-# get data from FutuOpenD
-# futu_opend = FutuOpenD()
-# df = futu_opend.get_historical_data('HK.00700', '2021-01-01', '2021-01-31', 'K_DAY')
-# print(df)
-
-# get data from Glassnode
-# resolution = '1h' # 1month, 1w, 24h, 1h, 10m
-glassnode = Glassnode()
-price = glassnode.get_historical_price('BTC', '2020-05-11', '2023-04-22', '10m')
-factor = glassnode.get_historical_price('BTC', '2020-05-11', '2023-04-22', '10m')
-df = pd.merge(price, factor, how='inner', on='t')
-print(df)
-
-
-#!!!!!!!!!!!!!!!!! ammend data with price and factor for analysis !!!!! need to amend
-
-df.rename(columns={'t':'datetime', 'v_x':'price', 'v_y':'factor'}, inplace=True)
-
+df = pd.DataFrame({
+    'datetime': price['t'],
+    'price':    price['v'],
+    'factor':   price['v'],
+})
+print(f"Loaded {len(df)} daily bars: {df['datetime'].iloc[0]} → {df['datetime'].iloc[-1]}")
 
 
 ### TECHNICAL ANALYSIS ###
-
-# Think about do we need to load data to ta or only as an interface or static menthod
-trading_period = 365*24*6
-period = 10
-signal = 1
-
-# already change to 'indicator' in ta.py (left as reference)
+# BTC trades 24/7/365 — use 365 for daily bars (252 is for equities only)
+trading_period = 365
 ta = TechnicalAnalysis(df)
-# ta.data['indicator']= ta.get_sma(period)
-# ta.data['indicator']= ta.get_ema(period)
-# ta.data['indicator']= ta.get_rsi(period)
-# ta.data['indicator']= ta.get_bollinger_band(period)
-# ta.data['indicator']= ta.get_stochastic_oscillator(period) # dont recommend
 
 
+### SINGLE BACKTEST — Bollinger + momentum on BTC ###
+period = 20
+signal = 1.0
 
-### TRADING STRATEGY ###
+perf = Performance(df, trading_period, ta.get_bollinger_band,
+                   Strategy.momentum_const_signal, period, signal)
 
-strat = Strategy()
+print("\n=== Strategy Performance (Bollinger 20 / signal 1.0) ===")
+print(perf.get_strategy_performance())
+print("\n=== Buy & Hold Performance ===")
+print(perf.get_buy_hold_performance())
 
-
-# def strategy(data_col, signal):
-#     position = np.where(data_col > signal, 1, np.where(data_col < -signal, -1, 0))
-#     position = position.astype(float)
-#     position[np.isnan(data_col)] = np.nan
-#     return position
-
-# ta.data['position'] = np.where(ta.data['ta'] > signal, 1, np.where(ta.data['ta'] < -signal, -1, 0))
-# ta.data.loc[ta.data['ta'].isna(), 'position'] = np.nan
-
-
-### Perf ###
-
-# backtest inconsistent as the data price has no change
-
-# perf = Performance(ta.data, trading_period, ta.get_bollinger_band, strategy, period, signal)
-
-# print(perf.get_strategy_performance())
-# print(perf.get_buy_hold_performance())
-
-# perf.data.to_csv('perf.csv')
-### Parameters Optimization ###
-
-# possible optmization to find by interquatile range
-window_list = tuple(x for x in range(0,50000,1000))
-signal_list = tuple(x for x in np.arange(0, 2.5, 0.25))
-
-# param_opt = ParametersOptimization(ta.data, trading_period, ta.get_sma, strategy)
-# param_opt = ParametersOptimization(ta.data, trading_period, ta.get_ema, strategy)
-# param_opt = ParametersOptimization(ta.data, trading_period, ta.get_rsi, strategy)
-param_opt = ParametersOptimization(ta.data, trading_period, ta.get_bollinger_band, strat.momentum_const_signal)
+# Save daily PnL to CSV for inspection
+perf.data.to_csv('../../results/perf_btc_bollinger.csv', index=False)
+print("\nDaily PnL saved to results/perf_btc_bollinger.csv")
 
 
-param_perf = pd.DataFrame(param_opt.optimize(window_list, signal_list))
-param_perf.rename(columns={0:'window',1:'signal',2:'sharpe'},inplace=True)
-print(param_perf)
+### PARAMETER OPTIMIZATION — grid search over window × signal ###
+# Bollinger z-score works well with momentum_const_signal because
+# the z-score is centered around 0, matching the ±signal thresholds.
+window_list = tuple(range(5, 105, 5))            # 5, 10, 15 ... 100
+signal_list = tuple(np.arange(0.25, 2.75, 0.25)) # 0.25, 0.50 ... 2.50
 
-### plot ###
+param_opt = ParametersOptimization(
+    ta.data, trading_period,
+    ta.get_bollinger_band,
+    Strategy.momentum_const_signal,
+)
 
-# fig = px.line(perf.data, x='datetime', y=['cumu', 'buy_hold_cumu'], title='strategy')
-# fig.write_html('Trading Strategy.html', auto_open=True)
+param_perf = pd.DataFrame(
+    param_opt.optimize(window_list, signal_list),
+    columns=['window', 'signal', 'sharpe'],
+)
 
-data_table = param_perf.pivot(index='window',columns='signal',values='sharpe')
-sns.heatmap(data_table, annot=True, fmt='g', cmap='Greens')
-plt.show()
+# Save raw grid results
+param_perf.to_csv('../../results/opt_btc_bollinger.csv', index=False)
+print(f"\nGrid search: {len(param_perf)} combinations evaluated")
+print(param_perf.sort_values('sharpe', ascending=False).head(10))
 
-end = time.time()
-print(end-start)
+# Best parameters
+best = param_perf.loc[param_perf['sharpe'].idxmax()]
+print(f"\n★ Best: window={int(best['window'])}, signal={best['signal']:.2f}, "
+      f"Sharpe={best['sharpe']:.4f}")
 
 
+### HEATMAP ###
+pivot = param_perf.pivot(index='window', columns='signal', values='sharpe')
+plt.figure(figsize=(12, 8))
+sns.heatmap(pivot, annot=True, fmt='.2f', cmap='RdYlGn', center=0)
+plt.title('BTC Bollinger Momentum — Sharpe Ratio Heatmap')
+plt.xlabel('Signal Threshold')
+plt.ylabel('Bollinger Window')
+plt.tight_layout()
+plt.savefig('../../results/heatmap_btc_bollinger.png', dpi=150)
+print("Heatmap saved to results/heatmap_btc_bollinger.png")
 
+elapsed = time.time() - start
+print(f"\nDone in {elapsed:.1f}s")
 
 
 

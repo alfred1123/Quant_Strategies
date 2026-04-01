@@ -67,8 +67,9 @@ Add a pipeline test in [tests/integration/test_backtest_pipeline.py](../../tests
 def test_<indicator>_<name>_pipeline(self, synthetic_market_data):
     df = synthetic_market_data.copy()
     ta = TechnicalAnalysis(df)
+    # Use 365 for crypto, 252 for equity
     perf = Performance(
-        ta.data, 252, ta.get_bollinger_band, Strategy.<name>_signal, 20, 1.0
+        ta.data, 365, ta.get_bollinger_band, Strategy.<name>_signal, 20, 1.0
     )
     result = perf.get_strategy_performance()
     assert isinstance(result, pd.Series)
