@@ -4,6 +4,8 @@ This script is for retrieving data from different sources of API.
 2. Glassnode
 
 future updates: turn retreiving data function to recursive for memoization and caching
+
+BybitData class moved to backup/deco/ — platform decommissioned.
 '''
 
 import futu
@@ -13,7 +15,6 @@ from dotenv import load_dotenv
 import time
 import pandas as pd
 from functools import lru_cache
-import ccxt
 
 # Create a class for retrieving data from Futu OpenD
 class FutuOpenD:
@@ -79,19 +80,7 @@ class Glassnode:
         df = pd.read_json(res.text, convert_dates=['t'])
         
         return df
-        
-class BybitData:
-        
-        def __init__(self, exchange, symbol, interval, limit) -> None:
-            self.exchange = exchange
-            self.symbol = symbol
-            self.interval = interval
-            self.limit = limit
-            
-        @lru_cache(maxsize=32)
-        def bybit_historical_price(self):
-            return self.exchange.fetchOHLCV(self.symbol, self.interval, self.limit)
-        
+
 
 # print the DataFrame
 if __name__ == "__main__":

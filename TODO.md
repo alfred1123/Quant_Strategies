@@ -77,7 +77,7 @@
 Quant_Strategies/
 ├── scripts/
 │   ├── backtest/            # Backtesting pipeline
-│   │   ├── data.py          # Data retrieval (Futu, Glassnode, Bybit)
+│   │   ├── data.py          # Data retrieval (Futu, Glassnode)
 │   │   ├── ta.py            # Technical analysis indicators
 │   │   ├── strat.py         # Signal generation strategies
 │   │   ├── perf.py          # Performance metrics & PnL engine
@@ -85,11 +85,9 @@ Quant_Strategies/
 │   │   ├── main.py          # Backtest entry point — wires everything together
 │   │   └── .env
 │   │
-│   ├── trade/
-│   │   ├── bybit_trade_data.py  # Live data collector (writes to data.csv)
-│   │   ├── bybit._trade.py      # Live trading loop (reads data.csv, places orders)
-│   │   ├── prod_data.py         # (WIP) Real-time data class
-│   │   └── .env                 # API keys (gitignored)
+│   └── .env                     # API keys (gitignored)
+├── backup/
+│   └── deco/                    # Decommissioned Bybit scripts (kept for reference)
 ├── notebooks/               # Jupyter exploration & prototyping
 ├── data/
 │   ├── raw/                 # Source datasets (Excel, zips)
@@ -101,3 +99,84 @@ Quant_Strategies/
 
 1. Plug in Futu API trade (optional Alphavantage / Glassnode).
 2. Start with a crypto pricing strategy.
+
+---
+
+## Code Quality & Robustness
+
+### Error Handling
+1. Add try/except around all API calls in `data.py` (Glassnode, Futu) — currently any network failure crashes silently or propagates unhandled.
+2. Guard against division-by-zero in `perf.py` (Sharpe denominator, annualized return).
+3. Add error handling for future live trading scripts.
+4. Validate DataFrame columns exist before accessing (`ta.py` assumes `'factor'`, `'Close'`, `'High'`, `'Low'` without checks).
+
+### Configuration
+1. Extract hardcoded parameters from source into a config file (YAML or JSON):
+   - Symbol, date range, interval (`main.py`)
+   - Indicator window, signal threshold (`main.py`)
+   - Trading period constant (`365 * 24 * 6`)
+   - Transaction cost (`0.0005` in `perf.py`)
+   - Bet size, polling interval (future live trading scripts)
+2. Support CLI arguments for `main.py` (e.g. `python main.py --symbol BTC --start 2020-01-01 --end 2025-01-01`).
+
+### Logging
+1. Replace all `print()` calls with Python `logging` module — especially in live trading scripts.
+2. Add persistent log files for trade execution audit trail (future live trading scripts).
+3. Add timestamps and log levels for debugging.
+
+### Code Duplication
+1. `perf.py`: Strategy and buy-and-hold metrics are near-identical — refactor into a shared `_compute_metrics(returns)` method.
+2. Inline z-score logic in decommissioned trade scripts should be reused from `ta.py` in future live trading.
+3. Fix typo: `get_buy_hold_get_annualized_return()` → `get_buy_hold_annualized_return()`.
+
+---
+
+## Architecture & Design
+
+### Data Layer
+1. Add a common interface (base class or protocol) for all data sources (`FutuOpenD`, `Glassnode`) so they return a consistent DataFrame schema.
+2. Fix `@lru_cache` on instance methods in `data.py` — either use `functools.cached_property` or move to module-level caching.
+3. Add input validation on symbols, date ranges, intervals at the data layer boundary.
+
+### Strategy Abstraction
+1. Convert `Strategy` static methods to a proper strategy interface (base class with `generate_signal(data, params) -> Series`).
+2. Future live trading should import and use the same strategy definitions as backtesting.
+3. Add position sizing support beyond fixed `{-1, 0, 1}`.
+
+### Live Trading Reliability
+1. When building new live trading integration, use SQLite or an in-memory queue instead of CSV as shared state (lesson from decommissioned Bybit scripts — see `backup/deco/`).
+2. Add graceful shutdown (signal handling for SIGINT/SIGTERM) to any live trading loops.
+3. Add position reconciliation — check actual exchange position vs. expected before placing orders.
+4. Persist trade fills to database (not just stdout).
+
+### Directory Restructure
+1. Decommissioned Bybit scripts moved to `backup/deco/` — reuse signal/strategy logic for future integrations.
+2. Clean up dead/commented-out code in `main.py` and `ta.py` (commented MACD method, placeholder data merge).
+
+---
+
+## Testing & CI/CD
+
+### Unit Tests
+1. Test indicator calculations in `ta.py` against known values (e.g. SMA of `[1,2,3,4,5]` with window 3).
+2. Test `perf.py` metrics: Sharpe, max drawdown, Calmar on synthetic return series.
+3. Test strategy signals: verify `{-1, 0, 1}` output for known inputs.
+4. Test data source classes with mocked API responses.
+
+### Integration Tests
+1. End-to-end backtest run with sample data (no live API calls).
+2. Validate parameter optimization returns expected grid shape.
+
+### CI/CD Pipeline
+1. GitHub Actions workflow: lint (`ruff`/`flake8`), test (`pytest`), on push/PR.
+2. Add `pyproject.toml` for standardized project metadata and tool config.
+3. Pre-commit hooks for formatting and linting.
+
+---
+
+## Documentation
+
+1. Add inline comments for non-obvious algorithm details (RSI smoothing, Bollinger Z formula).
+2. Add a troubleshooting section to README (Futu OpenD connection, API rate limits, common errors).
+3. Add type hints to function signatures across all modules.
+4. Document the database schema relationships and query patterns (when SQLite is implemented).

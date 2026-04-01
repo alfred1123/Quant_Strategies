@@ -36,8 +36,6 @@ if [ ! -f "$REPO_DIR/scripts/.env" ]; then
     echo "  GLASSNODE_API_KEY=your_key_here"
     echo "  FUTU_HOST=127.0.0.1"
     echo "  FUTU_PORT=11111"
-    echo "  BYBIT_API_KEY=your_key_here"
-    echo "  BYBIT_SECRET_KEY=your_key_here"
     echo "  EOF"
     echo ""
 else
