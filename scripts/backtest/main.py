@@ -6,7 +6,7 @@ and calculates performance metrics.
 '''
 
 
-from data import FutuOpenD, Glassnode, AlphaVantage
+from data import FutuOpenD, Glassnode, AlphaVantage, YahooFinance
 from ta import TechnicalAnalysis
 from perf import Performance
 from param_opt import ParametersOptimization

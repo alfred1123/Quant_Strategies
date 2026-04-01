@@ -5,6 +5,7 @@ Supported sources:
     1. FutuOpenD — HK/US equity via Futu API
     2. Glassnode — on-chain crypto metrics
     3. AlphaVantage — equity and crypto price data
+    4. YahooFinance — free equity/crypto/ETF data via yfinance
 
 BybitData class moved to backup/deco/ — platform decommissioned.
 """
@@ -188,6 +189,71 @@ class AlphaVantage:
         res = requests.get(self.BASE_URL, params=params, timeout=30)
         res.raise_for_status()
         return res.json()
+
+
+class YahooFinance:
+    """Retrieve free historical price data via Yahoo Finance (yfinance).
+
+    No API key required. Supports equities, ETFs, indices, and crypto.
+    Returns 10+ years of daily data for backtesting and overfitting checks.
+
+    yfinance is an unofficial scraper — Yahoo may rate-limit or block
+    requests. This class lazy-imports yfinance (avoid import-time hangs),
+    retries on failure, and sleeps between attempts.
+    """
+
+    MAX_RETRIES = 3
+    RETRY_DELAY = 2  # seconds between retries
+
+    @lru_cache(maxsize=32)
+    def get_historical_price(self, symbol, start_date, end_date):
+        """Fetch daily close prices from Yahoo Finance.
+
+        Args:
+            symbol: Yahoo Finance ticker (e.g. 'AAPL', 'BTC-USD', '^GSPC').
+            start_date: Start date (YYYY-MM-DD).
+            end_date: End date (YYYY-MM-DD).
+
+        Returns:
+            DataFrame with columns ['t', 'v'] matching the pipeline interface.
+
+        Raises:
+            ValueError: If no data is returned for the given symbol/range.
+            RuntimeError: If all retry attempts are exhausted.
+        """
+        import yfinance as yf  # lazy import — avoids import-time network calls
+
+        last_err = None
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            try:
+                ticker = yf.Ticker(symbol)
+                hist = ticker.history(
+                    start=start_date, end=end_date,
+                    auto_adjust=True, timeout=30,
+                )
+                break
+            except Exception as exc:
+                last_err = exc
+                if attempt < self.MAX_RETRIES:
+                    time.sleep(self.RETRY_DELAY * attempt)
+        else:
+            raise RuntimeError(
+                f"Yahoo Finance failed after {self.MAX_RETRIES} attempts "
+                f"for '{symbol}': {last_err}"
+            ) from last_err
+
+        if hist.empty:
+            raise ValueError(
+                f"Yahoo Finance returned no data for '{symbol}' "
+                f"({start_date} to {end_date})"
+            )
+
+        df = pd.DataFrame({
+            "t": hist.index.strftime("%Y-%m-%d"),
+            "v": hist["Close"].values,
+        })
+        df["v"] = df["v"].astype(float)
+        return df.reset_index(drop=True)
 
 
 if __name__ == "__main__":

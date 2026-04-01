@@ -15,9 +15,10 @@ All modules are orchestrated by `main.py`. Imports are **relative** to the `scri
 ## Module Interfaces
 
 ### data.py — Data Sources
-- Each source is a class (`FutuOpenD`, `Glassnode`, `AlphaVantage`).
-- Returns a DataFrame. Glassnode and AlphaVantage return columns `['t', 'v']`.
+- Each source is a class (`FutuOpenD`, `Glassnode`, `AlphaVantage`, `YahooFinance`).
+- Returns a DataFrame. Glassnode, AlphaVantage, and YahooFinance return columns `['t', 'v']`.
 - API keys loaded from `scripts/.env` via `python-dotenv`; constructors validate that required keys are set.
+- `YahooFinance` requires no API key. Supports equities, ETFs, indices, and crypto (e.g. `'BTC-USD'`). Returns 10+ years of free daily data.
 - Methods use `@lru_cache` — clear cache in tests.
 - AlphaVantage auto-detects crypto vs equity symbols and uses the appropriate API endpoint.
 
