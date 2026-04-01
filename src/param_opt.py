@@ -16,12 +16,9 @@ logger = logging.getLogger(__name__)
 
 class ParametersOptimization:
     
-    def __init__(self, data, trading_period, indicator_func, strategy_func,
-                 *, fee_bps=None):
+    def __init__(self, data, config, *, fee_bps=None):
         self.data = data
-        self.trading_period = trading_period
-        self.indicator_func = indicator_func
-        self.strategy_func = strategy_func
+        self.config = config
         self.fee_bps = fee_bps
     
     
@@ -40,8 +37,7 @@ class ParametersOptimization:
             itertools.product(indicator_tuple, strategy_tuple)
         ):
             try:
-                perf = Performance(self.data, self.trading_period,
-                                   self.indicator_func, self.strategy_func,
+                perf = Performance(self.data, self.config,
                                    window, signal, fee_bps=self.fee_bps)
                 sharpe = perf.get_sharpe_ratio()
             except Exception:

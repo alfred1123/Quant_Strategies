@@ -2,22 +2,19 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ta import TechnicalAnalysis
-from strat import Strategy
+from strat import Strategy, StrategyConfig
 from perf import Performance
 
 
-def _make_performance(df, window=5, signal=0.5, trading_period=252):
+_BOLLINGER_CONFIG = StrategyConfig("get_bollinger_band",
+                                   Strategy.momentum_const_signal, 252)
+
+
+def _make_performance(df, window=5, signal=0.5, config=None):
     """Helper to build a Performance object from a DataFrame with price & factor columns."""
-    ta = TechnicalAnalysis(df.copy())
-    return Performance(
-        ta.data,
-        trading_period,
-        ta.get_bollinger_band,
-        Strategy.momentum_const_signal,
-        window,
-        signal,
-    )
+    if config is None:
+        config = _BOLLINGER_CONFIG
+    return Performance(df.copy(), config, window, signal)
 
 
 class TestPerformanceInit:
@@ -114,11 +111,11 @@ class TestBuyHoldMetrics:
 
 class TestTrendingMarkets:
     def test_buy_hold_positive_in_uptrend(self, trending_up_df):
-        perf = _make_performance(trending_up_df, window=10, signal=0.5, trading_period=252)
+        perf = _make_performance(trending_up_df, window=10, signal=0.5)
         assert perf.get_buy_hold_total_return() > 0
 
     def test_buy_hold_negative_in_downtrend(self, trending_down_df):
-        perf = _make_performance(trending_down_df, window=10, signal=0.5, trading_period=252)
+        perf = _make_performance(trending_down_df, window=10, signal=0.5)
         assert perf.get_buy_hold_total_return() < 0
 
     def test_transaction_costs_reduce_returns(self, sample_ohlc_df):
@@ -126,3 +123,26 @@ class TestTrendingMarkets:
         total_trade_cost = (perf.data["trade"] * 0.0005).sum()
         # Transaction costs should be non-negative
         assert total_trade_cost >= 0
+
+
+class TestPerformanceWithConfig:
+    def test_config_stored(self, sample_ohlc_df):
+        config = StrategyConfig("get_bollinger_band",
+                                Strategy.momentum_const_signal, 252)
+        perf = Performance(sample_ohlc_df.copy(), config, 5, 0.5)
+        assert perf.config is config
+        assert perf.trading_period == 252
+
+    def test_fee_bps(self, sample_ohlc_df):
+        config = StrategyConfig("get_bollinger_band",
+                                Strategy.momentum_const_signal, 252)
+        perf = Performance(sample_ohlc_df.copy(), config, 5, 0.5, fee_bps=10.0)
+        assert perf.fee_bps == 10.0
+
+    def test_different_indicator(self, sample_ohlc_df):
+        config = StrategyConfig("get_sma",
+                                Strategy.momentum_const_signal, 252)
+        perf = Performance(sample_ohlc_df.copy(), config, 5, 0.5)
+        result = perf.get_strategy_performance()
+        assert isinstance(result, pd.Series)
+        assert len(result) == 5

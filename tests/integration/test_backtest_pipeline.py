@@ -1,6 +1,6 @@
 """
 Integration test: runs the full backtest pipeline with synthetic data.
-data → TechnicalAnalysis → Strategy → Performance → ParametersOptimization
+data → StrategyConfig → Performance → ParametersOptimization → WalkForward
 No external API calls are made.
 """
 
@@ -12,10 +12,10 @@ import pandas as pd
 import pytest
 from unittest.mock import patch, MagicMock
 
-from ta import TechnicalAnalysis
-from strat import Strategy
+from strat import Strategy, StrategyConfig
 from perf import Performance
 from param_opt import ParametersOptimization
+from walk_forward import WalkForward, WalkForwardResult
 
 
 @pytest.fixture
@@ -41,11 +41,8 @@ class TestFullBacktestPipeline:
     """End-to-end test: data → indicators → strategy → performance."""
 
     def test_sma_momentum_pipeline(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_sma, Strategy.momentum_const_signal, 20, 0.5
-        )
+        config = StrategyConfig("get_sma", Strategy.momentum_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 20, 0.5)
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
         assert len(result) == 5
@@ -53,21 +50,15 @@ class TestFullBacktestPipeline:
         assert perf.get_max_drawdown() >= 0
 
     def test_ema_reversion_pipeline(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_ema, Strategy.reversion_const_signal, 15, 1.0
-        )
+        config = StrategyConfig("get_ema", Strategy.reversion_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 15, 1.0)
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
         assert np.isfinite(result["Sharpe Ratio"])
 
     def test_bollinger_momentum_pipeline(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_bollinger_band, Strategy.momentum_const_signal, 20, 1.0
-        )
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 20, 1.0)
         strat_perf = perf.get_strategy_performance()
         bh_perf = perf.get_buy_hold_performance()
         assert isinstance(strat_perf, pd.Series)
@@ -77,11 +68,8 @@ class TestFullBacktestPipeline:
         assert np.isfinite(bh_perf["Total Return"])
 
     def test_rsi_momentum_pipeline(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_rsi, Strategy.momentum_const_signal, 14, 30.0
-        )
+        config = StrategyConfig("get_rsi", Strategy.momentum_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 14, 30.0)
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
 
@@ -90,11 +78,8 @@ class TestParameterOptimizationPipeline:
     """End-to-end test: data → indicators → grid search → Sharpe results."""
 
     def test_grid_search_produces_results(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        opt = ParametersOptimization(
-            ta.data, 252, ta.get_bollinger_band, Strategy.momentum_const_signal
-        )
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
+        opt = ParametersOptimization(synthetic_market_data.copy(), config)
         windows = (10, 20, 30)
         signals = (0.5, 1.0, 1.5)
         results = pd.DataFrame(
@@ -106,11 +91,8 @@ class TestParameterOptimizationPipeline:
         assert results["sharpe"].notna().all()
 
     def test_grid_search_can_pivot_to_heatmap(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        opt = ParametersOptimization(
-            ta.data, 252, ta.get_bollinger_band, Strategy.momentum_const_signal
-        )
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
+        opt = ParametersOptimization(synthetic_market_data.copy(), config)
         results = pd.DataFrame(
             opt.optimize((10, 20), (0.5, 1.0)), columns=["window", "signal", "sharpe"]
         )
@@ -123,31 +105,22 @@ class TestStrategyVsBuyHoldConsistency:
     """Verify that strategy and buy-and-hold metrics are internally consistent."""
 
     def test_buy_hold_cumulative_matches_total_return(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_bollinger_band, Strategy.momentum_const_signal, 20, 1.0
-        )
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 20, 1.0)
         total = perf.get_buy_hold_total_return()
         cumu_last = perf.data["buy_hold_cumu"].iloc[-1]
         assert total == pytest.approx(cumu_last)
 
     def test_strategy_cumulative_matches_total_return(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_bollinger_band, Strategy.momentum_const_signal, 20, 1.0
-        )
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 20, 1.0)
         total = perf.get_total_return()
         cumu_last = perf.data["cumu"].iloc[-1]
         assert total == pytest.approx(cumu_last)
 
     def test_max_drawdown_within_cumulative_range(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_bollinger_band, Strategy.momentum_const_signal, 20, 1.0
-        )
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 20, 1.0)
         max_dd = perf.get_max_drawdown()
         cumu_range = perf.data["cumu"].max() - perf.data["cumu"].min()
         assert max_dd <= cumu_range + 1e-10
@@ -157,62 +130,42 @@ class TestRemainingIndicatorStrategyCombos:
     """Cover indicator × strategy combinations not tested in TestFullBacktestPipeline."""
 
     def test_sma_reversion_pipeline(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_sma, Strategy.reversion_const_signal, 20, 0.5
-        )
+        config = StrategyConfig("get_sma", Strategy.reversion_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 20, 0.5)
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
         assert np.isfinite(result["Total Return"])
 
     def test_ema_momentum_pipeline(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_ema, Strategy.momentum_const_signal, 15, 1.0
-        )
+        config = StrategyConfig("get_ema", Strategy.momentum_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 15, 1.0)
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
         assert np.isfinite(result["Total Return"])
 
     def test_bollinger_reversion_pipeline(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_bollinger_band, Strategy.reversion_const_signal, 20, 1.0
-        )
+        config = StrategyConfig("get_bollinger_band", Strategy.reversion_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 20, 1.0)
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
         assert np.isfinite(result["Total Return"])
 
     def test_rsi_reversion_pipeline(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_rsi, Strategy.reversion_const_signal, 14, 30.0
-        )
+        config = StrategyConfig("get_rsi", Strategy.reversion_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 14, 30.0)
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
         assert np.isfinite(result["Total Return"])
 
     def test_stochastic_momentum_pipeline(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_stochastic_oscillator,
-            Strategy.momentum_const_signal, 14, 20.0
-        )
+        config = StrategyConfig("get_stochastic_oscillator", Strategy.momentum_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 14, 20.0)
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
 
     def test_stochastic_reversion_pipeline(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_stochastic_oscillator,
-            Strategy.reversion_const_signal, 14, 20.0
-        )
+        config = StrategyConfig("get_stochastic_oscillator", Strategy.reversion_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 14, 20.0)
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
 
@@ -221,28 +174,19 @@ class TestTransactionCostPipeline:
     """Verify transaction fees propagate correctly through the pipeline."""
 
     def test_higher_fees_reduce_returns(self, synthetic_market_data):
-        df_zero = synthetic_market_data.copy()
-        ta_zero = TechnicalAnalysis(df_zero)
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
         perf_zero = Performance(
-            ta_zero.data, 252, ta_zero.get_bollinger_band,
-            Strategy.momentum_const_signal, 20, 1.0, fee_bps=0,
+            synthetic_market_data.copy(), config, 20, 1.0, fee_bps=0,
         )
-
-        df_high = synthetic_market_data.copy()
-        ta_high = TechnicalAnalysis(df_high)
         perf_high = Performance(
-            ta_high.data, 252, ta_high.get_bollinger_band,
-            Strategy.momentum_const_signal, 20, 1.0, fee_bps=50,
+            synthetic_market_data.copy(), config, 20, 1.0, fee_bps=50,
         )
-
         assert perf_zero.get_total_return() >= perf_high.get_total_return()
 
     def test_zero_fee_no_cost_deducted(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
         perf = Performance(
-            ta.data, 252, ta.get_bollinger_band,
-            Strategy.momentum_const_signal, 20, 1.0, fee_bps=0,
+            synthetic_market_data.copy(), config, 20, 1.0, fee_bps=0,
         )
         # With zero fees, pnl = position_x1 * chg (no cost adjustment)
         expected_pnl = perf.data["position_x1"] * perf.data["chg"]
@@ -251,21 +195,16 @@ class TestTransactionCostPipeline:
         )
 
     def test_fee_propagates_to_param_opt(self, synthetic_market_data):
-        df_zero = synthetic_market_data.copy()
-        ta_zero = TechnicalAnalysis(df_zero)
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
         opt_zero = ParametersOptimization(
-            ta_zero.data, 252, ta_zero.get_bollinger_band,
-            Strategy.momentum_const_signal, fee_bps=0,
+            synthetic_market_data.copy(), config, fee_bps=0,
         )
         results_zero = pd.DataFrame(
             opt_zero.optimize((20,), (1.0,)), columns=["window", "signal", "sharpe"]
         )
 
-        df_high = synthetic_market_data.copy()
-        ta_high = TechnicalAnalysis(df_high)
         opt_high = ParametersOptimization(
-            ta_high.data, 252, ta_high.get_bollinger_band,
-            Strategy.momentum_const_signal, fee_bps=50,
+            synthetic_market_data.copy(), config, fee_bps=50,
         )
         results_high = pd.DataFrame(
             opt_high.optimize((20,), (1.0,)), columns=["window", "signal", "sharpe"]
@@ -279,19 +218,11 @@ class TestTradingPeriodVariants:
     """Verify annualization differences between crypto (365) and equity (252)."""
 
     def test_crypto_vs_equity_sharpe_differs(self, synthetic_market_data):
-        df_crypto = synthetic_market_data.copy()
-        ta_crypto = TechnicalAnalysis(df_crypto)
-        perf_crypto = Performance(
-            ta_crypto.data, 365, ta_crypto.get_bollinger_band,
-            Strategy.momentum_const_signal, 20, 1.0
-        )
+        config_crypto = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 365)
+        perf_crypto = Performance(synthetic_market_data.copy(), config_crypto, 20, 1.0)
 
-        df_equity = synthetic_market_data.copy()
-        ta_equity = TechnicalAnalysis(df_equity)
-        perf_equity = Performance(
-            ta_equity.data, 252, ta_equity.get_bollinger_band,
-            Strategy.momentum_const_signal, 20, 1.0
-        )
+        config_equity = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
+        perf_equity = Performance(synthetic_market_data.copy(), config_equity, 20, 1.0)
 
         # Same daily data but different annualization → different Sharpe
         sharpe_crypto = perf_crypto.get_sharpe_ratio()
@@ -299,12 +230,8 @@ class TestTradingPeriodVariants:
         assert sharpe_crypto != pytest.approx(sharpe_equity)
 
     def test_crypto_annualized_return_uses_365(self, synthetic_market_data):
-        df = synthetic_market_data.copy()
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 365, ta.get_bollinger_band,
-            Strategy.momentum_const_signal, 20, 1.0
-        )
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 365)
+        perf = Performance(synthetic_market_data.copy(), config, 20, 1.0)
         ann_ret = perf.get_annualized_return()
         daily_mean = perf.data.loc[20:len(perf.data) - 1, "pnl"].mean()
         assert ann_ret == pytest.approx(daily_mean * 365)
@@ -322,11 +249,8 @@ class TestEdgeCases:
             "price": prices, "factor": prices, "Close": prices,
             "High": prices + 1, "Low": prices - 1,
         })
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_bollinger_band,
-            Strategy.momentum_const_signal, 20, 1.0
-        )
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
+        perf = Performance(df, config, 20, 1.0)
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
         assert len(result) == 5
@@ -339,11 +263,8 @@ class TestEdgeCases:
             "price": prices, "factor": prices, "Close": prices,
             "High": prices, "Low": prices,
         })
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_sma,
-            Strategy.momentum_const_signal, 10, 0.5
-        )
+        config = StrategyConfig("get_sma", Strategy.momentum_const_signal, 252)
+        perf = Performance(df, config, 10, 0.5)
         # No price change → zero PnL
         assert perf.get_total_return() == pytest.approx(0.0)
         assert perf.get_buy_hold_total_return() == pytest.approx(0.0)
@@ -358,11 +279,8 @@ class TestEdgeCases:
             "price": prices, "factor": prices, "Close": prices,
             "High": prices + 5, "Low": prices - 5,
         })
-        ta = TechnicalAnalysis(df)
-        perf = Performance(
-            ta.data, 252, ta.get_bollinger_band,
-            Strategy.momentum_const_signal, 20, 1.0
-        )
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
+        perf = Performance(df, config, 20, 1.0)
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
         assert perf.get_max_drawdown() >= 0
@@ -443,3 +361,149 @@ class TestCLIMainIntegration:
             opt_df = pd.read_csv(opt_file)
             assert list(opt_df.columns) == ["window", "signal", "sharpe"]
             assert len(opt_df) == 4  # 2 windows × 2 signals
+
+
+class TestWalkForwardPipeline:
+    """Integration test: walk-forward overfitting detection with synthetic data."""
+
+    def test_walk_forward_full_pipeline(self, synthetic_market_data):
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
+        wf = WalkForward(synthetic_market_data.copy(), 0.5, config)
+        result = wf.run((10, 20, 30), (0.5, 1.0, 1.5))
+
+        assert isinstance(result, WalkForwardResult)
+        assert result.best_window in (10, 20, 30)
+        assert result.best_signal in (0.5, 1.0, 1.5)
+        assert isinstance(result.is_metrics, pd.Series)
+        assert isinstance(result.oos_metrics, pd.Series)
+
+    def test_walk_forward_summary_table(self, synthetic_market_data):
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
+        wf = WalkForward(synthetic_market_data.copy(), 0.5, config)
+        result = wf.run((20,), (1.0,))
+        summary = result.summary()
+
+        assert isinstance(summary, pd.DataFrame)
+        assert "In-Sample" in summary.columns
+        assert "Out-of-Sample" in summary.columns
+        assert "Overfitting Ratio" in summary.index
+
+    def test_walk_forward_with_different_splits(self, synthetic_market_data):
+        """Different split ratios should produce different in-sample sizes."""
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
+        results = {}
+        for ratio in (0.3, 0.5, 0.7):
+            wf = WalkForward(synthetic_market_data.copy(), ratio, config)
+            results[ratio] = wf.run((20,), (1.0,))
+
+        # All should complete without error
+        for ratio, result in results.items():
+            assert isinstance(result, WalkForwardResult)
+
+    def test_walk_forward_with_fees(self, synthetic_market_data):
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
+        wf_no_fee = WalkForward(
+            synthetic_market_data.copy(), 0.5, config, fee_bps=0,
+        )
+        result_no_fee = wf_no_fee.run((20,), (1.0,))
+
+        wf_fee = WalkForward(
+            synthetic_market_data.copy(), 0.5, config, fee_bps=50,
+        )
+        result_fee = wf_fee.run((20,), (1.0,))
+
+        # Higher fees should reduce in-sample total return
+        assert result_no_fee.is_metrics["Total Return"] >= result_fee.is_metrics["Total Return"]
+
+    def test_walk_forward_crypto_period(self, synthetic_market_data):
+        """Walk-forward should work with crypto trading period (365)."""
+        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 365)
+        wf = WalkForward(synthetic_market_data.copy(), 0.5, config)
+        result = wf.run((20,), (1.0,))
+        assert isinstance(result, WalkForwardResult)
+        assert np.isfinite(result.is_metrics["Annualized Return"])
+
+    def test_walk_forward_cli_produces_output(self, synthetic_market_data):
+        """CLI main() with --walk-forward produces wf_ CSV."""
+        mock_price = pd.DataFrame({
+            "t": [f"2021-01-{i+1:02d}" for i in range(len(synthetic_market_data))],
+            "v": synthetic_market_data["price"].values,
+        })
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("main.YahooFinance") as mock_yf_cls:
+                mock_yf = MagicMock()
+                mock_yf.get_historical_price.return_value = mock_price
+                mock_yf_cls.return_value = mock_yf
+
+                from main import main, parse_args
+                args = parse_args([
+                    "--symbol", "TEST",
+                    "--indicator", "bollinger",
+                    "--strategy", "momentum",
+                    "--no-grid",
+                    "--walk-forward",
+                    "--split", "0.5",
+                    "--win-min", "10",
+                    "--win-max", "20",
+                    "--win-step", "10",
+                    "--sig-min", "0.5",
+                    "--sig-max", "1.0",
+                    "--sig-step", "0.5",
+                    "--outdir", tmpdir,
+                ])
+                main(args)
+
+            wf_file = os.path.join(tmpdir, "wf_test_bollinger.csv")
+            assert os.path.isfile(wf_file)
+            wf_df = pd.read_csv(wf_file)
+            assert "In-Sample" in wf_df.columns
+            assert "Out-of-Sample" in wf_df.columns
+
+
+class TestStrategyConfigPipeline:
+    """Integration test: full pipeline using StrategyConfig directly."""
+
+    def test_config_full_pipeline(self, synthetic_market_data):
+        config = StrategyConfig("get_bollinger_band",
+                                Strategy.momentum_const_signal, 252)
+        perf = Performance(synthetic_market_data.copy(), config, 20, 1.0)
+        result = perf.get_strategy_performance()
+        assert isinstance(result, pd.Series)
+        assert len(result) == 5
+        assert np.isfinite(result["Total Return"])
+
+    def test_config_grid_search(self, synthetic_market_data):
+        config = StrategyConfig("get_bollinger_band",
+                                Strategy.momentum_const_signal, 252)
+        opt = ParametersOptimization(synthetic_market_data.copy(), config)
+        results = pd.DataFrame(
+            opt.optimize((10, 20), (0.5, 1.0)),
+            columns=["window", "signal", "sharpe"],
+        )
+        assert len(results) == 4
+        assert results["sharpe"].notna().all()
+
+    def test_config_walk_forward(self, synthetic_market_data):
+        config = StrategyConfig("get_bollinger_band",
+                                Strategy.momentum_const_signal, 252)
+        wf = WalkForward(synthetic_market_data.copy(), 0.5, config)
+        result = wf.run((10, 20), (0.5, 1.0))
+        assert isinstance(result, WalkForwardResult)
+        assert result.best_window in (10, 20)
+
+    def test_config_reusable_across_calls(self, synthetic_market_data):
+        """Same config reused for perf, opt, and walk-forward."""
+        config = StrategyConfig("get_sma",
+                                Strategy.reversion_const_signal, 365)
+
+        perf = Performance(synthetic_market_data.copy(), config, 20, 0.5)
+        assert isinstance(perf.get_strategy_performance(), pd.Series)
+
+        opt = ParametersOptimization(synthetic_market_data.copy(), config)
+        results = list(opt.optimize((20,), (0.5,)))
+        assert len(results) == 1
+
+        wf = WalkForward(synthetic_market_data.copy(), 0.5, config)
+        wf_result = wf.run((20,), (0.5,))
+        assert isinstance(wf_result, WalkForwardResult)

@@ -56,9 +56,9 @@ import seaborn as sns
 from data import YahooFinance
 from param_opt import ParametersOptimization
 from perf import Performance
-from strat import Strategy
+from strat import Strategy, StrategyConfig
 from log_config import setup_logging
-from ta import TechnicalAnalysis
+from walk_forward import WalkForward
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +138,12 @@ def parse_args(argv=None):
     p.add_argument('--fee', type=float, default=5.0,
                    help='Transaction fee in basis points (default: %(default)s)')
 
+    # Walk-forward
+    p.add_argument('--walk-forward', action='store_true',
+                   help='Run walk-forward overfitting test')
+    p.add_argument('--split', type=float, default=0.5,
+                   help='Train/test split ratio for walk-forward (default: %(default)s)')
+
     return p.parse_args(argv)
 
 
@@ -158,6 +164,12 @@ def main(args=None):
     indicator_method = INDICATORS[args.indicator]
     strategy_func = STRATEGIES[args.strategy]
 
+    config = StrategyConfig(
+        indicator_name=indicator_method,
+        strategy_func=strategy_func,
+        trading_period=trading_period,
+    )
+
     t0 = time.time()
 
     # ── Fetch data ──────────────────────────────────────────────────
@@ -172,13 +184,8 @@ def main(args=None):
     logger.info("Loaded %d daily bars: %s → %s",
                 len(df), df['datetime'].iloc[0], df['datetime'].iloc[-1])
 
-    # ── Technical analysis ──────────────────────────────────────────
-    ta = TechnicalAnalysis(df)
-    indicator_func = getattr(ta, indicator_method)
-
     # ── Single backtest ─────────────────────────────────────────────
-    perf = Performance(df, trading_period, indicator_func,
-                       strategy_func, args.window, args.signal,
+    perf = Performance(df, config, args.window, args.signal,
                        fee_bps=args.fee)
 
     logger.info("\n=== Strategy Performance "
@@ -200,8 +207,7 @@ def main(args=None):
                                       args.sig_step))
 
         param_opt = ParametersOptimization(
-            ta.data, trading_period, indicator_func, strategy_func,
-            fee_bps=args.fee,
+            df.copy(), config, fee_bps=args.fee,
         )
 
         param_perf = pd.DataFrame(
@@ -232,6 +238,33 @@ def main(args=None):
         heatmap_path = os.path.join(args.outdir, f'heatmap_{tag}.png')
         plt.savefig(heatmap_path, dpi=150)
         logger.info("Heatmap saved to %s", heatmap_path)
+
+    # ── Walk-forward overfitting test ───────────────────────────────
+    if args.walk_forward:
+        window_list = tuple(range(args.win_min, args.win_max + 1, args.win_step))
+        signal_list = tuple(np.arange(args.sig_min,
+                                      args.sig_max + args.sig_step / 2,
+                                      args.sig_step))
+
+        wf_df = pd.DataFrame({
+            'datetime': price['t'],
+            'price':    price['v'],
+            'factor':   price['v'],
+        })
+
+        wf = WalkForward(
+            wf_df, args.split, config, fee_bps=args.fee,
+        )
+        result = wf.run(window_list, signal_list)
+
+        logger.info("\n=== Walk-Forward Results ===")
+        logger.info("Best params: window=%d, signal=%.2f",
+                    result.best_window, result.best_signal)
+        logger.info("\n%s", result.summary())
+
+        wf_path = os.path.join(args.outdir, f'wf_{tag}.csv')
+        result.summary().to_csv(wf_path)
+        logger.info("Walk-forward results saved to %s", wf_path)
 
     logger.info("Done in %.1fs", time.time() - t0)
 

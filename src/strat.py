@@ -2,10 +2,24 @@
 # we will need a unique name for each strategy wtih ID
 
 import logging
+from dataclasses import dataclass
+from typing import Callable
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class StrategyConfig:
+    """Immutable identity of a trading strategy — portable across backtest and live.
+
+    Carries *what* to run (indicator + strategy + annualisation) but not
+    platform-specific details like transaction fees or data.
+    """
+    indicator_name: str        # TechnicalAnalysis method name, e.g. "get_bollinger_band"
+    strategy_func: Callable    # e.g. Strategy.momentum_const_signal
+    trading_period: int        # 365 (crypto) or 252 (equity)
 
 
 class Strategy:

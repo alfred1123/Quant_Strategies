@@ -165,6 +165,8 @@ All CLI options (run `python main.py --help`):
 | `--win-min/max/step` | `5/100/5` | Grid search window range |
 | `--sig-min/max/step` | `0.25/2.50/0.25` | Grid search signal range |
 | `--outdir` | `../results` | Output directory for CSVs and heatmap |
+| `--walk-forward` | `false` | Run walk-forward overfitting test |
+| `--split` | `0.5` | In-sample ratio for walk-forward split (0.0–1.0) |
 
 **Output files** (saved to `results/` by default):
 
@@ -173,6 +175,34 @@ All CLI options (run `python main.py --help`):
 | `perf_<symbol>_<indicator>.csv` | Daily PnL, cumulative returns, drawdown, positions |
 | `opt_<symbol>_<indicator>.csv` | Grid search results (window, signal, sharpe) |
 | `heatmap_<symbol>_<indicator>.png` | Sharpe ratio heatmap |
+| `wf_<symbol>_<indicator>.csv` | Walk-forward in-sample vs out-of-sample comparison |
+
+### Walk-Forward Overfitting Test
+
+The walk-forward test splits data into **in-sample** (training) and **out-of-sample** (validation) periods. It optimizes parameters on in-sample data via grid search, then evaluates the best parameters on out-of-sample data to detect overfitting.
+
+**CLI:**
+
+```bash
+# Walk-forward with default 50/50 split
+python main.py --walk-forward
+
+# 70% in-sample / 30% out-of-sample
+python main.py --walk-forward --split 0.7
+
+# Combined with other options
+python main.py --symbol AAPL --asset equity --indicator sma --walk-forward --split 0.6
+```
+
+**Dashboard:** The "Walk-Forward Test" tab in the Streamlit dashboard provides an interactive split ratio slider and displays:
+- Best parameters found on in-sample data
+- Side-by-side performance metrics (in-sample vs out-of-sample)
+- Overfitting ratio with color coding (green < 0.3, yellow 0.3–0.5, red > 0.5)
+- Cumulative return chart with a vertical line marking the split point
+
+**Overfitting ratio:** `1 − (OOS Sharpe / IS Sharpe)`. Values near 0 indicate robust parameters; values near 1 indicate the strategy performs much worse out-of-sample.
+
+---
 
 ### Running Tests
 
@@ -202,7 +232,7 @@ The `trading_period` parameter controls how the Sharpe ratio is annualized:
 - **Crypto**: use `365` — markets trade 24/7/365
 - **Equity**: use `252` — NYSE/NASDAQ trading days per year
 
-The CLI `--asset` flag sets this automatically. In code, pass the correct value to `Performance()` and `ParametersOptimization()`.
+The CLI `--asset` flag sets this automatically. In code, set it via `StrategyConfig(trading_period=...)`.
 
 ### Indicator + Strategy Pairing
 
@@ -242,9 +272,10 @@ Quant_Strategies/
 ├── src/                     # Backtesting pipeline
 │   ├── data.py              # Data sources (YahooFinance, AlphaVantage, Glassnode, FutuOpenD)
 │   ├── ta.py                # Technical analysis indicators
-│   ├── strat.py             # Signal generation strategies
+│   ├── strat.py             # Signal generation strategies + StrategyConfig dataclass
 │   ├── perf.py              # Performance metrics & PnL engine
 │   ├── param_opt.py         # Grid-search parameter optimization
+│   ├── walk_forward.py      # Walk-forward overfitting test
 │   ├── log_config.py        # Centralised logging configuration
 │   ├── main.py              # CLI entry point — configurable via argparse
 │   └── app.py               # Streamlit web dashboard
@@ -271,7 +302,11 @@ Quant_Strategies/
 ## Pipeline Architecture
 
 ```
-data.py ──► ta.py ──► strat.py ──► perf.py ──► param_opt.py
+data.py ──► ta.py ──► strat.py ──► perf.py ──► param_opt.py ──► walk_forward.py
+  │            │           │           │              │                  │
+  │            │           │           │              │                  └─ Split data into in-sample / out-of-sample,
+  │            │           │           │              │                     optimize on IS, evaluate on OOS, report
+  │            │           │           │              │                     overfitting ratio
   │            │           │           │              │
   │            │           │           │              └─ Grid search over (window, signal)
   │            │           │           │                 pairs, returns best Sharpe
@@ -310,6 +345,25 @@ data.py ──► ta.py ──► strat.py ──► perf.py ──► param_opt
 |---|---|---|---|
 | `momentum_const_signal` | indicator > +signal | indicator < −signal | otherwise |
 | `reversion_const_signal` | indicator < −signal | indicator > +signal | otherwise |
+
+**StrategyConfig** (`strat.py`) — frozen dataclass packaging the strategy identity:
+
+```python
+from strat import StrategyConfig, Strategy
+
+config = StrategyConfig(
+    indicator_name="get_bollinger_band",           # TechnicalAnalysis method name
+    strategy_func=Strategy.momentum_const_signal,  # signal generation function
+    trading_period=365,                            # 365 crypto, 252 equity
+)
+
+# All pipeline constructors accept config directly:
+perf = Performance(data, config, window=20, signal=1.0, fee_bps=5.0)
+opt  = ParametersOptimization(data, config, fee_bps=5.0)
+wf   = WalkForward(data, split_ratio=0.5, config=config, fee_bps=5.0)
+```
+
+Transaction fees (`fee_bps`) are **not** part of the config — they vary by trading platform and are passed separately.
 
 **Performance Metrics** (`perf.py` — computed for both strategy and buy-and-hold):
 

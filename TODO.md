@@ -2,9 +2,69 @@
 
 ## Overall
 
-1. Unit testing for all scripts
-2. Integration test
-3. CI/CD to deploy to production
+1. CI/CD to deploy to production
+
+
+## ~~Walk-Forward Overfitting Test~~ ✅ Done
+
+Split historical data into **in-sample** (training) and **out-of-sample** (validation) periods to detect parameter overfitting.
+
+**Implemented:** `src/walk_forward.py`, CLI flags (`--walk-forward`, `--split`), Streamlit "Walk-Forward Test" tab, unit tests (`tests/unit/test_walk_forward.py`), integration tests.
+
+### Concept
+
+```
+|◄──────── 10 years of data ────────►|
+|◄── in-sample (5y) ──►|◄── out-of-sample (5y) ──►|
+   grid search here          test best params here
+```
+
+1. **In-sample**: run `ParametersOptimization.optimize()` on the training window → best `(window, signal)` by Sharpe.
+2. **Out-of-sample**: run `Performance` with those fixed params on the held-out window → measure Sharpe, return, drawdown.
+3. **Overfitting ratio**: compare in-sample Sharpe vs out-of-sample Sharpe. A large drop signals overfitting.
+
+### Implementation Plan
+
+1. **`src/walk_forward.py`** — new module with a `WalkForward` class:
+   - `__init__(data, split_ratio, trading_period, indicator_func, strategy_func, *, fee_bps=None)`
+   - `split_ratio` (float, e.g. `0.5`) controls where to cut the data.
+   - `run(window_tuple, signal_tuple)` → runs grid search on in-sample, evaluates best params on out-of-sample.
+   - Returns a result object / dict with:
+     - Best `(window, signal)` from in-sample
+     - In-sample metrics: Sharpe, return, max drawdown, Calmar
+     - Out-of-sample metrics: same set
+     - Overfitting ratio: `1 - (oos_sharpe / is_sharpe)` — closer to 0 is better, >0.5 is suspicious
+   - Optional: **rolling walk-forward** — slide the train/test window forward in steps (e.g. train on years 1–5, test on 6; then 2–6, test on 7; etc.) and average the overfitting ratio across folds.
+
+2. **`src/main.py`** — add CLI flags:
+   - `--walk-forward` (flag) — enable walk-forward test instead of plain grid search.
+   - `--split` (float, default `0.5`) — train/test split ratio.
+   - Output: print in-sample vs out-of-sample metrics side by side + overfitting ratio.
+   - Save walk-forward results to `results/wf_<symbol>_<indicator>.csv`.
+
+3. **`src/app.py`** — add a **Walk-Forward Test** tab in the Streamlit dashboard:
+   - Slider for split ratio (0.2–0.8).
+   - Reuse grid search bounds from sidebar.
+   - Display in-sample vs out-of-sample metrics table.
+   - Plot cumulative return for both periods (vertical line at split point).
+   - Show overfitting ratio with colour coding (green < 0.3, yellow 0.3–0.5, red > 0.5).
+
+4. **Tests**:
+   - `tests/unit/test_walk_forward.py` — split correctness, metric computation, edge cases (split too small).
+   - `tests/integration/test_backtest_pipeline.py` — full walk-forward pipeline with synthetic data.
+
+### Metrics to report
+
+| Metric | In-Sample | Out-of-Sample |
+|--------|-----------|---------------|
+| Best window | from grid search | (same, fixed) |
+| Best signal | from grid search | (same, fixed) |
+| Total Return | ✓ | ✓ |
+| Annualized Return | ✓ | ✓ |
+| Sharpe Ratio | ✓ | ✓ |
+| Max Drawdown | ✓ | ✓ |
+| Calmar Ratio | ✓ | ✓ |
+| **Overfitting Ratio** | — | `1 - (oos_sharpe / is_sharpe)` |
 
 
 ## SQLite (database: TradeBros)
@@ -75,7 +135,6 @@
 ## Agent
 
 1. Prefer backtests anchored on **daily closing prices** (align rules with that bar).
-2. When strategies exist under `src/`, surface them as selectable commands or CLI targets to run.
 
 ## Trade
 

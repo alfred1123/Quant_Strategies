@@ -2,20 +2,17 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ta import TechnicalAnalysis
-from strat import Strategy
+from strat import Strategy, StrategyConfig
 from param_opt import ParametersOptimization
+
+
+_BOLLINGER_CONFIG = StrategyConfig("get_bollinger_band",
+                                   Strategy.momentum_const_signal, 252)
 
 
 class TestParametersOptimization:
     def _make_optimizer(self, df):
-        ta = TechnicalAnalysis(df.copy())
-        return ParametersOptimization(
-            ta.data,
-            252,
-            ta.get_bollinger_band,
-            Strategy.momentum_const_signal,
-        )
+        return ParametersOptimization(df.copy(), _BOLLINGER_CONFIG)
 
     def test_optimize_yields_tuples(self, sample_ohlc_df):
         opt = self._make_optimizer(sample_ohlc_df)
@@ -64,3 +61,17 @@ class TestParametersOptimization:
         # Should be a generator, not a list
         import types
         assert isinstance(gen, types.GeneratorType)
+
+
+class TestParametersOptimizationWithConfig:
+    def test_config_stored(self, sample_ohlc_df):
+        config = StrategyConfig("get_bollinger_band",
+                                Strategy.momentum_const_signal, 252)
+        opt = ParametersOptimization(sample_ohlc_df.copy(), config)
+        assert opt.config is config
+
+    def test_fee_propagates(self, sample_ohlc_df):
+        config = StrategyConfig("get_bollinger_band",
+                                Strategy.momentum_const_signal, 252)
+        opt = ParametersOptimization(sample_ohlc_df.copy(), config, fee_bps=20.0)
+        assert opt.fee_bps == 20.0

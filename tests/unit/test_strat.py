@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from strat import Strategy
+from strat import Strategy, StrategyConfig
 
 
 class TestMomentumConstSignal:
@@ -76,3 +76,27 @@ class TestReversionConstSignal:
         assert np.isnan(result[0])
         assert result[1] == 1.0
         assert result[2] == -1.0
+
+
+class TestStrategyConfig:
+    def test_frozen_dataclass(self):
+        cfg = StrategyConfig("get_bollinger_band",
+                             Strategy.momentum_const_signal, 365)
+        with pytest.raises(AttributeError):
+            cfg.trading_period = 252
+
+    def test_fields(self):
+        cfg = StrategyConfig("get_sma", Strategy.reversion_const_signal, 252)
+        assert cfg.indicator_name == "get_sma"
+        assert cfg.strategy_func is Strategy.reversion_const_signal
+        assert cfg.trading_period == 252
+
+    def test_equality(self):
+        a = StrategyConfig("get_ema", Strategy.momentum_const_signal, 365)
+        b = StrategyConfig("get_ema", Strategy.momentum_const_signal, 365)
+        assert a == b
+
+    def test_inequality(self):
+        a = StrategyConfig("get_sma", Strategy.momentum_const_signal, 365)
+        b = StrategyConfig("get_ema", Strategy.momentum_const_signal, 365)
+        assert a != b

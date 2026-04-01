@@ -14,11 +14,11 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from data import YahooFinance, AlphaVantage
-from ta import TechnicalAnalysis
-from strat import Strategy
+from strat import Strategy, StrategyConfig
 from perf import Performance
 from log_config import setup_logging
 from param_opt import ParametersOptimization
+from walk_forward import WalkForward
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -95,6 +95,12 @@ with st.sidebar:
                               help="Fee in basis points per unit of turnover "
                                    "(1 bp = 0.01%).")
 
+    st.divider()
+    st.subheader("Walk-Forward Test")
+    split_ratio = st.slider("Train/test split ratio", min_value=0.2,
+                            max_value=0.8, value=0.5, step=0.05,
+                            help="Fraction of data used for in-sample training.")
+
 
 # ── Helper: fetch data (cached across reruns) ───────────────────────
 
@@ -123,7 +129,9 @@ st.sidebar.success(f"Loaded {len(df)} daily bars")
 
 # ── Tab layout ──────────────────────────────────────────────────────
 
-tab_single, tab_grid = st.tabs(["Single Backtest", "Parameter Optimization"])
+tab_single, tab_grid, tab_wf = st.tabs(
+    ["Single Backtest", "Parameter Optimization", "Walk-Forward Test"]
+)
 
 # ── Tab 1: Single backtest ──────────────────────────────────────────
 
@@ -132,12 +140,13 @@ with tab_single:
 
     if run_single:
         data_copy = df.copy()
-        ta = TechnicalAnalysis(data_copy)
-        indicator_func = getattr(ta, INDICATORS[indicator_name])
-        strategy_func = STRATEGIES[strategy_name]
+        config = StrategyConfig(
+            indicator_name=INDICATORS[indicator_name],
+            strategy_func=STRATEGIES[strategy_name],
+            trading_period=trading_period,
+        )
 
-        perf = Performance(data_copy, trading_period, indicator_func,
-                           strategy_func, window, signal,
+        perf = Performance(data_copy, config, window, signal,
                            fee_bps=fee_bps)
 
         # Performance metrics side-by-side
@@ -194,13 +203,14 @@ with tab_grid:
             st.warning(f"Grid has {total} combinations — this may take a while.")
 
         data_copy = df.copy()
-        ta = TechnicalAnalysis(data_copy)
-        indicator_func = getattr(ta, INDICATORS[indicator_name])
-        strategy_func = STRATEGIES[strategy_name]
+        config = StrategyConfig(
+            indicator_name=INDICATORS[indicator_name],
+            strategy_func=STRATEGIES[strategy_name],
+            trading_period=trading_period,
+        )
 
         opt = ParametersOptimization(
-            ta.data, trading_period, indicator_func, strategy_func,
-            fee_bps=fee_bps,
+            data_copy, config, fee_bps=fee_bps,
         )
 
         # Run with progress bar
@@ -257,3 +267,91 @@ with tab_grid:
         csv = param_perf.to_csv(index=False)
         st.download_button("Download grid results (CSV)", csv,
                            file_name=f"opt_{symbol}.csv", mime="text/csv")
+
+# ── Tab 3: Walk-forward overfitting test ───────────────────────────
+
+with tab_wf:
+    run_wf = st.button("Run Walk-Forward Test", type="primary", key="run_wf")
+
+    if run_wf:
+        window_list = list(range(int(win_min), int(win_max) + 1, int(win_step)))
+        signal_list = list(np.arange(sig_min, sig_max + sig_step / 2, sig_step))
+
+        data_copy = df.copy()
+        config = StrategyConfig(
+            indicator_name=INDICATORS[indicator_name],
+            strategy_func=STRATEGIES[strategy_name],
+            trading_period=trading_period,
+        )
+
+        try:
+            wf = WalkForward(
+                data_copy, split_ratio, config, fee_bps=fee_bps,
+            )
+        except ValueError as exc:
+            st.error(f"Walk-forward setup failed: {exc}")
+            st.stop()
+
+        with st.spinner("Running walk-forward test (grid search on in-sample)..."):
+            result = wf.run(tuple(window_list), tuple(signal_list))
+
+        st.success(
+            f"**Best params (in-sample):** window={result.best_window}, "
+            f"signal={result.best_signal:.2f}"
+        )
+
+        # Overfitting ratio with colour coding
+        ov = result.overfitting_ratio
+        if np.isnan(ov):
+            st.warning("Overfitting ratio: N/A (in-sample Sharpe is zero or NaN)")
+        elif ov < 0.3:
+            st.success(f"Overfitting ratio: **{ov:.4f}** — Low risk of overfitting")
+        elif ov < 0.5:
+            st.warning(f"Overfitting ratio: **{ov:.4f}** — Moderate overfitting risk")
+        else:
+            st.error(f"Overfitting ratio: **{ov:.4f}** — High overfitting risk")
+
+        # Metrics comparison table
+        st.subheader("In-Sample vs Out-of-Sample Metrics")
+        summary = result.summary()
+        st.dataframe(summary, use_container_width=True)
+
+        # Cumulative return chart with split line
+        split_idx = wf.split_idx
+        full_data = df.copy()
+        full_perf = Performance(
+            full_data, config, result.best_window, result.best_signal,
+            fee_bps=fee_bps,
+        )
+        chart_df = full_perf.data.dropna(subset=["cumu"]).copy()
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=chart_df["datetime"], y=chart_df["cumu"],
+            mode="lines", name="Strategy",
+        ))
+        fig.add_trace(go.Scatter(
+            x=chart_df["datetime"], y=chart_df["buy_hold_cumu"],
+            mode="lines", name="Buy & Hold",
+        ))
+
+        # Vertical line at split point
+        if "datetime" in chart_df.columns and split_idx < len(chart_df):
+            split_date = chart_df["datetime"].iloc[split_idx]
+            fig.add_vline(
+                x=split_date, line_dash="dash", line_color="red",
+                annotation_text="Train/Test Split",
+                annotation_position="top right",
+            )
+
+        fig.update_layout(
+            title=f"{symbol} — Cumulative Return (Walk-Forward)",
+            xaxis_title="Date", yaxis_title="Cumulative Return",
+            height=500,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Download walk-forward results
+        csv = summary.to_csv()
+        st.download_button("Download walk-forward results (CSV)", csv,
+                           file_name=f"wf_{symbol}.csv", mime="text/csv")

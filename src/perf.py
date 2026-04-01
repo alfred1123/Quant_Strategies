@@ -14,6 +14,8 @@ import logging
 import pandas as pd
 import numpy as np
 
+from ta import TechnicalAnalysis
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,25 +24,26 @@ class Performance:
     
     DEFAULT_FEE_BPS = 5.0  # 5 bps (0.05%) transaction cost per unit of turnover
 
-    def __init__(self, data, trading_period, indicator_func, strategy_func,
-                 window, signal, *, fee_bps=None) -> None:
-        self.data = data
-        self.trading_period = trading_period
-        self.indicator_func = indicator_func
-        self.strategy_func = strategy_func
+    def __init__(self, data, config, window, signal, *, fee_bps=None) -> None:
+        ta = TechnicalAnalysis(data)
+        self.data = ta.data
+        self.config = config
+        self.trading_period = config.trading_period
         self.window = window
         self.signal = signal
         self.fee_bps = fee_bps if fee_bps is not None else self.DEFAULT_FEE_BPS
         self.transaction_cost = self.fee_bps / 10_000  # bps → decimal
 
+        indicator_func = getattr(ta, config.indicator_name)
+
         logger.debug("Computing performance: window=%s, signal=%s, "
                      "trading_period=%s, fee_bps=%s",
-                     window, signal, trading_period, self.fee_bps)
+                     window, signal, config.trading_period, self.fee_bps)
         
         # strategy daily performance
         self.data['chg'] = self.data['price'].pct_change()
-        self.data['indicator'] = self.indicator_func(self.window)
-        self.data['position'] = self.strategy_func(self.data['indicator'], self.signal)
+        self.data['indicator'] = indicator_func(self.window)
+        self.data['position'] = config.strategy_func(self.data['indicator'], self.signal)
         self.data['position_x1'] = self.data['position'].shift(1)  
 
         self.data['trade'] = abs(self.data['position'] - self.data['position_x1'])
