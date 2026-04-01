@@ -1,0 +1,9 @@
+pandas
+numpy
+requests
+python-dotenv
+ccxt
+matplotlib
+plotly
+seaborn
+futu-api
