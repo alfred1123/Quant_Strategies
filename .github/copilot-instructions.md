@@ -4,7 +4,7 @@
 
 | Path | Role |
 |------|------|
-| `scripts/backtest/` | Pipeline: `data.py` → `ta.py` → `strat.py` → `perf.py` → `param_opt.py`, orchestrated by `main.py` |
+| `scripts/bt/` | Pipeline: `data.py` → `ta.py` → `strat.py` → `perf.py` → `param_opt.py`, orchestrated by `main.py` |
 | `scripts/` | Top-level utilities |
 | `backup/deco/` | Decommissioned scripts (kept for reference) |
 | `tests/unit/` | Unit tests per module |
@@ -15,7 +15,7 @@
 ## Code Style
 
 - Python 3.12+, pandas/numpy idioms matching existing modules.
-- Imports in `scripts/backtest/` are **relative** to that package (e.g. `from data import Glassnode`).
+- Imports in `scripts/bt/` are **relative** to that package (e.g. `from data import Glassnode`).
 - Run tests with `python -m pytest tests/ -v` from project root.
 
 ## Build and Test
@@ -24,7 +24,7 @@
 ./setup.sh                        # Create venv, install deps
 source env/bin/activate
 python -m pytest tests/ -v        # Run all tests
-cd scripts/backtest && python main.py  # Run backtest
+cd scripts/bt && python main.py  # Run backtest
 ```
 
 ## Conventions
@@ -33,6 +33,7 @@ cd scripts/backtest && python main.py  # Run backtest
 - **Secrets**: API keys live in `scripts/.env` (gitignored). Never commit credentials.
 - `env/` is gitignored — always recreate via `setup.sh` or `requirements.txt`.
 - New dependencies go in `requirements.txt`.
+- **README**: After any change that affects usage, setup, CLI options, directory structure, data sources, or dependencies, review and update `README.md` to keep it accurate.
 
 ## Safety
 

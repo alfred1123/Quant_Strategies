@@ -75,16 +75,16 @@
 ## Agent
 
 1. Prefer backtests anchored on **daily closing prices** (align rules with that bar).
-2. When strategies exist under `scripts/backtest/`, surface them as selectable commands or CLI targets to run.
+2. When strategies exist under `scripts/bt/`, surface them as selectable commands or CLI targets to run.
 
 ## Trade
 
-1. Redesign trading repository: strategies as objects, loadable from the backtest package (shared definitions with live trading).
+1. Redesign trading repository: strategies as objects, loadable from the bt package (shared definitions with live trading).
 
 ```
 Quant_Strategies/
 ├── scripts/
-│   ├── backtest/            # Backtesting pipeline
+│   ├── bt/                  # Backtesting pipeline
 │   │   ├── data.py          # Data retrieval (Futu, Glassnode)
 │   │   ├── ta.py            # Technical analysis indicators
 │   │   ├── strat.py         # Signal generation strategies

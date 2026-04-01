@@ -6,18 +6,19 @@ This repository contains Python tooling for **backtesting**, **technical analysi
 
 | Path | Role |
 |------|------|
-| `scripts/backtest/` | Pipeline: `data.py` (sources), `ta.py` (indicators), `strat.py`, `perf.py`, `param_opt.py`, `main.py` (orchestration) |
+| `scripts/bt/` | Pipeline: `data.py` (sources), `ta.py` (indicators), `strat.py`, `perf.py`, `param_opt.py`, `main.py` (orchestration) |
 | `scripts/` | Top-level utilities |
 | `backup/deco/` | Decommissioned scripts (Bybit live trading — kept for reference) |
 | `notebooks/` | Exploratory analysis and requirements discovery |
 
-Run backtest-style code from `scripts/backtest/` (imports are relative to that package, e.g. `from data import ...` in `main.py`).
+Run backtest-style code from `scripts/bt/` (imports are relative to that package, e.g. `from data import ...` in `main.py`).
 
 ## Conventions
 
 - Prefer **pandas/numpy** idioms already used in existing modules; match style of neighboring code (naming, plotting libs).
 - Keep changes **focused**: extend existing functions/classes rather than duplicating logic.
 - **Secrets**: API keys and env live in `scripts/.env` (gitignored). Never commit credentials or paste them into source files.
+- **README**: After any change that affects usage, setup, CLI options, directory structure, data sources, or dependencies, review and update `README.md` to keep it accurate.
 
 ## Safety
 

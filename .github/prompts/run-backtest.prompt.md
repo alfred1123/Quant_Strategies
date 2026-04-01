@@ -3,11 +3,11 @@ description: "Run a backtest with specified parameters: symbol, date range, indi
 agent: "agent"
 argument-hint: "Symbol, date range, indicator name, strategy name"
 ---
-Run a backtest using the pipeline in `scripts/backtest/`. 
+Run a backtest using the pipeline in `scripts/bt/`. 
 
 1. Identify the requested symbol, date range, indicator, and strategy from the user's input.
 2. Show what parameters will be used before running.
-3. Execute from `scripts/backtest/` using: `cd scripts/backtest && python main.py`
+3. Execute from `scripts/bt/` using: `cd scripts/bt && python main.py`
 4. Display the strategy performance and buy-and-hold comparison.
 
 Available indicators: `sma`, `ema`, `rsi`, `bollinger_band`, `stochastic_oscillator`

@@ -127,7 +127,7 @@ plt.savefig('../../results/heatmap_<symbol>_<indicator>.png', dpi=150)
 ### 7. Run from command line
 
 ```bash
-cd scripts/backtest && python main.py
+cd scripts/bt && python main.py
 ```
 
 **Output files** (saved to `results/`):

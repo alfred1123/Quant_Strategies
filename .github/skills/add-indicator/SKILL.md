@@ -7,14 +7,14 @@ argument-hint: 'Indicator name, e.g. MACD, VWAP, ATR'
 # Add Technical Indicator
 
 ## When to Use
-- Adding a new indicator to `scripts/backtest/ta.py`
+- Adding a new indicator to `scripts/bt/ta.py`
 - Extending the backtest pipeline with a new signal source
 
 ## Procedure
 
 ### 1. Implement the indicator
 
-Add a method to `TechnicalAnalysis` in [ta.py](../../scripts/backtest/ta.py):
+Add a method to `TechnicalAnalysis` in [ta.py](../../scripts/bt/ta.py):
 
 ```python
 def get_<name>(self, period):

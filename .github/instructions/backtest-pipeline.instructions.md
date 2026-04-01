@@ -1,6 +1,6 @@
 ---
 description: "Use when modifying or extending the backtest pipeline: data sources, technical indicators, strategies, performance metrics, or parameter optimization. Covers module interfaces and data flow."
-applyTo: "scripts/backtest/**"
+applyTo: "scripts/bt/**"
 ---
 # Backtest Pipeline Rules
 
@@ -10,7 +10,7 @@ applyTo: "scripts/backtest/**"
 data.py → ta.py → strat.py → perf.py → param_opt.py
 ```
 
-All modules are orchestrated by `main.py`. Imports are **relative** to the `scripts/backtest/` package.
+All modules are orchestrated by `main.py`. Imports are **relative** to the `scripts/bt/` package.
 
 ## Module Interfaces
 
