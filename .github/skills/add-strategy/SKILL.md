@@ -7,14 +7,14 @@ argument-hint: 'Strategy name, e.g. breakout, mean-reversion-band'
 # Add Trading Strategy
 
 ## When to Use
-- Adding a new signal generation strategy to `scripts/bt/strat.py`
+- Adding a new signal generation strategy to `src/strat.py`
 - Creating a new position-sizing or signal logic
 
 ## Procedure
 
 ### 1. Implement the strategy
 
-Add a static method to `Strategy` in [strat.py](../../scripts/bt/strat.py):
+Add a static method to `Strategy` in [strat.py](../../src/strat.py):
 
 ```python
 def <name>_signal(data_col, signal):

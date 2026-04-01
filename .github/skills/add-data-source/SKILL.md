@@ -7,7 +7,7 @@ argument-hint: 'Data source name, e.g. Tiingo, Binance, EODHD'
 # Add Data Source
 
 ## When to Use
-- Adding a new pricing data provider to `scripts/bt/data.py`
+- Adding a new pricing data provider to `src/data.py`
 - Integrating a free or paid API for equity, crypto, or ETF data
 - Replacing or supplementing an existing data source
 
@@ -15,7 +15,7 @@ argument-hint: 'Data source name, e.g. Tiingo, Binance, EODHD'
 
 ### 1. Implement the class
 
-Add a class to [data.py](../../scripts/bt/data.py) following the existing pattern:
+Add a class to [data.py](../../src/data.py) following the existing pattern:
 
 ```python
 class <SourceName>:
@@ -114,9 +114,9 @@ Update these files:
 
 | File | Change |
 |------|--------|
-| `scripts/bt/main.py` | Add to import: `from data import ..., <SourceName>` |
+| `src/main.py` | Add to import: `from data import ..., <SourceName>` |
 | `requirements.txt` | Add the library (e.g. `yfinance`, `tiingo`) |
-| `scripts/.env.example` | Add placeholder for API key (or note if none needed) |
+| `.env.example` | Add placeholder for API key (or note if none needed) |
 | `.github/instructions/backtest-pipeline.instructions.md` | Add class to data.py section |
 
 ### 4. Install and verify
@@ -128,7 +128,7 @@ python -m pytest tests/unit/test_data.py -v --tb=short
 
 ### 5. Smoke test with real data
 
-Quick sanity check from `scripts/bt/`:
+Quick sanity check from `src/`:
 
 ```python
 from data import <SourceName>

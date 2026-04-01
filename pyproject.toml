@@ -1,6 +1,6 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["scripts/bt"]
+pythonpath = ["src"]
 markers = [
     "e2e: end-to-end tests that hit real APIs (require network + API keys)",
 ]

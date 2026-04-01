@@ -1,6 +1,6 @@
 ---
 description: "Use when modifying or extending the backtest pipeline: data sources, technical indicators, strategies, performance metrics, or parameter optimization. Covers module interfaces and data flow."
-applyTo: "scripts/bt/**"
+applyTo: "src/**"
 ---
 # Backtest Pipeline Rules
 
@@ -10,14 +10,14 @@ applyTo: "scripts/bt/**"
 data.py → ta.py → strat.py → perf.py → param_opt.py
 ```
 
-All modules are orchestrated by `main.py`. Imports are **relative** to the `scripts/bt/` package.
+All modules are orchestrated by `main.py`. Imports are **relative** to the `src/` package.
 
 ## Module Interfaces
 
 ### data.py — Data Sources
 - Each source is a class (`FutuOpenD`, `Glassnode`, `AlphaVantage`, `YahooFinance`).
 - Returns a DataFrame. Glassnode, AlphaVantage, and YahooFinance return columns `['t', 'v']`.
-- API keys loaded from `scripts/.env` via `python-dotenv`; constructors validate that required keys are set.
+- API keys loaded from `.env` at the project root via `python-dotenv`; constructors validate that required keys are set.
 - `YahooFinance` requires no API key. Supports equities, ETFs, indices, and crypto (e.g. `'BTC-USD'`). Returns 10+ years of free daily data.
 - Methods use `@lru_cache` — clear cache in tests.
 - AlphaVantage auto-detects crypto vs equity symbols and uses the appropriate API endpoint.
@@ -34,9 +34,9 @@ All modules are orchestrated by `main.py`. Imports are **relative** to the `scri
 - These are effectively static methods (no `self` used).
 
 ### perf.py — Performance Metrics
-- `Performance(data, trading_period, indicator_func, strategy_func, window, signal)`.
+- `Performance(data, trading_period, indicator_func, strategy_func, window, signal, *, fee_bps=None)`.
 - Computes `pnl`, `cumu`, `dd` columns in-place on `data`.
-- Transaction cost hardcoded at `0.0005` (0.05 bps).
+- Transaction cost defaults to 5 bps (0.05%); configurable via `fee_bps` kwarg.
 - Key metrics: `get_sharpe_ratio()`, `get_max_drawdown()`, `get_calmar_ratio()`.
 - Also computes buy-and-hold benchmark columns.
 

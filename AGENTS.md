@@ -6,24 +6,22 @@ This repository contains Python tooling for **backtesting**, **technical analysi
 
 | Path | Role |
 |------|------|
-| `scripts/bt/` | Pipeline: `data.py` (sources), `ta.py` (indicators), `strat.py`, `perf.py`, `param_opt.py`, `main.py` (orchestration) |
-| `scripts/` | Top-level utilities |
+| `src/` | Pipeline: `data.py` (sources), `ta.py` (indicators), `strat.py`, `perf.py`, `param_opt.py`, `main.py` (orchestration) |
 | `backup/deco/` | Decommissioned scripts (Bybit live trading — kept for reference) |
-| `notebooks/` | Exploratory analysis and requirements discovery |
 
-Run backtest-style code from `scripts/bt/` (imports are relative to that package, e.g. `from data import ...` in `main.py`).
+Run backtest-style code from `src/` (imports are relative to that package, e.g. `from data import ...` in `main.py`).
 
 ## Conventions
 
 - Prefer **pandas/numpy** idioms already used in existing modules; match style of neighboring code (naming, plotting libs).
 - Keep changes **focused**: extend existing functions/classes rather than duplicating logic.
-- **Secrets**: API keys and env live in `scripts/.env` (gitignored). Never commit credentials or paste them into source files.
+- **Secrets**: API keys and env live in `.env` (gitignored) at the project root. Never commit credentials or paste them into source files.
 - **README**: After any change that affects usage, setup, CLI options, directory structure, data sources, or dependencies, review and update `README.md` to keep it accurate.
 
 ## Logging
 
 - Every module uses `import logging` and `logger = logging.getLogger(__name__)` at the top.
-- Logging format and level are configured **once** in `scripts/bt/log_config.py` (`setup_logging()`). Do **not** call `logging.basicConfig()` anywhere else.
+- Logging format and level are configured **once** in `src/log_config.py` (`setup_logging()`). Do **not** call `logging.basicConfig()` anywhere else.
 - **Entry points only** (`main.py`, `app.py`) call `from log_config import setup_logging; setup_logging()`.
 - Library modules **never** call `setup_logging` — they only emit via `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`.
 - Do **not** use `print()` for status output — use the logger at the appropriate level.

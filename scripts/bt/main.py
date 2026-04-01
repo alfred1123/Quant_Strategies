@@ -133,10 +133,9 @@ def parse_args(argv=None):
     p.add_argument('--verbose', '-v', action='store_true',
                    help='Enable DEBUG-level logging')
 
-    # Costs (coming soon — placeholder for future configurability)
+    # Costs
     p.add_argument('--fee', type=float, default=5.0,
-                   help='Transaction fee in bps — NOT YET WIRED '
-                        '(hardcoded at 5 bps in perf.py) (default: %(default)s)')
+                   help='Transaction fee in basis points (default: %(default)s)')
 
     return p.parse_args(argv)
 
@@ -153,10 +152,6 @@ def main(args=None):
 
     os.makedirs(args.outdir, exist_ok=True)
     tag = f"{args.symbol.lower().replace('-', '')}_{args.indicator}"
-
-    if args.fee != 5.0:
-        logger.warning("--fee %s ignored — fee is hardcoded at 5 bps "
-                       "in perf.py (coming soon)", args.fee)
 
     trading_period = ASSET_TRADING_PERIODS[args.asset]
     indicator_method = INDICATORS[args.indicator]
@@ -182,7 +177,8 @@ def main(args=None):
 
     # ── Single backtest ─────────────────────────────────────────────
     perf = Performance(df, trading_period, indicator_func,
-                       strategy_func, args.window, args.signal)
+                       strategy_func, args.window, args.signal,
+                       fee_bps=args.fee)
 
     logger.info("\n=== Strategy Performance "
                 "(%s %s / signal %s) ===\n%s",
@@ -204,6 +200,7 @@ def main(args=None):
 
         param_opt = ParametersOptimization(
             ta.data, trading_period, indicator_func, strategy_func,
+            fee_bps=args.fee,
         )
 
         param_perf = pd.DataFrame(

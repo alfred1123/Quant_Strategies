@@ -3,7 +3,7 @@ E2E tests: hit the real Alpha Vantage API → run data through the full
 backtest pipeline (ta → strategy → performance).
 
 These tests require:
-  - A valid ALPHAVANTAGE_API_KEY in scripts/.env
+  - A valid ALPHAVANTAGE_API_KEY in .env
   - Network access
 
 Run explicitly:
@@ -27,7 +27,7 @@ from strat import Strategy
 from perf import Performance
 
 # Load .env so we can check for the key
-load_dotenv(os.path.join(os.path.dirname(__file__), '../../scripts/.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
 
 _has_key = bool(os.getenv('ALPHAVANTAGE_API_KEY'))
 

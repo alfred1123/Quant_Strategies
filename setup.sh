@@ -27,17 +27,17 @@ echo "Installing dependencies..."
 pip install -r "$REPO_DIR/requirements.txt" --quiet
 
 # 5. Check for .env configuration
-if [ ! -f "$REPO_DIR/scripts/.env" ]; then
+if [ ! -f "$REPO_DIR/.env" ]; then
     echo ""
-    echo "ERROR: No scripts/.env file found."
+    echo "ERROR: No .env file found."
     echo "Copy the template and fill in your API keys:"
     echo ""
-    echo "  cp scripts/.env.example scripts/.env"
-    echo "  # then edit scripts/.env with your keys"
+    echo "  cp .env.example .env"
+    echo "  # then edit .env with your keys"
     echo ""
     exit 1
 else
-    echo "scripts/.env found."
+    echo ".env found."
 fi
 
 echo ""
@@ -45,7 +45,7 @@ echo "Setup complete! Activate your environment with:"
 echo "  source env/bin/activate"
 echo ""
 echo "Run a backtest with:"
-echo "  cd scripts/bt && python main.py"
+echo "  cd src && python main.py"
 echo ""
 echo "Or launch the dashboard:"
-echo "  cd scripts/bt && streamlit run app.py"
+echo "  cd src && streamlit run app.py"

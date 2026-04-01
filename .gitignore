@@ -13,7 +13,6 @@ build/
 *.egg
 
 # Secrets / API keys
-/scripts/.env
 .env
 
 # Jupyter Notebook

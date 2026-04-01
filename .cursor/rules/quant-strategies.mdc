@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Quant Strategies
 
-- **Stack**: Python, pandas/numpy; notebooks for exploration; `scripts/bt/` for the main backtest pipeline (`data`, `ta`, `strat`, `perf`, `param_opt`, `main`).
-- **Secrets**: Use `scripts/.env` only; never commit API keys or embed them in code.
+- **Stack**: Python, pandas/numpy; `src/` for the main backtest pipeline (`data`, `ta`, `strat`, `perf`, `param_opt`, `main`).
+- **Secrets**: Use `.env` at the project root only; never commit API keys or embed them in code.
 - **Edits**: Match existing patterns in the file you change; avoid unrelated refactors.
 - **Risk**: Exchange/live trading code is sensitive; do not assume paper trading without explicit confirmation.

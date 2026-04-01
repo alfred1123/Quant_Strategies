@@ -18,7 +18,7 @@ cd Quant_Strategies
 source env/bin/activate
 
 # 3. Launch the dashboard (no API key needed)
-cd scripts/bt && streamlit run app.py
+cd src && streamlit run app.py
 ```
 
 Open the URL shown in the terminal (default: `http://localhost:8501`). The dashboard lets you configure everything from the sidebar — symbol, dates, indicator, strategy, parameters — and run backtests or grid search with one click.
@@ -48,7 +48,7 @@ This script:
 1. Creates a virtual environment at `env/`
 2. Upgrades pip
 3. Installs all packages from `requirements.txt`
-4. Checks that `scripts/.env` exists (exits with error if missing)
+4. Checks that `.env` exists (exits with error if missing)
 
 ### Option B: Manual
 
@@ -56,7 +56,7 @@ This script:
 python3 -m venv env
 source env/bin/activate
 pip install -r requirements.txt
-cp scripts/.env.example scripts/.env   # then edit with your keys
+cp .env.example .env   # then edit with your keys
 ```
 
 ### Environment Variables
@@ -64,7 +64,7 @@ cp scripts/.env.example scripts/.env   # then edit with your keys
 Copy the template and fill in any keys you need:
 
 ```bash
-cp scripts/.env.example scripts/.env
+cp .env.example .env
 ```
 
 | Variable | Required? | Description |
@@ -84,7 +84,7 @@ cp scripts/.env.example scripts/.env
 The easiest way to run backtests. Launch the interactive web dashboard:
 
 ```bash
-cd scripts/bt && streamlit run app.py
+cd src && streamlit run app.py
 ```
 
 Open the URL printed in the terminal (default: `http://localhost:8501`).
@@ -122,10 +122,10 @@ Open the URL printed in the terminal (default: `http://localhost:8501`).
 
 ### CLI Backtest (`main.py`)
 
-Run from `scripts/bt/`:
+Run from `src/`:
 
 ```bash
-cd scripts/bt
+cd src
 
 # Default: BTC-USD, Bollinger + momentum, full grid search
 python main.py
@@ -164,7 +164,7 @@ All CLI options (run `python main.py --help`):
 | `--no-grid` | `false` | Skip parameter optimization |
 | `--win-min/max/step` | `5/100/5` | Grid search window range |
 | `--sig-min/max/step` | `0.25/2.50/0.25` | Grid search signal range |
-| `--outdir` | `../../results` | Output directory for CSVs and heatmap |
+| `--outdir` | `../results` | Output directory for CSVs and heatmap |
 
 **Output files** (saved to `results/` by default):
 
@@ -227,7 +227,7 @@ Not all combinations are meaningful:
 
 ### Transaction Costs
 
-`perf.py` applies a fixed **0.05% (5 bps) per unit of turnover** — hardcoded in `Performance.__init__`. This is deducted from PnL on every position change.
+`perf.py` applies a **5 bps (0.05%) fee per unit of turnover** by default, deducted from PnL on every position change. Override via `--fee` in the CLI or the "Transaction fee" input in the dashboard.
 
 ### Virtual Environment
 
@@ -239,24 +239,23 @@ Not all combinations are meaningful:
 
 ```
 Quant_Strategies/
-├── scripts/
-│   ├── bt/                  # Backtesting pipeline
-│   │   ├── data.py          # Data sources (YahooFinance, AlphaVantage, Glassnode, FutuOpenD)
-│   │   ├── ta.py            # Technical analysis indicators
-│   │   ├── strat.py         # Signal generation strategies
-│   │   ├── perf.py          # Performance metrics & PnL engine
-│   │   ├── param_opt.py     # Grid-search parameter optimization
-│   │   ├── main.py          # CLI entry point — configurable via argparse
-│   │   └── app.py           # Streamlit web dashboard
-│   │
-│   ├── .env                 # API keys (gitignored — copy from .env.example)
-│   └── .env.example         # Template for API keys
+├── src/                     # Backtesting pipeline
+│   ├── data.py              # Data sources (YahooFinance, AlphaVantage, Glassnode, FutuOpenD)
+│   ├── ta.py                # Technical analysis indicators
+│   ├── strat.py             # Signal generation strategies
+│   ├── perf.py              # Performance metrics & PnL engine
+│   ├── param_opt.py         # Grid-search parameter optimization
+│   ├── log_config.py        # Centralised logging configuration
+│   ├── main.py              # CLI entry point — configurable via argparse
+│   └── app.py               # Streamlit web dashboard
 │
 ├── tests/
 │   ├── unit/                # Unit tests (mocked, fast)
 │   ├── integration/         # Pipeline tests with synthetic data
 │   └── e2e/                 # End-to-end tests hitting real APIs
 │
+├── .env                     # API keys (gitignored — copy from .env.example)
+├── .env.example             # Template for API keys
 ├── results/                 # Output CSVs and heatmap PNGs (gitignored)
 ├── db/                      # SQLite schema and migrations (planned)
 ├── backup/

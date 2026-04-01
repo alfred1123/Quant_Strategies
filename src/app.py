@@ -1,8 +1,7 @@
-"""
-Streamlit UI for the backtest pipeline.
+"""Streamlit UI for the backtest pipeline.
 
 Launch:
-    cd scripts/bt && streamlit run app.py
+    cd src && streamlit run app.py
 """
 
 import logging
@@ -13,9 +12,6 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-
-# Ensure backtest modules are importable
-sys.path.insert(0, os.path.dirname(__file__))
 
 from data import YahooFinance, AlphaVantage
 from ta import TechnicalAnalysis

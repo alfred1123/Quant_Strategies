@@ -75,34 +75,29 @@
 ## Agent
 
 1. Prefer backtests anchored on **daily closing prices** (align rules with that bar).
-2. When strategies exist under `scripts/bt/`, surface them as selectable commands or CLI targets to run.
+2. When strategies exist under `src/`, surface them as selectable commands or CLI targets to run.
 
 ## Trade
 
-1. Redesign trading repository: strategies as objects, loadable from the bt package (shared definitions with live trading).
+1. Redesign trading repository: strategies as objects, loadable from the src package (shared definitions with live trading).
 
 ```
 Quant_Strategies/
-├── scripts/
-│   ├── bt/                  # Backtesting pipeline
-│   │   ├── data.py          # Data retrieval (Futu, Glassnode)
-│   │   ├── ta.py            # Technical analysis indicators
-│   │   ├── strat.py         # Signal generation strategies
-│   │   ├── perf.py          # Performance metrics & PnL engine
-│   │   ├── param_opt.py     # Grid-search parameter optimization
-│   │   ├── main.py          # Backtest entry point — wires everything together
-│   │   └── .env
-│   │
-│   └── .env                     # API keys (gitignored)
+├── src/                     # Backtesting pipeline
+│   ├── data.py              # Data retrieval (YahooFinance, AlphaVantage, Glassnode, FutuOpenD)
+│   ├── ta.py                # Technical analysis indicators
+│   ├── strat.py             # Signal generation strategies
+│   ├── perf.py              # Performance metrics & PnL engine
+│   ├── param_opt.py         # Grid-search parameter optimization
+│   ├── log_config.py        # Centralised logging configuration
+│   ├── main.py              # CLI entry point — configurable via argparse
+│   └── app.py               # Streamlit web dashboard
+│
+├── .env                     # API keys (gitignored)
 ├── backup/
-│   └── deco/                    # Decommissioned Bybit scripts (kept for reference)
-├── notebooks/               # Jupyter exploration & prototyping
-├── data/
-│   ├── raw/                 # Source datasets (Excel, zips)
-│   └── processed/           # Cleaned datasets
-├── results/                 # Output charts (PNGs)
-├── data.csv                 # Live OHLCV feed (created at runtime)
-└── Trading Strategy.html    # Plotly backtest visualization
+│   └── deco/                # Decommissioned Bybit scripts (kept for reference)
+├── results/                 # Output CSVs and heatmap PNGs
+└── tests/                   # Unit, integration, and e2e tests
 ```
 
 1. Plug in Futu API trade (optional Alphavantage / Glassnode).
