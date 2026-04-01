@@ -29,15 +29,13 @@ pip install -r "$REPO_DIR/requirements.txt" --quiet
 # 5. Check for .env configuration
 if [ ! -f "$REPO_DIR/scripts/.env" ]; then
     echo ""
-    echo "NOTE: No scripts/.env file found."
-    echo "Create one with your API keys:"
+    echo "ERROR: No scripts/.env file found."
+    echo "Copy the template and fill in your API keys:"
     echo ""
-    echo "  cat > scripts/.env << 'EOF'"
-    echo "  GLASSNODE_API_KEY=your_key_here"
-    echo "  FUTU_HOST=127.0.0.1"
-    echo "  FUTU_PORT=11111"
-    echo "  EOF"
+    echo "  cp scripts/.env.example scripts/.env"
+    echo "  # then edit scripts/.env with your keys"
     echo ""
+    exit 1
 else
     echo "scripts/.env found."
 fi

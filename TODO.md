@@ -43,6 +43,14 @@
     | 2 | COMPLETED | Transaction successfully completed | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
     | 3 | FAILED | Transaction failed due to error | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
 
+    REFDATA.API_LIMIT — record rate limits and quotas per data source so the pipeline can throttle automatically.
+
+    | API_LIMIT_ID | APP_ID | LIMIT_TYPE | MAX_VALUE | TIME_WINDOW_SEC | DESCRIPTION | USER_ID | UPDATE_DB_TS |
+    |--------------|--------|------------|-----------|-----------------|-------------|---------|--------------|
+    | 1 | 2 | RATE | 1 | 1 | 1 request per second (free tier) | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
+    | 2 | 2 | DAILY_QUOTA | 25 | 86400 | 25 requests per day (free tier) | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
+    | 3 | 2 | OUTPUT_SIZE | 100 | NULL | Compact mode returns ~100 most recent trading days only | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
+
     BACKTEST.API_REQUEST
 
     | API_REQ_ID | API_REQ_VID | APP_ID | TM_INTERVAL_ID | SYMBOL | IS_CURRENT_IND | RANGE_START_TS | RANGE_END_TS | STORAGE_PATH | API_REQ_PAYLOAD | USER_ID | CREATED_AT |

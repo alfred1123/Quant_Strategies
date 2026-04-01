@@ -31,6 +31,13 @@ Reuse existing fixtures from `conftest.py` before creating new ones:
 - Clear `@lru_cache` with `.cache_clear()` between tests when mocking data sources.
 - Mock `pd.read_json` when testing Glassnode (pandas 3.x changed string handling).
 
+## Test Data Integrity
+
+- **Never** fabricate dummy data solely to make a test pass. Mock responses must mirror the **real API response structure** (field names, nesting, types). When in doubt, capture a real response sample for reference.
+- If a mock response structure cannot be verified against the real API, flag it for **user review** before merging.
+- Prefer deterministic fixture data (e.g. `[1, 2, 3, ...]`) over random data so failures are reproducible.
+- When adding mocks for a new API, include a comment citing the source documentation or a sample response so reviewers can verify accuracy.
+
 ## What to Test
 
 - **Indicators (ta.py)**: known values, NaN leading zeros, output length, value bounds (e.g. RSI 0–100).

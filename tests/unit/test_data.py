@@ -11,6 +11,7 @@ class TestGlassnode:
     def test_get_historical_price_returns_dataframe(self, mock_get, mock_read_json):
         mock_response = MagicMock()
         mock_response.text = '[{"t":"2020-05-11","v":8500},{"t":"2020-05-12","v":8600}]'
+        mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
         expected_df = pd.DataFrame([
             {"t": "2020-05-11", "v": 8500.0},
@@ -34,6 +35,7 @@ class TestGlassnode:
     def test_get_historical_price_calls_api_with_params(self, mock_get, _):
         mock_response = MagicMock()
         mock_response.text = "[]"
+        mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
         from data import Glassnode
@@ -46,7 +48,9 @@ class TestGlassnode:
         params = call_kwargs.kwargs.get("params") or call_kwargs[1].get("params")
         assert params["a"] == "ETH"
         assert params["i"] == "1h"
-        assert params["api_key"] == "test_key"
+        # API key now sent via header, not query params
+        headers = call_kwargs.kwargs.get("headers") or call_kwargs[1].get("headers")
+        assert headers["X-Api-Key"] == "test_key"
 
     @patch.dict("os.environ", {"GLASSNODE_API_KEY": "test_key"})
     @patch("data.pd.read_json", return_value=pd.DataFrame({"t": ["x"], "v": [1]}))
@@ -54,6 +58,7 @@ class TestGlassnode:
     def test_get_historical_price_default_resolution(self, mock_get, _):
         mock_response = MagicMock()
         mock_response.text = "[]"
+        mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
         from data import Glassnode
@@ -63,6 +68,12 @@ class TestGlassnode:
 
         params = mock_get.call_args.kwargs.get("params") or mock_get.call_args[1].get("params")
         assert params["i"] == "24h"
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_init_raises_without_api_key(self):
+        from data import Glassnode
+        with pytest.raises(ValueError, match="GLASSNODE_API_KEY"):
+            Glassnode()
 
 
 class TestFutuOpenD:
@@ -90,3 +101,147 @@ class TestFutuOpenD:
         result = futu.get_historical_data("HK.00700", "2021-01-01", "2021-01-31")
 
         assert isinstance(result, pd.DataFrame)
+
+    @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
+    @patch("data.futu.OpenQuoteContext")
+    def test_get_historical_data_raises_on_error(self, mock_ctx_cls):
+        mock_ctx = MagicMock()
+        mock_ctx_cls.return_value = mock_ctx
+        mock_ctx.request_history_kline.return_value = (-1, "connection error", None)
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+
+        from data import FutuOpenD
+        futu = FutuOpenD()
+        futu.get_historical_data.cache_clear()
+        with pytest.raises(RuntimeError, match="Futu API error"):
+            futu.get_historical_data("HK.00700", "2021-01-01", "2021-01-31")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_init_raises_without_env_vars(self):
+        from data import FutuOpenD
+        with pytest.raises(ValueError, match="FUTU_HOST"):
+            FutuOpenD()
+
+
+class TestAlphaVantage:
+    EQUITY_RESPONSE = {
+        "Meta Data": {"1. Information": "Daily Prices"},
+        "Time Series (Daily)": {
+            "2021-01-04": {"1. open": "133.52", "2. high": "133.61", "3. low": "126.76", "4. close": "129.41", "5. volume": "143301900"},
+            "2021-01-05": {"1. open": "128.89", "2. high": "131.74", "3. low": "128.43", "4. close": "131.01", "5. volume": "97664900"},
+        },
+    }
+
+    CRYPTO_RESPONSE = {
+        "Meta Data": {"1. Information": "Daily Prices"},
+        "Time Series (Digital Currency Daily)": {
+            "2021-01-04": {"1a. open (USD)": "33000", "2a. high (USD)": "34000", "3a. low (USD)": "32000", "4a. close (USD)": "33500", "5. volume": "1234", "6. market cap (USD)": "0"},
+            "2021-01-05": {"1a. open (USD)": "33500", "2a. high (USD)": "35000", "3a. low (USD)": "33000", "4a. close (USD)": "34200", "5. volume": "1345", "6. market cap (USD)": "0"},
+        },
+    }
+
+    @patch.dict("os.environ", {"ALPHAVANTAGE_API_KEY": "test_key"})
+    @patch("data.requests.get")
+    def test_get_equity_price_returns_dataframe(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = self.EQUITY_RESPONSE
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        from data import AlphaVantage
+        av = AlphaVantage()
+        av.get_historical_price.cache_clear()
+        df = av.get_historical_price("IBM", "2021-01-04", "2021-01-05")
+
+        assert isinstance(df, pd.DataFrame)
+        assert list(df.columns) == ["t", "v"]
+        assert len(df) == 2
+        assert df.iloc[0]["v"] == 129.41
+        assert df.iloc[1]["v"] == 131.01
+
+    @patch.dict("os.environ", {"ALPHAVANTAGE_API_KEY": "test_key"})
+    @patch("data.requests.get")
+    def test_get_crypto_price_returns_dataframe(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = self.CRYPTO_RESPONSE
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        from data import AlphaVantage
+        av = AlphaVantage()
+        av.get_historical_price.cache_clear()
+        df = av.get_historical_price("BTC", "2021-01-04", "2021-01-05")
+
+        assert isinstance(df, pd.DataFrame)
+        assert list(df.columns) == ["t", "v"]
+        assert len(df) == 2
+        assert df.iloc[0]["v"] == 33500.0
+
+    @patch.dict("os.environ", {"ALPHAVANTAGE_API_KEY": "test_key"})
+    @patch("data.requests.get")
+    def test_filters_by_date_range(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = self.EQUITY_RESPONSE
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        from data import AlphaVantage
+        av = AlphaVantage()
+        av.get_historical_price.cache_clear()
+        df = av.get_historical_price("IBM", "2021-01-04", "2021-01-04")
+
+        assert len(df) == 1
+        assert df.iloc[0]["t"] == "2021-01-04"
+
+    @patch.dict("os.environ", {"ALPHAVANTAGE_API_KEY": "test_key"})
+    @patch("data.requests.get")
+    def test_raises_on_api_error(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"Error Message": "Invalid API call"}
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        from data import AlphaVantage
+        av = AlphaVantage()
+        av.get_historical_price.cache_clear()
+        with pytest.raises(ValueError, match="AlphaVantage error"):
+            av.get_historical_price("INVALID", "2021-01-01", "2021-01-02")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_init_raises_without_api_key(self):
+        from data import AlphaVantage
+        with pytest.raises(ValueError, match="ALPHAVANTAGE_API_KEY"):
+            AlphaVantage()
+
+    @patch.dict("os.environ", {"ALPHAVANTAGE_API_KEY": "test_key"})
+    @patch("data.requests.get")
+    def test_uses_correct_endpoint_for_equity(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = self.EQUITY_RESPONSE
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        from data import AlphaVantage
+        av = AlphaVantage()
+        av.get_historical_price.cache_clear()
+        av.get_historical_price("IBM", "2021-01-04", "2021-01-05")
+
+        params = mock_get.call_args.kwargs.get("params") or mock_get.call_args[1].get("params")
+        assert params["function"] == "TIME_SERIES_DAILY"
+
+    @patch.dict("os.environ", {"ALPHAVANTAGE_API_KEY": "test_key"})
+    @patch("data.requests.get")
+    def test_uses_correct_endpoint_for_crypto(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = self.CRYPTO_RESPONSE
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        from data import AlphaVantage
+        av = AlphaVantage()
+        av.get_historical_price.cache_clear()
+        av.get_historical_price("BTC", "2021-01-04", "2021-01-05")
+
+        params = mock_get.call_args.kwargs.get("params") or mock_get.call_args[1].get("params")
+        assert params["function"] == "DIGITAL_CURRENCY_DAILY"
