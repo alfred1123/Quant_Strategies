@@ -38,7 +38,7 @@ Each constructor creates `TechnicalAnalysis` internally — callers pass raw dat
 
 ### data.py — Data Sources
 - Each source is a class (`FutuOpenD`, `Glassnode`, `AlphaVantage`, `YahooFinance`).
-- Returns a DataFrame. Glassnode, AlphaVantage, and YahooFinance return columns `['t', 'v']`.
+- Returns a DataFrame. Glassnode, AlphaVantage, and YahooFinance return columns `['t', 'v']`. YahooFinance also returns `'volume'`.
 - API keys loaded from `.env` at the project root via `python-dotenv`; constructors validate that required keys are set.
 - `YahooFinance` requires no API key. Supports equities, ETFs, indices, and crypto (e.g. `'BTC-USD'`). Returns 10+ years of free daily data.
 - Methods use `@lru_cache` — clear cache in tests.
@@ -66,7 +66,9 @@ Each constructor creates `TechnicalAnalysis` internally — callers pass raw dat
 
 ### param_opt.py — Grid Search
 - `ParametersOptimization(data, config, *, fee_bps=None)`.
-- `optimize(window_tuple, signal_tuple)` → generator yielding `(window, signal, sharpe)`.
+- `optimize(window_tuple, signal_tuple, factor_columns=None)` → generator.
+  - Without `factor_columns`: yields `(window, signal, sharpe)` — backward compatible.
+  - With `factor_columns` (e.g. `["price", "volume"]`): yields `(window, signal, factor, sharpe)`. For each factor, copies data and sets `data['factor'] = data[factor_col]` before computing performance.
 
 ### walk_forward.py — Overfitting Detection
 - `WalkForward(data, split_ratio, config, *, fee_bps=None)`.

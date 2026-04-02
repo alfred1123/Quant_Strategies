@@ -29,6 +29,7 @@ def sample_ohlc_df():
         "Close": close,
         "price": close,
         "factor": close,
+        "volume": np.abs(np.random.randn(n) * 1000) + 100,
     })
 
 
@@ -51,6 +52,7 @@ def trending_up_df():
         "Close": prices,
         "High": prices + 1,
         "Low": prices - 1,
+        "volume": np.linspace(100, 200, n),
     })
 
 
@@ -65,4 +67,5 @@ def trending_down_df():
         "Close": prices,
         "High": prices + 1,
         "Low": prices - 1,
+        "volume": np.linspace(200, 100, n),
     })

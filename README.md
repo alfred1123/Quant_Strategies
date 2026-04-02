@@ -142,6 +142,9 @@ python main.py --symbol ETH-USD --start 2020-01-01 --end 2026-01-01
 # Different indicator + strategy
 python main.py --indicator sma --strategy reversion
 
+# Optimize over both price and volume as the indicator factor
+python main.py --factor price volume
+
 # Custom grid search bounds
 python main.py --win-min 10 --win-max 60 --win-step 10 --sig-min 0.5 --sig-max 2.0
 
@@ -159,6 +162,7 @@ All CLI options (run `python main.py --help`):
 | `--asset` | `crypto` | `crypto` (365 days/year) or `equity` (252 trading days/year) |
 | `--indicator` | `bollinger` | `bollinger`, `sma`, `ema`, `rsi` |
 | `--strategy` | `momentum` | `momentum` or `reversion` |
+| `--factor` | `price` | `price`, `volume`, or both (sweep in grid search) |
 | `--window` | `20` | Indicator window for single backtest |
 | `--signal` | `1.0` | Signal threshold for single backtest |
 | `--no-grid` | `false` | Skip parameter optimization |
@@ -201,6 +205,83 @@ python main.py --symbol AAPL --asset equity --indicator sma --walk-forward --spl
 - Cumulative return chart with a vertical line marking the split point
 
 **Overfitting ratio:** `1 − (OOS Sharpe / IS Sharpe)`. Values near 0 indicate robust parameters; values near 1 indicate the strategy performs much worse out-of-sample.
+
+---
+
+### Paper Trading with Futu OpenD
+
+The **Trading** tab in the Streamlit dashboard lets you connect to a running Futu OpenD gateway and execute orders in paper (simulate) or live mode — directly from your backtest results.
+
+#### Prerequisites
+
+1. **Install Futu OpenD** — download from [futunn.com](https://www.futunn.com/download/openAPI) and install on your desktop (Windows/macOS).
+2. **Launch Futu OpenD** — open the desktop app and log in. The gateway must be running whenever you trade.
+3. **Enable API access** — in Futu OpenD settings, ensure the API server is enabled (default port: `11111`).
+4. **Set env vars** — add to your `.env`:
+   ```
+   FUTU_HOST=127.0.0.1
+   FUTU_PORT=11111
+   ```
+   If running on a remote server, use the IP of the machine running Futu OpenD and allow the port through the firewall.
+
+#### Paper trading walkthrough
+
+1. Launch the dashboard:
+   ```bash
+   cd src && streamlit run app.py
+   ```
+2. Go to the **Trading** tab.
+3. Configure:
+   - **Futu Symbol** — use Futu format: `US.AAPL`, `US.WEAT`, `HK.00700`
+   - **Quantity** — number of shares per order
+   - **Paper Trading** — toggle ON (enabled by default)
+4. Click **Connect to Futu OpenD**. You should see a green "Connected (PAPER mode)" banner.
+5. The **Account Overview** section shows your simulated account balance and any open positions.
+
+#### Placing orders
+
+**Manual orders:**
+- Select **Side** (BUY/SELL), **Type** (MARKET/LIMIT), and optionally a **Limit Price**.
+- Click **Place Order**. The order routes to Futu's paper trading environment.
+
+**Strategy-driven orders:**
+- Under **Apply Backtest Strategy**, set the **Window** and **Signal** parameters (pre-filled from the sidebar).
+- Click **Generate Signal & Execute**. The dashboard:
+  1. Runs the backtest pipeline on the latest data
+  2. Reads the most recent position signal (LONG / SHORT / FLAT)
+  3. Compares it to your current Futu position
+  4. Places the required order(s) to match the signal — including closing opposing positions first
+
+#### Visualising trades in the Futu app
+
+Paper trades placed through the dashboard appear in the **Futu desktop app** (Futu NiuNiu / moomoo) in real time:
+
+- **Portfolio** → **Paper Trading** tab shows your simulated positions, P&L, and market value.
+- **Trade** → **Order History** shows all orders placed through the API, including status (filled, pending, cancelled).
+- **Charts** — open any symbol's chart in Futu and your paper positions are overlaid as buy/sell markers. Use Futu's built-in technical analysis tools (SMA, Bollinger Bands, RSI, etc.) to cross-reference with your strategy's signals.
+- **Alerts** — set price alerts in Futu to get notified when your strategy's signal levels are approached.
+
+> **Tip:** Futu's paper trading environment simulates realistic fills during market hours. Outside trading hours, market orders will queue until the next session opens.
+
+#### From Python (without the dashboard)
+
+```python
+from trade import FutuTrader
+
+with FutuTrader(paper=True) as trader:
+    # Place a market buy
+    result = trader.place_order("US.AAPL", 10, "BUY")
+    print(result)  # OrderResult(success=True, order_id='...', message='...')
+
+    # Check positions
+    print(trader.get_positions())
+
+    # Apply a strategy signal directly
+    trader.apply_signal("US.AAPL", signal_value=1, qty=10)  # go long
+
+    # Cancel all open orders
+    trader.cancel_all_orders()
+```
 
 ---
 
@@ -276,6 +357,7 @@ Quant_Strategies/
 │   ├── perf.py              # Performance metrics & PnL engine
 │   ├── param_opt.py         # Grid-search parameter optimization
 │   ├── walk_forward.py      # Walk-forward overfitting test
+│   ├── trade.py             # Futu OpenD paper/live trade execution
 │   ├── log_config.py        # Centralised logging configuration
 │   ├── main.py              # CLI entry point — configurable via argparse
 │   └── app.py               # Streamlit web dashboard
