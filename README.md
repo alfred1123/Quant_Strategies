@@ -1,6 +1,6 @@
 # Quant Strategies
 
-Backtesting and trading framework for crypto and equity markets. Strategies are built around technical indicators (SMA, EMA, RSI, Bollinger Z-score, Stochastic Oscillator) and optimized via grid search over parameter space.
+Backtesting and trading framework for crypto and equity markets. Strategies are built around technical indicators (SMA, EMA, RSI, Bollinger Z-score, Stochastic Oscillator) and optimized via N-dimensional grid search over parameter space.
 
 **Target:** strategies with Sharpe > 1.5 and strong Calmar ratios.
 
@@ -93,10 +93,31 @@ Open the URL printed in the terminal (default: `http://localhost:8501`).
 - **Symbol** — any Yahoo Finance ticker: `BTC-USD`, `AAPL`, `ETH-USD`, `SPY`, `^GSPC`
 - **Date range** — start and end dates for the backtest
 - **Asset type** — Crypto (365 days/year) or Equity (252 trading days/year)
-- **Indicator** — Bollinger Band (z-score), SMA, EMA, RSI
+- **Indicator** — Bollinger Band (z-score), SMA, EMA, RSI, Stochastic Oscillator
 - **Strategy** — Momentum or Reversion
 - **Window / Signal** — parameters for single backtest
-- **Grid search bounds** — window min/max/step and signal min/max/step
+- **Grid search rows** — row-based configuration builder (see below)
+
+**Full Analysis tab** (recommended — one-click end-to-end):
+1. Configure grid search rows in the sidebar (each row = factor × indicator × strategy × window range × signal range)
+2. Click **Run Full Analysis**
+3. Grid search runs across all rows, producing a combined results table
+4. Walk-forward overfitting test runs automatically on the first row's configuration
+5. Interactive heatmap — select any parameter pair as axes, filter remaining dimensions
+6. Select parameters to drill into: strategy performance metrics, cumulative return chart, drawdown chart
+7. Overfitting ratio with color coding (green/yellow/red)
+8. Download grid results, daily PnL, and walk-forward summary as CSV
+
+**Row-based grid search configuration:**
+
+The sidebar grid search section uses a **row-based builder**. Each row independently specifies:
+- **Factor** — price or volume
+- **Indicator** — Bollinger, SMA, EMA, RSI, or Stochastic Oscillator
+- **Strategy** — Momentum or Reversion
+- **Window range** — min, max, step
+- **Signal range** — min, max, step
+
+Click **➕ Add Row** to add more configurations. Each row runs as a separate sweep and results are combined into a single Sharpe heatmap with per-row metadata (factor, indicator, strategy) as filterable dimensions.
 
 **Single Backtest tab:**
 1. Set your parameters in the sidebar
@@ -106,7 +127,7 @@ Open the URL printed in the terminal (default: `http://localhost:8501`).
 5. Download daily PnL as CSV
 
 **Parameter Optimization tab:**
-1. Set grid search ranges in the sidebar
+1. Uses the same row-based grid from the sidebar
 2. Click **Run Grid Search**
 3. Progress bar shows completion status
 4. View top-10 parameter combinations ranked by Sharpe ratio
@@ -142,6 +163,12 @@ python main.py --symbol ETH-USD --start 2020-01-01 --end 2026-01-01
 # Different indicator + strategy
 python main.py --indicator sma --strategy reversion
 
+# Sweep multiple indicators and strategies in grid search
+python main.py --indicator bollinger sma rsi --strategy momentum reversion
+
+# Stochastic oscillator
+python main.py --indicator stochastic --strategy momentum
+
 # Optimize over both price and volume as the indicator factor
 python main.py --factor price volume
 
@@ -160,8 +187,8 @@ All CLI options (run `python main.py --help`):
 | `--start` | `2016-01-01` | Backtest start date |
 | `--end` | `2026-04-01` | Backtest end date |
 | `--asset` | `crypto` | `crypto` (365 days/year) or `equity` (252 trading days/year) |
-| `--indicator` | `bollinger` | `bollinger`, `sma`, `ema`, `rsi` |
-| `--strategy` | `momentum` | `momentum` or `reversion` |
+| `--indicator` | `bollinger` | `bollinger`, `sma`, `ema`, `rsi`, `stochastic` — accepts multiple values (sweep in grid search) |
+| `--strategy` | `momentum` | `momentum` or `reversion` — accepts multiple values (sweep in grid search) |
 | `--factor` | `price` | `price`, `volume`, or both (sweep in grid search) |
 | `--window` | `20` | Indicator window for single backtest |
 | `--signal` | `1.0` | Signal threshold for single backtest |
@@ -355,7 +382,7 @@ Quant_Strategies/
 │   ├── ta.py                # Technical analysis indicators
 │   ├── strat.py             # Signal generation strategies + StrategyConfig dataclass
 │   ├── perf.py              # Performance metrics & PnL engine
-│   ├── param_opt.py         # Grid-search parameter optimization
+│   ├── param_opt.py         # N-dimensional grid-search parameter optimization
 │   ├── walk_forward.py      # Walk-forward overfitting test
 │   ├── trade.py             # Futu OpenD paper/live trade execution
 │   ├── log_config.py        # Centralised logging configuration
@@ -390,8 +417,9 @@ data.py ──► ta.py ──► strat.py ──► perf.py ──► param_opt
   │            │           │           │              │                     optimize on IS, evaluate on OOS, report
   │            │           │           │              │                     overfitting ratio
   │            │           │           │              │
-  │            │           │           │              └─ Grid search over (window, signal)
-  │            │           │           │                 pairs, returns best Sharpe
+  │            │           │           │              └─ N-dimensional grid search over param_grid
+  │            │           │           │                 (window, signal, factor, indicator, strategy),
+  │            │           │           │                 returns best Sharpe
   │            │           │           │
   │            │           │           └─ Computes PnL, cumulative return, drawdown,
   │            │           │              Sharpe, Calmar vs buy-and-hold benchmark
@@ -419,7 +447,7 @@ data.py ──► ta.py ──► strat.py ──► perf.py ──► param_opt
 | `get_ema(period)` | Exponential Moving Average |
 | `get_rsi(period)` | Relative Strength Index (0–100) |
 | `get_bollinger_band(period)` | Bollinger Z-score: `(factor - SMA) / rolling_std` |
-| `get_stochastic_oscillator(period)` | Stochastic %D (requires High/Low/Close columns — not available in dashboard) |
+| `get_stochastic_oscillator(period)` | Stochastic %D — available in both CLI and dashboard |
 
 **Strategies** (`strat.py`):
 
@@ -443,6 +471,11 @@ config = StrategyConfig(
 perf = Performance(data, config, window=20, signal=1.0, fee_bps=5.0)
 opt  = ParametersOptimization(data, config, fee_bps=5.0)
 wf   = WalkForward(data, split_ratio=0.5, config=config, fee_bps=5.0)
+
+# N-dimensional grid search via optimize_grid():
+param_grid = {'window': (10, 20, 50), 'signal': (0.5, 1.0, 1.5)}
+for result in opt.optimize_grid(param_grid):
+    print(result)  # {'window': 10, 'signal': 0.5, 'sharpe': 1.23, ...}
 ```
 
 Transaction fees (`fee_bps`) are **not** part of the config — they vary by trading platform and are passed separately.
