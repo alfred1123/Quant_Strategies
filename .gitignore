@@ -31,5 +31,8 @@ Thumbs.db
 # Backtest output
 results/
 
+# Logs
+log/
+
 # Data (large files generated at runtime)
 data.csv

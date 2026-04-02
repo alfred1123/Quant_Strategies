@@ -337,7 +337,7 @@ with tab_wf:
 
         # Vertical line at split point
         if "datetime" in chart_df.columns and split_idx < len(chart_df):
-            split_date = chart_df["datetime"].iloc[split_idx]
+            split_date = pd.Timestamp(chart_df["datetime"].iloc[split_idx])
             fig.add_vline(
                 x=split_date, line_dash="dash", line_color="red",
                 annotation_text="Train/Test Split",
