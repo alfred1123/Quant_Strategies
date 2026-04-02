@@ -5,7 +5,6 @@ Launch:
 """
 
 import logging
-import sys
 import os
 
 import numpy as np
@@ -46,6 +45,27 @@ ASSET_TYPES = {
 
 st.set_page_config(page_title="Quant Strategies — Backtest", layout="wide")
 st.title("Quant Strategies — Backtest Dashboard")
+
+st.markdown("""
+<style>
+/* Primary buttons — larger, bolder, with hover effect */
+button[kind="primary"] {
+    font-size: 1.1rem !important;
+    font-weight: 700 !important;
+    padding: 0.6rem 2.4rem !important;
+    border-radius: 0.5rem !important;
+    transition: transform 0.1s, box-shadow 0.1s !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
+}
+button[kind="primary"]:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25) !important;
+}
+button[kind="primary"]:active {
+    transform: translateY(0px) !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ── Sidebar inputs ──────────────────────────────────────────────────
 
@@ -116,6 +136,23 @@ def fetch_data(symbol, start, end):
     })
 
 
+# ── Helpers: build grid lists & config (shared by all tabs) ─────────
+
+def _build_grid_lists():
+    """Return (window_list, signal_list) from sidebar inputs."""
+    wl = list(range(int(win_min), int(win_max) + 1, int(win_step)))
+    sl = list(np.arange(sig_min, sig_max + sig_step / 2, sig_step))
+    return wl, sl
+
+
+def _build_config():
+    return StrategyConfig(
+        indicator_name=INDICATORS[indicator_name],
+        strategy_func=STRATEGIES[strategy_name],
+        trading_period=trading_period,
+    )
+
+
 # ── Fetch data ──────────────────────────────────────────────────────
 
 try:
@@ -129,9 +166,271 @@ st.sidebar.success(f"Loaded {len(df)} daily bars")
 
 # ── Tab layout ──────────────────────────────────────────────────────
 
-tab_single, tab_grid, tab_wf = st.tabs(
-    ["Single Backtest", "Parameter Optimization", "Walk-Forward Test"]
+tab_full, tab_single, tab_grid, tab_wf = st.tabs(
+    ["Full Analysis", "Single Backtest", "Parameter Optimization", "Walk-Forward Test"]
 )
+
+# ── Tab 0: Full Analysis ───────────────────────────────────────────
+
+with tab_full:
+    run_full = st.button("Run Full Analysis", type="primary", key="run_full")
+
+    if run_full:
+        config = _build_config()
+
+        # ── Step 1: Grid Search ─────────────────────────────────────
+        window_list, signal_list = _build_grid_lists()
+        total = len(window_list) * len(signal_list)
+
+        if total == 0:
+            st.error("Grid is empty — check Window/Signal ranges in the sidebar.")
+            st.stop()
+
+        if total > 5000:
+            st.warning(f"Grid has {total} combinations — this may take a while.")
+
+        opt = ParametersOptimization(df.copy(), config, fee_bps=fee_bps)
+
+        progress = st.progress(0, text="Running grid search...")
+        results = []
+        for i, row in enumerate(
+            opt.optimize(tuple(window_list), tuple(signal_list))
+        ):
+            results.append(row)
+            progress.progress((i + 1) / total,
+                              text=f"Evaluated {i + 1}/{total} combinations")
+        progress.empty()
+
+        param_perf = pd.DataFrame(results, columns=["window", "signal", "sharpe"])
+
+        # ── Walk-Forward ────────────────────────────────────────────
+        wf_result = None
+        wf_split_idx = None
+        try:
+            wf = WalkForward(df.copy(), split_ratio, config, fee_bps=fee_bps)
+            wf_result = wf.run(tuple(window_list), tuple(signal_list))
+            wf_split_idx = wf.split_idx
+        except ValueError as exc:
+            st.warning(f"Walk-forward skipped: {exc}")
+
+        # Persist to session_state so heatmap clicks survive reruns
+        st.session_state["full_param_perf"] = param_perf
+        st.session_state["full_config"] = config
+        st.session_state["full_fee_bps"] = fee_bps
+        st.session_state["full_symbol"] = symbol
+        st.session_state["full_indicator"] = indicator_name
+        st.session_state["full_strategy"] = strategy_name
+        st.session_state["full_wf_result"] = wf_result
+        st.session_state["full_wf_split_idx"] = wf_split_idx
+        st.session_state["full_df"] = df.copy()
+
+    # ── Render results from session_state ───────────────────────────
+    if "full_param_perf" in st.session_state:
+        param_perf = st.session_state["full_param_perf"]
+        config = st.session_state["full_config"]
+        _fee_bps = st.session_state["full_fee_bps"]
+        _symbol = st.session_state["full_symbol"]
+        _indicator = st.session_state["full_indicator"]
+        _strategy = st.session_state["full_strategy"]
+        wf_result = st.session_state["full_wf_result"]
+        wf_split_idx = st.session_state["full_wf_split_idx"]
+        _df = st.session_state["full_df"]
+
+        valid = param_perf["sharpe"].dropna()
+        if valid.empty:
+            st.error("All Sharpe ratios are NaN — check data length vs window sizes.")
+            st.stop()
+        best = param_perf.loc[valid.idxmax()]
+        best_window = int(best["window"])
+        best_signal = float(best["signal"])
+
+        # ── Heatmap with click support ──────────────────────────────
+        st.header("1. Parameter Optimization")
+        st.success(
+            f"**Optimal parameters:** window={best_window}, "
+            f"signal={best_signal:.2f}, Sharpe={best['sharpe']:.4f}"
+        )
+
+        pivot = param_perf.pivot(index="window", columns="signal",
+                                values="sharpe")
+        fig_hm = go.Figure(data=go.Heatmap(
+            z=pivot.values,
+            x=[f"{s:.2f}" for s in pivot.columns],
+            y=pivot.index.tolist(),
+            colorscale="RdYlGn",
+            zmid=0,
+            text=np.round(pivot.values, 2),
+            texttemplate="%{text}",
+            hovertemplate="Window: %{y}<br>Signal: %{x}<br>Sharpe: %{z:.4f}",
+        ))
+        fig_hm.update_layout(
+            title=f"{_symbol} {_indicator} + {_strategy} — Sharpe Heatmap (click a cell)",
+            xaxis_title="Signal Threshold",
+            yaxis_title="Indicator Window",
+            height=max(400, len(pivot.index) * 30),
+        )
+
+        hm_selection = st.plotly_chart(fig_hm, use_container_width=True)
+
+        # Determine which params to show
+        windows = sorted(param_perf["window"].unique().astype(int))
+        signals = sorted(param_perf["signal"].unique())
+
+        st.subheader("Select parameters")
+        col_pw, col_ps = st.columns(2)
+        with col_pw:
+            sel_window = st.selectbox(
+                "Window", windows,
+                index=windows.index(best_window),
+                key="full_sel_window",
+            )
+        with col_ps:
+            sig_labels = [f"{s:.2f}" for s in signals]
+            sel_signal_label = st.selectbox(
+                "Signal", sig_labels,
+                index=sig_labels.index(f"{best_signal:.2f}"),
+                key="full_sel_signal",
+            )
+            sel_signal = float(sel_signal_label)
+
+        # Show Sharpe for the selected combo
+        match = param_perf[
+            (param_perf["window"] == sel_window)
+            & (np.isclose(param_perf["signal"], sel_signal))
+        ]
+        if not match.empty:
+            sel_sharpe = match.iloc[0]["sharpe"]
+            st.info(f"**Selected:** window={sel_window}, signal={sel_signal:.2f}, Sharpe={sel_sharpe:.4f}")
+
+        st.divider()
+
+        # ── Performance for selected params ─────────────────────────
+        st.header(f"2. Strategy Performance (window={sel_window}, signal={sel_signal:.2f})")
+
+        perf = Performance(_df.copy(), config, sel_window, sel_signal,
+                           fee_bps=_fee_bps)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("Strategy")
+            st.dataframe(perf.get_strategy_performance().to_frame("Value"),
+                         use_container_width=True)
+        with col2:
+            st.subheader("Buy & Hold")
+            st.dataframe(perf.get_buy_hold_performance().to_frame("Value"),
+                         use_container_width=True)
+
+        # Cumulative return chart
+        chart_df = perf.data.dropna(subset=["cumu"]).copy()
+        fig_ret = go.Figure()
+        fig_ret.add_trace(go.Scatter(
+            x=chart_df["datetime"], y=chart_df["cumu"],
+            mode="lines", name="Strategy",
+        ))
+        fig_ret.add_trace(go.Scatter(
+            x=chart_df["datetime"], y=chart_df["buy_hold_cumu"],
+            mode="lines", name="Buy & Hold",
+        ))
+        fig_ret.update_layout(
+            title=f"{_symbol} — Cumulative Return (window={sel_window}, signal={sel_signal:.2f})",
+            xaxis_title="Date", yaxis_title="Cumulative Return",
+            height=500,
+        )
+        st.plotly_chart(fig_ret, use_container_width=True)
+
+        # Drawdown chart
+        fig_dd = go.Figure()
+        fig_dd.add_trace(go.Scatter(
+            x=chart_df["datetime"], y=-chart_df["dd"],
+            fill="tozeroy", name="Strategy DD",
+        ))
+        fig_dd.add_trace(go.Scatter(
+            x=chart_df["datetime"], y=-chart_df["buy_hold_dd"],
+            fill="tozeroy", name="Buy & Hold DD",
+        ))
+        fig_dd.update_layout(title="Drawdown", xaxis_title="Date",
+                             yaxis_title="Drawdown", height=350)
+        st.plotly_chart(fig_dd, use_container_width=True)
+
+        st.divider()
+
+        # ── Walk-Forward Results ────────────────────────────────────
+        st.header("3. Overfitting Analysis")
+        if wf_result is not None:
+            st.info(
+                f"**Walk-forward best (in-sample):** window={wf_result.best_window}, "
+                f"signal={wf_result.best_signal:.2f}"
+            )
+
+            ov = wf_result.overfitting_ratio
+            if np.isnan(ov):
+                st.warning("Overfitting ratio: N/A (in-sample Sharpe is zero or NaN)")
+            elif ov < 0.3:
+                st.success(f"Overfitting ratio: **{ov:.4f}** — Low risk of overfitting")
+            elif ov < 0.5:
+                st.warning(f"Overfitting ratio: **{ov:.4f}** — Moderate overfitting risk")
+            else:
+                st.error(f"Overfitting ratio: **{ov:.4f}** — High overfitting risk")
+
+            summary = wf_result.summary()
+            st.dataframe(summary, use_container_width=True)
+
+            # Walk-forward cumulative return chart
+            wf_perf = Performance(
+                _df.copy(), config, wf_result.best_window, wf_result.best_signal,
+                fee_bps=_fee_bps,
+            )
+            wf_chart = wf_perf.data.dropna(subset=["cumu"]).copy()
+
+            fig_wf = go.Figure()
+            fig_wf.add_trace(go.Scatter(
+                x=wf_chart["datetime"], y=wf_chart["cumu"],
+                mode="lines", name="Strategy",
+            ))
+            fig_wf.add_trace(go.Scatter(
+                x=wf_chart["datetime"], y=wf_chart["buy_hold_cumu"],
+                mode="lines", name="Buy & Hold",
+            ))
+            if ("datetime" in wf_chart.columns
+                    and wf_split_idx is not None
+                    and wf_split_idx < len(wf_chart)):
+                split_date = str(wf_chart["datetime"].iloc[wf_split_idx])
+                fig_wf.add_vline(
+                    x=split_date, line_dash="dash", line_color="red",
+                )
+                fig_wf.add_annotation(
+                    x=split_date, y=1, yref="paper",
+                    text="Train/Test Split", showarrow=False,
+                    xanchor="left", yanchor="top",
+                    font=dict(color="red"),
+                )
+            fig_wf.update_layout(
+                title=f"{_symbol} — Walk-Forward Cumulative Return",
+                xaxis_title="Date", yaxis_title="Cumulative Return",
+                height=500,
+            )
+            st.plotly_chart(fig_wf, use_container_width=True)
+        else:
+            st.warning("Walk-forward test was skipped (see above).")
+
+        # Download all results
+        st.divider()
+        col_dl1, col_dl2 = st.columns(2)
+        with col_dl1:
+            st.download_button("Grid results (CSV)",
+                               param_perf.to_csv(index=False),
+                               file_name=f"opt_{_symbol}.csv", mime="text/csv",
+                               key="full_dl_grid")
+        with col_dl2:
+            st.download_button("Daily PnL (CSV)",
+                               perf.data.to_csv(index=False),
+                               file_name=f"perf_{_symbol}.csv", mime="text/csv",
+                               key="full_dl_perf")
+        if wf_result is not None:
+            st.download_button("Walk-forward (CSV)",
+                               wf_result.summary().to_csv(),
+                               file_name=f"wf_{_symbol}.csv", mime="text/csv",
+                               key="full_dl_wf")
 
 # ── Tab 1: Single backtest ──────────────────────────────────────────
 
@@ -140,11 +439,7 @@ with tab_single:
 
     if run_single:
         data_copy = df.copy()
-        config = StrategyConfig(
-            indicator_name=INDICATORS[indicator_name],
-            strategy_func=STRATEGIES[strategy_name],
-            trading_period=trading_period,
-        )
+        config = _build_config()
 
         perf = Performance(data_copy, config, window, signal,
                            fee_bps=fee_bps)
@@ -195,19 +490,18 @@ with tab_grid:
     run_grid = st.button("Run Grid Search", type="primary", key="run_grid")
 
     if run_grid:
-        window_list = list(range(int(win_min), int(win_max) + 1, int(win_step)))
-        signal_list = list(np.arange(sig_min, sig_max + sig_step / 2, sig_step))
+        window_list, signal_list = _build_grid_lists()
         total = len(window_list) * len(signal_list)
+
+        if total == 0:
+            st.error("Grid is empty — check Window/Signal ranges in the sidebar.")
+            st.stop()
 
         if total > 5000:
             st.warning(f"Grid has {total} combinations — this may take a while.")
 
         data_copy = df.copy()
-        config = StrategyConfig(
-            indicator_name=INDICATORS[indicator_name],
-            strategy_func=STRATEGIES[strategy_name],
-            trading_period=trading_period,
-        )
+        config = _build_config()
 
         opt = ParametersOptimization(
             data_copy, config, fee_bps=fee_bps,
@@ -227,7 +521,11 @@ with tab_grid:
         param_perf = pd.DataFrame(results, columns=["window", "signal", "sharpe"])
 
         # Best parameters
-        best = param_perf.loc[param_perf["sharpe"].idxmax()]
+        valid = param_perf["sharpe"].dropna()
+        if valid.empty:
+            st.error("All Sharpe ratios are NaN — check data length vs window sizes.")
+            st.stop()
+        best = param_perf.loc[valid.idxmax()]
         st.success(
             f"**Best:** window={int(best['window'])}, "
             f"signal={best['signal']:.2f}, Sharpe={best['sharpe']:.4f}"
@@ -274,15 +572,14 @@ with tab_wf:
     run_wf = st.button("Run Walk-Forward Test", type="primary", key="run_wf")
 
     if run_wf:
-        window_list = list(range(int(win_min), int(win_max) + 1, int(win_step)))
-        signal_list = list(np.arange(sig_min, sig_max + sig_step / 2, sig_step))
+        window_list, signal_list = _build_grid_lists()
+
+        if not window_list or not signal_list:
+            st.error("Grid is empty — check Window/Signal ranges in the sidebar.")
+            st.stop()
 
         data_copy = df.copy()
-        config = StrategyConfig(
-            indicator_name=INDICATORS[indicator_name],
-            strategy_func=STRATEGIES[strategy_name],
-            trading_period=trading_period,
-        )
+        config = _build_config()
 
         try:
             wf = WalkForward(
@@ -336,12 +633,18 @@ with tab_wf:
         ))
 
         # Vertical line at split point
-        if "datetime" in chart_df.columns and split_idx < len(chart_df):
-            split_date = pd.Timestamp(chart_df["datetime"].iloc[split_idx])
+        if ("datetime" in chart_df.columns
+                and split_idx is not None
+                and split_idx < len(chart_df)):
+            split_date = str(chart_df["datetime"].iloc[split_idx])
             fig.add_vline(
                 x=split_date, line_dash="dash", line_color="red",
-                annotation_text="Train/Test Split",
-                annotation_position="top right",
+            )
+            fig.add_annotation(
+                x=split_date, y=1, yref="paper",
+                text="Train/Test Split", showarrow=False,
+                xanchor="left", yanchor="top",
+                font=dict(color="red"),
             )
 
         fig.update_layout(
