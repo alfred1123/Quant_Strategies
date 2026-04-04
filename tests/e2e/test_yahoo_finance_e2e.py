@@ -16,7 +16,7 @@ import pandas as pd
 import pytest
 
 from data import YahooFinance
-from strat import Strategy, StrategyConfig
+from strat import Strategy, StrategyConfig, FactorConfig
 from perf import Performance
 from param_opt import ParametersOptimization
 from walk_forward import WalkForward
@@ -95,7 +95,7 @@ class TestFullPipelineE2E:
     @pytest.fixture
     def equity_config(self):
         return StrategyConfig(
-            indicator_name="get_sma",
+            factors=(FactorConfig("factor", "get_sma"),),
             strategy_func=Strategy.momentum_const_signal,
             trading_period=252,
         )
@@ -112,7 +112,7 @@ class TestFullPipelineE2E:
 
     def test_bollinger_reversion_produces_valid_metrics(self, aapl_data):
         config = StrategyConfig(
-            indicator_name="get_bollinger_band",
+            factors=(FactorConfig("factor", "get_bollinger_band"),),
             strategy_func=Strategy.reversion_const_signal,
             trading_period=252,
         )
@@ -124,7 +124,7 @@ class TestFullPipelineE2E:
 
     def test_ema_momentum_produces_valid_metrics(self, aapl_data):
         config = StrategyConfig(
-            indicator_name="get_ema",
+            factors=(FactorConfig("factor", "get_ema"),),
             strategy_func=Strategy.momentum_const_signal,
             trading_period=252,
         )
@@ -165,7 +165,7 @@ class TestParamOptE2E:
 
     def test_grid_search_returns_results(self, spy_data):
         config = StrategyConfig(
-            indicator_name="get_sma",
+            factors=(FactorConfig("factor", "get_sma"),),
             strategy_func=Strategy.momentum_const_signal,
             trading_period=252,
         )
@@ -195,7 +195,7 @@ class TestWalkForwardE2E:
 
     def test_walk_forward_produces_result(self, spy_data):
         config = StrategyConfig(
-            indicator_name="get_sma",
+            factors=(FactorConfig("factor", "get_sma"),),
             strategy_func=Strategy.momentum_const_signal,
             trading_period=252,
         )
@@ -210,7 +210,7 @@ class TestWalkForwardE2E:
 
     def test_walk_forward_summary_dataframe(self, spy_data):
         config = StrategyConfig(
-            indicator_name="get_bollinger_band",
+            factors=(FactorConfig("factor", "get_bollinger_band"),),
             strategy_func=Strategy.reversion_const_signal,
             trading_period=252,
         )

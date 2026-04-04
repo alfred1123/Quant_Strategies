@@ -2,12 +2,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from strat import Strategy, StrategyConfig
+from strat import Strategy, StrategyConfig, FactorConfig
 from param_opt import ParametersOptimization
 
 
-_BOLLINGER_CONFIG = StrategyConfig("get_bollinger_band",
-                                   Strategy.momentum_const_signal, 252)
+_BOLLINGER_CONFIG = StrategyConfig(
+    factors=(FactorConfig('factor', 'get_bollinger_band'),),
+    strategy_func=Strategy.momentum_const_signal,
+    trading_period=252,
+)
 
 
 class TestParametersOptimization:
@@ -65,14 +68,20 @@ class TestParametersOptimization:
 
 class TestParametersOptimizationWithConfig:
     def test_config_stored(self, sample_ohlc_df):
-        config = StrategyConfig("get_bollinger_band",
-                                Strategy.momentum_const_signal, 252)
+        config = StrategyConfig(
+            factors=(FactorConfig('factor', 'get_bollinger_band'),),
+            strategy_func=Strategy.momentum_const_signal,
+            trading_period=252,
+        )
         opt = ParametersOptimization(sample_ohlc_df.copy(), config)
         assert opt.config is config
 
     def test_fee_propagates(self, sample_ohlc_df):
-        config = StrategyConfig("get_bollinger_band",
-                                Strategy.momentum_const_signal, 252)
+        config = StrategyConfig(
+            factors=(FactorConfig('factor', 'get_bollinger_band'),),
+            strategy_func=Strategy.momentum_const_signal,
+            trading_period=252,
+        )
         opt = ParametersOptimization(sample_ohlc_df.copy(), config, fee_bps=20.0)
         assert opt.fee_bps == 20.0
 

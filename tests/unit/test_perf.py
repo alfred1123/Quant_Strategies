@@ -2,12 +2,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from strat import Strategy, StrategyConfig
+from strat import Strategy, StrategyConfig, FactorConfig
 from perf import Performance
 
 
-_BOLLINGER_CONFIG = StrategyConfig("get_bollinger_band",
-                                   Strategy.momentum_const_signal, 252)
+_BOLLINGER_CONFIG = StrategyConfig(
+    factors=(FactorConfig('factor', 'get_bollinger_band'),),
+    strategy_func=Strategy.momentum_const_signal,
+    trading_period=252,
+)
 
 
 def _make_performance(df, window=5, signal=0.5, config=None):
@@ -127,21 +130,30 @@ class TestTrendingMarkets:
 
 class TestPerformanceWithConfig:
     def test_config_stored(self, sample_ohlc_df):
-        config = StrategyConfig("get_bollinger_band",
-                                Strategy.momentum_const_signal, 252)
+        config = StrategyConfig(
+            factors=(FactorConfig('factor', 'get_bollinger_band'),),
+            strategy_func=Strategy.momentum_const_signal,
+            trading_period=252,
+        )
         perf = Performance(sample_ohlc_df.copy(), config, 5, 0.5)
         assert perf.config is config
         assert perf.trading_period == 252
 
     def test_fee_bps(self, sample_ohlc_df):
-        config = StrategyConfig("get_bollinger_band",
-                                Strategy.momentum_const_signal, 252)
+        config = StrategyConfig(
+            factors=(FactorConfig('factor', 'get_bollinger_band'),),
+            strategy_func=Strategy.momentum_const_signal,
+            trading_period=252,
+        )
         perf = Performance(sample_ohlc_df.copy(), config, 5, 0.5, fee_bps=10.0)
         assert perf.fee_bps == 10.0
 
     def test_different_indicator(self, sample_ohlc_df):
-        config = StrategyConfig("get_sma",
-                                Strategy.momentum_const_signal, 252)
+        config = StrategyConfig(
+            factors=(FactorConfig('factor', 'get_sma'),),
+            strategy_func=Strategy.momentum_const_signal,
+            trading_period=252,
+        )
         perf = Performance(sample_ohlc_df.copy(), config, 5, 0.5)
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)

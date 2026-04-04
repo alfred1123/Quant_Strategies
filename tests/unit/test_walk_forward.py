@@ -2,12 +2,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from strat import Strategy, StrategyConfig
+from strat import Strategy, StrategyConfig, FactorConfig
 from walk_forward import WalkForward, WalkForwardResult
 
 
-_BOLLINGER_CONFIG = StrategyConfig("get_bollinger_band",
-                                   Strategy.momentum_const_signal, 252)
+_BOLLINGER_CONFIG = StrategyConfig(
+    factors=(FactorConfig('factor', 'get_bollinger_band'),),
+    strategy_func=Strategy.momentum_const_signal,
+    trading_period=252,
+)
 
 
 def _make_synthetic_data(n=500, seed=42):
@@ -107,7 +110,7 @@ class TestWalkForwardResult:
                                 index=['Total Return', 'Annualized Return',
                                        'Sharpe Ratio', 'Max Drawdown',
                                        'Calmar Ratio'])
-        result = WalkForwardResult(20, 1.0, is_metrics, oos_metrics, 0.333)
+        result = WalkForwardResult((20,), (1.0,), is_metrics, oos_metrics, 0.333)
         summary = result.summary()
         assert isinstance(summary, pd.DataFrame)
         assert 'In-Sample' in summary.columns
@@ -123,7 +126,7 @@ class TestWalkForwardResult:
                                 index=['Total Return', 'Annualized Return',
                                        'Sharpe Ratio', 'Max Drawdown',
                                        'Calmar Ratio'])
-        result = WalkForwardResult(20, 1.0, is_metrics, oos_metrics, 0.333)
+        result = WalkForwardResult((20,), (1.0,), is_metrics, oos_metrics, 0.333)
         summary = result.summary()
         assert summary.loc['Overfitting Ratio', 'Out-of-Sample'] == pytest.approx(0.333)
         assert np.isnan(summary.loc['Overfitting Ratio', 'In-Sample'])
@@ -137,8 +140,11 @@ class TestWalkForwardWithConfig:
 
     def test_run_produces_result(self):
         df = _make_synthetic_data()
-        config = StrategyConfig("get_bollinger_band",
-                                Strategy.momentum_const_signal, 252)
+        config = StrategyConfig(
+            factors=(FactorConfig('factor', 'get_bollinger_band'),),
+            strategy_func=Strategy.momentum_const_signal,
+            trading_period=252,
+        )
         wf = WalkForward(df.copy(), 0.5, config)
         result = wf.run((20,), (1.0,))
         assert isinstance(result, WalkForwardResult)
@@ -146,7 +152,10 @@ class TestWalkForwardWithConfig:
 
     def test_fee_propagates(self):
         df = _make_synthetic_data()
-        config = StrategyConfig("get_bollinger_band",
-                                Strategy.momentum_const_signal, 252)
+        config = StrategyConfig(
+            factors=(FactorConfig('factor', 'get_bollinger_band'),),
+            strategy_func=Strategy.momentum_const_signal,
+            trading_period=252,
+        )
         wf = WalkForward(df, 0.5, config, fee_bps=15.0)
         assert wf.fee_bps == 15.0

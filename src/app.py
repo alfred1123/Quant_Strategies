@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from data import YahooFinance, AlphaVantage
-from strat import Strategy, StrategyConfig
+from strat import Strategy, StrategyConfig, FactorConfig
 from perf import Performance
 from log_config import setup_logging
 from param_opt import ParametersOptimization
@@ -109,9 +109,9 @@ with st.sidebar:
     # ── Session state for grid rows ─────────────────────────────────
     _FACTORS = ["price", "volume"]
     _DEFAULT_ROW = {
-        "factor": "price",
-        "indicator": list(INDICATORS.keys())[0],
-        "strategy": list(STRATEGIES.keys())[0],
+        "factor": ["price"],
+        "indicator": [list(INDICATORS.keys())[0]],
+        "strategy": [list(STRATEGIES.keys())[0]],
         "win_min": 5, "win_max": 100, "win_step": 5,
         "sig_min": 0.25, "sig_max": 2.50, "sig_step": 0.25,
     }
@@ -124,25 +124,31 @@ with st.sidebar:
         with st.container(border=True):
             cols_top = st.columns([1.5, 2, 2, 0.5])
             with cols_top[0]:
-                row["factor"] = st.selectbox(
+                _fac_cur = row["factor"]
+                _fac_default = _fac_cur if isinstance(_fac_cur, list) else [_fac_cur]
+                row["factor"] = st.multiselect(
                     "Factor", _FACTORS,
-                    index=_FACTORS.index(row["factor"]),
+                    default=_fac_default,
                     key=f"gr_factor_{idx}",
                 )
             with cols_top[1]:
                 ind_keys = list(INDICATORS.keys())
-                row["indicator"] = st.selectbox(
+                _ind_cur = row["indicator"]
+                _ind_default = _ind_cur if isinstance(_ind_cur, list) else [_ind_cur]
+                _ind_default = [v for v in _ind_default if v in ind_keys] or [ind_keys[0]]
+                row["indicator"] = st.multiselect(
                     "Indicator", ind_keys,
-                    index=ind_keys.index(row["indicator"])
-                    if row["indicator"] in ind_keys else 0,
+                    default=_ind_default,
                     key=f"gr_ind_{idx}",
                 )
             with cols_top[2]:
                 strat_keys = list(STRATEGIES.keys())
-                row["strategy"] = st.selectbox(
+                _strat_cur = row["strategy"]
+                _strat_default = _strat_cur if isinstance(_strat_cur, list) else [_strat_cur]
+                _strat_default = [v for v in _strat_default if v in strat_keys] or [strat_keys[0]]
+                row["strategy"] = st.multiselect(
                     "Strategy", strat_keys,
-                    index=strat_keys.index(row["strategy"])
-                    if row["strategy"] in strat_keys else 0,
+                    default=_strat_default,
                     key=f"gr_strat_{idx}",
                 )
             with cols_top[3]:
@@ -218,24 +224,34 @@ def fetch_data(symbol, start, end):
 
 def _build_config():
     return StrategyConfig(
-        indicator_name=INDICATORS[indicator_name],
+        factors=(FactorConfig('price', INDICATORS[indicator_name]),),
         strategy_func=STRATEGIES[strategy_name],
         trading_period=trading_period,
     )
 
 
 def _build_row_grids():
-    """Build a list of (config, param_grid) from grid search rows.
+    """Build a list of (config, param_grid, meta) from grid search rows.
 
-    Each sidebar row becomes one param_grid with fixed factor/indicator/strategy
-    and its own window × signal ranges.
+    Each sidebar row becomes one param_grid.  Dimensions with multiple
+    values (factor, indicator, strategy) are included in param_grid so
+    ``optimize_grid`` sweeps over them.
     """
     row_grids = []
     for row in st.session_state.get("grid_rows", []):
-        ind_method = INDICATORS[row["indicator"]]
-        strat_func = STRATEGIES[row["strategy"]]
+        factors = row["factor"] if isinstance(row["factor"], list) else [row["factor"]]
+        indicators = row["indicator"] if isinstance(row["indicator"], list) else [row["indicator"]]
+        strategies = row["strategy"] if isinstance(row["strategy"], list) else [row["strategy"]]
+
+        if not factors or not indicators or not strategies:
+            continue  # skip rows with empty selections
+
+        ind_method = INDICATORS[indicators[0]]
+        strat_func = STRATEGIES[strategies[0]]
         config = StrategyConfig(
-            indicator_name=ind_method,
+            factors=tuple(
+                FactorConfig(f, ind_method) for f in factors
+            ),
             strategy_func=strat_func,
             trading_period=trading_period,
         )
@@ -253,9 +269,17 @@ def _build_row_grids():
             'window': tuple(wl),
             'signal': tuple(sl),
         }
-        # Attach row metadata so results carry the factor/indicator/strategy
+        # Include multi-value dimensions in param_grid for sweeping
+        if len(factors) > 1:
+            param_grid['factor'] = factors
+        if len(indicators) > 1:
+            param_grid['indicator'] = [INDICATORS[i] for i in indicators]
+        if len(strategies) > 1:
+            param_grid['strategy'] = [STRATEGIES[s] for s in strategies]
+
+        # Meta carries single-value defaults (used when dim not in param_grid)
         meta = {
-            'factor': row["factor"],
+            'factor': factors[0],
             'indicator': ind_method,
             'strategy': strat_func.__name__
                 if callable(strat_func) else str(strat_func),
@@ -306,7 +330,8 @@ with tab_full:
 
         # ── Step 1: Grid Search ─────────────────────────────────────
         total = sum(
-            len(pg['window']) * len(pg['signal']) for _, pg, _ in row_grids
+            int(np.prod([len(v) for v in pg.values()]))
+            for _, pg, _ in row_grids
         )
         if total == 0:
             st.error("Grid is empty — check Window/Signal ranges in the sidebar.")
@@ -319,12 +344,13 @@ with tab_full:
         done = 0
         for config, param_grid, meta in row_grids:
             data_copy = df.copy()
-            data_copy['factor'] = data_copy[meta['factor']]
+            if 'factor' not in param_grid:
+                data_copy['factor'] = data_copy[meta['factor']]
             opt = ParametersOptimization(data_copy, config, fee_bps=fee_bps)
             for result in opt.optimize_grid(param_grid):
-                result['factor'] = meta['factor']
-                result['indicator'] = meta['indicator']
-                result['strategy'] = meta['strategy']
+                result.setdefault('factor', meta['factor'])
+                result.setdefault('indicator', meta['indicator'])
+                result.setdefault('strategy', meta['strategy'])
                 all_results.append(result)
                 done += 1
                 progress.progress(done / total,
@@ -423,7 +449,8 @@ with tab_full:
             else:
                 hm_data = hm_data[hm_data[dim] == val]
 
-        pivot = hm_data.pivot(index=y_axis, columns=x_axis, values="sharpe")
+        pivot = hm_data.pivot_table(index=y_axis, columns=x_axis,
+                                     values="sharpe", aggfunc="first")
         x_labels = [_display_label(x_axis, v) for v in pivot.columns]
         y_labels = [_display_label(y_axis, v) for v in pivot.index]
 
@@ -495,14 +522,15 @@ with tab_full:
         if "factor" in selected:
             perf_df["factor"] = perf_df[selected["factor"]]
 
-        sel_indicator = selected.get("indicator", row_grids[0][0].indicator_name)
+        sel_indicator = selected.get("indicator", row_grids[0][0].factors[0].indicator_name)
         sel_strategy_name = selected.get("strategy", None)
         if sel_strategy_name:
             sel_strategy_func = STRATEGY_FUNCS[sel_strategy_name]
         else:
             sel_strategy_func = row_grids[0][0].strategy_func
+        sel_factor = selected.get("factor", "price")
         perf_config = StrategyConfig(
-            indicator_name=sel_indicator,
+            factors=(FactorConfig(sel_factor, sel_indicator),),
             strategy_func=sel_strategy_func,
             trading_period=row_grids[0][0].trading_period,
         )
@@ -705,7 +733,8 @@ with tab_grid:
             st.stop()
 
         total = sum(
-            len(pg['window']) * len(pg['signal']) for _, pg, _ in row_grids
+            int(np.prod([len(v) for v in pg.values()]))
+            for _, pg, _ in row_grids
         )
 
         if total == 0:
@@ -721,12 +750,13 @@ with tab_grid:
         done = 0
         for config, param_grid, meta in row_grids:
             data_copy = df.copy()
-            data_copy['factor'] = data_copy[meta['factor']]
+            if 'factor' not in param_grid:
+                data_copy['factor'] = data_copy[meta['factor']]
             opt = ParametersOptimization(data_copy, config, fee_bps=fee_bps)
             for result in opt.optimize_grid(param_grid):
-                result['factor'] = meta['factor']
-                result['indicator'] = meta['indicator']
-                result['strategy'] = meta['strategy']
+                result.setdefault('factor', meta['factor'])
+                result.setdefault('indicator', meta['indicator'])
+                result.setdefault('strategy', meta['strategy'])
                 all_results.append(result)
                 done += 1
                 progress.progress(done / total,
@@ -798,7 +828,8 @@ with tab_grid:
             else:
                 hm_data = hm_data[hm_data[dim] == val]
 
-        pivot = hm_data.pivot(index=y_axis, columns=x_axis, values="sharpe")
+        pivot = hm_data.pivot_table(index=y_axis, columns=x_axis,
+                                     values="sharpe", aggfunc="first")
         x_labels = [_display_label(x_axis, v) for v in pivot.columns]
         y_labels = [_display_label(y_axis, v) for v in pivot.index]
 

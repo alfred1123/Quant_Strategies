@@ -62,7 +62,7 @@ import seaborn as sns
 from data import YahooFinance
 from param_opt import ParametersOptimization
 from perf import Performance
-from strat import Strategy, StrategyConfig
+from strat import Strategy, StrategyConfig, FactorConfig
 from log_config import setup_logging
 from walk_forward import WalkForward
 
@@ -181,7 +181,7 @@ def main(args=None):
     strategy_func = STRATEGIES[args.strategy[0]]
 
     config = StrategyConfig(
-        indicator_name=indicator_method,
+        factors=(FactorConfig(args.factor[0], indicator_method),),
         strategy_func=strategy_func,
         trading_period=trading_period,
     )
