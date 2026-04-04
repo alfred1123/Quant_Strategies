@@ -10,8 +10,8 @@ class TestParseArgsDefaults:
         assert args.start == "2016-01-01"
         assert args.end == "2026-04-01"
         assert args.asset == "crypto"
-        assert args.indicator == ["bollinger"]
-        assert args.strategy == ["momentum"]
+        assert args.indicator == "bollinger"
+        assert args.strategy == "momentum"
         assert args.window == 20
         assert args.signal == 1.0
         assert args.no_grid is False
@@ -39,7 +39,7 @@ class TestParseArgsDefaults:
     def test_indicator_choices(self):
         for ind in INDICATORS:
             args = parse_args(["--indicator", ind])
-            assert args.indicator == [ind]
+            assert args.indicator == ind
 
     def test_indicator_invalid_rejected(self):
         with pytest.raises(SystemExit):
@@ -48,15 +48,7 @@ class TestParseArgsDefaults:
     def test_strategy_choices(self):
         for strat in STRATEGIES:
             args = parse_args(["--strategy", strat])
-            assert args.strategy == [strat]
-
-    def test_indicator_multiple_values(self):
-        args = parse_args(["--indicator", "bollinger", "sma"])
-        assert args.indicator == ["bollinger", "sma"]
-
-    def test_strategy_multiple_values(self):
-        args = parse_args(["--strategy", "momentum", "reversion"])
-        assert args.strategy == ["momentum", "reversion"]
+            assert args.strategy == strat
 
     def test_strategy_invalid_rejected(self):
         with pytest.raises(SystemExit):
@@ -94,7 +86,7 @@ class TestParseArgsDefaults:
 
 class TestRegistries:
     def test_indicators_registry_keys(self):
-        expected = {"bollinger", "sma", "ema", "rsi", "stochastic"}
+        expected = {"bollinger", "sma", "ema", "rsi"}
         assert set(INDICATORS.keys()) == expected
 
     def test_indicators_registry_values_are_method_names(self):

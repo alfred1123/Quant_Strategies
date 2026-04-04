@@ -12,7 +12,6 @@ BybitData class moved to backup/deco/ — platform decommissioned.
 
 import os
 import logging
-import socket
 import time
 from functools import lru_cache
 
@@ -27,33 +26,14 @@ logger = logging.getLogger(__name__)
 class FutuOpenD:
     """Retrieve equity data from Futu OpenD gateway."""
 
-    DEFAULT_TIMEOUT = 5  # seconds
-
-    def __init__(self, *, timeout: int | None = None) -> None:
+    def __init__(self) -> None:
         load_dotenv()
         self.__host = os.getenv('FUTU_HOST')
         port_str = os.getenv('FUTU_PORT')
         if not self.__host or not port_str:
             raise ValueError("FUTU_HOST and FUTU_PORT must be set in .env")
         self.__port = int(port_str)
-        self.__timeout = timeout if timeout is not None else self.DEFAULT_TIMEOUT
-
-        self._check_connection()
         self.quote_ctx = futu.OpenQuoteContext(host=self.__host, port=self.__port)
-
-    def _check_connection(self) -> None:
-        """Pre-check that Futu OpenD is reachable before creating the context."""
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(self.__timeout)
-        try:
-            sock.connect((self.__host, self.__port))
-        except (ConnectionRefusedError, socket.timeout, OSError) as exc:
-            raise ConnectionError(
-                f"Cannot reach Futu OpenD at {self.__host}:{self.__port} "
-                f"(timeout={self.__timeout}s). Is the gateway running?"
-            ) from exc
-        finally:
-            sock.close()
 
     @lru_cache(maxsize=32)
     def get_historical_data(self, symbol, start_date, end_date, resolution='K_DAY'):
@@ -285,10 +265,8 @@ class YahooFinance:
         df = pd.DataFrame({
             "t": hist.index.strftime("%Y-%m-%d"),
             "v": hist["Close"].values,
-            "volume": hist["Volume"].values,
         })
         df["v"] = df["v"].astype(float)
-        df["volume"] = df["volume"].astype(float)
         logger.info("YahooFinance: fetched %d rows for %s (%s to %s)",
                     len(df), symbol, start_date, end_date)
         return df.reset_index(drop=True)

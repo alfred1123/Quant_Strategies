@@ -34,7 +34,6 @@ def synthetic_market_data():
         "Close": close,
         "High": high,
         "Low": low,
-        "volume": np.abs(np.random.randn(n) * 1000) + 100,
     })
 
 
@@ -100,209 +99,6 @@ class TestParameterOptimizationPipeline:
         pivot = results.pivot(index="window", columns="signal", values="sharpe")
         assert pivot.shape == (2, 2)
         assert not pivot.isna().any().any()
-
-    def test_grid_search_with_factor_columns(self, synthetic_market_data):
-        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
-        opt = ParametersOptimization(synthetic_market_data.copy(), config)
-        results = pd.DataFrame(
-            opt.optimize((10, 20), (0.5, 1.0),
-                         factor_columns=["price", "volume"]),
-            columns=["window", "signal", "factor", "sharpe"],
-        )
-        # 2 windows × 2 signals × 2 factors = 8
-        assert len(results) == 8
-        assert set(results["factor"]) == {"price", "volume"}
-        assert results["sharpe"].notna().all()
-
-        # Can pivot per-factor
-        for fct in ["price", "volume"]:
-            subset = results[results["factor"] == fct]
-            pivot = subset.pivot(index="window", columns="signal",
-                                 values="sharpe")
-            assert pivot.shape == (2, 2)
-
-
-class TestOptimizeGridPipeline:
-    """Integration test: optimize_grid with multi-indicator, multi-strategy sweeps."""
-
-    def test_grid_with_multi_indicator(self, synthetic_market_data):
-        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
-        opt = ParametersOptimization(synthetic_market_data.copy(), config)
-        results = pd.DataFrame(opt.optimize_grid({
-            'window': (10, 20),
-            'signal': (0.5, 1.0),
-            'indicator': ['get_bollinger_band', 'get_sma'],
-        }))
-        # 2 windows × 2 signals × 2 indicators = 8
-        assert len(results) == 8
-        assert set(results['indicator']) == {'get_bollinger_band', 'get_sma'}
-        assert results['sharpe'].notna().all()
-
-    def test_grid_with_multi_strategy(self, synthetic_market_data):
-        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
-        opt = ParametersOptimization(synthetic_market_data.copy(), config)
-        results = pd.DataFrame(opt.optimize_grid({
-            'window': (10, 20),
-            'signal': (0.5, 1.0),
-            'strategy': [Strategy.momentum_const_signal,
-                         Strategy.reversion_const_signal],
-        }))
-        # 2 windows × 2 signals × 2 strategies = 8
-        assert len(results) == 8
-        assert set(results['strategy']) == {
-            'momentum_const_signal', 'reversion_const_signal'
-        }
-
-    def test_full_nd_grid(self, synthetic_market_data):
-        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
-        opt = ParametersOptimization(synthetic_market_data.copy(), config)
-        results = pd.DataFrame(opt.optimize_grid({
-            'window': (10, 20),
-            'signal': (0.5,),
-            'indicator': ['get_bollinger_band', 'get_sma'],
-            'strategy': [Strategy.momentum_const_signal,
-                         Strategy.reversion_const_signal],
-            'factor': ['price', 'volume'],
-        }))
-        # 2 × 1 × 2 × 2 × 2 = 16
-        assert len(results) == 16
-        assert list(results.columns) == [
-            'window', 'signal', 'indicator', 'strategy', 'factor', 'sharpe'
-        ]
-        # Can pivot per slice
-        subset = results[
-            (results['indicator'] == 'get_sma')
-            & (results['strategy'] == 'momentum_const_signal')
-            & (results['factor'] == 'price')
-        ]
-        pivot = subset.pivot(index='window', columns='signal', values='sharpe')
-        assert pivot.shape == (2, 1)
-
-    def test_grid_with_cli_multi_indicator(self, synthetic_market_data):
-        """CLI main() with multiple --indicator values produces per-indicator heatmaps."""
-        mock_price = pd.DataFrame({
-            "t": [f"2021-01-{i+1:02d}" for i in range(len(synthetic_market_data))],
-            "v": synthetic_market_data["price"].values,
-            "volume": synthetic_market_data["volume"].values,
-        })
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("main.YahooFinance") as mock_yf_cls:
-                mock_yf = MagicMock()
-                mock_yf.get_historical_price.return_value = mock_price
-                mock_yf_cls.return_value = mock_yf
-
-                from main import main, parse_args
-                args = parse_args([
-                    "--symbol", "TEST",
-                    "--indicator", "bollinger", "sma",
-                    "--strategy", "momentum",
-                    "--win-min", "10",
-                    "--win-max", "20",
-                    "--win-step", "10",
-                    "--sig-min", "0.5",
-                    "--sig-max", "1.0",
-                    "--sig-step", "0.5",
-                    "--outdir", tmpdir,
-                ])
-                main(args)
-
-            opt_file = os.path.join(tmpdir, "opt_test_bollinger.csv")
-            assert os.path.isfile(opt_file)
-            opt_df = pd.read_csv(opt_file)
-            assert 'indicator' in opt_df.columns
-            assert set(opt_df['indicator']) == {'get_bollinger_band', 'get_sma'}
-
-
-class TestAllIndicatorStrategyCombos:
-    """Exhaustive sweep: every indicator × every strategy through optimize_grid."""
-
-    ALL_INDICATORS = [
-        'get_bollinger_band', 'get_sma', 'get_ema', 'get_rsi',
-        'get_stochastic_oscillator',
-    ]
-    ALL_STRATEGIES = [
-        Strategy.momentum_const_signal,
-        Strategy.reversion_const_signal,
-    ]
-
-    def test_all_combos_produce_finite_sharpe(self, synthetic_market_data):
-        """5 indicators × 2 strategies = 10 combos, all should produce finite Sharpe."""
-        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
-        opt = ParametersOptimization(synthetic_market_data.copy(), config)
-        results = pd.DataFrame(opt.optimize_grid({
-            'window': (14,),
-            'signal': (1.0,),
-            'indicator': self.ALL_INDICATORS,
-            'strategy': self.ALL_STRATEGIES,
-        }))
-        assert len(results) == 10
-        assert results['sharpe'].notna().all()
-        assert set(results['indicator']) == set(self.ALL_INDICATORS)
-        assert set(results['strategy']) == {
-            'momentum_const_signal', 'reversion_const_signal'
-        }
-
-    def test_all_combos_with_factor(self, synthetic_market_data):
-        """5 indicators × 2 strategies × 2 factors = 20 combos."""
-        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
-        opt = ParametersOptimization(synthetic_market_data.copy(), config)
-        results = pd.DataFrame(opt.optimize_grid({
-            'window': (14,),
-            'signal': (1.0,),
-            'indicator': self.ALL_INDICATORS,
-            'strategy': self.ALL_STRATEGIES,
-            'factor': ['price', 'volume'],
-        }))
-        assert len(results) == 20
-        assert results['sharpe'].notna().all()
-
-    def test_stochastic_grid_search(self, synthetic_market_data):
-        """Stochastic oscillator works in grid search with multiple windows."""
-        config = StrategyConfig(
-            "get_stochastic_oscillator", Strategy.momentum_const_signal, 252
-        )
-        opt = ParametersOptimization(synthetic_market_data.copy(), config)
-        results = pd.DataFrame(opt.optimize_grid({
-            'window': (10, 14, 20),
-            'signal': (20.0, 30.0),
-        }))
-        assert len(results) == 6
-        assert results['sharpe'].notna().all()
-
-    def test_stochastic_walk_forward(self, synthetic_market_data):
-        """Walk-forward test with stochastic oscillator."""
-        config = StrategyConfig(
-            "get_stochastic_oscillator", Strategy.momentum_const_signal, 252
-        )
-        wf = WalkForward(synthetic_market_data.copy(), 0.5, config)
-        result = wf.run((14, 20), (20.0, 30.0))
-        assert isinstance(result, WalkForwardResult)
-        assert result.best_window in (14, 20)
-        assert result.best_signal in (20.0, 30.0)
-
-    def test_all_combos_with_multiple_windows_signals(self, synthetic_market_data):
-        """Full sweep with 2 windows × 2 signals × 3 indicators × 2 strategies."""
-        config = StrategyConfig("get_bollinger_band", Strategy.momentum_const_signal, 252)
-        opt = ParametersOptimization(synthetic_market_data.copy(), config)
-        results = pd.DataFrame(opt.optimize_grid({
-            'window': (10, 20),
-            'signal': (0.5, 1.0),
-            'indicator': ['get_bollinger_band', 'get_sma', 'get_ema'],
-            'strategy': self.ALL_STRATEGIES,
-        }))
-        # 2 × 2 × 3 × 2 = 24
-        assert len(results) == 24
-        assert results['sharpe'].notna().all()
-        # Can pivot each indicator/strategy slice
-        for ind in ['get_bollinger_band', 'get_sma', 'get_ema']:
-            for strat in ['momentum_const_signal', 'reversion_const_signal']:
-                subset = results[
-                    (results['indicator'] == ind) & (results['strategy'] == strat)
-                ]
-                pivot = subset.pivot(index='window', columns='signal',
-                                     values='sharpe')
-                assert pivot.shape == (2, 2)
 
 
 class TestStrategyVsBuyHoldConsistency:
@@ -497,7 +293,6 @@ class TestCLIMainIntegration:
         mock_price = pd.DataFrame({
             "t": [f"2021-01-{i+1:02d}" for i in range(len(synthetic_market_data))],
             "v": synthetic_market_data["price"].values,
-            "volume": synthetic_market_data["volume"].values,
         })
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -530,7 +325,6 @@ class TestCLIMainIntegration:
         mock_price = pd.DataFrame({
             "t": [f"2021-01-{i+1:02d}" for i in range(len(synthetic_market_data))],
             "v": synthetic_market_data["price"].values,
-            "volume": synthetic_market_data["volume"].values,
         })
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -634,7 +428,6 @@ class TestWalkForwardPipeline:
         mock_price = pd.DataFrame({
             "t": [f"2021-01-{i+1:02d}" for i in range(len(synthetic_market_data))],
             "v": synthetic_market_data["price"].values,
-            "volume": synthetic_market_data["volume"].values,
         })
 
         with tempfile.TemporaryDirectory() as tmpdir:

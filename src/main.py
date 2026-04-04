@@ -20,9 +20,6 @@ Examples:
     # Different indicator + strategy combination
     python main.py --indicator sma --strategy reversion
 
-    # Optimize over both price and volume as factor
-    python main.py --factor price volume
-
     # Skip grid search (single backtest only)
     python main.py --no-grid
 
@@ -34,11 +31,8 @@ Options:
     --start         Backtest start date YYYY-MM-DD    (default: 2016-01-01)
     --end           Backtest end date YYYY-MM-DD      (default: 2026-04-01)
     --asset         Asset type: crypto | equity       (default: crypto)
-    --indicator     Indicator(s): bollinger|sma|ema|rsi  (default: bollinger)
-                     Multiple values sweep across indicators in grid search
-    --strategy      Strategy(ies): momentum | reversion  (default: momentum)
-                     Multiple values sweep across strategies in grid search
-    --factor        Factor: price | volume (multi ok)  (default: price)
+    --indicator     Indicator: bollinger|sma|ema|rsi  (default: bollinger)
+    --strategy      Strategy: momentum | reversion    (default: momentum)
     --window        Single backtest window            (default: 20)
     --signal        Single backtest signal threshold   (default: 1.0)
     --no-grid       Skip parameter optimization        (default: False)
@@ -71,11 +65,10 @@ logger = logging.getLogger(__name__)
 # ── Registries ──────────────────────────────────────────────────────
 
 INDICATORS = {
-    'bollinger':  'get_bollinger_band',
-    'sma':        'get_sma',
-    'ema':        'get_ema',
-    'rsi':        'get_rsi',
-    'stochastic': 'get_stochastic_oscillator',
+    'bollinger': 'get_bollinger_band',
+    'sma':       'get_sma',
+    'ema':       'get_ema',
+    'rsi':       'get_rsi',
 }
 
 STRATEGIES = {
@@ -106,14 +99,12 @@ def parse_args(argv=None):
                    help='Asset type (default: %(default)s)')
 
     # Indicator / strategy
-    p.add_argument('--indicator', nargs='+', default=['bollinger'],
+    p.add_argument('--indicator', default='bollinger',
                    choices=INDICATORS.keys(),
-                   help='Technical indicator(s) — multiple values sweep in '
-                        'grid search (default: %(default)s)')
-    p.add_argument('--strategy', nargs='+', default=['momentum'],
+                   help='Technical indicator (default: %(default)s)')
+    p.add_argument('--strategy', default='momentum',
                    choices=STRATEGIES.keys(),
-                   help='Trading strategy(ies) — multiple values sweep in '
-                        'grid search (default: %(default)s)')
+                   help='Trading strategy (default: %(default)s)')
 
     # Single backtest
     p.add_argument('--window', type=int, default=20,
@@ -143,13 +134,6 @@ def parse_args(argv=None):
     p.add_argument('--verbose', '-v', action='store_true',
                    help='Enable DEBUG-level logging')
 
-    # Factor
-    p.add_argument('--factor', nargs='+', default=['price'],
-                   choices=['price', 'volume'],
-                   help='Data column(s) to use as the indicator factor. '
-                        'Multiple values sweep over each in grid search '
-                        '(default: %(default)s)')
-
     # Costs
     p.add_argument('--fee', type=float, default=5.0,
                    help='Transaction fee in basis points (default: %(default)s)')
@@ -174,11 +158,11 @@ def main(args=None):
     pd.set_option('display.width', 1000)
 
     os.makedirs(args.outdir, exist_ok=True)
-    tag = f"{args.symbol.lower().replace('-', '')}_{args.indicator[0]}"
+    tag = f"{args.symbol.lower().replace('-', '')}_{args.indicator}"
 
     trading_period = ASSET_TRADING_PERIODS[args.asset]
-    indicator_method = INDICATORS[args.indicator[0]]
-    strategy_func = STRATEGIES[args.strategy[0]]
+    indicator_method = INDICATORS[args.indicator]
+    strategy_func = STRATEGIES[args.strategy]
 
     config = StrategyConfig(
         indicator_name=indicator_method,
@@ -196,13 +180,7 @@ def main(args=None):
         'datetime': price['t'],
         'price':    price['v'],
         'factor':   price['v'],
-        'volume':   price['volume'],
     })
-
-    # Override factor column for single backtest when a single factor is chosen
-    if len(args.factor) == 1 and args.factor[0] != 'price':
-        df['factor'] = df[args.factor[0]]
-
     logger.info("Loaded %d daily bars: %s → %s",
                 len(df), df['datetime'].iloc[0], df['datetime'].iloc[-1])
 
@@ -232,18 +210,10 @@ def main(args=None):
             df.copy(), config, fee_bps=args.fee,
         )
 
-        param_grid = {
-            'window': window_list,
-            'signal': signal_list,
-        }
-        if len(args.indicator) > 1:
-            param_grid['indicator'] = [INDICATORS[i] for i in args.indicator]
-        if len(args.strategy) > 1:
-            param_grid['strategy'] = [STRATEGIES[s] for s in args.strategy]
-        if len(args.factor) > 1:
-            param_grid['factor'] = args.factor
-
-        param_perf = pd.DataFrame(param_opt.optimize_grid(param_grid))
+        param_perf = pd.DataFrame(
+            param_opt.optimize(window_list, signal_list),
+            columns=['window', 'signal', 'sharpe'],
+        )
 
         opt_path = os.path.join(args.outdir, f'opt_{tag}.csv')
         param_perf.to_csv(opt_path, index=False)
@@ -252,43 +222,22 @@ def main(args=None):
                     param_perf.sort_values('sharpe', ascending=False).head(10))
 
         best = param_perf.loc[param_perf['sharpe'].idxmax()]
-        param_cols = [c for c in param_perf.columns if c != 'sharpe']
-        best_parts = [f"{c}={best[c]}" for c in param_cols]
-        best_msg = f"Best: {', '.join(best_parts)}, Sharpe={best['sharpe']:.4f}"
-        logger.info(best_msg)
+        logger.info("Best: window=%d, signal=%.2f, Sharpe=%.4f",
+                    int(best['window']), best['signal'], best['sharpe'])
 
-        # Heatmap — one per unique combination of non-axis dimensions
-        extra_cols = [c for c in param_cols
-                      if c not in ('window', 'signal')]
-
-        if extra_cols:
-            groups = param_perf.groupby(extra_cols)
-        else:
-            groups = [(None, param_perf)]
-
-        for group_key, subset in groups:
-            if group_key is not None:
-                if not isinstance(group_key, tuple):
-                    group_key = (group_key,)
-                suffix = "_" + "_".join(str(v) for v in group_key)
-                title_extra = " (" + ", ".join(
-                    f"{k}={v}" for k, v in zip(extra_cols, group_key)
-                ) + ")"
-            else:
-                suffix = ""
-                title_extra = ""
-            pivot = subset.pivot(index='window', columns='signal',
+        # Heatmap
+        pivot = param_perf.pivot(index='window', columns='signal',
                                  values='sharpe')
-            plt.figure(figsize=(12, 8))
-            sns.heatmap(pivot, annot=True, fmt='.2f', cmap='RdYlGn', center=0)
-            plt.title(f'{args.symbol} — Sharpe Ratio Heatmap{title_extra}')
-            plt.xlabel('Signal Threshold')
-            plt.ylabel('Indicator Window')
-            plt.tight_layout()
-            heatmap_path = os.path.join(args.outdir,
-                                        f'heatmap_{tag}{suffix}.png')
-            plt.savefig(heatmap_path, dpi=150)
-            logger.info("Heatmap saved to %s", heatmap_path)
+        plt.figure(figsize=(12, 8))
+        sns.heatmap(pivot, annot=True, fmt='.2f', cmap='RdYlGn', center=0)
+        plt.title(f'{args.symbol} {args.indicator} {args.strategy} '
+                  f'— Sharpe Ratio Heatmap')
+        plt.xlabel('Signal Threshold')
+        plt.ylabel('Indicator Window')
+        plt.tight_layout()
+        heatmap_path = os.path.join(args.outdir, f'heatmap_{tag}.png')
+        plt.savefig(heatmap_path, dpi=150)
+        logger.info("Heatmap saved to %s", heatmap_path)
 
     # ── Walk-forward overfitting test ───────────────────────────────
     if args.walk_forward:
@@ -301,7 +250,6 @@ def main(args=None):
             'datetime': price['t'],
             'price':    price['v'],
             'factor':   price['v'],
-            'volume':   price['volume'],
         })
 
         wf = WalkForward(

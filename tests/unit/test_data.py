@@ -81,10 +81,7 @@ class TestFutuOpenD:
     @patch("data.load_dotenv", lambda *a, **kw: None)
     @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
     @patch("data.futu.OpenQuoteContext")
-    @patch("data.socket.socket")
-    def test_init_loads_env(self, mock_sock_cls, mock_ctx):
-        mock_sock = MagicMock()
-        mock_sock_cls.return_value = mock_sock
+    def test_init_loads_env(self, mock_ctx):
         from data import FutuOpenD
         futu_src = FutuOpenD()
         assert futu_src._FutuOpenD__host == "127.0.0.1"
@@ -93,10 +90,7 @@ class TestFutuOpenD:
     @patch("data.load_dotenv", lambda *a, **kw: None)
     @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
     @patch("data.futu.OpenQuoteContext")
-    @patch("data.socket.socket")
-    def test_get_historical_data_calls_api(self, mock_sock_cls, mock_ctx_cls):
-        mock_sock = MagicMock()
-        mock_sock_cls.return_value = mock_sock
+    def test_get_historical_data_calls_api(self, mock_ctx_cls):
         mock_ctx = MagicMock()
         mock_ctx_cls.return_value = mock_ctx
         mock_df = pd.DataFrame({"close": [100, 101]})
@@ -114,10 +108,7 @@ class TestFutuOpenD:
     @patch("data.load_dotenv", lambda *a, **kw: None)
     @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
     @patch("data.futu.OpenQuoteContext")
-    @patch("data.socket.socket")
-    def test_get_historical_data_raises_on_error(self, mock_sock_cls, mock_ctx_cls):
-        mock_sock = MagicMock()
-        mock_sock_cls.return_value = mock_sock
+    def test_get_historical_data_raises_on_error(self, mock_ctx_cls):
         mock_ctx = MagicMock()
         mock_ctx_cls.return_value = mock_ctx
         mock_ctx.request_history_kline.return_value = (-1, "connection error", None)
@@ -137,29 +128,6 @@ class TestFutuOpenD:
         from data import FutuOpenD
         with pytest.raises(ValueError, match="FUTU_HOST"):
             FutuOpenD()
-
-    @patch("data.load_dotenv", lambda *a, **kw: None)
-    @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
-    def test_init_raises_connection_error_on_timeout(self):
-        import socket
-        with patch("data.socket.socket") as mock_sock_cls:
-            mock_sock = MagicMock()
-            mock_sock.connect.side_effect = socket.timeout("timed out")
-            mock_sock_cls.return_value = mock_sock
-            from data import FutuOpenD
-            with pytest.raises(ConnectionError, match="Cannot reach Futu OpenD"):
-                FutuOpenD()
-
-    @patch("data.load_dotenv", lambda *a, **kw: None)
-    @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
-    def test_custom_timeout_value(self):
-        with patch("data.socket.socket") as mock_sock_cls, \
-             patch("data.futu.OpenQuoteContext"):
-            mock_sock = MagicMock()
-            mock_sock_cls.return_value = mock_sock
-            from data import FutuOpenD
-            futu_src = FutuOpenD(timeout=15)
-            mock_sock.settimeout.assert_called_with(15)
 
 
 class TestAlphaVantage:
@@ -315,7 +283,7 @@ class TestYahooFinance:
         df = yf_src.get_historical_price("AAPL", "2021-01-04", "2021-01-05")
 
         assert isinstance(df, pd.DataFrame)
-        assert list(df.columns) == ["t", "v", "volume"]
+        assert list(df.columns) == ["t", "v"]
         assert len(df) == 2
         assert df.iloc[0]["v"] == pytest.approx(129.41)
         assert df.iloc[1]["v"] == pytest.approx(131.01)

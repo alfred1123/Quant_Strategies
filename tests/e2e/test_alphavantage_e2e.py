@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 
 from data import AlphaVantage
 from ta import TechnicalAnalysis
-from strat import Strategy, StrategyConfig
+from strat import Strategy
 from perf import Performance
 
 # Load .env so we can check for the key
@@ -107,12 +107,11 @@ class TestFullPipelineE2E:
         return df
 
     def test_sma_momentum_on_real_data(self, ibm_data):
-        config = StrategyConfig(
-            indicator_name="get_sma",
-            strategy_func=Strategy.momentum_const_signal,
-            trading_period=252,
+        ta = TechnicalAnalysis(ibm_data)
+        perf = Performance(
+            ta.data, 252, ta.get_sma,
+            Strategy.momentum_const_signal, 20, 0.5,
         )
-        perf = Performance(ibm_data, config, 20, 0.5)
         result = perf.get_strategy_performance()
 
         assert isinstance(result, pd.Series)
@@ -121,24 +120,22 @@ class TestFullPipelineE2E:
         assert np.isfinite(result["Sharpe Ratio"])
 
     def test_bollinger_reversion_on_real_data(self, ibm_data):
-        config = StrategyConfig(
-            indicator_name="get_bollinger_band",
-            strategy_func=Strategy.reversion_const_signal,
-            trading_period=252,
+        ta = TechnicalAnalysis(ibm_data)
+        perf = Performance(
+            ta.data, 252, ta.get_bollinger_band,
+            Strategy.reversion_const_signal, 20, 1.0,
         )
-        perf = Performance(ibm_data, config, 20, 1.0)
         result = perf.get_strategy_performance()
 
         assert isinstance(result, pd.Series)
         assert perf.get_max_drawdown() >= 0
 
     def test_buy_hold_benchmark_on_real_data(self, ibm_data):
-        config = StrategyConfig(
-            indicator_name="get_sma",
-            strategy_func=Strategy.momentum_const_signal,
-            trading_period=252,
+        ta = TechnicalAnalysis(ibm_data)
+        perf = Performance(
+            ta.data, 252, ta.get_sma,
+            Strategy.momentum_const_signal, 20, 0.5,
         )
-        perf = Performance(ibm_data, config, 20, 0.5)
         bh = perf.get_buy_hold_performance()
 
         assert isinstance(bh, pd.Series)

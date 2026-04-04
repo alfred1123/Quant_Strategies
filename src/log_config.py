@@ -9,7 +9,6 @@ Usage (entry points only):
 
 import logging
 import os
-import sys
 
 LOG_FORMAT = '[%(asctime)s] [%(levelname)s] %(name)s: %(message)s'
 LOG_DATEFMT = '%Y-%m-%d %H:%M:%S'
@@ -30,14 +29,3 @@ def setup_logging(*, debug: bool = False) -> None:
             logging.StreamHandler(),
         ],
     )
-
-    # Capture uncaught exceptions to the log file
-    _original_excepthook = sys.excepthook
-    _logger = logging.getLogger(__name__)
-
-    def _log_uncaught(exc_type, exc_value, exc_tb):
-        if not issubclass(exc_type, KeyboardInterrupt):
-            _logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_tb))
-        _original_excepthook(exc_type, exc_value, exc_tb)
-
-    sys.excepthook = _log_uncaught
