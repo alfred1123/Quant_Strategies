@@ -5,6 +5,156 @@
 1. CI/CD to deploy to production
 
 
+## Multi-Factor Conjunction Strategy
+
+Combine multiple indicators (e.g. price-based Bollinger + volume-based SMA) into a single backtest where a position is taken only when **all** (AND) or **any** (OR) factors agree on direction.
+
+### Problem Statement
+
+Currently each grid-search row runs **independently** — row 1 computes Sharpe from price alone, row 2 from volume alone. There is no mechanism to:
+- Combine factor positions into a joint signal before computing PnL.
+- Search over the combined parameter space (window₀ × signal₀ × window₁ × signal₁).
+- Visualize and optimize across the joint space.
+
+### Design Principles
+
+1. **Separate concerns** — factor-combining logic belongs in `strat.py`, not scattered across `perf.py`/`param_opt.py`.
+2. **Backward compatible** — single-factor backtests must continue to work unchanged with no new required fields.
+3. **Testable first** — write unit tests for every new function/class before wiring into the Streamlit UI.
+4. **Incremental** — implement in small, verifiable steps; each step must leave all existing tests passing.
+
+### Phase 1 — Core Logic (strat.py + tests)
+
+Goal: add factor-combining primitives with full test coverage.
+
+1. **`FactorConfig` dataclass** (`strat.py`)
+   - Fields: `indicator_name: str`, `strategy_func: Callable`, `data_column: str` (e.g. `"v"`, `"volume"`).
+   - Frozen, like `StrategyConfig`.
+   - Represents one factor's identity (indicator + strategy + which DataFrame column to use).
+
+2. **`combine_positions()` function** (`strat.py`)
+   - Signature: `combine_positions(positions: list[np.ndarray], conjunction: str = "AND") -> np.ndarray`
+   - `"AND"`: take position only when **all** factors agree (element-wise min of absolute values, preserving sign when unanimous).
+   - `"OR"`: take position when **any** factor signals (element-wise max of absolute values).
+   - Returns `np.ndarray` of `{-1, 0, 1}`.
+   - Edge cases: single-factor list returns that array unchanged; empty list raises `ValueError`.
+
+3. **Extend `StrategyConfig`** (`strat.py`)
+   - Add optional field `factors: tuple[FactorConfig, ...] = ()`.
+   - Add optional field `conjunction: str = "AND"`.
+   - Add helper `get_factors() -> list[FactorConfig]`: if `factors` is non-empty return it; otherwise synthesize a single-factor list from `indicator_name` + `strategy_func` + default column `"factor"` (backward compat).
+   - **Do not remove** `indicator_name` / `strategy_func` — single-factor callers still use them directly.
+
+4. **Unit tests** (`tests/unit/test_strat.py`)
+   - `test_combine_positions_and_unanimous` — all agree → combined signal matches.
+   - `test_combine_positions_and_disagree` — factors disagree → position = 0.
+   - `test_combine_positions_or` — any factor signals → combined follows.
+   - `test_combine_positions_single_factor` — passthrough.
+   - `test_combine_positions_empty_raises` — ValueError.
+   - `test_factor_config_creation` — frozen, correct fields.
+   - `test_strategy_config_get_factors_legacy` — no `factors` set → infers single factor.
+   - `test_strategy_config_get_factors_explicit` — `factors` set → returns them.
+
+### Phase 2 — Performance Engine (perf.py + tests)
+
+Goal: make `Performance` compute PnL from combined multi-factor positions.
+
+1. **Multi-factor `Performance.__init__`** (`perf.py`)
+   - Accept `window` and `signal` as **tuples** when multi-factor: `window=(20, 14)`, `signal=(1.5, 30)`.
+   - For each factor in `config.get_factors()`:
+     - Copy data, set `data['factor'] = data[factor.data_column]`.
+     - Create `TechnicalAnalysis`, call the factor's indicator with corresponding window.
+     - Compute position via the factor's strategy func with corresponding signal.
+   - Call `combine_positions(all_positions, config.conjunction)` → final position.
+   - Compute PnL/cumulative/drawdown from the **combined** position (single PnL stream).
+   - **Backward compat**: when `config.get_factors()` returns one factor, behavior is identical to current code.
+
+2. **Set `self.data['indicator']`** — for multi-factor, store the first factor's indicator (for plotting). Document that this is approximate.
+
+3. **Unit tests** (`tests/unit/test_perf.py`)
+   - `test_performance_single_factor_unchanged` — verify existing single-factor tests still pass.
+   - `test_performance_multi_factor_and` — two factors, AND conjunction, verify combined position and PnL.
+   - `test_performance_multi_factor_or` — two factors, OR conjunction.
+   - `test_performance_multi_factor_window_signal_tuples` — verify tuple unpacking per factor.
+
+### Phase 3 — Grid Search (param_opt.py + tests)
+
+Goal: search over the combined N-dimensional parameter space.
+
+1. **Extend `optimize()` or add `optimize_multi()`** (`param_opt.py`)
+   - Accept per-factor ranges: `window_tuples=[(10,50,5), (5,30,5)]`, `signal_tuples=[(0.5,2.5,0.5), (20,80,10)]`.
+   - Build Cartesian product across all factor window × signal combinations.
+   - For each combo, call `Performance(data.copy(), config, window=(w0,w1), signal=(s0,s1))`.
+   - Yield per-combo metrics: `dict(window_0=w0, signal_0=s0, window_1=w1, signal_1=s1, sharpe=...)`.
+   - **Warn** when total grid size > 10,000 combinations.
+   - **Backward compat**: when only one factor, accept flat `window_tuple`, `signal_tuple` and yield `(window, signal, sharpe)`.
+
+2. **Unit tests** (`tests/unit/test_param_opt.py`)
+   - `test_optimize_multi_factor_grid_shape` — verify correct number of combinations yielded.
+   - `test_optimize_multi_factor_best_sharpe` — verify best combo selection.
+   - `test_optimize_single_factor_backward_compat` — existing tests still pass.
+
+### Phase 4 — Walk-Forward (walk_forward.py + tests)
+
+Goal: multi-factor walk-forward overfitting detection.
+
+1. **Extend `WalkForward.run()`** (`walk_forward.py`)
+   - Accept per-factor parameter ranges (same signature as param_opt).
+   - In-sample: run multi-factor grid search → best combo.
+   - Out-of-sample: evaluate best combo → metrics.
+   - Overfitting ratio logic unchanged.
+
+2. **Unit tests** (`tests/unit/test_walk_forward.py`)
+   - `test_walk_forward_multi_factor` — end-to-end with two factors.
+
+### Phase 5 — Streamlit UI (app.py + integration tests)
+
+Goal: expose multi-factor configuration in the dashboard.
+
+1. **Factor row builder** (`app.py`)
+   - Dynamic "Add Factor" button in sidebar.
+   - Each row: data column selector, indicator dropdown, strategy dropdown, window/signal range sliders.
+   - Conjunction selector: AND / OR radio button.
+   - Minimum 1 factor row; maximum 4 (prevent grid explosion).
+
+2. **Grid Search tab** — call multi-factor `optimize()`, build heatmap:
+   - For 2 factors: 2D heatmap with `window_0` vs `window_1` (fixed signals at best), or use a dropdown to select which two axes to plot.
+   - For 1 factor: existing heatmap unchanged.
+
+3. **Full Analysis tab** — run multi-factor `Performance`, display combined PnL chart.
+
+4. **Walk-Forward tab** — pass multi-factor ranges to `WalkForward.run()`.
+
+5. **Integration tests** (`tests/integration/test_backtest_pipeline.py`)
+   - `test_multi_factor_pipeline_end_to_end` — data → ta → multi-factor perf → grid search → walk-forward.
+
+### Phase 6 — main.py CLI
+
+1. **CLI args**: `--factors` (JSON or repeated `--factor` flags) for multi-factor from command line.
+2. Print combined metrics and best multi-factor params.
+
+### Open Questions
+
+- Should each factor have its own `trading_period`, or share one from `StrategyConfig`?
+- Should the heatmap for N>2 factors use parallel coordinates or marginal slices?
+- How to handle factors with different data column requirements (e.g. one needs OHLC, another needs just `v`)?
+- Should `combine_positions` support weighted averaging (e.g. 60% price, 40% volume) in addition to AND/OR?
+
+### Lessons from Previous Attempt
+
+The earlier multi-factor implementation was reverted because:
+1. **No tests for new code** — `combine_positions`, `FactorConfig`, and multi-factor `Performance` paths had zero test coverage.
+2. **`indicator` column missing** — multi-factor path didn't set `self.data['indicator']`, breaking plotting.
+3. **`self.signal` type inconsistency** — stored scalar for single-factor, tuple for multi-factor, causing downstream bugs.
+4. **walk_forward.py / main.py not wired** — only partial integration.
+5. **No AND/OR selector in UI** — always defaulted to AND.
+6. **Strategy func from first row only** — all factors shared one strategy function.
+7. **Grid explosion** — no warning when N-factor product creates millions of combinations.
+8. **Config override incompatible** — `config.indicator_name` override in single-factor path clashed with multi-factor.
+9. **Design spread too thin** — changes touched 4 files simultaneously without incremental validation.
+
+---
+
 ## ~~Walk-Forward Overfitting Test~~ ✅ Done
 
 Split historical data into **in-sample** (training) and **out-of-sample** (validation) periods to detect parameter overfitting.
