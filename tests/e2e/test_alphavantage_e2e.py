@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 
 from data import AlphaVantage
 from ta import TechnicalAnalysis
-from strat import Strategy, StrategyConfig
+from strat import Strategy, StrategyConfig, FactorConfig
 from perf import Performance
 
 # Load .env so we can check for the key
@@ -108,7 +108,7 @@ class TestFullPipelineE2E:
 
     def test_sma_momentum_on_real_data(self, ibm_data):
         config = StrategyConfig(
-            indicator_name="get_sma",
+            factors=(FactorConfig("factor", "get_sma"),),
             strategy_func=Strategy.momentum_const_signal,
             trading_period=252,
         )
@@ -122,7 +122,7 @@ class TestFullPipelineE2E:
 
     def test_bollinger_reversion_on_real_data(self, ibm_data):
         config = StrategyConfig(
-            indicator_name="get_bollinger_band",
+            factors=(FactorConfig("factor", "get_bollinger_band"),),
             strategy_func=Strategy.reversion_const_signal,
             trading_period=252,
         )
@@ -134,7 +134,7 @@ class TestFullPipelineE2E:
 
     def test_buy_hold_benchmark_on_real_data(self, ibm_data):
         config = StrategyConfig(
-            indicator_name="get_sma",
+            factors=(FactorConfig("factor", "get_sma"),),
             strategy_func=Strategy.momentum_const_signal,
             trading_period=252,
         )

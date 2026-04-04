@@ -17,18 +17,35 @@ All modules are orchestrated by `main.py`. Imports are **relative** to the `src/
 `StrategyConfig` (in `strat.py`) is a frozen dataclass that packages the strategy identity — reusable across backtest and live trading:
 
 ```python
-from strat import StrategyConfig, Strategy
+from strat import StrategyConfig, FactorConfig, Strategy
+
+# Single-factor (backward-compatible)
 config = StrategyConfig(
-    indicator_name="get_bollinger_band",   # TechnicalAnalysis method name
+    factors=(FactorConfig('price', 'get_bollinger_band'),),
     strategy_func=Strategy.momentum_const_signal,
     trading_period=365,                    # 365 crypto, 252 equity
 )
+
+# Multi-factor conjunction
+config = StrategyConfig(
+    factors=(
+        FactorConfig('price', 'get_bollinger_band'),
+        FactorConfig('volume', 'get_bollinger_band'),
+    ),
+    strategy_func=Strategy.momentum_const_signal,
+    trading_period=365,
+    conjunction='AND',  # 'AND' | 'OR'
+)
 ```
+
+- `FactorConfig(column, indicator_name)` — defines a single factor (data column + indicator method).
+- `conjunction` defaults to `'AND'`.
+- Window and signal are optimization parameters, NOT part of config.
 
 **Transaction fees are NOT part of the config** — they vary by platform and are passed separately via `fee_bps`.
 
 All pipeline constructors accept `StrategyConfig` directly:
-- `Performance(data, config, window, signal, *, fee_bps=None)`
+- `Performance(data, config, windows, signals, *, fee_bps=None)` — windows/signals are tuples (one per factor), or scalars for single-factor.
 - `ParametersOptimization(data, config, *, fee_bps=None)`
 - `WalkForward(data, split_ratio, config, *, fee_bps=None)`
 
@@ -55,24 +72,28 @@ Each constructor creates `TechnicalAnalysis` internally — callers pass raw dat
 - `Strategy.reversion_const_signal(data_col, signal)` → inverse of momentum.
 - These are effectively static methods (no `self` used).
 - `StrategyConfig` frozen dataclass — see **StrategyConfig** section above.
+- `FactorConfig(column, indicator_name)` — frozen dataclass for a single factor.
+- `combine_positions(factor_positions, conjunction)` — combines per-factor positions via AND/OR.
 
 ### perf.py — Performance Metrics
-- `Performance(data, config, window, signal, *, fee_bps=None)`.
-- Creates `TechnicalAnalysis` internally and resolves the indicator from `config.indicator_name`.
-- Computes `pnl`, `cumu`, `dd` columns in-place on `data`.
-- Transaction cost defaults to 5 bps (0.05%); configurable via `fee_bps` kwarg.
-- Key metrics: `get_sharpe_ratio()`, `get_max_drawdown()`, `get_calmar_ratio()`.
-- Also computes buy-and-hold benchmark columns.
+- `Performance(data, config, windows, signals, *, fee_bps=None)`.
+- `windows` and `signals` are tuples (one per factor), or scalars for single-factor backward compat.
+- Creates `TechnicalAnalysis` per-factor internally, resolves indicators from `config.factors`.
+- Uses `combine_positions()` for multi-factor conjunction.
+- `warmup = max(windows)` for metric slicing.
 
 ### param_opt.py — Grid Search
 - `ParametersOptimization(data, config, *, fee_bps=None)`.
-- `optimize(window_tuple, signal_tuple, factor_columns=None)` → generator.
-  - Without `factor_columns`: yields `(window, signal, sharpe)` — backward compatible.
-  - With `factor_columns` (e.g. `["price", "volume"]`): yields `(window, signal, factor, sharpe)`. For each factor, copies data and sets `data['factor'] = data[factor_col]` before computing performance.
+- `optimize_grid(param_grid)` — sweeps N-dimensional parameter grid.
+  - Single-factor: `{'window': (...), 'signal': (...)}`.
+  - Multi-factor indexed: `{'window_0': (...), 'signal_0': (...), 'window_1': (...), 'signal_1': (...)}`.
+  - Optional: `factor`, `indicator`, `strategy` dimensions.
+- `optimize(window_tuple, signal_tuple, factor_columns=None)` — backward-compatible wrapper.
 
 ### walk_forward.py — Overfitting Detection
 - `WalkForward(data, split_ratio, config, *, fee_bps=None)`.
-- `run(window_tuple, signal_tuple)` → `WalkForwardResult` with in-sample/out-of-sample metrics and overfitting ratio.
+- `run(window_tuple, signal_tuple)` or `run(param_grid={...})` for multi-factor.
+- Returns `WalkForwardResult` with per-factor best windows/signals.
 
 ## Adding a New Indicator
 

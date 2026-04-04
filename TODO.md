@@ -5,6 +5,100 @@
 1. CI/CD to deploy to production
 
 
+## Multi-Factor Conjunction Strategy
+
+Refactor the pipeline so strategies operate on **multiple factors simultaneously** (e.g., LONG only when `price_zscore > 0.7 AND volume_zscore > 0.5`). Each factor gets its own indicator, window, and signal threshold. Signals are combined via AND/OR conjunction.
+
+Single-factor becomes a 1-element tuple — no separate code path.
+
+### Phase 1: Data Model — `src/strat.py`
+
+*No dependencies — start here*
+
+- [x] Add `FactorConfig` frozen dataclass: `FactorConfig(column: str, indicator_name: str)`
+- [x] Refactor `StrategyConfig`:
+  - Remove `indicator_name: str`
+  - Add `factors: tuple[FactorConfig, ...]`
+  - Add `conjunction: str = 'AND'` (values: `'AND'` | `'OR'`)
+  - Keep `strategy_func` and `trading_period`
+- [x] Add `combine_positions(factor_positions: list[np.array], conjunction: str) → np.array`
+  - `AND`: LONG when ALL factors = 1, SHORT when ALL = -1, else 0
+  - `OR`: LONG when ANY factor = 1, SHORT when ANY = -1, else 0
+  - NaN if ANY factor is NaN
+- [x] Existing strategy functions (`momentum_const_signal`, `reversion_const_signal`) unchanged — applied per-factor
+
+### Phase 2: Performance — `src/perf.py` *(depends on Phase 1)*
+
+- [x] Change `__init__` signature: `Performance(data, config, windows: tuple, signals: tuple, *, fee_bps=None)`
+- [x] Validate `len(windows) == len(signals) == len(config.factors)` — raise `ValueError` on mismatch
+- [x] For each factor `i`:
+  - Set `data['factor'] = data[factor.column]`
+  - Create `TechnicalAnalysis`, compute `indicator_func(windows[i])`
+  - Compute per-factor position via `config.strategy_func(indicator, signals[i])`
+  - Store as `indicator_i` / `position_i` columns for inspection
+- [x] Call `combine_positions()` for final `position` column
+- [ ] **Continuous position sizing** — support fractional positions (e.g., 0.8, -0.5) instead of discrete {-1, 0, 1}. Strategy functions can return continuous values based on indicator strength; `combine_positions` averages or multiplies per-factor weights
+- [x] Use `warmup = max(windows)` for metric slicing (replaces single `self.window`)
+- [x] All metric methods unchanged — they read `position`, `pnl`, `cumu`, `dd`
+- [ ] **JSON pipeline output** — `Performance` exposes results as a JSON-serialisable dict/object (config, params, metrics, positions) that can flow to the next stage (grid search, walk-forward, UI, or external API)
+
+### Phase 3: Grid Search — `src/param_opt.py` *(depends on Phases 1–2)*
+
+- [x] Change `optimize_grid` param keys to indexed format: `window_0`, `signal_0`, `window_1`, `signal_1`, ...
+- [x] Recognize `window_N` / `signal_N` pattern, pack into tuples for `Performance`
+- [x] Result dicts include per-factor params: `{'window_0': 20, 'signal_0': 0.7, 'window_1': 30, 'signal_1': 0.5, 'sharpe': 1.23}`
+- [x] Config (factors, conjunction, strategy) is fixed per call — only windows/signals are swept
+- [ ] Remove legacy `optimize()` method — all callers migrate to `optimize_grid` with indexed keys
+
+### Phase 4: Walk-Forward — `src/walk_forward.py` *(depends on Phases 1–3)*
+
+- [x] `run()` accepts a `param_grid` dict with indexed keys (same format as `optimize_grid`)
+- [x] `WalkForwardResult` stores per-factor best windows/signals
+
+### Phase 5: CLI — `src/main.py` *(depends on Phases 1–4)*
+
+- [x] Multi-factor CLI args: `--factor price:bollinger volume:bollinger`
+- [ ] Per-factor window/signal ranges
+- [ ] `--conjunction AND|OR`
+- [x] Build `FactorConfig` tuple from args, param_grid with indexed keys
+
+### Phase 6: Streamlit UI — `src/app.py` *(depends on Phases 1–4)*
+
+- [x] Sidebar: list of factor configs, each with column / indicator / window range / signal range
+- [ ] Add/remove factor buttons within each grid row
+- [ ] Conjunction mode selector (AND / OR)
+- [x] `_build_row_grids()` produces indexed `window_0` / `signal_0` / ... keys
+- [ ] Heatmap axis selectors include per-factor dimensions, filter dropdowns for extras
+- [ ] **Position logic visualisation** — display per-factor indicator values, per-factor positions ({-1, 0, 1}), and the combined position after AND/OR conjunction. Show as a multi-panel chart: one subplot per factor (indicator + thresholds + position bands) plus a combined position subplot. Colour-code LONG (green), SHORT (red), FLAT (grey) regions so the user can visually verify the conjunction logic.
+
+### Phase 7: Tests *(depends on all phases)*
+
+- [x] `tests/unit/test_strat.py` — `FactorConfig`, `combine_positions` (AND/OR logic, NaN propagation), refactored `StrategyConfig`
+- [x] `tests/unit/test_perf.py` — Single-factor as 1-tuple produces same results; multi-factor AND/OR conjunction
+- [x] `tests/unit/test_param_opt.py` — Indexed grid search produces correct combos
+- [x] `tests/unit/test_walk_forward.py` — Multi-factor param grid
+- [x] `tests/integration/test_backtest_pipeline.py` — 2-factor pipeline end-to-end
+- [x] Update every existing test that creates `StrategyConfig` or `Performance` to use tuple params
+
+### Design Decisions
+
+- `FactorConfig` holds column + indicator_name. Window and signal are optimization parameters, NOT part of config.
+- `StrategyConfig.conjunction` defaults to `'AND'`.
+- Strategy function is shared across all factors (same momentum/reversion applied per-factor, then combined).
+- Single-factor usage: `factors=(FactorConfig('price', 'get_bollinger_band'),)`, `windows=(20,)`, `signals=(1.0,)`.
+- Grid explosion warning: 2 factors × 20 windows × 10 signals each = 40,000 combos → UI warns at >5,000.
+- `TechnicalAnalysis` unchanged — `Performance` creates per-factor copies internally.
+- `warmup = max(windows)` ensures all factors have valid indicators before slicing.
+
+### Future Considerations
+
+1. **Per-factor strategy functions** (e.g., momentum on price, reversion on volume) — defer to future iteration.
+2. **CLI ergonomics** — complex multi-factor args could use a YAML config file (`--config backtest.yaml`).
+3. **Per-factor strategy** — allow different `strategy_func` per factor in `FactorConfig` for asymmetric signal logic.
+4. **Hybrid expression mode (Option C)** — Form rows build a preview expression (e.g., `bollinger(price, $w0) > $s0 AND bollinger(volume, $w1) > $s1`). Advanced users toggle to raw expression mode for nested logic like `(A AND B) OR C`. Requires a sandboxed parser (no `eval`), placeholder syntax for sweepable params (`$w0`, `$s0`), and function/column discovery. Only pursue if flat AND/OR proves insufficient — the parser is significant work and most quant strategies use flat conjunction.
+5. **TypeScript UI migration** — Replace Streamlit with a TypeScript frontend (React/Next.js). The JSON pipeline output from Phase 2 becomes the API contract: Python backend exposes a REST/WebSocket API serving backtest results as JSON, TypeScript frontend consumes it. This removes Streamlit's limitations (limited interactivity, no custom components, single-threaded reruns) while keeping the Python backtest engine intact.
+
+
 ## ~~Walk-Forward Overfitting Test~~ ✅ Done
 
 Split historical data into **in-sample** (training) and **out-of-sample** (validation) periods to detect parameter overfitting.
