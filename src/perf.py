@@ -45,7 +45,7 @@ class Performance:
         # strategy daily performance
         self.data['chg'] = self.data['price'].pct_change()
         self.data['indicator'] = self.indicator_func(self.window) # look back window
-        self.data['position'] = self.config.strategy_func(self.data['indicator'], self.signal) # need insert relation logic
+        self.data['position'] = self.config.signal_func(self.data['indicator'], self.signal) # need insert relation logic
         self.data['position_x1'] = self.data['position'].shift(1)  
 
         self.data['trade'] = abs(self.data['position'] - self.data['position_x1'])

@@ -379,8 +379,8 @@ Not all combinations are meaningful:
 Quant_Strategies/
 ├── src/                     # Backtesting pipeline
 │   ├── data.py              # Data sources (YahooFinance, AlphaVantage, Glassnode, FutuOpenD)
-│   ├── ta.py                # Technical analysis indicators
-│   ├── strat.py             # Signal generation strategies + StrategyConfig dataclass
+│   ├── ta.py                # Technical analysis indicators (shim — logic in strat.py)
+│   ├── strat.py             # TechnicalAnalysis, SignalDirection, StrategyConfig
 │   ├── perf.py              # Performance metrics & PnL engine
 │   ├── param_opt.py         # N-dimensional grid-search parameter optimization
 │   ├── walk_forward.py      # Walk-forward overfitting test
@@ -411,24 +411,23 @@ Quant_Strategies/
 ## Pipeline Architecture
 
 ```
-data.py ──► ta.py ──► strat.py ──► perf.py ──► param_opt.py ──► walk_forward.py
-  │            │           │           │              │                  │
-  │            │           │           │              │                  └─ Split data into in-sample / out-of-sample,
-  │            │           │           │              │                     optimize on IS, evaluate on OOS, report
-  │            │           │           │              │                     overfitting ratio
-  │            │           │           │              │
-  │            │           │           │              └─ N-dimensional grid search over param_grid
-  │            │           │           │                 (window, signal, factor, indicator, strategy),
-  │            │           │           │                 returns best Sharpe
-  │            │           │           │
-  │            │           │           └─ Computes PnL, cumulative return, drawdown,
-  │            │           │              Sharpe, Calmar vs buy-and-hold benchmark
+data.py ──► strat.py ──► perf.py ──► param_opt.py ──► walk_forward.py
+  │            │           │              │                  │
+  │            │           │              │                  └─ Split data into in-sample / out-of-sample,
+  │            │           │              │                     optimize on IS, evaluate on OOS, report
+  │            │           │              │                     overfitting ratio
+  │            │           │              │
+  │            │           │              └─ N-dimensional grid search over param_grid
+  │            │           │                 (window, signal, factor, indicator, strategy),
+  │            │           │                 returns best Sharpe
   │            │           │
-  │            │           └─ Generates position array {-1, 0, 1} from indicator
-  │            │              vs threshold signal
+  │            │           └─ Computes PnL, cumulative return, drawdown,
+  │            │              Sharpe, Calmar vs buy-and-hold benchmark
   │            │
-  │            └─ Calculates indicator values (SMA, EMA, RSI, Bollinger Z,
-  │               Stochastic) on the factor column
+  │            └─ TechnicalAnalysis: calculates indicator values (SMA, EMA, RSI,
+  │               Bollinger Z, Stochastic) on the factor column.
+  │               SignalDirection: generates position array {-1, 0, 1} from
+  │               indicator vs threshold signal.
   │
   └─ Fetches daily close prices from YahooFinance (or AlphaVantage/Glassnode/FutuOpenD)
 ```
@@ -439,7 +438,7 @@ data.py ──► ta.py ──► strat.py ──► perf.py ──► param_opt
 
 ## Available Indicators & Strategies
 
-**Indicators** (`ta.py` — all operate on the `factor` column):
+**Indicators** (`strat.py` — `TechnicalAnalysis` class, all operate on the `factor` column):
 
 | Method | Description |
 |---|---|
@@ -449,7 +448,7 @@ data.py ──► ta.py ──► strat.py ──► perf.py ──► param_opt
 | `get_bollinger_band(period)` | Bollinger Z-score: `(factor - SMA) / rolling_std` |
 | `get_stochastic_oscillator(period)` | Stochastic %D — available in both CLI and dashboard |
 
-**Strategies** (`strat.py`):
+**Signal Directions** (`strat.py` — `SignalDirection` class):
 
 | Method | Long (+1) | Short (-1) | Flat (0) |
 |---|---|---|---|
@@ -459,12 +458,12 @@ data.py ──► ta.py ──► strat.py ──► perf.py ──► param_opt
 **StrategyConfig** (`strat.py`) — frozen dataclass packaging the strategy identity:
 
 ```python
-from strat import StrategyConfig, Strategy
+from strat import StrategyConfig, SignalDirection
 
 config = StrategyConfig(
-    indicator_name="get_bollinger_band",           # TechnicalAnalysis method name
-    strategy_func=Strategy.momentum_const_signal,  # signal generation function
-    trading_period=365,                            # 365 crypto, 252 equity
+    indicator_name="get_bollinger_band",                    # TechnicalAnalysis method name
+    signal_func=SignalDirection.momentum_const_signal,      # signal generation function
+    trading_period=365,                                     # 365 crypto, 252 equity
 )
 
 # All pipeline constructors accept config directly:

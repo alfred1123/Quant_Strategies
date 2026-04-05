@@ -25,7 +25,7 @@ class StrategyConfig:
     platform-specific details like transaction fees or data.
     """
     indicator_name: str        # TechnicalAnalysis method name, e.g. "get_bollinger_band"
-    strategy_func: Callable    # e.g. Strategy.momentum_const_signal
+    signal_func: Callable      # e.g. SignalDirection.momentum_const_signal
     trading_period: int        # 365 (crypto) or 252 (equity)
 
 
@@ -125,8 +125,12 @@ class TechnicalAnalysis:
         return d
 
 
-class Strategy:
+class SignalDirection:
     """Trading signal generators — all static methods with signature (data_col, signal)."""
+
+
+# Backward-compat alias
+Strategy = SignalDirection
 
     @staticmethod
     def momentum_const_signal(data_col, signal):

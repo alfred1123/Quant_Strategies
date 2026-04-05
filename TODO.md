@@ -12,18 +12,18 @@
 
 ## User Plan vs Copilot Plan — Conflict Table
 
-| # | Topic | User Plan | Copilot Plan | Conflict | Recommendation |
-|---|-------|-----------|--------------|----------|----------------|
-| 1 | **StrategyConfig fields** | Includes `strategy_dict`, `relation`, `user`, `portfolio`, `app`, `ticker` in one object | Minimal 3-field frozen dataclass (`indicator_name`, `strategy_func`, `trading_period`) | User wants a fat config carrying deployment metadata. Copilot wants a lean strategy identity. Mixing concerns makes the config non-portable (backtest doesn't need `portfolio` or `user`). | Split: `StrategyConfig` stays lean (backtest identity). Add `DeploymentConfig` (portfolio/user/app/ticker) separately for trading. |
-| 2 | **Relation syntax** | `"relation": "(1 AND 2) OR 3"` as a string → needs expression parser | `conjunction: str = "AND"` — flat AND/OR enum on `StrategyConfig` | String expressions like `(1 AND 2) OR 3` require an AST parser — non-trivial to implement and test. Copilot's flat enum can't represent nested logic. | Start with flat AND/OR (Copilot). Support nested expressions in a later phase via a simple recursive-descent parser or existing libs (e.g. `pyparsing`). Most real use cases are AND or OR, not nested. |
-| 3 | **Substrategy structure** | Numeric-keyed dict: `{1: {indicator, signal, window, param_opt_config}, 2: {...}}` | `factors: tuple[FactorConfig, ...]` ordered tuple of frozen dataclasses | Dicts with int keys are fragile (key ordering, serialization). Copilot's tuple is immutable but loses the human-readable numbering. Neither handles param_opt_config. | Use an ordered tuple of `SubStrategy` (renamed from `FactorConfig`) dataclasses. Include an `id` field for labeling. Keep `param_opt_config` outside the strategy config (it's optimization metadata, not strategy identity). |
-| 4 | **param_opt_config** | Embedded in each substrategy dict: `{win_min, win_max, win_step, sig_min, sig_max, sig_step}` | Not part of strategy config — passed as args to `optimize()` | User wants optimization bounds stored with the strategy for reproducibility. Copilot keeps them as runtime args. Embedding them couples strategy identity to optimization, but it's convenient for review. | Store param_opt_config in a separate `OptimizationConfig` dataclass. Link it to strategy via a wrapper or DB relation, not by embedding it in `StrategyConfig`. |
-| 5 | **Strategy naming** | `"strategy": "strategy_name"` auto-generated, AI-naming in future | No naming concept — strategy identified by its config fields | User wants named strategies for portfolio management and DB storage. Copilot relies on structural equality. | Add an optional `name: str = ""` field to `StrategyConfig`. Auto-generate from indicator+strategy if empty. |
-| 6 | **Multi-factor perf** | Phase 3: Refactor `enrich_performance()` with AND/OR wrapper functions | Phase 2: `Performance.__init__` accepts tuple `window=(20,14)`, `signal=(1.5,30)`, calls `combine_positions()` | Same goal, different API design. User wants explicit wrapper functions. Copilot overloads existing args with tuples. Tuple overloading makes the constructor fragile (scalar vs tuple detection). | Keep `Performance.__init__` signature clean — accept a list of `SubStrategy` results (pre-computed positions), not tuples. `combine_positions()` runs outside Performance, keeping concerns separate. |
-| 7 | **Grid search** | Phase 4: Use scikit-learn with ML features + N-dim heatmap | Phase 3: Cartesian product `optimize_multi()`, warn at >10k combos | Scikit-learn's `GridSearchCV` doesn't fit custom backtests. Cartesian product explodes with N factors. Neither addresses efficiency. | Use `optuna` for Bayesian optimization (far more efficient than grid). Keep Cartesian product as a baseline option for small grids. Scikit-learn adds no value here. |
-| 8 | **Visualization** | Phase 5: 1-dim heatmap, N-dim different viz | Phase 5: 2D heatmap with dropdown axis selector, 1-factor unchanged | N-dim visualization is genuinely hard. Both plans underspecify what "different viz" means. | 1 factor: standard 2D heatmap. 2 factors: slice heatmaps (fix one factor at best, sweep the other). 3+: parallel coordinates plot (Plotly supports this natively). |
-| 9 | **JSON API / DB** | Phase 2: Strategy JSON as the API payload to `trade.py`, shreddable in DB | Phase 6 (CLI): `--factors` JSON flag, no DB plan | User wants JSON as the bridge between backtest and trading. Copilot barely addresses it. JSON shredding (normalizing into SQL tables) is complex. | Define the JSON schema in Phase 2 but defer DB storage to a later phase. Use `dataclasses.asdict()` for serialization. Design DB schema once the JSON shape stabilizes. |
-| 10 | **TypeScript UI** | "Replace Streamlit with TypeScript" post-Phase 5 | Not addressed | Full rewrite is high effort. Streamlit limitations are real but a TS frontend is a 2-3x multiplier on all UI phases. | Bridge approach: keep Streamlit for now, add a FastAPI backend endpoint that returns JSON. Build TS frontend against the API incrementally. Or use Streamlit custom components (React/TS widgets). |
+| # | Topic | User Plan | Copilot Plan | Conflict | Decision |
+|---|-------|-----------|--------------|----------|----------|
+| 1 | **StrategyConfig fields** | Fat config with deployment metadata | Lean 3-field frozen dataclass | Mixing concerns | **AGREED**: Split `StrategyConfig` (backtest) + `DeploymentConfig` (trading), mapped by `strategy_id` FK. Backtest results stored with strategy for review. See `docs/design-trade-api.md`. |
+| 2 | **Relation syntax** | `"(1 AND 2) OR 3"` string parser | Flat AND/OR enum | Parser complexity | **AGREED**: Start with flat AND/OR for 2 substrategies. Most feasible scope for now. |
+| 3 | **Substrategy structure** | Numeric-keyed dict | Ordered tuple of dataclasses | Serialization | **AGREED**: Ordered tuple of `SubStrategy` dataclasses with `id` field. Max 2 substrategies initially. |
+| 4 | **param_opt_config** | Embedded in substrategy | Runtime args to `optimize()` | Coupling | **AGREED**: Separate `OptimizationConfig` linked via DB relation. |
+| 5 | **Strategy naming** | Auto-generated names | No naming | DB needs names | **AGREED**: Optional `name` field, auto-generated from indicator+strategy. |
+| 6 | **Multi-factor perf** | AND/OR wrapper functions | Tuple overloading in `__init__` | API design | **AGREED**: Clean `combine_positions()` function, no tuple overloading. Data array mismatch not a concern — same time interval source assumed. |
+| 7 | **Grid search** | Scikit-learn | Cartesian product | Efficiency | **AGREED**: Cartesian product as baseline (backtest speed acceptable, not used in trading). Bayesian opt (optuna) as opt-in alternative. User must be aware which optimizer is active — large step sizes in Bayesian can miss good params on random-walk data. |
+| 8 | **Visualization** | N-dim different viz | 2D heatmap with dropdown | Underspecified | **AGREED**: 1-factor heatmap, 2-factor slice heatmaps, 3+ parallel coordinates. |
+| 9 | **JSON API / DB** | Strategy JSON → trade API | CLI `--factors` flag | Scope gap | **AGREED**: Full Trade API design doc created — see `docs/design-trade-api.md`. JSON schema defined. DB schema designed (strategies, substrategies, backtest_results, deployments, trade_log). |
+| 10 | **TypeScript UI** | Replace Streamlit with TS | Not addressed | Effort vs growth | **AGREED**: Do it now. FastAPI backend (reuses Trade API) + React/TS frontend. Less pain now than later. |
 
 ---
 
@@ -68,15 +68,21 @@ Define `SubStrategy` (indicator + signal + window per factor) and a JSON-seriali
 - Store strategy JSON blob alongside normalized columns for querying.
 - Migrations in `db/sql/migrations/`.
 
-### Phase 7 — Trade integration (requires separate design doc)
+### Phase 7 — Trade API service (design doc: `docs/design-trade-api.md`)
 
-- Strategy JSON → `trade.py` API.
-- Position sizing, order types, risk checks, partial fills — all underspecified, needs design first.
+- FastAPI service in `trade_api/` — separate from backtest pipeline.
+- `TradeAdapter` interface: `FutuAdapter` (wraps existing `FutuTrader`), future `BybitAdapter`.
+- Signal execution loop: fetch data → compute indicators → combine → risk checks → execute.
+- Endpoints: strategies CRUD, deployments CRUD, execution log, backtest results storage.
+- Risk checks: kill switch, paper-first default, max position, stop loss, cash check, signal validation.
+- One-click deploy flow: serialize strategy + backtest results → POST to Trade API → user fills deployment config → deploy.
 
-### Phase 8 — TypeScript UI replacement
+### Phase 8 — TypeScript UI (do now, not later)
 
-- FastAPI backend serving JSON (reuse strategy serialization from Phase 2).
-- React/TS frontend, or Streamlit custom components as a bridge.
+- FastAPI backend (shared with Trade API from Phase 7).
+- React/TS frontend replacing Streamlit.
+- Deploy button wired to Trade API `/deployments` endpoint.
+- Strategy review dashboard: backtest results, live performance, trade log.
 
 ---
 

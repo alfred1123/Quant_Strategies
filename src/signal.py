@@ -1,5 +1,5 @@
-"""Backward-compatibility shim — Strategy signals have moved to strat.py.
+"""Backward-compatibility shim — Signal direction logic has moved to strat.py.
 
 Note: 'signal' shadows a Python builtin module. Import from strat directly.
 """
-from strat import Strategy  # noqa: F401
+from strat import SignalDirection, Strategy  # noqa: F401

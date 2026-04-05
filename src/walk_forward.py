@@ -6,9 +6,9 @@ periods. Optimizes parameters on in-sample via grid search, then evaluates the
 best parameters on out-of-sample to detect overfitting.
 
 Usage:
-    from strat import Strategy, StrategyConfig
+    from strat import SignalDirection, StrategyConfig
     config = StrategyConfig("get_bollinger_band",
-                            Strategy.momentum_const_signal, 365)
+                            SignalDirection.momentum_const_signal, 365)
     wf = WalkForward(data, 0.5, config)
     result = wf.run(window_tuple, signal_tuple)
 """
@@ -53,7 +53,7 @@ class WalkForward:
         Args:
             data: DataFrame with 'price' and 'factor' columns.
             split_ratio: Fraction of data used for in-sample (0.0–1.0).
-            config: StrategyConfig with indicator_name, strategy_func, trading_period.
+            config: StrategyConfig with indicator_name, signal_func, trading_period.
             fee_bps: Transaction fee in basis points.
         """
         if not 0.0 < split_ratio < 1.0:

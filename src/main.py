@@ -56,7 +56,7 @@ import seaborn as sns
 from data import YahooFinance
 from param_opt import ParametersOptimization
 from perf import Performance
-from strat import Strategy, StrategyConfig
+from strat import SignalDirection, StrategyConfig
 from log_config import setup_logging
 from walk_forward import WalkForward
 
@@ -72,8 +72,8 @@ INDICATORS = {
 }
 
 STRATEGIES = {
-    'momentum':  Strategy.momentum_const_signal,
-    'reversion': Strategy.reversion_const_signal,
+    'momentum':  SignalDirection.momentum_const_signal,
+    'reversion': SignalDirection.reversion_const_signal,
 }
 
 ASSET_TRADING_PERIODS = {
@@ -166,7 +166,7 @@ def main(args=None):
 
     config = StrategyConfig(
         indicator_name=indicator_method,
-        strategy_func=strategy_func,
+        signal_func=strategy_func,
         trading_period=trading_period,
     )
 

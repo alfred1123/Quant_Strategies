@@ -14,7 +14,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from data import YahooFinance, AlphaVantage
-from strat import Strategy, StrategyConfig
+from strat import SignalDirection, StrategyConfig
 from perf import Performance
 from log_config import setup_logging
 from param_opt import ParametersOptimization
@@ -33,8 +33,8 @@ INDICATORS = {
 }
 
 STRATEGIES = {
-    "Momentum": Strategy.momentum_const_signal,
-    "Reversion": Strategy.reversion_const_signal,
+    "Momentum": SignalDirection.momentum_const_signal,
+    "Reversion": SignalDirection.reversion_const_signal,
 }
 
 ASSET_TYPES = {
@@ -142,7 +142,7 @@ with tab_single:
         data_copy = df.copy()
         config = StrategyConfig(
             indicator_name=INDICATORS[indicator_name],
-            strategy_func=STRATEGIES[strategy_name],
+            signal_func=STRATEGIES[strategy_name],
             trading_period=trading_period,
         )
 
@@ -205,7 +205,7 @@ with tab_grid:
         data_copy = df.copy()
         config = StrategyConfig(
             indicator_name=INDICATORS[indicator_name],
-            strategy_func=STRATEGIES[strategy_name],
+            signal_func=STRATEGIES[strategy_name],
             trading_period=trading_period,
         )
 
@@ -280,7 +280,7 @@ with tab_wf:
         data_copy = df.copy()
         config = StrategyConfig(
             indicator_name=INDICATORS[indicator_name],
-            strategy_func=STRATEGIES[strategy_name],
+            signal_func=STRATEGIES[strategy_name],
             trading_period=trading_period,
         )
 
