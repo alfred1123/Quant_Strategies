@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ta import TechnicalAnalysis
+from strat import TechnicalAnalysis
 
 
 class TestSMA:

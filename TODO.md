@@ -1,11 +1,94 @@
 # TODO
 
-## Overall
+## Phase 1 — COMPLETED: Merge ta.py + signal.py → strat.py
+
+**Done.** `strat.py` now contains `TechnicalAnalysis`, `Strategy`, and `StrategyConfig`.
+- `ta.py` and `signal.py` reduced to backward-compat re-export shims.
+- `perf.py` broken `Strategy` class removed; fixed `enrich_performance()` bugs (`self.` prefix, called in `__init__`).
+- All imports updated across `main.py`, `app.py`, `walk_forward.py`, `test_ta.py`.
+- 204 tests pass.
+
+---
+
+## User Plan vs Copilot Plan — Conflict Table
+
+| # | Topic | User Plan | Copilot Plan | Conflict | Recommendation |
+|---|-------|-----------|--------------|----------|----------------|
+| 1 | **StrategyConfig fields** | Includes `strategy_dict`, `relation`, `user`, `portfolio`, `app`, `ticker` in one object | Minimal 3-field frozen dataclass (`indicator_name`, `strategy_func`, `trading_period`) | User wants a fat config carrying deployment metadata. Copilot wants a lean strategy identity. Mixing concerns makes the config non-portable (backtest doesn't need `portfolio` or `user`). | Split: `StrategyConfig` stays lean (backtest identity). Add `DeploymentConfig` (portfolio/user/app/ticker) separately for trading. |
+| 2 | **Relation syntax** | `"relation": "(1 AND 2) OR 3"` as a string → needs expression parser | `conjunction: str = "AND"` — flat AND/OR enum on `StrategyConfig` | String expressions like `(1 AND 2) OR 3` require an AST parser — non-trivial to implement and test. Copilot's flat enum can't represent nested logic. | Start with flat AND/OR (Copilot). Support nested expressions in a later phase via a simple recursive-descent parser or existing libs (e.g. `pyparsing`). Most real use cases are AND or OR, not nested. |
+| 3 | **Substrategy structure** | Numeric-keyed dict: `{1: {indicator, signal, window, param_opt_config}, 2: {...}}` | `factors: tuple[FactorConfig, ...]` ordered tuple of frozen dataclasses | Dicts with int keys are fragile (key ordering, serialization). Copilot's tuple is immutable but loses the human-readable numbering. Neither handles param_opt_config. | Use an ordered tuple of `SubStrategy` (renamed from `FactorConfig`) dataclasses. Include an `id` field for labeling. Keep `param_opt_config` outside the strategy config (it's optimization metadata, not strategy identity). |
+| 4 | **param_opt_config** | Embedded in each substrategy dict: `{win_min, win_max, win_step, sig_min, sig_max, sig_step}` | Not part of strategy config — passed as args to `optimize()` | User wants optimization bounds stored with the strategy for reproducibility. Copilot keeps them as runtime args. Embedding them couples strategy identity to optimization, but it's convenient for review. | Store param_opt_config in a separate `OptimizationConfig` dataclass. Link it to strategy via a wrapper or DB relation, not by embedding it in `StrategyConfig`. |
+| 5 | **Strategy naming** | `"strategy": "strategy_name"` auto-generated, AI-naming in future | No naming concept — strategy identified by its config fields | User wants named strategies for portfolio management and DB storage. Copilot relies on structural equality. | Add an optional `name: str = ""` field to `StrategyConfig`. Auto-generate from indicator+strategy if empty. |
+| 6 | **Multi-factor perf** | Phase 3: Refactor `enrich_performance()` with AND/OR wrapper functions | Phase 2: `Performance.__init__` accepts tuple `window=(20,14)`, `signal=(1.5,30)`, calls `combine_positions()` | Same goal, different API design. User wants explicit wrapper functions. Copilot overloads existing args with tuples. Tuple overloading makes the constructor fragile (scalar vs tuple detection). | Keep `Performance.__init__` signature clean — accept a list of `SubStrategy` results (pre-computed positions), not tuples. `combine_positions()` runs outside Performance, keeping concerns separate. |
+| 7 | **Grid search** | Phase 4: Use scikit-learn with ML features + N-dim heatmap | Phase 3: Cartesian product `optimize_multi()`, warn at >10k combos | Scikit-learn's `GridSearchCV` doesn't fit custom backtests. Cartesian product explodes with N factors. Neither addresses efficiency. | Use `optuna` for Bayesian optimization (far more efficient than grid). Keep Cartesian product as a baseline option for small grids. Scikit-learn adds no value here. |
+| 8 | **Visualization** | Phase 5: 1-dim heatmap, N-dim different viz | Phase 5: 2D heatmap with dropdown axis selector, 1-factor unchanged | N-dim visualization is genuinely hard. Both plans underspecify what "different viz" means. | 1 factor: standard 2D heatmap. 2 factors: slice heatmaps (fix one factor at best, sweep the other). 3+: parallel coordinates plot (Plotly supports this natively). |
+| 9 | **JSON API / DB** | Phase 2: Strategy JSON as the API payload to `trade.py`, shreddable in DB | Phase 6 (CLI): `--factors` JSON flag, no DB plan | User wants JSON as the bridge between backtest and trading. Copilot barely addresses it. JSON shredding (normalizing into SQL tables) is complex. | Define the JSON schema in Phase 2 but defer DB storage to a later phase. Use `dataclasses.asdict()` for serialization. Design DB schema once the JSON shape stabilizes. |
+| 10 | **TypeScript UI** | "Replace Streamlit with TypeScript" post-Phase 5 | Not addressed | Full rewrite is high effort. Streamlit limitations are real but a TS frontend is a 2-3x multiplier on all UI phases. | Bridge approach: keep Streamlit for now, add a FastAPI backend endpoint that returns JSON. Build TS frontend against the API incrementally. Or use Streamlit custom components (React/TS widgets). |
+
+---
+
+## Remaining Phases
+
+### Phase 2 — Strategy JSON + SubStrategy dataclass
+
+Define `SubStrategy` (indicator + signal + window per factor) and a JSON-serializable strategy dict.
+
+- Add `SubStrategy` dataclass to `strat.py`: `indicator_name`, `strategy_func_name`, `window`, `signal`.
+- Add optional `name: str` to `StrategyConfig`.
+- Define JSON schema for strategy_dict (see conflict table #1: split `StrategyConfig` from `DeploymentConfig`).
+- Serialize via `dataclasses.asdict()`. Defer DB storage until schema stabilizes.
+- Keep `param_opt_config` in a separate `OptimizationConfig`, not embedded in strategy (conflict #4).
+- Start with flat AND/OR `conjunction` enum, not string expression parser (conflict #2).
+
+### Phase 3 — Multi-factor Performance engine
+
+- Add `combine_positions(positions, conjunction)` to `strat.py` — AND/OR logic.
+- Refactor `Performance.enrich_performance()` to loop over substrategies, compute per-factor positions, then combine.
+- AND/OR wrapper functions (user's idea of future proportional weighting noted for later).
+- Unit tests for `combine_positions` (unanimous, disagree, single-factor, empty).
+
+### Phase 4 — Multi-factor grid search
+
+- Extend `ParametersOptimization.optimize()` for N-dimensional parameter space.
+- Use `optuna` for Bayesian optimization on large grids (conflict #7: scikit-learn adds no value here).
+- Keep Cartesian product as baseline for small grids.
+- Guard against >10k combinations.
+
+### Phase 5 — Visualization + Streamlit UI
+
+- 1-factor: existing 2D heatmap.
+- 2-factor: slice heatmaps (fix one factor at best, sweep the other).
+- 3+ factors: parallel coordinates (Plotly).
+- Add factor row builder in Streamlit sidebar ("Add/Remove Factor" buttons).
+- Conjunction selector (AND/OR radio).
+
+### Phase 6 — DB schema + persistence
+
+- Design SQLite schema: `strategies`, `substrategies`, `optimization_runs`, `backtest_results`.
+- Store strategy JSON blob alongside normalized columns for querying.
+- Migrations in `db/sql/migrations/`.
+
+### Phase 7 — Trade integration (requires separate design doc)
+
+- Strategy JSON → `trade.py` API.
+- Position sizing, order types, risk checks, partial fills — all underspecified, needs design first.
+
+### Phase 8 — TypeScript UI replacement
+
+- FastAPI backend serving JSON (reuse strategy serialization from Phase 2).
+- React/TS frontend, or Streamlit custom components as a bridge.
+
+---
+
+## Overall (non-phase items)
 
 1. CI/CD to deploy to production
+2. Hard coded options in main.py should be stored in the object script originated.
+3. Logging: all modules now follow log_config.py pattern. ✓
 
+---
 
-## Multi-Factor Conjunction Strategy
+## Multi-Factor Conjunction Strategy (from Copilot — reference)
 
 Combine multiple indicators (e.g. price-based Bollinger + volume-based SMA) into a single backtest where a position is taken only when **all** (AND) or **any** (OR) factors agree on direction.
 

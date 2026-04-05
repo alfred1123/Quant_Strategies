@@ -6,7 +6,7 @@ periods. Optimizes parameters on in-sample via grid search, then evaluates the
 best parameters on out-of-sample to detect overfitting.
 
 Usage:
-    from strat import StrategyConfig, Strategy
+    from strat import Strategy, StrategyConfig
     config = StrategyConfig("get_bollinger_band",
                             Strategy.momentum_const_signal, 365)
     wf = WalkForward(data, 0.5, config)
