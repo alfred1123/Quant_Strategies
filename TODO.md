@@ -1,50 +1,68 @@
 # TODO
 
-## Phase 1 — COMPLETED: Merge ta.py + signal.py → strat.py
+---
 
-**Done.** `strat.py` now contains `TechnicalAnalysis`, `SignalDirection` (alias `Strategy` for backward compat), and `StrategyConfig`.
+## Completed Phases
+
+<details>
+<summary>Phase 1 — Merge ta.py + signal.py → strat.py ✅</summary>
+
+- `strat.py` now contains `TechnicalAnalysis`, `SignalDirection` (alias `Strategy` for backward compat), and `StrategyConfig`.
 - `ta.py` and `signal.py` reduced to backward-compat re-export shims.
 - `perf.py` broken `Strategy` class removed; fixed `enrich_performance()` bugs (`self.` prefix, called in `__init__`).
 - Renamed: `Strategy` → `SignalDirection`, `strategy_func` → `signal_func`.
-- Added `ticker: str` and `strategy_id: str` (auto-UUID) to `StrategyConfig`.
+- Added `ticker: str` and `strategy_id: str` (auto-UUID v7) to `StrategyConfig`.
 - All imports updated across `main.py`, `app.py`, `walk_forward.py`, tests.
 - 204 tests pass.
 
----
+</details>
 
-## User Plan vs Copilot Plan — Conflict Table
-
-| # | Topic | User Plan | Copilot Plan | Conflict | Decision |
-|---|-------|-----------|--------------|----------|----------|
-| 1 | **StrategyConfig fields** | Fat config with deployment metadata | Lean 3-field frozen dataclass | Mixing concerns | **AGREED**: Split `StrategyConfig` (backtest) + `DeploymentConfig` (trading), mapped by `strategy_id` FK. Backtest results stored with strategy for review. See `docs/design-trade-api.md`. |
-| 2 | **Relation syntax** | `"(1 AND 2) OR 3"` string parser | Flat AND/OR enum | Parser complexity | **AGREED**: Start with flat AND/OR for 2 substrategies. Most feasible scope for now. |
-| 3 | **Substrategy structure** | Numeric-keyed dict | Ordered tuple of dataclasses | Serialization | **AGREED**: Ordered tuple of `SubStrategy` dataclasses with `id` field. Max 2 substrategies initially. |
-| 4 | **param_opt_config** | Embedded in substrategy | Runtime args to `optimize()` | Coupling | **AGREED**: Separate `OptimizationConfig` linked via DB relation. |
-| 5 | **Strategy naming** | Auto-generated names | No naming | DB needs names | **AGREED**: Optional `name` field, auto-generated from indicator+strategy. |
-| 6 | **Multi-factor perf** | AND/OR wrapper functions | Tuple overloading in `__init__` | API design | **AGREED**: Clean `combine_positions()` function, no tuple overloading. Data array mismatch not a concern — same time interval source assumed. |
-| 7 | **Grid search** | Scikit-learn | Cartesian product | Efficiency | **AGREED**: Cartesian product as baseline (backtest speed acceptable, not used in trading). Bayesian opt (optuna) as opt-in alternative. User must be aware which optimizer is active — large step sizes in Bayesian can miss good params on random-walk data. |
-| 8 | **Visualization** | N-dim different viz | 2D heatmap with dropdown | Underspecified | **AGREED**: 1-factor heatmap, 2-factor slice heatmaps, 3+ parallel coordinates. |
-| 9 | **JSON API / DB** | Strategy JSON → trade API | CLI `--factors` flag | Scope gap | **AGREED**: Full Trade API design doc created — see `docs/design-trade-api.md`. JSON schema defined. Shared DB schema designed (strategies, substrategies, backtest_results, deployments, trade_log, ticker_mapping). Backtest and trade share the same DB. |
-| 10 | **TypeScript UI** | Replace Streamlit with TS | Not addressed | Effort vs growth | **AGREED**: Do it now. FastAPI backend (reuses Trade API) + React/TS frontend. Less pain now than later. |
-
----
-
-## Remaining Phases
-
-### Phase 2 — COMPLETED: Strategy JSON + SubStrategy dataclass
-
-**Done.** `SubStrategy` frozen dataclass and JSON serialization implemented in `strat.py`.
+<details>
+<summary>Phase 2 — Strategy JSON + SubStrategy dataclass ✅</summary>
 
 - `SubStrategy(indicator_name, signal_func_name, window, signal, data_column="v")` — frozen dataclass with `resolve_signal_func()` method.
 - `StrategyConfig` extended: `name`, `conjunction` (AND/OR), `substrategies` tuple.
 - `StrategyConfig.single()` convenience constructor for single-indicator case — builds `SubStrategy` internally.
 - `StrategyConfig.get_substrategies()` — returns populated subs or synthesizes from legacy fields.
-- `strategy_to_json(config)` — serializes config + substrategies with auto-generated name.
+- `strategy_to_json(config)` — serializes config + substrategies with auto-generated name (`{ticker}_strategy_{id_prefix}`).
 - `backtest_results_to_json(strategy_id, perf, ticker, start, end, fee_bps)` — links backtest metrics to strategy.
 - Legacy `StrategyConfig` (without substrategies) still supported — pass `window`/`signal` to `strategy_to_json()`.
-- Design doc §7 updated: DB tables use `SCHEMA.TABLE` naming (`BACKTEST.STRATEGY`, `BACKTEST.SUBSTRATEGY`, `BACKTEST.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`, `REFDATA.TICKER_MAPPING`). All columns UPPER_CASE, `<TABLE>_ID` PKs, `USER_ID`/`CREATED_AT` audit columns, `IS_CURRENT_IND` soft versioning.
-- Design doc §8 updated: serialization code now references `signal_func` (not `strategy_func`).
+- Design doc §7: DB tables use `SCHEMA.TABLE` naming. Design doc §8: serialization updated.
+- UUID switched from v4 to v7 (time-ordered) via `uuid_extensions` package.
 - 238 tests pass (45 strat unit + 7 new integration).
+
+</details>
+
+---
+
+## Decisions Log
+
+All agreed decisions in one place. Referenced by conflict # from the original discussion and subsequent conversations.
+
+| # | Topic | Decision | Ref |
+|---|-------|----------|-----|
+| 1 | **Config split** | `StrategyConfig` (backtest identity) + `DeploymentConfig` (trading target), linked by `strategy_id` FK. Backtest results stored with strategy for review. | design doc §1 |
+| 2 | **Conjunction syntax** | Flat `"AND"` / `"OR"` enum on `StrategyConfig.conjunction`. No string expression parser. Max 2 substrategies initially. | strat.py |
+| 3 | **Substrategy structure** | Ordered tuple of frozen `SubStrategy` dataclasses with sequential `id`. | strat.py |
+| 4 | **Optimization config** | Separate `OptimizationConfig`, not embedded in substrategy. Runtime args to `optimize()`. | Phase 4 |
+| 5 | **Strategy naming** | Optional `name` field. Auto-generated as `{ticker}_strategy_{id_prefix}` if empty. | strat.py `_auto_name()` |
+| 6 | **Multi-factor positions** | Clean `combine_positions()` function in `strat.py`. No tuple overloading in `Performance.__init__`. Same time interval source assumed. | Phase 3 |
+| 7 | **Grid search engine** | Cartesian product as baseline (backtest speed acceptable). Bayesian opt via `optuna` as opt-in alternative. Warn on >10k combos. | Phase 4 |
+| 8 | **Visualization** | 1-factor: 2D heatmap. 2-factor: slice heatmaps. 3+: parallel coordinates (Plotly). | Phase 5 |
+| 9 | **JSON API / DB** | Full Trade API design doc. Shared DB for backtest + trade. JSON schema for strategy + deployment + backtest results. | design doc |
+| 10 | **TypeScript UI** | Do it now. FastAPI backend (shared with Trade API) + React/TS frontend. Replaces Streamlit. | Phase 8 |
+| 11 | **UUID version** | UUID v7 (time-ordered) via `uuid_extensions` package. Switch to stdlib `uuid.uuid7()` when Python 3.14 stable (Oct 2026). | strat.py |
+| 12 | **DB naming convention** | `SCHEMA.TABLE` format. Schemas: `BACKTEST.`, `TRADE.`, `REFDATA.`. Columns UPPER_CASE. PKs: `<TABLE>_ID`. Audit: `USER_ID`, `CREATED_AT`/`UPDATE_DB_TS`. Soft versioning: `IS_CURRENT_IND` (Y/N). DB name: `TradeBros`. | design doc §7, data-sql instructions |
+| 13 | **DB tables** | `BACKTEST.STRATEGY`, `BACKTEST.SUBSTRATEGY`, `BACKTEST.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`, `REFDATA.TICKER_MAPPING`. | design doc §7 |
+| 14 | **Ticker mapping** | `REFDATA.TICKER_MAPPING` maps data-source symbols (e.g. `"AAPL"`) to broker-specific symbols (e.g. `"US.AAPL"` for Futu). Queried at deployment time. | design doc §7 |
+| 15 | **Broker adapter pattern** | `TradeAdapter` abstract interface. `FutuAdapter` wraps existing `FutuTrader`. `DeploymentConfig.broker` enum selects adapter at runtime. "FUTU" = broker name, not app name. | design doc §5, Phase 7 |
+| 16 | **AWS infrastructure** | EC2 t4g.small (Graviton ARM, ~$7/mo reserved). RDS PostgreSQL 16 Serverless v2 (scales to zero, ~$5-15/mo). Native `CREATE SCHEMA` supports `SCHEMA.TABLE` convention. Total ~$15-25/mo. | design doc §11 |
+| 17 | **Local dev DB** | SQLite or Docker Postgres locally. Switch via `DB_URL` env var. | design doc §11 |
+| 18 | **Risk checks** | Kill switch, paper-first default, max position, stop loss, cash check, signal validation, duplicate guard. | design doc §4 |
+
+---
+
+## Remaining Phases
 
 ### Phase 3 — Multi-factor Performance engine
 
@@ -68,11 +86,12 @@
 - Add factor row builder in Streamlit sidebar ("Add/Remove Factor" buttons).
 - Conjunction selector (AND/OR radio).
 
-### Phase 6 — DB schema + persistence (shared DB for backtest + trade)
+### Phase 6 — DB schema + persistence
 
-- Single shared SQLite DB for both backtest results and trade execution (no separation needed until scale demands it).
-- Schema: `strategies`, `substrategies`, `backtest_results`, `deployments`, `trade_log`, `ticker_mapping` (see design doc §7).
-- `ticker_mapping` table maps data-source symbols (e.g. `"AAPL"`) to broker-specific symbols (e.g. `"US.AAPL"` for Futu, `"BTCUSDT"` for Bybit). Queried at deployment time.
+- RDS PostgreSQL 16 Serverless v2 in production; SQLite or Docker Postgres locally (decision #16, #17).
+- Schemas: `BACKTEST.*`, `TRADE.*`, `REFDATA.*` (decision #12, #13).
+- Tables: `BACKTEST.STRATEGY`, `BACKTEST.SUBSTRATEGY`, `BACKTEST.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`, `REFDATA.TICKER_MAPPING` (design doc §7).
+- `REFDATA.TICKER_MAPPING` maps data-source symbols to broker-specific symbols (decision #14).
 - Store strategy JSON blob alongside normalized columns for querying.
 - Migrations in `db/sql/migrations/`.
 
