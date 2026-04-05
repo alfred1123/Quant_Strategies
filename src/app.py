@@ -141,6 +141,7 @@ with tab_single:
     if run_single:
         data_copy = df.copy()
         config = StrategyConfig(
+            ticker=symbol,
             indicator_name=INDICATORS[indicator_name],
             signal_func=STRATEGIES[strategy_name],
             trading_period=trading_period,
@@ -204,6 +205,7 @@ with tab_grid:
 
         data_copy = df.copy()
         config = StrategyConfig(
+            ticker=symbol,
             indicator_name=INDICATORS[indicator_name],
             signal_func=STRATEGIES[strategy_name],
             trading_period=trading_period,
@@ -279,6 +281,7 @@ with tab_wf:
 
         data_copy = df.copy()
         config = StrategyConfig(
+            ticker=symbol,
             indicator_name=INDICATORS[indicator_name],
             signal_func=STRATEGIES[strategy_name],
             trading_period=trading_period,

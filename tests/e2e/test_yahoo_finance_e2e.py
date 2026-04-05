@@ -94,9 +94,9 @@ class TestFullPipelineE2E:
 
     @pytest.fixture
     def equity_config(self):
-        return StrategyConfig(
+        return StrategyConfig(ticker="AAPL",
             indicator_name="get_sma",
-            strategy_func=Strategy.momentum_const_signal,
+            signal_func=Strategy.momentum_const_signal,
             trading_period=252,
         )
 
@@ -111,9 +111,9 @@ class TestFullPipelineE2E:
         assert result["Max Drawdown"] >= 0
 
     def test_bollinger_reversion_produces_valid_metrics(self, aapl_data):
-        config = StrategyConfig(
+        config = StrategyConfig(ticker="AAPL",
             indicator_name="get_bollinger_band",
-            strategy_func=Strategy.reversion_const_signal,
+            signal_func=Strategy.reversion_const_signal,
             trading_period=252,
         )
         perf = Performance(aapl_data, config, 20, 1.0)
@@ -123,9 +123,9 @@ class TestFullPipelineE2E:
         assert perf.get_max_drawdown() >= 0
 
     def test_ema_momentum_produces_valid_metrics(self, aapl_data):
-        config = StrategyConfig(
+        config = StrategyConfig(ticker="AAPL",
             indicator_name="get_ema",
-            strategy_func=Strategy.momentum_const_signal,
+            signal_func=Strategy.momentum_const_signal,
             trading_period=252,
         )
         perf = Performance(aapl_data, config, 20, 0.5)
@@ -164,9 +164,9 @@ class TestParamOptE2E:
         })
 
     def test_grid_search_returns_results(self, spy_data):
-        config = StrategyConfig(
+        config = StrategyConfig(ticker="SPY",
             indicator_name="get_sma",
-            strategy_func=Strategy.momentum_const_signal,
+            signal_func=Strategy.momentum_const_signal,
             trading_period=252,
         )
         opt = ParametersOptimization(spy_data, config)
@@ -194,9 +194,9 @@ class TestWalkForwardE2E:
         })
 
     def test_walk_forward_produces_result(self, spy_data):
-        config = StrategyConfig(
+        config = StrategyConfig(ticker="SPY",
             indicator_name="get_sma",
-            strategy_func=Strategy.momentum_const_signal,
+            signal_func=Strategy.momentum_const_signal,
             trading_period=252,
         )
         wf = WalkForward(spy_data, 0.5, config)
@@ -209,9 +209,9 @@ class TestWalkForwardE2E:
         assert isinstance(result.overfitting_ratio, float)
 
     def test_walk_forward_summary_dataframe(self, spy_data):
-        config = StrategyConfig(
+        config = StrategyConfig(ticker="SPY",
             indicator_name="get_bollinger_band",
-            strategy_func=Strategy.reversion_const_signal,
+            signal_func=Strategy.reversion_const_signal,
             trading_period=252,
         )
         wf = WalkForward(spy_data, 0.5, config)

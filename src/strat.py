@@ -8,13 +8,38 @@ Pipeline: data.py → strat.py → perf.py → param_opt.py → walk_forward.py
 '''
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Callable
+
+from uuid_extensions import uuid7
 
 import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Data model
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class SubStrategy:
+    """One indicator + signal direction pair with its parameters.
+
+    Maps 1:1 to a row in ``BACKTEST.SUBSTRATEGY`` and to elements
+    in the ``substrategies`` JSON array (design doc §1.1).
+    """
+    indicator_name: str        # TechnicalAnalysis method, e.g. "get_bollinger_band"
+    signal_func_name: str      # SignalDirection method name, e.g. "momentum_const_signal"
+    window: int                # indicator lookback period
+    signal: float              # threshold
+    data_column: str = "v"     # which raw column becomes 'factor'
+
+    def resolve_signal_func(self) -> Callable:
+        """Resolve ``signal_func_name`` to an actual callable on ``SignalDirection``."""
+        return getattr(SignalDirection, self.signal_func_name)
 
 
 @dataclass(frozen=True)
@@ -23,10 +48,61 @@ class StrategyConfig:
 
     Carries *what* to run (indicator + strategy + annualisation) but not
     platform-specific details like transaction fees or data.
+
+    ``strategy_id`` links this config to DeploymentConfig and DB records
+    (``BACKTEST.STRATEGY.STRATEGY_ID``).
+
+    ``ticker`` records the data-source symbol the strategy was backtested on
+    (e.g. ``"BTC-USD"`` for Yahoo Finance).  Broker-specific symbols
+    (e.g. ``"US.AAPL"`` for Futu) live in DeploymentConfig; the mapping
+    between them is stored in ``REFDATA.TICKER_MAPPING``.
     """
+    ticker: str                # Data-source symbol, e.g. "BTC-USD", "AAPL"
     indicator_name: str        # TechnicalAnalysis method name, e.g. "get_bollinger_band"
     signal_func: Callable      # e.g. SignalDirection.momentum_const_signal
     trading_period: int        # 365 (crypto) or 252 (equity)
+    strategy_id: str = field(default_factory=lambda: str(uuid7()))
+    name: str = ""             # human-readable; auto-generated if empty
+    conjunction: str = "AND"   # "AND" | "OR" — how substrategies combine
+    substrategies: tuple = ()  # tuple[SubStrategy, ...]; empty = single-factor legacy
+
+    @classmethod
+    def single(cls, ticker, indicator_name, signal_func, trading_period,
+               window=20, signal=1.0, data_column="v", **kwargs):
+        """Convenience constructor for the common single-indicator case.
+
+        Builds a ``SubStrategy`` internally so the config is fully
+        self-describing for JSON serialization.
+        """
+        sub = SubStrategy(
+            indicator_name=indicator_name,
+            signal_func_name=signal_func.__name__,
+            window=window,
+            signal=signal,
+            data_column=data_column,
+        )
+        return cls(
+            ticker=ticker,
+            indicator_name=indicator_name,
+            signal_func=signal_func,
+            trading_period=trading_period,
+            substrategies=(sub,),
+            **kwargs,
+        )
+
+    def get_substrategies(self):
+        """Return substrategies, synthesizing one from top-level fields if empty."""
+        if self.substrategies:
+            return list(self.substrategies)
+        # Legacy single-factor config — synthesize a SubStrategy for callers
+        # that need the uniform interface.
+        return [SubStrategy(
+            indicator_name=self.indicator_name,
+            signal_func_name=self.signal_func.__name__,
+            window=0,      # caller must supply window separately
+            signal=0.0,    # caller must supply signal separately
+            data_column="factor",
+        )]
 
 
 class TechnicalAnalysis:
@@ -128,10 +204,6 @@ class TechnicalAnalysis:
 class SignalDirection:
     """Trading signal generators — all static methods with signature (data_col, signal)."""
 
-
-# Backward-compat alias
-Strategy = SignalDirection
-
     @staticmethod
     def momentum_const_signal(data_col, signal):
         """Go long when indicator > signal, short when < -signal, flat otherwise.
@@ -163,3 +235,76 @@ Strategy = SignalDirection
         position = position.astype(float)
         position[np.isnan(data_col)] = np.nan
         return position
+
+
+# Backward-compat alias
+Strategy = SignalDirection
+
+
+# ---------------------------------------------------------------------------
+# JSON serialization  (design doc §8)
+# ---------------------------------------------------------------------------
+
+def strategy_to_json(config: StrategyConfig, window=None, signal=None) -> dict:
+    """Serialize a StrategyConfig to the Strategy JSON schema.
+
+    If ``config.substrategies`` is populated, ``window`` and ``signal`` are
+    ignored (they come from each SubStrategy).  For legacy single-factor
+    configs, ``window`` and ``signal`` are required.
+    """
+    subs = config.get_substrategies()
+
+    # Legacy path: inject window/signal into the synthesized sub
+    if not config.substrategies:
+        if window is None or signal is None:
+            raise ValueError("window and signal required for legacy StrategyConfig "
+                             "without substrategies")
+        subs = [SubStrategy(
+            indicator_name=config.indicator_name,
+            signal_func_name=config.signal_func.__name__,
+            window=window,
+            signal=signal,
+            data_column="v",
+        )]
+
+    name = config.name or _auto_name(config, subs)
+
+    return {
+        "strategy_id": config.strategy_id,
+        "name": name,
+        "version": 1,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "ticker": config.ticker,
+        "conjunction": config.conjunction,
+        "trading_period": config.trading_period,
+        "substrategies": [
+            {
+                "id": i + 1,
+                "indicator": s.indicator_name,
+                "signal_func": s.signal_func_name,
+                "window": s.window,
+                "signal": s.signal,
+                "data_column": s.data_column,
+            }
+            for i, s in enumerate(subs)
+        ],
+    }
+
+
+def backtest_results_to_json(strategy_id, perf, ticker, start, end, fee_bps):
+    """Serialize backtest Performance metrics to JSON."""
+    return {
+        "strategy_id": strategy_id,
+        "run_at": datetime.now(timezone.utc).isoformat(),
+        "data_range": {"start": start, "end": end},
+        "ticker_backtested": ticker,
+        "fee_bps": fee_bps,
+        "metrics": perf.get_strategy_performance().to_dict(),
+        "buy_hold_metrics": perf.get_buy_hold_performance().to_dict(),
+    }
+
+
+def _auto_name(config, subs):
+    """Generate a short name: ``{ticker}_strategy_{id_prefix}``."""
+    short_id = config.strategy_id[:8]
+    return f"{config.ticker}_strategy_{short_id}"

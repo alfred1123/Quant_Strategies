@@ -6,7 +6,7 @@ from strat import Strategy, StrategyConfig
 from walk_forward import WalkForward, WalkForwardResult
 
 
-_BOLLINGER_CONFIG = StrategyConfig("get_bollinger_band",
+_BOLLINGER_CONFIG = StrategyConfig("TEST", "get_bollinger_band",
                                    Strategy.momentum_const_signal, 252)
 
 
@@ -137,7 +137,7 @@ class TestWalkForwardWithConfig:
 
     def test_run_produces_result(self):
         df = _make_synthetic_data()
-        config = StrategyConfig("get_bollinger_band",
+        config = StrategyConfig("TEST", "get_bollinger_band",
                                 Strategy.momentum_const_signal, 252)
         wf = WalkForward(df.copy(), 0.5, config)
         result = wf.run((20,), (1.0,))
@@ -146,7 +146,7 @@ class TestWalkForwardWithConfig:
 
     def test_fee_propagates(self):
         df = _make_synthetic_data()
-        config = StrategyConfig("get_bollinger_band",
+        config = StrategyConfig("TEST", "get_bollinger_band",
                                 Strategy.momentum_const_signal, 252)
         wf = WalkForward(df, 0.5, config, fee_bps=15.0)
         assert wf.fee_bps == 15.0

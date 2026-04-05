@@ -7,7 +7,7 @@ best parameters on out-of-sample to detect overfitting.
 
 Usage:
     from strat import SignalDirection, StrategyConfig
-    config = StrategyConfig("get_bollinger_band",
+    config = StrategyConfig("BTC-USD", "get_bollinger_band",
                             SignalDirection.momentum_const_signal, 365)
     wf = WalkForward(data, 0.5, config)
     result = wf.run(window_tuple, signal_tuple)

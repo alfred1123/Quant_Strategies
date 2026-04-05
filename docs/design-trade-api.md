@@ -36,6 +36,7 @@ Two top-level objects: `StrategyConfig` (what to compute) and `DeploymentConfig`
   "name": "bollinger_momentum_20_1.0",
   "version": 1,
   "created_at": "2026-04-05T12:00:00Z",
+  "ticker": "BTC-USD",
   "conjunction": "AND",
   "trading_period": 365,
   "substrategies": [
@@ -64,6 +65,7 @@ Two top-level objects: `StrategyConfig` (what to compute) and `DeploymentConfig`
 | `strategy_id` | string (UUID) | Unique identifier, auto-generated |
 | `name` | string | Human-readable name; auto-generated from indicator+strategy if empty |
 | `version` | int | Incremented on parameter changes; original preserved for audit |
+| `ticker` | string | Data-source symbol the strategy was backtested on (e.g. `"BTC-USD"`, `"AAPL"`). Broker-specific symbols live in DeploymentConfig; mapping stored in `ticker_mapping` DB table. |
 | `conjunction` | `"AND"` \| `"OR"` | How substrategy positions combine (flat enum for now) |
 | `trading_period` | int | 365 (crypto) or 252 (equity) — for annualization |
 | `substrategies` | array | 1–2 substrategy objects (expandable later) |
@@ -74,7 +76,7 @@ Each substrategy:
 |-------|------|-------------|
 | `id` | int | Ordering key (1-indexed) |
 | `indicator` | string | `TechnicalAnalysis` method name |
-| `signal_func` | string | `Strategy` static method name (serialized as string, resolved at runtime) |
+| `signal_func` | string | `SignalDirection` static method name (serialized as string, resolved at runtime) |
 | `window` | int | Indicator lookback period |
 | `signal` | float | Signal threshold |
 | `data_column` | string | Source data column to use as `factor` |
@@ -348,68 +350,100 @@ def execute_deployment(deployment, strategy):
 
 ## 7. DB Schema (high-level)
 
+Database: **TradeBros**. Tables use `SCHEMA.TABLE` naming:
+- `BACKTEST.` — backtest artifacts and strategy definitions
+- `TRADE.` — live execution records
+- `REFDATA.` — reference/lookup data
+
 ```sql
-CREATE TABLE strategies (
-    strategy_id   TEXT PRIMARY KEY,
-    name          TEXT NOT NULL,
-    version       INTEGER DEFAULT 1,
-    conjunction   TEXT CHECK(conjunction IN ('AND', 'OR')) DEFAULT 'AND',
-    trading_period INTEGER NOT NULL,
-    config_json   TEXT NOT NULL,        -- full StrategyConfig JSON
-    created_at    TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TEXT DEFAULT CURRENT_TIMESTAMP,
-    active        INTEGER DEFAULT 1
+-- ── BACKTEST schema ──
+
+CREATE TABLE BACKTEST.STRATEGY (
+    STRATEGY_ID   TEXT PRIMARY KEY,
+    NAME          TEXT NOT NULL,
+    VERSION       INTEGER DEFAULT 1,
+    TICKER        TEXT NOT NULL,          -- data-source symbol (e.g. "BTC-USD")
+    CONJUNCTION   TEXT CHECK(CONJUNCTION IN ('AND', 'OR')) DEFAULT 'AND',
+    TRADING_PERIOD INTEGER NOT NULL,
+    CONFIG_JSON   TEXT NOT NULL,          -- full StrategyConfig JSON
+    USER_ID       TEXT,
+    CREATED_AT    TEXT DEFAULT CURRENT_TIMESTAMP,
+    UPDATE_DB_TS  TEXT DEFAULT CURRENT_TIMESTAMP,
+    IS_CURRENT_IND TEXT DEFAULT 'Y' CHECK(IS_CURRENT_IND IN ('Y', 'N'))
 );
 
-CREATE TABLE substrategies (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    strategy_id   TEXT REFERENCES strategies(strategy_id),
-    substrategy_id INTEGER NOT NULL,    -- 1, 2, ...
-    indicator     TEXT NOT NULL,
-    signal_func   TEXT NOT NULL,
-    window        INTEGER NOT NULL,
-    signal        REAL NOT NULL,
-    data_column   TEXT DEFAULT 'v'
+CREATE TABLE BACKTEST.SUBSTRATEGY (
+    SUBSTRATEGY_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    STRATEGY_ID    TEXT REFERENCES BACKTEST.STRATEGY(STRATEGY_ID),
+    SEQ            INTEGER NOT NULL,      -- 1, 2, ...
+    INDICATOR      TEXT NOT NULL,
+    SIGNAL_FUNC    TEXT NOT NULL,
+    WINDOW         INTEGER NOT NULL,
+    SIGNAL         REAL NOT NULL,
+    DATA_COLUMN    TEXT DEFAULT 'v',
+    USER_ID        TEXT,
+    CREATED_AT     TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE backtest_results (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    strategy_id   TEXT REFERENCES strategies(strategy_id),
-    run_at        TEXT DEFAULT CURRENT_TIMESTAMP,
-    data_start    TEXT,
-    data_end      TEXT,
-    ticker        TEXT,
-    fee_bps       REAL,
-    metrics_json  TEXT NOT NULL,        -- {sharpe, calmar, max_dd, ...}
-    walk_forward_json TEXT              -- optional
+CREATE TABLE BACKTEST.RESULT (
+    RESULT_ID     INTEGER PRIMARY KEY AUTOINCREMENT,
+    STRATEGY_ID   TEXT REFERENCES BACKTEST.STRATEGY(STRATEGY_ID),
+    RUN_AT        TEXT DEFAULT CURRENT_TIMESTAMP,
+    DATA_START    TEXT,
+    DATA_END      TEXT,
+    TICKER        TEXT,
+    FEE_BPS       REAL,
+    METRICS_JSON  TEXT NOT NULL,          -- {sharpe, calmar, max_dd, ...}
+    WALK_FORWARD_JSON TEXT,               -- optional
+    USER_ID       TEXT,
+    CREATED_AT    TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE deployments (
-    deployment_id TEXT PRIMARY KEY,
-    strategy_id   TEXT REFERENCES strategies(strategy_id),
-    portfolio     TEXT DEFAULT 'DEFAULT',
-    user          TEXT NOT NULL,
-    broker        TEXT NOT NULL,
-    ticker        TEXT NOT NULL,
-    qty           INTEGER NOT NULL,
-    paper         INTEGER DEFAULT 1,
-    market        TEXT DEFAULT 'US',
-    schedule      TEXT DEFAULT 'daily_close',
-    enabled       INTEGER DEFAULT 1,
-    risk_limits_json TEXT,
-    created_at    TEXT DEFAULT CURRENT_TIMESTAMP
+-- ── TRADE schema ──
+
+CREATE TABLE TRADE.DEPLOYMENT (
+    DEPLOYMENT_ID    TEXT PRIMARY KEY,
+    STRATEGY_ID      TEXT REFERENCES BACKTEST.STRATEGY(STRATEGY_ID),
+    PORTFOLIO        TEXT DEFAULT 'DEFAULT',
+    USER_ID          TEXT NOT NULL,
+    BROKER           TEXT NOT NULL,
+    TICKER           TEXT NOT NULL,
+    QTY              INTEGER NOT NULL,
+    PAPER            INTEGER DEFAULT 1,
+    MARKET           TEXT DEFAULT 'US',
+    SCHEDULE         TEXT DEFAULT 'daily_close',
+    ENABLED          INTEGER DEFAULT 1,
+    RISK_LIMITS_JSON TEXT,
+    CREATED_AT       TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE trade_log (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    deployment_id TEXT REFERENCES deployments(deployment_id),
-    timestamp     TEXT DEFAULT CURRENT_TIMESTAMP,
-    signal_value  REAL,
-    action        TEXT,                 -- BUY, SELL, HOLD, REJECTED
-    qty           INTEGER,
-    order_id      TEXT,
-    success       INTEGER,
-    message       TEXT
+CREATE TABLE TRADE.LOG (
+    LOG_ID        INTEGER PRIMARY KEY AUTOINCREMENT,
+    DEPLOYMENT_ID TEXT REFERENCES TRADE.DEPLOYMENT(DEPLOYMENT_ID),
+    TIMESTAMP     TEXT DEFAULT CURRENT_TIMESTAMP,
+    SIGNAL_VALUE  REAL,
+    ACTION        TEXT,                   -- BUY, SELL, HOLD, REJECTED
+    QTY           INTEGER,
+    ORDER_ID      TEXT,
+    SUCCESS       INTEGER,
+    MESSAGE       TEXT,
+    USER_ID       TEXT,
+    CREATED_AT    TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ── REFDATA schema ──
+
+-- Maps data-source symbols to broker-specific symbols.
+-- Avoids hardcoding the mapping; queried at deployment time.
+CREATE TABLE REFDATA.TICKER_MAPPING (
+    TICKER_MAPPING_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    DATA_TICKER       TEXT NOT NULL,        -- e.g. "AAPL", "BTC-USD"
+    BROKER            TEXT NOT NULL,        -- e.g. "FUTU", "BYBIT"
+    BROKER_TICKER     TEXT NOT NULL,        -- e.g. "US.AAPL", "BTCUSDT"
+    MARKET            TEXT,                 -- e.g. "US", "HK", "CRYPTO"
+    USER_ID           TEXT,
+    CREATED_AT        TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(DATA_TICKER, BROKER)
 );
 ```
 
@@ -417,45 +451,37 @@ CREATE TABLE trade_log (
 
 ## 8. Serialization: StrategyConfig ↔ JSON
 
+Implemented in `src/strat.py` — `strategy_to_json()` and `backtest_results_to_json()`.
+
 ```python
-import json
-import uuid
-from dataclasses import asdict
-from datetime import datetime, timezone
+from strat import StrategyConfig, SubStrategy, strategy_to_json, backtest_results_to_json
 
-def strategy_to_json(config: StrategyConfig, window, signal) -> dict:
-    """Serialize a StrategyConfig + params to the Strategy JSON schema."""
-    return {
-        "strategy_id": str(uuid.uuid4()),
-        "name": f"{config.indicator_name}_{config.strategy_func.__name__}_{window}_{signal}",
-        "version": 1,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "conjunction": "AND",
-        "trading_period": config.trading_period,
-        "substrategies": [
-            {
-                "id": 1,
-                "indicator": config.indicator_name,
-                "signal_func": config.strategy_func.__name__,
-                "window": window,
-                "signal": signal,
-                "data_column": "v",
-            }
-        ],
-    }
+# Single-factor (uses StrategyConfig.single for self-describing config):
+cfg = StrategyConfig.single(
+    "BTC-USD", "get_bollinger_band",
+    SignalDirection.momentum_const_signal, 365,
+    window=20, signal=1.0
+)
+strat_json = strategy_to_json(cfg)
 
-def backtest_results_to_json(strategy_id, perf, ticker, start, end, fee_bps):
-    """Serialize backtest Performance metrics to JSON."""
-    return {
-        "strategy_id": strategy_id,
-        "run_at": datetime.now(timezone.utc).isoformat(),
-        "data_range": {"start": start, "end": end},
-        "ticker_backtested": ticker,
-        "fee_bps": fee_bps,
-        "metrics": perf.get_strategy_performance().to_dict(),
-        "buy_hold_metrics": perf.get_buy_hold_performance().to_dict(),
-    }
+# Multi-factor:
+sub1 = SubStrategy("get_sma", "momentum_const_signal", 20, 1.0)
+sub2 = SubStrategy("get_rsi", "reversion_const_signal", 14, 0.5)
+cfg = StrategyConfig(
+    "AAPL", "get_sma", SignalDirection.momentum_const_signal, 252,
+    conjunction="AND", substrategies=(sub1, sub2)
+)
+strat_json = strategy_to_json(cfg)
+
+# Backtest results (links via strategy_id):
+bt_json = backtest_results_to_json(
+    cfg.strategy_id, perf, cfg.ticker,
+    "2020-01-01", "2023-12-31", 5.0
+)
 ```
+
+Legacy `StrategyConfig` (without substrategies) is still supported —
+pass `window` and `signal` explicitly to `strategy_to_json(cfg, window=20, signal=1.0)`.
 
 ---
 
@@ -482,3 +508,101 @@ def backtest_results_to_json(strategy_id, perf, ticker, start, end, fee_bps):
 3. **Position sizing**: Current design is fixed `qty`. Future: fractional/proportional sizing based on portfolio value.
 4. **Rebalance frequency**: `daily_close` is straightforward. Intraday signals need streaming data — significantly more complex.
 5. **Auth**: Trade API needs authentication. JWT tokens? API keys? Tied to `user` field.
+
+---
+
+## 11. AWS Infrastructure
+
+### Compute — EC2 t4g.small (Graviton ARM)
+
+| Spec | Value |
+|------|-------|
+| vCPU | 2 |
+| RAM | 2 GB |
+| Architecture | ARM64 (Graviton) — 20% cheaper than x86 |
+| Baseline CPU | 20% sustained, burstable to 100% |
+| On-Demand | ~$12/mo |
+| Reserved 1yr | ~$7/mo |
+
+**Why burstable**: FastAPI idle 99% of the time, daily signal cron runs for seconds, backtests are occasional bursts. CPU credits accumulate overnight. Upgrade to `t4g.medium` (4 GB, ~$24/mo) only if grid search exhausts burst credits regularly.
+
+**Why Graviton**: Entire stack is Python — no x86 dependency. ARM is cheaper and faster for Python workloads.
+
+### Database — RDS PostgreSQL 16 (Serverless v2)
+
+| Spec | Value |
+|------|-------|
+| Engine | PostgreSQL 16 |
+| Min ACU | 0 (scales to zero when idle) |
+| Max ACU | 2 |
+| Cost | ~$0.12/ACU-hour when active |
+| Storage | 20 GB gp3 (~$2.30/mo) |
+
+**Why Postgres over SQLite**:
+- Native `CREATE SCHEMA` — `BACKTEST.`, `TRADE.`, `REFDATA.` schemas work natively
+- `jsonb` type for `CONFIG_JSON`, `METRICS_JSON` — queryable and indexable
+- Native `UUID` column type (not text)
+- Concurrent writes (Trade API + backtest don't collide)
+- Serverless v2 scales to zero — near-$0 when idle
+
+**Why not DynamoDB**: Data is relational (FK joins: strategy → substrategy → results → deployments). Wrong fit for key-value.
+
+### Architecture Diagram
+
+```
+┌───────────────────────────────────────────────┐
+│  EC2 t4g.small                                │
+│                                               │
+│  ┌─────────────────┐   ┌──────────────────┐   │
+│  │  FastAPI         │   │  React/TS        │   │
+│  │  Trade API       │   │  Frontend        │   │
+│  │  :8000           │   │  :3000           │   │
+│  └────────┬─────────┘   └──────────────────┘   │
+│           │                                    │
+│  ┌────────┴─────────┐                          │
+│  │  APScheduler /   │                          │
+│  │  Cron             │                          │
+│  │  (daily signals) │                          │
+│  └────────┬─────────┘                          │
+└───────────┼───────────────────────────────────┘
+            │
+            ▼
+┌───────────────────────┐          ┌──────────┐
+│  RDS PostgreSQL       │          │ Exchange │
+│  Serverless v2        │          │ (Futu /  │
+│  ┌─────────────────┐  │          │  Bybit)  │
+│  │ BACKTEST.*      │  │          └──────────┘
+│  │ TRADE.*         │  │               ▲
+│  │ REFDATA.*       │  │               │
+│  └─────────────────┘  │         Orders/Fills
+│  DB: TradeBros        │               │
+└───────────────────────┘     ◄─────────┘
+```
+
+### Local Development
+
+Use SQLite or Docker Postgres locally. Switch via environment variable:
+
+```bash
+# .env
+DB_URL=sqlite:///db/store/tradebros.db          # local dev
+DB_URL=postgresql://user:pass@host/tradebros     # AWS
+```
+
+### Estimated Monthly Cost
+
+| Resource | Cost |
+|----------|------|
+| EC2 t4g.small (reserved 1yr) | ~$7 |
+| RDS Serverless v2 (mostly idle) | ~$5–15 |
+| EBS 20 GB gp3 | ~$1.60 |
+| **Total** | **~$15–25** |
+
+### Upgrade Path
+
+| Trigger | Action |
+|---------|--------|
+| Grid search too slow on burstable | Upgrade to `t4g.medium` or `c7g.medium` (sustained compute) |
+| Multi-user or high-frequency signals | Move to ECS Fargate or EKS |
+| DB exceeds 2 ACU regularly | Increase Max ACU or switch to provisioned RDS |
+| Python 3.14 stable (Oct 2026) | Drop `uuid7` package, use stdlib `uuid.uuid7()` |

@@ -6,7 +6,7 @@ from strat import Strategy, StrategyConfig
 from param_opt import ParametersOptimization
 
 
-_BOLLINGER_CONFIG = StrategyConfig("get_bollinger_band",
+_BOLLINGER_CONFIG = StrategyConfig("TEST", "get_bollinger_band",
                                    Strategy.momentum_const_signal, 252)
 
 
@@ -65,13 +65,13 @@ class TestParametersOptimization:
 
 class TestParametersOptimizationWithConfig:
     def test_config_stored(self, sample_ohlc_df):
-        config = StrategyConfig("get_bollinger_band",
+        config = StrategyConfig("TEST", "get_bollinger_band",
                                 Strategy.momentum_const_signal, 252)
         opt = ParametersOptimization(sample_ohlc_df.copy(), config)
         assert opt.config is config
 
     def test_fee_propagates(self, sample_ohlc_df):
-        config = StrategyConfig("get_bollinger_band",
+        config = StrategyConfig("TEST", "get_bollinger_band",
                                 Strategy.momentum_const_signal, 252)
         opt = ParametersOptimization(sample_ohlc_df.copy(), config, fee_bps=20.0)
         assert opt.fee_bps == 20.0

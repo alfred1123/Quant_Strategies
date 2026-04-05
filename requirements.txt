@@ -8,3 +8,4 @@ seaborn
 futu-api
 yfinance
 streamlit
+uuid7

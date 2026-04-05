@@ -17,13 +17,33 @@ All modules are orchestrated by `main.py`. Imports are **relative** to the `src/
 `StrategyConfig` (in `strat.py`) is a frozen dataclass that packages the strategy identity — reusable across backtest and live trading:
 
 ```python
-from strat import StrategyConfig, Strategy
+from strat import StrategyConfig, SignalDirection, SubStrategy
+
+# Legacy single-factor (backward compatible):
 config = StrategyConfig(
-    indicator_name="get_bollinger_band",   # TechnicalAnalysis method name
-    strategy_func=Strategy.momentum_const_signal,
-    trading_period=365,                    # 365 crypto, 252 equity
+    ticker="BTC-USD",
+    indicator_name="get_bollinger_band",
+    signal_func=SignalDirection.momentum_const_signal,
+    trading_period=365,
+)
+
+# Single-factor with self-describing SubStrategy:
+config = StrategyConfig.single(
+    "BTC-USD", "get_bollinger_band",
+    SignalDirection.momentum_const_signal, 365,
+    window=20, signal=1.0,
+)
+
+# Multi-factor:
+sub1 = SubStrategy("get_sma", "momentum_const_signal", 20, 1.0)
+sub2 = SubStrategy("get_rsi", "reversion_const_signal", 14, 0.5)
+config = StrategyConfig(
+    "AAPL", "get_sma", SignalDirection.momentum_const_signal, 252,
+    conjunction="AND", substrategies=(sub1, sub2),
 )
 ```
+
+**Fields**: `ticker`, `indicator_name`, `signal_func`, `trading_period`, `strategy_id` (auto-UUID), `name`, `conjunction` ("AND"/"OR"), `substrategies` (tuple of `SubStrategy`).
 
 **Transaction fees are NOT part of the config** — they vary by platform and are passed separately via `fee_bps`.
 

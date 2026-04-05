@@ -2,10 +2,12 @@
 
 ## Phase 1 — COMPLETED: Merge ta.py + signal.py → strat.py
 
-**Done.** `strat.py` now contains `TechnicalAnalysis`, `Strategy`, and `StrategyConfig`.
+**Done.** `strat.py` now contains `TechnicalAnalysis`, `SignalDirection` (alias `Strategy` for backward compat), and `StrategyConfig`.
 - `ta.py` and `signal.py` reduced to backward-compat re-export shims.
 - `perf.py` broken `Strategy` class removed; fixed `enrich_performance()` bugs (`self.` prefix, called in `__init__`).
-- All imports updated across `main.py`, `app.py`, `walk_forward.py`, `test_ta.py`.
+- Renamed: `Strategy` → `SignalDirection`, `strategy_func` → `signal_func`.
+- Added `ticker: str` and `strategy_id: str` (auto-UUID) to `StrategyConfig`.
+- All imports updated across `main.py`, `app.py`, `walk_forward.py`, tests.
 - 204 tests pass.
 
 ---
@@ -22,23 +24,27 @@
 | 6 | **Multi-factor perf** | AND/OR wrapper functions | Tuple overloading in `__init__` | API design | **AGREED**: Clean `combine_positions()` function, no tuple overloading. Data array mismatch not a concern — same time interval source assumed. |
 | 7 | **Grid search** | Scikit-learn | Cartesian product | Efficiency | **AGREED**: Cartesian product as baseline (backtest speed acceptable, not used in trading). Bayesian opt (optuna) as opt-in alternative. User must be aware which optimizer is active — large step sizes in Bayesian can miss good params on random-walk data. |
 | 8 | **Visualization** | N-dim different viz | 2D heatmap with dropdown | Underspecified | **AGREED**: 1-factor heatmap, 2-factor slice heatmaps, 3+ parallel coordinates. |
-| 9 | **JSON API / DB** | Strategy JSON → trade API | CLI `--factors` flag | Scope gap | **AGREED**: Full Trade API design doc created — see `docs/design-trade-api.md`. JSON schema defined. DB schema designed (strategies, substrategies, backtest_results, deployments, trade_log). |
+| 9 | **JSON API / DB** | Strategy JSON → trade API | CLI `--factors` flag | Scope gap | **AGREED**: Full Trade API design doc created — see `docs/design-trade-api.md`. JSON schema defined. Shared DB schema designed (strategies, substrategies, backtest_results, deployments, trade_log, ticker_mapping). Backtest and trade share the same DB. |
 | 10 | **TypeScript UI** | Replace Streamlit with TS | Not addressed | Effort vs growth | **AGREED**: Do it now. FastAPI backend (reuses Trade API) + React/TS frontend. Less pain now than later. |
 
 ---
 
 ## Remaining Phases
 
-### Phase 2 — Strategy JSON + SubStrategy dataclass
+### Phase 2 — COMPLETED: Strategy JSON + SubStrategy dataclass
 
-Define `SubStrategy` (indicator + signal + window per factor) and a JSON-serializable strategy dict.
+**Done.** `SubStrategy` frozen dataclass and JSON serialization implemented in `strat.py`.
 
-- Add `SubStrategy` dataclass to `strat.py`: `indicator_name`, `strategy_func_name`, `window`, `signal`.
-- Add optional `name: str` to `StrategyConfig`.
-- Define JSON schema for strategy_dict (see conflict table #1: split `StrategyConfig` from `DeploymentConfig`).
-- Serialize via `dataclasses.asdict()`. Defer DB storage until schema stabilizes.
-- Keep `param_opt_config` in a separate `OptimizationConfig`, not embedded in strategy (conflict #4).
-- Start with flat AND/OR `conjunction` enum, not string expression parser (conflict #2).
+- `SubStrategy(indicator_name, signal_func_name, window, signal, data_column="v")` — frozen dataclass with `resolve_signal_func()` method.
+- `StrategyConfig` extended: `name`, `conjunction` (AND/OR), `substrategies` tuple.
+- `StrategyConfig.single()` convenience constructor for single-indicator case — builds `SubStrategy` internally.
+- `StrategyConfig.get_substrategies()` — returns populated subs or synthesizes from legacy fields.
+- `strategy_to_json(config)` — serializes config + substrategies with auto-generated name.
+- `backtest_results_to_json(strategy_id, perf, ticker, start, end, fee_bps)` — links backtest metrics to strategy.
+- Legacy `StrategyConfig` (without substrategies) still supported — pass `window`/`signal` to `strategy_to_json()`.
+- Design doc §7 updated: DB tables use `SCHEMA.TABLE` naming (`BACKTEST.STRATEGY`, `BACKTEST.SUBSTRATEGY`, `BACKTEST.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`, `REFDATA.TICKER_MAPPING`). All columns UPPER_CASE, `<TABLE>_ID` PKs, `USER_ID`/`CREATED_AT` audit columns, `IS_CURRENT_IND` soft versioning.
+- Design doc §8 updated: serialization code now references `signal_func` (not `strategy_func`).
+- 238 tests pass (45 strat unit + 7 new integration).
 
 ### Phase 3 — Multi-factor Performance engine
 
@@ -62,19 +68,26 @@ Define `SubStrategy` (indicator + signal + window per factor) and a JSON-seriali
 - Add factor row builder in Streamlit sidebar ("Add/Remove Factor" buttons).
 - Conjunction selector (AND/OR radio).
 
-### Phase 6 — DB schema + persistence
+### Phase 6 — DB schema + persistence (shared DB for backtest + trade)
 
-- Design SQLite schema: `strategies`, `substrategies`, `optimization_runs`, `backtest_results`.
+- Single shared SQLite DB for both backtest results and trade execution (no separation needed until scale demands it).
+- Schema: `strategies`, `substrategies`, `backtest_results`, `deployments`, `trade_log`, `ticker_mapping` (see design doc §7).
+- `ticker_mapping` table maps data-source symbols (e.g. `"AAPL"`) to broker-specific symbols (e.g. `"US.AAPL"` for Futu, `"BTCUSDT"` for Bybit). Queried at deployment time.
 - Store strategy JSON blob alongside normalized columns for querying.
 - Migrations in `db/sql/migrations/`.
 
 ### Phase 7 — Trade API service (design doc: `docs/design-trade-api.md`)
 
 - FastAPI service in `trade_api/` — separate from backtest pipeline.
-- `TradeAdapter` interface: `FutuAdapter` (wraps existing `FutuTrader`), future `BybitAdapter`.
-- Signal execution loop: fetch data → compute indicators → combine → risk checks → execute.
+- **Broker adapter pattern** (design doc §5):
+  - `TradeAdapter` — abstract interface all brokers implement.
+  - `FutuAdapter` — wraps existing `FutuTrader` from `src/trade.py` (HK/US equities).
+  - Future: `BybitAdapter` — resume from `backup/deco/bybit._trade.py` (crypto).
+  - `DeploymentConfig.broker` enum value (e.g. `"FUTU"`, `"BYBIT"`) selects which adapter to instantiate at runtime.
+- Broker-specific symbols (e.g. `"US.AAPL"`) resolved from `ticker_mapping` DB table using `StrategyConfig.ticker` + `DeploymentConfig.broker`.
+- Signal execution loop: fetch data → compute indicators → combine via conjunction → risk checks → execute via adapter.
 - Endpoints: strategies CRUD, deployments CRUD, execution log, backtest results storage.
-- Risk checks: kill switch, paper-first default, max position, stop loss, cash check, signal validation.
+- Risk checks: kill switch, paper-first default, max position, stop loss, cash check, signal validation, duplicate guard.
 - One-click deploy flow: serialize strategy + backtest results → POST to Trade API → user fills deployment config → deploy.
 
 ### Phase 8 — TypeScript UI (do now, not later)
@@ -96,6 +109,10 @@ Define `SubStrategy` (indicator + signal + window per factor) and a JSON-seriali
 
 ## Multi-Factor Conjunction Strategy (from Copilot — reference)
 
+> **Note:** This section provides detailed implementation guidance for Phases 2–5 above.
+> Sub-phases below (MF-1 through MF-6) map to the main phases as follows:
+> MF-1 → Phase 2, MF-2 → Phase 3, MF-3 → Phase 4, MF-4/MF-5 → Phase 5, MF-6 → Phase 5 CLI.
+
 Combine multiple indicators (e.g. price-based Bollinger + volume-based SMA) into a single backtest where a position is taken only when **all** (AND) or **any** (OR) factors agree on direction.
 
 ### Problem Statement
@@ -112,14 +129,14 @@ Currently each grid-search row runs **independently** — row 1 computes Sharpe 
 3. **Testable first** — write unit tests for every new function/class before wiring into the Streamlit UI.
 4. **Incremental** — implement in small, verifiable steps; each step must leave all existing tests passing.
 
-### Phase 1 — Core Logic (strat.py + tests)
+### MF-1 — Core Logic (strat.py + tests)
 
 Goal: add factor-combining primitives with full test coverage.
 
-1. **`FactorConfig` dataclass** (`strat.py`)
-   - Fields: `indicator_name: str`, `strategy_func: Callable`, `data_column: str` (e.g. `"v"`, `"volume"`).
+1. **`SubStrategy` dataclass** (`strat.py`)
+   - Fields: `indicator_name: str`, `signal_func: Callable`, `data_column: str` (e.g. `"v"`, `"volume"`), `window: int`, `signal: float`.
    - Frozen, like `StrategyConfig`.
-   - Represents one factor's identity (indicator + strategy + which DataFrame column to use).
+   - Represents one factor's identity — same structure as the design doc §1.1 `substrategies` array elements.
 
 2. **`combine_positions()` function** (`strat.py`)
    - Signature: `combine_positions(positions: list[np.ndarray], conjunction: str = "AND") -> np.ndarray`
@@ -129,10 +146,11 @@ Goal: add factor-combining primitives with full test coverage.
    - Edge cases: single-factor list returns that array unchanged; empty list raises `ValueError`.
 
 3. **Extend `StrategyConfig`** (`strat.py`)
-   - Add optional field `factors: tuple[FactorConfig, ...] = ()`.
+   - Add optional field `substrategies: tuple[SubStrategy, ...] = ()`.
    - Add optional field `conjunction: str = "AND"`.
-   - Add helper `get_factors() -> list[FactorConfig]`: if `factors` is non-empty return it; otherwise synthesize a single-factor list from `indicator_name` + `strategy_func` + default column `"factor"` (backward compat).
-   - **Do not remove** `indicator_name` / `strategy_func` — single-factor callers still use them directly.
+   - Add `StrategyConfig.single()` classmethod for the common single-indicator case.
+   - Add helper `get_substrategies() -> list[SubStrategy]`: if `substrategies` is non-empty return it; otherwise synthesize a single-item list from `indicator_name` + `signal_func` + default column `"factor"` (backward compat).
+   - **Do not remove** `indicator_name` / `signal_func` — single-factor callers still use them directly.
 
 4. **Unit tests** (`tests/unit/test_strat.py`)
    - `test_combine_positions_and_unanimous` — all agree → combined signal matches.
@@ -140,23 +158,23 @@ Goal: add factor-combining primitives with full test coverage.
    - `test_combine_positions_or` — any factor signals → combined follows.
    - `test_combine_positions_single_factor` — passthrough.
    - `test_combine_positions_empty_raises` — ValueError.
-   - `test_factor_config_creation` — frozen, correct fields.
-   - `test_strategy_config_get_factors_legacy` — no `factors` set → infers single factor.
-   - `test_strategy_config_get_factors_explicit` — `factors` set → returns them.
+   - `test_substrategy_creation` — frozen, correct fields.
+   - `test_strategy_config_get_substrategies_legacy` — no `substrategies` set → infers single sub.
+   - `test_strategy_config_get_substrategies_explicit` — `substrategies` set → returns them.
 
-### Phase 2 — Performance Engine (perf.py + tests)
+### MF-2 — Performance Engine (perf.py + tests)
 
 Goal: make `Performance` compute PnL from combined multi-factor positions.
 
 1. **Multi-factor `Performance.__init__`** (`perf.py`)
    - Accept `window` and `signal` as **tuples** when multi-factor: `window=(20, 14)`, `signal=(1.5, 30)`.
-   - For each factor in `config.get_factors()`:
-     - Copy data, set `data['factor'] = data[factor.data_column]`.
-     - Create `TechnicalAnalysis`, call the factor's indicator with corresponding window.
-     - Compute position via the factor's strategy func with corresponding signal.
+   - For each sub in `config.get_substrategies()`:
+     - Copy data, set `data['factor'] = data[sub.data_column]`.
+     - Create `TechnicalAnalysis`, call the sub's indicator with corresponding window.
+     - Compute position via the sub's `signal_func` with corresponding signal.
    - Call `combine_positions(all_positions, config.conjunction)` → final position.
    - Compute PnL/cumulative/drawdown from the **combined** position (single PnL stream).
-   - **Backward compat**: when `config.get_factors()` returns one factor, behavior is identical to current code.
+   - **Backward compat**: when `config.get_substrategies()` returns one sub, behavior is identical to current code.
 
 2. **Set `self.data['indicator']`** — for multi-factor, store the first factor's indicator (for plotting). Document that this is approximate.
 
@@ -166,7 +184,7 @@ Goal: make `Performance` compute PnL from combined multi-factor positions.
    - `test_performance_multi_factor_or` — two factors, OR conjunction.
    - `test_performance_multi_factor_window_signal_tuples` — verify tuple unpacking per factor.
 
-### Phase 3 — Grid Search (param_opt.py + tests)
+### MF-3 — Grid Search (param_opt.py + tests)
 
 Goal: search over the combined N-dimensional parameter space.
 
@@ -183,7 +201,7 @@ Goal: search over the combined N-dimensional parameter space.
    - `test_optimize_multi_factor_best_sharpe` — verify best combo selection.
    - `test_optimize_single_factor_backward_compat` — existing tests still pass.
 
-### Phase 4 — Walk-Forward (walk_forward.py + tests)
+### MF-4 — Walk-Forward (walk_forward.py + tests)
 
 Goal: multi-factor walk-forward overfitting detection.
 
@@ -196,7 +214,7 @@ Goal: multi-factor walk-forward overfitting detection.
 2. **Unit tests** (`tests/unit/test_walk_forward.py`)
    - `test_walk_forward_multi_factor` — end-to-end with two factors.
 
-### Phase 5 — Streamlit UI (app.py + integration tests)
+### MF-5 — Streamlit UI (app.py + integration tests)
 
 Goal: expose multi-factor configuration in the dashboard.
 
@@ -217,7 +235,7 @@ Goal: expose multi-factor configuration in the dashboard.
 5. **Integration tests** (`tests/integration/test_backtest_pipeline.py`)
    - `test_multi_factor_pipeline_end_to_end` — data → ta → multi-factor perf → grid search → walk-forward.
 
-### Phase 6 — main.py CLI
+### MF-6 — main.py CLI
 
 1. **CLI args**: `--factors` (JSON or repeated `--factor` flags) for multi-factor from command line.
 2. Print combined metrics and best multi-factor params.
@@ -232,7 +250,7 @@ Goal: expose multi-factor configuration in the dashboard.
 ### Lessons from Previous Attempt
 
 The earlier multi-factor implementation was reverted because:
-1. **No tests for new code** — `combine_positions`, `FactorConfig`, and multi-factor `Performance` paths had zero test coverage.
+1. **No tests for new code** — `combine_positions`, `SubStrategy`, and multi-factor `Performance` paths had zero test coverage.
 2. **`indicator` column missing** — multi-factor path didn't set `self.data['indicator']`, breaking plotting.
 3. **`self.signal` type inconsistency** — stored scalar for single-factor, tuple for multi-factor, causing downstream bugs.
 4. **walk_forward.py / main.py not wired** — only partial integration.
@@ -265,7 +283,7 @@ Split historical data into **in-sample** (training) and **out-of-sample** (valid
 ### Implementation Plan
 
 1. **`src/walk_forward.py`** — new module with a `WalkForward` class:
-   - `__init__(data, split_ratio, trading_period, indicator_func, strategy_func, *, fee_bps=None)`
+   - `__init__(data, split_ratio, config, *, fee_bps=None)` — accepts `StrategyConfig` (includes `ticker`, `strategy_id`).
    - `split_ratio` (float, e.g. `0.5`) controls where to cut the data.
    - `run(window_tuple, signal_tuple)` → runs grid search on in-sample, evaluates best params on out-of-sample.
    - Returns a result object / dict with:

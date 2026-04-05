@@ -165,6 +165,7 @@ def main(args=None):
     strategy_func = STRATEGIES[args.strategy]
 
     config = StrategyConfig(
+        ticker=args.symbol,
         indicator_name=indicator_method,
         signal_func=strategy_func,
         trading_period=trading_period,
