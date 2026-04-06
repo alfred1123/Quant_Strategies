@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ========== TRADE tables ========== -->
+
+    <changeSet id="300-trade-deployment" author="alfcheun" context="trade" runOnChange="false">
+        <sqlFile path="tables/DEPLOYMENT.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS TRADE.DEPLOYMENT;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="301-trade-log" author="alfcheun" context="trade" runOnChange="false">
+        <sqlFile path="tables/LOG.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS TRADE.LOG;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="302-trade-transaction" author="alfcheun" context="trade" runOnChange="false">
+        <sqlFile path="tables/TRANSACTION.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS TRADE.TRANSACTION;</sql></rollback>
+    </changeSet>
+
+</databaseChangeLog>

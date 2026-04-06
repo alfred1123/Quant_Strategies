@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ========== REFDATA tables ========== -->
+
+    <changeSet id="100-refdata-app" author="alfcheun" context="refdata" runOnChange="false">
+        <sqlFile path="tables/APP.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS REFDATA.APP;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="101-refdata-tm-interval" author="alfcheun" context="refdata" runOnChange="false">
+        <sqlFile path="tables/TM_INTERVAL.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS REFDATA.TM_INTERVAL;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="102-refdata-asset-type" author="alfcheun" context="refdata" runOnChange="false">
+        <sqlFile path="tables/ASSET_TYPE.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS REFDATA.ASSET_TYPE;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="103-refdata-indicator" author="alfcheun" context="refdata" runOnChange="false">
+        <sqlFile path="tables/INDICATOR.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS REFDATA.INDICATOR;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="104-refdata-signal-type" author="alfcheun" context="refdata" runOnChange="false">
+        <sqlFile path="tables/SIGNAL_TYPE.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS REFDATA.SIGNAL_TYPE;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="105-refdata-order-state" author="alfcheun" context="refdata" runOnChange="false">
+        <sqlFile path="tables/ORDER_STATE.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS REFDATA.ORDER_STATE;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="106-refdata-trans-state" author="alfcheun" context="refdata" runOnChange="false">
+        <sqlFile path="tables/TRANS_STATE.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS REFDATA.TRANS_STATE;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="107-refdata-api-limit" author="alfcheun" context="refdata" runOnChange="false">
+        <sqlFile path="tables/API_LIMIT.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS REFDATA.API_LIMIT;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="108-refdata-ticker-mapping" author="alfcheun" context="refdata" runOnChange="false">
+        <sqlFile path="tables/TICKER_MAPPING.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS REFDATA.TICKER_MAPPING;</sql></rollback>
+    </changeSet>
+
+    <!-- ========== REFDATA seed data ========== -->
+
+    <changeSet id="150-refdata-seed-asset-type" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/ASSET_TYPE.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DELETE FROM REFDATA.ASSET_TYPE;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="151-refdata-seed-indicator" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/INDICATOR.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DELETE FROM REFDATA.INDICATOR;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="152-refdata-seed-signal-type" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/SIGNAL_TYPE.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DELETE FROM REFDATA.SIGNAL_TYPE;</sql></rollback>
+    </changeSet>
+
+</databaseChangeLog>

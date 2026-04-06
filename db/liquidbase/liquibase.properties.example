@@ -1,0 +1,7 @@
+changelog-file=quantdb-changelog.xml
+url=jdbc:postgresql://<RDS_ENDPOINT>:5432/quantdb
+driver=org.postgresql.Driver
+# Pass credentials via CLI or env vars:
+#   liquibase --username=<user> --password=<pass> update
+#   export LIQUIBASE_COMMAND_USERNAME=<user>
+#   export LIQUIBASE_COMMAND_PASSWORD=<pass>

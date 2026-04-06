@@ -351,84 +351,71 @@ def execute_deployment(deployment, strategy):
 ## 7. DB Schema (high-level)
 
 Database: **TradeBros**. Tables use `SCHEMA.TABLE` naming:
-- `BACKTEST.` — backtest artifacts and strategy definitions
+- `BT.` — backtest artifacts and strategy definitions
 - `TRADE.` — live execution records
 - `REFDATA.` — reference/lookup data
 
 ```sql
--- ── BACKTEST schema ──
+-- ── BT schema ──
 
-CREATE TABLE BACKTEST.STRATEGY (
-    STRATEGY_ID   TEXT PRIMARY KEY,
-    NAME          TEXT NOT NULL,
-    VERSION       INTEGER DEFAULT 1,
-    TICKER        TEXT NOT NULL,          -- data-source symbol (e.g. "BTC-USD")
-    CONJUNCTION   TEXT CHECK(CONJUNCTION IN ('AND', 'OR')) DEFAULT 'AND',
+CREATE TABLE BT.STRATEGY (
+    STRATEGY_ID    UUID PRIMARY KEY,
+    NAME           TEXT NOT NULL,
+    VERSION        INTEGER,
+    TICKER         TEXT NOT NULL,          -- data-source symbol (e.g. "BTC-USD")
+    CONJUNCTION    TEXT,
     TRADING_PERIOD INTEGER NOT NULL,
-    CONFIG_JSON   TEXT NOT NULL,          -- full StrategyConfig JSON
-    USER_ID       TEXT,
-    CREATED_AT    TEXT DEFAULT CURRENT_TIMESTAMP,
-    UPDATE_DB_TS  TEXT DEFAULT CURRENT_TIMESTAMP,
-    IS_CURRENT_IND TEXT DEFAULT 'Y' CHECK(IS_CURRENT_IND IN ('Y', 'N'))
-);
-
-CREATE TABLE BACKTEST.SUBSTRATEGY (
-    SUBSTRATEGY_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-    STRATEGY_ID    TEXT REFERENCES BACKTEST.STRATEGY(STRATEGY_ID),
-    SEQ            INTEGER NOT NULL,      -- 1, 2, ...
-    INDICATOR      TEXT NOT NULL,
-    SIGNAL_FUNC    TEXT NOT NULL,
-    WINDOW         INTEGER NOT NULL,
-    SIGNAL         REAL NOT NULL,
-    DATA_COLUMN    TEXT DEFAULT 'v',
+    CONFIG_JSON    JSONB NOT NULL,         -- full StrategyConfig JSON
     USER_ID        TEXT,
-    CREATED_AT     TEXT DEFAULT CURRENT_TIMESTAMP
+    CREATED_AT     TIMESTAMPTZ,
+    UPDATED_AT     TIMESTAMPTZ,
+    IS_CURRENT_IND CHAR(1)
 );
 
-CREATE TABLE BACKTEST.RESULT (
-    RESULT_ID     INTEGER PRIMARY KEY AUTOINCREMENT,
-    STRATEGY_ID   TEXT REFERENCES BACKTEST.STRATEGY(STRATEGY_ID),
-    RUN_AT        TEXT DEFAULT CURRENT_TIMESTAMP,
-    DATA_START    TEXT,
-    DATA_END      TEXT,
-    TICKER        TEXT,
-    FEE_BPS       REAL,
-    METRICS_JSON  TEXT NOT NULL,          -- {sharpe, calmar, max_dd, ...}
-    WALK_FORWARD_JSON TEXT,               -- optional
-    USER_ID       TEXT,
-    CREATED_AT    TEXT DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE BT.RESULT (
+    RESULT_ID         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    STRATEGY_ID       UUID NOT NULL,
+    RUN_AT            TIMESTAMPTZ,
+    DATA_START        DATE,
+    DATA_END          DATE,
+    TICKER            TEXT,
+    FEE_BPS           NUMERIC,
+    METRICS_JSON      JSONB NOT NULL,     -- {sharpe, calmar, max_dd, ...}
+    WALK_FORWARD_JSON JSONB,              -- optional
+    USER_ID           TEXT,
+    CREATED_AT        TIMESTAMPTZ
 );
 
 -- ── TRADE schema ──
 
 CREATE TABLE TRADE.DEPLOYMENT (
-    DEPLOYMENT_ID    TEXT PRIMARY KEY,
-    STRATEGY_ID      TEXT REFERENCES BACKTEST.STRATEGY(STRATEGY_ID),
-    PORTFOLIO        TEXT DEFAULT 'DEFAULT',
+    DEPLOYMENT_ID    UUID PRIMARY KEY,
+    STRATEGY_ID      UUID NOT NULL,
+    PORTFOLIO        TEXT,
     USER_ID          TEXT NOT NULL,
     BROKER           TEXT NOT NULL,
     TICKER           TEXT NOT NULL,
     QTY              INTEGER NOT NULL,
-    PAPER            INTEGER DEFAULT 1,
-    MARKET           TEXT DEFAULT 'US',
-    SCHEDULE         TEXT DEFAULT 'daily_close',
-    ENABLED          INTEGER DEFAULT 1,
-    RISK_LIMITS_JSON TEXT,
-    CREATED_AT       TEXT DEFAULT CURRENT_TIMESTAMP
+    PAPER            CHAR(1),
+    MARKET           TEXT,
+    SCHEDULE         TEXT,
+    ENABLED          CHAR(1),
+    RISK_LIMITS_JSON JSONB,
+    CREATED_AT       TIMESTAMPTZ
 );
 
 CREATE TABLE TRADE.LOG (
-    LOG_ID        INTEGER PRIMARY KEY AUTOINCREMENT,
-    DEPLOYMENT_ID TEXT REFERENCES TRADE.DEPLOYMENT(DEPLOYMENT_ID),
-    TIMESTAMP     TEXT DEFAULT CURRENT_TIMESTAMP,
-    SIGNAL_VALUE  REAL,
+    LOG_ID        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    DEPLOYMENT_ID UUID NOT NULL,
+    TIMESTAMP     TIMESTAMPTZ,
+    SIGNAL_VALUE  NUMERIC,
     ACTION        TEXT,                   -- BUY, SELL, HOLD, REJECTED
     QTY           INTEGER,
     ORDER_ID      TEXT,
-    SUCCESS       INTEGER,
+    SUCCESS       CHAR(1),
     MESSAGE       TEXT,
     USER_ID       TEXT,
-    CREATED_AT    TEXT DEFAULT CURRENT_TIMESTAMP
+    CREATED_AT    TIMESTAMPTZ
 );
 
 -- ── REFDATA schema ──
@@ -436,14 +423,14 @@ CREATE TABLE TRADE.LOG (
 -- Maps data-source symbols to broker-specific symbols.
 -- Avoids hardcoding the mapping; queried at deployment time.
 CREATE TABLE REFDATA.TICKER_MAPPING (
-    TICKER_MAPPING_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    TICKER_MAPPING_ID INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     DATA_TICKER       TEXT NOT NULL,        -- e.g. "AAPL", "BTC-USD"
     BROKER            TEXT NOT NULL,        -- e.g. "FUTU", "BYBIT"
     BROKER_TICKER     TEXT NOT NULL,        -- e.g. "US.AAPL", "BTCUSDT"
     MARKET            TEXT,                 -- e.g. "US", "HK", "CRYPTO"
     USER_ID           TEXT,
-    CREATED_AT        TEXT DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(DATA_TICKER, BROKER)
+    CREATED_AT        TIMESTAMPTZ,
+    UNIQUE (DATA_TICKER, BROKER)
 );
 ```
 
@@ -539,13 +526,13 @@ pass `window` and `signal` explicitly to `strategy_to_json(cfg, window=20, signa
 | Storage | 20 GB gp3 (~$2.30/mo) |
 
 **Why Postgres over SQLite**:
-- Native `CREATE SCHEMA` — `BACKTEST.`, `TRADE.`, `REFDATA.` schemas work natively
+- Native `CREATE SCHEMA` — `BT.`, `TRADE.`, `REFDATA.` schemas work natively
 - `jsonb` type for `CONFIG_JSON`, `METRICS_JSON` — queryable and indexable
 - Native `UUID` column type (not text)
 - Concurrent writes (Trade API + backtest don't collide)
 - Serverless v2 scales to zero — near-$0 when idle
 
-**Why not DynamoDB**: Data is relational (FK joins: strategy → substrategy → results → deployments). Wrong fit for key-value.
+**Why not DynamoDB**: Data is relational (joins: strategy → results → deployments). Wrong fit for key-value.
 
 ### Architecture Diagram
 
@@ -571,7 +558,7 @@ pass `window` and `signal` explicitly to `strategy_to_json(cfg, window=20, signa
 │  RDS PostgreSQL       │          │ Exchange │
 │  Serverless v2        │          │ (Futu /  │
 │  ┌─────────────────┐  │          │  Bybit)  │
-│  │ BACKTEST.*      │  │          └──────────┘
+│  │ BT.*            │  │          └──────────┘
 │  │ TRADE.*         │  │               ▲
 │  │ REFDATA.*       │  │               │
 │  └─────────────────┘  │         Orders/Fills

@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class SubStrategy:
     """One indicator + signal direction pair with its parameters.
 
-    Maps 1:1 to a row in ``BACKTEST.SUBSTRATEGY`` and to elements
+    Maps 1:1 to elements in the ``substrategies`` JSON array
     in the ``substrategies`` JSON array (design doc §1.1).
     """
     indicator_name: str        # TechnicalAnalysis method, e.g. "get_bollinger_band"
@@ -50,7 +50,7 @@ class StrategyConfig:
     platform-specific details like transaction fees or data.
 
     ``strategy_id`` links this config to DeploymentConfig and DB records
-    (``BACKTEST.STRATEGY.STRATEGY_ID``).
+    (``BT.STRATEGY.STRATEGY_ID``).
 
     ``ticker`` records the data-source symbol the strategy was backtested on
     (e.g. ``"BTC-USD"`` for Yahoo Finance).  Broker-specific symbols

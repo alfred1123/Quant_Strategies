@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ========== Phase 0: Schemas & Extensions ========== -->
+
+    <changeSet id="000-schemas" author="alfcheun" context="schema" runOnChange="false">
+        <comment>Create schemas and extensions</comment>
+        <sql>
+            CREATE SCHEMA IF NOT EXISTS CORE_ADMIN;
+            CREATE SCHEMA IF NOT EXISTS REFDATA;
+            CREATE SCHEMA IF NOT EXISTS BT;
+            CREATE SCHEMA IF NOT EXISTS TRADE;
+            CREATE EXTENSION IF NOT EXISTS pg_partman;
+        </sql>
+        <rollback>
+            <sql>
+                DROP SCHEMA IF EXISTS TRADE CASCADE;
+                DROP SCHEMA IF EXISTS BT CASCADE;
+                DROP SCHEMA IF EXISTS REFDATA CASCADE;
+                DROP SCHEMA IF EXISTS CORE_ADMIN CASCADE;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

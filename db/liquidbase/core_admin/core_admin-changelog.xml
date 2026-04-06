@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ========== CORE_ADMIN tables ========== -->
+
+    <changeSet id="010-core-admin-log-proc-detail" author="alfcheun" context="core_admin" runOnChange="false">
+        <sqlFile path="tables/LOG_PROC_DETAIL.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS CORE_ADMIN.LOG_PROC_DETAIL;</sql></rollback>
+    </changeSet>
+
+    <!-- ========== CORE_ADMIN procedures ========== -->
+
+    <changeSet id="020-core-admin-proc-ins-log-proc" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/CORE_INS_LOG_PROC.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS CORE_ADMIN.CORE_INS_LOG_PROC;</sql></rollback>
+    </changeSet>
+
+</databaseChangeLog>

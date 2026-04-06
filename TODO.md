@@ -52,8 +52,8 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 | 9 | **JSON API / DB** | Full Trade API design doc. Shared DB for backtest + trade. JSON schema for strategy + deployment + backtest results. | design doc |
 | 10 | **TypeScript UI** | Do it now. FastAPI backend (shared with Trade API) + React/TS frontend. Replaces Streamlit. | Phase 8 |
 | 11 | **UUID version** | UUID v7 (time-ordered) via `uuid_extensions` package. Switch to stdlib `uuid.uuid7()` when Python 3.14 stable (Oct 2026). | strat.py |
-| 12 | **DB naming convention** | `SCHEMA.TABLE` format. Schemas: `BACKTEST.`, `TRADE.`, `REFDATA.`. Columns UPPER_CASE. PKs: `<TABLE>_ID`. Audit: `USER_ID`, `CREATED_AT`/`UPDATE_DB_TS`. Soft versioning: `IS_CURRENT_IND` (Y/N). DB name: `TradeBros`. | design doc §7, data-sql instructions |
-| 13 | **DB tables** | `BACKTEST.STRATEGY`, `BACKTEST.SUBSTRATEGY`, `BACKTEST.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`, `REFDATA.TICKER_MAPPING`. | design doc §7 |
+| 12 | **DB naming convention** | `SCHEMA.TABLE` format. Schemas: `BT.`, `TRADE.`, `REFDATA.`. Columns UPPER_CASE. PKs: `<TABLE>_ID`. Audit: `USER_ID`, `CREATED_AT`/`UPDATED_AT`. Flags: `CHAR(1)`, no default, no CHECK. Soft versioning: `IS_CURRENT_IND`. DB name: `TradeBros`. No CHECK constraints anywhere — validation at app layer. | design doc §7, data-sql instructions |
+| 13 | **DB tables** | `BT.STRATEGY`, `BT.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`, `REFDATA.TICKER_MAPPING`. | design doc §7 |
 | 14 | **Ticker mapping** | `REFDATA.TICKER_MAPPING` maps data-source symbols (e.g. `"AAPL"`) to broker-specific symbols (e.g. `"US.AAPL"` for Futu). Queried at deployment time. | design doc §7 |
 | 15 | **Broker adapter pattern** | `TradeAdapter` abstract interface. `FutuAdapter` wraps existing `FutuTrader`. `DeploymentConfig.broker` enum selects adapter at runtime. "FUTU" = broker name, not app name. | design doc §5, Phase 7 |
 | 16 | **AWS infrastructure** | EC2 t4g.small (Graviton ARM, ~$7/mo reserved). RDS PostgreSQL 16 Serverless v2 (scales to zero, ~$5-15/mo). Native `CREATE SCHEMA` supports `SCHEMA.TABLE` convention. Total ~$15-25/mo. | design doc §11 |
@@ -89,8 +89,8 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 ### Phase 6 — DB schema + persistence
 
 - RDS PostgreSQL 16 Serverless v2 in production; SQLite or Docker Postgres locally (decision #16, #17).
-- Schemas: `BACKTEST.*`, `TRADE.*`, `REFDATA.*` (decision #12, #13).
-- Tables: `BACKTEST.STRATEGY`, `BACKTEST.SUBSTRATEGY`, `BACKTEST.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`, `REFDATA.TICKER_MAPPING` (design doc §7).
+- Schemas: `BT.*`, `TRADE.*`, `REFDATA.*` (decision #12, #13).
+- Tables: `BT.STRATEGY`, `BT.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`, `REFDATA.TICKER_MAPPING` (design doc §7).
 - `REFDATA.TICKER_MAPPING` maps data-source symbols to broker-specific symbols (decision #14).
 - Store strategy JSON blob alongside normalized columns for querying.
 - Migrations in `db/sql/migrations/`.
@@ -349,20 +349,20 @@ Split historical data into **in-sample** (training) and **out-of-sample** (valid
 
     REFDATA.APP
 
-    | APP_ID | NAME | DESCRIPTION | USER_ID | UPDATE_DB_TS |
+    | APP_ID | NAME | DESCRIPTION | USER_ID | UPDATED_AT |
     |--------|------|-------------|---------|--------------|
     | 1 | Futu API | Futu Trade API | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
     | 2 | Alphavantage | Alphavantage | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
 
     REFDATA.TM_INTERVAL
 
-    | TM_INTERVAL_ID | NAME | DESCRIPTION | USER_ID | UPDATE_DB_TS |
+    | TM_INTERVAL_ID | NAME | DESCRIPTION | USER_ID | UPDATED_AT |
     |----------------|------|-------------|---------|--------------|
     | 1 | Daily | Daily Closing Price | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
 
     REFDATA.ORDER_STATE
 
-    | ORDER_STATE_ID | NAME | DESCRIPTION | USER_ID | UPDATE_DB_TS |
+    | ORDER_STATE_ID | NAME | DESCRIPTION | USER_ID | UPDATED_AT |
     | --- | --- | --- | --- | --- |
     | 1 | NEW | Order has been created but not yet sent | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
     | 2 | PENDING | Order submitted, awaiting processing | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
@@ -373,7 +373,7 @@ Split historical data into **in-sample** (training) and **out-of-sample** (valid
 
     REFDATA.TRANS_STATE
 
-    | TRANS_STATE_ID | NAME | DESCRIPTION | USER_ID | UPDATE_DB_TS |
+    | TRANS_STATE_ID | NAME | DESCRIPTION | USER_ID | UPDATED_AT |
     | --- | --- | --- | --- | --- |
     | 1 | PENDING | Transaction created, not yet processed | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
     | 2 | COMPLETED | Transaction successfully completed | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
@@ -381,23 +381,25 @@ Split historical data into **in-sample** (training) and **out-of-sample** (valid
 
     REFDATA.API_LIMIT — record rate limits and quotas per data source so the pipeline can throttle automatically.
 
-    | API_LIMIT_ID | APP_ID | LIMIT_TYPE | MAX_VALUE | TIME_WINDOW_SEC | DESCRIPTION | USER_ID | UPDATE_DB_TS |
+    | API_LIMIT_ID | APP_ID | LIMIT_TYPE | MAX_VALUE | TIME_WINDOW_SEC | DESCRIPTION | USER_ID | UPDATED_AT |
     |--------------|--------|------------|-----------|-----------------|-------------|---------|--------------|
     | 1 | 2 | RATE | 1 | 1 | 1 request per second (free tier) | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
     | 2 | 2 | DAILY_QUOTA | 25 | 86400 | 25 requests per day (free tier) | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
     | 3 | 2 | OUTPUT_SIZE | 100 | NULL | Compact mode returns ~100 most recent trading days only | alfcheun | CURRENT TIMESTAMP - CURRENT TIMEZONE |
 
-    BACKTEST.API_REQUEST
+    BT.API_REQUEST — one row per data subscription (symbol + source + interval). Metadata only.
 
-    | API_REQ_ID | API_REQ_VID | APP_ID | TM_INTERVAL_ID | SYMBOL | IS_CURRENT_IND | RANGE_START_TS | RANGE_END_TS | STORAGE_PATH | API_REQ_PAYLOAD | USER_ID | CREATED_AT |
-    |------------|-------------|--------|----------------|--------|----------------|----------------|--------------|--------------|-----------------|--------|------------|
-    | UUID | 1 | 2 | 1 | BTCUSDT | Y | 2010-01-01T00:00:00Z | 2026-01-01T00:00:00Z | /data/raw/alphavantage | `{"filter1":"xxx","filter2":"xxx","filterdate":{"from":"...","to":"..."}}` | alfcheun | 2026-03-30T12:00:00Z |
+    | API_REQ_ID | APP_ID | TM_INTERVAL_ID | SYMBOL | FULL_RANGE_START | FULL_RANGE_END | IS_CURRENT_IND | USER_ID | CREATED_AT |
+    |------------|--------|----------------|--------|------------------|----------------|----------------|---------|------------|
+    | UUID | 2 | 1 | BTCUSDT | 2010-01-01T00:00:00Z | 2026-04-01T00:00:00Z | Y | alfcheun | 2026-03-30T12:00:00Z |
 
-    BACKTEST.API_REQUEST_PAYLOAD — normalized storage for large/split responses. `API_REQ_PAYLOAD` on `API_REQUEST` holds inline or summary JSON; use this child table when the payload is large or versioned separately.
+    BT.API_REQUEST_PAYLOAD — each VID stores the full merged history. App fetches only delta from API, merges with previous VID, writes complete dataset as new VID. Partitioned by CREATED_AT (quarterly via pg_partman). Append-only — no UPDATEs. PK is (API_REQ_ID, API_REQ_VID, CREATED_AT).
 
-    | API_REQ_ID | API_REQ_VID | PAYLOAD | CREATED_AT |
-    |------------|-------------|---------|------------|
-    | UUID | 1 | {...data...} | CURRENT TIMESTAMP - CURRENT TIMEZONE |
+    | API_REQ_ID | API_REQ_VID | RANGE_START_TS | RANGE_END_TS | PAYLOAD | USER_ID | CREATED_AT |
+    |------------|-------------|----------------|--------------|---------|---------|------------|
+    | UUID | 1 | 2010-01-01 | 2025-01-01 | {...9 years...} | alfcheun | 2026-03-30T12:00:00Z |
+    | UUID | 2 | 2010-01-01 | 2026-01-01 | {...10 years...} | alfcheun | 2026-06-01T10:00:00Z |
+    | UUID | 3 | 2010-01-01 | 2026-04-01 | {...full history...} | alfcheun | 2026-04-01T10:00:00Z |
 
     TRADE.TRANSACTION — `ORDER_STATE_ID` is denormalized here for convenience; consider a dedicated `ORDERS` table if order lifecycle grows.
 

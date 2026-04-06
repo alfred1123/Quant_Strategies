@@ -1,0 +1,15 @@
+CREATE TABLE TRADE.DEPLOYMENT (
+    DEPLOYMENT_ID    UUID PRIMARY KEY,
+    STRATEGY_ID      UUID NOT NULL,
+    PORTFOLIO        TEXT,
+    USER_ID          TEXT NOT NULL,
+    BROKER           TEXT NOT NULL,
+    TICKER           TEXT NOT NULL,
+    QTY              INTEGER NOT NULL,
+    PAPER            CHAR(1),
+    MARKET           TEXT,
+    SCHEDULE         TEXT,
+    ENABLED          CHAR(1),
+    RISK_LIMITS_JSON JSONB,
+    CREATED_AT       TIMESTAMPTZ
+);

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ========== BT tables ========== -->
+
+    <changeSet id="200-bt-strategy" author="alfcheun" context="bt" runOnChange="false">
+        <sqlFile path="tables/STRATEGY.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS BT.STRATEGY;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="201-bt-result" author="alfcheun" context="bt" runOnChange="false">
+        <sqlFile path="tables/RESULT.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS BT.RESULT;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="202-bt-api-request" author="alfcheun" context="bt" runOnChange="false">
+        <sqlFile path="tables/API_REQUEST.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS BT.API_REQUEST;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="203-bt-api-request-payload" author="alfcheun" context="bt" runOnChange="false">
+        <sqlFile path="tables/API_REQUEST_PAYLOAD.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS BT.API_REQUEST_PAYLOAD;</sql></rollback>
+    </changeSet>
+
+    <!-- ========== BT procedures ========== -->
+
+    <changeSet id="210-bt-proc-insert-strategy" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/INSERT_STRATEGY.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS BT.INSERT_STRATEGY;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="211-bt-proc-insert-result" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/INSERT_RESULT.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS BT.INSERT_RESULT;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="212-bt-proc-insert-api-request" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/INSERT_API_REQUEST.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS BT.INSERT_API_REQUEST;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="213-bt-proc-insert-api-request-payload" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/INSERT_API_REQUEST_PAYLOAD.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS BT.INSERT_API_REQUEST_PAYLOAD;</sql></rollback>
+    </changeSet>
+
+</databaseChangeLog>
