@@ -72,6 +72,10 @@ cp .env.example .env
 | `ALPHAVANTAGE_API_KEY` | Optional | Free key from [alphavantage.co](https://www.alphavantage.co/support/#api-key). Limited to 25 req/day. |
 | `GLASSNODE_API_KEY` | Optional | On-chain crypto metrics. Only if you use the Glassnode data source. |
 | `FUTU_HOST` / `FUTU_PORT` | Optional | Only if using Futu OpenD gateway for HK/US equities. |
+| `QUANTDB_HOST` | Optional | PostgreSQL host (default: `localhost`). |
+| `QUANTDB_PORT` | Optional | PostgreSQL port (default: `5433`). |
+| `QUANTDB_USERNAME` | Optional | Database user for quantdb. |
+| `QUANTDB_PASSWORD` | Optional | Database password. |
 
 **Yahoo Finance requires no API key** — it is the default and recommended data source for getting started.
 
@@ -397,7 +401,16 @@ Quant_Strategies/
 ├── .env                     # API keys (gitignored — copy from .env.example)
 ├── .env.example             # Template for API keys
 ├── results/                 # Output CSVs and heatmap PNGs (gitignored)
-├── db/                      # SQLite schema and migrations (planned)
+├── db/
+│   ├── liquidbase/              # Liquibase changelogs (per-schema deployment)
+│   │   ├── quantdb-changelog.xml    # Master — schema & extension creation only
+│   │   ├── liquibase.properties     # Master properties (public schema tracking)
+│   │   ├── core_admin/              # CORE_ADMIN tables + procedures
+│   │   ├── refdata/                 # REFDATA tables + seed data
+│   │   ├── bt/                      # BT tables + procedures
+│   │   └── trade/                   # TRADE tables
+│   └── sql/                         # Standalone SQL scripts
+│
 ├── backup/
 │   └── deco/                # Decommissioned Bybit live trading scripts
 │
@@ -405,6 +418,37 @@ Quant_Strategies/
 ├── pyproject.toml           # pytest configuration
 └── setup.sh                 # Automated environment setup
 ```
+
+### Database
+
+The project uses **PostgreSQL 17** with Liquibase for schema management. Each schema is deployed independently with its own `databasechangelog` tracking table.
+
+**Schemas:**
+
+| Schema | Purpose |
+|--------|--------|
+| `CORE_ADMIN` | Logging infrastructure (`LOG_PROC_DETAIL` table, `CORE_INS_LOG_PROC` procedure) |
+| `REFDATA` | Reference data (`APP`, `TICKER_MAPPING`, `INDICATOR`, `SIGNAL_TYPE`, etc.) |
+| `BT` | Backtest results (`STRATEGY`, `RESULT`, `API_REQUEST`, `API_REQUEST_PAYLOAD` + insert procedures) |
+| `TRADE` | Live trading (`DEPLOYMENT`, `LOG`, `TRANSACTION`) |
+
+**Deployment:**
+
+```bash
+# Source credentials
+source .env
+
+# Phase 0: create schemas + extensions
+cd db/liquidbase && liquibase --defaults-file=liquibase.properties update
+
+# Per-schema deployment (each has its own liquibase.properties)
+cd core_admin && source ../../../.env && liquibase --defaults-file=liquibase.properties update
+cd ../refdata  && source ../../../.env && liquibase --defaults-file=liquibase.properties update
+cd ../bt       && source ../../../.env && liquibase --defaults-file=liquibase.properties update
+cd ../trade    && source ../../../.env && liquibase --defaults-file=liquibase.properties update
+```
+
+See `.github/skills/liquibase/SKILL.md` for full conventions and pitfalls.
 
 ---
 

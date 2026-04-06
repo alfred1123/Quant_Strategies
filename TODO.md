@@ -52,7 +52,7 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 | 9 | **JSON API / DB** | Full Trade API design doc. Shared DB for backtest + trade. JSON schema for strategy + deployment + backtest results. | design doc |
 | 10 | **TypeScript UI** | Do it now. FastAPI backend (shared with Trade API) + React/TS frontend. Replaces Streamlit. | Phase 8 |
 | 11 | **UUID version** | UUID v7 (time-ordered) via `uuid_extensions` package. Switch to stdlib `uuid.uuid7()` when Python 3.14 stable (Oct 2026). | strat.py |
-| 12 | **DB naming convention** | `SCHEMA.TABLE` format. Schemas: `BT.`, `TRADE.`, `REFDATA.`. Columns UPPER_CASE. PKs: `<TABLE>_ID`. Audit: `USER_ID`, `CREATED_AT`/`UPDATED_AT`. Flags: `CHAR(1)`, no default, no CHECK. Soft versioning: `IS_CURRENT_IND`. DB name: `TradeBros`. No CHECK constraints anywhere — validation at app layer. | design doc §7, data-sql instructions |
+| 12 | **DB naming convention** | `SCHEMA.TABLE` format. Schemas: `CORE_ADMIN.`, `BT.`, `TRADE.`, `REFDATA.`. Columns UPPER_CASE. PKs: `<TABLE>_ID`. Audit: `USER_ID`, `CREATED_AT`/`UPDATED_AT`. Flags: `CHAR(1)`, no default, no CHECK. Soft versioning: `IS_CURRENT_IND`. DB name: `quantdb`. No CHECK constraints anywhere — validation at app layer. Procedure params: `IN_XXX`/`OUT_XXX`. | design doc §7, data-sql instructions |
 | 13 | **DB tables** | `BT.STRATEGY`, `BT.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`, `REFDATA.TICKER_MAPPING`. | design doc §7 |
 | 14 | **Ticker mapping** | `REFDATA.TICKER_MAPPING` maps data-source symbols (e.g. `"AAPL"`) to broker-specific symbols (e.g. `"US.AAPL"` for Futu). Queried at deployment time. | design doc §7 |
 | 15 | **Broker adapter pattern** | `TradeAdapter` abstract interface. `FutuAdapter` wraps existing `FutuTrader`. `DeploymentConfig.broker` enum selects adapter at runtime. "FUTU" = broker name, not app name. | design doc §5, Phase 7 |
@@ -86,14 +86,17 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 - Add factor row builder in Streamlit sidebar ("Add/Remove Factor" buttons).
 - Conjunction selector (AND/OR radio).
 
-### Phase 6 — DB schema + persistence
+### Phase 6 — DB schema + persistence ✅
 
-- RDS PostgreSQL 16 Serverless v2 in production; SQLite or Docker Postgres locally (decision #16, #17).
-- Schemas: `BT.*`, `TRADE.*`, `REFDATA.*` (decision #12, #13).
-- Tables: `BT.STRATEGY`, `BT.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`, `REFDATA.TICKER_MAPPING` (design doc §7).
-- `REFDATA.TICKER_MAPPING` maps data-source symbols to broker-specific symbols (decision #14).
-- Store strategy JSON blob alongside normalized columns for querying.
-- Migrations in `db/sql/migrations/`.
+- ~~RDS PostgreSQL 16 Serverless v2 in production; SQLite or Docker Postgres locally (decision #16, #17).~~
+- **Deployed:** PostgreSQL 17
+ on `localhost:5433`, database `quantdb`.
+- **Schemas:** `CORE_ADMIN`, `REFDATA`, `BT`, `TRADE` — all created and populated via Liquibase.
+- **Per-schema Liquibase deployment:** Each schema has its own `liquibase.properties` with `liquibase-schema-name`, giving independent `databasechangelog` tracking per schema. Master changelog (`quantdb-changelog.xml`) handles only schema/extension creation.
+- **Tables deployed:** `CORE_ADMIN.LOG_PROC_DETAIL`, 9 REFDATA tables (APP, TM_INTERVAL, ASSET_TYPE, INDICATOR, SIGNAL_TYPE, ORDER_STATE, TRANS_STATE, API_LIMIT, TICKER_MAPPING), 4 BT tables (STRATEGY, RESULT, API_REQUEST, API_REQUEST_PAYLOAD), 3 TRADE tables (DEPLOYMENT, LOG, TRANSACTION).
+- **Procedures deployed:** `CORE_ADMIN.CORE_INS_LOG_PROC`, `BT.INSERT_STRATEGY`, `BT.INSERT_RESULT`, `BT.INSERT_API_REQUEST`, `BT.INSERT_API_REQUEST_PAYLOAD`. All use `IN_XXX`/`OUT_XXX` naming, `LANGUAGE plpgsql`, `EXCEPTION WHEN OTHERS` + `GET STACKED DIAGNOSTICS`.
+- **Seed data:** REFDATA.ASSET_TYPE, REFDATA.INDICATOR, REFDATA.SIGNAL_TYPE populated.
+- **Conventions:** See `.github/skills/db-ddl/SKILL.md` (DDL + procedure patterns) and `.github/skills/liquibase/SKILL.md` (deployment patterns).
 
 ### Phase 7 — Trade API service (design doc: `docs/design-trade-api.md`)
 
