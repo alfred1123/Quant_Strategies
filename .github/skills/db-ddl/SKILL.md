@@ -65,9 +65,16 @@ db/liquidbase/
 - Tables: `SCHEMA.TABLE_NAME` (UPPER_CASE)
 - Columns: `UPPER_CASE`
 - Primary keys: `<TABLE>_ID` — `UUID` for entities, `INTEGER GENERATED ALWAYS AS IDENTITY` for sequences
-- Version columns: `<TABLE>_VID INTEGER`
-- Audit columns (every table): `USER_ID TEXT`, `CREATED_AT TIMESTAMPTZ` or `UPDATED_AT TIMESTAMPTZ`
-- Soft versioning: `IS_CURRENT_IND CHAR(1)` — no default, no CHECK constraint
+- Version columns: `<TABLE>_VID INTEGER` (e.g. `STRATEGY_VID`)
+- Name columns: `<TABLE>_NM TEXT` (e.g. `STRATEGY_NM`)
+- Audit columns (every table): `USER_ID TEXT`, `CREATED_AT TIMESTAMPTZ`. Use `UPDATED_AT TIMESTAMPTZ` only on tables where rows are genuinely mutated (e.g. REFDATA lookup tables). Do **not** add `UPDATED_AT` solely for `IS_CURRENT_IND` flips — soft-versioning inserts a new row with a new `CREATED_AT` instead.
+- `CREATED_AT` is **never** an input parameter on `SP_INS_*` procedures. Always use `NOW()` (UTC) in the INSERT VALUES clause. The database records the actual insert time, not a caller-supplied timestamp.
+- Soft versioning: `IS_CURRENT_IND CHAR(1)` — no default, no CHECK constraint. Superseding a row means inserting a new version (new `CREATED_AT`) and flipping the old row's `IS_CURRENT_IND` to `'N'`. This is **not** an update that warrants `UPDATED_AT`.
+  - Tables with `IS_CURRENT_IND` **must** also have a `<TABLE>_VID INTEGER` column. The PK is composite: `PRIMARY KEY (<TABLE>_ID, <TABLE>_VID)`.
+  - `IN_<TABLE>_VID` and `IN_IS_CURRENT_IND` are **never** input parameters on `SP_INS_*` procedures. They are computed internally:
+    1. `V_VID := COALESCE(MAX(<TABLE>_VID), 0) + 1` from existing rows for the same ID.
+    2. `UPDATE ... SET IS_CURRENT_IND = 'N' WHERE <TABLE>_ID = IN_<TABLE>_ID AND IS_CURRENT_IND = 'Y'`.
+    3. `INSERT` the new row with `<TABLE>_VID = V_VID` and `IS_CURRENT_IND = 'Y'`.
 - **No foreign keys**: Do NOT use `REFERENCES` or `FOREIGN KEY` constraints. Relationships are enforced at the application layer. Column names still follow the `<PARENT_TABLE>_ID` convention to document intent.
 - **No CHECK constraints**: Do NOT use `CHECK` constraints. Value validation is enforced at the application layer. CHECK constraints slow down purge/update operations on large tables.
 - **No DEFAULT values**: Do NOT use `DEFAULT` on any column. All values must be explicitly supplied by the application layer.
@@ -151,6 +158,21 @@ Before committing a DDL file:
 
 ## Stored Procedure Conventions
 
+### Procedure Naming
+
+All stored procedures use the prefix `SP_` followed by the operation and table name:
+
+| Operation | Prefix | Example |
+|-----------|--------|---------|
+| Insert | `SP_INS_` | `SP_INS_STRATEGY` |
+| Update | `SP_UPD_` | `SP_UPD_STRATEGY` |
+| Delete | `SP_DEL_` | `SP_DEL_STRATEGY` |
+| Select / Get | `SP_GET_` | `SP_GET_STRATEGY` |
+
+The prefix is **not** schema-specific — all schemas use `SP_`. The schema qualifier comes from the `CREATE OR REPLACE PROCEDURE <SCHEMA>.SP_INS_...` declaration.
+
+**Exception:** `CORE_ADMIN` schema procedures use the `CORE_` prefix (e.g. `CORE_INS_LOG_PROC`).
+
 ### Parameter Naming
 
 - Input parameters: `IN_XXX` (UPPER_CASE, prefixed with `IN_`)
@@ -160,21 +182,32 @@ Before committing a DDL file:
 
 ### Required OUT Parameters
 
-Every procedure MUST include these two OUT parameters for error reporting:
+#### CORE_ADMIN schema (infrastructure procedures)
+
+CORE_ADMIN procedures use a minimal 2-param error signature:
 
 | Parameter | Type | Purpose |
 |-----------|------|---------|
 | `OUT_SQLSTATE` | `TEXT` | PostgreSQL 5-char SQLSTATE code (`'00000'` = success) |
 | `OUT_SQLERRMC` | `TEXT` | Error message text (custom or system-generated) |
 
+#### All other schemas (BT, TRADE, REFDATA, etc.)
+
+Every non-CORE_ADMIN procedure MUST include these three OUT parameters:
+
+| Parameter | Type | Purpose |
+|-----------|------|---------|
+| `OUT_SQLSTATE` | `TEXT` | PostgreSQL 5-char SQLSTATE (`'00000'` = success, captured on error via `GET STACKED DIAGNOSTICS`) |
+| `OUT_SQLMSG` | `TEXT` | Step progress marker — set to `'10'`, `'20'`, `'30'` etc. before each major step. On failure, shows where the procedure was when the error occurred |
+| `OUT_SQLERRMC` | `TEXT` | Error message text. On success: `'Stored Procedure completed successfully'`. On error: system error message from `GET STACKED DIAGNOSTICS` |
+
 ### Error Handling Pattern
 
-All procedures use `LANGUAGE plpgsql` with `EXCEPTION WHEN OTHERS` and `GET STACKED DIAGNOSTICS`:
+#### CORE_ADMIN procedures
 
 ```sql
-CREATE OR REPLACE PROCEDURE <SCHEMA>.<PROC_NAME>(
+CREATE OR REPLACE PROCEDURE CORE_ADMIN.<PROC_NAME>(
     IN  IN_COL1       TEXT,
-    IN  IN_COL2       INTEGER,
     OUT OUT_SQLSTATE   TEXT,
     OUT OUT_SQLERRMC   TEXT
 )
@@ -184,14 +217,150 @@ BEGIN
     OUT_SQLSTATE := '00000';
     OUT_SQLERRMC := NULL;
 
-    INSERT INTO <SCHEMA>.<TABLE> (COL1, COL2)
-    VALUES (IN_COL1, IN_COL2);
+    -- ... logic ...
 
 EXCEPTION
     WHEN OTHERS THEN
         GET STACKED DIAGNOSTICS
             OUT_SQLSTATE = RETURNED_SQLSTATE,
             OUT_SQLERRMC = MESSAGE_TEXT;
+END;
+$$;
+```
+
+#### All other schemas (BT, TRADE, REFDATA, etc.)
+
+```sql
+CREATE OR REPLACE PROCEDURE <SCHEMA>.SP_INS_<TABLE>(
+    IN  IN_COL1        TEXT,
+    IN  IN_COL2        INTEGER,
+    IN  IN_USER_ID     TEXT,
+    OUT OUT_SQLSTATE   TEXT,
+    OUT OUT_SQLMSG     TEXT,
+    OUT OUT_SQLERRMC   TEXT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    V_START_TS  TIMESTAMPTZ := CURRENT_TIMESTAMP;
+BEGIN
+    OUT_SQLSTATE := '00000';
+    OUT_SQLMSG   := '0';
+    OUT_SQLERRMC := 'Stored Procedure completed successfully';
+
+    OUT_SQLMSG := '10';
+    INSERT INTO <SCHEMA>.<TABLE> (
+        COL1,
+        COL2,
+        USER_ID,
+        CREATED_AT
+    ) VALUES (
+        IN_COL1,
+        IN_COL2,
+        IN_USER_ID,
+        NOW()
+    );
+
+    OUT_SQLMSG := '20';
+    CALL CORE_ADMIN.CORE_INS_LOG_PROC('<SCHEMA>', 'SP_INS_<TABLE>', V_START_TS, NULL, NULL, IN_USER_ID, NULL, NULL);
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DECLARE
+            V_DETAIL  TEXT;
+            V_CONTEXT TEXT;
+        BEGIN
+            GET STACKED DIAGNOSTICS
+                OUT_SQLSTATE = RETURNED_SQLSTATE,
+                OUT_SQLERRMC = MESSAGE_TEXT,
+                V_DETAIL     = PG_EXCEPTION_DETAIL,
+                V_CONTEXT    = PG_EXCEPTION_CONTEXT;
+
+            RAISE WARNING '[SP_INS_<TABLE>] % (SQLSTATE: %). Detail: %. Context: %',
+                OUT_SQLERRMC, OUT_SQLSTATE, V_DETAIL, V_CONTEXT;
+        END;
+END;
+$$;
+```
+
+**Step markers:** Assign `OUT_SQLMSG` to `'10'`, `'20'`, `'30'`, etc. before each major step. If the procedure fails, `OUT_SQLMSG` retains the last step reached, making it easy to identify where the failure occurred.
+
+#### Soft-versioning INSERT template (tables with IS_CURRENT_IND)
+
+For tables with `IS_CURRENT_IND` + `<TABLE>_VID`, the procedure auto-increments VID and flips old rows. `IN_<TABLE>_VID` and `IN_IS_CURRENT_IND` are **not** input parameters.
+
+```sql
+CREATE OR REPLACE PROCEDURE <SCHEMA>.SP_INS_<TABLE>(
+    IN  IN_<TABLE>_ID  UUID,
+    IN  IN_COL1        TEXT,
+    IN  IN_USER_ID     TEXT,
+    OUT OUT_SQLSTATE   TEXT,
+    OUT OUT_SQLMSG     TEXT,
+    OUT OUT_SQLERRMC   TEXT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    V_START_TS   TIMESTAMPTZ := CURRENT_TIMESTAMP;
+    V_OTHER_TEXT TEXT;
+    V_VID        INTEGER;
+BEGIN
+    OUT_SQLSTATE := '00000';
+    OUT_SQLMSG   := '0';
+    OUT_SQLERRMC := 'Stored Procedure completed successfully';
+
+    V_OTHER_TEXT := 'IN_<TABLE>_ID=' || COALESCE(IN_<TABLE>_ID::TEXT, '');
+
+    -- Step 10: Resolve VID — get current max, or start at 1
+    OUT_SQLMSG := '10';
+    SELECT COALESCE(MAX(<TABLE>_VID), 0) + 1
+      INTO V_VID
+      FROM <SCHEMA>.<TABLE>
+     WHERE <TABLE>_ID = IN_<TABLE>_ID;
+
+    -- Step 20: Flip old current row(s) to 'N'
+    OUT_SQLMSG := '20';
+    UPDATE <SCHEMA>.<TABLE>
+       SET IS_CURRENT_IND = 'N'
+     WHERE <TABLE>_ID     = IN_<TABLE>_ID
+       AND IS_CURRENT_IND = 'Y';
+
+    -- Step 30: Insert new version as current
+    OUT_SQLMSG := '30';
+    INSERT INTO <SCHEMA>.<TABLE> (
+        <TABLE>_ID,
+        <TABLE>_VID,
+        COL1,
+        USER_ID,
+        CREATED_AT,
+        IS_CURRENT_IND
+    ) VALUES (
+        IN_<TABLE>_ID,
+        V_VID,
+        IN_COL1,
+        IN_USER_ID,
+        NOW(),
+        'Y'
+    );
+
+    OUT_SQLMSG := '40';
+    CALL CORE_ADMIN.CORE_INS_LOG_PROC('<SCHEMA>', 'SP_INS_<TABLE>', V_START_TS, NULL, V_OTHER_TEXT, IN_USER_ID, NULL, NULL);
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DECLARE
+            V_DETAIL  TEXT;
+            V_CONTEXT TEXT;
+        BEGIN
+            GET STACKED DIAGNOSTICS
+                OUT_SQLSTATE = RETURNED_SQLSTATE,
+                OUT_SQLERRMC = MESSAGE_TEXT,
+                V_DETAIL     = PG_EXCEPTION_DETAIL,
+                V_CONTEXT    = PG_EXCEPTION_CONTEXT;
+
+            RAISE WARNING '[SP_INS_<TABLE>] % (SQLSTATE: %). Detail: %. Context: %. Params: %',
+                OUT_SQLERRMC, OUT_SQLSTATE, V_DETAIL, V_CONTEXT, V_OTHER_TEXT;
+        END;
 END;
 $$;
 ```
@@ -204,6 +373,8 @@ All non-trivial procedures should log to `CORE_ADMIN.LOG_PROC_DETAIL` via `CORE_
 
 - All SQL keywords in UPPER CASE: `CREATE`, `INSERT INTO`, `VALUES`, `BEGIN`, `END`, `EXCEPTION`
 - All identifiers (table, column, param names) in UPPER CASE
+- **One column per line** in INSERT column lists and VALUES clauses for readability
+- **`CALL CORE_ADMIN.CORE_INS_LOG_PROC(...)`** on a single line — all arguments inline for readability
 - Use `LANGUAGE plpgsql` — never `LANGUAGE SQL` for procedures with error handling
 - Use `CREATE OR REPLACE PROCEDURE` — enables `runOnChange="true"` in Liquibase
 

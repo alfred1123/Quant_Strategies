@@ -29,24 +29,24 @@
 
     <!-- ========== BT procedures ========== -->
 
-    <changeSet id="210-bt-proc-insert-strategy" author="alfcheun" context="proc" runOnChange="true">
-        <sqlFile path="procedures/INSERT_STRATEGY.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
-        <rollback><sql>DROP PROCEDURE IF EXISTS BT.INSERT_STRATEGY;</sql></rollback>
+    <changeSet id="210-bt-proc-sp-ins-strategy" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_INS_STRATEGY.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_INS_STRATEGY;</sql></rollback>
     </changeSet>
 
-    <changeSet id="211-bt-proc-insert-result" author="alfcheun" context="proc" runOnChange="true">
-        <sqlFile path="procedures/INSERT_RESULT.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
-        <rollback><sql>DROP PROCEDURE IF EXISTS BT.INSERT_RESULT;</sql></rollback>
+    <changeSet id="211-bt-proc-sp-ins-result" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_INS_RESULT;</sql></rollback>
     </changeSet>
 
-    <changeSet id="212-bt-proc-insert-api-request" author="alfcheun" context="proc" runOnChange="true">
-        <sqlFile path="procedures/INSERT_API_REQUEST.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
-        <rollback><sql>DROP PROCEDURE IF EXISTS BT.INSERT_API_REQUEST;</sql></rollback>
+    <changeSet id="212-bt-proc-sp-ins-api-request" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_INS_API_REQUEST.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_INS_API_REQUEST;</sql></rollback>
     </changeSet>
 
-    <changeSet id="213-bt-proc-insert-api-request-payload" author="alfcheun" context="proc" runOnChange="true">
-        <sqlFile path="procedures/INSERT_API_REQUEST_PAYLOAD.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
-        <rollback><sql>DROP PROCEDURE IF EXISTS BT.INSERT_API_REQUEST_PAYLOAD;</sql></rollback>
+    <changeSet id="213-bt-proc-sp-ins-api-request-payload" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_INS_API_REQUEST_PAYLOAD.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_INS_API_REQUEST_PAYLOAD;</sql></rollback>
     </changeSet>
 
 </databaseChangeLog>

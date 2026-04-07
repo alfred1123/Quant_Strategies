@@ -14,20 +14,20 @@ CREATE TABLE BT.API_REQUEST_PAYLOAD (
     PRIMARY KEY (API_REQ_ID, API_REQ_VID, CREATED_AT)
 ) PARTITION BY RANGE (CREATED_AT);
 
--- pg_partman: automatic quarterly partition creation & retention.
+-- pg_partman: automatic yearly partition creation & retention.
 -- Requires: CREATE EXTENSION IF NOT EXISTS pg_partman;
 -- Schedule run_maintenance() via pg_partman BGW or cron.
 SELECT create_parent(
     p_parent_table   := 'bt.api_request_payload',
     p_control        := 'created_at',
-    p_interval       := '3 months',
-    p_premake        := 4
+    p_interval       := '1 year',
+    p_premake        := 2
 );
 
 -- Example partitions (auto-created by pg_partman, shown for reference):
--- BT.API_REQUEST_PAYLOAD_p2026_01 : 2026-01-01 .. 2026-04-01
--- BT.API_REQUEST_PAYLOAD_p2026_04 : 2026-04-01 .. 2026-07-01
--- BT.API_REQUEST_PAYLOAD_p2026_07 : 2026-07-01 .. 2026-10-01
+-- BT.API_REQUEST_PAYLOAD_p2025 : 2025-01-01 .. 2026-01-01
+-- BT.API_REQUEST_PAYLOAD_p2026 : 2026-01-01 .. 2027-01-01
+-- BT.API_REQUEST_PAYLOAD_p2027 : 2027-01-01 .. 2028-01-01
 -- BT.API_REQUEST_PAYLOAD_p2026_10 : 2026-10-01 .. 2027-01-01
 --
 -- Purge old partitions:
