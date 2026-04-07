@@ -89,12 +89,19 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 ### Phase 6 — DB schema + persistence ✅
 
 - ~~RDS PostgreSQL 16 Serverless v2 in production; SQLite or Docker Postgres locally (decision #16, #17).~~
-- **Deployed:** PostgreSQL 17
- on `localhost:5433`, database `quantdb`.
+- **Deployed:** PostgreSQL 17 on `localhost:5433`, database `quantdb`.
 - **Schemas:** `CORE_ADMIN`, `REFDATA`, `BT`, `TRADE` — all created and populated via Liquibase.
 - **Per-schema Liquibase deployment:** Each schema has its own `liquibase.properties` with `liquibase-schema-name`, giving independent `databasechangelog` tracking per schema. Master changelog (`quantdb-changelog.xml`) handles only schema/extension creation.
 - **Tables deployed:** `CORE_ADMIN.LOG_PROC_DETAIL`, 9 REFDATA tables (APP, TM_INTERVAL, ASSET_TYPE, INDICATOR, SIGNAL_TYPE, ORDER_STATE, TRANS_STATE, API_LIMIT, TICKER_MAPPING), 4 BT tables (STRATEGY, RESULT, API_REQUEST, API_REQUEST_PAYLOAD), 3 TRADE tables (DEPLOYMENT, LOG, TRANSACTION).
-- **Procedures deployed:** `CORE_ADMIN.CORE_INS_LOG_PROC`, `BT.INSERT_STRATEGY`, `BT.INSERT_RESULT`, `BT.INSERT_API_REQUEST`, `BT.INSERT_API_REQUEST_PAYLOAD`. All use `IN_XXX`/`OUT_XXX` naming, `LANGUAGE plpgsql`, `EXCEPTION WHEN OTHERS` + `GET STACKED DIAGNOSTICS`.
+- **Procedures deployed:**
+  - `CORE_ADMIN.CORE_INS_LOG_PROC` — central logging for all stored procedures.
+  - `REFDATA.SP_GET_ENUM` — generic REFCURSOR procedure to SELECT * FROM any REFDATA table by name (app startup cache loading); validates table via `pg_tables`, safe dynamic SQL with `format('%I', LOWER(...))`.
+  - `BT.SP_INS_STRATEGY` — soft-versioning insert (auto-VID + IS_CURRENT_IND flip).
+  - `BT.SP_INS_API_REQUEST` — soft-versioning insert.
+  - `BT.SP_INS_RESULT` — append-only insert (IDENTITY PK, references STRATEGY_VID).
+  - `BT.SP_INS_API_REQUEST_PAYLOAD` — append-only insert into yearly-partitioned table.
+  - All use `IN_XXX`/`OUT_XXX` naming, `LANGUAGE plpgsql`, `EXCEPTION WHEN OTHERS` + `GET STACKED DIAGNOSTICS`, `V_LOG_STATE`/`V_LOG_MSG` for CORE_INS_LOG_PROC OUT params.
+- **TRADE procedures:** Deferred — low priority until Trade API (Phase 7) is actively developed.
 - **Seed data:** REFDATA.ASSET_TYPE, REFDATA.INDICATOR, REFDATA.SIGNAL_TYPE populated.
 - **Conventions:** See `.github/skills/db-ddl/SKILL.md` (DDL + procedure patterns) and `.github/skills/liquibase/SKILL.md` (deployment patterns).
 
