@@ -39,6 +39,7 @@ class ParametersOptimization:
             try:
                 perf = Performance(self.data, self.config,
                                    window, signal, fee_bps=self.fee_bps)
+                perf.enrich_performance()
                 sharpe = perf.get_sharpe_ratio()
             except Exception:
                 logger.warning("Grid search failed for window=%s, signal=%s",

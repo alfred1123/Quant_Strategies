@@ -22,8 +22,7 @@ import pytest
 from dotenv import load_dotenv
 
 from data import AlphaVantage
-from ta import TechnicalAnalysis
-from strat import Strategy
+from strat import TechnicalAnalysis, Strategy
 from perf import Performance
 
 # Load .env so we can check for the key

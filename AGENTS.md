@@ -6,7 +6,7 @@ This repository contains Python tooling for **backtesting**, **technical analysi
 
 | Path | Role |
 |------|------|
-| `src/` | Pipeline: `data.py` (sources), `ta.py` (indicators), `strat.py`, `perf.py`, `param_opt.py`, `main.py` (orchestration) |
+| `src/` | Pipeline: `data.py` (sources), `strat.py` (indicators + strategies + signals), `perf.py`, `param_opt.py`, `main.py` (orchestration) |
 | `backup/deco/` | Decommissioned scripts (Bybit live trading — kept for reference) |
 
 Run backtest-style code from `src/` (imports are relative to that package, e.g. `from data import ...` in `main.py`).
@@ -15,6 +15,7 @@ Run backtest-style code from `src/` (imports are relative to that package, e.g. 
 
 - Prefer **pandas/numpy** idioms already used in existing modules; match style of neighboring code (naming, plotting libs).
 - Keep changes **focused**: extend existing functions/classes rather than duplicating logic.
+- Do **not** consider backward compatibility for any code change. Completely remove old dependencies, imports, shims, and re-export wrappers — update all call sites directly.
 
 ### Database Column Naming
 

@@ -66,3 +66,21 @@ def trending_down_df():
         "High": prices + 1,
         "Low": prices - 1,
     })
+
+
+@pytest.fixture
+def multi_factor_df():
+    """DataFrame with two distinct factor columns for multi-factor tests."""
+    np.random.seed(42)
+    n = 100
+    close = 100 + np.cumsum(np.random.randn(n) * 0.5)
+    volume = 1000 + np.cumsum(np.random.randn(n) * 50)
+    return pd.DataFrame({
+        "price": close,
+        "factor": close,
+        "v": close,
+        "volume": volume,
+        "Close": close,
+        "High": close + np.abs(np.random.randn(n) * 0.3),
+        "Low": close - np.abs(np.random.randn(n) * 0.3),
+    })

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from strat import (Strategy, StrategyConfig, SubStrategy, SignalDirection,
-                   strategy_to_json, backtest_results_to_json)
+                   strategy_to_json, backtest_results_to_json, combine_positions)
 
 
 class TestMomentumConstSignal:
@@ -362,3 +362,100 @@ class TestBacktestResultsToJson:
         assert result["metrics"]["sharpe"] == 1.5
         assert result["buy_hold_metrics"]["sharpe"] == 0.8
         assert "run_at" in result
+
+
+# -------------------------------------------------------------------------
+# Phase 3: combine_positions
+# -------------------------------------------------------------------------
+
+class TestCombinePositions:
+    def test_and_unanimous_long(self):
+        a = np.array([1.0, 1.0, 1.0])
+        b = np.array([1.0, 1.0, 1.0])
+        result = combine_positions([a, b], "AND")
+        np.testing.assert_array_equal(result, [1.0, 1.0, 1.0])
+
+    def test_and_unanimous_short(self):
+        a = np.array([-1.0, -1.0, -1.0])
+        b = np.array([-1.0, -1.0, -1.0])
+        result = combine_positions([a, b], "AND")
+        np.testing.assert_array_equal(result, [-1.0, -1.0, -1.0])
+
+    def test_and_disagree_gives_flat(self):
+        a = np.array([1.0, -1.0, 1.0, 0.0])
+        b = np.array([-1.0, 1.0, 0.0, 1.0])
+        result = combine_positions([a, b], "AND")
+        np.testing.assert_array_equal(result, [0.0, 0.0, 0.0, 0.0])
+
+    def test_and_one_flat_gives_flat(self):
+        a = np.array([1.0, -1.0, 0.0])
+        b = np.array([0.0, -1.0, 0.0])
+        result = combine_positions([a, b], "AND")
+        np.testing.assert_array_equal(result, [0.0, -1.0, 0.0])
+
+    def test_or_any_long(self):
+        a = np.array([1.0, 0.0, 0.0])
+        b = np.array([0.0, 1.0, 0.0])
+        result = combine_positions([a, b], "OR")
+        np.testing.assert_array_equal(result, [1.0, 1.0, 0.0])
+
+    def test_or_any_short(self):
+        a = np.array([0.0, -1.0, 0.0])
+        b = np.array([-1.0, 0.0, 0.0])
+        result = combine_positions([a, b], "OR")
+        np.testing.assert_array_equal(result, [-1.0, -1.0, 0.0])
+
+    def test_or_mixed_positive_wins(self):
+        """When one factor is long and another short, positive wins in OR."""
+        a = np.array([1.0, -1.0])
+        b = np.array([-1.0, 1.0])
+        result = combine_positions([a, b], "OR")
+        np.testing.assert_array_equal(result, [1.0, 1.0])
+
+    def test_single_factor_passthrough(self):
+        a = np.array([1.0, 0.0, -1.0, 0.0])
+        result = combine_positions([a], "AND")
+        np.testing.assert_array_equal(result, a)
+
+    def test_single_factor_returns_copy(self):
+        a = np.array([1.0, 0.0, -1.0])
+        result = combine_positions([a])
+        assert result is not a
+
+    def test_empty_raises_value_error(self):
+        with pytest.raises(ValueError, match="must not be empty"):
+            combine_positions([])
+
+    def test_invalid_conjunction_raises(self):
+        a = np.array([1.0])
+        with pytest.raises(ValueError, match="conjunction must be"):
+            combine_positions([a, a], "XOR")
+
+    def test_nan_propagation(self):
+        a = np.array([np.nan, 1.0, -1.0])
+        b = np.array([1.0, np.nan, -1.0])
+        result = combine_positions([a, b], "AND")
+        assert np.isnan(result[0])
+        assert np.isnan(result[1])
+        assert result[2] == -1.0
+
+    def test_three_factors_and(self):
+        a = np.array([1.0, 1.0, -1.0])
+        b = np.array([1.0, -1.0, -1.0])
+        c = np.array([1.0, 1.0, -1.0])
+        result = combine_positions([a, b, c], "AND")
+        np.testing.assert_array_equal(result, [1.0, 0.0, -1.0])
+
+    def test_three_factors_or(self):
+        a = np.array([0.0, 0.0, 0.0])
+        b = np.array([0.0, 0.0, -1.0])
+        c = np.array([0.0, 1.0, 0.0])
+        result = combine_positions([a, b, c], "OR")
+        np.testing.assert_array_equal(result, [0.0, 1.0, -1.0])
+
+    def test_case_insensitive_conjunction(self):
+        a = np.array([1.0, -1.0])
+        b = np.array([1.0, -1.0])
+        result_lower = combine_positions([a, b], "and")
+        result_upper = combine_positions([a, b], "AND")
+        np.testing.assert_array_equal(result_lower, result_upper)

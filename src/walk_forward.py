@@ -111,6 +111,7 @@ class WalkForward:
             is_data_perf, self.config, best_window, best_signal,
             fee_bps=self.fee_bps,
         )
+        is_perf.enrich_performance()
         is_metrics = is_perf.get_strategy_performance()
 
         # ── Out-of-sample: evaluate with same params ────────────────
@@ -118,6 +119,7 @@ class WalkForward:
             oos_data, self.config, best_window, best_signal,
             fee_bps=self.fee_bps,
         )
+        oos_perf.enrich_performance()
         oos_metrics = oos_perf.get_strategy_performance()
 
         # ── Overfitting ratio ───────────────────────────────────────

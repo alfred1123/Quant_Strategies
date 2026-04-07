@@ -46,7 +46,7 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 | 3 | **Substrategy structure** | Ordered tuple of frozen `SubStrategy` dataclasses with sequential `id`. | strat.py |
 | 4 | **Optimization config** | Separate `OptimizationConfig`, not embedded in substrategy. Runtime args to `optimize()`. | Phase 4 |
 | 5 | **Strategy naming** | Optional `name` field. Auto-generated as `{ticker}_strategy_{id_prefix}` if empty. | strat.py `_auto_name()` |
-| 6 | **Multi-factor positions** | Clean `combine_positions()` function in `strat.py`. No tuple overloading in `Performance.__init__`. Same time interval source assumed. | Phase 3 |
+| 6 | **Multi-factor positions** | Clean `combine_positions()` function in `strat.py`. `Performance.__init__` reads window/signal from `config.substrategies` when populated (config is single source of truth). Legacy callers (param_opt grid search, walk_forward, CLI) still pass window/signal explicitly. Same time interval source assumed. | Phase 3 |
 | 7 | **Grid search engine** | Cartesian product as baseline (backtest speed acceptable). Bayesian opt via `optuna` as opt-in alternative. Warn on >10k combos. | Phase 4 |
 | 8 | **Visualization** | 1-factor: 2D heatmap. 2-factor: slice heatmaps. 3+: parallel coordinates (Plotly). | Phase 5 |
 | 9 | **JSON API / DB** | Full Trade API design doc. Shared DB for backtest + trade. JSON schema for strategy + deployment + backtest results. | design doc |

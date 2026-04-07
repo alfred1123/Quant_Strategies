@@ -188,6 +188,7 @@ def main(args=None):
     # ── Single backtest ─────────────────────────────────────────────
     perf = Performance(df, config, args.window, args.signal,
                        fee_bps=args.fee)
+    perf.enrich_performance()
 
     logger.info("\n=== Strategy Performance "
                 "(%s %s / signal %s) ===\n%s",

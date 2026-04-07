@@ -201,6 +201,51 @@ class TechnicalAnalysis:
         return d
 
 
+def combine_positions(positions: list, conjunction: str = "AND") -> np.ndarray:
+    """Combine position arrays from multiple factors using AND/OR logic.
+
+    Args:
+        positions: list of numpy arrays, each containing {-1, 0, 1, NaN}.
+        conjunction: "AND" — position only when ALL agree;
+                     "OR"  — position when ANY factor signals.
+
+    Returns:
+        numpy array of {-1.0, 0.0, 1.0}, NaN where any input is NaN.
+
+    Raises:
+        ValueError: if positions list is empty or conjunction is invalid.
+    """
+    if not positions:
+        raise ValueError("positions list must not be empty")
+
+    if len(positions) == 1:
+        return positions[0].copy()
+
+    conj = conjunction.upper()
+    if conj not in ("AND", "OR"):
+        raise ValueError(f"conjunction must be 'AND' or 'OR', got '{conjunction}'")
+
+    stacked = np.column_stack(positions)  # shape (n, num_factors)
+    nan_mask = np.isnan(stacked).any(axis=1)
+
+    if conj == "AND":
+        # All factors must agree on the same non-zero direction
+        signs = np.sign(stacked)
+        all_positive = (signs == 1).all(axis=1)
+        all_negative = (signs == -1).all(axis=1)
+        combined = np.where(all_positive, 1.0, np.where(all_negative, -1.0, 0.0))
+    else:  # OR
+        # Any factor with a non-zero signal wins; take the first non-zero direction
+        signs = np.sign(stacked)
+        any_positive = (signs == 1).any(axis=1)
+        any_negative = (signs == -1).any(axis=1)
+        # Positive wins over negative when both present (arbitrary but consistent)
+        combined = np.where(any_positive, 1.0, np.where(any_negative, -1.0, 0.0))
+
+    combined[nan_mask] = np.nan
+    return combined
+
+
 class SignalDirection:
     """Trading signal generators — all static methods with signature (data_col, signal)."""
 

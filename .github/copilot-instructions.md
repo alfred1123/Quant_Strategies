@@ -4,7 +4,7 @@
 
 | Path | Role |
 |------|------|
-| `src/` | Pipeline: `data.py` → `ta.py` → `strat.py` → `perf.py` → `param_opt.py`, orchestrated by `main.py` |
+| `src/` | Pipeline: `data.py` → `strat.py` (indicators + strategies + signals) → `perf.py` → `param_opt.py`, orchestrated by `main.py` |
 | `backup/deco/` | Decommissioned scripts (kept for reference) |
 | `tests/unit/` | Unit tests per module |
 | `tests/integration/` | End-to-end pipeline tests |

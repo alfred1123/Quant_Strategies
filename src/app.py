@@ -149,6 +149,7 @@ with tab_single:
 
         perf = Performance(data_copy, config, window, signal,
                            fee_bps=fee_bps)
+        perf.enrich_performance()
 
         # Performance metrics side-by-side
         col1, col2 = st.columns(2)
@@ -326,6 +327,7 @@ with tab_wf:
             full_data, config, result.best_window, result.best_signal,
             fee_bps=fee_bps,
         )
+        full_perf.enrich_performance()
         chart_df = full_perf.data.dropna(subset=["cumu"]).copy()
 
         fig = go.Figure()
