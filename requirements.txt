@@ -9,3 +9,4 @@ futu-api
 yfinance
 streamlit
 uuid7
+optuna

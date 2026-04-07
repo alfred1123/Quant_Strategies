@@ -141,7 +141,7 @@ class Performance:
         pnl = self.data.loc[self._metric_window:len(self.data)-1, 'pnl']
         std = pnl.std()
         if std == 0 or np.isnan(std):
-            logger.warning("Sharpe ratio undefined (zero or NaN std for pnl)")
+            logger.debug("Sharpe ratio undefined (zero or NaN std for pnl)")
             return np.nan
         sharpe_ratio = pnl.mean() / std * np.sqrt(self.trading_period)
         return sharpe_ratio
@@ -153,7 +153,7 @@ class Performance:
     def get_calmar_ratio(self):
         max_dd = self.data['dd'].max()
         if max_dd == 0 or np.isnan(max_dd):
-            logger.warning("Calmar ratio undefined (zero or NaN max drawdown)")
+            logger.debug("Calmar ratio undefined (zero or NaN max drawdown)")
             return np.nan
         calmar_ratio = self.data.loc[self._metric_window:len(self.data)-1,'pnl'].mean() / max_dd
         return calmar_ratio
@@ -170,7 +170,7 @@ class Performance:
         bh = self.data.loc[self._metric_window:len(self.data)-1, 'buy_hold']
         std = bh.std()
         if std == 0 or np.isnan(std):
-            logger.warning("Buy-hold Sharpe ratio undefined (zero or NaN std)")
+            logger.debug("Buy-hold Sharpe ratio undefined (zero or NaN std)")
             return np.nan
         sharpe_ratio = bh.mean() / std * np.sqrt(self.trading_period)
         return sharpe_ratio
@@ -182,7 +182,7 @@ class Performance:
     def get_buy_hold_calmar_ratio(self):
         max_dd = self.data['buy_hold_dd'].max()
         if max_dd == 0 or np.isnan(max_dd):
-            logger.warning("Buy-hold Calmar ratio undefined (zero or NaN max drawdown)")
+            logger.debug("Buy-hold Calmar ratio undefined (zero or NaN max drawdown)")
             return np.nan
         calmar_ratio = self.data.loc[self._metric_window:len(self.data)-1,'buy_hold'].mean() / max_dd
         return calmar_ratio

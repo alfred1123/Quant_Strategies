@@ -212,10 +212,7 @@ def main(args=None):
             df.copy(), config, fee_bps=args.fee,
         )
 
-        param_perf = pd.DataFrame(
-            param_opt.optimize(window_list, signal_list),
-            columns=['window', 'signal', 'sharpe'],
-        )
+        param_perf = param_opt.optimize(window_list, signal_list)
 
         opt_path = os.path.join(args.outdir, f'opt_{tag}.csv')
         param_perf.to_csv(opt_path, index=False)

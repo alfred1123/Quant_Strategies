@@ -21,6 +21,34 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Indicator defaults — sensible window/signal bounds per indicator
+# ---------------------------------------------------------------------------
+
+INDICATOR_DEFAULTS = {
+    "get_sma": {
+        "win_min": 5, "win_max": 200, "win_step": 5,
+        "sig_min": 0.0, "sig_max": 0.10, "sig_step": 0.01,
+    },
+    "get_ema": {
+        "win_min": 5, "win_max": 200, "win_step": 5,
+        "sig_min": 0.0, "sig_max": 0.10, "sig_step": 0.01,
+    },
+    "get_rsi": {
+        "win_min": 5, "win_max": 50, "win_step": 1,
+        "sig_min": 10.0, "sig_max": 40.0, "sig_step": 5.0,
+    },
+    "get_bollinger_band": {
+        "win_min": 10, "win_max": 100, "win_step": 5,
+        "sig_min": 0.25, "sig_max": 2.50, "sig_step": 0.25,
+    },
+    "get_stochastic_oscillator": {
+        "win_min": 5, "win_max": 50, "win_step": 5,
+        "sig_min": 10.0, "sig_max": 40.0, "sig_step": 5.0,
+    },
+}
+
+
+# ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
 

@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 
 from strat import (Strategy, StrategyConfig, SubStrategy, SignalDirection,
-                   strategy_to_json, backtest_results_to_json, combine_positions)
+                   strategy_to_json, backtest_results_to_json, combine_positions,
+                   INDICATOR_DEFAULTS)
 
 
 class TestMomentumConstSignal:
@@ -459,3 +460,30 @@ class TestCombinePositions:
         result_lower = combine_positions([a, b], "and")
         result_upper = combine_positions([a, b], "AND")
         np.testing.assert_array_equal(result_lower, result_upper)
+
+
+class TestIndicatorDefaults:
+    REQUIRED_KEYS = {"win_min", "win_max", "win_step",
+                     "sig_min", "sig_max", "sig_step"}
+
+    def test_all_indicators_have_defaults(self):
+        expected = {"get_sma", "get_ema", "get_rsi",
+                    "get_bollinger_band", "get_stochastic_oscillator"}
+        assert set(INDICATOR_DEFAULTS.keys()) == expected
+
+    def test_all_entries_have_required_keys(self):
+        for name, bounds in INDICATOR_DEFAULTS.items():
+            missing = self.REQUIRED_KEYS - set(bounds.keys())
+            assert not missing, f"{name} missing keys: {missing}"
+
+    def test_min_less_than_max(self):
+        for name, b in INDICATOR_DEFAULTS.items():
+            assert b["win_min"] < b["win_max"], f"{name}: win_min >= win_max"
+            assert b["sig_min"] < b["sig_max"], f"{name}: sig_min >= sig_max"
+
+    def test_window_min_at_least_two(self):
+        for name, b in INDICATOR_DEFAULTS.items():
+            assert b["win_min"] >= 2, f"{name}: win_min < 2"
+
+    def test_bollinger_window_min_at_least_ten(self):
+        assert INDICATOR_DEFAULTS["get_bollinger_band"]["win_min"] >= 10

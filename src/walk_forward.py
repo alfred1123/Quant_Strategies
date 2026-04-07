@@ -75,7 +75,7 @@ class WalkForward:
                      self.split_idx, len(data) - self.split_idx, split_ratio)
 
     def run(self, window_tuple, signal_tuple):
-        """Run walk-forward test.
+        """Run walk-forward test (single-factor).
 
         Args:
             window_tuple: Tuple of window values for grid search.
@@ -93,10 +93,7 @@ class WalkForward:
             is_data, self.config, fee_bps=self.fee_bps,
         )
 
-        grid_results = pd.DataFrame(
-            is_opt.optimize(window_tuple, signal_tuple),
-            columns=['window', 'signal', 'sharpe'],
-        )
+        grid_results = is_opt.optimize(window_tuple, signal_tuple)
 
         best = grid_results.loc[grid_results['sharpe'].idxmax()]
         best_window = int(best['window'])
@@ -123,16 +120,10 @@ class WalkForward:
         oos_metrics = oos_perf.get_strategy_performance()
 
         # ── Overfitting ratio ───────────────────────────────────────
-        is_sharpe = is_metrics['Sharpe Ratio']
-        oos_sharpe = oos_metrics['Sharpe Ratio']
-
-        if np.isnan(is_sharpe) or is_sharpe == 0:
-            overfitting_ratio = np.nan
-        else:
-            overfitting_ratio = 1 - (oos_sharpe / is_sharpe)
+        overfitting_ratio = self._overfitting_ratio(is_metrics, oos_metrics)
 
         logger.info("Out-of-sample Sharpe=%.4f, Overfitting ratio=%.4f",
-                     oos_sharpe, overfitting_ratio)
+                     oos_metrics['Sharpe Ratio'], overfitting_ratio)
 
         return WalkForwardResult(
             best_window=best_window,
@@ -141,3 +132,67 @@ class WalkForward:
             oos_metrics=oos_metrics,
             overfitting_ratio=overfitting_ratio,
         )
+
+    def run_multi(self, window_ranges, signal_ranges):
+        """Run walk-forward test (multi-factor).
+
+        Args:
+            window_ranges: list of tuples, one per substrategy.
+            signal_ranges: list of tuples, one per substrategy.
+
+        Returns:
+            WalkForwardResult with in-sample/out-of-sample metrics.
+            ``best_window`` and ``best_signal`` are tuples (one per factor).
+        """
+        is_data = self.data.iloc[:self.split_idx].copy().reset_index(drop=True)
+        oos_data = self.data.iloc[self.split_idx:].copy().reset_index(drop=True)
+
+        is_opt = ParametersOptimization(
+            is_data, self.config, fee_bps=self.fee_bps,
+        )
+
+        grid_results = is_opt.optimize_multi(window_ranges, signal_ranges)
+        best = grid_results.loc[grid_results['sharpe'].idxmax()]
+
+        n_factors = len(window_ranges)
+        best_windows = tuple(int(best[f'window_{i}']) for i in range(n_factors))
+        best_signals = tuple(float(best[f'signal_{i}']) for i in range(n_factors))
+
+        logger.info("In-sample best: windows=%s, signals=%s, Sharpe=%.4f",
+                     best_windows, best_signals, best['sharpe'])
+
+        is_data_perf = self.data.iloc[:self.split_idx].copy().reset_index(drop=True)
+        is_perf = Performance(
+            is_data_perf, self.config, best_windows, best_signals,
+            fee_bps=self.fee_bps,
+        )
+        is_perf.enrich_performance()
+        is_metrics = is_perf.get_strategy_performance()
+
+        oos_perf = Performance(
+            oos_data, self.config, best_windows, best_signals,
+            fee_bps=self.fee_bps,
+        )
+        oos_perf.enrich_performance()
+        oos_metrics = oos_perf.get_strategy_performance()
+
+        overfitting_ratio = self._overfitting_ratio(is_metrics, oos_metrics)
+
+        logger.info("Out-of-sample Sharpe=%.4f, Overfitting ratio=%.4f",
+                     oos_metrics['Sharpe Ratio'], overfitting_ratio)
+
+        return WalkForwardResult(
+            best_window=best_windows,
+            best_signal=best_signals,
+            is_metrics=is_metrics,
+            oos_metrics=oos_metrics,
+            overfitting_ratio=overfitting_ratio,
+        )
+
+    @staticmethod
+    def _overfitting_ratio(is_metrics, oos_metrics):
+        is_sharpe = is_metrics['Sharpe Ratio']
+        oos_sharpe = oos_metrics['Sharpe Ratio']
+        if np.isnan(is_sharpe) or is_sharpe == 0:
+            return np.nan
+        return 1 - (oos_sharpe / is_sharpe)

@@ -86,9 +86,7 @@ class TestParameterOptimizationPipeline:
         opt = ParametersOptimization(synthetic_market_data.copy(), config)
         windows = (10, 20, 30)
         signals = (0.5, 1.0, 1.5)
-        results = pd.DataFrame(
-            opt.optimize(windows, signals), columns=["window", "signal", "sharpe"]
-        )
+        results = opt.optimize(windows, signals)
         assert len(results) == 9
         assert results["window"].nunique() == 3
         assert results["signal"].nunique() == 3
@@ -97,9 +95,7 @@ class TestParameterOptimizationPipeline:
     def test_grid_search_can_pivot_to_heatmap(self, synthetic_market_data):
         config = StrategyConfig("TEST", "get_bollinger_band", Strategy.momentum_const_signal, 252)
         opt = ParametersOptimization(synthetic_market_data.copy(), config)
-        results = pd.DataFrame(
-            opt.optimize((10, 20), (0.5, 1.0)), columns=["window", "signal", "sharpe"]
-        )
+        results = opt.optimize((10, 20), (0.5, 1.0))
         pivot = results.pivot(index="window", columns="signal", values="sharpe")
         assert pivot.shape == (2, 2)
         assert not pivot.isna().any().any()
@@ -215,16 +211,12 @@ class TestTransactionCostPipeline:
         opt_zero = ParametersOptimization(
             synthetic_market_data.copy(), config, fee_bps=0,
         )
-        results_zero = pd.DataFrame(
-            opt_zero.optimize((20,), (1.0,)), columns=["window", "signal", "sharpe"]
-        )
+        results_zero = opt_zero.optimize((20,), (1.0,))
 
         opt_high = ParametersOptimization(
             synthetic_market_data.copy(), config, fee_bps=50,
         )
-        results_high = pd.DataFrame(
-            opt_high.optimize((20,), (1.0,)), columns=["window", "signal", "sharpe"]
-        )
+        results_high = opt_high.optimize((20,), (1.0,))
 
         # Higher fees should produce lower or equal Sharpe
         assert results_zero.iloc[0]["sharpe"] >= results_high.iloc[0]["sharpe"]
@@ -500,10 +492,7 @@ class TestStrategyConfigPipeline:
         config = StrategyConfig("TEST", "get_bollinger_band",
                                 Strategy.momentum_const_signal, 252)
         opt = ParametersOptimization(synthetic_market_data.copy(), config)
-        results = pd.DataFrame(
-            opt.optimize((10, 20), (0.5, 1.0)),
-            columns=["window", "signal", "sharpe"],
-        )
+        results = opt.optimize((10, 20), (0.5, 1.0))
         assert len(results) == 4
         assert results["sharpe"].notna().all()
 
@@ -525,7 +514,7 @@ class TestStrategyConfigPipeline:
         assert isinstance(perf.get_strategy_performance(), pd.Series)
 
         opt = ParametersOptimization(synthetic_market_data.copy(), config)
-        results = list(opt.optimize((20,), (0.5,)))
+        results = list(opt.optimize((20,), (0.5,)).itertuples(index=False))
         assert len(results) == 1
 
         wf = WalkForward(synthetic_market_data.copy(), 0.5, config)
@@ -573,10 +562,7 @@ class TestStrategyConfigSinglePipeline:
             window=20, signal=0.5
         )
         opt = ParametersOptimization(synthetic_market_data.copy(), cfg)
-        results = pd.DataFrame(
-            opt.optimize((10, 20), (0.5, 1.0)),
-            columns=["window", "signal", "sharpe"],
-        )
+        results = opt.optimize((10, 20), (0.5, 1.0))
         assert len(results) == 4
 
 
@@ -693,3 +679,82 @@ class TestMultiFactorPipeline:
         assert perf_and.get_buy_hold_total_return() == pytest.approx(
             perf_or.get_buy_hold_total_return(), abs=1e-10
         )
+
+
+# -------------------------------------------------------------------------
+# Phase 4: Multi-factor grid search integration
+# -------------------------------------------------------------------------
+
+class TestMultiFactorGridSearch:
+    """End-to-end: multi-factor StrategyConfig → ParametersOptimization → metrics."""
+
+    @pytest.fixture
+    def multi_factor_market_data(self):
+        np.random.seed(99)
+        n = 300
+        close = 100 + np.cumsum(np.random.randn(n) * 0.5)
+        volume = 5000 + np.cumsum(np.random.randn(n) * 100)
+        return pd.DataFrame({
+            "price": close,
+            "factor": close,
+            "v": close,
+            "volume": volume,
+            "Close": close,
+            "High": close + np.abs(np.random.randn(n) * 0.3),
+            "Low": close - np.abs(np.random.randn(n) * 0.3),
+        })
+
+    def test_optimize_multi_end_to_end(self, multi_factor_market_data):
+        sub_a = SubStrategy("get_sma", "momentum_const_signal", 10, 0.5, "v")
+        sub_b = SubStrategy("get_sma", "momentum_const_signal", 20, 0.5, "volume")
+        config = StrategyConfig(
+            "TEST", "get_sma", Strategy.momentum_const_signal, 252,
+            conjunction="AND", substrategies=(sub_a, sub_b),
+        )
+        opt = ParametersOptimization(multi_factor_market_data.copy(), config)
+        results = opt.optimize_multi(
+            [(10, 20), (10, 20)],
+            [(0.5, 1.0), (0.5,)],
+        )
+        assert len(results) == 8  # (2×2) × (2×1)
+        assert "sharpe" in results.columns
+        assert results["sharpe"].notna().all()
+        best = results.loc[results["sharpe"].idxmax()]
+        assert best["sharpe"] == results["sharpe"].max()
+
+    def test_optimize_multi_or_conjunction(self, multi_factor_market_data):
+        sub_a = SubStrategy("get_sma", "momentum_const_signal", 10, 0.5, "v")
+        sub_b = SubStrategy("get_sma", "momentum_const_signal", 20, 0.5, "volume")
+        config = StrategyConfig(
+            "TEST", "get_sma", Strategy.momentum_const_signal, 252,
+            conjunction="OR", substrategies=(sub_a, sub_b),
+        )
+        opt = ParametersOptimization(multi_factor_market_data.copy(), config)
+        results = opt.optimize_multi(
+            [(10, 20), (10, 20)],
+            [(0.5,), (0.5,)],
+        )
+        assert len(results) == 4
+        assert results["sharpe"].notna().all()
+
+    def test_optimize_multi_fee_propagates(self, multi_factor_market_data):
+        sub_a = SubStrategy("get_sma", "momentum_const_signal", 10, 0.5, "v")
+        sub_b = SubStrategy("get_sma", "momentum_const_signal", 20, 0.5, "volume")
+        config = StrategyConfig(
+            "TEST", "get_sma", Strategy.momentum_const_signal, 252,
+            conjunction="AND", substrategies=(sub_a, sub_b),
+        )
+        opt_zero = ParametersOptimization(
+            multi_factor_market_data.copy(), config, fee_bps=0,
+        )
+        opt_high = ParametersOptimization(
+            multi_factor_market_data.copy(), config, fee_bps=50.0,
+        )
+        r_zero = opt_zero.optimize_multi(
+            [(10,), (20,)], [(0.5,), (0.5,)],
+        )
+        r_high = opt_high.optimize_multi(
+            [(10,), (20,)], [(0.5,), (0.5,)],
+        )
+        # Higher fees should reduce or equal Sharpe
+        assert r_zero.iloc[0]["sharpe"] >= r_high.iloc[0]["sharpe"]

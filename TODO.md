@@ -33,6 +33,34 @@
 
 </details>
 
+<details>
+<summary>Phase 3 — Multi-factor Performance engine ✅</summary>
+
+- `combine_positions(positions, conjunction)` in `strat.py` — AND/OR logic.
+- `Performance.enrich_performance()` dispatches to `_enrich_single_factor()` or `_enrich_multi_factor()` based on config.
+- Unified column naming: single-factor produces `factor1`/`indicator1`/`position1`; multi-factor produces `factorN`/`indicatorN`/`positionN` per sub.
+- `FinalPosition` column = combined position (AND/OR for multi, copy of `position1` for single). `FinalPosition_x1` = shifted.
+- Lazy init pattern: `__init__` stores state only, `enrich_performance()` computes.
+- Bug fixes: duplicate column dedup via `dict.fromkeys()`, RSI length mismatch via `.reindex()`.
+- Deleted backward-compat shims `ta.py` and `signal.py`; all imports updated to `strat`.
+- 265 tests pass.
+
+</details>
+
+<details>
+<summary>Phase 4 — Multi-factor grid search ✅</summary>
+
+- `ParametersOptimization.optimize_multi(window_ranges, signal_ranges)` — N-dimensional Cartesian product grid search.
+- Accepts per-factor window/signal ranges as lists of tuples; yields dicts with `window_0`, `signal_0`, …, `sharpe`.
+- Warns on >10k combinations (`GRID_WARN_THRESHOLD`).
+- Existing `optimize()` unchanged for single-factor callers.
+- `WalkForward.run_multi(window_ranges, signal_ranges)` — multi-factor walk-forward overfitting test.
+- Returns `WalkForwardResult` with tuple `best_window`/`best_signal` (one per factor).
+- Overfitting ratio logic extracted to `_overfitting_ratio()` static method (shared by `run` and `run_multi`).
+- 283 tests pass (10 new param_opt + 8 new walk_forward).
+
+</details>
+
 ---
 
 ## Decisions Log
@@ -63,20 +91,6 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 ---
 
 ## Remaining Phases
-
-### Phase 3 — Multi-factor Performance engine
-
-- Add `combine_positions(positions, conjunction)` to `strat.py` — AND/OR logic.
-- Refactor `Performance.enrich_performance()` to loop over substrategies, compute per-factor positions, then combine.
-- AND/OR wrapper functions (user's idea of future proportional weighting noted for later).
-- Unit tests for `combine_positions` (unanimous, disagree, single-factor, empty).
-
-### Phase 4 — Multi-factor grid search
-
-- Extend `ParametersOptimization.optimize()` for N-dimensional parameter space.
-- Use `optuna` for Bayesian optimization on large grids (conflict #7: scikit-learn adds no value here).
-- Keep Cartesian product as baseline for small grids.
-- Guard against >10k combinations.
 
 ### Phase 5 — Visualization + Streamlit UI
 
