@@ -182,6 +182,9 @@ with st.sidebar:
     # ── Walk-forward ────────────────────────────────────────────────
     st.divider()
     st.subheader("Walk-Forward Test")
+    include_walk_forward = st.checkbox(
+        "Include walk-forward test", value=True,
+        help="Run walk-forward overfitting analysis after optimization.")
     split_ratio = st.slider("Train/test split ratio", min_value=0.2,
                             max_value=0.8, value=0.5, step=0.05,
                             help="Fraction of data used for in-sample training.")
@@ -227,7 +230,7 @@ def render_optuna_plots(study, title_prefix):
             fig = optuna_vis.plot_contour(study)
             fig.update_layout(title=f"{title_prefix} — Contour Plot",
                               height=600)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         except Exception as exc:
             st.warning(f"Contour plot unavailable: {exc}")
 
@@ -236,7 +239,7 @@ def render_optuna_plots(study, title_prefix):
             fig = optuna_vis.plot_param_importances(study)
             fig.update_layout(title=f"{title_prefix} — Parameter Importances",
                               height=500)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         except Exception as exc:
             st.warning(f"Parameter importances unavailable: {exc}")
 
@@ -245,146 +248,197 @@ def render_optuna_plots(study, title_prefix):
             fig = optuna_vis.plot_optimization_history(study)
             fig.update_layout(title=f"{title_prefix} — Optimization History",
                               height=500)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         except Exception as exc:
             st.warning(f"Optimization history unavailable: {exc}")
 
-# ── Tab layout ──────────────────────────────────────────────────────
+# ── Pipeline ────────────────────────────────────────────────────────
 
-tab_single, tab_grid, tab_multi, tab_wf = st.tabs([
-    "Single Backtest",
-    "Parameter Optimization",
-    "Multi-Factor Optimization",
-    "Walk-Forward Test",
-])
+mode = st.radio("Mode", ["Single-factor", "Multi-factor"],
+                horizontal=True, key="pipeline_mode")
 
-# ── Tab 1: Single backtest ──────────────────────────────────────────
+run_pipeline = st.button("Run Pipeline", type="primary", key="run_pipeline")
 
-with tab_single:
-    run_single = st.button("Run Backtest", type="primary", key="run_single")
+if not run_pipeline:
+    st.info("Configure parameters in the sidebar, then click **Run Pipeline**.")
+    st.stop()
 
-    if run_single:
-        data_copy = df.copy()
-        config = StrategyConfig(
-            ticker=symbol,
-            indicator_name=INDICATORS[indicator_name],
-            signal_func=STRATEGY_FUNCS[strategy_name],
-            trading_period=trading_period,
+# ── Build config and grid ranges ────────────────────────────────────
+
+if mode == "Single-factor":
+    config = StrategyConfig(
+        ticker=symbol,
+        indicator_name=INDICATORS[indicator_name],
+        signal_func=STRATEGY_FUNCS[strategy_name],
+        trading_period=trading_period,
+    )
+    window_list = tuple(range(int(win_min), int(win_max) + 1, int(win_step)))
+    signal_list = tuple(np.arange(sig_min, sig_max + sig_step / 2, sig_step))
+    total = len(window_list) * len(signal_list)
+
+else:  # Multi-factor
+    substrategies = []
+    window_ranges = []
+    signal_ranges = []
+    for f in factors:
+        substrategies.append(SubStrategy(
+            indicator_name=f["indicator"],
+            signal_func_name=f["strategy_func_name"],
+            window=0,
+            signal=0.0,
+            data_column=f["data_column"],
+        ))
+        window_ranges.append(
+            tuple(range(int(f["win_min"]),
+                        int(f["win_max"]) + 1,
+                        int(f["win_step"])))
+        )
+        signal_ranges.append(
+            tuple(np.arange(f["sig_min"],
+                            f["sig_max"] + f["sig_step"] / 2,
+                            f["sig_step"]))
         )
 
-        perf = Performance(data_copy, config, window, signal,
-                           fee_bps=fee_bps)
-        perf.enrich_performance()
+    config = StrategyConfig(
+        ticker=symbol,
+        indicator_name=factors[0]["indicator"],
+        signal_func=factors[0]["strategy_func"],
+        trading_period=trading_period,
+        conjunction=conjunction,
+        substrategies=tuple(substrategies),
+    )
+    total = math.prod(
+        len(w) * len(s) for w, s in zip(window_ranges, signal_ranges)
+    )
 
-        # Performance metrics side-by-side
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("Strategy Performance")
-            st.dataframe(perf.get_strategy_performance().to_frame("Value"),
-                         use_container_width=True)
-        with col2:
-            st.subheader("Buy & Hold Performance")
-            st.dataframe(perf.get_buy_hold_performance().to_frame("Value"),
-                         use_container_width=True)
+if total > 5000:
+    st.warning(f"Grid has {total} combinations — this may take a while.")
 
-        # Cumulative return chart
-        chart_df = perf.data.dropna(subset=["cumu"]).copy()
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=chart_df["datetime"], y=chart_df["cumu"],
-                                 mode="lines", name="Strategy"))
-        fig.add_trace(go.Scatter(x=chart_df["datetime"],
-                                 y=chart_df["buy_hold_cumu"],
-                                 mode="lines", name="Buy & Hold"))
-        fig.update_layout(title=f"{symbol} — Cumulative Return",
-                          xaxis_title="Date", yaxis_title="Cumulative Return",
-                          height=500)
-        st.plotly_chart(fig, use_container_width=True)
+# ── 1. Parameter Optimization ───────────────────────────────────────
 
-        # Drawdown chart
-        fig_dd = go.Figure()
-        fig_dd.add_trace(go.Scatter(x=chart_df["datetime"], y=-chart_df["dd"],
-                                    fill="tozeroy", name="Strategy DD"))
-        fig_dd.add_trace(go.Scatter(x=chart_df["datetime"],
-                                    y=-chart_df["buy_hold_dd"],
-                                    fill="tozeroy", name="Buy & Hold DD"))
-        fig_dd.update_layout(title="Drawdown", xaxis_title="Date",
-                             yaxis_title="Drawdown", height=350)
-        st.plotly_chart(fig_dd, use_container_width=True)
+st.header("1. Parameter Optimization")
 
-        # Download daily PnL
-        csv = perf.data.to_csv(index=False)
-        st.download_button("Download daily PnL (CSV)", csv,
-                           file_name=f"perf_{symbol}.csv", mime="text/csv")
+data_copy = df.copy()
+opt = ParametersOptimization(data_copy, config, fee_bps=fee_bps)
 
-# ── Tab 2: Single-factor parameter optimization ────────────────────
+progress_bar = st.progress(0, text=f"Trial 0 / {total}")
+completed = [0]
 
-with tab_grid:
-    run_grid = st.button("Run Optimization", type="primary", key="run_grid")
+def _on_trial(study, trial):
+    completed[0] += 1
+    progress_bar.progress(
+        completed[0] / total,
+        text=f"Trial {completed[0]} / {total}",
+    )
 
-    if run_grid:
-        window_list = list(range(int(win_min), int(win_max) + 1, int(win_step)))
-        signal_list = list(np.arange(sig_min, sig_max + sig_step / 2, sig_step))
-        total = len(window_list) * len(signal_list)
+if mode == "Single-factor":
+    param_perf = opt.optimize(
+        window_list, signal_list, callbacks=[_on_trial],
+    )
+else:
+    param_perf = opt.optimize_multi(
+        window_ranges, signal_ranges, callbacks=[_on_trial],
+    )
 
-        if total > 5000:
-            st.warning(f"Grid has {total} combinations — this may take a while.")
+progress_bar.empty()
 
-        data_copy = df.copy()
-        config = StrategyConfig(
-            ticker=symbol,
-            indicator_name=INDICATORS[indicator_name],
-            signal_func=STRATEGY_FUNCS[strategy_name],
-            trading_period=trading_period,
-        )
+# Summary counts
+n_valid = param_perf["sharpe"].notna().sum()
+n_nan = param_perf["sharpe"].isna().sum()
+st.info(f"**{total}** trials completed — "
+        f"**{n_valid}** valid, **{n_nan}** undefined Sharpe")
 
-        opt = ParametersOptimization(data_copy, config, fee_bps=fee_bps)
+if n_valid == 0:
+    st.error("No valid Sharpe ratios found. Try wider parameter "
+             "ranges or a different indicator/strategy.")
+    st.stop()
 
-        progress_bar = st.progress(0, text=f"Trial 0 / {total}")
-        completed = [0]
+# Best parameters
+best = param_perf.loc[param_perf["sharpe"].idxmax()]
 
-        def _on_trial(study, trial):
-            completed[0] += 1
-            progress_bar.progress(
-                completed[0] / total,
-                text=f"Trial {completed[0]} / {total}",
+if mode == "Single-factor":
+    best_w = int(best["window"])
+    best_s = float(best["signal"])
+    st.success(
+        f"**Best:** window={best_w}, signal={best_s:.2f}, "
+        f"Sharpe={best['sharpe']:.4f}"
+    )
+else:
+    n_factors = len(factors)
+    best_w = tuple(int(best[f"window_{i}"]) for i in range(n_factors))
+    best_s = tuple(float(best[f"signal_{i}"]) for i in range(n_factors))
+    parts = [
+        f"F{i + 1}: window={best_w[i]}, signal={best_s[i]:.2f}"
+        for i in range(n_factors)
+    ]
+    st.success(
+        f"**Best ({conjunction}):** {' | '.join(parts)}, "
+        f"Sharpe={best['sharpe']:.4f}"
+    )
+
+# Top 10 table
+# TODO: Future — replace with interactive row-click to show equity curve
+#       for the selected combination (requires TypeScript custom component).
+st.subheader("Top 10 Parameter Combinations")
+st.dataframe(
+    param_perf.sort_values("sharpe", ascending=False).head(10)
+    .reset_index(drop=True),
+    width='stretch',
+)
+
+# Heatmap (single-factor only — multi-factor has N-dimensional space)
+if mode == "Single-factor":
+    st.subheader("Sharpe Ratio Heatmap")
+    pivot = param_perf.pivot(index="window", columns="signal",
+                             values="sharpe")
+    fig_hm = go.Figure(data=go.Heatmap(
+        z=pivot.values,
+        x=[f"{s:.2f}" for s in pivot.columns],
+        y=pivot.index.tolist(),
+        colorscale="RdYlGn",
+        zmid=0,
+        text=np.round(pivot.values, 2),
+        texttemplate="%{text}",
+        hovertemplate="Window: %{y}<br>Signal: %{x}<br>Sharpe: %{z:.4f}",
+    ))
+    fig_hm.update_layout(
+        title=f"{symbol} {indicator_name} + {strategy_name} — Sharpe Heatmap",
+        xaxis_title="Signal Threshold",
+        yaxis_title="Indicator Window",
+        height=max(400, len(window_list) * 30),
+    )
+    st.plotly_chart(fig_hm, width='stretch')
+
+# Slice heatmaps (multi-factor: fix each factor at best, sweep the other)
+if mode == "Multi-factor" and n_valid > 0:
+    st.subheader("Slice Heatmaps — Fix One Factor at Best")
+
+    for target_i in range(n_factors):
+        # Fix all OTHER factors at their best values
+        mask = pd.Series(True, index=param_perf.index)
+        fixed_parts = []
+        for j in range(n_factors):
+            if j == target_i:
+                continue
+            mask &= (param_perf[f"window_{j}"] == best_w[j])
+            mask &= (param_perf[f"signal_{j}"] == best_s[j])
+            fixed_parts.append(
+                f"F{j + 1}: window={best_w[j]}, signal={best_s[j]:.2f}"
             )
 
-        param_perf = opt.optimize(
-            tuple(window_list), tuple(signal_list),
-            callbacks=[_on_trial],
-        )
-        progress_bar.empty()
+        slice_df = param_perf.loc[mask].copy()
+        if slice_df.empty or slice_df["sharpe"].notna().sum() == 0:
+            st.warning(f"Factor {target_i + 1} slice heatmap: "
+                       "no data after filtering.")
+            continue
 
-        # Summary counts
-        n_valid = param_perf["sharpe"].notna().sum()
-        n_nan = param_perf["sharpe"].isna().sum()
-        st.info(f"**{total}** trials completed — "
-                f"**{n_valid}** valid, **{n_nan}** undefined Sharpe")
-
-        # Best parameters
-        if n_valid == 0:
-            st.error("No valid Sharpe ratios found. Try wider parameter "
-                     "ranges or a different indicator/strategy.")
-        else:
-            best = param_perf.loc[param_perf["sharpe"].idxmax()]
-            st.success(
-                f"**Best:** window={int(best['window'])}, "
-                f"signal={best['signal']:.2f}, Sharpe={best['sharpe']:.4f}"
-            )
-
-        # Top 10 table
-        st.subheader("Top 10 Parameter Combinations")
-        st.dataframe(
-            param_perf.sort_values("sharpe", ascending=False).head(10)
-            .reset_index(drop=True),
-            use_container_width=True,
+        wcol = f"window_{target_i}"
+        scol = f"signal_{target_i}"
+        pivot = slice_df.pivot_table(
+            index=wcol, columns=scol, values="sharpe", aggfunc="first",
         )
 
-        # Heatmap
-        st.subheader("Sharpe Ratio Heatmap")
-        pivot = param_perf.pivot(index="window", columns="signal",
-                                values="sharpe")
-        fig_hm = go.Figure(data=go.Heatmap(
+        fig_slice = go.Figure(data=go.Heatmap(
             z=pivot.values,
             x=[f"{s:.2f}" for s in pivot.columns],
             y=pivot.index.tolist(),
@@ -392,338 +446,225 @@ with tab_grid:
             zmid=0,
             text=np.round(pivot.values, 2),
             texttemplate="%{text}",
-            hovertemplate="Window: %{y}<br>Signal: %{x}<br>Sharpe: %{z:.4f}",
+            hovertemplate=(f"F{target_i + 1} Window: %{{y}}<br>"
+                           f"F{target_i + 1} Signal: %{{x}}<br>"
+                           "Sharpe: %{z:.4f}"),
         ))
-        fig_hm.update_layout(
-            title=f"{symbol} {indicator_name} + {strategy_name} — Sharpe Heatmap",
-            xaxis_title="Signal Threshold",
-            yaxis_title="Indicator Window",
-            height=max(400, len(window_list) * 30),
+        fig_slice.update_layout(
+            title=(f"Factor {target_i + 1} Sweep — "
+                   f"Fixed: {', '.join(fixed_parts)}"),
+            xaxis_title=f"F{target_i + 1} Signal",
+            yaxis_title=f"F{target_i + 1} Window",
+            height=max(400, len(pivot.index) * 30),
         )
-        st.plotly_chart(fig_hm, use_container_width=True)
+        st.plotly_chart(fig_slice, width='stretch')
 
-        # Optuna visualizations
-        if opt.last_study is not None:
-            render_optuna_plots(opt.last_study,
-                                f"{symbol} {indicator_name} + {strategy_name}")
+# Optuna visualizations
+if opt.last_study is not None:
+    if mode == "Single-factor":
+        render_optuna_plots(opt.last_study,
+                            f"{symbol} {indicator_name} + {strategy_name}")
+    else:
+        st.subheader("Optuna Visualizations")
 
-        # Download grid results
-        csv = param_perf.to_csv(index=False)
-        st.download_button("Download grid results (CSV)", csv,
-                           file_name=f"opt_{symbol}.csv", mime="text/csv")
+        viz_tabs = st.tabs([
+            "Contour (per factor pair)",
+            "Parallel Coordinates",
+            "Param Importances",
+            "Optimization History",
+        ])
 
-# ── Tab 3: Multi-factor parameter optimization ─────────────────────
-
-with tab_multi:
-    run_multi = st.button("Run Multi-Factor Optimization", type="primary",
-                          key="run_multi")
-
-    if run_multi:
-        substrategies = []
-        window_ranges = []
-        signal_ranges = []
-        for i, f in enumerate(factors):
-            substrategies.append(SubStrategy(
-                indicator_name=f["indicator"],
-                signal_func_name=f["strategy_func_name"],
-                window=0,
-                signal=0.0,
-                data_column=f["data_column"],
-            ))
-            window_ranges.append(
-                tuple(range(int(f["win_min"]),
-                            int(f["win_max"]) + 1,
-                            int(f["win_step"])))
-            )
-            signal_ranges.append(
-                tuple(np.arange(f["sig_min"],
-                                f["sig_max"] + f["sig_step"] / 2,
-                                f["sig_step"]))
-            )
-
-        config = StrategyConfig(
-            ticker=symbol,
-            indicator_name=factors[0]["indicator"],
-            signal_func=factors[0]["strategy_func"],
-            trading_period=trading_period,
-            conjunction=conjunction,
-            substrategies=tuple(substrategies),
-        )
-
-        total = math.prod(
-            len(w) * len(s) for w, s in zip(window_ranges, signal_ranges)
-        )
-
-        if total > 5000:
-            st.warning(f"Multi-factor grid has {total} combinations — "
-                       "this may take a while.")
-
-        data_copy = df.copy()
-        opt = ParametersOptimization(data_copy, config, fee_bps=fee_bps)
-
-        progress_bar = st.progress(0, text=f"Trial 0 / {total}")
-        completed = [0]
-
-        def _on_trial_multi(study, trial):
-            completed[0] += 1
-            progress_bar.progress(
-                completed[0] / total,
-                text=f"Trial {completed[0]} / {total}",
-            )
-
-        param_perf = opt.optimize_multi(
-            window_ranges, signal_ranges,
-            callbacks=[_on_trial_multi],
-        )
-        progress_bar.empty()
-
-        # Summary counts
-        n_valid = param_perf["sharpe"].notna().sum()
-        n_nan = param_perf["sharpe"].isna().sum()
-        st.info(f"**{total}** trials completed — "
-                f"**{n_valid}** valid, **{n_nan}** undefined Sharpe")
-
-        if n_valid == 0:
-            st.error("No valid Sharpe ratios found. Try wider parameter "
-                     "ranges or different indicators/strategies.")
-        else:
-            best = param_perf.loc[param_perf["sharpe"].idxmax()]
-            parts = []
+        with viz_tabs[0]:
             for i in range(len(factors)):
-                parts.append(
-                    f"F{i + 1}: window={int(best[f'window_{i}'])}, "
-                    f"signal={best[f'signal_{i}']:.2f}"
-                )
-            st.success(
-                f"**Best ({conjunction}):** {' | '.join(parts)}, "
-                f"Sharpe={best['sharpe']:.4f}"
-            )
-
-        st.subheader("Top 10 Parameter Combinations")
-        st.dataframe(
-            param_perf.sort_values("sharpe", ascending=False).head(10)
-            .reset_index(drop=True),
-            use_container_width=True,
-        )
-
-        # Optuna visualizations
-        if opt.last_study is not None:
-            st.subheader("Optuna Visualizations")
-
-            viz_tabs = st.tabs([
-                "Contour (per factor pair)",
-                "Parallel Coordinates",
-                "Param Importances",
-                "Optimization History",
-            ])
-
-            with viz_tabs[0]:
-                for i in range(len(factors)):
-                    try:
-                        fig = optuna_vis.plot_contour(
-                            opt.last_study,
-                            params=[f"window_{i}", f"signal_{i}"],
-                        )
-                        fig.update_layout(
-                            title=f"Factor {i + 1} — Contour",
-                            height=500,
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                    except Exception as exc:
-                        st.warning(f"Factor {i + 1} contour unavailable: {exc}")
-
-            with viz_tabs[1]:
                 try:
-                    fig = optuna_vis.plot_parallel_coordinate(opt.last_study)
-                    fig.update_layout(
-                        title="Multi-Factor — Parallel Coordinates",
-                        height=600,
+                    fig = optuna_vis.plot_contour(
+                        opt.last_study,
+                        params=[f"window_{i}", f"signal_{i}"],
                     )
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as exc:
-                    st.warning(f"Parallel coordinates unavailable: {exc}")
-
-            with viz_tabs[2]:
-                try:
-                    fig = optuna_vis.plot_param_importances(opt.last_study)
                     fig.update_layout(
-                        title="Multi-Factor — Parameter Importances",
+                        title=f"Factor {i + 1} — Contour",
                         height=500,
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
                 except Exception as exc:
-                    st.warning(f"Parameter importances unavailable: {exc}")
+                    st.warning(f"Factor {i + 1} contour unavailable: {exc}")
 
-            with viz_tabs[3]:
-                try:
-                    fig = optuna_vis.plot_optimization_history(opt.last_study)
-                    fig.update_layout(
-                        title="Multi-Factor — Optimization History",
-                        height=500,
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as exc:
-                    st.warning(f"Optimization history unavailable: {exc}")
-
-        csv = param_perf.to_csv(index=False)
-        st.download_button("Download multi-factor results (CSV)", csv,
-                           file_name=f"opt_multi_{symbol}.csv", mime="text/csv")
-
-# ── Tab 4: Walk-forward overfitting test ───────────────────────────
-
-with tab_wf:
-    wf_mode = st.radio("Walk-forward mode",
-                       ["Single-factor", "Multi-factor"],
-                       key="wf_mode", horizontal=True)
-
-    run_wf = st.button("Run Walk-Forward Test", type="primary", key="run_wf")
-
-    if run_wf:
-        data_copy = df.copy()
-
-        if wf_mode == "Single-factor":
-            window_list = list(range(int(win_min), int(win_max) + 1,
-                                     int(win_step)))
-            signal_list = list(np.arange(sig_min, sig_max + sig_step / 2,
-                                         sig_step))
-
-            config = StrategyConfig(
-                ticker=symbol,
-                indicator_name=INDICATORS[indicator_name],
-                signal_func=STRATEGY_FUNCS[strategy_name],
-                trading_period=trading_period,
-            )
-
+        with viz_tabs[1]:
             try:
-                wf = WalkForward(data_copy, split_ratio, config,
-                                 fee_bps=fee_bps)
-            except ValueError as exc:
-                st.error(f"Walk-forward setup failed: {exc}")
-                st.stop()
-
-            with st.spinner("Running walk-forward test "
-                            "(optimization on in-sample)..."):
-                result = wf.run(tuple(window_list), tuple(signal_list))
-
-            st.success(
-                f"**Best params (in-sample):** window={result.best_window}, "
-                f"signal={result.best_signal:.2f}"
-            )
-
-            best_w = result.best_window
-            best_s = result.best_signal
-
-        else:  # Multi-factor walk-forward
-            substrategies = []
-            window_ranges = []
-            signal_ranges = []
-            for i, f in enumerate(factors):
-                substrategies.append(SubStrategy(
-                    indicator_name=f["indicator"],
-                    signal_func_name=f["strategy_func_name"],
-                    window=0,
-                    signal=0.0,
-                    data_column=f["data_column"],
-                ))
-                window_ranges.append(
-                    tuple(range(int(f["win_min"]),
-                                int(f["win_max"]) + 1,
-                                int(f["win_step"])))
+                fig = optuna_vis.plot_parallel_coordinate(opt.last_study)
+                fig.update_layout(
+                    title="Multi-Factor — Parallel Coordinates",
+                    height=600,
                 )
-                signal_ranges.append(
-                    tuple(np.arange(f["sig_min"],
-                                    f["sig_max"] + f["sig_step"] / 2,
-                                    f["sig_step"]))
-                )
+                st.plotly_chart(fig, width='stretch')
+            except Exception as exc:
+                st.warning(f"Parallel coordinates unavailable: {exc}")
 
-            config = StrategyConfig(
-                ticker=symbol,
-                indicator_name=factors[0]["indicator"],
-                signal_func=factors[0]["strategy_func"],
-                trading_period=trading_period,
-                conjunction=conjunction,
-                substrategies=tuple(substrategies),
-            )
-
+        with viz_tabs[2]:
             try:
-                wf = WalkForward(data_copy, split_ratio, config,
-                                 fee_bps=fee_bps)
-            except ValueError as exc:
-                st.error(f"Walk-forward setup failed: {exc}")
-                st.stop()
-
-            with st.spinner("Running multi-factor walk-forward test..."):
-                result = wf.run_multi(window_ranges, signal_ranges)
-
-            parts = []
-            for i in range(len(factors)):
-                parts.append(
-                    f"F{i + 1}: window={result.best_window[i]}, "
-                    f"signal={result.best_signal[i]:.2f}"
+                fig = optuna_vis.plot_param_importances(opt.last_study)
+                fig.update_layout(
+                    title="Multi-Factor — Parameter Importances",
+                    height=500,
                 )
-            st.success(
-                f"**Best params (in-sample, {conjunction}):** "
-                f"{' | '.join(parts)}"
-            )
+                st.plotly_chart(fig, width='stretch')
+            except Exception as exc:
+                st.warning(f"Parameter importances unavailable: {exc}")
 
-            best_w = result.best_window
-            best_s = result.best_signal
+        with viz_tabs[3]:
+            try:
+                fig = optuna_vis.plot_optimization_history(opt.last_study)
+                fig.update_layout(
+                    title="Multi-Factor — Optimization History",
+                    height=500,
+                )
+                st.plotly_chart(fig, width='stretch')
+            except Exception as exc:
+                st.warning(f"Optimization history unavailable: {exc}")
 
-        # Overfitting ratio with colour coding
-        ov = result.overfitting_ratio
-        if np.isnan(ov):
-            st.warning("Overfitting ratio: N/A "
-                       "(in-sample Sharpe is zero or NaN)")
-        elif ov < 0.3:
-            st.success(f"Overfitting ratio: **{ov:.4f}** — "
-                       "Low risk of overfitting")
-        elif ov < 0.5:
-            st.warning(f"Overfitting ratio: **{ov:.4f}** — "
-                       "Moderate overfitting risk")
+csv_opt = param_perf.to_csv(index=False)
+st.download_button("Download optimization results (CSV)", csv_opt,
+                   file_name=f"opt_{symbol}.csv", mime="text/csv")
+
+# ── 2. Equity Curve — Best Sharpe ───────────────────────────────────
+
+st.header("2. Equity Curve — Best Parameters")
+
+perf = Performance(df.copy(), config, best_w, best_s, fee_bps=fee_bps)
+perf.enrich_performance()
+
+col1, col2 = st.columns(2)
+with col1:
+    st.subheader("Strategy Performance")
+    st.dataframe(perf.get_strategy_performance().to_frame("Value"),
+                 width='stretch')
+with col2:
+    st.subheader("Buy & Hold Performance")
+    st.dataframe(perf.get_buy_hold_performance().to_frame("Value"),
+                 width='stretch')
+
+chart_df = perf.data.dropna(subset=["cumu"]).copy()
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=chart_df["datetime"], y=chart_df["cumu"],
+                         mode="lines", name="Strategy"))
+fig.add_trace(go.Scatter(x=chart_df["datetime"],
+                         y=chart_df["buy_hold_cumu"],
+                         mode="lines", name="Buy & Hold"))
+fig.update_layout(title=f"{symbol} — Cumulative Return (Best Sharpe)",
+                  xaxis_title="Date", yaxis_title="Cumulative Return",
+                  height=500)
+st.plotly_chart(fig, width='stretch')
+
+fig_dd = go.Figure()
+fig_dd.add_trace(go.Scatter(x=chart_df["datetime"], y=-chart_df["dd"],
+                            fill="tozeroy", name="Strategy DD"))
+fig_dd.add_trace(go.Scatter(x=chart_df["datetime"],
+                             y=-chart_df["buy_hold_dd"],
+                             fill="tozeroy", name="Buy & Hold DD"))
+fig_dd.update_layout(title="Drawdown", xaxis_title="Date",
+                     yaxis_title="Drawdown", height=350)
+st.plotly_chart(fig_dd, width='stretch')
+
+csv_perf = perf.data.to_csv(index=False)
+st.download_button("Download daily PnL (CSV)", csv_perf,
+                   file_name=f"perf_{symbol}.csv", mime="text/csv")
+
+# ── 3. Walk-Forward Overfitting Test (optional) ────────────────────
+
+if include_walk_forward:
+    st.header("3. Walk-Forward Overfitting Test")
+
+    wf_data = df.copy()
+    try:
+        wf = WalkForward(wf_data, split_ratio, config, fee_bps=fee_bps)
+    except ValueError as exc:
+        st.error(f"Walk-forward setup failed: {exc}")
+        st.stop()
+
+    with st.spinner("Running walk-forward test "
+                    "(optimization on in-sample)..."):
+        if mode == "Single-factor":
+            wf_result = wf.run(window_list, signal_list)
         else:
-            st.error(f"Overfitting ratio: **{ov:.4f}** — "
-                     "High overfitting risk")
+            wf_result = wf.run(window_ranges, signal_ranges)
 
-        # Metrics comparison table
-        st.subheader("In-Sample vs Out-of-Sample Metrics")
-        summary = result.summary()
-        st.dataframe(summary, use_container_width=True)
-
-        # Cumulative return chart with split line
-        split_idx = wf.split_idx
-        full_data = df.copy()
-        full_perf = Performance(
-            full_data, config, best_w, best_s,
-            fee_bps=fee_bps,
+    # Best params from walk-forward
+    if mode == "Single-factor":
+        st.success(
+            f"**Best params (in-sample):** "
+            f"window={wf_result.best_window}, "
+            f"signal={wf_result.best_signal:.2f}"
         )
-        full_perf.enrich_performance()
-        chart_df = full_perf.data.dropna(subset=["cumu"]).copy()
-
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=chart_df["datetime"], y=chart_df["cumu"],
-            mode="lines", name="Strategy",
-        ))
-        fig.add_trace(go.Scatter(
-            x=chart_df["datetime"], y=chart_df["buy_hold_cumu"],
-            mode="lines", name="Buy & Hold",
-        ))
-
-        if "datetime" in chart_df.columns and split_idx < len(chart_df):
-            split_date = pd.Timestamp(chart_df["datetime"].iloc[split_idx])
-            fig.add_vline(
-                x=split_date, line_dash="dash", line_color="red",
-                annotation_text="Train/Test Split",
-                annotation_position="top right",
-            )
-
-        fig.update_layout(
-            title=f"{symbol} — Cumulative Return (Walk-Forward)",
-            xaxis_title="Date", yaxis_title="Cumulative Return",
-            height=500,
+        wf_best_w = wf_result.best_window
+        wf_best_s = wf_result.best_signal
+    else:
+        parts = [
+            f"F{i + 1}: window={wf_result.best_window[i]}, "
+            f"signal={wf_result.best_signal[i]:.2f}"
+            for i in range(len(factors))
+        ]
+        st.success(
+            f"**Best params (in-sample, {conjunction}):** "
+            f"{' | '.join(parts)}"
         )
-        st.plotly_chart(fig, use_container_width=True)
+        wf_best_w = wf_result.best_window
+        wf_best_s = wf_result.best_signal
 
-        csv = summary.to_csv()
-        st.download_button("Download walk-forward results (CSV)", csv,
-                           file_name=f"wf_{symbol}.csv", mime="text/csv")
+    # Overfitting ratio with colour coding
+    ov = wf_result.overfitting_ratio
+    if np.isnan(ov):
+        st.warning("Overfitting ratio: N/A "
+                   "(in-sample Sharpe is zero or NaN)")
+    elif ov < 0.3:
+        st.success(f"Overfitting ratio: **{ov:.4f}** — "
+                   "Low risk of overfitting")
+    elif ov < 0.5:
+        st.warning(f"Overfitting ratio: **{ov:.4f}** — "
+                   "Moderate overfitting risk")
+    else:
+        st.error(f"Overfitting ratio: **{ov:.4f}** — "
+                 "High overfitting risk")
+
+    # Metrics comparison table
+    st.subheader("In-Sample vs Out-of-Sample Metrics")
+    summary = wf_result.summary()
+    st.dataframe(summary, width='stretch')
+
+    # Cumulative return chart with split line
+    split_idx = wf.split_idx
+    full_data = df.copy()
+    full_perf = Performance(
+        full_data, config, wf_best_w, wf_best_s,
+        fee_bps=fee_bps,
+    )
+    full_perf.enrich_performance()
+    wf_chart = full_perf.data.dropna(subset=["cumu"]).copy()
+
+    fig_wf = go.Figure()
+    fig_wf.add_trace(go.Scatter(
+        x=wf_chart["datetime"], y=wf_chart["cumu"],
+        mode="lines", name="Strategy",
+    ))
+    fig_wf.add_trace(go.Scatter(
+        x=wf_chart["datetime"], y=wf_chart["buy_hold_cumu"],
+        mode="lines", name="Buy & Hold",
+    ))
+
+    if "datetime" in wf_chart.columns and split_idx < len(wf_chart):
+        split_date = str(wf_chart["datetime"].iloc[split_idx])
+        fig_wf.add_vline(
+            x=split_date, line_dash="dash", line_color="red",
+            annotation_text="Train/Test Split",
+            annotation_position="top right",
+        )
+
+    fig_wf.update_layout(
+        title=f"{symbol} — Cumulative Return (Walk-Forward)",
+        xaxis_title="Date", yaxis_title="Cumulative Return",
+        height=500,
+    )
+    st.plotly_chart(fig_wf, width='stretch')
+
+    csv_wf = summary.to_csv()
+    st.download_button("Download walk-forward results (CSV)", csv_wf,
+                       file_name=f"wf_{symbol}.csv", mime="text/csv")

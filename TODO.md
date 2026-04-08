@@ -92,13 +92,14 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 
 ## Remaining Phases
 
-### Phase 5 — Visualization + Streamlit UI
+### Phase 5 — Visualization + Streamlit UI ✅
 
-- 1-factor: existing 2D heatmap.
-- 2-factor: slice heatmaps (fix one factor at best, sweep the other).
-- 3+ factors: parallel coordinates (Plotly).
-- Add factor row builder in Streamlit sidebar ("Add/Remove Factor" buttons).
-- Conjunction selector (AND/OR radio).
+- ~~1-factor: existing 2D heatmap.~~
+- ~~2-factor: slice heatmaps (fix one factor at best, sweep the other).~~
+- ~~3+ factors: parallel coordinates (Plotly).~~
+- ~~Add factor row builder in Streamlit sidebar ("Add/Remove Factor" buttons).~~
+- ~~Conjunction selector (AND/OR radio).~~
+- **Delivered:** Unified single-page pipeline (mode radio → optimize → equity curve → optional walk-forward). 1-factor heatmap, multi-factor slice heatmaps, Optuna contour/parallel-coordinates/param-importances/history. Top-10 table with TODO for future TypeScript row-click.
 
 ### Phase 6 — DB schema + persistence ✅
 

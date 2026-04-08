@@ -6,11 +6,21 @@ periods. Optimizes parameters on in-sample via grid search, then evaluates the
 best parameters on out-of-sample to detect overfitting.
 
 Usage:
-    from strat import SignalDirection, StrategyConfig
+    from strat import SignalDirection, StrategyConfig, SubStrategy
+    # Single-factor
     config = StrategyConfig("BTC-USD", "get_bollinger_band",
                             SignalDirection.momentum_const_signal, 365)
     wf = WalkForward(data, 0.5, config)
     result = wf.run(window_tuple, signal_tuple)
+
+    # Multi-factor — run() auto-detects from config
+    sub1 = SubStrategy("get_sma", "momentum_const_signal", 20, 1.0, "v")
+    sub2 = SubStrategy("get_rsi", "reversion_const_signal", 14, 0.5, "volume")
+    config = StrategyConfig("BTC-USD", "get_sma",
+                            SignalDirection.momentum_const_signal, 365,
+                            conjunction="AND", substrategies=(sub1, sub2))
+    wf = WalkForward(data, 0.5, config)
+    result = wf.run(window_ranges, signal_ranges)
 """
 
 import logging
@@ -74,16 +84,26 @@ class WalkForward:
         logger.info("Walk-forward split: %d in-sample, %d out-of-sample (ratio=%.2f)",
                      self.split_idx, len(data) - self.split_idx, split_ratio)
 
-    def run(self, window_tuple, signal_tuple):
-        """Run walk-forward test (single-factor).
+    def run(self, window_values, signal_values):
+        """Run walk-forward test — auto-detects single vs multi-factor from config.
 
         Args:
-            window_tuple: Tuple of window values for grid search.
-            signal_tuple: Tuple of signal values for grid search.
+            window_values: Single-factor: tuple of window candidates.
+                           Multi-factor: list of tuples, one per substrategy.
+            signal_values: Single-factor: tuple of signal candidates.
+                           Multi-factor: list of tuples, one per substrategy.
 
         Returns:
             WalkForwardResult with in-sample/out-of-sample metrics.
+            Multi-factor: ``best_window`` and ``best_signal`` are tuples.
         """
+        subs = self.config.get_substrategies()
+        if len(subs) > 1:
+            return self._run_multi(window_values, signal_values)
+        return self._run_single(window_values, signal_values)
+
+    def _run_single(self, window_tuple, signal_tuple):
+        """Walk-forward for a single-factor config."""
         # ── Split data ──────────────────────────────────────────────
         is_data = self.data.iloc[:self.split_idx].copy().reset_index(drop=True)
         oos_data = self.data.iloc[self.split_idx:].copy().reset_index(drop=True)
@@ -133,17 +153,8 @@ class WalkForward:
             overfitting_ratio=overfitting_ratio,
         )
 
-    def run_multi(self, window_ranges, signal_ranges):
-        """Run walk-forward test (multi-factor).
-
-        Args:
-            window_ranges: list of tuples, one per substrategy.
-            signal_ranges: list of tuples, one per substrategy.
-
-        Returns:
-            WalkForwardResult with in-sample/out-of-sample metrics.
-            ``best_window`` and ``best_signal`` are tuples (one per factor).
-        """
+    def _run_multi(self, window_ranges, signal_ranges):
+        """Walk-forward for a multi-factor config."""
         is_data = self.data.iloc[:self.split_idx].copy().reset_index(drop=True)
         oos_data = self.data.iloc[self.split_idx:].copy().reset_index(drop=True)
 

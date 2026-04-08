@@ -187,14 +187,14 @@ class TestWalkForwardMultiFactor:
         df = _make_multi_factor_data()
         config = _multi_factor_config()
         wf = WalkForward(df, 0.5, config)
-        result = wf.run_multi([(10, 20), (10, 20)], [(0.5,), (0.5,)])
+        result = wf.run([(10, 20), (10, 20)], [(0.5,), (0.5,)])
         assert isinstance(result, WalkForwardResult)
 
     def test_best_params_are_tuples(self):
         df = _make_multi_factor_data()
         config = _multi_factor_config()
         wf = WalkForward(df, 0.5, config)
-        result = wf.run_multi([(10, 20), (10, 20)], [(0.5, 1.0), (0.5,)])
+        result = wf.run([(10, 20), (10, 20)], [(0.5, 1.0), (0.5,)])
         assert isinstance(result.best_window, tuple)
         assert isinstance(result.best_signal, tuple)
         assert len(result.best_window) == 2
@@ -204,7 +204,7 @@ class TestWalkForwardMultiFactor:
         df = _make_multi_factor_data()
         config = _multi_factor_config()
         wf = WalkForward(df, 0.5, config)
-        result = wf.run_multi([(10, 20), (10, 20)], [(0.5,), (0.5,)])
+        result = wf.run([(10, 20), (10, 20)], [(0.5,), (0.5,)])
         assert result.best_window[0] in (10, 20)
         assert result.best_window[1] in (10, 20)
 
@@ -212,7 +212,7 @@ class TestWalkForwardMultiFactor:
         df = _make_multi_factor_data()
         config = _multi_factor_config()
         wf = WalkForward(df, 0.5, config)
-        result = wf.run_multi([(10,), (20,)], [(0.5,), (0.5,)])
+        result = wf.run([(10,), (20,)], [(0.5,), (0.5,)])
         assert isinstance(result.is_metrics, pd.Series)
         assert isinstance(result.oos_metrics, pd.Series)
         assert len(result.is_metrics) == 5
@@ -222,14 +222,14 @@ class TestWalkForwardMultiFactor:
         df = _make_multi_factor_data()
         config = _multi_factor_config()
         wf = WalkForward(df, 0.5, config)
-        result = wf.run_multi([(10,), (20,)], [(0.5,), (0.5,)])
+        result = wf.run([(10,), (20,)], [(0.5,), (0.5,)])
         assert np.isfinite(result.overfitting_ratio) or np.isnan(result.overfitting_ratio)
 
     def test_summary_returns_dataframe(self):
         df = _make_multi_factor_data()
         config = _multi_factor_config()
         wf = WalkForward(df, 0.5, config)
-        result = wf.run_multi([(10,), (20,)], [(0.5,), (0.5,)])
+        result = wf.run([(10,), (20,)], [(0.5,), (0.5,)])
         summary = result.summary()
         assert isinstance(summary, pd.DataFrame)
         assert "In-Sample" in summary.columns
