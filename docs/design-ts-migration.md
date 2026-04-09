@@ -511,3 +511,235 @@ class WalkForwardResponse(BaseModel):
 | 2 | **Auth** — needed for MVP? | No. Add JWT/session auth when multi-user or Trade API goes live. |
 | 3 | **Deployment** — single container or split? | Single Docker image with both FastAPI + static frontend for MVP. Split later for scale. |
 | 4 | **Keep Streamlit?** — as fallback during migration? | Yes. Remove after M-6 is verified. |
+
+---
+
+## 10. Decommission Plan — `app.py` (Streamlit)
+
+`src/app.py` stays in the repo throughout migration. When the TS frontend reaches parity (M-6), everything below can be removed in one go.
+
+### 10.1 Deco Tag: `[DECO:STREAMLIT]`
+
+All files and artefacts that exist **solely** for the Streamlit UI are tagged here. Nothing in `src/` library modules (`data.py`, `strat.py`, `perf.py`, `param_opt.py`, `walk_forward.py`) is tagged — those are shared with the FastAPI backend.
+
+| Artefact | Type | Reason |
+|----------|------|--------|
+| `src/app.py` | File | Streamlit UI — entire file |
+| `streamlit` | pip dep | Only used by `app.py` |
+| `INDICATORS` dict in `app.py` | Code | Hardcoded registry → replaced by `REFDATA.INDICATOR` |
+| `STRATEGY_FUNCS` / `STRATEGY_NAMES` dicts in `app.py` | Code | Hardcoded registry → replaced by `REFDATA.SIGNAL_TYPE` |
+| `ASSET_TYPES` dict in `app.py` | Code | Hardcoded registry → replaced by `REFDATA.ASSET_TYPE` |
+| `DATA_COLUMNS` dict in `app.py` | Code | Hardcoded registry → replaced by `REFDATA.DATA_COLUMN` |
+| `INDICATOR_DEFAULTS` in `src/strat.py` | Code | Hardcoded grid defaults → replaced by `WIN_MIN`..`SIG_STEP` columns on `REFDATA.INDICATOR` |
+| Conjunction `["AND", "OR"]` literals in `app.py` | Code | Hardcoded → replaced by `REFDATA.CONJUNCTION` |
+
+### 10.2 One-Go Removal Checklist
+
+When M-6 is verified:
+
+1. Delete `src/app.py`
+2. Remove `streamlit` from `requirements.txt`
+3. Remove `INDICATOR_DEFAULTS` from `src/strat.py` (backend reads from REFDATA cache)
+4. Remove Streamlit launch instructions from `README.md`
+5. Update `setup.sh` — drop streamlit, add Node.js frontend build
+6. Update `AGENTS.md` / `.github/copilot-instructions.md` layout table
+
+---
+
+## 11. REFDATA-Driven Dropdowns
+
+Every dropdown / radio / selectbox in the current Streamlit UI maps to a `REFDATA` table. The TS frontend and FastAPI backend both consume REFDATA — the frontend fetches it via REST, the backend caches it at startup.
+
+### 11.1 Mapping: Hardcoded → REFDATA
+
+| UI Element | Hardcoded in `app.py` | REFDATA Table | Key Columns |
+|---|---|---|---|
+| Indicator selectbox | `INDICATORS` dict | `REFDATA.INDICATOR` | `DISPLAY_NAME` (label), `METHOD_NAME` (value) |
+| Strategy selectbox | `STRATEGY_FUNCS` / `STRATEGY_NAMES` | `REFDATA.SIGNAL_TYPE` | `DISPLAY_NAME` (label), `FUNC_NAME` (value) |
+| Asset type selectbox | `ASSET_TYPES` dict | `REFDATA.ASSET_TYPE` | `DISPLAY_NAME` (label), `TRADING_PERIOD` (value) |
+| Data column selectbox | `DATA_COLUMNS` dict | `REFDATA.DATA_COLUMN` | `DISPLAY_NAME` (label), `COLUMN_NAME` (value) |
+| Conjunction radio | `["AND", "OR"]` literal | `REFDATA.CONJUNCTION` | `DISPLAY_NAME` (label), `NAME` (value) |
+| Grid search defaults | `INDICATOR_DEFAULTS` in `strat.py` | `REFDATA.INDICATOR` | `WIN_MIN`, `WIN_MAX`, `WIN_STEP`, `SIG_MIN`, `SIG_MAX`, `SIG_STEP` (columns on same table) |
+| Broker selectbox (Phase 7) | not yet built | `REFDATA.APP` | `NAME` (label) |
+| Ticker mapping (Phase 7) | not yet built | `REFDATA.TICKER_MAPPING` | `DATA_TICKER` → `BROKER_TICKER` |
+
+### 11.2 REFDATA REST Endpoint
+
+```
+GET /api/v1/refdata/{table_name}
+```
+
+Returns all rows from the named REFDATA table. The backend validates `table_name` against an allow-list (same pattern as `SP_GET_ENUM`).
+
+Response example (`GET /api/v1/refdata/indicator`):
+```json
+[
+  {"indicator_id": 1, "name": "bollinger", "display_name": "Bollinger Band (z-score)", "method_name": "get_bollinger_band"},
+  {"indicator_id": 2, "name": "sma", "display_name": "SMA", "method_name": "get_sma"},
+  {"indicator_id": 3, "name": "ema", "display_name": "EMA", "method_name": "get_ema"},
+  {"indicator_id": 4, "name": "rsi", "display_name": "RSI", "method_name": "get_rsi"}
+]
+```
+
+Joined endpoint for indicator defaults:
+```
+GET /api/v1/refdata/indicator?include=defaults
+```
+```json
+[
+  {
+    "indicator_id": 1, "name": "bollinger", "display_name": "Bollinger Band (z-score)",
+    "method_name": "get_bollinger_band",
+    "defaults": {"win_min": 10, "win_max": 100, "win_step": 5, "sig_min": 0.25, "sig_max": 2.50, "sig_step": 0.25}
+  },
+  ...
+]
+```
+
+---
+
+## 12. REFDATA Caching Layer
+
+### 12.1 Problem
+
+REFDATA tables are small (< 100 rows each), rarely change, and are read on every request (dropdown population, parameter validation, indicator lookup). Hitting PostgreSQL on every API call is unnecessary.
+
+### 12.2 Design
+
+```
+                    ┌──────────────┐
+                    │  PostgreSQL  │
+                    │  :5433       │
+                    └──────┬───────┘
+                           │ startup + refresh
+                    ┌──────▼───────┐
+                    │ RefDataCache │  (in-process dict)
+                    │ {table: rows}│
+                    └──────┬───────┘
+                           │ cache hit
+              ┌────────────┼────────────┐
+              │            │            │
+      ┌───────▼──┐  ┌─────▼────┐  ┌───▼──────┐
+      │ /refdata │  │ optimize │  │ validate │
+      │ endpoint │  │ service  │  │ config   │
+      └──────────┘  └──────────┘  └──────────┘
+```
+
+### 12.3 Implementation
+
+```python
+# api/services/refdata_cache.py
+
+import logging
+from functools import lru_cache
+from typing import Any
+
+import psycopg
+
+logger = logging.getLogger(__name__)
+
+# Allow-list of tables the cache can load (prevents SQL injection)
+REFDATA_TABLES = frozenset({
+    "indicator", "signal_type", "asset_type", "data_column",
+    "conjunction", "ticker_mapping", "app",
+    "api_limit", "tm_interval", "order_state", "trans_state",
+})
+
+
+class RefDataCache:
+    """In-process cache for REFDATA tables.
+
+    Loaded once at startup, refreshable via .refresh().
+    Thread-safe for reads (dict is immutable after load).
+    """
+
+    def __init__(self, conninfo: str):
+        self._conninfo = conninfo
+        self._store: dict[str, list[dict[str, Any]]] = {}
+
+    def load_all(self) -> None:
+        """Fetch all REFDATA tables into memory."""
+        with psycopg.connect(self._conninfo) as conn:
+            for table in REFDATA_TABLES:
+                self._store[table] = self._fetch_table(conn, table)
+        logger.info("RefDataCache loaded %d tables", len(self._store))
+
+    def get(self, table: str) -> list[dict[str, Any]]:
+        """Return cached rows for a REFDATA table."""
+        if table not in REFDATA_TABLES:
+            raise ValueError(f"Unknown REFDATA table: {table}")
+        return self._store.get(table, [])
+
+    def get_by_id(self, table: str, id_col: str, id_val: int) -> dict[str, Any] | None:
+        """Lookup a single row by its ID column."""
+        for row in self.get(table):
+            if row.get(id_col) == id_val:
+                return row
+        return None
+
+    def get_indicator_defaults(self) -> dict[str, dict]:
+        """Return {method_name: {win_min, win_max, ...}} for backward compat."""
+        result = {}
+        for r in self.get("indicator"):
+            result[r["method_name"]] = {
+                "win_min": r["win_min"], "win_max": r["win_max"],
+                "win_step": r["win_step"], "sig_min": float(r["sig_min"]),
+                "sig_max": float(r["sig_max"]), "sig_step": float(r["sig_step"]),
+            }
+        return result
+
+    def refresh(self) -> None:
+        """Re-fetch all tables (call after REFDATA changes)."""
+        self.load_all()
+
+    @staticmethod
+    def _fetch_table(conn, table: str) -> list[dict[str, Any]]:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT * FROM refdata.{table}")  # table is from allow-list
+            cols = [desc.name for desc in cur.description]
+            return [dict(zip(cols, row)) for row in cur.fetchall()]
+```
+
+### 12.4 FastAPI Integration
+
+```python
+# api/main.py
+
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Depends
+from api.services.refdata_cache import RefDataCache
+
+cache = RefDataCache(conninfo="host=localhost port=5433 dbname=quantdb ...")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    cache.load_all()      # warm cache at startup
+    yield                  # app runs
+    # no cleanup needed
+
+app = FastAPI(lifespan=lifespan)
+
+def get_cache() -> RefDataCache:
+    return cache
+
+@app.get("/api/v1/refdata/{table_name}")
+def get_refdata(table_name: str, cache: RefDataCache = Depends(get_cache)):
+    return cache.get(table_name)
+
+@app.post("/api/v1/refdata/refresh")
+def refresh_refdata(cache: RefDataCache = Depends(get_cache)):
+    cache.refresh()
+    return {"status": "ok"}
+```
+
+### 12.5 Cache Properties
+
+| Property | Value |
+|---|---|
+| Storage | In-process `dict[str, list[dict]]` |
+| Warmup | `load_all()` at FastAPI startup via `lifespan` |
+| Staleness | Acceptable — REFDATA changes are rare (admin-only). Manual refresh via `POST /refdata/refresh`. |
+| Thread safety | Reads are safe (immutable snapshot). `refresh()` replaces the whole dict atomically. |
+| DB target | `localhost:5433` (PostgreSQL via AWS SSM port-forward) |
+| Fallback | If DB unreachable at startup, log error and fail fast — REFDATA is required for the app to function. |
+| No TTL | No automatic expiry. REFDATA is admin-managed; changes are deployed then `POST /refdata/refresh`. |

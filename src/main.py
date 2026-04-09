@@ -212,21 +212,20 @@ def main(args=None):
             df.copy(), config, fee_bps=args.fee,
         )
 
-        param_perf = param_opt.optimize(window_list, signal_list)
+        opt_result = param_opt.optimize(window_list, signal_list)
 
         opt_path = os.path.join(args.outdir, f'opt_{tag}.csv')
-        param_perf.to_csv(opt_path, index=False)
-        logger.info("Grid search: %d combinations evaluated", len(param_perf))
-        logger.info("\n%s",
-                    param_perf.sort_values('sharpe', ascending=False).head(10))
+        opt_result.grid_df.to_csv(opt_path, index=False)
+        logger.info("Grid search: %d combinations evaluated", len(opt_result.grid_df))
+        logger.info("\n%s", pd.DataFrame(opt_result.top10))
 
-        best = param_perf.loc[param_perf['sharpe'].idxmax()]
         logger.info("Best: window=%d, signal=%.2f, Sharpe=%.4f",
-                    int(best['window']), best['signal'], best['sharpe'])
+                    int(opt_result.best['window']), opt_result.best['signal'],
+                    opt_result.best['sharpe'])
 
         # Heatmap
-        pivot = param_perf.pivot(index='window', columns='signal',
-                                 values='sharpe')
+        pivot = opt_result.grid_df.pivot(index='window', columns='signal',
+                                         values='sharpe')
         plt.figure(figsize=(12, 8))
         sns.heatmap(pivot, annot=True, fmt='.2f', cmap='RdYlGn', center=0)
         plt.title(f'{args.symbol} {args.indicator} {args.strategy} '

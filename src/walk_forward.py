@@ -38,12 +38,14 @@ class WalkForwardResult:
     """Container for walk-forward test results."""
 
     def __init__(self, best_window, best_signal,
-                 is_metrics, oos_metrics, overfitting_ratio):
+                 is_metrics, oos_metrics, overfitting_ratio,
+                 full_equity_df=None):
         self.best_window = best_window
         self.best_signal = best_signal
         self.is_metrics = is_metrics    # pd.Series
         self.oos_metrics = oos_metrics  # pd.Series
         self.overfitting_ratio = overfitting_ratio
+        self.full_equity_df = full_equity_df  # pd.DataFrame, full-period enriched data
 
     def summary(self):
         """Return a DataFrame comparing in-sample vs out-of-sample."""
@@ -113,14 +115,12 @@ class WalkForward:
             is_data, self.config, fee_bps=self.fee_bps,
         )
 
-        grid_results = is_opt.optimize(window_tuple, signal_tuple)
-
-        best = grid_results.loc[grid_results['sharpe'].idxmax()]
-        best_window = int(best['window'])
-        best_signal = float(best['signal'])
+        opt_result = is_opt.optimize(window_tuple, signal_tuple)
+        best_window = int(opt_result.best['window'])
+        best_signal = float(opt_result.best['signal'])
 
         logger.info("In-sample best: window=%d, signal=%.2f, Sharpe=%.4f",
-                     best_window, best_signal, best['sharpe'])
+                     best_window, best_signal, opt_result.best['sharpe'])
 
         # ── In-sample: full performance with best params ────────────
         is_data_perf = self.data.iloc[:self.split_idx].copy().reset_index(drop=True)
@@ -145,12 +145,20 @@ class WalkForward:
         logger.info("Out-of-sample Sharpe=%.4f, Overfitting ratio=%.4f",
                      oos_metrics['Sharpe Ratio'], overfitting_ratio)
 
+        # ── Full-period equity curve ────────────────────────────────
+        full_perf = Performance(
+            self.data.copy(), self.config, best_window, best_signal,
+            fee_bps=self.fee_bps,
+        )
+        full_perf.enrich_performance()
+
         return WalkForwardResult(
             best_window=best_window,
             best_signal=best_signal,
             is_metrics=is_metrics,
             oos_metrics=oos_metrics,
             overfitting_ratio=overfitting_ratio,
+            full_equity_df=full_perf.data,
         )
 
     def _run_multi(self, window_ranges, signal_ranges):
@@ -162,15 +170,14 @@ class WalkForward:
             is_data, self.config, fee_bps=self.fee_bps,
         )
 
-        grid_results = is_opt.optimize_multi(window_ranges, signal_ranges)
-        best = grid_results.loc[grid_results['sharpe'].idxmax()]
+        opt_result = is_opt.optimize_multi(window_ranges, signal_ranges)
 
         n_factors = len(window_ranges)
-        best_windows = tuple(int(best[f'window_{i}']) for i in range(n_factors))
-        best_signals = tuple(float(best[f'signal_{i}']) for i in range(n_factors))
+        best_windows = tuple(int(opt_result.best[f'window_{i}']) for i in range(n_factors))
+        best_signals = tuple(float(opt_result.best[f'signal_{i}']) for i in range(n_factors))
 
         logger.info("In-sample best: windows=%s, signals=%s, Sharpe=%.4f",
-                     best_windows, best_signals, best['sharpe'])
+                     best_windows, best_signals, opt_result.best['sharpe'])
 
         is_data_perf = self.data.iloc[:self.split_idx].copy().reset_index(drop=True)
         is_perf = Performance(
@@ -192,12 +199,20 @@ class WalkForward:
         logger.info("Out-of-sample Sharpe=%.4f, Overfitting ratio=%.4f",
                      oos_metrics['Sharpe Ratio'], overfitting_ratio)
 
+        # ── Full-period equity curve ────────────────────────────────
+        full_perf = Performance(
+            self.data.copy(), self.config, best_windows, best_signals,
+            fee_bps=self.fee_bps,
+        )
+        full_perf.enrich_performance()
+
         return WalkForwardResult(
             best_window=best_windows,
             best_signal=best_signals,
             is_metrics=is_metrics,
             oos_metrics=oos_metrics,
             overfitting_ratio=overfitting_ratio,
+            full_equity_df=full_perf.data,
         )
 
     @staticmethod

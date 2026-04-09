@@ -87,16 +87,16 @@ class TestParameterOptimizationPipeline:
         windows = (10, 20, 30)
         signals = (0.5, 1.0, 1.5)
         results = opt.optimize(windows, signals)
-        assert len(results) == 9
-        assert results["window"].nunique() == 3
-        assert results["signal"].nunique() == 3
-        assert results["sharpe"].notna().all()
+        assert len(results.grid_df) == 9
+        assert results.grid_df["window"].nunique() == 3
+        assert results.grid_df["signal"].nunique() == 3
+        assert results.grid_df["sharpe"].notna().all()
 
     def test_grid_search_can_pivot_to_heatmap(self, synthetic_market_data):
         config = StrategyConfig("TEST", "get_bollinger_band", Strategy.momentum_const_signal, 252)
         opt = ParametersOptimization(synthetic_market_data.copy(), config)
         results = opt.optimize((10, 20), (0.5, 1.0))
-        pivot = results.pivot(index="window", columns="signal", values="sharpe")
+        pivot = results.grid_df.pivot(index="window", columns="signal", values="sharpe")
         assert pivot.shape == (2, 2)
         assert not pivot.isna().any().any()
 
@@ -219,7 +219,7 @@ class TestTransactionCostPipeline:
         results_high = opt_high.optimize((20,), (1.0,))
 
         # Higher fees should produce lower or equal Sharpe
-        assert results_zero.iloc[0]["sharpe"] >= results_high.iloc[0]["sharpe"]
+        assert results_zero.grid_df.iloc[0]["sharpe"] >= results_high.grid_df.iloc[0]["sharpe"]
 
 
 class TestTradingPeriodVariants:
@@ -493,8 +493,8 @@ class TestStrategyConfigPipeline:
                                 Strategy.momentum_const_signal, 252)
         opt = ParametersOptimization(synthetic_market_data.copy(), config)
         results = opt.optimize((10, 20), (0.5, 1.0))
-        assert len(results) == 4
-        assert results["sharpe"].notna().all()
+        assert len(results.grid_df) == 4
+        assert results.grid_df["sharpe"].notna().all()
 
     def test_config_walk_forward(self, synthetic_market_data):
         config = StrategyConfig("TEST", "get_bollinger_band",
@@ -514,7 +514,7 @@ class TestStrategyConfigPipeline:
         assert isinstance(perf.get_strategy_performance(), pd.Series)
 
         opt = ParametersOptimization(synthetic_market_data.copy(), config)
-        results = list(opt.optimize((20,), (0.5,)).itertuples(index=False))
+        results = list(opt.optimize((20,), (0.5,)).grid_df.itertuples(index=False))
         assert len(results) == 1
 
         wf = WalkForward(synthetic_market_data.copy(), 0.5, config)
@@ -563,7 +563,7 @@ class TestStrategyConfigSinglePipeline:
         )
         opt = ParametersOptimization(synthetic_market_data.copy(), cfg)
         results = opt.optimize((10, 20), (0.5, 1.0))
-        assert len(results) == 4
+        assert len(results.grid_df) == 4
 
 
 class TestJsonSerializationPipeline:
@@ -716,11 +716,11 @@ class TestMultiFactorGridSearch:
             [(10, 20), (10, 20)],
             [(0.5, 1.0), (0.5,)],
         )
-        assert len(results) == 8  # (2×2) × (2×1)
-        assert "sharpe" in results.columns
-        assert results["sharpe"].notna().all()
-        best = results.loc[results["sharpe"].idxmax()]
-        assert best["sharpe"] == results["sharpe"].max()
+        assert len(results.grid_df) == 8  # (2×2) × (2×1)
+        assert "sharpe" in results.grid_df.columns
+        assert results.grid_df["sharpe"].notna().all()
+        best = results.grid_df.loc[results.grid_df["sharpe"].idxmax()]
+        assert best["sharpe"] == results.grid_df["sharpe"].max()
 
     def test_optimize_multi_or_conjunction(self, multi_factor_market_data):
         sub_a = SubStrategy("get_sma", "momentum_const_signal", 10, 0.5, "v")
@@ -734,8 +734,8 @@ class TestMultiFactorGridSearch:
             [(10, 20), (10, 20)],
             [(0.5,), (0.5,)],
         )
-        assert len(results) == 4
-        assert results["sharpe"].notna().all()
+        assert len(results.grid_df) == 4
+        assert results.grid_df["sharpe"].notna().all()
 
     def test_optimize_multi_fee_propagates(self, multi_factor_market_data):
         sub_a = SubStrategy("get_sma", "momentum_const_signal", 10, 0.5, "v")
@@ -757,4 +757,4 @@ class TestMultiFactorGridSearch:
             [(10,), (20,)], [(0.5,), (0.5,)],
         )
         # Higher fees should reduce or equal Sharpe
-        assert r_zero.iloc[0]["sharpe"] >= r_high.iloc[0]["sharpe"]
+        assert r_zero.grid_df.iloc[0]["sharpe"] >= r_high.grid_df.iloc[0]["sharpe"]

@@ -52,6 +52,16 @@
         <rollback><sql>DROP TABLE IF EXISTS REFDATA.TICKER_MAPPING;</sql></rollback>
     </changeSet>
 
+    <changeSet id="110-refdata-data-column" author="alfcheun" context="refdata" runOnChange="false">
+        <sqlFile path="tables/DATA_COLUMN.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS REFDATA.DATA_COLUMN;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="111-refdata-conjunction" author="alfcheun" context="refdata" runOnChange="false">
+        <sqlFile path="tables/CONJUNCTION.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS REFDATA.CONJUNCTION;</sql></rollback>
+    </changeSet>
+
     <!-- ========== REFDATA seed data ========== -->
 
     <changeSet id="150-refdata-seed-asset-type" author="alfcheun" context="seed" runOnChange="false">
@@ -67,6 +77,38 @@
     <changeSet id="152-refdata-seed-signal-type" author="alfcheun" context="seed" runOnChange="false">
         <sqlFile path="data/SIGNAL_TYPE.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
         <rollback><sql>DELETE FROM REFDATA.SIGNAL_TYPE;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="154-refdata-seed-data-column" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/DATA_COLUMN.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DELETE FROM REFDATA.DATA_COLUMN;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="155-refdata-seed-conjunction" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/CONJUNCTION.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DELETE FROM REFDATA.CONJUNCTION;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="156-refdata-seed-app" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/APP.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DELETE FROM REFDATA.APP;</sql></rollback>
+    </changeSet>
+
+    <!-- ========== REFDATA ALTER TABLE ========== -->
+
+    <changeSet id="112-refdata-app-add-display-class" author="alfcheun" context="refdata" runOnChange="false">
+        <sql>
+            ALTER TABLE REFDATA.APP
+                ADD COLUMN IF NOT EXISTS DISPLAY_NAME TEXT,
+                ADD COLUMN IF NOT EXISTS CLASS_NAME   TEXT;
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE REFDATA.APP
+                    DROP COLUMN IF EXISTS DISPLAY_NAME,
+                    DROP COLUMN IF EXISTS CLASS_NAME;
+            </sql>
+        </rollback>
     </changeSet>
 
     <!-- ========== REFDATA procedures ========== -->

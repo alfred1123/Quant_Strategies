@@ -1,4 +1,9 @@
-"""Streamlit UI for the backtest pipeline.
+"""[DECO:STREAMLIT] Streamlit UI for the backtest pipeline.
+
+This file and its unique dependencies (streamlit pip package, hardcoded
+registries below) are tagged for decommission once the React/TypeScript
+frontend reaches parity (Phase 8, migration M-6).
+See docs/design-ts-migration.md §10.
 
 Launch:
     cd src && streamlit run app.py
@@ -25,7 +30,8 @@ from walk_forward import WalkForward
 setup_logging()
 logger = logging.getLogger(__name__)
 
-# ── Registry of available indicators and strategies ─────────────────
+# ── [DECO:STREAMLIT] Hardcoded registries — replace with REFDATA tables ──
+# See docs/design-ts-migration.md §11 for REFDATA mapping
 
 INDICATORS = {
     "Bollinger Band (z-score)": "get_bollinger_band",
@@ -332,19 +338,20 @@ def _on_trial(study, trial):
     )
 
 if mode == "Single-factor":
-    param_perf = opt.optimize(
+    opt_result = opt.optimize(
         window_list, signal_list, callbacks=[_on_trial],
     )
 else:
-    param_perf = opt.optimize_multi(
+    opt_result = opt.optimize_multi(
         window_ranges, signal_ranges, callbacks=[_on_trial],
     )
 
 progress_bar.empty()
+param_perf = opt_result.grid_df
 
 # Summary counts
-n_valid = param_perf["sharpe"].notna().sum()
-n_nan = param_perf["sharpe"].isna().sum()
+n_valid = opt_result.n_valid
+n_nan = len(param_perf) - n_valid
 st.info(f"**{total}** trials completed — "
         f"**{n_valid}** valid, **{n_nan}** undefined Sharpe")
 
@@ -354,7 +361,7 @@ if n_valid == 0:
     st.stop()
 
 # Best parameters
-best = param_perf.loc[param_perf["sharpe"].idxmax()]
+best = opt_result.best
 
 if mode == "Single-factor":
     best_w = int(best["window"])
@@ -381,8 +388,7 @@ else:
 #       for the selected combination (requires TypeScript custom component).
 st.subheader("Top 10 Parameter Combinations")
 st.dataframe(
-    param_perf.sort_values("sharpe", ascending=False).head(10)
-    .reset_index(drop=True),
+    pd.DataFrame(opt_result.top10).reset_index(drop=True),
     width='stretch',
 )
 
@@ -460,9 +466,9 @@ if mode == "Multi-factor" and n_valid > 0:
         st.plotly_chart(fig_slice, width='stretch')
 
 # Optuna visualizations
-if opt.last_study is not None:
+if opt_result.study is not None:
     if mode == "Single-factor":
-        render_optuna_plots(opt.last_study,
+        render_optuna_plots(opt_result.study,
                             f"{symbol} {indicator_name} + {strategy_name}")
     else:
         st.subheader("Optuna Visualizations")
@@ -478,7 +484,7 @@ if opt.last_study is not None:
             for i in range(len(factors)):
                 try:
                     fig = optuna_vis.plot_contour(
-                        opt.last_study,
+                        opt_result.study,
                         params=[f"window_{i}", f"signal_{i}"],
                     )
                     fig.update_layout(
@@ -491,7 +497,7 @@ if opt.last_study is not None:
 
         with viz_tabs[1]:
             try:
-                fig = optuna_vis.plot_parallel_coordinate(opt.last_study)
+                fig = optuna_vis.plot_parallel_coordinate(opt_result.study)
                 fig.update_layout(
                     title="Multi-Factor — Parallel Coordinates",
                     height=600,
@@ -502,7 +508,7 @@ if opt.last_study is not None:
 
         with viz_tabs[2]:
             try:
-                fig = optuna_vis.plot_param_importances(opt.last_study)
+                fig = optuna_vis.plot_param_importances(opt_result.study)
                 fig.update_layout(
                     title="Multi-Factor — Parameter Importances",
                     height=500,
@@ -513,7 +519,7 @@ if opt.last_study is not None:
 
         with viz_tabs[3]:
             try:
-                fig = optuna_vis.plot_optimization_history(opt.last_study)
+                fig = optuna_vis.plot_optimization_history(opt_result.study)
                 fig.update_layout(
                     title="Multi-Factor — Optimization History",
                     height=500,
@@ -632,13 +638,8 @@ if include_walk_forward:
 
     # Cumulative return chart with split line
     split_idx = wf.split_idx
-    full_data = df.copy()
-    full_perf = Performance(
-        full_data, config, wf_best_w, wf_best_s,
-        fee_bps=fee_bps,
-    )
-    full_perf.enrich_performance()
-    wf_chart = full_perf.data.dropna(subset=["cumu"]).copy()
+    wf_chart = wf_result.full_equity_df.dropna(subset=["cumu"]).copy()
+    wf_chart["datetime"] = pd.to_datetime(wf_chart["datetime"])
 
     fig_wf = go.Figure()
     fig_wf.add_trace(go.Scatter(
@@ -651,7 +652,7 @@ if include_walk_forward:
     ))
 
     if "datetime" in wf_chart.columns and split_idx < len(wf_chart):
-        split_date = str(wf_chart["datetime"].iloc[split_idx])
+        split_date = pd.Timestamp(wf_chart["datetime"].iloc[split_idx])
         fig_wf.add_vline(
             x=split_date, line_dash="dash", line_color="red",
             annotation_text="Train/Test Split",

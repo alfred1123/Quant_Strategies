@@ -10,3 +10,6 @@ yfinance
 streamlit
 uuid7
 optuna
+fastapi
+uvicorn[standard]
+psycopg[binary]

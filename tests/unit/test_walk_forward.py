@@ -96,6 +96,14 @@ class TestWalkForwardRun:
         result = wf.run((20,), (1.0,))
         assert np.isfinite(result.overfitting_ratio) or np.isnan(result.overfitting_ratio)
 
+    def test_full_equity_df_covers_full_period(self):
+        df = _make_synthetic_data()
+        wf = WalkForward(df, 0.5, _BOLLINGER_CONFIG)
+        result = wf.run((20,), (1.0,))
+        assert isinstance(result.full_equity_df, pd.DataFrame)
+        assert len(result.full_equity_df) == len(df)
+        assert "cumu" in result.full_equity_df.columns
+
 
 class TestWalkForwardResult:
     def test_summary_returns_dataframe(self):

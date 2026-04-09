@@ -350,7 +350,7 @@ def execute_deployment(deployment, strategy):
 
 ## 7. DB Schema (high-level)
 
-Database: **TradeBros**. Tables use `SCHEMA.TABLE` naming:
+Database: **Quant**. Tables use `SCHEMA.TABLE` naming:
 - `BT.` — backtest artifacts and strategy definitions
 - `TRADE.` — live execution records
 - `REFDATA.` — reference/lookup data
@@ -562,7 +562,7 @@ pass `window` and `signal` explicitly to `strategy_to_json(cfg, window=20, signa
 │  │ TRADE.*         │  │               ▲
 │  │ REFDATA.*       │  │               │
 │  └─────────────────┘  │         Orders/Fills
-│  DB: TradeBros        │               │
+│  DB: Quant             │               │
 └───────────────────────┘     ◄─────────┘
 ```
 
@@ -572,8 +572,8 @@ Use SQLite or Docker Postgres locally. Switch via environment variable:
 
 ```bash
 # .env
-DB_URL=sqlite:///db/store/tradebros.db          # local dev
-DB_URL=postgresql://user:pass@host/tradebros     # AWS
+DB_URL=sqlite:///db/store/quant.db               # local dev
+DB_URL=postgresql://user:pass@host/quant          # AWS
 ```
 
 ### Estimated Monthly Cost

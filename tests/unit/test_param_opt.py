@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from strat import Strategy, StrategyConfig, SubStrategy, SignalDirection
-from param_opt import ParametersOptimization, OPTUNA_MAX_TRIALS
+from param_opt import ParametersOptimization, OptimizeResult, OPTUNA_MAX_TRIALS
 
 
 _BOLLINGER_CONFIG = StrategyConfig("TEST", "get_bollinger_band",
@@ -14,28 +14,27 @@ class TestParametersOptimization:
     def _make_optimizer(self, df):
         return ParametersOptimization(df.copy(), _BOLLINGER_CONFIG)
 
-    def test_optimize_returns_dataframe(self, sample_ohlc_df):
+    def test_optimize_returns_result(self, sample_ohlc_df):
         opt = self._make_optimizer(sample_ohlc_df)
-        results = opt.optimize((5, 10), (0.5, 1.0))
-        assert isinstance(results, pd.DataFrame)
-        assert len(results) == 4  # 2 windows x 2 signals
+        result = opt.optimize((5, 10), (0.5, 1.0))
+        assert isinstance(result, OptimizeResult)
+        assert len(result.grid_df) == 4  # 2 windows x 2 signals
 
     def test_optimize_result_columns(self, sample_ohlc_df):
         opt = self._make_optimizer(sample_ohlc_df)
-        results = opt.optimize((5,), (0.5,))
-        assert len(results) == 1
-        assert list(results.columns) == ["window", "signal", "sharpe"]
-        row = results.iloc[0]
-        assert row["window"] == 5
-        assert row["signal"] == 0.5
-        assert isinstance(row["sharpe"], (int, float, np.floating))
+        result = opt.optimize((5,), (0.5,))
+        assert len(result.grid_df) == 1
+        assert list(result.grid_df.columns) == ["window", "signal", "sharpe"]
+        assert result.best["window"] == 5
+        assert result.best["signal"] == 0.5
+        assert isinstance(result.best["sharpe"], (int, float, np.floating))
 
     def test_optimize_covers_all_combinations(self, sample_ohlc_df):
         opt = self._make_optimizer(sample_ohlc_df)
         windows = (5, 10, 15)
         signals = (0.5, 1.0)
-        results = opt.optimize(windows, signals)
-        result_params = list(zip(results["window"], results["signal"]))
+        result = opt.optimize(windows, signals)
+        result_params = list(zip(result.grid_df["window"], result.grid_df["signal"]))
         assert (5, 0.5) in result_params
         assert (5, 1.0) in result_params
         assert (10, 0.5) in result_params
@@ -45,21 +44,21 @@ class TestParametersOptimization:
 
     def test_optimize_sharpe_varies_with_params(self, sample_ohlc_df):
         opt = self._make_optimizer(sample_ohlc_df)
-        results = opt.optimize((5, 20), (0.5, 1.5))
-        sharpes = results["sharpe"].tolist()
+        result = opt.optimize((5, 20), (0.5, 1.5))
+        sharpes = result.grid_df["sharpe"].tolist()
         # Different params should generally produce different Sharpe ratios
         assert len(set(sharpes)) > 1
 
     def test_optimize_single_param(self, sample_ohlc_df):
         opt = self._make_optimizer(sample_ohlc_df)
-        results = opt.optimize((10,), (1.0,))
-        assert len(results) == 1
+        result = opt.optimize((10,), (1.0,))
+        assert len(result.grid_df) == 1
 
     def test_optimize_with_n_trials(self, sample_ohlc_df):
         """When n_trials < total, TPE sampler is used and fewer trials run."""
         opt = self._make_optimizer(sample_ohlc_df)
-        results = opt.optimize((5, 10, 15, 20), (0.5, 1.0, 1.5), n_trials=3)
-        assert len(results) == 3
+        result = opt.optimize((5, 10, 15, 20), (0.5, 1.0, 1.5), n_trials=3)
+        assert len(result.grid_df) == 3
 
 
 class TestParametersOptimizationWithConfig:
@@ -96,36 +95,36 @@ def _multi_factor_config(**overrides):
 
 
 class TestOptimizeMulti:
-    def test_returns_dataframe(self, multi_factor_df):
+    def test_returns_result(self, multi_factor_df):
         config = _multi_factor_config()
         opt = ParametersOptimization(multi_factor_df.copy(), config)
-        results = opt.optimize_multi(
+        result = opt.optimize_multi(
             [(5, 10), (5, 10)],
             [(0.5,), (0.5,)],
         )
-        assert isinstance(results, pd.DataFrame)
-        assert len(results) == 4  # 2 × 1 × 2 × 1
+        assert isinstance(result, OptimizeResult)
+        assert len(result.grid_df) == 4  # 2 × 1 × 2 × 1
         for col in ["window_0", "signal_0", "window_1", "signal_1", "sharpe"]:
-            assert col in results.columns
+            assert col in result.grid_df.columns
 
     def test_grid_size_correct(self, multi_factor_df):
         config = _multi_factor_config()
         opt = ParametersOptimization(multi_factor_df.copy(), config)
-        results = opt.optimize_multi(
+        result = opt.optimize_multi(
             [(5, 10, 15), (5, 10)],
             [(0.5, 1.0), (0.5,)],
         )
         # Factor 0: 3 windows × 2 signals = 6.  Factor 1: 2 × 1 = 2.  Total: 12.
-        assert len(results) == 12
+        assert len(result.grid_df) == 12
 
     def test_covers_all_combinations(self, multi_factor_df):
         config = _multi_factor_config()
         opt = ParametersOptimization(multi_factor_df.copy(), config)
-        results = opt.optimize_multi(
+        result = opt.optimize_multi(
             [(5, 10), (5, 10)],
             [(0.5,), (0.5,)],
         )
-        params = list(zip(results["window_0"], results["window_1"]))
+        params = list(zip(result.grid_df["window_0"], result.grid_df["window_1"]))
         assert (5, 5) in params
         assert (5, 10) in params
         assert (10, 5) in params
@@ -134,12 +133,12 @@ class TestOptimizeMulti:
     def test_sharpe_is_numeric(self, multi_factor_df):
         config = _multi_factor_config()
         opt = ParametersOptimization(multi_factor_df.copy(), config)
-        results = opt.optimize_multi(
+        result = opt.optimize_multi(
             [(5,), (10,)],
             [(0.5,), (0.5,)],
         )
-        assert len(results) == 1
-        assert isinstance(results.iloc[0]["sharpe"], (int, float, np.floating))
+        assert len(result.grid_df) == 1
+        assert isinstance(result.grid_df.iloc[0]["sharpe"], (int, float, np.floating))
 
     def test_mismatched_ranges_raises(self, multi_factor_df):
         config = _multi_factor_config()
@@ -155,74 +154,67 @@ class TestOptimizeMulti:
         import logging
         with caplog.at_level(logging.INFO):
             # Run with small n_trials to avoid long execution
-            results = opt.optimize_multi(
+            result = opt.optimize_multi(
                 [big_range, big_range], [big_range, big_range],
                 n_trials=2,
             )
         assert any("TPE" in rec.message for rec in caplog.records)
-        assert len(results) == 2
+        assert len(result.grid_df) == 2
 
     def test_or_conjunction(self, multi_factor_df):
         config = _multi_factor_config(conjunction="OR")
         opt = ParametersOptimization(multi_factor_df.copy(), config)
-        results = opt.optimize_multi(
+        result = opt.optimize_multi(
             [(5,), (10,)],
             [(0.5,), (0.5,)],
         )
-        assert len(results) == 1
-        assert isinstance(results.iloc[0]["sharpe"], (int, float, np.floating))
+        assert len(result.grid_df) == 1
+        assert isinstance(result.grid_df.iloc[0]["sharpe"], (int, float, np.floating))
 
     def test_best_sharpe_selection(self, multi_factor_df):
         config = _multi_factor_config()
         opt = ParametersOptimization(multi_factor_df.copy(), config)
-        results = opt.optimize_multi(
+        result = opt.optimize_multi(
             [(5, 10, 20), (5, 10)],
             [(0.5, 1.0), (0.5,)],
         )
-        best = results.loc[results["sharpe"].idxmax()]
-        # Best sharpe should be the max
-        assert best["sharpe"] == results["sharpe"].max()
+        assert result.best["sharpe"] == result.grid_df["sharpe"].max()
 
     def test_n_trials_limits_evaluations(self, multi_factor_df):
         config = _multi_factor_config()
         opt = ParametersOptimization(multi_factor_df.copy(), config)
-        results = opt.optimize_multi(
+        result = opt.optimize_multi(
             [(5, 10, 20), (5, 10)],
             [(0.5, 1.0), (0.5,)],
             n_trials=3,
         )
-        assert len(results) == 3
+        assert len(result.grid_df) == 3
 
 
 # -------------------------------------------------------------------------
-# last_study exposure
+# study exposure
 # -------------------------------------------------------------------------
 
-class TestLastStudy:
-    def test_last_study_none_before_optimize(self, sample_ohlc_df):
+class TestStudy:
+    def test_study_set_after_optimize(self, sample_ohlc_df):
         opt = ParametersOptimization(sample_ohlc_df.copy(), _BOLLINGER_CONFIG)
-        assert opt.last_study is None
+        result = opt.optimize((5, 10), (0.5, 1.0))
+        assert result.study is not None
+        assert len(result.study.trials) == 4
 
-    def test_last_study_set_after_optimize(self, sample_ohlc_df):
-        opt = ParametersOptimization(sample_ohlc_df.copy(), _BOLLINGER_CONFIG)
-        opt.optimize((5, 10), (0.5, 1.0))
-        assert opt.last_study is not None
-        assert len(opt.last_study.trials) == 4
-
-    def test_last_study_set_after_optimize_multi(self, multi_factor_df):
+    def test_study_set_after_optimize_multi(self, multi_factor_df):
         config = _multi_factor_config()
         opt = ParametersOptimization(multi_factor_df.copy(), config)
-        opt.optimize_multi([(5, 10), (5, 10)], [(0.5,), (0.5,)])
-        assert opt.last_study is not None
-        assert len(opt.last_study.trials) == 4
+        result = opt.optimize_multi([(5, 10), (5, 10)], [(0.5,), (0.5,)])
+        assert result.study is not None
+        assert len(result.study.trials) == 4
 
-    def test_last_study_updated_on_second_call(self, sample_ohlc_df):
+    def test_study_independent_per_call(self, sample_ohlc_df):
         opt = ParametersOptimization(sample_ohlc_df.copy(), _BOLLINGER_CONFIG)
-        opt.optimize((5,), (0.5,))
-        first_study = opt.last_study
-        opt.optimize((5, 10), (0.5, 1.0))
-        assert opt.last_study is not first_study
-        assert len(opt.last_study.trials) == 4
+        result1 = opt.optimize((5,), (0.5,))
+        result2 = opt.optimize((5, 10), (0.5, 1.0))
+        assert result1.study is not result2.study
+        assert len(result2.study.trials) == 4
 
 
 # -------------------------------------------------------------------------
@@ -251,4 +243,4 @@ class TestCallbacks:
         """Callbacks default to None — optimization still works."""
         opt = ParametersOptimization(sample_ohlc_df.copy(), _BOLLINGER_CONFIG)
         result = opt.optimize((5,), (0.5,))
-        assert len(result) == 1
+        assert len(result.grid_df) == 1

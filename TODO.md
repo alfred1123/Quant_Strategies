@@ -368,7 +368,7 @@ Split historical data into **in-sample** (training) and **out-of-sample** (valid
 | **Overfitting Ratio** | — | `1 - (oos_sharpe / is_sharpe)` |
 
 
-## SQLite (database: TradeBros)
+## SQLite (database: Quant)
 
 1. Store datasource metadata and **requirements** for what to persist; minimize repeat API queries. Each stored requirement should point at the dataset it produced.
 

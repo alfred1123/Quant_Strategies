@@ -10,6 +10,7 @@ Uses optuna for efficient search:
 import itertools
 import logging
 import math
+from dataclasses import dataclass
 
 import numpy as np
 import optuna
@@ -26,13 +27,24 @@ OPTUNA_MAX_TRIALS = 10_000
 OPTUNA_SEED = 42
 
 
+@dataclass
+class OptimizeResult:
+    """Result returned by ParametersOptimization.optimize() and optimize_multi()."""
+
+    grid_df: pd.DataFrame  # Raw results — NaN preserved, for CSV/heatmap
+    best: dict             # Best params by Sharpe (NaN → None)
+    top10: list            # Top 10 by Sharpe descending (NaN → None)
+    grid: list             # All rows (NaN → None)
+    n_valid: int           # Trials with finite Sharpe
+    study: object          # optuna.Study — for visualization
+
+
 class ParametersOptimization:
 
     def __init__(self, data, config, *, fee_bps=None):
         self.data = data
         self.config = config
         self.fee_bps = fee_bps
-        self.last_study = None
 
     def optimize(self, window_values, signal_values, *, n_trials=None,
                  callbacks=None):
@@ -92,7 +104,6 @@ class ParametersOptimization:
 
         study.optimize(objective, n_trials=n_trials,
                        callbacks=callbacks or [])
-        self.last_study = study
 
         rows = []
         for trial in study.trials:
@@ -105,7 +116,7 @@ class ParametersOptimization:
                 })
 
         logger.info("Optimization complete: %d trials evaluated", len(rows))
-        return pd.DataFrame(rows)
+        return self._build_result(pd.DataFrame(rows), study)
 
     def optimize_multi(self, window_ranges, signal_ranges, *, n_trials=None,
                        callbacks=None):
@@ -191,7 +202,6 @@ class ParametersOptimization:
 
         study.optimize(objective, n_trials=n_trials,
                        callbacks=callbacks or [])
-        self.last_study = study
 
         rows = []
         for trial in study.trials:
@@ -206,7 +216,24 @@ class ParametersOptimization:
 
         logger.info("Multi-factor optimization complete: %d trials evaluated",
                      len(rows))
-        return pd.DataFrame(rows)
+        return self._build_result(pd.DataFrame(rows), study)
+
+
+    @staticmethod
+    def _build_result(df: pd.DataFrame, study) -> "OptimizeResult":
+        valid = int(df["sharpe"].notna().sum())
+        sorted_df = df.dropna(subset=["sharpe"]).sort_values("sharpe", ascending=False)
+        top10 = sorted_df.head(10).replace({np.nan: None}).to_dict(orient="records")
+        best = top10[0] if top10 else {}
+        grid = df.replace({np.nan: None}).to_dict(orient="records")
+        return OptimizeResult(
+            grid_df=df,
+            best=best,
+            top10=top10,
+            grid=grid,
+            n_valid=valid,
+            study=study,
+        )
 
 
 # ---------- Legacy Cartesian grid search (kept as reference) ----------

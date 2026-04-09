@@ -1,0 +1,109 @@
+"""Pydantic request/response models for the backtest API."""
+
+from pydantic import BaseModel
+
+
+class RangeParam(BaseModel):
+    min: float
+    max: float
+    step: float
+
+
+class FactorConfig(BaseModel):
+    indicator: str
+    strategy: str
+    data_column: str = "price"
+    window_range: RangeParam
+    signal_range: RangeParam
+
+
+# ── Requests ────────────────────────────────────────────────────────
+
+class DataRequest(BaseModel):
+    symbol: str
+    start: str
+    end: str
+
+
+class OptimizeRequest(BaseModel):
+    symbol: str
+    start: str
+    end: str
+    mode: str  # "single" | "multi"
+    trading_period: int
+    fee_bps: float = 5.0
+    data_source: str = "yahoo"  # REFDATA.APP.NAME
+    # Single-factor
+    indicator: str | None = None
+    strategy: str | None = None
+    window_range: RangeParam | None = None
+    signal_range: RangeParam | None = None
+    # Multi-factor
+    conjunction: str | None = None
+    factors: list[FactorConfig] | None = None
+
+
+class PerformanceRequest(BaseModel):
+    symbol: str
+    start: str
+    end: str
+    mode: str
+    trading_period: int
+    fee_bps: float = 5.0
+    data_source: str = "yahoo"  # REFDATA.APP.NAME
+    # Single-factor
+    indicator: str | None = None
+    strategy: str | None = None
+    window: int | None = None
+    signal: float | None = None
+    # Multi-factor
+    conjunction: str | None = None
+    factors: list[FactorConfig] | None = None
+    windows: list[int] | None = None
+    signals: list[float] | None = None
+
+
+class WalkForwardRequest(OptimizeRequest):
+    split_ratio: float = 0.5
+
+
+# ── Responses ───────────────────────────────────────────────────────
+
+class DataResponse(BaseModel):
+    rows: int
+    start_date: str
+    end_date: str
+    data: list[dict]
+
+
+class OptimizeResponse(BaseModel):
+    total_trials: int
+    valid: int
+    best: dict
+    top10: list[dict]
+    grid: list[dict]
+    optuna_plots: dict | None = None
+
+
+class EquityPoint(BaseModel):
+    datetime: str
+    cumu: float
+    buy_hold_cumu: float
+    dd: float
+    buy_hold_dd: float
+
+
+class PerformanceResponse(BaseModel):
+    strategy_metrics: dict
+    buy_hold_metrics: dict
+    equity_curve: list[EquityPoint]
+
+
+class WalkForwardResponse(BaseModel):
+    best_window: int | list[int]
+    best_signal: float | list[float]
+    is_metrics: dict
+    oos_metrics: dict
+    overfitting_ratio: float | None
+    equity_curve: list[EquityPoint]
+    split_date: str

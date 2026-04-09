@@ -6,7 +6,7 @@ applyTo: "db/**"
 
 ## Schema Conventions
 
-- Database name: `TradeBros`. Engine: PostgreSQL 16 (RDS Serverless v2).
+- Database name: `Quant`. Engine: PostgreSQL 16 (RDS Serverless v2).
 - Schema prefixes: `REFDATA.` (reference/lookup), `BT.` (backtest artifacts), `TRADE.` (live execution).
 - Primary keys: `<TABLE>_ID` — use `UUID` for entity PKs, `INTEGER GENERATED ALWAYS AS IDENTITY` for sequence PKs.
 - Version column `<TABLE>_VID` where applicable.

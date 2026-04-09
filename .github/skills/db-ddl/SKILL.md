@@ -1,6 +1,6 @@
 ---
 name: db-ddl
-description: 'Write or modify Postgres DDL for the TradeBros database. Use when creating tables, altering columns, adding indexes, or writing Liquibase changesets under db/liquidbase/. Enforces project type conventions (UUID, TIMESTAMPTZ, JSONB, CHAR(1) Y/N flags, NUMERIC, IDENTITY).'
+description: 'Write or modify Postgres DDL for the Quant database. Use when creating tables, altering columns, adding indexes, or writing Liquibase changesets under db/liquidbase/. Enforces project type conventions (UUID, TIMESTAMPTZ, JSONB, CHAR(1) Y/N flags, NUMERIC, IDENTITY).'
 ---
 
 # DB DDL Skill
@@ -46,7 +46,9 @@ db/liquidbase/
     ├── tables/                    # REFDATA schema DDL files
     │   ├── APP.sql
     │   ├── ASSET_TYPE.sql
-    │   ├── INDICATOR.sql
+    │   ├── CONJUNCTION.sql
+    │   ├── DATA_COLUMN.sql
+    │   ├── INDICATOR.sql          # includes grid-search default columns
     │   ├── SIGNAL_TYPE.sql
     │   ├── TM_INTERVAL.sql
     │   ├── ORDER_STATE.sql
@@ -55,6 +57,8 @@ db/liquidbase/
     │   └── TICKER_MAPPING.sql
     └── data/                      # REFDATA seed INSERT files
         ├── ASSET_TYPE.sql
+        ├── CONJUNCTION.sql
+        ├── DATA_COLUMN.sql
         ├── INDICATOR.sql
         └── SIGNAL_TYPE.sql
 ```

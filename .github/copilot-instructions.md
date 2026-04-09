@@ -5,10 +5,13 @@
 | Path | Role |
 |------|------|
 | `src/` | Pipeline: `data.py` → `strat.py` (indicators + strategies + signals) → `perf.py` → `param_opt.py`, orchestrated by `main.py` |
+| `src/app.py` | **[DECO:STREAMLIT]** Streamlit UI — kept until TS frontend parity (see `docs/design-ts-migration.md` §10) |
+| `api/` | FastAPI backend (Phase 7+8) |
+| `frontend/` | React/TypeScript SPA (Phase 8) |
 | `backup/deco/` | Decommissioned scripts (kept for reference) |
 | `tests/unit/` | Unit tests per module |
 | `tests/integration/` | End-to-end pipeline tests |
-| `db/` | SQLite schema and migrations (planned) |
+| `db/` | PostgreSQL schema and Liquibase migrations |
 
 ## Code Style
 
