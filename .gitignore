@@ -36,3 +36,6 @@ log/
 
 # Data (large files generated at runtime)
 data.csv
+
+# Extracted live DDL — regenerated on demand, never committed
+db/syncddl/

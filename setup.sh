@@ -40,12 +40,46 @@ else
     echo ".env found."
 fi
 
+# 6. Node.js via nvm
 echo ""
-echo "Setup complete! Activate your environment with:"
-echo "  source env/bin/activate"
+echo "=== Node.js Setup ==="
+export NVM_DIR="$HOME/.nvm"
+if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+    echo "Installing nvm..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+    # shellcheck source=/dev/null
+    source "$NVM_DIR/nvm.sh"
+else
+    # shellcheck source=/dev/null
+    source "$NVM_DIR/nvm.sh"
+    echo "nvm already installed."
+fi
+
+echo "Installing Node.js (version from .nvmrc)..."
+nvm install
+nvm use
+
+# 7. Frontend dependencies
 echo ""
-echo "Run a backtest with:"
-echo "  cd src && python main.py"
+echo "=== Frontend Setup ==="
+FRONTEND_DIR="$REPO_DIR/frontend"
+if [ -d "$FRONTEND_DIR" ]; then
+    echo "Installing frontend dependencies..."
+    cd "$FRONTEND_DIR" && npm install --silent
+    cd "$REPO_DIR"
+    echo "Frontend dependencies installed."
+else
+    echo "WARNING: frontend/ directory not found — skipping npm install."
+fi
+
 echo ""
-echo "Or launch the dashboard:"
-echo "  cd src && streamlit run app.py"
+echo "Setup complete!"
+echo ""
+echo "Start the backend:"
+echo "  source env/bin/activate && uvicorn api.main:app --reload"
+echo ""
+echo "Start the frontend (in a separate terminal):"
+echo "  cd frontend && npm run dev"
+echo ""
+echo "Run a backtest:"
+echo "  source env/bin/activate && cd src && python main.py"

@@ -1,8 +1,8 @@
 -- One row per unique data subscription (symbol + source + interval).
 -- Metadata only — payloads live in API_REQUEST_PAYLOAD.
 CREATE TABLE BT.API_REQUEST (
-    API_REQ_ID       UUID,
-    API_REQ_VID      INTEGER,
+    API_REQ_ID       UUID NOT NULL,
+    API_REQ_VID      INTEGER NOT NULL,
     APP_ID           INTEGER,
     TM_INTERVAL_ID   INTEGER,
     SYMBOL           TEXT NOT NULL,

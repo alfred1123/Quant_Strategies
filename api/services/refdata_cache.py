@@ -29,7 +29,7 @@ class RefDataCache:
         self._store: dict[str, list[dict[str, Any]]] = {}
 
     def load_all(self) -> None:
-        """Fetch every allow-listed REFDATA table into memory."""
+        """Fetch every allow-listed REFDATA table into memory via SP_GET_ENUM."""
         with psycopg.connect(self._conninfo) as conn:
             for table in REFDATA_TABLES:
                 try:
@@ -64,7 +64,20 @@ class RefDataCache:
 
     @staticmethod
     def _fetch_table(conn, table: str) -> list[dict[str, Any]]:
+        """Call REFDATA.SP_GET_ENUM and drain the returned REFCURSOR."""
         with conn.cursor() as cur:
-            cur.execute(f"SELECT * FROM refdata.{table}")  # noqa: S608 — table from allow-list
+            cur.execute(
+                "CALL REFDATA.SP_GET_ENUM(%s, NULL, NULL, NULL, NULL)",
+                (table,),
+            )
+            row = cur.fetchone()
+            cursor_name, sqlstate, sqlmsg, sqlerrmc = row[0], row[1], row[2], row[3]
+
+            if sqlstate != "00000":
+                raise RuntimeError(
+                    f"SP_GET_ENUM({table}) failed — state={sqlstate} msg={sqlerrmc}"
+                )
+
+            cur.execute(f'FETCH ALL FROM "{cursor_name}"')
             cols = [desc.name for desc in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+            return [dict(zip(cols, r)) for r in cur.fetchall()]

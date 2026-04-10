@@ -9,19 +9,20 @@ Backtesting and trading framework for crypto and equity markets. Strategies are 
 ## Quick Start
 
 ```bash
-# 1. Clone and set up
+# 1. Clone and set up (creates Python venv, installs Node.js via nvm, installs all deps)
 git clone https://github.com/alfred1123/Quant_Strategies.git
 cd Quant_Strategies
-./setup.sh                    # creates venv, installs deps, checks .env
+./setup.sh
 
-# 2. Activate the virtual environment
+# 2. Start the FastAPI backend (Terminal 1)
 source env/bin/activate
+uvicorn api.main:app --reload
 
-# 3. Launch the dashboard (no API key needed)
-cd src && streamlit run app.py
+# 3. Start the React frontend (Terminal 2)
+cd frontend && npm run dev
 ```
 
-Open the URL shown in the terminal (default: `http://localhost:8501`). The dashboard lets you configure everything from the sidebar — symbol, dates, indicator, strategy, parameters — and run backtests or grid search with one click.
+Open `http://localhost:5173`. The UI lets you configure symbol, dates, indicator, strategy, parameters, and run grid-search optimization or single backtests — all from a collapsible side drawer. Dropdowns are populated live from the REFDATA database.
 
 ---
 
@@ -30,9 +31,11 @@ Open the URL shown in the terminal (default: `http://localhost:8501`). The dashb
 | Requirement | Notes |
 |---|---|
 | Python 3.12+ | Tested on 3.12.3 |
-| pip | Used by `setup.sh` to install dependencies |
+| Node.js 24+ | Managed via nvm — `setup.sh` installs automatically from `.nvmrc` |
+| pip | Used by `setup.sh` to install Python dependencies |
 | Git | To clone the repo |
 | Linux / macOS | Windows works but `setup.sh` is a bash script — run manually or use WSL |
+| PostgreSQL 17 | Connected via `localhost:5433` (AWS SSM port-forward) — required for REFDATA dropdowns |
 
 ---
 
@@ -45,10 +48,11 @@ Open the URL shown in the terminal (default: `http://localhost:8501`). The dashb
 ```
 
 This script:
-1. Creates a virtual environment at `env/`
-2. Upgrades pip
-3. Installs all packages from `requirements.txt`
-4. Checks that `.env` exists (exits with error if missing)
+1. Creates a Python virtual environment at `env/`
+2. Upgrades pip and installs all packages from `requirements.txt`
+3. Checks that `.env` exists (exits with error if missing)
+4. Installs nvm (if not present) and the Node.js version pinned in `.nvmrc`
+5. Runs `npm install` in `frontend/`
 
 ### Option B: Manual
 
@@ -83,67 +87,7 @@ cp .env.example .env
 
 ## Usage
 
-### Streamlit Dashboard (`app.py`) — Recommended
 
-The easiest way to run backtests. Launch the interactive web dashboard:
-
-```bash
-cd src && streamlit run app.py
-```
-
-Open the URL printed in the terminal (default: `http://localhost:8501`).
-
-**Sidebar controls:**
-- **Symbol** — any Yahoo Finance ticker: `BTC-USD`, `AAPL`, `ETH-USD`, `SPY`, `^GSPC`
-- **Date range** — start and end dates for the backtest
-- **Asset type** — Crypto (365 days/year) or Equity (252 trading days/year)
-- **Indicator** — Bollinger Band (z-score), SMA, EMA, RSI, Stochastic Oscillator
-- **Strategy** — Momentum or Reversion
-- **Window / Signal** — parameters for single backtest
-- **Grid search rows** — row-based configuration builder (see below)
-
-**Full Analysis tab** (recommended — one-click end-to-end):
-1. Configure grid search rows in the sidebar (each row = factor × indicator × strategy × window range × signal range)
-2. Click **Run Full Analysis**
-3. Grid search runs across all rows, producing a combined results table
-4. Walk-forward overfitting test runs automatically on the first row's configuration
-5. Interactive heatmap — select any parameter pair as axes, filter remaining dimensions
-6. Select parameters to drill into: strategy performance metrics, cumulative return chart, drawdown chart
-7. Overfitting ratio with color coding (green/yellow/red)
-8. Download grid results, daily PnL, and walk-forward summary as CSV
-
-**Row-based grid search configuration:**
-
-The sidebar grid search section uses a **row-based builder**. Each row independently specifies:
-- **Factor** — price or volume
-- **Indicator** — Bollinger, SMA, EMA, RSI, or Stochastic Oscillator
-- **Strategy** — Momentum or Reversion
-- **Window range** — min, max, step
-- **Signal range** — min, max, step
-
-Click **➕ Add Row** to add more configurations. Each row runs as a separate sweep and results are combined into a single Sharpe heatmap with per-row metadata (factor, indicator, strategy) as filterable dimensions.
-
-**Single Backtest tab:**
-1. Set your parameters in the sidebar
-2. Click **Run Backtest**
-3. View strategy vs buy-and-hold performance metrics side by side
-4. Interactive cumulative return chart and drawdown chart (Plotly — zoom, hover, pan)
-5. Download daily PnL as CSV
-
-**Parameter Optimization tab:**
-1. Uses the same row-based grid from the sidebar
-2. Click **Run Grid Search**
-3. Progress bar shows completion status
-4. View top-10 parameter combinations ranked by Sharpe ratio
-5. Interactive heatmap (Sharpe by window × signal) — hover for exact values
-6. Download full grid results as CSV
-
-**Tips:**
-- Data is cached — switching tabs or re-running with the same symbol/dates won't re-fetch
-- For headless servers, add `--server.headless true` to suppress browser auto-open
-- To use a different port: `streamlit run app.py --server.port 8502`
-
----
 
 ### CLI Backtest (`main.py`)
 
@@ -239,7 +183,50 @@ python main.py --symbol AAPL --asset equity --indicator sma --walk-forward --spl
 
 ---
 
-### FastAPI Backend (`api/`)
+### React Frontend (`frontend/`) — Recommended UI
+
+A single-page React + TypeScript application that replaces the Streamlit dashboard as the primary UI.
+
+**Start it (requires the FastAPI backend to be running on port 8000):**
+
+```bash
+# Terminal 1 — backend
+source env/bin/activate
+uvicorn api.main:app --reload
+
+# Terminal 2 — frontend dev server
+cd frontend && npm run dev
+```
+
+Open `http://localhost:5173` in your browser.
+
+**Features:**
+- **⚙ Configure** button in the topbar opens a collapsible left drawer with all backtest settings
+- **Dropdowns** (indicator, strategy, asset type, conjunction) are populated live from `REFDATA` tables
+- Selecting an **indicator** auto-fills window and signal range defaults from `REFDATA.INDICATOR`
+- **Single-factor** and **multi-factor** modes — add as many factors as needed per run
+- On **Run**: drawer closes, optimization grid-search runs, best params auto-selected, analysis loads immediately
+- **Top-10 results table** (MUI DataGrid) — ★ Best row highlighted; each row has a **View Analysis** button
+- Analysis panel: side-by-side metrics cards + Sharpe heatmap + equity curve + drawdown chart
+- **CSV download** of full grid search results
+
+**Build for production:**
+
+```bash
+cd frontend && npm run build
+# Outputs to frontend/dist/ — serve via FastAPI's StaticFiles or any CDN
+```
+
+---
+
+### Streamlit Dashboard (`app.py`) `[DECO:STREAMLIT]`
+
+> **Note:** The Streamlit dashboard is scheduled for removal in Phase 8 migration M-6 once the React frontend reaches full parity. It is kept for reference. See `docs/design-ts-migration.md` §10 for the removal checklist.
+
+```bash
+source env/bin/activate
+cd src && streamlit run app.py
+```
 
 A REST API that exposes the backtest pipeline for programmatic access and the TypeScript frontend (Phase 8).
 
@@ -422,7 +409,7 @@ Quant_Strategies/
 │   ├── trade.py             # Futu OpenD paper/live trade execution
 │   ├── log_config.py        # Centralised logging configuration
 │   ├── main.py              # CLI entry point — configurable via argparse
-│   └── app.py               # Streamlit web dashboard [DECO:STREAMLIT]
+│   └── app.py               # Streamlit web dashboard [DECO:STREAMLIT — pending removal]
 │
 ├── api/                     # FastAPI backend (Phase 7+8)
 │   ├── main.py              # App factory — CORS, lifespan (REFDATA cache load), router registration
@@ -435,6 +422,15 @@ Quant_Strategies/
 │       ├── backtest.py      # Service layer: _build_config, _build_param_ranges, run_optimize/performance/walk_forward
 │       └── refdata_cache.py # RefDataCache — loads all REFDATA tables into memory at startup
 │
+├── frontend/                # React + TypeScript SPA (Phase 8)
+│   ├── src/
+│   │   ├── api/             # Axios client + TanStack Query hooks (backtest, refdata)
+│   │   ├── components/      # ConfigDrawer, Top10Table, MetricsCards, HeatmapChart, EquityCurveChart
+│   │   ├── pages/           # BacktestPage (single-page layout)
+│   │   └── types/           # TypeScript types for backtest and refdata API
+│   ├── package.json         # npm dependencies (MUI, Tailwind, TanStack Query, Plotly, Axios)
+│   └── vite.config.ts       # Vite 8 + Tailwind plugin + /api proxy to :8000
+│
 ├── tests/
 │   ├── unit/                # Unit tests (mocked, fast)
 │   ├── integration/         # Pipeline tests with synthetic data
@@ -442,6 +438,7 @@ Quant_Strategies/
 │
 ├── .env                     # API keys (gitignored — copy from .env.example)
 ├── .env.example             # Template for API keys
+├── .nvmrc                   # Node.js version pin (v24.14.1)
 ├── results/                 # Output CSVs and heatmap PNGs (gitignored)
 ├── db/
 │   ├── liquidbase/              # Liquibase changelogs (per-schema deployment)
@@ -458,7 +455,7 @@ Quant_Strategies/
 │
 ├── requirements.txt         # Python dependencies
 ├── pyproject.toml           # pytest configuration
-└── setup.sh                 # Automated environment setup
+└── setup.sh                 # Automated environment setup (Python venv + Node.js + frontend)
 ```
 
 ### Database
@@ -473,6 +470,12 @@ The project uses **PostgreSQL 17** with Liquibase for schema management. Each sc
 | `REFDATA` | Reference data (`APP`, `TICKER_MAPPING`, `INDICATOR`, `SIGNAL_TYPE`, etc.) + `SP_GET_ENUM` procedure for cache loading |
 | `BT` | Backtest results (`STRATEGY`, `RESULT`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert procedures (`SP_INS_STRATEGY`, `SP_INS_RESULT`, `SP_INS_API_REQUEST`, `SP_INS_API_REQUEST_PAYLOAD`) |
 | `TRADE` | Live trading tables (`DEPLOYMENT`, `LOG`, `TRANSACTION`) — procedures deferred |
+
+**Conventions:**
+
+- **No direct DML** — All writes from Python/FastAPI must call stored procedures via `CALL schema.procedure(...)`. Raw `INSERT`, `UPDATE`, or `DELETE` statements in application code are forbidden. Liquibase seed changesets are the only exception. `SELECT` queries are unrestricted.
+- **REFDATA reads** — `RefDataCache` loads all REFDATA tables at startup via `CALL REFDATA.SP_GET_ENUM(table_name, ...)`. Never query REFDATA tables directly from application code.
+- If a required write procedure does not exist yet, create it in `db/liquidbase/<schema>/procedures/` first.
 
 **Deployment:**
 

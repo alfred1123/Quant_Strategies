@@ -42,26 +42,27 @@ Replace `src/app.py` (Streamlit) with a React/TypeScript SPA backed by a FastAPI
 ### 2.1 Directory Layout
 
 ```
-frontend/               # React / TypeScript SPA (Vite)
+frontend/               # React / TypeScript SPA (Vite + Tailwind + MUI)
   src/
-    api/                # Generated API client (openapi-typescript-codegen)
+    api/
+      client.ts         # Axios instance (baseURL /api/v1, proxied to :8000)
+      backtest.ts       # runOptimize(), runPerformance()
+      refdata.ts        # useIndicators(), useSignalTypes(), useAssetTypes(), useConjunctions()
     components/
-      Sidebar.tsx       # Config panel (symbol, indicator, strategy, grid ranges)
-      PipelineRunner.tsx# "Run Pipeline" button + progress bar
-      OptGrid.tsx       # Top 10 table (DataGrid) + row-click drill-in
-      Heatmap.tsx       # Plotly heatmap (single-factor & slice)
-      EquityCurve.tsx   # Cumulative return + drawdown charts
-      WalkForward.tsx   # IS vs OOS metrics comparison + split-line chart
-      OverfitBadge.tsx  # Colour-coded overfitting ratio
+      ConfigDrawer.tsx  # Left-side MUI Drawer — all form fields + Run button
+      Top10Table.tsx    # MUI DataGrid — param rows + View Analysis / ★ Best buttons
+      MetricsCards.tsx  # Strategy vs Buy & Hold metric cards (side-by-side)
+      HeatmapChart.tsx  # Plotly heatmap (Sharpe vs window/signal grid)
+      EquityCurveChart.tsx # Plotly cumulative return + drawdown charts
     pages/
-      BacktestPage.tsx  # Unified pipeline page (replaces app.py flow)
-      StrategiesPage.tsx# CRUD list of saved strategies (Phase 7)
-      DeployPage.tsx    # One-click deploy form (Phase 7)
+      BacktestPage.tsx  # Single-page layout: topbar, drawer, results, analysis
     types/
-      backtest.ts       # Request/response types (generated from OpenAPI)
-    App.tsx
-    main.tsx
-  vite.config.ts
+      backtest.ts       # BacktestConfig (form state) + API request/response types
+      refdata.ts        # IndicatorRow, SignalTypeRow, AssetTypeRow, ConjunctionRow
+    App.tsx             # → BacktestPage only
+    main.tsx            # StrictMode + QueryClientProvider
+    index.css           # @import "tailwindcss"
+  vite.config.ts        # Tailwind plugin + /api proxy → localhost:8000
   tsconfig.json
   package.json
 
@@ -371,15 +372,28 @@ This is the single most impactful UX improvement over Streamlit — interactive 
 - Backend uses optuna callback (same pattern as `_on_trial` in app.py) → sends JSON frame.
 - Frontend `<PipelineRunner>` connects, renders progress bar, closes on `complete` message.
 
-### M-3: React Scaffold + Sidebar
+### M-3: React Scaffold + Single-Page UI ✅
 
-**Goal:** Basic SPA that can configure and submit a backtest.
+**Goal:** Full single-page application with collapsible config drawer.
 
-- Vite + React + TypeScript scaffold in `frontend/`.
-- `<Sidebar>` with all form fields matching app.py sidebar.
-- API client generated from FastAPI OpenAPI spec.
-- `<PipelineRunner>` button → calls optimize endpoint via WebSocket.
-- Progress bar renders from WS stream.
+**Implemented:**
+
+- Vite + React + TypeScript scaffold in `frontend/`
+- Tailwind CSS v4 (`@tailwindcss/vite`) + MUI v7 (`@mui/material`, `@mui/x-data-grid`)
+- `<ConfigDrawer>` — slides in from left on "⚙ Configure" click
+  - All form fields: symbol, date range, asset type (from `REFDATA.ASSET_TYPE`), fee bps
+  - Mode toggle: Single Factor / Multi Factor
+  - Indicator + Strategy dropdowns from `REFDATA.INDICATOR` / `REFDATA.SIGNAL_TYPE`
+  - Window/Signal ranges **auto-fill** from `REFDATA.INDICATOR.WIN_MIN` etc. on indicator change
+  - Multi-factor: dynamic Add/Remove Factor rows with per-factor indicator, strategy, ranges
+- `<BacktestPage>` single-page layout:
+  1. Topbar with "⚙ Configure" button
+  2. On **Run**: drawer closes, optimization runs, best params auto-selected, analysis renders immediately
+  3. Top 10 table (MUI DataGrid) — each row has **[View Analysis]** or **★ Best** button
+  4. Clicking any row → `POST /backtest/performance` → replaces analysis section with 1 API call
+  5. Analysis section: metric cards + Sharpe heatmap + equity curve + drawdown charts
+- Vite dev server proxy: `/api` → `http://localhost:8000` (no CORS issues in dev)
+- All dropdowns sourced exclusively from `GET /api/v1/refdata/{table}` (TanStack Query, staleTime=Infinity)
 
 ### M-4: Results Display
 

@@ -42,6 +42,15 @@ Run backtest-style code from `src/` (imports are relative to that package, e.g. 
 
 - Scripts may touch **live trading** or exchange APIs. Treat order placement and production paths as **high risk**; confirm intent before suggesting automated execution or destructive operations.
 
+### No Direct DML — Use Stored Procedures
+
+**Never** write raw `INSERT`, `UPDATE`, or `DELETE` statements against application tables in Python, API services, or migration seed scripts. All data mutations must go through the schema's stored procedures (e.g. `BT.SP_INS_STRATEGY`, `BT.SP_INS_RESULT`, `BT.SP_INS_API_REQUEST`, `BT.SP_INS_API_REQUEST_PAYLOAD`).
+
+- Python/FastAPI code must call procedures via `CALL <schema>.<procedure>(...)`.
+- Seed data (Liquibase `<sql>` changesets) is the only exception — it runs once at deploy time and is acceptable as direct `INSERT` within a changelog file.
+- If a required procedure does not exist yet, create it first (following the db-ddl skill conventions) before writing the calling code.
+- `SELECT` queries (reads) are fine directly — this rule applies to writes only.
+
 ## Environment
 
 - A local `env/` may exist for Jupyter and dependencies; do not assume it is committed. Prefer whatever dependency mechanism the project uses (requirements/pip) when adding packages.
@@ -78,3 +87,28 @@ The `INDICATOR_DEFAULTS` dict in `src/strat.py` is a **legacy fallback** — onc
 ### No Backward Compatibility for Decommissioned Code
 
 When removing `[DECO:STREAMLIT]` artefacts, do not add shims, re-exports, or deprecation warnings. Delete completely and update all references.
+
+### Checking Schema Discrepancies (DB vs Source DDL)
+
+Before proposing DDL changes, verify the live DB state matches the source files. Use the `extractddl` skill:
+
+```bash
+# 1. Extract live DDL into db/syncddl/ (mirrors db/liquidbase/ layout)
+source .env
+bash .github/skills/extractddl/extract_ddl.sh
+
+# 2. Diff a specific table against its source DDL
+diff db/syncddl/refdata/tables/APP.sql db/liquidbase/refdata/tables/APP.sql
+
+# 3. Diff all tables in a schema at once
+for f in db/liquidbase/refdata/tables/*.sql; do
+  name=$(basename "$f")
+  live="db/syncddl/refdata/tables/${name}"
+  [[ -f "$live" ]] && diff "$live" "$f" && echo "OK: $name" || echo "DIFF: $name"
+done
+```
+
+`db/syncddl/` is regenerated on demand — never commit it. It is gitignored. The canonical source of truth is `db/liquidbase/`.
+
+Remaining known formatting differences (cosmetic only, not schema drift):
+- Source uses **inline** `PRIMARY KEY` / `UNIQUE` on the column; extracted output uses **table-level** constraint syntax — this is a Postgres catalog normalization, not a real discrepancy.

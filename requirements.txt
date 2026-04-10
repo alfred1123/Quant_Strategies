@@ -13,3 +13,5 @@ optuna
 fastapi
 uvicorn[standard]
 psycopg[binary]
+httpx
+pytest

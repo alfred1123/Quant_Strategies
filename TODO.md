@@ -87,6 +87,7 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 | 16 | **AWS infrastructure** | EC2 t4g.small (Graviton ARM, ~$7/mo reserved). RDS PostgreSQL 16 Serverless v2 (scales to zero, ~$5-15/mo). Native `CREATE SCHEMA` supports `SCHEMA.TABLE` convention. Total ~$15-25/mo. | design doc §11 |
 | 17 | **Local dev DB** | SQLite or Docker Postgres locally. Switch via `DB_URL` env var. | design doc §11 |
 | 18 | **Risk checks** | Kill switch, paper-first default, max position, stop loss, cash check, signal validation, duplicate guard. | design doc §4 |
+| 19 | **No direct DML** | All writes to application tables must go through stored procedures (`CALL schema.procedure(...)`). Direct `INSERT`/`UPDATE`/`DELETE` in Python or FastAPI is forbidden. Liquibase seed `<sql>` changesets are the only exception. `SELECT` queries are unrestricted. | AGENTS.md, `api/services/refdata_cache.py` |
 
 ---
 
