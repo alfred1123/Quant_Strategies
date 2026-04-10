@@ -239,6 +239,27 @@ class TestCallbacks:
         )
         assert len(calls) == 4  # 2×1 × 2×1
 
+
+# -------------------------------------------------------------------------
+# run() auto-dispatch
+# -------------------------------------------------------------------------
+
+class TestRun:
+    def test_run_dispatches_single(self, sample_ohlc_df):
+        opt = ParametersOptimization(sample_ohlc_df.copy(), _BOLLINGER_CONFIG)
+        result = opt.run((5, 10), (0.5, 1.0))
+        assert isinstance(result, OptimizeResult)
+        assert list(result.grid_df.columns) == ["window", "signal", "sharpe"]
+        assert len(result.grid_df) == 4
+
+    def test_run_dispatches_multi(self, multi_factor_df):
+        config = _multi_factor_config()
+        opt = ParametersOptimization(multi_factor_df.copy(), config)
+        result = opt.run([(5, 10), (5, 10)], [(0.5,), (0.5,)])
+        assert isinstance(result, OptimizeResult)
+        assert "window_0" in result.grid_df.columns
+        assert len(result.grid_df) == 4
+
     def test_optimize_no_callbacks_default(self, sample_ohlc_df):
         """Callbacks default to None — optimization still works."""
         opt = ParametersOptimization(sample_ohlc_df.copy(), _BOLLINGER_CONFIG)

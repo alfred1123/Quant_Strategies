@@ -118,6 +118,23 @@ class ParametersOptimization:
         logger.info("Optimization complete: %d trials evaluated", len(rows))
         return self._build_result(pd.DataFrame(rows), study)
 
+    def run(self, window_values, signal_values, *, n_trials=None, callbacks=None):
+        """Auto-dispatch to optimize() or optimize_multi() based on config substrategies.
+
+        Mirrors the auto-dispatch pattern in WalkForward.run().
+        Single-factor configs call optimize(); multi-factor call optimize_multi().
+        """
+        subs = self.config.get_substrategies()
+        if len(subs) > 1:
+            return self.optimize_multi(
+                window_values, signal_values,
+                n_trials=n_trials, callbacks=callbacks,
+            )
+        return self.optimize(
+            window_values, signal_values,
+            n_trials=n_trials, callbacks=callbacks,
+        )
+
     def optimize_multi(self, window_ranges, signal_ranges, *, n_trials=None,
                        callbacks=None):
         """Multi-factor optimization over N-dimensional parameter space.

@@ -49,25 +49,24 @@ def _fetch_df(symbol: str, start: str, end: str, data_source: str, cache) -> pd.
 # already constrained to valid values. getattr raises AttributeError if
 # an unknown name is sent directly to the API — no extra validation needed.
 
-def _build_single_config(req) -> StrategyConfig:
-    return StrategyConfig(
-        ticker=req.symbol,
-        indicator_name=req.indicator,
-        signal_func=getattr(SignalDirection, req.strategy),
-        trading_period=req.trading_period,
-    )
-
-
-def _build_multi_config(req) -> StrategyConfig:
-    substrategies = []
-    for f in req.factors:
-        substrategies.append(SubStrategy(
+def _build_config(req) -> StrategyConfig:
+    if req.mode == "single":
+        return StrategyConfig(
+            ticker=req.symbol,
+            indicator_name=req.indicator,
+            signal_func=getattr(SignalDirection, req.strategy),
+            trading_period=req.trading_period,
+        )
+    substrategies = [
+        SubStrategy(
             indicator_name=f.indicator,
             signal_func_name=f.strategy,
             window=0,
             signal=0.0,
             data_column=f.data_column,
-        ))
+        )
+        for f in req.factors
+    ]
     return StrategyConfig(
         ticker=req.symbol,
         indicator_name=req.factors[0].indicator,
@@ -75,6 +74,23 @@ def _build_multi_config(req) -> StrategyConfig:
         trading_period=req.trading_period,
         conjunction=req.conjunction or "AND",
         substrategies=tuple(substrategies),
+    )
+
+
+def _build_param_ranges(req):
+    """Return (window_list, signal_list) shaped for ParametersOptimization.run() / WalkForward.run().
+
+    Single mode: flat tuples.
+    Multi mode: lists of tuples, one per factor.
+    """
+    if req.mode == "single":
+        return (
+            _resize_param_range(req.window_range, as_int=True),
+            _resize_param_range(req.signal_range),
+        )
+    return (
+        [_resize_param_range(f.window_range, as_int=True) for f in req.factors],
+        [_resize_param_range(f.signal_range) for f in req.factors],
     )
 
 
@@ -90,19 +106,10 @@ def _resize_param_range(r, as_int=False):
 def run_optimize(req: OptimizeRequest, cache, callback=None) -> OptimizeResponse:
     df = _fetch_df(req.symbol, req.start, req.end, req.data_source, cache)
     callbacks = [callback] if callback else []
-
-    if req.mode == "single":
-        config = _build_single_config(req)
-        window_list = _resize_param_range(req.window_range, as_int=True)
-        signal_list = _resize_param_range(req.signal_range)
-        opt = ParametersOptimization(df.copy(), config, fee_bps=req.fee_bps)
-        result = opt.optimize(window_list, signal_list, callbacks=callbacks)
-    else:
-        config = _build_multi_config(req)
-        window_ranges = [_resize_param_range(f.window_range, as_int=True) for f in req.factors]
-        signal_ranges = [_resize_param_range(f.signal_range) for f in req.factors]
-        opt = ParametersOptimization(df.copy(), config, fee_bps=req.fee_bps)
-        result = opt.optimize_multi(window_ranges, signal_ranges, callbacks=callbacks)
+    config = _build_config(req)
+    window_list, signal_list = _build_param_ranges(req)
+    opt = ParametersOptimization(df.copy(), config, fee_bps=req.fee_bps)
+    result = opt.run(window_list, signal_list, callbacks=callbacks)
 
     return OptimizeResponse(
         total_trials=len(result.grid_df),
@@ -159,15 +166,9 @@ def _extract_optuna_plots(study, req: OptimizeRequest) -> dict | None:
 
 def run_performance(req: PerformanceRequest, cache) -> PerformanceResponse:
     df = _fetch_df(req.symbol, req.start, req.end, req.data_source, cache)
-
-    if req.mode == "single":
-        config = _build_single_config(req)
-        window = req.window
-        signal = req.signal
-    else:
-        config = _build_multi_config(req)
-        window = tuple(req.windows)
-        signal = tuple(req.signals)
+    config = _build_config(req)
+    window = req.window if req.mode == "single" else tuple(req.windows)
+    signal = req.signal if req.mode == "single" else tuple(req.signals)
 
     perf = Performance(df.copy(), config, window, signal, fee_bps=req.fee_bps)
     perf.enrich_performance()
@@ -198,15 +199,8 @@ def run_performance(req: PerformanceRequest, cache) -> PerformanceResponse:
 
 def run_walk_forward(req: WalkForwardRequest, cache) -> WalkForwardResponse:
     df = _fetch_df(req.symbol, req.start, req.end, req.data_source, cache)
-
-    if req.mode == "single":
-        config = _build_single_config(req)
-        window_list = _resize_param_range(req.window_range, as_int=True)
-        signal_list = _resize_param_range(req.signal_range)
-    else:
-        config = _build_multi_config(req)
-        window_list = [_resize_param_range(f.window_range, as_int=True) for f in req.factors]
-        signal_list = [_resize_param_range(f.signal_range) for f in req.factors]
+    config = _build_config(req)
+    window_list, signal_list = _build_param_ranges(req)
 
     wf = WalkForward(df.copy(), req.split_ratio, config, fee_bps=req.fee_bps)
     result = wf.run(window_list, signal_list)

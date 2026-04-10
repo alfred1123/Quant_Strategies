@@ -87,7 +87,9 @@ class WalkForward:
                      self.split_idx, len(data) - self.split_idx, split_ratio)
 
     def run(self, window_values, signal_values):
-        """Run walk-forward test — auto-detects single vs multi-factor from config.
+        """Run walk-forward test.
+
+        Auto-dispatches to single vs multi-factor via ParametersOptimization.run().
 
         Args:
             window_values: Single-factor: tuple of window candidates.
@@ -99,53 +101,28 @@ class WalkForward:
             WalkForwardResult with in-sample/out-of-sample metrics.
             Multi-factor: ``best_window`` and ``best_signal`` are tuples.
         """
-        subs = self.config.get_substrategies()
-        if len(subs) > 1:
-            return self._run_multi(window_values, signal_values)
-        return self._run_single(window_values, signal_values)
-
-    def _run_single(self, window_tuple, signal_tuple):
-        """Walk-forward for a single-factor config."""
-        # ── Split data ──────────────────────────────────────────────
         is_data = self.data.iloc[:self.split_idx].copy().reset_index(drop=True)
         oos_data = self.data.iloc[self.split_idx:].copy().reset_index(drop=True)
 
-        # ── In-sample: grid search ──────────────────────────────────
-        is_opt = ParametersOptimization(
+        # ── In-sample: optimize on training split ───────────────────
+        opt_result = ParametersOptimization(
             is_data, self.config, fee_bps=self.fee_bps,
-        )
+        ).run(window_values, signal_values)
 
-        opt_result = is_opt.optimize(window_tuple, signal_tuple)
-        best_window = int(opt_result.best['window'])
-        best_signal = float(opt_result.best['signal'])
+        best_window, best_signal = self._extract_best(opt_result.best)
 
-        logger.info("In-sample best: window=%d, signal=%.2f, Sharpe=%.4f",
-                     best_window, best_signal, opt_result.best['sharpe'])
+        logger.info("In-sample best: window=%s, signal=%s, Sharpe=%.4f",
+                    best_window, best_signal, opt_result.best['sharpe'])
 
-        # ── In-sample: full performance with best params ────────────
-        is_data_perf = self.data.iloc[:self.split_idx].copy().reset_index(drop=True)
-        is_perf = Performance(
-            is_data_perf, self.config, best_window, best_signal,
-            fee_bps=self.fee_bps,
-        )
-        is_perf.enrich_performance()
-        is_metrics = is_perf.get_strategy_performance()
-
-        # ── Out-of-sample: evaluate with same params ────────────────
-        oos_perf = Performance(
-            oos_data, self.config, best_window, best_signal,
-            fee_bps=self.fee_bps,
-        )
-        oos_perf.enrich_performance()
-        oos_metrics = oos_perf.get_strategy_performance()
-
-        # ── Overfitting ratio ───────────────────────────────────────
+        # ── Evaluate IS and OOS with best params ────────────────────
+        is_metrics = self._evaluate(is_data, best_window, best_signal)
+        oos_metrics = self._evaluate(oos_data, best_window, best_signal)
         overfitting_ratio = self._overfitting_ratio(is_metrics, oos_metrics)
 
         logger.info("Out-of-sample Sharpe=%.4f, Overfitting ratio=%.4f",
-                     oos_metrics['Sharpe Ratio'], overfitting_ratio)
+                    oos_metrics['Sharpe Ratio'], overfitting_ratio)
 
-        # ── Full-period equity curve ────────────────────────────────
+        # ── Full-period equity curve ─────────────────────────────────
         full_perf = Performance(
             self.data.copy(), self.config, best_window, best_signal,
             fee_bps=self.fee_bps,
@@ -161,59 +138,34 @@ class WalkForward:
             full_equity_df=full_perf.data,
         )
 
+    def _evaluate(self, data, best_window, best_signal):
+        """Run Performance on a data slice with fixed params and return metrics."""
+        perf = Performance(
+            data, self.config, best_window, best_signal, fee_bps=self.fee_bps,
+        )
+        perf.enrich_performance()
+        return perf.get_strategy_performance()
+
+    @staticmethod
+    def _extract_best(best: dict):
+        """Extract (best_window, best_signal) from an OptimizeResult.best dict.
+
+        Single-factor dicts have keys 'window'/'signal'.
+        Multi-factor dicts have keys 'window_0', 'signal_0', 'window_1', ...
+        """
+        if 'window' in best:
+            return int(best['window']), float(best['signal'])
+        n = sum(1 for k in best if k.startswith('window_'))
+        return (
+            tuple(int(best[f'window_{i}']) for i in range(n)),
+            tuple(float(best[f'signal_{i}']) for i in range(n)),
+        )
+
+    def _run_single(self, window_tuple, signal_tuple):
+        return self.run(window_tuple, signal_tuple)
+
     def _run_multi(self, window_ranges, signal_ranges):
-        """Walk-forward for a multi-factor config."""
-        is_data = self.data.iloc[:self.split_idx].copy().reset_index(drop=True)
-        oos_data = self.data.iloc[self.split_idx:].copy().reset_index(drop=True)
-
-        is_opt = ParametersOptimization(
-            is_data, self.config, fee_bps=self.fee_bps,
-        )
-
-        opt_result = is_opt.optimize_multi(window_ranges, signal_ranges)
-
-        n_factors = len(window_ranges)
-        best_windows = tuple(int(opt_result.best[f'window_{i}']) for i in range(n_factors))
-        best_signals = tuple(float(opt_result.best[f'signal_{i}']) for i in range(n_factors))
-
-        logger.info("In-sample best: windows=%s, signals=%s, Sharpe=%.4f",
-                     best_windows, best_signals, opt_result.best['sharpe'])
-
-        is_data_perf = self.data.iloc[:self.split_idx].copy().reset_index(drop=True)
-        is_perf = Performance(
-            is_data_perf, self.config, best_windows, best_signals,
-            fee_bps=self.fee_bps,
-        )
-        is_perf.enrich_performance()
-        is_metrics = is_perf.get_strategy_performance()
-
-        oos_perf = Performance(
-            oos_data, self.config, best_windows, best_signals,
-            fee_bps=self.fee_bps,
-        )
-        oos_perf.enrich_performance()
-        oos_metrics = oos_perf.get_strategy_performance()
-
-        overfitting_ratio = self._overfitting_ratio(is_metrics, oos_metrics)
-
-        logger.info("Out-of-sample Sharpe=%.4f, Overfitting ratio=%.4f",
-                     oos_metrics['Sharpe Ratio'], overfitting_ratio)
-
-        # ── Full-period equity curve ────────────────────────────────
-        full_perf = Performance(
-            self.data.copy(), self.config, best_windows, best_signals,
-            fee_bps=self.fee_bps,
-        )
-        full_perf.enrich_performance()
-
-        return WalkForwardResult(
-            best_window=best_windows,
-            best_signal=best_signals,
-            is_metrics=is_metrics,
-            oos_metrics=oos_metrics,
-            overfitting_ratio=overfitting_ratio,
-            full_equity_df=full_perf.data,
-        )
+        return self.run(window_ranges, signal_ranges)
 
     @staticmethod
     def _overfitting_ratio(is_metrics, oos_metrics):

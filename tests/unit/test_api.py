@@ -81,7 +81,7 @@ class TestOptimizeEndpoint:
         mock_opt = MagicMock()
         from param_opt import OptimizeResult
         _df = pd.DataFrame({"window": [10, 20], "signal": [0.01, 0.02], "sharpe": [1.5, 1.8]})
-        mock_opt.optimize.return_value = OptimizeResult(
+        mock_opt.run.return_value = OptimizeResult(
             grid_df=_df,
             best={"window": 20, "signal": 0.02, "sharpe": 1.8},
             top10=[{"window": 20, "signal": 0.02, "sharpe": 1.8}, {"window": 10, "signal": 0.01, "sharpe": 1.5}],
