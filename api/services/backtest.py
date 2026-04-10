@@ -85,20 +85,13 @@ def _build_param_ranges(req):
     """
     if req.mode == "single":
         return (
-            _resize_param_range(req.window_range, as_int=True),
-            _resize_param_range(req.signal_range),
+            req.window_range.to_values(as_int=True),
+            req.signal_range.to_values(),
         )
     return (
-        [_resize_param_range(f.window_range, as_int=True) for f in req.factors],
-        [_resize_param_range(f.signal_range) for f in req.factors],
+        [f.window_range.to_values(as_int=True) for f in req.factors],
+        [f.signal_range.to_values() for f in req.factors],
     )
-
-
-def _resize_param_range(r, as_int=False):
-    """Expand a RangeParam into a concrete value sequence for the optimizer."""
-    if as_int:
-        return tuple(range(int(r.min), int(r.max) + 1, int(r.step)))
-    return tuple(np.arange(r.min, r.max + r.step / 2, r.step))
 
 
 # ── Optimize ─────────────────────────────────────────────────────────────────
@@ -117,49 +110,8 @@ def run_optimize(req: OptimizeRequest, cache, callback=None) -> OptimizeResponse
         best=result.best,
         top10=result.top10,
         grid=result.grid,
-        optuna_plots=_extract_optuna_plots(result.study, req),
+        optuna_plots=result.extract_plots(),
     )
-
-
-def _extract_optuna_plots(study, req: OptimizeRequest) -> dict | None:
-    """Serialize optuna visualizations as Plotly JSON for the frontend."""
-    if study is None:
-        return None
-    import optuna.visualization as optuna_vis
-    import json
-
-    plots = {}
-    try:
-        fig = optuna_vis.plot_optimization_history(study)
-        plots["optimization_history"] = json.loads(fig.to_json())
-    except Exception:
-        pass
-    try:
-        fig = optuna_vis.plot_param_importances(study)
-        plots["param_importances"] = json.loads(fig.to_json())
-    except Exception:
-        pass
-
-    if req.mode == "single":
-        try:
-            fig = optuna_vis.plot_contour(study)
-            plots["contour"] = json.loads(fig.to_json())
-        except Exception:
-            pass
-    else:
-        try:
-            fig = optuna_vis.plot_parallel_coordinate(study)
-            plots["parallel_coordinate"] = json.loads(fig.to_json())
-        except Exception:
-            pass
-        for i in range(len(req.factors)):
-            try:
-                fig = optuna_vis.plot_contour(
-                    study, params=[f"window_{i}", f"signal_{i}"])
-                plots[f"contour_factor_{i}"] = json.loads(fig.to_json())
-            except Exception:
-                pass
-    return plots or None
 
 
 # ── Performance ───────────────────────────────────────────────────────────────
@@ -228,13 +180,9 @@ def run_walk_forward(req: WalkForwardRequest, cache) -> WalkForwardResponse:
     ov = result.overfitting_ratio
     ov_out = None if (ov is None or (isinstance(ov, float) and np.isnan(ov))) else float(ov)
 
-    # Normalize best_window/best_signal for JSON
-    if isinstance(best_w, tuple):
-        best_w_out = list(best_w)
-        best_s_out = [float(s) for s in best_s]
-    else:
-        best_w_out = int(best_w)
-        best_s_out = float(best_s)
+    # Pydantic expects list[int]/list[float] for multi-factor, not tuple
+    best_w_out = list(best_w) if isinstance(best_w, tuple) else best_w
+    best_s_out = list(best_s) if isinstance(best_s, tuple) else best_s
 
     return WalkForwardResponse(
         best_window=best_w_out,

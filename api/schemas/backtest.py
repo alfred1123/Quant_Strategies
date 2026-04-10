@@ -1,5 +1,6 @@
-"""Pydantic request/response models for the backtest API."""
+import math
 
+import numpy as np
 from pydantic import BaseModel
 
 
@@ -7,6 +8,12 @@ class RangeParam(BaseModel):
     min: float
     max: float
     step: float
+
+    def to_values(self, as_int: bool = False) -> tuple:
+        """Expand into a concrete value sequence for the optimizer."""
+        if as_int:
+            return tuple(range(int(self.min), int(self.max) + 1, int(self.step)))
+        return tuple(np.arange(self.min, self.max + self.step / 2, self.step))
 
 
 class FactorConfig(BaseModel):

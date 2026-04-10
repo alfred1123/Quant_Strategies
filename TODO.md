@@ -122,6 +122,19 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 
 ### Phase 7 — Trade API service (design doc: `docs/design-trade-api.md`)
 
+**Backtest API service — delivered ✅**
+- FastAPI app in `api/` serves the backtest pipeline as a REST API.
+- `POST /backtest/optimize` — single and multi-factor parameter optimization via `ParametersOptimization.run()` (auto-dispatches to `optimize` or `optimize_multi`).
+- `POST /backtest/performance` — single-backtest equity curve + metrics.
+- `POST /backtest/walk-forward` — IS/OOS overfitting test via `WalkForward.run()`; result includes `full_equity_df` (computed once, not duplicated).
+- `GET /refdata/{table_name}` + `POST /refdata/refresh` — REFDATA cache endpoints.
+- Service layer is fully mode-agnostic: `_build_config(req)` and `_build_param_ranges(req)` handle single/multi without branching in the service functions.
+- `RangeParam.to_values(as_int=False)` on the schema handles its own expansion (no service-layer resize helper).
+- `OptimizeResult.extract_plots()` auto-detects single vs multi from `grid_df` column names.
+- CORS configured for Vite dev server (`http://localhost:5173`).
+- 304 unit + integration tests passing.
+
+**Trade API service — remaining:**
 - FastAPI service in `trade_api/` — separate from backtest pipeline.
 - **Broker adapter pattern** (design doc §5):
   - `TradeAdapter` — abstract interface all brokers implement.

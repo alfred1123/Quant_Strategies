@@ -38,6 +38,59 @@ class OptimizeResult:
     n_valid: int           # Trials with finite Sharpe
     study: object          # optuna.Study — for visualization
 
+    def extract_plots(self) -> dict | None:
+        """Serialize optuna visualizations as Plotly JSON dicts.
+
+        Auto-detects single vs multi-factor from grid_df column names.
+        Returns None if study is unavailable or contains no completed trials.
+        """
+        if self.study is None:
+            return None
+        import json
+        import optuna.visualization as optuna_vis
+
+        n_factors = sum(1 for c in self.grid_df.columns if c.startswith("window_"))
+        is_multi = n_factors > 0
+
+        plots = {}
+        try:
+            plots["optimization_history"] = json.loads(
+                optuna_vis.plot_optimization_history(self.study).to_json()
+            )
+        except Exception:
+            pass
+        try:
+            plots["param_importances"] = json.loads(
+                optuna_vis.plot_param_importances(self.study).to_json()
+            )
+        except Exception:
+            pass
+
+        if not is_multi:
+            try:
+                plots["contour"] = json.loads(
+                    optuna_vis.plot_contour(self.study).to_json()
+                )
+            except Exception:
+                pass
+        else:
+            try:
+                plots["parallel_coordinate"] = json.loads(
+                    optuna_vis.plot_parallel_coordinate(self.study).to_json()
+                )
+            except Exception:
+                pass
+            for i in range(n_factors):
+                try:
+                    plots[f"contour_factor_{i}"] = json.loads(
+                        optuna_vis.plot_contour(
+                            self.study, params=[f"window_{i}", f"signal_{i}"]
+                        ).to_json()
+                    )
+                except Exception:
+                    pass
+        return plots or None
+
 
 class ParametersOptimization:
 

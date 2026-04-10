@@ -239,6 +239,37 @@ python main.py --symbol AAPL --asset equity --indicator sma --walk-forward --spl
 
 ---
 
+### FastAPI Backend (`api/`)
+
+A REST API that exposes the backtest pipeline for programmatic access and the TypeScript frontend (Phase 8).
+
+**Start the server:**
+
+```bash
+# From project root (venv active)
+uvicorn api.main:app --reload --port 8000
+```
+
+Interactive docs available at `http://localhost:8000/docs` once running.
+
+**Endpoints:**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/backtest/optimize` | Run parameter grid search (single or multi-factor). Returns top-10 results, Optuna plots, and best params. |
+| `POST` | `/backtest/performance` | Run a single backtest at fixed params. Returns equity curve, metrics, and daily P&L. |
+| `POST` | `/backtest/walk-forward` | Walk-forward overfitting test. Returns IS/OOS metrics, overfitting ratio, and full equity curve. |
+| `GET`  | `/refdata/{table_name}` | Fetch a cached REFDATA table (e.g. `INDICATOR`, `SIGNAL_TYPE`, `ASSET_TYPE`). |
+| `POST` | `/refdata/refresh` | Reload all REFDATA tables from the database without restarting the server. |
+
+**Single vs multi-factor mode:**  
+All backtest endpoints accept `"mode": "single"` or `"mode": "multi"` in the request body. Single mode takes flat `window_range`/`signal_range`; multi mode takes a `factors` list with per-factor ranges. The service layer dispatches automatically — no separate endpoints.
+
+**REFDATA cache:**  
+All REFDATA tables are loaded into an in-process dict at startup (`RefDataCache`). The cache is attached to `app.state` and passed to every service call. Refresh without restart via `POST /refdata/refresh`.
+
+---
+
 ### Paper Trading with Futu OpenD
 
 The **Trading** tab in the Streamlit dashboard lets you connect to a running Futu OpenD gateway and execute orders in paper (simulate) or live mode — directly from your backtest results.
@@ -386,12 +417,23 @@ Quant_Strategies/
 │   ├── ta.py                # Technical analysis indicators (shim — logic in strat.py)
 │   ├── strat.py             # TechnicalAnalysis, SignalDirection, StrategyConfig
 │   ├── perf.py              # Performance metrics & PnL engine
-│   ├── param_opt.py         # N-dimensional grid-search parameter optimization
-│   ├── walk_forward.py      # Walk-forward overfitting test
+│   ├── param_opt.py         # N-dimensional grid-search parameter optimization (OptimizeResult, ParametersOptimization)
+│   ├── walk_forward.py      # Walk-forward overfitting test (WalkForward, WalkForwardResult)
 │   ├── trade.py             # Futu OpenD paper/live trade execution
 │   ├── log_config.py        # Centralised logging configuration
 │   ├── main.py              # CLI entry point — configurable via argparse
-│   └── app.py               # Streamlit web dashboard
+│   └── app.py               # Streamlit web dashboard [DECO:STREAMLIT]
+│
+├── api/                     # FastAPI backend (Phase 7+8)
+│   ├── main.py              # App factory — CORS, lifespan (REFDATA cache load), router registration
+│   ├── routers/
+│   │   ├── backtest.py      # POST /backtest/optimize, /backtest/performance, /backtest/walk-forward
+│   │   └── refdata.py       # GET /refdata/{table_name}, POST /refdata/refresh
+│   ├── schemas/
+│   │   └── backtest.py      # Pydantic request/response models (RangeParam.to_values, single/multi modes)
+│   └── services/
+│       ├── backtest.py      # Service layer: _build_config, _build_param_ranges, run_optimize/performance/walk_forward
+│       └── refdata_cache.py # RefDataCache — loads all REFDATA tables into memory at startup
 │
 ├── tests/
 │   ├── unit/                # Unit tests (mocked, fast)
