@@ -80,4 +80,6 @@ class RefDataCache:
 
             cur.execute(f'FETCH ALL FROM "{cursor_name}"')
             cols = [desc.name for desc in cur.description]
-            return [dict(zip(cols, r)) for r in cur.fetchall()]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            cur.execute(f'CLOSE "{cursor_name}"')
+            return rows

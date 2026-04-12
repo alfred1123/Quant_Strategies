@@ -208,6 +208,8 @@ Open `http://localhost:5173` in your browser.
 - On **Run**: drawer closes, optimization grid-search runs, best params auto-selected, analysis loads immediately
 - **Top-10 results table** (MUI DataGrid) — ★ Best row highlighted; each row has a **View Analysis** button
 - Analysis panel: side-by-side metrics cards + Sharpe heatmap + equity curve + drawdown chart
+
+> **WIP:** The frontend is functional but needs further styling and polish (layout spacing, theme consistency, responsive breakpoints, loading states). See `TODO.md` Phase 8.
 - **CSV download** of full grid search results
 
 **Build for production:**

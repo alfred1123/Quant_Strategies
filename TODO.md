@@ -150,8 +150,9 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 
 ### Phase 8 — TypeScript UI (do now, not later)
 
-- FastAPI backend (shared with Trade API from Phase 7).
-- React/TS frontend replacing Streamlit.
+- FastAPI backend (shared with Trade API from Phase 7). ✅
+- React/TS frontend replacing Streamlit. ✅ (scaffold + all components created, REFDATA dropdowns wired)
+- **UI styling (remaining):** layout spacing, theme consistency, responsive breakpoints, loading/error states, colour palette, drawer polish, chart sizing.
 - Deploy button wired to Trade API `/deployments` endpoint.
 - Strategy review dashboard: backtest results, live performance, trade log.
 

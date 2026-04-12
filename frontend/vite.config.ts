@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      '/api': 'http://localhost:8000',
+      '/api': process.env.VITE_API_URL ?? 'http://localhost:8000',
     },
   },
 })
