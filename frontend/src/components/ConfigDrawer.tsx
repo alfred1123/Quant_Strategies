@@ -1,9 +1,9 @@
 import {
   Drawer, Box, Typography, TextField, Select, MenuItem,
-  FormControl, InputLabel, Button, RadioGroup, FormControlLabel,
-  Radio, Divider, IconButton, Stack, CircularProgress,
+  FormControl, InputLabel, Button, Divider, IconButton, Stack, CircularProgress,
 } from '@mui/material';
 import { useIndicators, useSignalTypes, useAssetTypes, useConjunctions } from '../api/refdata';
+import { countSteps } from '../utils/grid';
 import type { BacktestConfig, FactorConfig, RangeParam } from '../types/backtest';
 
 interface Props {
@@ -55,6 +55,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   };
 
   const addFactor = () => {
+    if (config.factors.length >= 2) return;
     const first = indicators[0];
     const newFactor: FactorConfig = {
       indicator: first?.method_name ?? '',
@@ -72,198 +73,181 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
     set({ factors: config.factors.map((f, idx) => idx === i ? { ...f, ...patch } : f) });
   };
 
+  const completeFactor = (f: FactorConfig) => Boolean(f.indicator && f.strategy);
+
+  const missingFields: string[] = [];
+  if (!config.symbol.trim()) missingFields.push('Symbol');
+  if (!config.assetType) missingFields.push('Asset Type');
+  config.factors.forEach((f, i) => {
+    const label = config.factors.length > 1 ? `Factor ${i + 1} ` : '';
+    if (!f.indicator) missingFields.push(`${label}Indicator`);
+    if (!f.strategy) missingFields.push(`${label}Strategy`);
+  });
+
+  const isRunnable = missingFields.length === 0 && config.factors.length >= 1;
+
+  const totalTrials = config.factors.reduce(
+    (acc, f) => acc * countSteps(f.window_range) * countSteps(f.signal_range),
+    1,
+  );
+
   return (
     <Drawer
-      anchor="left"
+      anchor="top"
       open={open}
       onClose={onClose}
-      PaperProps={{ sx: { width: 400, p: 3, overflowX: 'hidden' } }}
+      PaperProps={{ sx: { p: 3, maxHeight: '85vh', overflowY: 'auto', position: 'relative' } }}
     >
-      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+      {/* Close button — top right corner */}
+      <IconButton onClick={onClose} size="small" sx={{ position: 'absolute', top: 12, right: 12 }}>✕</IconButton>
+
+      {/* Header */}
+      <Box mb={3}>
         <Typography variant="h6" fontWeight={700}>Configure Backtest</Typography>
-        <IconButton onClick={onClose} size="small">✕</IconButton>
+        <Typography variant="body2" color="text.secondary" mt={0.5}>Set the backtest parameters and factor grid below, then run the optimization.</Typography>
       </Box>
 
-      <Stack spacing={2.5}>
-        {/* Symbol */}
+      {/* Row 1: base params */}
+      <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
         <TextField
-          label="Symbol" size="small" value={config.symbol} fullWidth
+          label="Symbol" size="small" value={config.symbol} sx={{ width: 130 }}
           onChange={e => set({ symbol: e.target.value })}
         />
+        <TextField
+          label="Start" size="small" type="date" value={config.start} sx={{ width: 155 }}
+          onChange={e => set({ start: e.target.value })}
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+        <TextField
+          label="End" size="small" type="date" value={config.end} sx={{ width: 155 }}
+          onChange={e => set({ end: e.target.value })}
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Asset Type</InputLabel>
+          <Select
+            value={config.assetType} label="Asset Type"
+            onChange={e => {
+              const at = assetTypes.find(a => a.display_name === e.target.value);
+              set({ assetType: e.target.value, tradingPeriod: at?.trading_period ?? 365 });
+            }}
+          >
+            {assetTypes.map(a => (
+              <MenuItem key={a.display_name} value={a.display_name}>{a.display_name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <TextField
+          label="Fee (bps)" size="small" type="number" value={config.feeBps} sx={{ width: 100 }}
+          onChange={e => set({ feeBps: Number(e.target.value) })}
+        />
+      </Box>
 
-        {/* Dates */}
-        <Stack direction="row" spacing={1}>
-          <TextField
-            label="Start" size="small" type="date" value={config.start} fullWidth
-            onChange={e => set({ start: e.target.value })}
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
-          <TextField
-            label="End" size="small" type="date" value={config.end} fullWidth
-            onChange={e => set({ end: e.target.value })}
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
-        </Stack>
+      <Divider sx={{ mb: 2 }} />
 
-        {/* Asset type + Fee */}
-        <Stack direction="row" spacing={1}>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Asset Type</InputLabel>
-            <Select
-              value={config.assetType} label="Asset Type"
-              onChange={e => {
-                const at = assetTypes.find(a => a.display_name === e.target.value);
-                set({ assetType: e.target.value, tradingPeriod: at?.trading_period ?? 365 });
-              }}
-            >
-              {assetTypes.map(a => (
-                <MenuItem key={a.display_name} value={a.display_name}>{a.display_name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            label="Fee (bps)" size="small" type="number" value={config.feeBps}
-            onChange={e => set({ feeBps: Number(e.target.value) })}
-            sx={{ width: 110 }}
-          />
-        </Stack>
-
-        <Divider />
-
-        {/* Mode */}
-        <RadioGroup
-          row value={config.mode}
-          onChange={e => set({ mode: e.target.value as 'single' | 'multi' })}
-        >
-          <FormControlLabel value="single" control={<Radio size="small" />} label="Single Factor" />
-          <FormControlLabel value="multi" control={<Radio size="small" />} label="Multi Factor" />
-        </RadioGroup>
-
-        {config.mode === 'single' ? (
-          <>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Indicator</InputLabel>
-              <Select
-                value={config.indicator} label="Indicator"
-                onChange={e => handleIndicatorChange(e.target.value)}
-              >
-                {indicators.map(i => (
-                  <MenuItem key={i.method_name} value={i.method_name}>{i.display_name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl size="small" fullWidth>
-              <InputLabel>Strategy</InputLabel>
-              <Select
-                value={config.strategy} label="Strategy"
-                onChange={e => set({ strategy: e.target.value })}
-              >
-                {signalTypes.map(s => (
-                  <MenuItem key={s.func_name} value={s.func_name}>{s.display_name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <Typography variant="caption" color="text.secondary">Window Range</Typography>
-            <Stack direction="row" spacing={1}>
-              <TextField label="Min" size="small" type="number" value={config.windowRange.min}
-                onChange={e => set({ windowRange: { ...config.windowRange, min: Number(e.target.value) } })} />
-              <TextField label="Max" size="small" type="number" value={config.windowRange.max}
-                onChange={e => set({ windowRange: { ...config.windowRange, max: Number(e.target.value) } })} />
-              <TextField label="Step" size="small" type="number" value={config.windowRange.step}
-                onChange={e => set({ windowRange: { ...config.windowRange, step: Number(e.target.value) } })} />
-            </Stack>
-
-            <Typography variant="caption" color="text.secondary">Signal Range</Typography>
-            <Stack direction="row" spacing={1}>
-              <TextField label="Min" size="small" type="number" value={config.signalRange.min}
-                onChange={e => set({ signalRange: { ...config.signalRange, min: Number(e.target.value) } })} />
-              <TextField label="Max" size="small" type="number" value={config.signalRange.max}
-                onChange={e => set({ signalRange: { ...config.signalRange, max: Number(e.target.value) } })} />
-              <TextField label="Step" size="small" type="number" value={config.signalRange.step}
-                onChange={e => set({ signalRange: { ...config.signalRange, step: Number(e.target.value) } })} />
-            </Stack>
-          </>
-        ) : (
-          <>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Conjunction</InputLabel>
-              <Select
-                value={config.conjunction} label="Conjunction"
-                onChange={e => set({ conjunction: e.target.value })}
-              >
-                {conjunctions.map(c => (
-                  <MenuItem key={c.name} value={c.name}>{c.display_name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {config.factors.map((factor, i) => (
-              <Box key={i} sx={{ border: '1px solid #e0e0e0', borderRadius: 1, p: 1.5 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                  <Typography variant="caption" fontWeight={600}>Factor {i + 1}</Typography>
-                  <IconButton size="small" onClick={() => removeFactor(i)}>×</IconButton>
+      {/* Factor configuration */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {config.factors.map((factor, i) => {
+          const factorTrials = countSteps(factor.window_range) * countSteps(factor.signal_range);
+          return (
+            <>
+              {/* Conjunction block — sits between factor 1 and factor 2 */}
+              {i === 1 && (
+                <Box key="conjunction" sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Divider sx={{ flex: 1 }} />
+                  <FormControl size="small" sx={{ minWidth: 120 }}>
+                    <InputLabel>Conjunction</InputLabel>
+                    <Select value={config.conjunction} label="Conjunction"
+                      onChange={e => set({ conjunction: e.target.value })}>
+                      {conjunctions.map(c => (
+                        <MenuItem key={c.name} value={c.name}>{c.display_name}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <Divider sx={{ flex: 1 }} />
                 </Box>
-                <Stack spacing={1.5}>
-                  <FormControl size="small" fullWidth>
-                    <InputLabel>Indicator</InputLabel>
-                    <Select
-                      value={factor.indicator} label="Indicator"
-                      onChange={e => handleFactorIndicatorChange(i, e.target.value)}
-                    >
-                      {indicators.map(ind => (
-                        <MenuItem key={ind.method_name} value={ind.method_name}>{ind.display_name}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <FormControl size="small" fullWidth>
-                    <InputLabel>Strategy</InputLabel>
-                    <Select
-                      value={factor.strategy} label="Strategy"
-                      onChange={e => updateFactor(i, { strategy: e.target.value })}
-                    >
-                      {signalTypes.map(s => (
-                        <MenuItem key={s.func_name} value={s.func_name}>{s.display_name}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <Stack direction="row" spacing={1}>
-                    <TextField label="Win Min" size="small" type="number" value={factor.window_range.min}
+              )}
+
+              <Box key={i} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2, bgcolor: 'background.paper' }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="caption" fontWeight={600}>
+                    Factor {i + 1}
+                    <Typography component="span" variant="caption" color="text.secondary" fontWeight={400}>
+                      {' '}— {factorTrials.toLocaleString()} grid pts
+                    </Typography>
+                  </Typography>
+                  {i > 0 && (
+                    <IconButton size="small" onClick={() => removeFactor(i)}>×</IconButton>
+                  )}
+                </Box>
+                <Stack spacing={1}>
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    <FormControl size="small" sx={{ minWidth: 180, flex: 2 }}>
+                      <InputLabel>Indicator</InputLabel>
+                      <Select value={factor.indicator} label="Indicator"
+                        onChange={e => handleFactorIndicatorChange(i, e.target.value)}>
+                        {indicators.map(ind => (
+                          <MenuItem key={ind.method_name} value={ind.method_name}>{ind.display_name}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <FormControl size="small" sx={{ minWidth: 140, flex: 1.5 }}>
+                      <InputLabel>Strategy</InputLabel>
+                      <Select value={factor.strategy} label="Strategy"
+                        onChange={e => updateFactor(i, { strategy: e.target.value })}>
+                        {signalTypes.map(s => (
+                          <MenuItem key={s.func_name} value={s.func_name}>{s.display_name}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <TextField label="Win Min" size="small" type="number" value={factor.window_range.min} sx={{ width: 80 }}
                       onChange={e => updateFactor(i, { window_range: { ...factor.window_range, min: Number(e.target.value) } })} />
-                    <TextField label="Win Max" size="small" type="number" value={factor.window_range.max}
+                    <TextField label="Win Max" size="small" type="number" value={factor.window_range.max} sx={{ width: 80 }}
                       onChange={e => updateFactor(i, { window_range: { ...factor.window_range, max: Number(e.target.value) } })} />
-                    <TextField label="Step" size="small" type="number" value={factor.window_range.step}
+                    <TextField label="Win Step" size="small" type="number" value={factor.window_range.step} sx={{ width: 80 }}
                       onChange={e => updateFactor(i, { window_range: { ...factor.window_range, step: Number(e.target.value) } })} />
-                  </Stack>
-                  <Stack direction="row" spacing={1}>
-                    <TextField label="Sig Min" size="small" type="number" value={factor.signal_range.min}
+                    <TextField label="Sig Min" size="small" type="number" value={factor.signal_range.min} sx={{ width: 80 }}
                       onChange={e => updateFactor(i, { signal_range: { ...factor.signal_range, min: Number(e.target.value) } })} />
-                    <TextField label="Sig Max" size="small" type="number" value={factor.signal_range.max}
+                    <TextField label="Sig Max" size="small" type="number" value={factor.signal_range.max} sx={{ width: 80 }}
                       onChange={e => updateFactor(i, { signal_range: { ...factor.signal_range, max: Number(e.target.value) } })} />
-                    <TextField label="Step" size="small" type="number" value={factor.signal_range.step}
+                    <TextField label="Sig Step" size="small" type="number" value={factor.signal_range.step} sx={{ width: 80 }}
                       onChange={e => updateFactor(i, { signal_range: { ...factor.signal_range, step: Number(e.target.value) } })} />
                   </Stack>
                 </Stack>
               </Box>
-            ))}
-
-            <Button variant="outlined" size="small" onClick={addFactor}>+ Add Factor</Button>
-          </>
+            </>
+          );
+        })}
+        {config.factors.length < 2 && (
+          <Button variant="outlined" size="small" onClick={addFactor} sx={{ alignSelf: 'flex-start' }}>+ Add Factor</Button>
         )}
+      </Box>
 
-        <Divider />
+      <Divider sx={{ my: 2 }} />
 
+      {/* Footer: missing fields + trial count + Run */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+        {missingFields.length > 0 && (
+          <Typography variant="caption" color="error" fontWeight={500}>
+            Missing: {missingFields.join(', ')}
+          </Typography>
+        )}
+        {isRunnable && (
+          <Typography variant="caption" color="text.secondary">
+            ~{totalTrials.toLocaleString()} total grid points
+          </Typography>
+        )}
+        <Box sx={{ flexGrow: 1 }} />
         <Button
           variant="contained"
           size="large"
           onClick={onRun}
-          disabled={isRunning}
+          disabled={isRunning || !isRunnable}
           startIcon={isRunning ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
           {isRunning ? 'Running…' : 'Run Optimization'}
         </Button>
-      </Stack>
+      </Box>
     </Drawer>
   );
 }

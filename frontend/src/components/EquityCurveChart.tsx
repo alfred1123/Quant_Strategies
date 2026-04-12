@@ -1,8 +1,10 @@
-import Plot from 'react-plotly.js';
+import Plot from '../lib/Plot';
 import type { EquityPoint } from '../types/backtest';
 
 export default function EquityCurveChart({ curve }: { curve: EquityPoint[] }) {
-  if (!curve.length) return null;
+  if (!curve || !curve.length) return null;
+
+  if (!Plot) return <p style={{ color: '#ef5350' }}>Plotly failed to load.</p>;
 
   const dates = curve.map(p => p.datetime);
 
@@ -16,7 +18,7 @@ export default function EquityCurveChart({ curve }: { curve: EquityPoint[] }) {
             name: 'Strategy',
             type: 'scatter',
             mode: 'lines',
-            line: { color: '#1976d2', width: 2 },
+            line: { color: '#4d8ef0', width: 2 },
           },
           {
             x: dates,
@@ -24,14 +26,19 @@ export default function EquityCurveChart({ curve }: { curve: EquityPoint[] }) {
             name: 'Buy & Hold',
             type: 'scatter',
             mode: 'lines',
-            line: { color: '#9e9e9e', dash: 'dash', width: 1.5 },
+            line: { color: '#7a8aa8', dash: 'dash', width: 1.5 },
           },
         ]}
         layout={{
-          title: { text: 'Cumulative Return (%)' },
+          title: { text: 'Cumulative Return (%)', font: { color: '#c8d0e0' } },
+          paper_bgcolor: '#131929',
+          plot_bgcolor: '#0d0f1a',
+          font: { color: '#c8d0e0' },
+          xaxis: { gridcolor: '#1e2d45', tickfont: { color: '#c8d0e0' } },
+          yaxis: { gridcolor: '#1e2d45', tickfont: { color: '#c8d0e0' } },
           height: 320,
           margin: { t: 50, r: 30, b: 40, l: 60 },
-          legend: { orientation: 'h', y: -0.2 },
+          legend: { orientation: 'h', y: -0.2, font: { color: '#c8d0e0' } },
           hovermode: 'x unified',
         }}
         config={{ responsive: true, displayModeBar: false }}
@@ -46,8 +53,8 @@ export default function EquityCurveChart({ curve }: { curve: EquityPoint[] }) {
             type: 'scatter',
             mode: 'lines',
             fill: 'tozeroy',
-            line: { color: '#d32f2f', width: 1.5 },
-            fillcolor: 'rgba(211,47,47,0.15)',
+            line: { color: '#ef5350', width: 1.5 },
+            fillcolor: 'rgba(239,83,80,0.15)',
           },
           {
             x: dates,
@@ -56,15 +63,20 @@ export default function EquityCurveChart({ curve }: { curve: EquityPoint[] }) {
             type: 'scatter',
             mode: 'lines',
             fill: 'tozeroy',
-            line: { color: '#ff9800', dash: 'dash', width: 1 },
-            fillcolor: 'rgba(255,152,0,0.08)',
+            line: { color: '#ffa726', dash: 'dash', width: 1 },
+            fillcolor: 'rgba(255,167,38,0.08)',
           },
         ]}
         layout={{
-          title: { text: 'Drawdown (%)' },
+          title: { text: 'Drawdown (%)', font: { color: '#c8d0e0' } },
+          paper_bgcolor: '#131929',
+          plot_bgcolor: '#0d0f1a',
+          font: { color: '#c8d0e0' },
+          xaxis: { gridcolor: '#1e2d45', tickfont: { color: '#c8d0e0' } },
+          yaxis: { gridcolor: '#1e2d45', tickfont: { color: '#c8d0e0' } },
           height: 250,
           margin: { t: 50, r: 30, b: 40, l: 60 },
-          legend: { orientation: 'h', y: -0.25 },
+          legend: { orientation: 'h', y: -0.25, font: { color: '#c8d0e0' } },
           hovermode: 'x unified',
         }}
         config={{ responsive: true, displayModeBar: false }}

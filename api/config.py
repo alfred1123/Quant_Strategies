@@ -19,6 +19,34 @@ import sys
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
+LOG_FORMAT = '[%(asctime)s] [%(levelname)s] %(name)s: %(message)s'
+LOG_DATEFMT = '%Y-%m-%d %H:%M:%S'
+_LOG_DIR = os.path.join(os.path.dirname(__file__), os.pardir, 'log')
+_LOG_FILE = os.path.join(_LOG_DIR, 'bt_app.log')
+
+
+def setup_logging(*, debug: bool = False) -> None:
+    os.makedirs(_LOG_DIR, exist_ok=True)
+    level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format=LOG_FORMAT,
+        datefmt=LOG_DATEFMT,
+        handlers=[
+            logging.FileHandler(_LOG_FILE),
+            logging.StreamHandler(),
+        ],
+    )
+
+
+# ---------------------------------------------------------------------------
+# SSM / env loading
+# ---------------------------------------------------------------------------
+
 # SSM path prefix — all parameters are stored as /quant/<env>/<KEY>
 _SSM_PREFIX = "/quant/{env}/"
 
@@ -69,14 +97,13 @@ def load_config(debug: bool = False) -> str:
     Returns:
         DB connection string (str).
     """
+    # Initialise logging first so subsequent log calls are formatted
+    setup_logging(debug=debug)
+
     # Add src/ to import path so pipeline modules resolve correctly
     src_path = os.path.join(os.path.dirname(__file__), os.pardir, "src")
     if src_path not in sys.path:
         sys.path.insert(0, src_path)
-
-    # Initialise logging first so subsequent log calls are formatted
-    from src.log_config import setup_logging  # noqa: PLC0415
-    setup_logging(debug=debug)
 
     # Load secrets / config
     use_ssm = os.getenv("USE_SSM", "").strip() == "1"

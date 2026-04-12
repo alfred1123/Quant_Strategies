@@ -3,7 +3,8 @@ import type { PerformanceResponse } from '../types/backtest';
 
 const PERCENT_KEYS = new Set(['Total Return', 'Annualized Return', 'Max Drawdown']);
 
-function fmt(key: string, v: number): string {
+function fmt(key: string, v: number | null | undefined): string {
+  if (v == null || !isFinite(v)) return '—';
   if (PERCENT_KEYS.has(key)) return `${(v * 100).toFixed(1)}%`;
   return v.toFixed(3);
 }
