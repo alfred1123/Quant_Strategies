@@ -1,6 +1,7 @@
 import {
   Drawer, Box, Typography, TextField, Select, MenuItem,
   FormControl, InputLabel, Button, Divider, IconButton, Stack, CircularProgress,
+  FormControlLabel, Checkbox, Slider,
 } from '@mui/material';
 import { useIndicators, useSignalTypes, useAssetTypes, useConjunctions } from '../api/refdata';
 import { countSteps } from '../utils/grid';
@@ -141,6 +142,31 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
           label="Fee (bps)" size="small" type="number" value={config.feeBps} sx={{ width: 100 }}
           onChange={e => set({ feeBps: Number(e.target.value) })}
         />
+        <FormControlLabel
+          control={
+            <Checkbox
+              size="small" checked={config.walkForward}
+              onChange={e => set({ walkForward: e.target.checked })}
+            />
+          }
+          label={<Typography variant="body2">Walk-Forward</Typography>}
+        />
+        {config.walkForward && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
+            <Typography variant="body2" noWrap>Split</Typography>
+            <Slider
+              size="small" min={0.2} max={0.8} step={0.05}
+              value={config.splitRatio}
+              onChange={(_, v) => set({ splitRatio: v as number })}
+              valueLabelDisplay="auto"
+              valueLabelFormat={v => `${Math.round(v * 100)}%`}
+              sx={{ minWidth: 100 }}
+            />
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {Math.round(config.splitRatio * 100)}% train
+            </Typography>
+          </Box>
+        )}
       </Box>
 
       <Divider sx={{ mb: 2 }} />

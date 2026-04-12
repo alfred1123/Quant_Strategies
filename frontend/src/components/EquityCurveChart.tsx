@@ -1,12 +1,26 @@
 import Plot from '../lib/Plot';
 import type { EquityPoint } from '../types/backtest';
 
-export default function EquityCurveChart({ curve }: { curve: EquityPoint[] }) {
+interface Props {
+  curve: EquityPoint[];
+  splitDate?: string;
+}
+
+export default function EquityCurveChart({ curve, splitDate }: Props) {
   if (!curve || !curve.length) return null;
 
   if (!Plot) return <p style={{ color: '#ef5350' }}>Plotly failed to load.</p>;
 
   const dates = curve.map(p => p.datetime);
+
+  const splitLine = splitDate
+    ? [{
+        type: 'line' as const,
+        x0: splitDate, x1: splitDate,
+        y0: 0, y1: 1, yref: 'paper' as const,
+        line: { color: '#ffa726', width: 2, dash: 'dash' as const },
+      }]
+    : [];
 
   return (
     <>
@@ -40,6 +54,15 @@ export default function EquityCurveChart({ curve }: { curve: EquityPoint[] }) {
           margin: { t: 50, r: 30, b: 40, l: 60 },
           legend: { orientation: 'h', y: -0.2, font: { color: '#c8d0e0' } },
           hovermode: 'x unified',
+          shapes: splitLine,
+          ...(splitDate ? {
+            annotations: [{
+              x: splitDate, y: 1, yref: 'paper' as const,
+              text: 'Train | Test', showarrow: false,
+              font: { color: '#ffa726', size: 11 },
+              yanchor: 'bottom' as const,
+            }],
+          } : {}),
         }}
         config={{ responsive: true, displayModeBar: false }}
         style={{ width: '100%' }}

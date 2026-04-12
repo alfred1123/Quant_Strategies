@@ -9,10 +9,10 @@ import Top10Table from '../components/Top10Table';
 import MetricsCards from '../components/MetricsCards';
 import HeatmapChart from '../components/HeatmapChart';
 import EquityCurveChart from '../components/EquityCurveChart';
-import { runOptimize, runPerformance } from '../api/backtest';
+import { runOptimize, runPerformance, runWalkForward } from '../api/backtest';
 import type {
   BacktestConfig, OptimizeResponse, PerformanceResponse, Top10Row,
-  OptimizeRequest, PerformanceRequest,
+  OptimizeRequest, PerformanceRequest, WalkForwardRequest, WalkForwardResponse,
 } from '../types/backtest';
 
 const DEFAULT_CONFIG: BacktestConfig = {
@@ -37,6 +37,8 @@ const DEFAULT_CONFIG: BacktestConfig = {
       signal_range: { min: 0.25, max: 2.5, step: 0.25 },
     },
   ],
+  walkForward: true,
+  splitRatio: 0.5,
 };
 
 function buildOptimizeRequest(cfg: BacktestConfig): OptimizeRequest {
@@ -84,6 +86,29 @@ function rowLabel(row: Top10Row, cfg: BacktestConfig): string {
     .join(', ');
 }
 
+function buildWalkForwardRequest(cfg: BacktestConfig): WalkForwardRequest {
+  return { ...buildOptimizeRequest(cfg), split_ratio: cfg.splitRatio };
+}
+
+function overfitColor(ratio: number | null): 'success' | 'warning' | 'error' | 'default' {
+  if (ratio == null || isNaN(ratio)) return 'default';
+  if (ratio < 0.3) return 'success';
+  if (ratio < 0.5) return 'warning';
+  return 'error';
+}
+
+function overfitLabel(ratio: number | null): string {
+  if (ratio == null || isNaN(ratio)) return 'N/A';
+  if (ratio < 0.3) return 'Low Risk';
+  if (ratio < 0.5) return 'Moderate';
+  return 'High Risk';
+}
+
+function formatMetric(v: number | null | undefined): string {
+  if (v == null || isNaN(v)) return 'N/A';
+  return v.toFixed(4);
+}
+
 export default function BacktestPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [config, setConfig] = useState<BacktestConfig>(DEFAULT_CONFIG);
@@ -95,6 +120,8 @@ export default function BacktestPage() {
   const [selectedRow, setSelectedRow] = useState<Top10Row | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [analysisTab, setAnalysisTab] = useState(0);
+  const [wfResult, setWfResult] = useState<WalkForwardResponse | null>(null);
+  const [isRunningWf, setIsRunningWf] = useState(false);
 
   const loadPerf = async (row: Top10Row, index: number, cfg: BacktestConfig) => {
     setIsLoadingPerf(true);
@@ -136,12 +163,30 @@ export default function BacktestPage() {
     setPerfResult(null);
     setSelectedIndex(null);
     setSelectedRow(null);
+    setWfResult(null);
     try {
       const result = await runOptimize(buildOptimizeRequest(config));
       setOptimizeResult(result);
+      // Fire walk-forward and performance in parallel
+      const promises: Promise<void>[] = [];
       if (result.top10?.length > 0) {
-        await loadPerf(result.top10[0], 0, config);
+        promises.push(loadPerf(result.top10[0], 0, config));
       }
+      if (config.walkForward) {
+        promises.push((async () => {
+          setIsRunningWf(true);
+          try {
+            const wf = await runWalkForward(buildWalkForwardRequest(config));
+            setWfResult(wf);
+          } catch (e: unknown) {
+            console.error('[BacktestPage] walk-forward error:', e);
+            // non-blocking — don't overwrite the main error
+          } finally {
+            setIsRunningWf(false);
+          }
+        })());
+      }
+      await Promise.all(promises);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Optimization failed';
       console.error('[BacktestPage] handleRun error:', e);
@@ -284,6 +329,7 @@ export default function BacktestPage() {
                     >
                       <Tab label="Equity Curve" />
                       {config.factors.length <= 1 && <Tab label="Heatmap" />}
+                      {(wfResult || isRunningWf) && <Tab label="Walk-Forward" />}
                     </Tabs>
 
                     {analysisTab === 0 && (
@@ -291,6 +337,56 @@ export default function BacktestPage() {
                     )}
                     {analysisTab === 1 && config.factors.length <= 1 && (
                       <HeatmapChart grid={optimizeResult.grid} mode="single" />
+                    )}
+                    {/* Walk-Forward tab — index depends on whether Heatmap tab exists */}
+                    {analysisTab === (config.factors.length <= 1 ? 2 : 1) && (wfResult || isRunningWf) && (
+                      <Box>
+                        {isRunningWf && <LinearProgress sx={{ mb: 2 }} />}
+                        {wfResult && (
+                          <>
+                            {/* Best params + overfitting ratio */}
+                            <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center" mb={2}>
+                              <Chip
+                                label={`Best Window: ${Array.isArray(wfResult.best_window) ? wfResult.best_window.join(', ') : wfResult.best_window}`}
+                                size="small" variant="outlined"
+                              />
+                              <Chip
+                                label={`Best Signal: ${Array.isArray(wfResult.best_signal) ? wfResult.best_signal.join(', ') : wfResult.best_signal}`}
+                                size="small" variant="outlined"
+                              />
+                              <Chip
+                                label={`Split: ${wfResult.split_date}`}
+                                size="small" variant="outlined"
+                              />
+                              <Chip
+                                label={`Overfitting: ${wfResult.overfitting_ratio != null ? (wfResult.overfitting_ratio * 100).toFixed(1) + '%' : 'N/A'} — ${overfitLabel(wfResult.overfitting_ratio)}`}
+                                size="small"
+                                color={overfitColor(wfResult.overfitting_ratio)}
+                              />
+                            </Stack>
+
+                            {/* IS vs OOS metrics comparison table */}
+                            <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+                              <Typography variant="subtitle2" fontWeight={600} mb={1}>In-Sample vs Out-of-Sample</Typography>
+                              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1 }}>
+                                <Typography variant="caption" fontWeight={600}>Metric</Typography>
+                                <Typography variant="caption" fontWeight={600}>In-Sample</Typography>
+                                <Typography variant="caption" fontWeight={600}>Out-of-Sample</Typography>
+                                {Object.keys(wfResult.is_metrics).map(key => (
+                                  <Box key={key} sx={{ display: 'contents' }}>
+                                    <Typography variant="body2">{key}</Typography>
+                                    <Typography variant="body2">{formatMetric(wfResult.is_metrics[key])}</Typography>
+                                    <Typography variant="body2">{formatMetric(wfResult.oos_metrics[key])}</Typography>
+                                  </Box>
+                                ))}
+                              </Box>
+                            </Paper>
+
+                            {/* WF equity curve with split line */}
+                            <EquityCurveChart curve={wfResult.equity_curve} splitDate={wfResult.split_date} />
+                          </>
+                        )}
+                      </Box>
                     )}
                   </>
                 )}

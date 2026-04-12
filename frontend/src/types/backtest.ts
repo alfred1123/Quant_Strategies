@@ -29,6 +29,9 @@ export interface BacktestConfig {
   // multi-factor
   conjunction: string;
   factors: FactorConfig[];
+  // walk-forward
+  walkForward: boolean;
+  splitRatio: number;
 }
 
 // API types (snake_case matches backend Pydantic models)
@@ -93,4 +96,19 @@ export interface PerformanceResponse {
   strategy_metrics: Record<string, number>;
   buy_hold_metrics: Record<string, number>;
   equity_curve: EquityPoint[];
+}
+
+// Walk-forward analysis
+export interface WalkForwardRequest extends OptimizeRequest {
+  split_ratio: number;
+}
+
+export interface WalkForwardResponse {
+  best_window: number | number[];
+  best_signal: number | number[];
+  is_metrics: Record<string, number>;
+  oos_metrics: Record<string, number>;
+  overfitting_ratio: number | null;
+  equity_curve: EquityPoint[];
+  split_date: string;
 }
