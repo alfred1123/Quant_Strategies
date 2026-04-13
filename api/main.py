@@ -54,25 +54,6 @@ app.include_router(backtest.router, prefix="/api/v1")
 app.include_router(refdata.router, prefix="/api/v1")
 
 
-
-app = FastAPI(
-    title="Quant Backtest API",
-    version="0.1.0",
-    lifespan=lifespan,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173").split(","),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(backtest.router, prefix="/api/v1")
-app.include_router(refdata.router, prefix="/api/v1")
-
-
 @app.get("/health")
 def health():
     return {"status": "ok"}

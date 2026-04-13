@@ -111,6 +111,56 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="113-refdata-indicator-add-is-bounded" author="alfcheun" context="refdata" runOnChange="false">
+        <sql>
+            ALTER TABLE REFDATA.INDICATOR
+                ADD COLUMN IF NOT EXISTS IS_BOUNDED_IND CHAR(1);
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE REFDATA.INDICATOR
+                    DROP COLUMN IF EXISTS IS_BOUNDED_IND;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="114-refdata-signal-type-add-func-columns" author="alfcheun" context="refdata" runOnChange="false">
+        <sql>
+            ALTER TABLE REFDATA.SIGNAL_TYPE
+                RENAME COLUMN FUNC_NAME TO FUNC_NAME_BAND;
+            ALTER TABLE REFDATA.SIGNAL_TYPE
+                ADD COLUMN IF NOT EXISTS FUNC_NAME_BOUNDED TEXT;
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE REFDATA.SIGNAL_TYPE
+                    DROP COLUMN IF EXISTS FUNC_NAME_BOUNDED;
+                ALTER TABLE REFDATA.SIGNAL_TYPE
+                    RENAME COLUMN FUNC_NAME_BAND TO FUNC_NAME;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ========== REFDATA seed data (bounded — depends on ALTER TABLE 113/114) ========== -->
+
+    <changeSet id="157-refdata-seed-indicator-bounded" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/INDICATOR_BOUNDED.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql>UPDATE REFDATA.INDICATOR SET IS_BOUNDED_IND = NULL;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="158-refdata-seed-signal-type-bounded" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/SIGNAL_TYPE_BOUNDED.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql>
+                UPDATE REFDATA.SIGNAL_TYPE SET FUNC_NAME_BOUNDED = NULL;
+                UPDATE REFDATA.SIGNAL_TYPE SET FUNC_NAME_BAND = 'momentum_const_signal' WHERE NAME = 'momentum';
+                UPDATE REFDATA.SIGNAL_TYPE SET FUNC_NAME_BAND = 'reversion_const_signal' WHERE NAME = 'reversion';
+            </sql>
+        </rollback>
+    </changeSet>
+
     <!-- ========== REFDATA procedures ========== -->
 
     <changeSet id="160-refdata-proc-sp-get-enum" author="alfcheun" context="refdata" runOnChange="true">

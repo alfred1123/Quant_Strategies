@@ -115,7 +115,7 @@ Business logic bridge between HTTP and the pipeline:
 - **`backtest.py`** — Converts Pydantic models → `StrategyConfig` and pipeline calls → Pydantic responses. Handles:
   - `_fetch_df()` — fetches data via `YahooFinance` and returns a pipeline-ready DataFrame.
   - `_build_single_config()` / `_build_multi_config()` — constructs `StrategyConfig` (with optional `SubStrategy` list for multi-factor).
-  - `_resolve_signal_func()` — maps strategy name strings (e.g. `"momentum_const_signal"`) to actual Python functions.
+  - `_resolve_signal_func()` — maps strategy name strings (e.g. `"momentum_band_signal"`) to actual Python functions.
   - `_extract_optuna_plots()` — serializes Optuna visualizations as Plotly JSON for the frontend.
 
 - **`refdata_cache.py`** — In-process cache for REFDATA tables. One `SELECT * FROM refdata.<table>` per table at startup, stored as `list[dict]`. No TTL — refresh via admin endpoint.
@@ -142,7 +142,7 @@ One indicator + one strategy + one window/signal pair.
 {
   "mode": "single",
   "indicator": "get_bollinger_band",
-  "strategy": "momentum_const_signal",
+  "strategy": "momentum_band_signal",
   "window_range": { "min": 5, "max": 100, "step": 5 },
   "signal_range": { "min": 0.25, "max": 2.5, "step": 0.25 }
 }
@@ -157,14 +157,14 @@ Multiple indicators combined with a conjunction (`AND` / `OR`). Each factor has 
   "factors": [
     {
       "indicator": "get_bollinger_band",
-      "strategy": "momentum_const_signal",
+      "strategy": "momentum_band_signal",
       "data_column": "price",
       "window_range": { "min": 10, "max": 50, "step": 5 },
       "signal_range": { "min": 0.5, "max": 2.0, "step": 0.5 }
     },
     {
       "indicator": "get_rsi",
-      "strategy": "reversion_const_signal",
+      "strategy": "reversion_band_signal",
       "data_column": "price",
       "window_range": { "min": 7, "max": 28, "step": 7 },
       "signal_range": { "min": 20, "max": 40, "step": 5 }

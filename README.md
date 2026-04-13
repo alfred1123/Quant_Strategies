@@ -543,8 +543,8 @@ data.py ──► strat.py ──► perf.py ──► param_opt.py ──► wa
 
 | Method | Long (+1) | Short (-1) | Flat (0) |
 |---|---|---|---|
-| `momentum_const_signal` | indicator > +signal | indicator < −signal | otherwise |
-| `reversion_const_signal` | indicator < −signal | indicator > +signal | otherwise |
+| `momentum_band_signal` | indicator > +signal | indicator < −signal | otherwise |
+| `reversion_band_signal` | indicator < −signal | indicator > +signal | otherwise |
 
 **StrategyConfig** (`strat.py`) — frozen dataclass packaging the strategy identity:
 
@@ -553,7 +553,7 @@ from strat import StrategyConfig, SignalDirection
 
 config = StrategyConfig(
     indicator_name="get_bollinger_band",                    # TechnicalAnalysis method name
-    signal_func=SignalDirection.momentum_const_signal,      # signal generation function
+    signal_func=SignalDirection.momentum_band_signal,      # signal generation function
     trading_period=365,                                     # 365 crypto, 252 equity
 )
 

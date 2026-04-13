@@ -47,3 +47,19 @@ See `TODO.md` for full schema — key tables:
 - Cache API responses to minimize repeat queries (see `BT.API_REQUEST`).
 - Raw data in `data/raw/`, processed in `data/processed/`.
 - Never store API keys or secrets in the database.
+
+## `.env` File
+
+- `.env` is gitignored — it is the **only copy** of credentials on disk. Treat with care.
+- Template: `.env.example` (placeholder values, safe to commit). Recreate from this if `.env` is lost or corrupted.
+- Vars prefixed with `export` are for bash scripts (`source .env`); plain vars are for python-dotenv only.
+- Key DB vars: `QUANTDB_HOST`, `QUANTDB_PORT`, `QUANTDB_USERNAME`, `QUANTDB_PASSWORD`, `PGPASSWORD`.
+- Liquibase vars: `LIQUIBASE_COMMAND_URL`, `LIQUIBASE_COMMAND_USERNAME`, `LIQUIBASE_COMMAND_PASSWORD`.
+- **NEVER** run `source .env` in a terminal that has an active pager (`less`) — the pager output gets interpreted as shell commands and can corrupt `.env`.
+
+## Terminal Safety for DB Operations
+
+- Always use **background terminals** for DB queries (psql, Liquibase, Python psycopg).
+- For psql: disable the pager with `PAGER='' psql ...` or use `--no-psqlrc -A -t` flags.
+- For Python DB queries: activate the venv first (`source env/bin/activate`).
+- If a terminal gets stuck in a pager, **do not reuse it** — open a fresh terminal.

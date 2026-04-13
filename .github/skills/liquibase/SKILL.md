@@ -216,6 +216,8 @@ Run only specific contexts: `liquibase update --contexts=bt,proc`
 | Procedures fail with syntax error | `splitStatements="true"` splits on `$$` | Set `splitStatements="false"` for procedure files |
 | ChangeSets not detected after splitting into sub-changelogs via `<include>` | Filename in DATABASECHANGELOG doesn't match sub-changelog path | Use per-schema deployment with `liquibase-schema-name` instead of `<include>`. Never use `logicalFilePath` hacks |
 | `rollback-count N` returns "0 changesets rolled back" | Filename mismatch between DATABASECHANGELOG records and current changelog path | Drop objects manually, truncate/drop DATABASECHANGELOG, redeploy |
+| Checksum validation failed | Source SQL file was edited after the changeSet was already deployed | Run `liquibase clear-checksums` before `update`. Only safe if the DB state already matches the edited file (e.g. changes were applied via separate ALTER TABLE changesets) |
+| Seed changeSet fails with "column does not exist" | Seed data changeSet runs before the ALTER TABLE that adds the column | Reorder changelog: ALTER TABLE changesets **must** appear before seed changesets that reference the new columns. Liquibase runs changesets in changelog order, not ID-numeric order |
 
 ## Rollback Notes
 
@@ -223,6 +225,33 @@ Run only specific contexts: `liquibase update --contexts=bt,proc`
 - **Failed changeSets are not recorded** in `DATABASECHANGELOG` — Liquibase doesn't know about them
 - PostgreSQL DDL auto-commits, so a failed changeSet may leave partial objects (e.g., table created but `create_parent()` failed)
 - Clean up manually with `DROP TABLE/PROCEDURE IF EXISTS`, then re-run `update`
+
+## Changelog Ordering Rules
+
+**Liquibase runs changesets in the order they appear in the changelog XML, NOT by ID number.** This means:
+
+1. ALTER TABLE changesets that add columns must appear **before** seed/data changesets that reference those columns
+2. Table creation changesets must appear before seed data for that table
+3. If you add a new column via ALTER TABLE and a seed that writes to it, always place the ALTER first in the XML even if the ALTER ID (e.g. `113`) is lower than the seed ID (e.g. `157`)
+4. When reordering changesets that are already deployed, only pending (not-yet-run) changesets are affected — Liquibase skips already-applied ones
+
+## Terminal Safety for Liquibase and DB Operations
+
+- Always use **background terminals** (`isBackground=true`) when running Liquibase or psql commands to avoid pager issues
+- Append `2>&1` to Liquibase commands (output goes to stderr)
+- **NEVER** run `source .env` in a terminal that has an active `less` pager — the pager output gets interpreted as shell commands and can **corrupt the `.env` file**
+- For psql commands: disable the pager with `PAGER='' psql ...` or use `--no-psqlrc -A -t` flags
+- For DB queries: prefer Python `psycopg` in a fresh background terminal over psql
+- If a terminal gets stuck in a pager, **do not reuse it** — open a fresh terminal
+- Always activate the venv (`source env/bin/activate`) before running Python DB queries
+
+## `.env` File Safety
+
+- `.env` is gitignored — it is the **only copy** of credentials on disk
+- Template: `.env.example` (placeholder values, safe to commit)
+- If `.env` gets corrupted, recreate from `.env.example` and fill in credentials
+- Key vars: `QUANTDB_HOST/PORT/USERNAME/PASSWORD`, `LIQUIBASE_COMMAND_URL/USERNAME/PASSWORD`, `PGPASSWORD`
+- Vars prefixed with `export` are for bash (`source .env`); plain vars are for python-dotenv
 
 ## Checklist
 
@@ -235,3 +264,5 @@ Before adding a new changeSet:
 5. `relativeToChangelogFile="true"` on all `<sqlFile>` and `<include>` elements
 6. `<rollback>` block included
 7. SQL file placed in the correct folder (`tables/`, `procedures/`, `data/`)
+8. **Changelog order**: ALTER TABLE before seeds that reference new columns
+9. If editing a source SQL file that was already deployed, plan to run `clear-checksums`

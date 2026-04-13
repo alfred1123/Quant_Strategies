@@ -64,7 +64,7 @@ def test_<name>_momentum_pipeline(self, synthetic_market_data):
     ta = TechnicalAnalysis(df)
     # Use 365 for crypto, 252 for equity
     perf = Performance(
-        ta.data, 365, ta.get_<name>, Strategy.momentum_const_signal, <window>, <signal>
+        ta.data, 365, ta.get_<name>, Strategy.momentum_band_signal, <window>, <signal>
     )
     result = perf.get_strategy_performance()
     assert isinstance(result, pd.Series)

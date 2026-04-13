@@ -41,13 +41,13 @@ INDICATORS = {
 }
 
 STRATEGY_FUNCS = {
-    "Momentum": SignalDirection.momentum_const_signal,
-    "Reversion": SignalDirection.reversion_const_signal,
+    "Momentum": SignalDirection.momentum_band_signal,
+    "Reversion": SignalDirection.reversion_band_signal,
 }
 
 STRATEGY_NAMES = {
-    "Momentum": "momentum_const_signal",
-    "Reversion": "reversion_const_signal",
+    "Momentum": "momentum_band_signal",
+    "Reversion": "reversion_band_signal",
 }
 
 ASSET_TYPES = {

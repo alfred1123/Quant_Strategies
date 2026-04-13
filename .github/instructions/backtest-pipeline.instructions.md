@@ -23,22 +23,22 @@ from strat import StrategyConfig, SignalDirection, SubStrategy
 config = StrategyConfig(
     ticker="BTC-USD",
     indicator_name="get_bollinger_band",
-    signal_func=SignalDirection.momentum_const_signal,
+    signal_func=SignalDirection.momentum_band_signal,
     trading_period=365,
 )
 
 # Single-factor with self-describing SubStrategy:
 config = StrategyConfig.single(
     "BTC-USD", "get_bollinger_band",
-    SignalDirection.momentum_const_signal, 365,
+    SignalDirection.momentum_band_signal, 365,
     window=20, signal=1.0,
 )
 
 # Multi-factor:
-sub1 = SubStrategy("get_sma", "momentum_const_signal", 20, 1.0)
-sub2 = SubStrategy("get_rsi", "reversion_const_signal", 14, 0.5)
+sub1 = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
+sub2 = SubStrategy("get_rsi", "reversion_band_signal", 14, 0.5)
 config = StrategyConfig(
-    "AAPL", "get_sma", SignalDirection.momentum_const_signal, 252,
+    "AAPL", "get_sma", SignalDirection.momentum_band_signal, 252,
     conjunction="AND", substrategies=(sub1, sub2),
 )
 ```
@@ -71,8 +71,8 @@ Each constructor creates `TechnicalAnalysis` internally — callers pass raw dat
 - Returns a Series (same length as input, NaN-padded at start).
 
 ### strat.py — Strategy Signals
-- `Strategy.momentum_const_signal(data_col, signal)` → numpy array of `{-1, 0, 1}`.
-- `Strategy.reversion_const_signal(data_col, signal)` → inverse of momentum.
+- `Strategy.momentum_band_signal(data_col, signal)` → numpy array of `{-1, 0, 1}`.
+- `Strategy.reversion_band_signal(data_col, signal)` → inverse of momentum.
 - These are effectively static methods (no `self` used).
 - `StrategyConfig` frozen dataclass — see **StrategyConfig** section above.
 

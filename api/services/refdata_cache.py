@@ -46,7 +46,7 @@ class RefDataCache:
         return self._store.get(table, [])
 
     def get_indicator_defaults(self) -> dict[str, dict]:
-        """Return ``{method_name: {win_min, win_max, ...}}``."""
+        """Return ``{method_name: {win_min, win_max, ..., is_bounded_ind}}``."""
         result = {}
         for r in self.get("indicator"):
             result[r["method_name"]] = {
@@ -56,6 +56,7 @@ class RefDataCache:
                 "sig_min": float(r["sig_min"]) if r.get("sig_min") is not None else None,
                 "sig_max": float(r["sig_max"]) if r.get("sig_max") is not None else None,
                 "sig_step": float(r["sig_step"]) if r.get("sig_step") is not None else None,
+                "is_bounded_ind": r.get("is_bounded_ind"),
             }
         return result
 

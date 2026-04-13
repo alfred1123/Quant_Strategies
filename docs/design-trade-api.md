@@ -43,7 +43,7 @@ Two top-level objects: `StrategyConfig` (what to compute) and `DeploymentConfig`
     {
       "id": 1,
       "indicator": "get_bollinger_band",
-      "signal_func": "momentum_const_signal",
+      "signal_func": "momentum_band_signal",
       "window": 20,
       "signal": 1.0,
       "data_column": "v"
@@ -51,7 +51,7 @@ Two top-level objects: `StrategyConfig` (what to compute) and `DeploymentConfig`
     {
       "id": 2,
       "indicator": "get_rsi",
-      "signal_func": "reversion_const_signal",
+      "signal_func": "reversion_band_signal",
       "window": 14,
       "signal": 30.0,
       "data_column": "v"
@@ -446,16 +446,16 @@ from strat import StrategyConfig, SubStrategy, strategy_to_json, backtest_result
 # Single-factor (uses StrategyConfig.single for self-describing config):
 cfg = StrategyConfig.single(
     "BTC-USD", "get_bollinger_band",
-    SignalDirection.momentum_const_signal, 365,
+    SignalDirection.momentum_band_signal, 365,
     window=20, signal=1.0
 )
 strat_json = strategy_to_json(cfg)
 
 # Multi-factor:
-sub1 = SubStrategy("get_sma", "momentum_const_signal", 20, 1.0)
-sub2 = SubStrategy("get_rsi", "reversion_const_signal", 14, 0.5)
+sub1 = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
+sub2 = SubStrategy("get_rsi", "reversion_band_signal", 14, 0.5)
 cfg = StrategyConfig(
-    "AAPL", "get_sma", SignalDirection.momentum_const_signal, 252,
+    "AAPL", "get_sma", SignalDirection.momentum_band_signal, 252,
     conjunction="AND", substrategies=(sub1, sub2)
 )
 strat_json = strategy_to_json(cfg)

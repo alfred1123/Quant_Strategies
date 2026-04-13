@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 import src.data as _data_module
-from src.strat import SignalDirection, StrategyConfig, SubStrategy
+from src.strat import SignalDirection, StrategyConfig, SubStrategy, resolve_signal_func
 from src.perf import Performance
 from src.param_opt import ParametersOptimization
 from src.walk_forward import WalkForward
@@ -49,28 +49,40 @@ def _fetch_df(symbol: str, start: str, end: str, data_source: str, cache) -> pd.
 # already constrained to valid values. getattr raises AttributeError if
 # an unknown name is sent directly to the API — no extra validation needed.
 
-def _build_config(req) -> StrategyConfig:
+def _build_config(req, cache) -> StrategyConfig:
+    indicator_rows = cache.get("indicator")
+    signal_type_rows = cache.get("signal_type")
+
     if req.mode == "single":
+        func = resolve_signal_func(
+            req.strategy, req.indicator, indicator_rows, signal_type_rows,
+        )
         return StrategyConfig(
             ticker=req.symbol,
             indicator_name=req.indicator,
-            signal_func=getattr(SignalDirection, req.strategy),
+            signal_func=func,
             trading_period=req.trading_period,
         )
     substrategies = [
         SubStrategy(
             indicator_name=f.indicator,
-            signal_func_name=f.strategy,
+            signal_func_name=resolve_signal_func(
+                f.strategy, f.indicator, indicator_rows, signal_type_rows,
+            ).__name__,
             window=0,
             signal=0.0,
             data_column=f.data_column,
         )
         for f in req.factors
     ]
+    first_func = resolve_signal_func(
+        req.factors[0].strategy, req.factors[0].indicator,
+        indicator_rows, signal_type_rows,
+    )
     return StrategyConfig(
         ticker=req.symbol,
         indicator_name=req.factors[0].indicator,
-        signal_func=getattr(SignalDirection, req.factors[0].strategy),
+        signal_func=first_func,
         trading_period=req.trading_period,
         conjunction=req.conjunction or "AND",
         substrategies=tuple(substrategies),
@@ -99,7 +111,7 @@ def _build_param_ranges(req):
 def run_optimize(req: OptimizeRequest, cache, callback=None) -> OptimizeResponse:
     df = _fetch_df(req.symbol, req.start, req.end, req.data_source, cache)
     callbacks = [callback] if callback else []
-    config = _build_config(req)
+    config = _build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
     opt = ParametersOptimization(df.copy(), config, fee_bps=req.fee_bps)
     result = opt.run(window_list, signal_list, callbacks=callbacks)
@@ -118,7 +130,7 @@ def run_optimize(req: OptimizeRequest, cache, callback=None) -> OptimizeResponse
 
 def run_performance(req: PerformanceRequest, cache) -> PerformanceResponse:
     df = _fetch_df(req.symbol, req.start, req.end, req.data_source, cache)
-    config = _build_config(req)
+    config = _build_config(req, cache)
     window = req.window if req.mode == "single" else tuple(req.windows)
     signal = req.signal if req.mode == "single" else tuple(req.signals)
 
@@ -151,7 +163,7 @@ def run_performance(req: PerformanceRequest, cache) -> PerformanceResponse:
 
 def run_walk_forward(req: WalkForwardRequest, cache) -> WalkForwardResponse:
     df = _fetch_df(req.symbol, req.start, req.end, req.data_source, cache)
-    config = _build_config(req)
+    config = _build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
 
     wf = WalkForward(df.copy(), req.split_ratio, config, fee_bps=req.fee_bps)

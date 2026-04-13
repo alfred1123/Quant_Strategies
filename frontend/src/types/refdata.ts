@@ -4,13 +4,14 @@ export interface IndicatorRow {
   win_min: number;
   win_max: number;
   win_step: number;
-  sig_min: number;
-  sig_max: number;
+  sig_min: number | null;
+  sig_max: number | null;
   sig_step: number;
+  is_bounded_ind: string | null;
 }
 
 export interface SignalTypeRow {
-  func_name: string;
+  name: string;
   display_name: string;
 }
 

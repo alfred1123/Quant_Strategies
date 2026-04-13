@@ -7,7 +7,7 @@ from perf import Performance
 
 
 _BOLLINGER_CONFIG = StrategyConfig("TEST", "get_bollinger_band",
-                                   Strategy.momentum_const_signal, 252)
+                                   Strategy.momentum_band_signal, 252)
 
 
 def _make_performance(df, window=5, signal=0.5, config=None):
@@ -130,20 +130,20 @@ class TestTrendingMarkets:
 class TestPerformanceWithConfig:
     def test_config_stored(self, sample_ohlc_df):
         config = StrategyConfig("TEST", "get_bollinger_band",
-                                Strategy.momentum_const_signal, 252)
+                                Strategy.momentum_band_signal, 252)
         perf = Performance(sample_ohlc_df.copy(), config, 5, 0.5)
         assert perf.config is config
         assert perf.trading_period == 252
 
     def test_fee_bps(self, sample_ohlc_df):
         config = StrategyConfig("TEST", "get_bollinger_band",
-                                Strategy.momentum_const_signal, 252)
+                                Strategy.momentum_band_signal, 252)
         perf = Performance(sample_ohlc_df.copy(), config, 5, 0.5, fee_bps=10.0)
         assert perf.fee_bps == 10.0
 
     def test_different_indicator(self, sample_ohlc_df):
         config = StrategyConfig("TEST", "get_sma",
-                                Strategy.momentum_const_signal, 252)
+                                Strategy.momentum_band_signal, 252)
         perf = Performance(sample_ohlc_df.copy(), config, 5, 0.5)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
@@ -159,18 +159,18 @@ def _multi_factor_config(**overrides):
     """Build a two-factor StrategyConfig for multi-factor tests."""
     sub_a = SubStrategy(
         indicator_name="get_sma",
-        signal_func_name="momentum_const_signal",
+        signal_func_name="momentum_band_signal",
         window=5, signal=0.5, data_column="v",
     )
     sub_b = SubStrategy(
         indicator_name="get_sma",
-        signal_func_name="momentum_const_signal",
+        signal_func_name="momentum_band_signal",
         window=10, signal=0.5, data_column="volume",
     )
     defaults = dict(
         ticker="TEST",
         indicator_name="get_sma",
-        signal_func=SignalDirection.momentum_const_signal,
+        signal_func=SignalDirection.momentum_band_signal,
         trading_period=252,
         conjunction="AND",
         substrategies=(sub_a, sub_b),
@@ -251,7 +251,7 @@ class TestMultiFactorPerformance:
     def test_single_factor_backward_compat(self, sample_ohlc_df):
         """Single-factor path produces identical results when window is not a tuple."""
         config = StrategyConfig("TEST", "get_bollinger_band",
-                                Strategy.momentum_const_signal, 252)
+                                Strategy.momentum_band_signal, 252)
         perf = Performance(sample_ohlc_df.copy(), config, 5, 0.5)
         perf.enrich_performance()
         assert perf._metric_window == 5

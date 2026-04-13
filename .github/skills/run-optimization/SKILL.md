@@ -66,7 +66,7 @@ trading_period = 365  # crypto (24/7/365); use 252 for equities
 
 from perf import Performance
 perf = Performance(df, trading_period, ta.get_bollinger_band,
-                   Strategy.momentum_const_signal, 20, 1.0)
+                   Strategy.momentum_band_signal, 20, 1.0)
 print(perf.get_strategy_performance())
 print(perf.get_buy_hold_performance())
 perf.data.to_csv('../../results/perf_<symbol>_<indicator>.csv', index=False)
@@ -78,7 +78,7 @@ perf.data.to_csv('../../results/perf_<symbol>_<indicator>.csv', index=False)
 opt = ParametersOptimization(
     ta.data, trading_period,
     ta.get_bollinger_band,          # indicator function
-    Strategy.momentum_const_signal, # strategy function
+    Strategy.momentum_band_signal, # strategy function
 )
 
 window_list = tuple(range(5, 105, 5))
@@ -142,6 +142,6 @@ cd src && python main.py
 
 **Indicators**: `get_sma`, `get_ema`, `get_rsi`, `get_bollinger_band`, `get_stochastic_oscillator`
 
-**Strategies**: `momentum_const_signal`, `reversion_const_signal`
+**Strategies**: `momentum_band_signal`, `reversion_band_signal`
 
 **Data sources**: `YahooFinance` (preferred), `AlphaVantage`, `Glassnode`, `FutuOpenD`

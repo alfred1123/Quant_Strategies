@@ -7,7 +7,7 @@ from param_opt import ParametersOptimization, OptimizeResult, OPTUNA_MAX_TRIALS
 
 
 _BOLLINGER_CONFIG = StrategyConfig("TEST", "get_bollinger_band",
-                                   Strategy.momentum_const_signal, 252)
+                                   Strategy.momentum_band_signal, 252)
 
 
 class TestParametersOptimization:
@@ -64,13 +64,13 @@ class TestParametersOptimization:
 class TestParametersOptimizationWithConfig:
     def test_config_stored(self, sample_ohlc_df):
         config = StrategyConfig("TEST", "get_bollinger_band",
-                                Strategy.momentum_const_signal, 252)
+                                Strategy.momentum_band_signal, 252)
         opt = ParametersOptimization(sample_ohlc_df.copy(), config)
         assert opt.config is config
 
     def test_fee_propagates(self, sample_ohlc_df):
         config = StrategyConfig("TEST", "get_bollinger_band",
-                                Strategy.momentum_const_signal, 252)
+                                Strategy.momentum_band_signal, 252)
         opt = ParametersOptimization(sample_ohlc_df.copy(), config, fee_bps=20.0)
         assert opt.fee_bps == 20.0
 
@@ -80,12 +80,12 @@ class TestParametersOptimizationWithConfig:
 # -------------------------------------------------------------------------
 
 def _multi_factor_config(**overrides):
-    sub_a = SubStrategy("get_sma", "momentum_const_signal", 5, 0.5, "v")
-    sub_b = SubStrategy("get_sma", "momentum_const_signal", 10, 0.5, "volume")
+    sub_a = SubStrategy("get_sma", "momentum_band_signal", 5, 0.5, "v")
+    sub_b = SubStrategy("get_sma", "momentum_band_signal", 10, 0.5, "volume")
     defaults = dict(
         ticker="TEST",
         indicator_name="get_sma",
-        signal_func=SignalDirection.momentum_const_signal,
+        signal_func=SignalDirection.momentum_band_signal,
         trading_period=252,
         conjunction="AND",
         substrategies=(sub_a, sub_b),

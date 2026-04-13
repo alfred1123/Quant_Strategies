@@ -72,8 +72,8 @@ INDICATORS = {
 }
 
 STRATEGIES = {
-    'momentum':  SignalDirection.momentum_const_signal,
-    'reversion': SignalDirection.reversion_const_signal,
+    'momentum':  SignalDirection.momentum_band_signal,
+    'reversion': SignalDirection.reversion_band_signal,
 }
 
 ASSET_TRADING_PERIODS = {

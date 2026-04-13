@@ -109,7 +109,7 @@ class TestFullPipelineE2E:
         ta = TechnicalAnalysis(ibm_data)
         perf = Performance(
             ta.data, 252, ta.get_sma,
-            Strategy.momentum_const_signal, 20, 0.5,
+            Strategy.momentum_band_signal, 20, 0.5,
         )
         result = perf.get_strategy_performance()
 
@@ -122,7 +122,7 @@ class TestFullPipelineE2E:
         ta = TechnicalAnalysis(ibm_data)
         perf = Performance(
             ta.data, 252, ta.get_bollinger_band,
-            Strategy.reversion_const_signal, 20, 1.0,
+            Strategy.reversion_band_signal, 20, 1.0,
         )
         result = perf.get_strategy_performance()
 
@@ -133,7 +133,7 @@ class TestFullPipelineE2E:
         ta = TechnicalAnalysis(ibm_data)
         perf = Performance(
             ta.data, 252, ta.get_sma,
-            Strategy.momentum_const_signal, 20, 0.5,
+            Strategy.momentum_band_signal, 20, 0.5,
         )
         bh = perf.get_buy_hold_performance()
 

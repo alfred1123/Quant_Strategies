@@ -143,7 +143,7 @@ Request:
   "end": "2026-04-01",
   "mode": "single",
   "indicator": "get_bollinger_band",
-  "strategy": "momentum_const_signal",
+  "strategy": "momentum_band_signal",
   "trading_period": 365,
   "fee_bps": 5.0,
   "window_range": {"min": 5, "max": 100, "step": 5},
@@ -164,14 +164,14 @@ Multi-factor request:
   "factors": [
     {
       "indicator": "get_bollinger_band",
-      "strategy": "momentum_const_signal",
+      "strategy": "momentum_band_signal",
       "data_column": "price",
       "window_range": {"min": 10, "max": 100, "step": 5},
       "signal_range": {"min": 0.25, "max": 2.50, "step": 0.25}
     },
     {
       "indicator": "get_rsi",
-      "strategy": "reversion_const_signal",
+      "strategy": "reversion_band_signal",
       "data_column": "price",
       "window_range": {"min": 5, "max": 50, "step": 1},
       "signal_range": {"min": 10.0, "max": 40.0, "step": 5.0}
@@ -230,7 +230,7 @@ Request:
   "end": "2026-04-01",
   "mode": "single",
   "indicator": "get_bollinger_band",
-  "strategy": "momentum_const_signal",
+  "strategy": "momentum_band_signal",
   "trading_period": 365,
   "fee_bps": 5.0,
   "window": 20,
@@ -438,7 +438,7 @@ class RangeParam(BaseModel):
 
 class FactorConfig(BaseModel):
     indicator: str          # e.g. "get_bollinger_band"
-    strategy: str           # e.g. "momentum_const_signal"
+    strategy: str           # e.g. "momentum_band_signal"
     data_column: str = "price"
     window_range: RangeParam
     signal_range: RangeParam

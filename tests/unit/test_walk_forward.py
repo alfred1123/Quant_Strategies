@@ -7,7 +7,7 @@ from walk_forward import WalkForward, WalkForwardResult
 
 
 _BOLLINGER_CONFIG = StrategyConfig("TEST", "get_bollinger_band",
-                                   Strategy.momentum_const_signal, 252)
+                                   Strategy.momentum_band_signal, 252)
 
 
 def _make_synthetic_data(n=500, seed=42):
@@ -146,7 +146,7 @@ class TestWalkForwardWithConfig:
     def test_run_produces_result(self):
         df = _make_synthetic_data()
         config = StrategyConfig("TEST", "get_bollinger_band",
-                                Strategy.momentum_const_signal, 252)
+                                Strategy.momentum_band_signal, 252)
         wf = WalkForward(df.copy(), 0.5, config)
         result = wf.run((20,), (1.0,))
         assert isinstance(result, WalkForwardResult)
@@ -155,7 +155,7 @@ class TestWalkForwardWithConfig:
     def test_fee_propagates(self):
         df = _make_synthetic_data()
         config = StrategyConfig("TEST", "get_bollinger_band",
-                                Strategy.momentum_const_signal, 252)
+                                Strategy.momentum_band_signal, 252)
         wf = WalkForward(df, 0.5, config, fee_bps=15.0)
         assert wf.fee_bps == 15.0
 
@@ -182,10 +182,10 @@ def _make_multi_factor_data(n=500, seed=42):
 
 
 def _multi_factor_config():
-    sub_a = SubStrategy("get_sma", "momentum_const_signal", 10, 0.5, "v")
-    sub_b = SubStrategy("get_sma", "momentum_const_signal", 20, 0.5, "volume")
+    sub_a = SubStrategy("get_sma", "momentum_band_signal", 10, 0.5, "v")
+    sub_b = SubStrategy("get_sma", "momentum_band_signal", 20, 0.5, "volume")
     return StrategyConfig(
-        "TEST", "get_sma", SignalDirection.momentum_const_signal, 252,
+        "TEST", "get_sma", SignalDirection.momentum_band_signal, 252,
         conjunction="AND", substrategies=(sub_a, sub_b),
     )
 

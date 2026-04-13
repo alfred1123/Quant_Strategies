@@ -11,6 +11,6 @@ Run a backtest using the pipeline in `src/`.
 4. Display the strategy performance and buy-and-hold comparison.
 
 Available indicators: `sma`, `ema`, `rsi`, `bollinger_band`, `stochastic_oscillator`
-Available strategies: `momentum_const_signal`, `reversion_const_signal`
+Available strategies: `momentum_band_signal`, `reversion_band_signal`
 
 If the user doesn't specify parameters, suggest sensible defaults (BTC, bollinger_band, momentum, window=20, signal=1.0).

@@ -9,15 +9,15 @@ Usage:
     from strat import SignalDirection, StrategyConfig, SubStrategy
     # Single-factor
     config = StrategyConfig("BTC-USD", "get_bollinger_band",
-                            SignalDirection.momentum_const_signal, 365)
+                            SignalDirection.momentum_band_signal, 365)
     wf = WalkForward(data, 0.5, config)
     result = wf.run(window_tuple, signal_tuple)
 
     # Multi-factor — run() auto-detects from config
-    sub1 = SubStrategy("get_sma", "momentum_const_signal", 20, 1.0, "v")
-    sub2 = SubStrategy("get_rsi", "reversion_const_signal", 14, 0.5, "volume")
+    sub1 = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0, "v")
+    sub2 = SubStrategy("get_rsi", "reversion_band_signal", 14, 0.5, "volume")
     config = StrategyConfig("BTC-USD", "get_sma",
-                            SignalDirection.momentum_const_signal, 365,
+                            SignalDirection.momentum_band_signal, 365,
                             conjunction="AND", substrategies=(sub1, sub2))
     wf = WalkForward(data, 0.5, config)
     result = wf.run(window_ranges, signal_ranges)

@@ -17,7 +17,15 @@ def client():
         from api.main import app
         app.state.refdata_cache = MagicMock()
         app.state.refdata_cache.get.side_effect = lambda table: {
-            "indicator": [{"display_name": "SMA", "method_name": "get_sma"}],
+            "indicator": [
+                {"display_name": "SMA", "method_name": "get_sma", "is_bounded_ind": "N"},
+                {"display_name": "Bollinger Band", "method_name": "get_bollinger_band", "is_bounded_ind": "N"},
+                {"display_name": "RSI", "method_name": "get_rsi", "is_bounded_ind": "Y"},
+            ],
+            "signal_type": [
+                {"name": "momentum", "display_name": "Momentum", "func_name_band": "momentum_band_signal", "func_name_bounded": "momentum_bounded_signal"},
+                {"name": "reversion", "display_name": "Reversion", "func_name_band": "reversion_band_signal", "func_name_bounded": "reversion_bounded_signal"},
+            ],
             "app": [
                 {"name": "yahoo", "display_name": "Yahoo Finance", "class_name": "YahooFinance"},
             ],
@@ -98,7 +106,7 @@ class TestOptimizeEndpoint:
             "mode": "single",
             "trading_period": 365,
             "indicator": "get_bollinger_band",
-            "strategy": "momentum_const_signal",
+            "strategy": "momentum",
             "window_range": {"min": 10, "max": 20, "step": 10},
             "signal_range": {"min": 0.01, "max": 0.02, "step": 0.01},
         })
@@ -165,7 +173,7 @@ class TestPerformanceEndpoint:
             "mode": "single",
             "trading_period": 365,
             "indicator": "get_bollinger_band",
-            "strategy": "momentum_const_signal",
+            "strategy": "momentum",
             "window": 20,
             "signal": 1.0,
         })
@@ -220,7 +228,7 @@ class TestWalkForwardEndpoint:
             "trading_period": 365,
             "split_ratio": 0.5,
             "indicator": "get_bollinger_band",
-            "strategy": "momentum_const_signal",
+            "strategy": "momentum",
             "window_range": {"min": 10, "max": 30, "step": 10},
             "signal_range": {"min": 0.5, "max": 1.5, "step": 0.5},
         })

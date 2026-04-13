@@ -35,7 +35,7 @@ INDICATOR_DEFAULTS = {
     },
     "get_rsi": {
         "win_min": 5, "win_max": 50, "win_step": 1,
-        "sig_min": 10.0, "sig_max": 40.0, "sig_step": 5.0,
+        "sig_min": None, "sig_max": None, "sig_step": 5.0,
     },
     "get_bollinger_band": {
         "win_min": 10, "win_max": 100, "win_step": 5,
@@ -43,7 +43,7 @@ INDICATOR_DEFAULTS = {
     },
     "get_stochastic_oscillator": {
         "win_min": 5, "win_max": 50, "win_step": 5,
-        "sig_min": 10.0, "sig_max": 40.0, "sig_step": 5.0,
+        "sig_min": None, "sig_max": None, "sig_step": 5.0,
     },
 }
 
@@ -60,7 +60,7 @@ class SubStrategy:
     in the ``substrategies`` JSON array (design doc §1.1).
     """
     indicator_name: str        # TechnicalAnalysis method, e.g. "get_bollinger_band"
-    signal_func_name: str      # SignalDirection method name, e.g. "momentum_const_signal"
+    signal_func_name: str      # SignalDirection method name, e.g. "momentum_band_signal"
     window: int                # indicator lookback period
     signal: float              # threshold
     data_column: str = "v"     # which raw column becomes 'factor'
@@ -87,7 +87,7 @@ class StrategyConfig:
     """
     ticker: str                # Data-source symbol, e.g. "BTC-USD", "AAPL"
     indicator_name: str        # TechnicalAnalysis method name, e.g. "get_bollinger_band"
-    signal_func: Callable      # e.g. SignalDirection.momentum_const_signal
+    signal_func: Callable      # e.g. SignalDirection.momentum_band_signal
     trading_period: int        # 365 (crypto) or 252 (equity)
     strategy_id: str = field(default_factory=lambda: str(uuid7()))
     name: str = ""             # human-readable; auto-generated if empty
@@ -278,12 +278,15 @@ class SignalDirection:
     """Trading signal generators — all static methods with signature (data_col, signal)."""
 
     @staticmethod
-    def momentum_const_signal(data_col, signal):
-        """Go long when indicator > signal, short when < -signal, flat otherwise.
+    def momentum_band_signal(data_col, signal):
+        """Go long when indicator > +signal, short when < -signal, flat otherwise.
+
+        Symmetric band around zero — for unbounded/zero-centered indicators
+        (Bollinger z-score, SMA deviation, EMA deviation).
 
         Args:
             data_col: indicator values (numpy array or pd.Series)
-            signal: threshold parameter
+            signal: half-width of the band
 
         Returns:
             numpy array of float: positions {-1.0, 0.0, 1.0}, NaN where input is NaN
@@ -294,12 +297,14 @@ class SignalDirection:
         return position
 
     @staticmethod
-    def reversion_const_signal(data_col, signal):
-        """Go long when indicator < -signal, short when > signal, flat otherwise.
+    def reversion_band_signal(data_col, signal):
+        """Go long when indicator < -signal, short when > +signal, flat otherwise.
+
+        Inverse of ``momentum_band_signal``.
 
         Args:
             data_col: indicator values (numpy array or pd.Series)
-            signal: threshold parameter
+            signal: half-width of the band
 
         Returns:
             numpy array of float: positions {-1.0, 0.0, 1.0}, NaN where input is NaN
@@ -309,9 +314,95 @@ class SignalDirection:
         position[np.isnan(data_col)] = np.nan
         return position
 
+    @staticmethod
+    def momentum_bounded_signal(data_col, signal):
+        """Go long when indicator > signal, short when < (100 - signal), flat otherwise.
+
+        Two-sided level threshold for 0–100 bounded indicators (RSI, stochastic).
+        ``signal`` is the upper boundary; the lower is mirrored at ``100 - signal``.
+
+        Example: signal=70 → long when > 70, short when < 30, flat 30–70.
+
+        Args:
+            data_col: indicator values (numpy array or pd.Series)
+            signal: upper threshold (lower = 100 - signal)
+
+        Returns:
+            numpy array of float: positions {-1.0, 0.0, 1.0}, NaN where input is NaN
+        """
+        lower = 100 - signal
+        position = np.where(data_col > signal, 1, np.where(data_col < lower, -1, 0))
+        position = position.astype(float)
+        position[np.isnan(data_col)] = np.nan
+        return position
+
+    @staticmethod
+    def reversion_bounded_signal(data_col, signal):
+        """Go long when indicator < (100 - signal), short when > signal, flat otherwise.
+
+        Inverse of ``momentum_bounded_signal`` — mean-reversion on 0–100
+        bounded indicators. Overbought (> signal) → short, oversold
+        (< 100 - signal) → long.
+
+        Example: signal=70 → short when > 70, long when < 30, flat 30–70.
+
+        Args:
+            data_col: indicator values (numpy array or pd.Series)
+            signal: upper threshold (lower = 100 - signal)
+
+        Returns:
+            numpy array of float: positions {-1.0, 0.0, 1.0}, NaN where input is NaN
+        """
+        lower = 100 - signal
+        position = np.where(data_col < lower, 1, np.where(data_col > signal, -1, 0))
+        position = position.astype(float)
+        position[np.isnan(data_col)] = np.nan
+        return position
+
 
 # Backward-compat alias
 Strategy = SignalDirection
+
+
+def resolve_signal_func(signal_name: str, indicator_name: str,
+                        indicator_rows: list[dict],
+                        signal_type_rows: list[dict]) -> Callable:
+    """Resolve user-facing signal direction + indicator → concrete signal function.
+
+    Reads ``IS_BOUNDED_IND`` from ``REFDATA.INDICATOR`` and picks
+    ``FUNC_NAME_BAND`` or ``FUNC_NAME_BOUNDED`` from ``REFDATA.SIGNAL_TYPE``.
+
+    Args:
+        signal_name: user-facing name, e.g. ``"momentum"`` or ``"reversion"``
+        indicator_name: TechnicalAnalysis method, e.g. ``"get_rsi"``
+        indicator_rows: cached rows from ``REFDATA.INDICATOR``
+        signal_type_rows: cached rows from ``REFDATA.SIGNAL_TYPE``
+
+    Returns:
+        Callable on ``SignalDirection``
+
+    Raises:
+        ValueError: if signal_name or indicator_name not found in REFDATA
+    """
+    # 1. Look up indicator → is it bounded?
+    ind = next((r for r in indicator_rows
+                if r["method_name"] == indicator_name), None)
+    if ind is None:
+        raise ValueError(f"Unknown indicator: {indicator_name}")
+    bounded = ind.get("is_bounded_ind") == "Y"
+
+    # 2. Look up signal type → pick correct func column
+    sig = next((r for r in signal_type_rows
+                if r["name"] == signal_name), None)
+    if sig is None:
+        raise ValueError(f"Unknown signal type: {signal_name}")
+    func_name = sig["func_name_bounded"] if bounded else sig["func_name_band"]
+
+    # 3. Resolve to actual callable
+    func = getattr(SignalDirection, func_name, None)
+    if func is None:
+        raise ValueError(f"SignalDirection has no method '{func_name}'")
+    return func
 
 
 # ---------------------------------------------------------------------------
