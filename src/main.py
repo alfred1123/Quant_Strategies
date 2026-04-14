@@ -181,6 +181,8 @@ def main(args=None):
         'datetime': price['t'],
         'price':    price['v'],
         'factor':   price['v'],
+        **{col: price[col] for col in ('Open', 'High', 'Low', 'Close', 'Volume')
+           if col in price.columns},
     })
     logger.info("Loaded %d daily bars: %s → %s",
                 len(df), df['datetime'].iloc[0], df['datetime'].iloc[-1])

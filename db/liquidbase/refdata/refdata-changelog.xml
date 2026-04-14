@@ -161,7 +161,21 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="159-refdata-seed-indicator-bounded-sig" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/INDICATOR_BOUNDED_SIG.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql>UPDATE REFDATA.INDICATOR SET SIG_MIN = NULL, SIG_MAX = NULL WHERE METHOD_NAME IN ('get_rsi', 'get_stochastic_oscillator');</sql>
+        </rollback>
+    </changeSet>
+
     <!-- ========== REFDATA procedures ========== -->
+
+    <changeSet id="161-refdata-seed-conjunction-filter" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/CONJUNCTION_FILTER.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql>DELETE FROM REFDATA.CONJUNCTION WHERE NAME = 'FILTER';</sql>
+        </rollback>
+    </changeSet>
 
     <changeSet id="160-refdata-proc-sp-get-enum" author="alfcheun" context="refdata" runOnChange="true">
         <sqlFile path="procedures/SP_GET_ENUM.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>

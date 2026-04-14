@@ -104,6 +104,7 @@ class PerformanceResponse(BaseModel):
     strategy_metrics: dict
     buy_hold_metrics: dict
     equity_curve: list[EquityPoint]
+    perf_csv: str
 
 
 class WalkForwardResponse(BaseModel):

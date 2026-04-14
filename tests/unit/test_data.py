@@ -283,7 +283,11 @@ class TestYahooFinance:
         df = yf_src.get_historical_price("AAPL", "2021-01-04", "2021-01-05")
 
         assert isinstance(df, pd.DataFrame)
-        assert list(df.columns) == ["t", "v"]
+        assert "t" in df.columns
+        assert "v" in df.columns
+        assert "High" in df.columns
+        assert "Low" in df.columns
+        assert "Close" in df.columns
         assert len(df) == 2
         assert df.iloc[0]["v"] == pytest.approx(129.41)
         assert df.iloc[1]["v"] == pytest.approx(131.01)

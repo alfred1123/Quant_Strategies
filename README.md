@@ -541,10 +541,14 @@ data.py ──► strat.py ──► perf.py ──► param_opt.py ──► wa
 
 **Signal Directions** (`strat.py` — `SignalDirection` class):
 
-| Method | Long (+1) | Short (-1) | Flat (0) |
-|---|---|---|---|
-| `momentum_band_signal` | indicator > +signal | indicator < −signal | otherwise |
-| `reversion_band_signal` | indicator < −signal | indicator > +signal | otherwise |
+The backend automatically selects the correct signal variant (band vs bounded) based on the indicator's `IS_BOUNDED_IND` flag in REFDATA. Band signals are for zero-centered indicators (Bollinger, SMA, EMA); bounded signals are for 0–100 indicators (RSI, Stochastic).
+
+| Method | Indicator Type | Long (+1) | Short (-1) | Flat (0) |
+|---|---|---|---|---|
+| `momentum_band_signal` | Unbounded | indicator > +signal | indicator < −signal | otherwise |
+| `reversion_band_signal` | Unbounded | indicator < −signal | indicator > +signal | otherwise |
+| `momentum_bounded_signal` | Bounded (0–100) | indicator > signal | indicator < (100 − signal) | otherwise |
+| `reversion_bounded_signal` | Bounded (0–100) | indicator < (100 − signal) | indicator > signal | otherwise |
 
 **StrategyConfig** (`strat.py`) — frozen dataclass packaging the strategy identity:
 

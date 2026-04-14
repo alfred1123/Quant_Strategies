@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   Drawer, Box, Typography, TextField, Select, MenuItem,
   FormControl, InputLabel, Button, Divider, IconButton, Stack, CircularProgress,
@@ -27,15 +28,10 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   const handleIndicatorChange = (method_name: string) => {
     const ind = indicators.find(i => i.method_name === method_name);
     if (ind) {
-      const bounded = ind.is_bounded_ind === 'Y';
       set({
         indicator: method_name,
         windowRange: { min: ind.win_min, max: ind.win_max, step: ind.win_step },
-        signalRange: {
-          min: bounded ? 0 : (ind.sig_min ?? 0),
-          max: bounded ? 0 : (ind.sig_max ?? 0),
-          step: ind.sig_step,
-        },
+        signalRange: { min: ind.sig_min, max: ind.sig_max, step: ind.sig_step },
       });
     } else {
       set({ indicator: method_name });
@@ -44,7 +40,6 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
 
   const handleFactorIndicatorChange = (i: number, method_name: string) => {
     const ind = indicators.find(x => x.method_name === method_name);
-    const isBounded = ind?.is_bounded_ind === 'Y';
     const updated = config.factors.map((f, idx) => {
       if (idx !== i) return f;
       return {
@@ -53,11 +48,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
         ...(ind
           ? {
               window_range: { min: ind.win_min, max: ind.win_max, step: ind.win_step } as RangeParam,
-              signal_range: {
-                min: isBounded ? 0 : (ind.sig_min ?? 0),
-                max: isBounded ? 0 : (ind.sig_max ?? 0),
-                step: ind.sig_step,
-              } as RangeParam,
+              signal_range: { min: ind.sig_min, max: ind.sig_max, step: ind.sig_step } as RangeParam,
             }
           : {}),
       };
@@ -65,30 +56,25 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
     set({ factors: updated });
   };
 
-  const isFactorBounded = (factor: FactorConfig): boolean => {
-    const ind = indicators.find(x => x.method_name === factor.indicator);
-    return ind?.is_bounded_ind === 'Y';
-  };
-
   const addFactor = () => {
     if (config.factors.length >= 2) return;
     const first = indicators[0];
-    const bounded = first?.is_bounded_ind === 'Y';
     const newFactor: FactorConfig = {
       indicator: first?.method_name ?? '',
       strategy: signalTypes[0]?.name ?? '',
       data_column: 'price',
       window_range: { min: first?.win_min ?? 5, max: first?.win_max ?? 100, step: first?.win_step ?? 5 },
-      signal_range: {
-        min: bounded ? 0 : (first?.sig_min ?? 0.25),
-        max: bounded ? 0 : (first?.sig_max ?? 2.5),
-        step: first?.sig_step ?? 0.25,
-      },
+      signal_range: { min: first?.sig_min ?? 0, max: first?.sig_max ?? 0, step: first?.sig_step ?? 1 },
     };
     set({ factors: [...config.factors, newFactor] });
   };
 
   const removeFactor = (i: number) => set({ factors: config.factors.filter((_, idx) => idx !== i) });
+
+  const isFactorBounded = (factor: FactorConfig): boolean => {
+    const ind = indicators.find(x => x.method_name === factor.indicator);
+    return ind?.is_bounded_ind === 'Y';
+  };
 
   const updateFactor = (i: number, patch: Partial<FactorConfig>) => {
     set({ factors: config.factors.map((f, idx) => idx === i ? { ...f, ...patch } : f) });
@@ -196,7 +182,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
         {config.factors.map((factor, i) => {
           const factorTrials = countSteps(factor.window_range) * countSteps(factor.signal_range);
           return (
-            <>
+            <React.Fragment key={i}>
               {/* Conjunction block — sits between factor 1 and factor 2 */}
               {i === 1 && (
                 <Box key="conjunction" sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -214,16 +200,16 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
                 </Box>
               )}
 
-              <Box key={i} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2, bgcolor: 'background.paper' }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+              <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2, bgcolor: 'background.paper' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                   <Typography variant="caption" fontWeight={600}>
                     Factor {i + 1}
                     <Typography component="span" variant="caption" color="text.secondary" fontWeight={400}>
                       {' '}— {factorTrials.toLocaleString()} grid pts
                     </Typography>
                   </Typography>
-                  {i > 0 && (
-                    <IconButton size="small" onClick={() => removeFactor(i)}>×</IconButton>
+                  {config.factors.length > 1 && (
+                    <IconButton size="small" onClick={() => removeFactor(i)} title="Remove factor">✕</IconButton>
                   )}
                 </Box>
                 <Stack spacing={1}>
@@ -254,16 +240,18 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
                       onChange={e => updateFactor(i, { window_range: { ...factor.window_range, step: Number(e.target.value) } })} />
                     <TextField label="Sig Min" size="small" type="number" value={factor.signal_range.min} sx={{ width: 80 }}
                       disabled={isFactorBounded(factor)}
+                      slotProps={{ inputLabel: { shrink: true } }}
                       onChange={e => updateFactor(i, { signal_range: { ...factor.signal_range, min: Number(e.target.value) } })} />
                     <TextField label="Sig Max" size="small" type="number" value={factor.signal_range.max} sx={{ width: 80 }}
                       disabled={isFactorBounded(factor)}
+                      slotProps={{ inputLabel: { shrink: true } }}
                       onChange={e => updateFactor(i, { signal_range: { ...factor.signal_range, max: Number(e.target.value) } })} />
                     <TextField label="Sig Step" size="small" type="number" value={factor.signal_range.step} sx={{ width: 80 }}
                       onChange={e => updateFactor(i, { signal_range: { ...factor.signal_range, step: Number(e.target.value) } })} />
                   </Stack>
                 </Stack>
               </Box>
-            </>
+            </React.Fragment>
           );
         })}
         {config.factors.length < 2 && (

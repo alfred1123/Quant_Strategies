@@ -109,7 +109,10 @@ class Performance:
             self.data[f'position{idx}'] = pos
             positions.append(pos)
 
-        combined = combine_positions(positions, self.config.conjunction)
+        indicator_strengths = [self.data[f'indicator{i+1}'].values
+                               for i in range(len(self._subs))]
+        combined = combine_positions(positions, self.config.conjunction,
+                                     strengths=indicator_strengths)
         self.data['FinalPosition'] = combined
 
     def _compute_pnl_columns(self):

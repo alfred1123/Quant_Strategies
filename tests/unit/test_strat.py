@@ -427,11 +427,6 @@ class TestCombinePositions:
         with pytest.raises(ValueError, match="must not be empty"):
             combine_positions([])
 
-    def test_invalid_conjunction_raises(self):
-        a = np.array([1.0])
-        with pytest.raises(ValueError, match="conjunction must be"):
-            combine_positions([a, a], "XOR")
-
     def test_nan_propagation(self):
         a = np.array([np.nan, 1.0, -1.0])
         b = np.array([1.0, np.nan, -1.0])
@@ -461,6 +456,122 @@ class TestCombinePositions:
         result_upper = combine_positions([a, b], "AND")
         np.testing.assert_array_equal(result_lower, result_upper)
 
+    # --- Signal-strength conflict resolution (percentile rank) ---
+    # Tests use 10-element arrays so percentile rank has enough history
+    # to distinguish extreme from moderate readings.
+
+    def test_and_disagree_strength_wins(self):
+        """AND + strengths: disagreement resolved by strongest factor."""
+        # Rows 0-1 disagree; rows 2-9 are filler (both flat)
+        a = np.array([1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        b = np.array([-1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        # sa: readings near the middle of distribution → low conviction
+        sa = np.array([50, 50, 48, 52, 49, 51, 48, 52, 49, 51])
+        # sb: extreme readings on rows 0/1 → high conviction → b wins
+        sb = np.array([99, 1, 50, 50, 50, 50, 50, 50, 50, 50])
+        result = combine_positions([a, b], "AND", strengths=[sa, sb])
+        assert result[0] == -1.0  # b wins (99 = extreme high percentile)
+        assert result[1] == 1.0   # b wins (1 = extreme low percentile)
+
+    def test_or_conflict_strength_wins(self):
+        """OR + strengths: conflict resolved by strongest factor."""
+        a = np.array([1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        b = np.array([-1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        # a extreme on row 0, b extreme on row 1
+        sa = np.array([99, 50, 50, 50, 50, 50, 50, 50, 50, 50])
+        sb = np.array([50, 99, 50, 50, 50, 50, 50, 50, 50, 50])
+        result = combine_positions([a, b], "OR", strengths=[sa, sb])
+        assert result[0] == 1.0   # a wins row 0 (a more extreme)
+        assert result[1] == 1.0   # b wins row 1 (b more extreme)
+
+    def test_and_strength_ignores_flat_factors(self):
+        """Flat (0) factors don't compete in strength tiebreak."""
+        a = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        b = np.array([0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        sa = np.array([50, 50, 48, 52, 49, 51, 48, 52, 49, 51])
+        sb = np.array([50, 50, 48, 52, 49, 51, 48, 52, 49, 51])
+        result = combine_positions([a, b], "AND", strengths=[sa, sb])
+        # Row 0: a=+1 b=0 → only a has signal → a wins (+1)
+        # Row 1: a=0 b=-1 → only b has signal → b wins (-1)
+        assert result[0] == 1.0
+        assert result[1] == -1.0
+
+    def test_three_factors_strength_tiebreak(self):
+        """Three factors disagree, percentile rank picks the winner."""
+        a = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        b = np.array([-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        c = np.array([-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        # b has the most extreme reading on row 0 → b wins
+        sa = np.array([50, 48, 52, 49, 51, 50, 48, 52, 49, 51])
+        sb = np.array([99, 48, 52, 49, 51, 50, 48, 52, 49, 51])
+        sc = np.array([50, 48, 52, 49, 51, 50, 48, 52, 49, 51])
+        result = combine_positions([a, b, c], "AND", strengths=[sa, sb, sc])
+        assert result[0] == -1.0  # b wins (most extreme)
+
+    def test_strengths_none_preserves_legacy(self):
+        """Without strengths, AND disagree stays flat, OR conflict positive wins."""
+        a = np.array([1.0, 1.0])
+        b = np.array([-1.0, -1.0])
+        and_result = combine_positions([a, b], "AND", strengths=None)
+        or_result = combine_positions([a, b], "OR", strengths=None)
+        np.testing.assert_array_equal(and_result, [0.0, 0.0])
+        np.testing.assert_array_equal(or_result, [1.0, 1.0])
+
+    # --- FILTER conjunction mode ---
+
+    def test_filter_gate_active_uses_signal_direction(self):
+        """FILTER: gate active (+1) → use signal factor direction."""
+        gate = np.array([1.0, 1.0, 1.0, 0.0])   # active except row 3
+        signal = np.array([1.0, -1.0, 0.0, 1.0])  # direction
+        result = combine_positions([gate, signal], "FILTER")
+        np.testing.assert_array_equal(result, [1.0, -1.0, 0.0, 0.0])
+
+    def test_filter_gate_inactive_gives_flat(self):
+        """FILTER: gate inactive (0) → always flat regardless of signal."""
+        gate = np.array([0.0, 0.0, 0.0])
+        signal = np.array([1.0, -1.0, 0.0])
+        result = combine_positions([gate, signal], "FILTER")
+        np.testing.assert_array_equal(result, [0.0, 0.0, 0.0])
+
+    def test_filter_gate_negative_counts_as_active(self):
+        """FILTER: gate -1 is still active (non-zero), direction comes from signal."""
+        gate = np.array([-1.0, -1.0])
+        signal = np.array([1.0, -1.0])
+        result = combine_positions([gate, signal], "FILTER")
+        np.testing.assert_array_equal(result, [1.0, -1.0])
+
+    def test_filter_three_factors_signals_agree(self):
+        """FILTER with 3 factors: gate + 2 signals AND-combined."""
+        gate = np.array([1.0, 1.0, 1.0, 0.0])
+        sig_a = np.array([1.0, 1.0, -1.0, 1.0])
+        sig_b = np.array([1.0, -1.0, -1.0, 1.0])
+        result = combine_positions([gate, sig_a, sig_b], "FILTER")
+        # Row 0: gate on, both +1 → +1
+        # Row 1: gate on, disagree → 0 (AND of signals)
+        # Row 2: gate on, both -1 → -1
+        # Row 3: gate off → 0
+        np.testing.assert_array_equal(result, [1.0, 0.0, -1.0, 0.0])
+
+    def test_filter_nan_propagation(self):
+        """FILTER: NaN in gate or signal → NaN in output."""
+        gate = np.array([np.nan, 1.0, 1.0])
+        signal = np.array([1.0, np.nan, -1.0])
+        result = combine_positions([gate, signal], "FILTER")
+        assert np.isnan(result[0])
+        assert np.isnan(result[1])
+        assert result[2] == -1.0
+
+    def test_filter_case_insensitive(self):
+        gate = np.array([1.0, 0.0])
+        signal = np.array([1.0, -1.0])
+        result = combine_positions([gate, signal], "filter")
+        np.testing.assert_array_equal(result, [1.0, 0.0])
+
+    def test_invalid_conjunction_raises(self):
+        a = np.array([1.0])
+        with pytest.raises(ValueError, match="conjunction must be"):
+            combine_positions([a, a], "XOR")
+
 
 class TestIndicatorDefaults:
     REQUIRED_KEYS = {"win_min", "win_max", "win_step",
@@ -482,11 +593,11 @@ class TestIndicatorDefaults:
             if b["sig_min"] is not None:
                 assert b["sig_min"] < b["sig_max"], f"{name}: sig_min >= sig_max"
 
-    def test_bounded_indicators_have_null_sig(self):
+    def test_bounded_indicators_have_sig_range(self):
         for name in ("get_rsi", "get_stochastic_oscillator"):
             b = INDICATOR_DEFAULTS[name]
-            assert b["sig_min"] is None, f"{name}: sig_min should be None"
-            assert b["sig_max"] is None, f"{name}: sig_max should be None"
+            assert b["sig_min"] == 0.0, f"{name}: sig_min should be 0.0"
+            assert b["sig_max"] == 100.0, f"{name}: sig_max should be 100.0"
             assert b["sig_step"] == 5.0, f"{name}: sig_step should be 5.0"
 
     def test_window_min_at_least_two(self):

@@ -207,6 +207,8 @@ def fetch_data(symbol, start, end):
         "datetime": price["t"],
         "price": price["v"],
         "factor": price["v"],
+        **{col: price[col] for col in ("Open", "High", "Low", "Close", "Volume")
+           if col in price.columns},
     })
 
 

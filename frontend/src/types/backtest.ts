@@ -96,6 +96,7 @@ export interface PerformanceResponse {
   strategy_metrics: Record<string, number>;
   buy_hold_metrics: Record<string, number>;
   equity_curve: EquityPoint[];
+  perf_csv: string;
 }
 
 // Walk-forward analysis

@@ -200,15 +200,12 @@ export default function BacktestPage() {
     loadPerf(row, index, config);
   };
 
-  const downloadCSV = () => {
-    if (!optimizeResult || !optimizeResult.top10.length) return;
-    const rows = optimizeResult.top10;
-    const keys = Object.keys(rows[0]);
-    const csv = [keys.join(','), ...rows.map(r => keys.map(k => r[k]).join(','))].join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  const downloadPerfCSV = () => {
+    if (!perfResult?.perf_csv) return;
+    const url = URL.createObjectURL(new Blob([perfResult.perf_csv], { type: 'text/csv' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `top10_${config.symbol}.csv`;
+    a.download = `perf_${config.symbol}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -284,7 +281,6 @@ export default function BacktestPage() {
                   <Chip label={config.conjunction} size="small" color="warning" variant="outlined" />
                 )}
                 <Box sx={{ flexGrow: 1 }} />
-                <Button size="small" variant="outlined" onClick={downloadCSV}>↓ Export CSV</Button>
                 <Button size="small" variant="outlined" onClick={() => setDrawerOpen(true)}>⚙ Re-configure</Button>
               </Stack>
             </Paper>
@@ -310,6 +306,10 @@ export default function BacktestPage() {
                     <Chip label={viewingLabel} size="small" variant="outlined" color="primary" />
                   )}
                   {isLoadingPerf && <CircularProgress size={16} />}
+                  <Box sx={{ flexGrow: 1 }} />
+                  {perfResult?.perf_csv && (
+                    <Button size="small" variant="outlined" onClick={downloadPerfCSV}>↓ Export CSV</Button>
+                  )}
                 </Stack>
 
                 {isLoadingPerf && <LinearProgress sx={{ mb: 2 }} />}

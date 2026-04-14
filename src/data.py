@@ -267,6 +267,10 @@ class YahooFinance:
             "v": hist["Close"].values,
         })
         df["v"] = df["v"].astype(float)
+        # Include OHLC columns for indicators that need them (e.g. stochastic)
+        for col in ("Open", "High", "Low", "Close", "Volume"):
+            if col in hist.columns:
+                df[col] = hist[col].values.astype(float)
         logger.info("YahooFinance: fetched %d rows for %s (%s to %s)",
                     len(df), symbol, start_date, end_date)
         return df.reset_index(drop=True)

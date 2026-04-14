@@ -35,7 +35,7 @@ INDICATOR_DEFAULTS = {
     },
     "get_rsi": {
         "win_min": 5, "win_max": 50, "win_step": 1,
-        "sig_min": None, "sig_max": None, "sig_step": 5.0,
+        "sig_min": 0.0, "sig_max": 100.0, "sig_step": 5.0,
     },
     "get_bollinger_band": {
         "win_min": 10, "win_max": 100, "win_step": 5,
@@ -43,7 +43,7 @@ INDICATOR_DEFAULTS = {
     },
     "get_stochastic_oscillator": {
         "win_min": 5, "win_max": 50, "win_step": 5,
-        "sig_min": None, "sig_max": None, "sig_step": 5.0,
+        "sig_min": 0.0, "sig_max": 100.0, "sig_step": 5.0,
     },
 }
 
@@ -91,7 +91,7 @@ class StrategyConfig:
     trading_period: int        # 365 (crypto) or 252 (equity)
     strategy_id: str = field(default_factory=lambda: str(uuid7()))
     name: str = ""             # human-readable; auto-generated if empty
-    conjunction: str = "AND"   # "AND" | "OR" — how substrategies combine
+    conjunction: str = "AND"   # "AND" | "OR" | "FILTER" — how substrategies combine
     substrategies: tuple = ()  # tuple[SubStrategy, ...]; empty = single-factor legacy
 
     @classmethod
@@ -229,13 +229,20 @@ class TechnicalAnalysis:
         return d
 
 
-def combine_positions(positions: list, conjunction: str = "AND") -> np.ndarray:
-    """Combine position arrays from multiple factors using AND/OR logic.
+def combine_positions(positions: list, conjunction: str = "AND",
+                      strengths: list | None = None) -> np.ndarray:
+    """Combine position arrays from multiple factors using AND/OR/FILTER logic.
 
     Args:
         positions: list of numpy arrays, each containing {-1, 0, 1, NaN}.
-        conjunction: "AND" — position only when ALL agree;
-                     "OR"  — position when ANY factor signals.
+        conjunction: "AND"    — position only when ALL agree;
+                     "OR"     — position when ANY factor signals;
+                     "FILTER" — first factor gates on/off (non-zero = pass),
+                                remaining factors provide direction (AND-combined).
+        strengths: optional list of numpy arrays with raw indicator values.
+            When provided, conflicts are resolved by signal strength
+            (the factor with the most extreme reading wins) instead of
+            going flat (AND) or defaulting to long (OR).
 
     Returns:
         numpy array of {-1.0, 0.0, 1.0}, NaN where any input is NaN.
@@ -250,25 +257,113 @@ def combine_positions(positions: list, conjunction: str = "AND") -> np.ndarray:
         return positions[0].copy()
 
     conj = conjunction.upper()
-    if conj not in ("AND", "OR"):
-        raise ValueError(f"conjunction must be 'AND' or 'OR', got '{conjunction}'")
+    if conj not in ("AND", "OR", "FILTER"):
+        raise ValueError(f"conjunction must be 'AND', 'OR', or 'FILTER', got '{conjunction}'")
 
     stacked = np.column_stack(positions)  # shape (n, num_factors)
     nan_mask = np.isnan(stacked).any(axis=1)
+    signs = np.sign(stacked)
+
+    if conj == "FILTER":
+        # First factor = gate (non-zero = active, direction ignored).
+        # Remaining factors = signal (provide direction, AND-combined).
+        gate = signs[:, 0] != 0  # True when gate is active
+
+        if signs.shape[1] == 2:
+            # Single signal factor — use its direction directly
+            combined = np.where(gate, stacked[:, 1], 0.0)
+        else:
+            # Multiple signal factors — AND-combine them
+            sig_signs = signs[:, 1:]
+            all_pos = (sig_signs == 1).all(axis=1)
+            all_neg = (sig_signs == -1).all(axis=1)
+            direction = np.where(all_pos, 1.0, np.where(all_neg, -1.0, 0.0))
+
+            # Disagreement among signals: resolve by strength if available
+            if strengths is not None:
+                sig_strengths = strengths[1:]
+                sig_positions = positions[1:]
+                has_signal = (sig_signs != 0).any(axis=1)
+                disagree = ~all_pos & ~all_neg & has_signal & ~nan_mask
+                if disagree.any():
+                    raw = np.column_stack(sig_strengths).astype(float)
+                    n_rows, n_cols = raw.shape
+                    pctile = np.full_like(raw, 0.5)
+                    for j in range(n_cols):
+                        col = raw[:, j]
+                        valid_mask = ~np.isnan(col)
+                        valid_count = valid_mask.sum()
+                        if valid_count <= 1:
+                            continue
+                        sorted_vals = np.sort(col[valid_mask])
+                        ranks = np.searchsorted(sorted_vals, col[valid_mask], side='right')
+                        pctile[valid_mask, j] = ranks / valid_count
+                    conv = np.abs(pctile - 0.5)
+                    masked = np.where(sig_signs[disagree] != 0, conv[disagree], -np.inf)
+                    winner = np.argmax(masked, axis=1)
+                    rows = np.arange(disagree.sum())
+                    direction[disagree] = sig_signs[disagree][rows, winner]
+
+            combined = np.where(gate, direction, 0.0)
+
+        combined = combined.astype(float)
+        combined[nan_mask] = np.nan
+        return combined
+
+    # Build per-factor conviction from raw indicator strengths.
+    # Percentile-rank each factor column independently, then measure
+    # distance from the median (0.5).  More extreme readings — whether
+    # at the top or bottom of the historical distribution — yield
+    # higher conviction.  Scale-invariant: RSI (0-100), Bollinger z
+    # (-3 to +3), and SMA ($) all become directly comparable.
+    conviction = None
+    if strengths is not None:
+        raw = np.column_stack(strengths).astype(float)
+        n_rows, n_cols = raw.shape
+        pctile = np.full_like(raw, 0.5)
+        for j in range(n_cols):
+            col = raw[:, j]
+            valid_mask = ~np.isnan(col)
+            valid_count = valid_mask.sum()
+            if valid_count <= 1:
+                continue  # single value → neutral conviction (0.5)
+            sorted_vals = np.sort(col[valid_mask])
+            ranks = np.searchsorted(sorted_vals, col[valid_mask], side='right')
+            pctile[valid_mask, j] = ranks / valid_count
+        conviction = np.abs(pctile - 0.5)
 
     if conj == "AND":
-        # All factors must agree on the same non-zero direction
-        signs = np.sign(stacked)
         all_positive = (signs == 1).all(axis=1)
         all_negative = (signs == -1).all(axis=1)
         combined = np.where(all_positive, 1.0, np.where(all_negative, -1.0, 0.0))
+
+        # Disagreement: strongest non-zero factor wins when strengths available
+        if conviction is not None:
+            has_signal = (signs != 0).any(axis=1)
+            disagree = ~all_positive & ~all_negative & has_signal & ~nan_mask
+            if disagree.any():
+                masked = np.where(signs[disagree] != 0, conviction[disagree], -np.inf)
+                winner = np.argmax(masked, axis=1)
+                rows = np.arange(disagree.sum())
+                combined[disagree] = signs[disagree][rows, winner]
     else:  # OR
-        # Any factor with a non-zero signal wins; take the first non-zero direction
-        signs = np.sign(stacked)
         any_positive = (signs == 1).any(axis=1)
         any_negative = (signs == -1).any(axis=1)
-        # Positive wins over negative when both present (arbitrary but consistent)
-        combined = np.where(any_positive, 1.0, np.where(any_negative, -1.0, 0.0))
+        conflict = any_positive & any_negative
+
+        # No conflict: straightforward direction
+        combined = np.where(any_positive & ~conflict, 1.0,
+                            np.where(any_negative & ~conflict, -1.0, 0.0))
+
+        if conviction is not None and conflict.any():
+            # Conflict: strongest signal wins
+            masked = np.where(signs[conflict] != 0, conviction[conflict], -np.inf)
+            winner = np.argmax(masked, axis=1)
+            rows = np.arange(conflict.sum())
+            combined[conflict] = signs[conflict][rows, winner]
+        else:
+            # Legacy fallback: positive wins over negative
+            combined[conflict] = 1.0
 
     combined[nan_mask] = np.nan
     return combined

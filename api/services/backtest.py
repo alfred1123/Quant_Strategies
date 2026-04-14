@@ -40,6 +40,8 @@ def _fetch_df(symbol: str, start: str, end: str, data_source: str, cache) -> pd.
         "datetime": price["t"],
         "price": price["v"],
         "factor": price["v"],
+        **{col: price[col] for col in ("Open", "High", "Low", "Close", "Volume")
+           if col in price.columns},
     })
 
 
@@ -152,10 +154,13 @@ def run_performance(req: PerformanceRequest, cache) -> PerformanceResponse:
         for _, row in chart_df.iterrows()
     ]
 
+    perf_csv = perf.data.to_csv(index=False)
+
     return PerformanceResponse(
         strategy_metrics=strat_metrics,
         buy_hold_metrics=bh_metrics,
         equity_curve=equity_curve,
+        perf_csv=perf_csv,
     )
 
 
