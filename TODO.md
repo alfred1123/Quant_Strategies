@@ -118,7 +118,7 @@ All agreed decisions in one place. Referenced by conflict # from the original di
   - `BT.SP_INS_API_REQUEST_PAYLOAD` — append-only insert into yearly-partitioned table.
   - All use `IN_XXX`/`OUT_XXX` naming, `LANGUAGE plpgsql`, `EXCEPTION WHEN OTHERS` + `GET STACKED DIAGNOSTICS`, `V_LOG_STATE`/`V_LOG_MSG` for CORE_INS_LOG_PROC OUT params.
 - **TRADE procedures:** Deferred — low priority until Trade API (Phase 7) is actively developed.
-- **Seed data:** REFDATA.ASSET_TYPE, REFDATA.INDICATOR, REFDATA.SIGNAL_TYPE populated.
+- **Seed data:** REFDATA.ASSET_TYPE, REFDATA.INDICATOR, REFDATA.SIGNAL_TYPE, REFDATA.CONJUNCTION (AND/OR/FILTER), REFDATA.DATA_COLUMN (price/volume) populated.
 - **Conventions:** See `.github/skills/db-ddl/SKILL.md` (DDL + procedure patterns) and `.github/skills/liquibase/SKILL.md` (deployment patterns).
 
 ### Phase 7 — Trade API service (design doc: `docs/design-trade-api.md`)
@@ -152,6 +152,11 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 
 - FastAPI backend (shared with Trade API from Phase 7). ✅
 - React/TS frontend replacing Streamlit. ✅ (scaffold + all components created, REFDATA dropdowns wired)
+- **FILTER conjunction mode** ✅ — `combine_positions()` supports AND / OR / FILTER. FILTER uses factor 1 as a gate for factor 2's directional signals. `REFDATA.CONJUNCTION` seeded with all three modes. 7 FILTER unit tests.
+- **Strength-based tiebreak** ✅ — `combine_positions()` uses `np.searchsorted` percentile-rank strength for AND/OR to break ties when factors disagree in magnitude. 5 strength unit tests.
+- **SSE progress bar** ✅ — `POST /optimize/stream` endpoint streams `init`, `progress`, `result` events. Frontend `runOptimizeStream()` parses SSE via `ReadableStream`. Determinate `LinearProgress` bar shows trial count and best Sharpe in real time.
+- **Trial count display** ✅ — ConfigDrawer shows calculated trial count with OPTUNA_MAX_TRIALS (10,000) cap awareness before running.
+- **Data Column dropdown** ✅ — Each factor card has a Data Column selector (Price / Volume) as the leftmost dropdown. `REFDATA.DATA_COLUMN` seeded with both rows. `DataColumnRow` type + `useDataColumns()` hook in frontend.
 - **UI styling (remaining):** layout spacing, theme consistency, responsive breakpoints, loading/error states, colour palette, drawer polish, chart sizing.
 - Deploy button wired to Trade API `/deployments` endpoint.
 - Strategy review dashboard: backtest results, live performance, trade log.
@@ -163,6 +168,7 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 1. CI/CD to deploy to production
 2. Hard coded options in main.py should be stored in the object script originated.
 3. Logging: all modules now follow log_config.py pattern. ✓
+4. **Backtest speed optimization** — design doc at `docs/design-backtest-speed.md`. Key findings: numpy-only Sharpe (O-1) + indicator cache (O-2) = ~120× speedup per trial. Implementation deferred.
 
 ---
 

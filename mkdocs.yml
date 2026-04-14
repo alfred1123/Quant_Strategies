@@ -1,0 +1,84 @@
+site_name: Quant Strategies Wiki
+site_description: Backtesting and trading framework for crypto and equity markets
+site_url: https://alfred1123.github.io/Quant_Strategies/
+repo_url: https://github.com/alfred1123/Quant_Strategies
+repo_name: alfred1123/Quant_Strategies
+
+dev_addr: 127.0.0.1:8001
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Quick Start: getting-started.md
+      - Environment Variables: env-vars.md
+  - Architecture:
+      - Pipeline: architecture/pipeline.md
+      - FastAPI Backend: architecture/api.md
+      - React Frontend: architecture/frontend.md
+      - Database: architecture/database.md
+  - Guides:
+      - CLI Backtest: guides/cli-backtest.md
+      - Indicators & Strategies: guides/indicators-strategies.md
+      - Paper Trading (Futu): guides/trading.md
+      - Adding Indicators: guides/adding-indicators.md
+      - Adding Strategies: guides/adding-strategies.md
+      - Running Tests: guides/testing.md
+  - Design Docs:
+      - Backtest API: design/backtest-api.md
+      - Trade API: design/trade-api.md
+      - TypeScript Migration: design/ts-migration.md
+      - Backtest Speed: design/backtest-speed.md
+  - Decisions: decisions.md

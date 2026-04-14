@@ -16,3 +16,4 @@ psycopg[binary]
 httpx
 pytest
 boto3
+mkdocs-material

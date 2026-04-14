@@ -10,6 +10,7 @@ This repository contains Python tooling for **backtesting**, **technical analysi
 | `src/app.py` | **[DECO:STREAMLIT]** Streamlit UI — kept until TypeScript frontend reaches parity (Phase 8, migration M-6). Remove together with `streamlit` pip dep and all hardcoded registries. See `docs/design-ts-migration.md` §10 |
 | `api/` | FastAPI backend (Phase 7+8) — serves backtest + trade endpoints; imports `src/` modules directly |
 | `frontend/` | React/TypeScript SPA (Phase 8) — replaces Streamlit |
+| `docs/` | MkDocs Material wiki — architecture, guides, design docs, decisions log. Serve locally with `mkdocs serve`. |
 | `backup/deco/` | Decommissioned scripts (Bybit live trading — kept for reference) |
 
 Run backtest-style code from `src/` (imports are relative to that package, e.g. `from data import ...` in `main.py`).
@@ -29,6 +30,7 @@ Run backtest-style code from `src/` (imports are relative to that package, e.g. 
 ### Testing: After any change to `src/`, review and update the corresponding unit tests in `tests/unit/` and integration tests in `tests/integration/`. New functions or classes must have unit tests. Run `python -m pytest tests/ -v` and confirm all tests pass before considering the change complete.
 - **Secrets**: API keys and env live in `.env` (gitignored) at the project root. Never commit credentials or paste them into source files.
 - **README**: After any change that affects usage, setup, CLI options, directory structure, data sources, or dependencies, review and update `README.md` to keep it accurate.
+- **Wiki**: After any change that affects architecture, API endpoints, database schema, indicators, strategies, or design decisions, review and update the relevant page in `docs/` (MkDocs wiki). Run `mkdocs serve` to preview.
 
 ## Logging
 

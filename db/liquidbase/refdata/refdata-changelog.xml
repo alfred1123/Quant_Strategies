@@ -177,6 +177,13 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="162-refdata-seed-data-column-volume" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/DATA_COLUMN_VOLUME.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql>DELETE FROM REFDATA.DATA_COLUMN WHERE NAME = 'volume';</sql>
+        </rollback>
+    </changeSet>
+
     <changeSet id="160-refdata-proc-sp-get-enum" author="alfcheun" context="refdata" runOnChange="true">
         <sqlFile path="procedures/SP_GET_ENUM.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
         <rollback><sql>DROP PROCEDURE IF EXISTS REFDATA.SP_GET_ENUM;</sql></rollback>

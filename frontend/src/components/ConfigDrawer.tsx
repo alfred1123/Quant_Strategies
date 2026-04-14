@@ -4,7 +4,7 @@ import {
   FormControl, InputLabel, Button, Divider, IconButton, Stack, CircularProgress,
   FormControlLabel, Checkbox, Slider,
 } from '@mui/material';
-import { useIndicators, useSignalTypes, useAssetTypes, useConjunctions } from '../api/refdata';
+import { useIndicators, useSignalTypes, useAssetTypes, useConjunctions, useDataColumns } from '../api/refdata';
 import { countSteps } from '../utils/grid';
 import type { BacktestConfig, FactorConfig, RangeParam } from '../types/backtest';
 
@@ -22,6 +22,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   const { data: signalTypes = [] } = useSignalTypes();
   const { data: assetTypes = [] } = useAssetTypes();
   const { data: conjunctions = [] } = useConjunctions();
+  const { data: dataColumns = [] } = useDataColumns();
 
   const set = (patch: Partial<BacktestConfig>) => onChange({ ...config, ...patch });
 
@@ -97,6 +98,9 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
     (acc, f) => acc * countSteps(f.window_range) * countSteps(f.signal_range),
     1,
   );
+  const OPTUNA_MAX_TRIALS = 10_000;
+  const cappedTrials = Math.min(totalTrials, OPTUNA_MAX_TRIALS);
+  const isCapped = totalTrials > OPTUNA_MAX_TRIALS;
 
   return (
     <Drawer
@@ -214,6 +218,15 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
                 </Box>
                 <Stack spacing={1}>
                   <Stack direction="row" spacing={1} flexWrap="wrap">
+                    <FormControl size="small" sx={{ minWidth: 120, flex: 1 }}>
+                      <InputLabel>Data Column</InputLabel>
+                      <Select value={factor.data_column} label="Data Column"
+                        onChange={e => updateFactor(i, { data_column: e.target.value })}>
+                        {dataColumns.map(dc => (
+                          <MenuItem key={dc.column_name} value={dc.column_name}>{dc.display_name}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                     <FormControl size="small" sx={{ minWidth: 180, flex: 2 }}>
                       <InputLabel>Indicator</InputLabel>
                       <Select value={factor.indicator} label="Indicator"
@@ -270,7 +283,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
         )}
         {isRunnable && (
           <Typography variant="caption" color="text.secondary">
-            ~{totalTrials.toLocaleString()} total grid points
+            {cappedTrials.toLocaleString()} trials{isCapped ? ` (capped from ${totalTrials.toLocaleString()} combos)` : ''}
           </Typography>
         )}
         <Box sx={{ flexGrow: 1 }} />

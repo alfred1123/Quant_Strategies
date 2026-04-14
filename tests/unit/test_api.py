@@ -130,6 +130,73 @@ class TestOptimizeEndpoint:
         assert resp.status_code == 400
 
 
+# ── /api/v1/backtest/optimize/stream (SSE) ──────────────────────────
+
+class TestOptimizeStreamEndpoint:
+    @patch("api.services.backtest.ParametersOptimization")
+    @patch("api.services.backtest._fetch_df")
+    def test_stream_emits_init_progress_and_result(self, mock_fetch, mock_opt_cls, client):
+        """SSE endpoint should emit init, progress events, and a final result."""
+        import json as _json
+        mock_fetch.return_value = pd.DataFrame({
+            "datetime": ["2024-01-01"] * 100,
+            "price": np.linspace(100, 200, 100),
+            "factor": np.linspace(100, 200, 100),
+        })
+        _df = pd.DataFrame({"window": [10, 20], "signal": [0.01, 0.02], "sharpe": [1.5, 1.8]})
+        from param_opt import OptimizeResult
+        mock_opt = MagicMock()
+        # Simulate optuna calling the callback for each trial
+        def fake_run(windows, signals, callbacks=None):
+            if callbacks:
+                for i, cb in enumerate(callbacks):
+                    study = MagicMock()
+                    study.best_value = 1.5 + i * 0.3
+                    trial = MagicMock()
+                    trial.number = 0
+                    cb(study, trial)
+                    trial.number = 1
+                    study.best_value = 1.8
+                    cb(study, trial)
+            return OptimizeResult(
+                grid_df=_df, best={"window": 20, "signal": 0.02, "sharpe": 1.8},
+                top10=[{"window": 20, "signal": 0.02, "sharpe": 1.8}],
+                grid=_df.to_dict(orient="records"), n_valid=2, study=None,
+            )
+        mock_opt.run.side_effect = fake_run
+        mock_opt_cls.return_value = mock_opt
+
+        with client.stream("POST", "/api/v1/backtest/optimize/stream", json={
+            "symbol": "BTC-USD", "start": "2024-01-01", "end": "2024-12-31",
+            "mode": "single", "trading_period": 365,
+            "indicator": "get_bollinger_band", "strategy": "momentum",
+            "window_range": {"min": 10, "max": 20, "step": 10},
+            "signal_range": {"min": 0.01, "max": 0.02, "step": 0.01},
+        }) as resp:
+            assert resp.status_code == 200
+            assert "text/event-stream" in resp.headers["content-type"]
+            body = resp.read().decode()
+
+        # Parse SSE events
+        events = []
+        for block in body.strip().split("\n\n"):
+            ev = {}
+            for line in block.split("\n"):
+                if line.startswith("event: "):
+                    ev["event"] = line[7:]
+                elif line.startswith("data: "):
+                    ev["data"] = _json.loads(line[6:])
+            if ev:
+                events.append(ev)
+
+        event_types = [e["event"] for e in events]
+        assert event_types[0] == "init"
+        assert events[0]["data"]["total"] > 0
+        assert "progress" in event_types
+        assert event_types[-1] == "result"
+        assert events[-1]["data"]["best"]["sharpe"] == 1.8
+
+
 # ── /api/v1/backtest/performance ────────────────────────────────────
 
 class TestPerformanceEndpoint:

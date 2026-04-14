@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { IndicatorRow, SignalTypeRow, AssetTypeRow, ConjunctionRow } from '../types/refdata';
+import type { IndicatorRow, SignalTypeRow, AssetTypeRow, ConjunctionRow, DataColumnRow } from '../types/refdata';
 
 async function fetchTable<T>(table: string): Promise<T[]> {
   const { data } = await apiClient.get<T[]>(`/refdata/${table}`);
@@ -32,5 +32,12 @@ export const useConjunctions = () =>
   useQuery({
     queryKey: ['refdata', 'conjunction'],
     queryFn: () => fetchTable<ConjunctionRow>('conjunction'),
+    staleTime: Infinity,
+  });
+
+export const useDataColumns = () =>
+  useQuery({
+    queryKey: ['refdata', 'data_column'],
+    queryFn: () => fetchTable<DataColumnRow>('data_column'),
     staleTime: Infinity,
   });

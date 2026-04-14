@@ -9,10 +9,11 @@ import Top10Table from '../components/Top10Table';
 import MetricsCards from '../components/MetricsCards';
 import HeatmapChart from '../components/HeatmapChart';
 import EquityCurveChart from '../components/EquityCurveChart';
-import { runOptimize, runPerformance, runWalkForward } from '../api/backtest';
+import { runOptimizeStream, runPerformance, runWalkForward } from '../api/backtest';
 import type {
   BacktestConfig, OptimizeResponse, PerformanceResponse, Top10Row,
   OptimizeRequest, PerformanceRequest, WalkForwardRequest, WalkForwardResponse,
+  OptimizeProgress,
 } from '../types/backtest';
 
 const DEFAULT_CONFIG: BacktestConfig = {
@@ -122,6 +123,7 @@ export default function BacktestPage() {
   const [analysisTab, setAnalysisTab] = useState(0);
   const [wfResult, setWfResult] = useState<WalkForwardResponse | null>(null);
   const [isRunningWf, setIsRunningWf] = useState(false);
+  const [optProgress, setOptProgress] = useState<OptimizeProgress | null>(null);
 
   const loadPerf = async (row: Top10Row, index: number, cfg: BacktestConfig) => {
     setIsLoadingPerf(true);
@@ -164,8 +166,13 @@ export default function BacktestPage() {
     setSelectedIndex(null);
     setSelectedRow(null);
     setWfResult(null);
+    setOptProgress(null);
     try {
-      const result = await runOptimize(buildOptimizeRequest(config));
+      const result = await runOptimizeStream(
+        buildOptimizeRequest(config),
+        (p) => setOptProgress(p),
+      );
+      setOptProgress(null);
       setOptimizeResult(result);
       // Fire walk-forward and performance in parallel
       const promises: Promise<void>[] = [];
@@ -241,8 +248,16 @@ export default function BacktestPage() {
         {/* Running state */}
         {isOptimizing && (
           <Box sx={{ my: 8, textAlign: 'center' }}>
-            <LinearProgress sx={{ mb: 2, maxWidth: 420, mx: 'auto' }} />
-            <Typography color="text.secondary">Running optimization…</Typography>
+            <LinearProgress
+              variant={optProgress?.trial ? 'determinate' : 'indeterminate'}
+              value={optProgress?.trial ? (optProgress.trial / optProgress.total) * 100 : undefined}
+              sx={{ mb: 2, maxWidth: 420, mx: 'auto' }}
+            />
+            <Typography color="text.secondary">
+              {optProgress?.trial
+                ? `Trial ${optProgress.trial} / ${optProgress.total}${optProgress.best_sharpe != null ? ` · Best Sharpe: ${optProgress.best_sharpe.toFixed(4)}` : ''}`
+                : 'Running optimization…'}
+            </Typography>
           </Box>
         )}
 

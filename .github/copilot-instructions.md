@@ -8,6 +8,7 @@
 | `src/app.py` | **[DECO:STREAMLIT]** Streamlit UI — kept until TS frontend parity (see `docs/design-ts-migration.md` §10) |
 | `api/` | FastAPI backend (Phase 7+8) |
 | `frontend/` | React/TypeScript SPA (Phase 8) |
+| `docs/` | MkDocs Material wiki — architecture, guides, design docs, decisions log |
 | `backup/deco/` | Decommissioned scripts (kept for reference) |
 | `tests/unit/` | Unit tests per module |
 | `tests/integration/` | End-to-end pipeline tests |
@@ -49,6 +50,7 @@ cd src && python main.py          # Run backtest
 - `env/` is gitignored — always recreate via `setup.sh` or `requirements.txt`.
 - New dependencies go in `requirements.txt`.
 - **README**: After any change that affects usage, setup, CLI options, directory structure, data sources, or dependencies, review and update `README.md` to keep it accurate.
+- **Wiki**: After any change that affects architecture, API endpoints, database schema, indicators, strategies, or design decisions, review and update the relevant page in `docs/` (MkDocs wiki).
 
 ## Safety
 

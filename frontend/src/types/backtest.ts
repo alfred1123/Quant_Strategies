@@ -84,6 +84,12 @@ export interface OptimizeResponse {
   grid: Top10Row[];
 }
 
+export interface OptimizeProgress {
+  trial: number;
+  total: number;
+  best_sharpe: number | null;
+}
+
 export interface EquityPoint {
   datetime: string;
   cumu: number;

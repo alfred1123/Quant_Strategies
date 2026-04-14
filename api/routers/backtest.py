@@ -3,6 +3,7 @@
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from api.schemas.backtest import (
     DataRequest, DataResponse,
@@ -23,6 +24,17 @@ def optimize(req: OptimizeRequest, request: Request):
     except Exception as exc:
         logger.exception("Optimization failed")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/optimize/stream")
+async def optimize_stream(req: OptimizeRequest, request: Request):
+    """SSE endpoint streaming per-trial progress during optimization."""
+    cache = request.app.state.refdata_cache
+    return StreamingResponse(
+        svc.stream_optimize(req, cache),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/performance", response_model=PerformanceResponse)

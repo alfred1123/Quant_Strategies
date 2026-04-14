@@ -4,6 +4,8 @@ Backtesting and trading framework for crypto and equity markets. Strategies are 
 
 **Target:** strategies with Sharpe > 1.5 and strong Calmar ratios.
 
+**Wiki:** Run `mkdocs serve` to browse the full documentation at `http://localhost:8001`, or visit the [GitHub Pages site](https://alfred1123.github.io/Quant_Strategies/).
+
 ---
 
 ## Quick Start
@@ -204,8 +206,11 @@ Open `http://localhost:5173` in your browser.
 - **⚙ Configure** button in the topbar opens a collapsible left drawer with all backtest settings
 - **Dropdowns** (indicator, strategy, asset type, conjunction) are populated live from `REFDATA` tables
 - Selecting an **indicator** auto-fills window and signal range defaults from `REFDATA.INDICATOR`
-- **Single-factor** and **multi-factor** modes — add as many factors as needed per run
-- On **Run**: drawer closes, optimization grid-search runs, best params auto-selected, analysis loads immediately
+- **Data Column** selector per factor — choose Price or Volume as the indicator input
+- **Single-factor** and **multi-factor** modes — add up to 2 factors per run
+- **Conjunction** selector (AND / OR / FILTER) between factors — FILTER uses factor 1 as a gate for factor 2's directional signals
+- **Trial count** shown before running — displays actual trial count with cap awareness (max 10,000)
+- On **Run**: drawer closes, **SSE progress bar** streams real-time trial progress (Trial N / Total · Best Sharpe), best params auto-selected, analysis loads immediately
 - **Top-10 results table** (MUI DataGrid) — ★ Best row highlighted; each row has a **View Analysis** button
 - Analysis panel: side-by-side metrics cards + Sharpe heatmap + equity curve + drawdown chart
 
@@ -246,13 +251,19 @@ Interactive docs available at `http://localhost:8000/docs` once running.
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/backtest/optimize` | Run parameter grid search (single or multi-factor). Returns top-10 results, Optuna plots, and best params. |
+| `POST` | `/backtest/optimize/stream` | SSE-streamed optimization — sends `init`, `progress` (trial/total/best_sharpe), and `result` events in real time. |
 | `POST` | `/backtest/performance` | Run a single backtest at fixed params. Returns equity curve, metrics, and daily P&L. |
 | `POST` | `/backtest/walk-forward` | Walk-forward overfitting test. Returns IS/OOS metrics, overfitting ratio, and full equity curve. |
 | `GET`  | `/refdata/{table_name}` | Fetch a cached REFDATA table (e.g. `INDICATOR`, `SIGNAL_TYPE`, `ASSET_TYPE`). |
 | `POST` | `/refdata/refresh` | Reload all REFDATA tables from the database without restarting the server. |
 
 **Single vs multi-factor mode:**  
-All backtest endpoints accept `"mode": "single"` or `"mode": "multi"` in the request body. Single mode takes flat `window_range`/`signal_range`; multi mode takes a `factors` list with per-factor ranges. The service layer dispatches automatically — no separate endpoints.
+All backtest endpoints accept `"mode": "single"` or `"mode": "multi"` in the request body. Single mode takes flat `window_range`/`signal_range`; multi mode takes a `factors` list with per-factor ranges and a `data_column` per factor (e.g. `"price"`, `"Volume"`). The service layer dispatches automatically — no separate endpoints.
+
+**Conjunction modes (multi-factor):**  
+- **AND** — position taken only when all factors agree on direction. Ties broken by percentile-rank strength.
+- **OR** — position taken when any factor signals. Ties broken by percentile-rank strength of the strongest signal.
+- **FILTER** — factor 1 acts as a gate (must be non-zero); factor 2 provides the directional signal.
 
 **REFDATA cache:**  
 All REFDATA tables are loaded into an in-process dict at startup (`RefDataCache`). The cache is attached to `app.state` and passed to every service call. Refresh without restart via `POST /refdata/refresh`.
@@ -426,10 +437,10 @@ Quant_Strategies/
 │
 ├── frontend/                # React + TypeScript SPA (Phase 8)
 │   ├── src/
-│   │   ├── api/             # Axios client + TanStack Query hooks (backtest, refdata)
+│   │   ├── api/             # Axios client + TanStack Query hooks (backtest, refdata, SSE streaming)
 │   │   ├── components/      # ConfigDrawer, Top10Table, MetricsCards, HeatmapChart, EquityCurveChart
-│   │   ├── pages/           # BacktestPage (single-page layout)
-│   │   └── types/           # TypeScript types for backtest and refdata API
+│   │   ├── pages/           # BacktestPage (single-page layout with SSE progress bar)
+│   │   └── types/           # TypeScript types for backtest, refdata, and SSE progress
 │   ├── package.json         # npm dependencies (MUI, Tailwind, TanStack Query, Plotly, Axios)
 │   └── vite.config.ts       # Vite 8 + Tailwind plugin + /api proxy to :8000
 │
@@ -437,6 +448,16 @@ Quant_Strategies/
 │   ├── unit/                # Unit tests (mocked, fast)
 │   ├── integration/         # Pipeline tests with synthetic data
 │   └── e2e/                 # End-to-end tests hitting real APIs
+│
+├── docs/                    # MkDocs Material wiki (mkdocs serve to preview)
+│   ├── index.md             # Home page
+│   ├── getting-started.md   # Setup + quick start
+│   ├── architecture/        # Pipeline, API, frontend, database
+│   ├── guides/              # CLI, indicators, strategies, trading, testing
+│   ├── design/              # Symlinks to design-*.md docs
+│   └── decisions.md         # All agreed design decisions
+│
+├── mkdocs.yml               # MkDocs configuration + nav structure
 │
 ├── .env                     # API keys (gitignored — copy from .env.example)
 ├── .env.example             # Template for API keys
@@ -469,7 +490,7 @@ The project uses **PostgreSQL 17** with Liquibase for schema management. Each sc
 | Schema | Purpose |
 |--------|--------|
 | `CORE_ADMIN` | Logging infrastructure (`LOG_PROC_DETAIL` table, `CORE_INS_LOG_PROC` procedure) |
-| `REFDATA` | Reference data (`APP`, `TICKER_MAPPING`, `INDICATOR`, `SIGNAL_TYPE`, etc.) + `SP_GET_ENUM` procedure for cache loading |
+| `REFDATA` | Reference data (`APP`, `TICKER_MAPPING`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, etc.) + `SP_GET_ENUM` procedure for cache loading |
 | `BT` | Backtest results (`STRATEGY`, `RESULT`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert procedures (`SP_INS_STRATEGY`, `SP_INS_RESULT`, `SP_INS_API_REQUEST`, `SP_INS_API_REQUEST_PAYLOAD`) |
 | `TRADE` | Live trading tables (`DEPLOYMENT`, `LOG`, `TRANSACTION`) — procedures deferred |
 

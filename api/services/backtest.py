@@ -4,7 +4,12 @@ All heavy lifting is delegated to the existing pipeline modules.
 This layer handles DataFrame ↔ dict conversion and config construction.
 """
 
+import asyncio
+import json
 import logging
+import math
+import queue
+import threading
 
 import numpy as np
 import pandas as pd
@@ -126,6 +131,85 @@ def run_optimize(req: OptimizeRequest, cache, callback=None) -> OptimizeResponse
         grid=result.grid,
         optuna_plots=result.extract_plots(),
     )
+
+
+def _compute_total_trials(req: OptimizeRequest) -> int:
+    """Pre-compute the number of trials that optuna will run."""
+    from src.param_opt import OPTUNA_MAX_TRIALS
+    if req.mode == "single":
+        w = req.window_range.to_values(as_int=True)
+        s = req.signal_range.to_values()
+        total = len(w) * len(s)
+    else:
+        total = math.prod(
+            len(f.window_range.to_values(as_int=True)) * len(f.signal_range.to_values())
+            for f in req.factors
+        )
+    return min(total, OPTUNA_MAX_TRIALS)
+
+
+def _sse_event(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+async def stream_optimize(req: OptimizeRequest, cache):
+    """Async generator yielding SSE events for optimization progress.
+
+    Events:
+        init     — {total: int}                           (before first trial)
+        progress — {trial, total, best_sharpe}             (after each trial)
+        result   — full OptimizeResponse dict               (on completion)
+        error    — {detail: str}                            (on failure)
+    """
+    progress_q: queue.Queue = queue.Queue()
+    total = _compute_total_trials(req)
+
+    def _run():
+        try:
+            df = _fetch_df(req.symbol, req.start, req.end, req.data_source, cache)
+            config = _build_config(req, cache)
+            window_list, signal_list = _build_param_ranges(req)
+
+            def on_trial(study, trial):
+                best = study.best_value if study.best_value > float("-inf") else None
+                progress_q.put(("progress", {
+                    "trial": trial.number + 1,
+                    "total": total,
+                    "best_sharpe": round(best, 4) if best is not None else None,
+                }))
+
+            opt = ParametersOptimization(df.copy(), config, fee_bps=req.fee_bps)
+            result = opt.run(window_list, signal_list, callbacks=[on_trial])
+
+            resp = OptimizeResponse(
+                total_trials=len(result.grid_df),
+                valid=result.n_valid,
+                best=result.best,
+                top10=result.top10,
+                grid=result.grid,
+                optuna_plots=result.extract_plots(),
+            )
+            progress_q.put(("result", resp.model_dump()))
+        except Exception as exc:
+            logger.exception("Streaming optimization failed")
+            progress_q.put(("error", {"detail": str(exc)}))
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+
+    yield _sse_event("init", {"total": total})
+
+    while True:
+        try:
+            event_type, data = await asyncio.to_thread(progress_q.get, timeout=600)
+        except Exception:
+            yield _sse_event("error", {"detail": "Optimization timed out"})
+            return
+
+        yield _sse_event(event_type, data)
+
+        if event_type in ("result", "error"):
+            return
 
 
 # ── Performance ───────────────────────────────────────────────────────────────

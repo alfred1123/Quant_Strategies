@@ -24,3 +24,8 @@ export interface ConjunctionRow {
   name: string;
   display_name: string;
 }
+
+export interface DataColumnRow {
+  column_name: string;
+  display_name: string;
+}

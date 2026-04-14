@@ -39,3 +39,6 @@ data.csv
 
 # Extracted live DDL — regenerated on demand, never committed
 db/syncddl/
+
+# MkDocs build output
+site/
