@@ -6,6 +6,7 @@ Supported sources:
     2. Glassnode — on-chain crypto metrics
     3. AlphaVantage — equity and crypto price data
     4. YahooFinance — free equity/crypto/ETF data via yfinance
+    5. NasdaqDataLink — time-series and table data via Nasdaq Data Link API
 
 BybitData class moved to backup/deco/ — platform decommissioned.
 """
@@ -274,6 +275,100 @@ class YahooFinance:
         logger.info("YahooFinance: fetched %d rows for %s (%s to %s)",
                     len(df), symbol, start_date, end_date)
         return df.reset_index(drop=True)
+
+
+class NasdaqDataLink:
+    """Retrieve data from Nasdaq Data Link (formerly Quandl).
+
+    Supports time-series datasets (e.g. CHRIS/CME_CL1, FRED/GDP) and
+    table-based data (e.g. WIKI/PRICES, ZACKS/FC).
+
+    API key required (free tier: 50 calls/day, 300 time-series datasets).
+    Set NASDAQ_DATA_LINK_API_KEY in .env.
+    See: https://docs.data.nasdaq.com/docs/python-installation
+    """
+
+    def __init__(self) -> None:
+        load_dotenv()
+        self.__api_key = os.getenv('NASDAQ_DATA_LINK_API_KEY')
+        if not self.__api_key:
+            raise ValueError("NASDAQ_DATA_LINK_API_KEY must be set in .env")
+        import nasdaqdatalink
+        nasdaqdatalink.ApiConfig.api_key = self.__api_key
+
+    @lru_cache(maxsize=32)
+    def get_historical_price(self, dataset_code, start_date, end_date,
+                             column='Close'):
+        """Fetch time-series data from Nasdaq Data Link.
+
+        Uses nasdaqdatalink.get() which returns a DataFrame with
+        DatetimeIndex and one or more value columns.
+
+        Args:
+            dataset_code: Dataset code (e.g. 'WIKI/AAPL', 'CHRIS/CME_CL1').
+            start_date: Start date (YYYY-MM-DD).
+            end_date: End date (YYYY-MM-DD).
+            column: Column name to use as the value. Defaults to 'Close'.
+                Falls back to the last column if not found.
+
+        Returns:
+            DataFrame with columns ['t', 'v'] matching the pipeline interface.
+            't' = date strings (YYYY-MM-DD), 'v' = float values.
+
+        Raises:
+            ValueError: If no data returned for the given dataset/range.
+        """
+        import nasdaqdatalink
+
+        data = nasdaqdatalink.get(
+            dataset_code,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        if data.empty:
+            raise ValueError(
+                f"Nasdaq Data Link returned no data for '{dataset_code}' "
+                f"({start_date} to {end_date})"
+            )
+
+        col_map = {c.lower(): c for c in data.columns}
+        col_key = column.lower()
+        if col_key in col_map:
+            actual_col = col_map[col_key]
+        else:
+            actual_col = data.columns[-1]
+            logger.warning(
+                "Column '%s' not found in %s; using '%s'",
+                column, dataset_code, actual_col,
+            )
+
+        df = pd.DataFrame({
+            "t": data.index.strftime("%Y-%m-%d"),
+            "v": data[actual_col].values,
+        })
+        df["v"] = df["v"].astype(float)
+        logger.info("NasdaqDataLink: fetched %d rows for %s (%s to %s)",
+                     len(df), dataset_code, start_date, end_date)
+        return df.reset_index(drop=True)
+
+    def get_table_data(self, table_code, **kwargs):
+        """Fetch table (datatable) data from Nasdaq Data Link.
+
+        Args:
+            table_code: Table code (e.g. 'WIKI/PRICES', 'ZACKS/FC').
+            **kwargs: Filter arguments passed to nasdaqdatalink.get_table().
+
+        Returns:
+            Raw DataFrame from the Nasdaq Data Link table API.
+        """
+        import nasdaqdatalink
+
+        kwargs.setdefault('paginate', True)
+        data = nasdaqdatalink.get_table(table_code, **kwargs)
+        logger.info("NasdaqDataLink: fetched %d rows from table %s",
+                     len(data), table_code)
+        return data
 
 
 if __name__ == "__main__":

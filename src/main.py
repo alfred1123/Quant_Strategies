@@ -53,7 +53,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from data import YahooFinance
+from data import NasdaqDataLink, YahooFinance
 from param_opt import ParametersOptimization
 from perf import Performance
 from strat import SignalDirection, StrategyConfig

@@ -64,4 +64,14 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="215-bt-proc-sp-get-api-request-with-payload" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_GET_API_REQUEST_WITH_PAYLOAD.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_GET_API_REQUEST_WITH_PAYLOAD;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="216-bt-proc-sp-get-api-limit-chk" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_GET_API_LIMIT_CHK.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_GET_API_LIMIT_CHK;</sql></rollback>
+    </changeSet>
+
 </databaseChangeLog>

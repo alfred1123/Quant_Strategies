@@ -73,6 +73,7 @@ db/liquidbase/
 - Name columns: `<TABLE>_NM TEXT` (e.g. `STRATEGY_NM`)
 - Audit columns (every table): `USER_ID TEXT`, `CREATED_AT TIMESTAMPTZ`. Use `UPDATED_AT TIMESTAMPTZ` only on tables where rows are genuinely mutated (e.g. REFDATA lookup tables). Do **not** add `UPDATED_AT` solely for `IS_CURRENT_IND` flips — soft-versioning inserts a new row with a new `CREATED_AT` instead.
 - `CREATED_AT` is **never** an input parameter on `SP_INS_*` procedures. Always use `NOW()` (UTC) in the INSERT VALUES clause. The database records the actual insert time, not a caller-supplied timestamp.
+- Audit columns (`CREATED_AT`, `UPDATED_AT`, `USER_ID`) are **internal** — they exist on every table for diagnostics and auditing but are **excluded from `SP_GET_*` result sets**. GET procedures return only domain/business columns. Callers that need audit data should query the table directly.
 - Soft versioning: `IS_CURRENT_IND CHAR(1)` — no default, no CHECK constraint. Superseding a row means inserting a new version (new `CREATED_AT`) and flipping the old row's `IS_CURRENT_IND` to `'N'`. This is **not** an update that warrants `UPDATED_AT`.
   - Tables with `IS_CURRENT_IND` **must** also have a `<TABLE>_VID INTEGER` column. The PK is composite: `PRIMARY KEY (<TABLE>_ID, <TABLE>_VID)`.
   - `IN_<TABLE>_VID` and `IN_IS_CURRENT_IND` are **never** input parameters on `SP_INS_*` procedures. They are computed internally:

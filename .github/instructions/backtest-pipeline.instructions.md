@@ -57,10 +57,11 @@ Each constructor creates `TechnicalAnalysis` internally — callers pass raw dat
 ## Module Interfaces
 
 ### data.py — Data Sources
-- Each source is a class (`FutuOpenD`, `Glassnode`, `AlphaVantage`, `YahooFinance`).
-- Returns a DataFrame. Glassnode, AlphaVantage, and YahooFinance return columns `['t', 'v']`. YahooFinance also returns `'volume'`.
+- Each source is a class (`FutuOpenD`, `Glassnode`, `AlphaVantage`, `YahooFinance`, `NasdaqDataLink`).
+- Returns a DataFrame. Glassnode, AlphaVantage, YahooFinance, and NasdaqDataLink return columns `['t', 'v']`. YahooFinance also returns `'volume'`.
 - API keys loaded from `.env` at the project root via `python-dotenv`; constructors validate that required keys are set.
 - `YahooFinance` requires no API key. Supports equities, ETFs, indices, and crypto (e.g. `'BTC-USD'`). Returns 10+ years of free daily data.
+- `NasdaqDataLink` requires `NASDAQ_DATA_LINK_API_KEY`. Supports time-series datasets (e.g. `'CHRIS/CME_CL1'`, `'FRED/GDP'`) and table data (e.g. `'WIKI/PRICES'`). `get_historical_price()` accepts a `column` arg (default `'Close'`) to select the value column.
 - Methods use `@lru_cache` — clear cache in tests.
 - AlphaVantage auto-detects crypto vs equity symbols and uses the appropriate API endpoint.
 

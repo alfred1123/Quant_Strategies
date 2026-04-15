@@ -199,4 +199,14 @@
         <rollback><sql>DROP PROCEDURE IF EXISTS REFDATA.SP_GET_ENUM;</sql></rollback>
     </changeSet>
 
+    <changeSet id="164-refdata-seed-app-ndl" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/APP_NDL.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DELETE FROM REFDATA.APP WHERE NAME = 'nasdaq_data_link';</sql></rollback>
+    </changeSet>
+
+    <changeSet id="165-refdata-seed-api-limit" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/API_LIMIT.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DELETE FROM REFDATA.API_LIMIT;</sql></rollback>
+    </changeSet>
+
 </databaseChangeLog>

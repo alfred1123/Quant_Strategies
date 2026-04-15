@@ -4,6 +4,7 @@ CREATE TABLE BT.API_REQUEST (
     API_REQ_ID       UUID NOT NULL,
     API_REQ_VID      INTEGER NOT NULL,
     APP_ID           INTEGER,
+    APP_METRIC_ID    INTEGER,
     TM_INTERVAL_ID   INTEGER,
     SYMBOL           TEXT NOT NULL,
     FULL_RANGE_START TIMESTAMPTZ,          -- earliest date across all versions

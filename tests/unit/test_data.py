@@ -383,3 +383,160 @@ class TestYahooFinance:
         yf_src.get_historical_price.cache_clear()
         with pytest.raises(RuntimeError, match="failed after 3 attempts"):
             yf_src.get_historical_price("AAPL", "2021-01-04", "2021-01-04")
+
+
+class TestNasdaqDataLink:
+    """Tests for NasdaqDataLink data source.
+
+    Mocks nasdaqdatalink.get() which returns a DataFrame with DatetimeIndex.
+    See: https://github.com/Nasdaq/data-link-python#retrieving-data
+    """
+
+    def _make_time_series(self, dates, values, col_name="Close"):
+        """Build a DataFrame matching nasdaqdatalink.get() output."""
+        idx = pd.DatetimeIndex(dates)
+        return pd.DataFrame({col_name: values}, index=idx)
+
+    @patch.dict("os.environ", {"NASDAQ_DATA_LINK_API_KEY": "test_key"})
+    @patch("nasdaqdatalink.ApiConfig")
+    @patch("nasdaqdatalink.get")
+    def test_get_historical_price_returns_dataframe(self, mock_get, _mock_cfg):
+        mock_get.return_value = self._make_time_series(
+            ["2021-01-04", "2021-01-05"], [129.41, 131.01],
+        )
+
+        from data import NasdaqDataLink
+        src = NasdaqDataLink()
+        src.get_historical_price.cache_clear()
+        df = src.get_historical_price("WIKI/AAPL", "2021-01-04", "2021-01-05")
+
+        assert isinstance(df, pd.DataFrame)
+        assert list(df.columns) == ["t", "v"]
+        assert len(df) == 2
+        assert df.iloc[0]["v"] == pytest.approx(129.41)
+        assert df.iloc[1]["v"] == pytest.approx(131.01)
+
+    @patch.dict("os.environ", {"NASDAQ_DATA_LINK_API_KEY": "test_key"})
+    @patch("nasdaqdatalink.ApiConfig")
+    @patch("nasdaqdatalink.get")
+    def test_get_historical_price_passes_correct_params(self, mock_get, _mock_cfg):
+        mock_get.return_value = self._make_time_series(
+            ["2021-01-04"], [100.0],
+        )
+
+        from data import NasdaqDataLink
+        src = NasdaqDataLink()
+        src.get_historical_price.cache_clear()
+        src.get_historical_price("CHRIS/CME_CL1", "2016-01-01", "2026-01-01")
+
+        mock_get.assert_called_once_with(
+            "CHRIS/CME_CL1",
+            start_date="2016-01-01",
+            end_date="2026-01-01",
+        )
+
+    @patch.dict("os.environ", {"NASDAQ_DATA_LINK_API_KEY": "test_key"})
+    @patch("nasdaqdatalink.ApiConfig")
+    @patch("nasdaqdatalink.get")
+    def test_raises_on_empty_response(self, mock_get, _mock_cfg):
+        mock_get.return_value = pd.DataFrame()
+
+        from data import NasdaqDataLink
+        src = NasdaqDataLink()
+        src.get_historical_price.cache_clear()
+        with pytest.raises(ValueError, match="no data"):
+            src.get_historical_price("INVALID/CODE", "2021-01-01", "2021-01-02")
+
+    def test_init_raises_without_api_key(self, monkeypatch):
+        monkeypatch.setattr("data.load_dotenv", lambda *a, **kw: None)
+        monkeypatch.delenv("NASDAQ_DATA_LINK_API_KEY", raising=False)
+        from data import NasdaqDataLink
+        with pytest.raises(ValueError, match="NASDAQ_DATA_LINK_API_KEY"):
+            NasdaqDataLink()
+
+    @patch.dict("os.environ", {"NASDAQ_DATA_LINK_API_KEY": "test_key"})
+    @patch("nasdaqdatalink.ApiConfig")
+    @patch("nasdaqdatalink.get")
+    def test_close_values_are_float(self, mock_get, _mock_cfg):
+        mock_get.return_value = self._make_time_series(
+            ["2021-01-04", "2021-01-05"], [100, 200],
+        )
+
+        from data import NasdaqDataLink
+        src = NasdaqDataLink()
+        src.get_historical_price.cache_clear()
+        df = src.get_historical_price("WIKI/AAPL", "2021-01-04", "2021-01-05")
+
+        assert df["v"].dtype == float
+
+    @patch.dict("os.environ", {"NASDAQ_DATA_LINK_API_KEY": "test_key"})
+    @patch("nasdaqdatalink.ApiConfig")
+    @patch("nasdaqdatalink.get")
+    def test_formats_dates_as_strings(self, mock_get, _mock_cfg):
+        mock_get.return_value = self._make_time_series(
+            ["2021-06-15"], [150.0],
+        )
+
+        from data import NasdaqDataLink
+        src = NasdaqDataLink()
+        src.get_historical_price.cache_clear()
+        df = src.get_historical_price("WIKI/MSFT", "2021-06-15", "2021-06-15")
+
+        assert df.iloc[0]["t"] == "2021-06-15"
+
+    @patch.dict("os.environ", {"NASDAQ_DATA_LINK_API_KEY": "test_key"})
+    @patch("nasdaqdatalink.ApiConfig")
+    @patch("nasdaqdatalink.get")
+    def test_falls_back_to_last_column(self, mock_get, _mock_cfg):
+        """When the requested column doesn't exist, use the last column."""
+        idx = pd.DatetimeIndex(["2021-01-04"])
+        mock_get.return_value = pd.DataFrame(
+            {"Value": [42.0], "Settle": [43.0]}, index=idx,
+        )
+
+        from data import NasdaqDataLink
+        src = NasdaqDataLink()
+        src.get_historical_price.cache_clear()
+        df = src.get_historical_price("CHRIS/CME_CL1", "2021-01-04", "2021-01-04")
+
+        # 'Close' not found → falls back to last column 'Settle'
+        assert df.iloc[0]["v"] == pytest.approx(43.0)
+
+    @patch.dict("os.environ", {"NASDAQ_DATA_LINK_API_KEY": "test_key"})
+    @patch("nasdaqdatalink.ApiConfig")
+    @patch("nasdaqdatalink.get")
+    def test_custom_column_parameter(self, mock_get, _mock_cfg):
+        """User can specify which column to extract as 'v'."""
+        idx = pd.DatetimeIndex(["2021-01-04"])
+        mock_get.return_value = pd.DataFrame(
+            {"Value": [42.0], "Settle": [43.0]}, index=idx,
+        )
+
+        from data import NasdaqDataLink
+        src = NasdaqDataLink()
+        src.get_historical_price.cache_clear()
+        df = src.get_historical_price(
+            "CHRIS/CME_CL1", "2021-01-04", "2021-01-04", column="Value",
+        )
+
+        assert df.iloc[0]["v"] == pytest.approx(42.0)
+
+    @patch.dict("os.environ", {"NASDAQ_DATA_LINK_API_KEY": "test_key"})
+    @patch("nasdaqdatalink.ApiConfig")
+    @patch("nasdaqdatalink.get_table")
+    def test_get_table_data_returns_dataframe(self, mock_get_table, _mock_cfg):
+        mock_get_table.return_value = pd.DataFrame({
+            "ticker": ["AAPL", "AAPL"],
+            "date": ["2021-01-04", "2021-01-05"],
+            "close": [129.41, 131.01],
+        })
+
+        from data import NasdaqDataLink
+        src = NasdaqDataLink()
+        df = src.get_table_data("WIKI/PRICES", ticker="AAPL")
+
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) == 2
+        mock_get_table.assert_called_once_with(
+            "WIKI/PRICES", paginate=True, ticker="AAPL",
+        )
