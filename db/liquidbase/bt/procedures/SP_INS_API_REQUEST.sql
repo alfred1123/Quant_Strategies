@@ -1,6 +1,7 @@
 CREATE OR REPLACE PROCEDURE BT.SP_INS_API_REQUEST(
     IN  IN_API_REQ_ID       UUID,
     IN  IN_APP_ID           INTEGER,
+    IN  IN_APP_METRIC_ID    INTEGER,
     IN  IN_TM_INTERVAL_ID   INTEGER,
     IN  IN_SYMBOL           TEXT,
     IN  IN_FULL_RANGE_START TIMESTAMPTZ,
@@ -46,6 +47,7 @@ BEGIN
         API_REQ_ID,
         API_REQ_VID,
         APP_ID,
+        APP_METRIC_ID,
         TM_INTERVAL_ID,
         SYMBOL,
         FULL_RANGE_START,
@@ -57,6 +59,7 @@ BEGIN
         IN_API_REQ_ID,
         V_VID,
         IN_APP_ID,
+        IN_APP_METRIC_ID,
         IN_TM_INTERVAL_ID,
         IN_SYMBOL,
         IN_FULL_RANGE_START,

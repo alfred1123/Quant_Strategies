@@ -184,6 +184,16 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="115-refdata-app-metric" author="alfcheun" context="refdata" runOnChange="false">
+        <sqlFile path="tables/APP_METRIC.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS REFDATA.APP_METRIC;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="163-refdata-seed-app-metric" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/APP_METRIC.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DELETE FROM REFDATA.APP_METRIC;</sql></rollback>
+    </changeSet>
+
     <changeSet id="160-refdata-proc-sp-get-enum" author="alfcheun" context="refdata" runOnChange="true">
         <sqlFile path="procedures/SP_GET_ENUM.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
         <rollback><sql>DROP PROCEDURE IF EXISTS REFDATA.SP_GET_ENUM;</sql></rollback>

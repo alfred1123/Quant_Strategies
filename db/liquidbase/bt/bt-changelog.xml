@@ -49,4 +49,19 @@
         <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_INS_API_REQUEST_PAYLOAD;</sql></rollback>
     </changeSet>
 
+    <!-- ========== BT ALTER TABLE ========== -->
+
+    <changeSet id="214-bt-api-request-add-app-metric-id" author="alfcheun" context="bt" runOnChange="false">
+        <sql>
+            ALTER TABLE BT.API_REQUEST
+                ADD COLUMN IF NOT EXISTS APP_METRIC_ID INTEGER;
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE BT.API_REQUEST
+                    DROP COLUMN IF EXISTS APP_METRIC_ID;
+            </sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

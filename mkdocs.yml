@@ -81,4 +81,5 @@ nav:
       - Trade API: design/trade-api.md
       - TypeScript Migration: design/ts-migration.md
       - Backtest Speed: design/backtest-speed.md
+      - Alternative Data Sources: design/alt-data-sources.md
   - Decisions: decisions.md
