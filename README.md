@@ -228,12 +228,14 @@ cd frontend && npm run build
 
 ### Streamlit Dashboard (`app.py`) `[DECO:STREAMLIT]`
 
-> **Note:** The Streamlit dashboard is scheduled for removal in Phase 8 migration M-6 once the React frontend reaches full parity. It is kept for reference. See `docs/design-ts-migration.md` §10 for the removal checklist.
+> **Note:** The Streamlit dashboard is scheduled for removal in Phase 8 migration M-6 once the React frontend reaches full parity. It is kept for reference. See `docs/design/ts-migration.md` §7 (M-6) for the removal checklist.
 
 ```bash
 source env/bin/activate
 cd src && streamlit run app.py
 ```
+
+### FastAPI Backend
 
 A REST API that exposes the backtest pipeline for programmatic access and the TypeScript frontend (Phase 8).
 
@@ -414,7 +416,6 @@ Not all combinations are meaningful:
 Quant_Strategies/
 ├── src/                     # Backtesting pipeline
 │   ├── data.py              # Data sources (YahooFinance, AlphaVantage, Glassnode, FutuOpenD)
-│   ├── ta.py                # Technical analysis indicators (shim — logic in strat.py)
 │   ├── strat.py             # TechnicalAnalysis, SignalDirection, StrategyConfig
 │   ├── perf.py              # Performance metrics & PnL engine
 │   ├── param_opt.py         # N-dimensional grid-search parameter optimization (OptimizeResult, ParametersOptimization)
@@ -454,7 +455,7 @@ Quant_Strategies/
 │   ├── getting-started.md   # Setup + quick start
 │   ├── architecture/        # Pipeline, API, frontend, database
 │   ├── guides/              # CLI, indicators, strategies, trading, testing
-│   ├── design/              # Symlinks to design-*.md docs
+│   ├── design/              # Design documentation
 │   └── decisions.md         # All agreed design decisions
 │
 ├── mkdocs.yml               # MkDocs configuration + nav structure
@@ -544,7 +545,7 @@ data.py ──► strat.py ──► perf.py ──► param_opt.py ──► wa
   └─ Fetches daily close prices from YahooFinance (or AlphaVantage/Glassnode/FutuOpenD)
 ```
 
-`main.py` orchestrates the full flow. `app.py` provides the same pipeline via an interactive Streamlit UI.
+`main.py` orchestrates the full flow. `app.py` provides the same pipeline via an interactive Streamlit UI `[DECO:STREAMLIT — scheduled for removal in M-6]`.
 
 ---
 

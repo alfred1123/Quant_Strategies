@@ -7,7 +7,7 @@ This repository contains Python tooling for **backtesting**, **technical analysi
 | Path | Role |
 |------|------|
 | `src/` | Pipeline: `data.py` (sources), `strat.py` (indicators + strategies + signals), `perf.py`, `param_opt.py`, `main.py` (orchestration) |
-| `src/app.py` | **[DECO:STREAMLIT]** Streamlit UI — kept until TypeScript frontend reaches parity (Phase 8, migration M-6). Remove together with `streamlit` pip dep and all hardcoded registries. See `docs/design-ts-migration.md` §10 |
+| `src/app.py` | **[DECO:STREAMLIT]** Streamlit UI — kept until TypeScript frontend reaches parity (Phase 8, migration M-6). Remove together with `streamlit` pip dep and all hardcoded registries. See `docs/design/ts-migration.md` §7 (M-6) |
 | `api/` | FastAPI backend (Phase 7+8) — serves backtest + trade endpoints; imports `src/` modules directly |
 | `frontend/` | React/TypeScript SPA (Phase 8) — replaces Streamlit |
 | `docs/` | MkDocs Material wiki — architecture, guides, design docs, decisions log. Serve locally with `mkdocs serve`. |
@@ -84,7 +84,7 @@ The `INDICATOR_DEFAULTS` dict in `src/strat.py` is a **legacy fallback** — onc
 
 ### Streamlit Decommission Tag: `[DECO:STREAMLIT]`
 
-`src/app.py` and its unique dependencies (`streamlit` pip package, hardcoded registries) are tagged `[DECO:STREAMLIT]`. They stay in the repo until Phase 8 migration M-6 is verified, then are removed in one go. See `docs/design-ts-migration.md` §10 for the full removal checklist.
+`src/app.py` and its unique dependencies (`streamlit` pip package, hardcoded registries) are tagged `[DECO:STREAMLIT]`. They stay in the repo until Phase 8 migration M-6 is verified, then are removed in one go. See `docs/design/ts-migration.md` §7 (M-6) for the full removal checklist.
 
 ### No Backward Compatibility for Decommissioned Code
 
