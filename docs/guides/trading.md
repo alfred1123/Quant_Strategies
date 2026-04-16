@@ -15,8 +15,8 @@ The **Trading** tab in the Streamlit dashboard lets you connect to a running Fut
 
 ## Paper Trading Walkthrough
 
-1. Launch the dashboard: `cd src && streamlit run app.py`
-2. Go to the **Trading** tab
+1. Launch the FastAPI backend: `cd api && uvicorn main:app --reload`
+2. Open the React frontend at `http://localhost:5173`
 3. Configure:
      - **Futu Symbol** — use Futu format: `US.AAPL`, `US.WEAT`, `HK.00700`
      - **Quantity** — number of shares per order

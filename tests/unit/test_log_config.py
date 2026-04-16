@@ -1,6 +1,6 @@
 import logging
 
-from log_config import setup_logging, LOG_FORMAT, LOG_DATEFMT
+from api.config import setup_logging, LOG_FORMAT, LOG_DATEFMT
 
 
 class TestSetupLogging:

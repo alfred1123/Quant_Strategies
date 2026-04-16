@@ -226,15 +226,6 @@ cd frontend && npm run build
 
 ---
 
-### Streamlit Dashboard (`app.py`) `[DECO:STREAMLIT]`
-
-> **Note:** The Streamlit dashboard is scheduled for removal in Phase 8 migration M-6 once the React frontend reaches full parity. It is kept for reference. See `docs/design/ts-migration.md` §7 (M-6) for the removal checklist.
-
-```bash
-source env/bin/activate
-cd src && streamlit run app.py
-```
-
 ### FastAPI Backend
 
 A REST API that exposes the backtest pipeline for programmatic access and the TypeScript frontend (Phase 8).
@@ -290,11 +281,11 @@ The **Trading** tab in the Streamlit dashboard lets you connect to a running Fut
 
 #### Paper trading walkthrough
 
-1. Launch the dashboard:
+1. Launch the FastAPI backend:
    ```bash
-   cd src && streamlit run app.py
+   cd api && uvicorn main:app --reload
    ```
-2. Go to the **Trading** tab.
+2. Open the React frontend at `http://localhost:5173`
 3. Configure:
    - **Futu Symbol** — use Futu format: `US.AAPL`, `US.WEAT`, `HK.00700`
    - **Quantity** — number of shares per order
@@ -421,9 +412,7 @@ Quant_Strategies/
 │   ├── param_opt.py         # N-dimensional grid-search parameter optimization (OptimizeResult, ParametersOptimization)
 │   ├── walk_forward.py      # Walk-forward overfitting test (WalkForward, WalkForwardResult)
 │   ├── trade.py             # Futu OpenD paper/live trade execution
-│   ├── log_config.py        # Centralised logging configuration
-│   ├── main.py              # CLI entry point — configurable via argparse
-│   └── app.py               # Streamlit web dashboard [DECO:STREAMLIT — pending removal]
+│   └── main.py              # CLI entry point — configurable via argparse
 │
 ├── api/                     # FastAPI backend (Phase 7+8)
 │   ├── main.py              # App factory — CORS, lifespan (REFDATA cache load), router registration
@@ -545,7 +534,7 @@ data.py ──► strat.py ──► perf.py ──► param_opt.py ──► wa
   └─ Fetches daily close prices from YahooFinance (or AlphaVantage/Glassnode/FutuOpenD)
 ```
 
-`main.py` orchestrates the full flow. `app.py` provides the same pipeline via an interactive Streamlit UI `[DECO:STREAMLIT — scheduled for removal in M-6]`.
+`main.py` orchestrates the full flow.
 
 ---
 

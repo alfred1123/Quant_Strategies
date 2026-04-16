@@ -32,7 +32,7 @@ data.py ──► strat.py ──► perf.py ──► param_opt.py ──► wa
   └─ Fetches daily close prices from YahooFinance (or AlphaVantage/Glassnode/FutuOpenD)
 ```
 
-`main.py` orchestrates the full flow. `app.py` provides the same pipeline via an interactive Streamlit UI (scheduled for removal).
+`main.py` orchestrates the full flow.
 
 ## Module Responsibilities
 

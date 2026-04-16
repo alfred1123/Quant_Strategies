@@ -8,7 +8,6 @@ seaborn
 futu-api
 yfinance
 nasdaq-data-link
-streamlit
 uuid7
 optuna
 fastapi

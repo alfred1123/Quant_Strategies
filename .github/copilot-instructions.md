@@ -5,7 +5,6 @@
 | Path | Role |
 |------|------|
 | `src/` | Pipeline: `data.py` → `strat.py` (indicators + strategies + signals) → `perf.py` → `param_opt.py`, orchestrated by `main.py` |
-| `src/app.py` | **[DECO:STREAMLIT]** Streamlit UI — kept until TS frontend parity (see `docs/design/ts-migration.md` §7 (M-6)) |
 | `api/` | FastAPI backend (Phase 7+8) |
 | `frontend/` | React/TypeScript SPA (Phase 8) |
 | `docs/` | MkDocs Material wiki — architecture, guides, design docs, decisions log |
@@ -23,13 +22,8 @@
 ## Logging
 
 - Every module uses `import logging` and `logger = logging.getLogger(__name__)` at the top.
-- Logging format and level are configured **once** in `src/log_config.py`. Do **not** call `logging.basicConfig()` anywhere else.
-- **Entry points only** (`main.py`, `app.py`) call `setup_logging()` from `log_config`:
-  ```python
-  from log_config import setup_logging
-  setup_logging()            # INFO level
-  setup_logging(debug=True)  # DEBUG level
-  ```
+- Logging format and level are configured **once** in `api/config.py` (`setup_logging()`). `src/main.py` has its own inline copy for standalone CLI use. Do **not** call `logging.basicConfig()` anywhere else.
+- **Entry points only** (`src/main.py`, `api/config.py`) call `setup_logging()`.
 - Library modules (`data.py`, `ta.py`, `perf.py`, `strat.py`, `param_opt.py`) **never** call `basicConfig` or `setup_logging` — they only use `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`.
 - Do **not** use `print()` for status output — use the logger at the appropriate level.
 

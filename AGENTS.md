@@ -7,7 +7,6 @@ This repository contains Python tooling for **backtesting**, **technical analysi
 | Path | Role |
 |------|------|
 | `src/` | Pipeline: `data.py` (sources), `strat.py` (indicators + strategies + signals), `perf.py`, `param_opt.py`, `main.py` (orchestration) |
-| `src/app.py` | **[DECO:STREAMLIT]** Streamlit UI — kept until TypeScript frontend reaches parity (Phase 8, migration M-6). Remove together with `streamlit` pip dep and all hardcoded registries. See `docs/design/ts-migration.md` §7 (M-6) |
 | `api/` | FastAPI backend (Phase 7+8) — serves backtest + trade endpoints; imports `src/` modules directly |
 | `frontend/` | React/TypeScript SPA (Phase 8) — replaces Streamlit |
 | `docs/` | MkDocs Material wiki — architecture, guides, design docs, decisions log. Serve locally with `mkdocs serve`. |
@@ -35,8 +34,8 @@ Run backtest-style code from `src/` (imports are relative to that package, e.g. 
 ## Logging
 
 - Every module uses `import logging` and `logger = logging.getLogger(__name__)` at the top.
-- Logging format and level are configured **once** in `src/log_config.py` (`setup_logging()`). Do **not** call `logging.basicConfig()` anywhere else.
-- **Entry points only** (`main.py`, `app.py`) call `from log_config import setup_logging; setup_logging()`.
+- Logging format and level are configured **once** in `api/config.py` (`setup_logging()`). `src/main.py` has its own inline copy for standalone CLI use. Do **not** call `logging.basicConfig()` anywhere else.
+- **Entry points only** (`src/main.py`, `api/config.py`) call `setup_logging()`.
 - Library modules **never** call `setup_logging` — they only emit via `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`.
 - Do **not** use `print()` for status output — use the logger at the appropriate level.
 
@@ -81,14 +80,6 @@ The `INDICATOR_DEFAULTS` dict in `src/strat.py` is a **legacy fallback** — onc
 - Frontend fetches REFDATA via `GET /api/v1/refdata/{table_name}` and caches client-side with TanStack Query (stale-while-revalidate).
 - DB connection: `localhost:5433` via AWS SSM port-forward.
 - If DB is unreachable at startup, the backend fails fast — REFDATA is required.
-
-### Streamlit Decommission Tag: `[DECO:STREAMLIT]`
-
-`src/app.py` and its unique dependencies (`streamlit` pip package, hardcoded registries) are tagged `[DECO:STREAMLIT]`. They stay in the repo until Phase 8 migration M-6 is verified, then are removed in one go. See `docs/design/ts-migration.md` §7 (M-6) for the full removal checklist.
-
-### No Backward Compatibility for Decommissioned Code
-
-When removing `[DECO:STREAMLIT]` artefacts, do not add shims, re-exports, or deprecation warnings. Delete completely and update all references.
 
 ### Checking Schema Discrepancies (DB vs Source DDL)
 
