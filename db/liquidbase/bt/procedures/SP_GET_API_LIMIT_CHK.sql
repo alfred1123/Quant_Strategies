@@ -38,6 +38,7 @@ BEGIN
           INTO V_CNT
           FROM BT.API_REQUEST
          WHERE APP_ID     = IN_APP_ID
+           AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'
            AND CREATED_AT >= V_START_TS - (R_LIMIT.TIME_WINDOW_SEC * INTERVAL '1 second');
 
         -- Step 30: If any limit is breached, return the first violation

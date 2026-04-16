@@ -1,0 +1,8 @@
+-- M:N junction: which products belong to each group.
+CREATE TABLE INST.PRODUCT_GROUP_MEMBER (
+    PRODUCT_GROUP_ID INTEGER NOT NULL,
+    PRODUCT_ID       INTEGER NOT NULL,
+    USER_ID          TEXT,
+    CREATED_AT       TIMESTAMPTZ,
+    PRIMARY KEY (PRODUCT_GROUP_ID, PRODUCT_ID)
+);

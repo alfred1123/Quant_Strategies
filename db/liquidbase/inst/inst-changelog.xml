@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ========== INST tables ========== -->
+
+    <changeSet id="400-inst-product" author="alfcheun" context="inst" runOnChange="false">
+        <sqlFile path="tables/PRODUCT.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS INST.PRODUCT;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="401-inst-product-xref" author="alfcheun" context="inst" runOnChange="false">
+        <sqlFile path="tables/PRODUCT_XREF.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS INST.PRODUCT_XREF;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="402-inst-product-group" author="alfcheun" context="inst" runOnChange="false">
+        <sqlFile path="tables/PRODUCT_GROUP.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS INST.PRODUCT_GROUP;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="403-inst-product-group-member" author="alfcheun" context="inst" runOnChange="false">
+        <sqlFile path="tables/PRODUCT_GROUP_MEMBER.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS INST.PRODUCT_GROUP_MEMBER;</sql></rollback>
+    </changeSet>
+
+</databaseChangeLog>

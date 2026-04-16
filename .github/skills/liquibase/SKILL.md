@@ -106,6 +106,7 @@ cd core_admin && source ../../../.env && liquibase --defaults-file=liquibase.pro
 cd ../refdata  && source ../../../.env && liquibase --defaults-file=liquibase.properties update
 cd ../bt       && source ../../../.env && liquibase --defaults-file=liquibase.properties update
 cd ../trade    && source ../../../.env && liquibase --defaults-file=liquibase.properties update
+cd ../inst     && source ../../../.env && liquibase --defaults-file=liquibase.properties update
 
 # Schema-specific commands
 cd db/liquidbase/bt
@@ -186,6 +187,7 @@ The master `quantdb-changelog.xml` creates schemas and extensions. It does **NOT
 | `refdata` | REFDATA table DDL |
 | `bt` | BT table DDL |
 | `trade` | TRADE table DDL |
+| `inst` | INST table DDL |
 | `proc` | Stored procedures |
 | `seed` | Reference data inserts |
 
@@ -204,6 +206,8 @@ Run only specific contexts: `liquibase update --contexts=bt,proc`
 | 210–249 | BT procedures |
 | 300–309 | TRADE tables |
 | 310–349 | TRADE procedures |
+| 400–409 | INST tables |
+| 410–449 | INST procedures |
 
 ## Common Pitfalls
 

@@ -1,15 +1,15 @@
 CREATE OR REPLACE PROCEDURE BT.SP_INS_API_REQUEST(
-    IN  IN_API_REQ_ID       UUID,
-    IN  IN_APP_ID           INTEGER,
-    IN  IN_APP_METRIC_ID    INTEGER,
-    IN  IN_TM_INTERVAL_ID   INTEGER,
-    IN  IN_SYMBOL           TEXT,
-    IN  IN_FULL_RANGE_START TIMESTAMPTZ,
-    IN  IN_FULL_RANGE_END   TIMESTAMPTZ,
-    IN  IN_USER_ID          TEXT,
-    OUT OUT_SQLSTATE        TEXT,
-    OUT OUT_SQLMSG          TEXT,
-    OUT OUT_SQLERRMC        TEXT
+    IN  IN_API_REQ_ID        UUID,
+    IN  IN_APP_ID            INTEGER,
+    IN  IN_APP_METRIC_ID     INTEGER,
+    IN  IN_TM_INTERVAL_ID    INTEGER,
+    IN  IN_PRODUCT_GROUP_ID  INTEGER,
+    IN  IN_FULL_RANGE_START  TIMESTAMPTZ,
+    IN  IN_FULL_RANGE_END    TIMESTAMPTZ,
+    IN  IN_USER_ID           TEXT,
+    OUT OUT_SQLSTATE         TEXT,
+    OUT OUT_SQLMSG           TEXT,
+    OUT OUT_SQLERRMC         TEXT
 )
 LANGUAGE plpgsql
 AS $$
@@ -25,7 +25,7 @@ BEGIN
     OUT_SQLERRMC := 'Stored Procedure completed successfully';
 
     V_OTHER_TEXT := 'IN_API_REQ_ID=' || COALESCE(IN_API_REQ_ID::TEXT, '')
-                 || ', IN_SYMBOL=' || COALESCE(IN_SYMBOL, '');
+                 || ', IN_PRODUCT_GROUP_ID=' || COALESCE(IN_PRODUCT_GROUP_ID::TEXT, '');
 
     -- Step 10: Resolve VID — get current max, or start at 1
     OUT_SQLMSG := '10';
@@ -34,14 +34,14 @@ BEGIN
       FROM BT.API_REQUEST
      WHERE API_REQ_ID = IN_API_REQ_ID;
 
-    -- Step 20: Flip old current row(s) to 'N'
+    -- Step 20: Close old current row — set TRANSACT_TO_TS to now
     OUT_SQLMSG := '20';
     UPDATE BT.API_REQUEST
-       SET IS_CURRENT_IND = 'N'
+       SET TRANSACT_TO_TS = V_START_TS
      WHERE API_REQ_ID     = IN_API_REQ_ID
-       AND IS_CURRENT_IND = 'Y';
+       AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31';
 
-    -- Step 30: Insert new version as current
+    -- Step 30: Insert new version as current (TRANSACT_TO_TS = 9999-12-31)
     OUT_SQLMSG := '30';
     INSERT INTO BT.API_REQUEST (
         API_REQ_ID,
@@ -49,10 +49,11 @@ BEGIN
         APP_ID,
         APP_METRIC_ID,
         TM_INTERVAL_ID,
-        SYMBOL,
+        PRODUCT_GROUP_ID,
         FULL_RANGE_START,
         FULL_RANGE_END,
-        IS_CURRENT_IND,
+        TRANSACT_FROM_TS,
+        TRANSACT_TO_TS,
         USER_ID,
         CREATED_AT
     ) VALUES (
@@ -61,10 +62,11 @@ BEGIN
         IN_APP_ID,
         IN_APP_METRIC_ID,
         IN_TM_INTERVAL_ID,
-        IN_SYMBOL,
+        IN_PRODUCT_GROUP_ID,
         IN_FULL_RANGE_START,
         IN_FULL_RANGE_END,
-        'Y',
+        V_START_TS,
+        TIMESTAMPTZ '9999-12-31',
         IN_USER_ID,
         NOW()
     );

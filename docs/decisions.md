@@ -15,7 +15,7 @@ All agreed design decisions in one place.
 | 9 | **JSON API / DB** | Full Trade API design doc. Shared DB for backtest + trade. JSON schema for strategy + deployment + backtest results. | design doc |
 | 10 | **TypeScript UI** | FastAPI backend (shared with Trade API) + React/TS frontend. Replaces Streamlit. | Phase 8 |
 | 11 | **UUID version** | UUID v7 (time-ordered) via `uuid_extensions` package. Switch to stdlib `uuid.uuid7()` when Python 3.14 stable (Oct 2026). | strat.py |
-| 12 | **DB naming convention** | `SCHEMA.TABLE` format. Schemas: `CORE_ADMIN.`, `BT.`, `TRADE.`, `REFDATA.`. Columns UPPER_CASE. PKs: `<TABLE>_ID`. Audit: `USER_ID`, `CREATED_AT`/`UPDATED_AT`. Flags: `CHAR(1)`, no default, no CHECK. Soft versioning: `IS_CURRENT_IND`. DB name: `quantdb`. No CHECK constraints — validation at app layer. Procedure params: `IN_XXX`/`OUT_XXX`. | data-sql instructions |
+| 12 | **DB naming convention** | `SCHEMA.TABLE` format. Schemas: `CORE_ADMIN.`, `BT.`, `TRADE.`, `REFDATA.`, `INST.`. Columns UPPER_CASE. PKs: `<TABLE>_ID`. Audit: `USER_ID`, `CREATED_AT`/`UPDATED_AT`. Flags: `CHAR(1)`, no default, no CHECK. Soft versioning: `IS_CURRENT_IND`. DB name: `quantdb`. No CHECK constraints — validation at app layer. Procedure params: `IN_XXX`/`OUT_XXX`. | data-sql instructions |
 | 13 | **DB tables** | `BT.STRATEGY`, `BT.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`, `REFDATA.TICKER_MAPPING`. | design doc §7 |
 | 14 | **Ticker mapping** | `REFDATA.TICKER_MAPPING` maps data-source symbols to broker-specific symbols (e.g. `"US.AAPL"` for Futu). | design doc §7 |
 | 15 | **Broker adapter pattern** | `TradeAdapter` abstract interface. `FutuAdapter` wraps `FutuTrader`. `DeploymentConfig.broker` enum selects adapter. | design doc §5 |
@@ -23,3 +23,4 @@ All agreed design decisions in one place.
 | 17 | **Local dev DB** | SQLite or Docker Postgres locally. Switch via `DB_URL` env var. | design doc §11 |
 | 18 | **Risk checks** | Kill switch, paper-first default, max position, stop loss, cash check, signal validation, duplicate guard. | design doc §4 |
 | 19 | **No direct DML** | All writes via stored procedures (`CALL schema.procedure(...)`). Liquibase seed changesets are the only exception. | AGENTS.md |
+| 20 | **INST schema** | New `INST` schema for product master: `PRODUCT`, `PRODUCT_XREF` (replaces `REFDATA.TICKER_MAPPING`), `PRODUCT_GROUP`, `PRODUCT_GROUP_MEMBER`. `BT.API_REQUEST` gets `PRODUCT_GROUP_ID` + `VENDOR_KEY` columns (SYMBOL kept until data migration). | database.md |

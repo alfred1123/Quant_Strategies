@@ -14,10 +14,12 @@
             CREATE SCHEMA IF NOT EXISTS REFDATA;
             CREATE SCHEMA IF NOT EXISTS BT;
             CREATE SCHEMA IF NOT EXISTS TRADE;
+            CREATE SCHEMA IF NOT EXISTS INST;
             CREATE EXTENSION IF NOT EXISTS pg_partman;
         </sql>
         <rollback>
             <sql>
+                DROP SCHEMA IF EXISTS INST CASCADE;
                 DROP SCHEMA IF EXISTS TRADE CASCADE;
                 DROP SCHEMA IF EXISTS BT CASCADE;
                 DROP SCHEMA IF EXISTS REFDATA CASCADE;

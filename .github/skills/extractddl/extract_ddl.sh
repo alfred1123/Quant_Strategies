@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # extract_ddl.sh — Extract full DDL (tables + procedures/functions) for all
-# QuantDB project schemas: refdata, bt, trade, core_admin.
+# QuantDB project schemas: refdata, bt, trade, core_admin, inst.
 #
 # Uses pure psql queries (no pg_dump) — compatible regardless of client/server
 # version mismatch.
@@ -27,7 +27,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-SCHEMAS=(refdata bt trade core_admin)
+SCHEMAS=(refdata bt trade core_admin inst)
 DB_NAME="quantdb"
 HOST="${QUANTDB_HOST:-localhost}"
 PORT="${QUANTDB_PORT:-5433}"

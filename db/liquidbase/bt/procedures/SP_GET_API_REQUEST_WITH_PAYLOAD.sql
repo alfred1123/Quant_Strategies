@@ -30,9 +30,11 @@ BEGIN
             r.APP_ID,
             r.APP_METRIC_ID,
             r.TM_INTERVAL_ID,
-            r.SYMBOL,
+            r.PRODUCT_GROUP_ID,
             r.FULL_RANGE_START,
             r.FULL_RANGE_END,
+            r.TRANSACT_FROM_TS,
+            r.TRANSACT_TO_TS,
             p.RANGE_START_TS,
             p.RANGE_END_TS,
             p.PAYLOAD
@@ -40,7 +42,7 @@ BEGIN
           LEFT JOIN BT.API_REQUEST_PAYLOAD p
             ON  p.API_REQ_ID  = r.API_REQ_ID
             AND p.API_REQ_VID = r.API_REQ_VID
-         WHERE r.IS_CURRENT_IND = 'Y'
+         WHERE r.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'
            AND r.API_REQ_ID     = IN_API_REQ_ID;
 
     OUT_SQLMSG := '20';

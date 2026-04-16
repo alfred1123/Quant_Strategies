@@ -10,6 +10,7 @@ The project uses **PostgreSQL 17** with Liquibase for schema management. Each sc
 | `REFDATA` | Reference data (`APP`, `TICKER_MAPPING`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, etc.) + `SP_GET_ENUM` procedure for cache loading |
 | `BT` | Backtest results (`STRATEGY`, `RESULT`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert procedures |
 | `TRADE` | Live trading tables (`DEPLOYMENT`, `LOG`, `TRANSACTION`) — procedures deferred |
+| `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GROUP`, `PRODUCT_GROUP_MEMBER`) — replaces `REFDATA.TICKER_MAPPING` |
 
 ## Conventions
 
@@ -44,6 +45,7 @@ cd core_admin && source ../../../.env && liquibase --defaults-file=liquibase.pro
 cd ../refdata  && source ../../../.env && liquibase --defaults-file=liquibase.properties update
 cd ../bt       && source ../../../.env && liquibase --defaults-file=liquibase.properties update
 cd ../trade    && source ../../../.env && liquibase --defaults-file=liquibase.properties update
+cd ../inst     && source ../../../.env && liquibase --defaults-file=liquibase.properties update
 ```
 
 ## Stored Procedures
@@ -67,7 +69,8 @@ db/
 │   ├── core_admin/               # CORE_ADMIN tables + procedures
 │   ├── refdata/                  # REFDATA tables + seed data
 │   ├── bt/                       # BT tables + procedures
-│   └── trade/                    # TRADE tables
+│   ├── trade/                    # TRADE tables
+│   └── inst/                     # INST tables (product master)
 ├── sql/                          # Standalone SQL scripts
 └── syncddl/                      # Extracted live DDL (gitignored, for diff)
 ```

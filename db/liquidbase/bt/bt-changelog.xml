@@ -74,4 +74,25 @@
         <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_GET_API_LIMIT_CHK;</sql></rollback>
     </changeSet>
 
+    <changeSet id="217-bt-api-request-add-product-group-temporal" author="alfcheun" context="bt" runOnChange="false">
+        <comment>Add PRODUCT_GROUP_ID and temporal versioning columns (replaces free-text SYMBOL + IS_CURRENT_IND)</comment>
+        <sql>
+            ALTER TABLE BT.API_REQUEST
+                ADD COLUMN IF NOT EXISTS PRODUCT_GROUP_ID INTEGER;
+            ALTER TABLE BT.API_REQUEST
+                ADD COLUMN IF NOT EXISTS TRANSACT_FROM_TS TIMESTAMPTZ;
+            ALTER TABLE BT.API_REQUEST
+                ADD COLUMN IF NOT EXISTS TRANSACT_TO_TS TIMESTAMPTZ;
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE BT.API_REQUEST
+                    DROP COLUMN IF EXISTS TRANSACT_TO_TS;
+                ALTER TABLE BT.API_REQUEST
+                    DROP COLUMN IF EXISTS TRANSACT_FROM_TS;
+                ALTER TABLE BT.API_REQUEST
+                    DROP COLUMN IF EXISTS PRODUCT_GROUP_ID;
+            </sql>
+        </rollback>
+    </changeSet>
 </databaseChangeLog>
