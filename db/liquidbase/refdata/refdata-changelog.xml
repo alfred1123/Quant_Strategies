@@ -209,4 +209,10 @@
         <rollback><sql>DELETE FROM REFDATA.API_LIMIT;</sql></rollback>
     </changeSet>
 
+    <changeSet id="166-refdata-seed-app-metric-ndl" author="alfcheun" context="seed" runOnChange="false">
+        <comment>Nasdaq Data Link industrial and alternative metrics (APP_ID=4)</comment>
+        <sqlFile path="data/APP_METRIC_NDL.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DELETE FROM REFDATA.APP_METRIC WHERE APP_ID = 4;</sql></rollback>
+    </changeSet>
+
 </databaseChangeLog>

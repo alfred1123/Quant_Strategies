@@ -201,6 +201,23 @@ class NasdaqDataLink:
 - Crude oil price as inflation/energy sector proxy
 - Fed Funds Rate as monetary policy regime signal
 
+#### Targeted Nasdaq Data Link Datasets — Industrial & Alternative Metrics
+
+All fetched via `NasdaqDataLink.get_table_data()` or `NasdaqDataLink.get_historical_price()` (APP_ID = 4).
+
+| Category | Metric Name | Description | API Table Code | Column / Path |
+|----------|-------------|-------------|---------------|---------------|
+| Machinery Activity | Machine Movement | 7-day rolling sum of physical machine moves | `NDAQ/GIALST` | `move_rollsum` |
+| Machinery Activity | Equipment Runtime | Cumulative hours of machine movement (7-day roll) | `NDAQ/GIALST` | `runtime_rollsum` |
+| Machinery Activity | Active Machine Count | Unique count of active machines recorded daily | `NDAQ/GIALST` | `count_rollsum` |
+| Machinery Activity | Equipment Type | Category of machinery (e.g. Construction, Mining) | `NDAQ/GIALST` | `equip_type` |
+| Supply Chain | Accounts Receivable | Daily B2B payment behavior and credit patterns | `NDAQ/CSP` | — |
+| Supply Chain | Revenue Dependency | % of revenue tied to specific industrial partners | `NDAQ/CSP` | — |
+| ESG & Risk | Risk Incident Alerts | Daily environmental or labor strike notifications | `REPRISK/TR` | — |
+| ESG & Risk | Carbon Estimates | Daily/periodic modeled GHG emission outputs | `NDAQ/ESG` | — |
+| Thematic | Industrial Exposure | Daily score (0–1) of exposure to "Metal Supply" | `NDAQ/GFT` | — |
+| Corporate | Daily List | Daily tracking of listings, delistings, and name changes | `NDAQ/NDL` | — |
+
 ---
 
 ### 3.4 Priority 3 — MarineTraffic

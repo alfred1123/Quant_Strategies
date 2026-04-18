@@ -2,10 +2,11 @@ CREATE OR REPLACE PROCEDURE BT.SP_INS_API_REQUEST(
     IN  IN_API_REQ_ID        UUID,
     IN  IN_APP_ID            INTEGER,
     IN  IN_APP_METRIC_ID     INTEGER,
-    IN  IN_TM_INTERVAL_ID    INTEGER,
+    IN  IN_TM_INTERVAL_ID   INTEGER,
     IN  IN_PRODUCT_GROUP_ID  INTEGER,
-    IN  IN_FULL_RANGE_START  TIMESTAMPTZ,
-    IN  IN_FULL_RANGE_END    TIMESTAMPTZ,
+    IN  IN_RANGE_START_TS    TIMESTAMPTZ,
+    IN  IN_RANGE_END_TS      TIMESTAMPTZ,
+    IN  IN_PAYLOAD           JSONB,
     IN  IN_USER_ID           TEXT,
     OUT OUT_SQLSTATE         TEXT,
     OUT OUT_SQLMSG           TEXT,
@@ -41,7 +42,7 @@ BEGIN
      WHERE API_REQ_ID     = IN_API_REQ_ID
        AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31';
 
-    -- Step 30: Insert new version as current (TRANSACT_TO_TS = 9999-12-31)
+    -- Step 30: Insert new API_REQUEST version (TRANSACT_TO_TS = 9999-12-31)
     OUT_SQLMSG := '30';
     INSERT INTO BT.API_REQUEST (
         API_REQ_ID,
@@ -50,8 +51,8 @@ BEGIN
         APP_METRIC_ID,
         TM_INTERVAL_ID,
         PRODUCT_GROUP_ID,
-        FULL_RANGE_START,
-        FULL_RANGE_END,
+        RANGE_START_TS,
+        RANGE_END_TS,
         TRANSACT_FROM_TS,
         TRANSACT_TO_TS,
         USER_ID,
@@ -63,15 +64,35 @@ BEGIN
         IN_APP_METRIC_ID,
         IN_TM_INTERVAL_ID,
         IN_PRODUCT_GROUP_ID,
-        IN_FULL_RANGE_START,
-        IN_FULL_RANGE_END,
+        IN_RANGE_START_TS,
+        IN_RANGE_END_TS,
         V_START_TS,
         TIMESTAMPTZ '9999-12-31',
         IN_USER_ID,
         NOW()
     );
 
+    -- Step 40: Insert payload row for this VID
     OUT_SQLMSG := '40';
+    INSERT INTO BT.API_REQUEST_PAYLOAD (
+        API_REQ_ID,
+        API_REQ_VID,
+        RANGE_START_TS,
+        RANGE_END_TS,
+        PAYLOAD,
+        USER_ID,
+        CREATED_AT
+    ) VALUES (
+        IN_API_REQ_ID,
+        V_VID,
+        IN_RANGE_START_TS,
+        IN_RANGE_END_TS,
+        IN_PAYLOAD,
+        IN_USER_ID,
+        NOW()
+    );
+
+    OUT_SQLMSG := '50';
     CALL CORE_ADMIN.CORE_INS_LOG_PROC('BT', 'SP_INS_API_REQUEST', V_START_TS, NULL, V_OTHER_TEXT, IN_USER_ID, V_LOG_STATE, V_LOG_MSG);
 
 EXCEPTION

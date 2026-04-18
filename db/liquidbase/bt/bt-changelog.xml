@@ -40,13 +40,8 @@
     </changeSet>
 
     <changeSet id="212-bt-proc-sp-ins-api-request" author="alfcheun" context="proc" runOnChange="true">
-        <sqlFile path="procedures/SP_INS_API_REQUEST.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <sqlFile path="procedures/SP_INS_API_REQUEST.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
         <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_INS_API_REQUEST;</sql></rollback>
-    </changeSet>
-
-    <changeSet id="213-bt-proc-sp-ins-api-request-payload" author="alfcheun" context="proc" runOnChange="true">
-        <sqlFile path="procedures/SP_INS_API_REQUEST_PAYLOAD.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
-        <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_INS_API_REQUEST_PAYLOAD;</sql></rollback>
     </changeSet>
 
     <!-- ========== BT ALTER TABLE ========== -->
@@ -64,35 +59,9 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="215-bt-proc-sp-get-api-request-with-payload" author="alfcheun" context="proc" runOnChange="true">
-        <sqlFile path="procedures/SP_GET_API_REQUEST_WITH_PAYLOAD.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_GET_API_REQUEST_WITH_PAYLOAD;</sql></rollback>
-    </changeSet>
-
     <changeSet id="216-bt-proc-sp-get-api-limit-chk" author="alfcheun" context="proc" runOnChange="true">
         <sqlFile path="procedures/SP_GET_API_LIMIT_CHK.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
         <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_GET_API_LIMIT_CHK;</sql></rollback>
     </changeSet>
 
-    <changeSet id="217-bt-api-request-add-product-group-temporal" author="alfcheun" context="bt" runOnChange="false">
-        <comment>Add PRODUCT_GROUP_ID and temporal versioning columns (replaces free-text SYMBOL + IS_CURRENT_IND)</comment>
-        <sql>
-            ALTER TABLE BT.API_REQUEST
-                ADD COLUMN IF NOT EXISTS PRODUCT_GROUP_ID INTEGER;
-            ALTER TABLE BT.API_REQUEST
-                ADD COLUMN IF NOT EXISTS TRANSACT_FROM_TS TIMESTAMPTZ;
-            ALTER TABLE BT.API_REQUEST
-                ADD COLUMN IF NOT EXISTS TRANSACT_TO_TS TIMESTAMPTZ;
-        </sql>
-        <rollback>
-            <sql>
-                ALTER TABLE BT.API_REQUEST
-                    DROP COLUMN IF EXISTS TRANSACT_TO_TS;
-                ALTER TABLE BT.API_REQUEST
-                    DROP COLUMN IF EXISTS TRANSACT_FROM_TS;
-                ALTER TABLE BT.API_REQUEST
-                    DROP COLUMN IF EXISTS PRODUCT_GROUP_ID;
-            </sql>
-        </rollback>
-    </changeSet>
 </databaseChangeLog>
