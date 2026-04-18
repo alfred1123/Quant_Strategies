@@ -38,6 +38,9 @@ data.py ──► strat.py ──► perf.py ──► param_opt.py ──► wa
 
 | Module | Class / Function | Role |
 |--------|-----------------|------|
+| `db.py` | `DbGateway` | Shared base class for DB repos — `conninfo`, `_call_get`, `_call_write`, `_drain_cursor` |
+| `data.py` | `RefDataCache(DbGateway)` | In-process cache for REFDATA tables (dynamic discovery via catalog) |
+| `data.py` | `BacktestCache(DbGateway)` | BT schema read/write — API request caching, coverage checks |
 | `data.py` | `YahooFinance`, `AlphaVantage`, `Glassnode`, `FutuOpenD` | Fetch OHLCV data, return normalized DataFrame |
 | `strat.py` | `TechnicalAnalysis` | Calculate indicator values on the `factor` column |
 | `strat.py` | `SignalDirection` | Generate position array `{-1, 0, 1}` from indicator vs threshold |

@@ -8,7 +8,7 @@ All agreed design decisions in one place.
 | 2 | **Conjunction syntax** | Flat `"AND"` / `"OR"` / `"FILTER"` enum on `StrategyConfig.conjunction`. No string expression parser. Max 2 substrategies initially. | strat.py |
 | 3 | **Substrategy structure** | Ordered tuple of frozen `SubStrategy` dataclasses with sequential `id`. | strat.py |
 | 4 | **Optimization config** | Separate `OptimizationConfig`, not embedded in substrategy. Runtime args to `optimize()`. | Phase 4 |
-| 5 | **Strategy naming** | Optional `name` field. Auto-generated as `{ticker}_strategy_{id_prefix}` if empty. | strat.py |
+| 5 | **Strategy naming** | Optional `name` field. Auto-generated as `{internal_cusip}_strategy_{id_prefix}` if empty. | strat.py |
 | 6 | **Multi-factor positions** | Clean `combine_positions()` function in `strat.py`. AND/OR use percentile-rank strength tiebreak. FILTER uses factor 1 as gate, factor 2 for direction. | Phase 3 |
 | 7 | **Grid search engine** | Cartesian product as baseline. Bayesian opt via `optuna` as opt-in alternative. Warn on >10k combos. | Phase 4 |
 | 8 | **Visualization** | 1-factor: 2D heatmap. 2-factor: slice heatmaps. 3+: parallel coordinates (Plotly). | Phase 5 |
@@ -16,11 +16,16 @@ All agreed design decisions in one place.
 | 10 | **TypeScript UI** | FastAPI backend (shared with Trade API) + React/TS frontend. Replaces Streamlit. | Phase 8 |
 | 11 | **UUID version** | UUID v7 (time-ordered) via `uuid_extensions` package. Switch to stdlib `uuid.uuid7()` when Python 3.14 stable (Oct 2026). | strat.py |
 | 12 | **DB naming convention** | `SCHEMA.TABLE` format. Schemas: `CORE_ADMIN.`, `BT.`, `TRADE.`, `REFDATA.`, `INST.`. Columns UPPER_CASE. PKs: `<TABLE>_ID`. Audit: `USER_ID`, `CREATED_AT`/`UPDATED_AT`. Flags: `CHAR(1)`, no default, no CHECK. Soft versioning: `IS_CURRENT_IND`. DB name: `quantdb`. No CHECK constraints — validation at app layer. Procedure params: `IN_XXX`/`OUT_XXX`. | data-sql instructions |
-| 13 | **DB tables** | `BT.STRATEGY`, `BT.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`, `REFDATA.TICKER_MAPPING`. | design doc §7 |
-| 14 | **Ticker mapping** | `REFDATA.TICKER_MAPPING` maps data-source symbols to broker-specific symbols (e.g. `"US.AAPL"` for Futu). | design doc §7 |
+| 13 | **DB tables** | `BT.STRATEGY`, `BT.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`. `REFDATA.TICKER_MAPPING` dropped — replaced by `INST.PRODUCT_XREF`. | design doc §7 |
+| 14 | **Ticker mapping** | ~~`REFDATA.TICKER_MAPPING`~~ retired. Vendor-symbol mapping now lives in `INST.PRODUCT_XREF` (one row per product × app). | design doc §7 |
 | 15 | **Broker adapter pattern** | `TradeAdapter` abstract interface. `FutuAdapter` wraps `FutuTrader`. `DeploymentConfig.broker` enum selects adapter. | design doc §5 |
 | 16 | **AWS infrastructure** | EC2 t4g.small (Graviton ARM, ~$7/mo). RDS PostgreSQL Serverless v2 (~$5-15/mo). | design doc §11 |
 | 17 | **Local dev DB** | SQLite or Docker Postgres locally. Switch via `DB_URL` env var. | design doc §11 |
 | 18 | **Risk checks** | Kill switch, paper-first default, max position, stop loss, cash check, signal validation, duplicate guard. | design doc §4 |
 | 19 | **No direct DML** | All writes via stored procedures (`CALL schema.procedure(...)`). Liquibase seed changesets are the only exception. | AGENTS.md |
-| 20 | **INST schema** | New `INST` schema for product master: `PRODUCT`, `PRODUCT_XREF` (replaces `REFDATA.TICKER_MAPPING`), `PRODUCT_GROUP`, `PRODUCT_GROUP_MEMBER`. `BT.API_REQUEST` gets `PRODUCT_GROUP_ID` + `VENDOR_KEY` columns (SYMBOL kept until data migration). | database.md |
+| 20 | **INST schema** | New `INST` schema for product master: `PRODUCT`, `PRODUCT_XREF` (`REFDATA.TICKER_MAPPING` dropped), `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`. `BT.API_REQUEST` gets `PRODUCT_GRP_ID` + `VENDOR_KEY` columns (SYMBOL kept until data migration). | database.md |
+| 21 | **INTERNAL_CUSIP** | Stable product identifier on `INST.PRODUCT`. **Always lowercase**, format `symbol.exchange`. Crypto spot: `btc-usd.crypto` (venue-agnostic). Equity: `aapl.nyse`. OTC: `ust10y.dtcc`. Crypto derivs: `btc-perp.binance` (exchange-specific). Index: `spx.cboe`. Vendor-specific symbols live in `PRODUCT_XREF.VENDOR_SYMBOL` (exact vendor case). Pipeline field: `StrategyConfig.internal_cusip`, API field: `internal_cusip`. | INST.PRODUCT |
+| 22 | **INST versioning** | `PRODUCT` uses soft-versioning (`PRODUCT_VID` + `IS_CURRENT_IND`). `PRODUCT_XREF` uses version rows plus transaction-time windows (`PRODUCT_XREF_VID`, `TRANSACT_FROM_TS`, `TRANSACT_TO_TS`). `PRODUCT_GRP` and `PRODUCT_GRP_MEMBER` do **not** — hierarchy versioning is impractical; `PRODUCT_GRP` uses `UPDATED_AT` for admin edits, `PRODUCT_GRP_MEMBER` is add/remove only. | database.md |
+| 23 | **PRODUCT_XREF population** | Long-term design is semi-automatic vendor import with proposal/approval before writing `INST.PRODUCT_XREF`. Until that workflow exists, admin/bootstrap population may be done directly in the DB. Application write paths still use stored procedures. | separate-underlying.md |
+| 24 | **DbGateway + schema repos** | `src/db.py` provides `DbGateway` base class (`conninfo`, `_call_get`, `_call_write`, `_drain_cursor`). Schema-specific repos inherit: `RefDataCache` (REFDATA), `BacktestCache` (BT). `RefDataCache` discovers tables dynamically from `information_schema` (no hardcoded list). Both live in `src/data.py`. `api/services/refdata_cache.py` deleted — no backward-compat shims. | pipeline.md |
+| 25 | **Drop TICKER_MAPPING** | `REFDATA.TICKER_MAPPING` dropped via Liquibase changeset `116-refdata-drop-ticker-mapping`. Functionality replaced by `INST.PRODUCT_XREF`. No Python code referenced it. | database.md |

@@ -108,7 +108,7 @@ def parse_args(argv=None):
 
     # Data
     p.add_argument('--symbol', default='BTC-USD',
-                   help='Yahoo Finance ticker (default: %(default)s)')
+                   help='Yahoo Finance symbol / internal CUSIP (default: %(default)s)')
     p.add_argument('--start', default='2016-01-01',
                    help='Start date YYYY-MM-DD (default: %(default)s)')
     p.add_argument('--end', default='2026-04-01',
@@ -183,8 +183,9 @@ def main(args=None):
     indicator_method = INDICATORS[args.indicator]
     strategy_func = STRATEGIES[args.strategy]
 
+    cusip = args.symbol.lower()
     config = StrategyConfig(
-        ticker=args.symbol,
+        internal_cusip=cusip,
         indicator_name=indicator_method,
         signal_func=strategy_func,
         trading_period=trading_period,
@@ -206,8 +207,10 @@ def main(args=None):
     logger.info("Loaded %d daily bars: %s → %s",
                 len(df), df['datetime'].iloc[0], df['datetime'].iloc[-1])
 
+    data_dict = {cusip: df}
+
     # ── Single backtest ─────────────────────────────────────────────
-    perf = Performance(df, config, args.window, args.signal,
+    perf = Performance(data_dict, config, args.window, args.signal,
                        fee_bps=args.fee)
     perf.enrich_performance()
 
@@ -230,7 +233,7 @@ def main(args=None):
                                       args.sig_step))
 
         param_opt = ParametersOptimization(
-            df.copy(), config, fee_bps=args.fee,
+            data_dict, config, fee_bps=args.fee,
         )
 
         opt_result = param_opt.optimize(window_list, signal_list)
@@ -270,9 +273,10 @@ def main(args=None):
             'price':    price['v'],
             'factor':   price['v'],
         })
+        wf_data_dict = {cusip: wf_df}
 
         wf = WalkForward(
-            wf_df, args.split, config, fee_bps=args.fee,
+            wf_data_dict, args.split, config, fee_bps=args.fee,
         )
         result = wf.run(window_list, signal_list)
 

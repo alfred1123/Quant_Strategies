@@ -101,13 +101,14 @@ SELECT
      )
   || E'\n);\n'
   || COALESCE(
-       E'\n' || (
+       E'\n\n' || (
          SELECT string_agg(pg_get_indexdef(i.indexrelid) || ';', E'\n' ORDER BY ic.relname)
          FROM pg_index i
          JOIN pg_class ic ON ic.oid = i.indexrelid
+         LEFT JOIN pg_constraint con ON con.conindid = i.indexrelid
          WHERE i.indrelid = c.oid
            AND NOT i.indisprimary
-           AND NOT i.indisunique
+           AND con.oid IS NULL
        ),
        ''
      )

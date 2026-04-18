@@ -59,9 +59,39 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="215-bt-api-request-add-internal-cusip" author="alfcheun" context="bt" runOnChange="false">
+        <sql>
+            ALTER TABLE BT.API_REQUEST
+                ADD COLUMN IF NOT EXISTS INTERNAL_CUSIP TEXT;
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE BT.API_REQUEST
+                    DROP COLUMN IF EXISTS INTERNAL_CUSIP;
+            </sql>
+        </rollback>
+    </changeSet>
+
     <changeSet id="216-bt-proc-sp-get-api-limit-chk" author="alfcheun" context="proc" runOnChange="true">
         <sqlFile path="procedures/SP_GET_API_LIMIT_CHK.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
         <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_GET_API_LIMIT_CHK;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="217-bt-proc-sp-get-api-request" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_GET_API_REQUEST.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS BT.SP_GET_API_REQUEST;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="218-bt-api-request-ux-app-metric-interval-cusip" author="alfcheun" context="bt" runOnChange="false">
+        <sql>
+            CREATE UNIQUE INDEX IF NOT EXISTS UX_API_REQUEST_CURRENT_SUBSCRIPTION
+            ON BT.API_REQUEST (APP_ID, APP_METRIC_ID, TM_INTERVAL_ID, INTERNAL_CUSIP)
+            NULLS NOT DISTINCT
+            WHERE TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31';
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS BT.UX_API_REQUEST_CURRENT_SUBSCRIPTION;</sql>
+        </rollback>
     </changeSet>
 
 </databaseChangeLog>

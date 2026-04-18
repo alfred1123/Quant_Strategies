@@ -3,7 +3,7 @@ import pytest
 
 from strat import (Strategy, StrategyConfig, SubStrategy, SignalDirection,
                    strategy_to_json, backtest_results_to_json, combine_positions,
-                   INDICATOR_DEFAULTS, resolve_signal_func)
+                   resolve_signal_func)
 
 
 class TestMomentumBandSignal:
@@ -82,30 +82,30 @@ class TestReversionBandSignal:
 
 class TestStrategyConfig:
     def test_frozen_dataclass(self):
-        cfg = StrategyConfig("TEST", "get_bollinger_band",
+        cfg = StrategyConfig("test", "get_bollinger_band",
                              Strategy.momentum_band_signal, 365)
         with pytest.raises(AttributeError):
             cfg.trading_period = 252
 
     def test_fields(self):
-        cfg = StrategyConfig("TEST", "get_sma", Strategy.reversion_band_signal, 252)
-        assert cfg.ticker == "TEST"
+        cfg = StrategyConfig("test", "get_sma", Strategy.reversion_band_signal, 252)
+        assert cfg.internal_cusip == "test"
         assert cfg.indicator_name == "get_sma"
         assert cfg.signal_func is Strategy.reversion_band_signal
         assert cfg.trading_period == 252
         assert cfg.strategy_id  # auto-generated UUID is non-empty
 
     def test_equality(self):
-        a = StrategyConfig("TEST", "get_ema", Strategy.momentum_band_signal, 365,
+        a = StrategyConfig("test", "get_ema", Strategy.momentum_band_signal, 365,
                            strategy_id="same-id")
-        b = StrategyConfig("TEST", "get_ema", Strategy.momentum_band_signal, 365,
+        b = StrategyConfig("test", "get_ema", Strategy.momentum_band_signal, 365,
                            strategy_id="same-id")
         assert a == b
 
     def test_inequality(self):
-        a = StrategyConfig("TEST", "get_sma", Strategy.momentum_band_signal, 365,
+        a = StrategyConfig("test", "get_sma", Strategy.momentum_band_signal, 365,
                            strategy_id="id-a")
-        b = StrategyConfig("TEST", "get_ema", Strategy.momentum_band_signal, 365,
+        b = StrategyConfig("test", "get_ema", Strategy.momentum_band_signal, 365,
                            strategy_id="id-b")
         assert a != b
 
@@ -144,6 +144,15 @@ class TestSubStrategy:
         with pytest.raises(AttributeError):
             sub.resolve_signal_func()
 
+    def test_default_internal_cusip_none(self):
+        sub = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
+        assert sub.internal_cusip is None
+
+    def test_custom_internal_cusip(self):
+        sub = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0,
+                          internal_cusip="eth-usd")
+        assert sub.internal_cusip == "eth-usd"
+
     def test_equality(self):
         a = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
         b = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
@@ -159,20 +168,20 @@ class TestStrategyConfigExtensions:
     """Tests for the new Phase 2 fields: name, conjunction, substrategies."""
 
     def test_default_name_empty(self):
-        cfg = StrategyConfig("TEST", "get_sma", Strategy.momentum_band_signal, 365)
+        cfg = StrategyConfig("test", "get_sma", Strategy.momentum_band_signal, 365)
         assert cfg.name == ""
 
     def test_default_conjunction_and(self):
-        cfg = StrategyConfig("TEST", "get_sma", Strategy.momentum_band_signal, 365)
+        cfg = StrategyConfig("test", "get_sma", Strategy.momentum_band_signal, 365)
         assert cfg.conjunction == "AND"
 
     def test_default_substrategies_empty(self):
-        cfg = StrategyConfig("TEST", "get_sma", Strategy.momentum_band_signal, 365)
+        cfg = StrategyConfig("test", "get_sma", Strategy.momentum_band_signal, 365)
         assert cfg.substrategies == ()
 
     def test_custom_fields(self):
         sub = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
-        cfg = StrategyConfig("TEST", "get_sma", Strategy.momentum_band_signal, 365,
+        cfg = StrategyConfig("test", "get_sma", Strategy.momentum_band_signal, 365,
                              name="my_strat", conjunction="OR",
                              substrategies=(sub,))
         assert cfg.name == "my_strat"
@@ -183,7 +192,7 @@ class TestStrategyConfigExtensions:
     def test_get_substrategies_from_populated(self):
         sub1 = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
         sub2 = SubStrategy("get_rsi", "reversion_band_signal", 14, 0.5)
-        cfg = StrategyConfig("TEST", "get_sma", Strategy.momentum_band_signal, 365,
+        cfg = StrategyConfig("test", "get_sma", Strategy.momentum_band_signal, 365,
                              substrategies=(sub1, sub2))
         result = cfg.get_substrategies()
         assert len(result) == 2
@@ -191,16 +200,34 @@ class TestStrategyConfigExtensions:
         assert result[1] is sub2
 
     def test_get_substrategies_synthesizes_from_legacy(self):
-        cfg = StrategyConfig("TEST", "get_bollinger_band",
+        cfg = StrategyConfig("test", "get_bollinger_band",
                              Strategy.momentum_band_signal, 365)
         result = cfg.get_substrategies()
         assert len(result) == 1
         assert result[0].indicator_name == "get_bollinger_band"
         assert result[0].signal_func_name == "momentum_band_signal"
 
+    def test_get_internal_cusips_single_factor(self):
+        cfg = StrategyConfig("btc-usd", "get_sma", Strategy.momentum_band_signal, 365)
+        assert cfg.get_internal_cusips() == {"btc-usd"}
+
+    def test_get_internal_cusips_multi_factor_same_ticker(self):
+        sub1 = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
+        sub2 = SubStrategy("get_rsi", "reversion_band_signal", 14, 0.5)
+        cfg = StrategyConfig("btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
+                             substrategies=(sub1, sub2))
+        assert cfg.get_internal_cusips() == {"btc-usd"}
+
+    def test_get_internal_cusips_multi_factor_different_tickers(self):
+        sub1 = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
+        sub2 = SubStrategy("get_sma", "momentum_band_signal", 14, 0.5, internal_cusip="eth-usd")
+        cfg = StrategyConfig("btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
+                             substrategies=(sub1, sub2))
+        assert cfg.get_internal_cusips() == {"btc-usd", "eth-usd"}
+
     def test_multi_substrategy_frozen(self):
         sub = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
-        cfg = StrategyConfig("TEST", "get_sma", Strategy.momentum_band_signal, 365,
+        cfg = StrategyConfig("test", "get_sma", Strategy.momentum_band_signal, 365,
                              substrategies=(sub,))
         with pytest.raises(TypeError):
             cfg.substrategies[0] = sub  # tuple is immutable
@@ -211,7 +238,7 @@ class TestStrategyConfigSingle:
 
     def test_single_creates_substrategy(self):
         cfg = StrategyConfig.single(
-            "BTC-USD", "get_bollinger_band",
+            "btc-usd", "get_bollinger_band",
             Strategy.momentum_band_signal, 365,
             window=20, signal=1.0
         )
@@ -225,10 +252,10 @@ class TestStrategyConfigSingle:
 
     def test_single_preserves_top_level(self):
         cfg = StrategyConfig.single(
-            "AAPL", "get_sma", Strategy.reversion_band_signal, 252,
+            "aapl", "get_sma", Strategy.reversion_band_signal, 252,
             window=50, signal=0.5
         )
-        assert cfg.ticker == "AAPL"
+        assert cfg.internal_cusip == "aapl"
         assert cfg.indicator_name == "get_sma"
         assert cfg.signal_func is Strategy.reversion_band_signal
         assert cfg.trading_period == 252
@@ -236,21 +263,21 @@ class TestStrategyConfigSingle:
 
     def test_single_custom_data_column(self):
         cfg = StrategyConfig.single(
-            "BTC-USD", "get_sma", Strategy.momentum_band_signal, 365,
+            "btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
             window=10, signal=1.0, data_column="volume"
         )
         assert cfg.substrategies[0].data_column == "volume"
 
     def test_single_custom_strategy_id(self):
         cfg = StrategyConfig.single(
-            "BTC-USD", "get_sma", Strategy.momentum_band_signal, 365,
+            "btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
             window=10, signal=1.0, strategy_id="custom-id"
         )
         assert cfg.strategy_id == "custom-id"
 
     def test_single_custom_name(self):
         cfg = StrategyConfig.single(
-            "BTC-USD", "get_sma", Strategy.momentum_band_signal, 365,
+            "btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
             window=10, signal=1.0, name="my_strat"
         )
         assert cfg.name == "my_strat"
@@ -259,13 +286,13 @@ class TestStrategyConfigSingle:
 class TestStrategyToJson:
     def test_single_substrategy(self):
         cfg = StrategyConfig.single(
-            "BTC-USD", "get_bollinger_band",
+            "btc-usd", "get_bollinger_band",
             Strategy.momentum_band_signal, 365,
             window=20, signal=1.0, strategy_id="test-id"
         )
         result = strategy_to_json(cfg)
         assert result["strategy_id"] == "test-id"
-        assert result["ticker"] == "BTC-USD"
+        assert result["internal_cusip"] == "btc-usd"
         assert result["conjunction"] == "AND"
         assert result["trading_period"] == 365
         assert len(result["substrategies"]) == 1
@@ -281,7 +308,7 @@ class TestStrategyToJson:
         sub1 = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
         sub2 = SubStrategy("get_rsi", "reversion_band_signal", 14, 0.5)
         cfg = StrategyConfig(
-            "AAPL", "get_sma", Strategy.momentum_band_signal, 252,
+            "aapl", "get_sma", Strategy.momentum_band_signal, 252,
             strategy_id="multi-id", substrategies=(sub1, sub2)
         )
         result = strategy_to_json(cfg)
@@ -291,12 +318,12 @@ class TestStrategyToJson:
         assert result["substrategies"][1]["indicator"] == "get_rsi"
 
     def test_legacy_config_requires_window_signal(self):
-        cfg = StrategyConfig("TEST", "get_sma", Strategy.momentum_band_signal, 365)
+        cfg = StrategyConfig("test", "get_sma", Strategy.momentum_band_signal, 365)
         with pytest.raises(ValueError, match="window and signal required"):
             strategy_to_json(cfg)
 
     def test_legacy_config_with_window_signal(self):
-        cfg = StrategyConfig("TEST", "get_sma", Strategy.momentum_band_signal, 365,
+        cfg = StrategyConfig("test", "get_sma", Strategy.momentum_band_signal, 365,
                              strategy_id="legacy-id")
         result = strategy_to_json(cfg, window=20, signal=1.0)
         assert result["strategy_id"] == "legacy-id"
@@ -306,16 +333,16 @@ class TestStrategyToJson:
 
     def test_auto_name(self):
         cfg = StrategyConfig.single(
-            "BTC-USD", "get_bollinger_band",
+            "btc-usd", "get_bollinger_band",
             Strategy.momentum_band_signal, 365,
             window=20, signal=1.0, strategy_id="abcd1234-0000-0000-0000-000000000000"
         )
         result = strategy_to_json(cfg)
-        assert result["name"] == "BTC-USD_strategy_abcd1234"
+        assert result["name"] == "btc-usd_strategy_abcd1234"
 
     def test_custom_name_preserved(self):
         cfg = StrategyConfig.single(
-            "BTC-USD", "get_sma", Strategy.momentum_band_signal, 365,
+            "btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
             window=20, signal=1.0, name="my_custom"
         )
         result = strategy_to_json(cfg)
@@ -323,7 +350,7 @@ class TestStrategyToJson:
 
     def test_created_at_present(self):
         cfg = StrategyConfig.single(
-            "BTC-USD", "get_sma", Strategy.momentum_band_signal, 365,
+            "btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
             window=20, signal=1.0
         )
         result = strategy_to_json(cfg)
@@ -332,11 +359,21 @@ class TestStrategyToJson:
 
     def test_version_default_1(self):
         cfg = StrategyConfig.single(
-            "BTC-USD", "get_sma", Strategy.momentum_band_signal, 365,
+            "btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
             window=20, signal=1.0
         )
         result = strategy_to_json(cfg)
         assert result["version"] == 1
+
+    def test_sub_internal_cusip_in_json(self):
+        sub1 = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
+        sub2 = SubStrategy("get_sma", "momentum_band_signal", 14, 0.5,
+                           internal_cusip="eth-usd")
+        cfg = StrategyConfig("btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
+                             substrategies=(sub1, sub2))
+        result = strategy_to_json(cfg)
+        assert "internal_cusip" not in result["substrategies"][0]
+        assert result["substrategies"][1]["internal_cusip"] == "eth-usd"
 
 
 class TestBacktestResultsToJson:
@@ -352,11 +389,11 @@ class TestBacktestResultsToJson:
             {"sharpe": 0.8, "calmar": 1.0, "max_dd": 0.2})
 
         result = backtest_results_to_json(
-            "strat-001", mock_perf, "BTC-USD",
+            "strat-001", mock_perf, "btc-usd",
             "2020-01-01", "2023-12-31", 5.0
         )
         assert result["strategy_id"] == "strat-001"
-        assert result["ticker_backtested"] == "BTC-USD"
+        assert result["internal_cusip"] == "btc-usd"
         assert result["fee_bps"] == 5.0
         assert result["data_range"]["start"] == "2020-01-01"
         assert result["data_range"]["end"] == "2023-12-31"
@@ -571,41 +608,6 @@ class TestCombinePositions:
         a = np.array([1.0])
         with pytest.raises(ValueError, match="conjunction must be"):
             combine_positions([a, a], "XOR")
-
-
-class TestIndicatorDefaults:
-    REQUIRED_KEYS = {"win_min", "win_max", "win_step",
-                     "sig_min", "sig_max", "sig_step"}
-
-    def test_all_indicators_have_defaults(self):
-        expected = {"get_sma", "get_ema", "get_rsi",
-                    "get_bollinger_band", "get_stochastic_oscillator"}
-        assert set(INDICATOR_DEFAULTS.keys()) == expected
-
-    def test_all_entries_have_required_keys(self):
-        for name, bounds in INDICATOR_DEFAULTS.items():
-            missing = self.REQUIRED_KEYS - set(bounds.keys())
-            assert not missing, f"{name} missing keys: {missing}"
-
-    def test_min_less_than_max(self):
-        for name, b in INDICATOR_DEFAULTS.items():
-            assert b["win_min"] < b["win_max"], f"{name}: win_min >= win_max"
-            if b["sig_min"] is not None:
-                assert b["sig_min"] < b["sig_max"], f"{name}: sig_min >= sig_max"
-
-    def test_bounded_indicators_have_sig_range(self):
-        for name in ("get_rsi", "get_stochastic_oscillator"):
-            b = INDICATOR_DEFAULTS[name]
-            assert b["sig_min"] == 0.0, f"{name}: sig_min should be 0.0"
-            assert b["sig_max"] == 100.0, f"{name}: sig_max should be 100.0"
-            assert b["sig_step"] == 5.0, f"{name}: sig_step should be 5.0"
-
-    def test_window_min_at_least_two(self):
-        for name, b in INDICATOR_DEFAULTS.items():
-            assert b["win_min"] >= 2, f"{name}: win_min < 2"
-
-    def test_bollinger_window_min_at_least_ten(self):
-        assert INDICATOR_DEFAULTS["get_bollinger_band"]["win_min"] >= 10
 
 
 # -------------------------------------------------------------------------

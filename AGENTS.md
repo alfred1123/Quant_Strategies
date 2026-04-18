@@ -75,7 +75,8 @@ The `INDICATOR_DEFAULTS` dict in `src/strat.py` is a **legacy fallback** — onc
 
 ### REFDATA Caching
 
-- Backend loads all REFDATA tables into an in-process `RefDataCache` (Python dict) at startup.
+- `RefDataCache` lives in `src/data.py` (inherits `DbGateway` from `src/db.py`). Discovers REFDATA tables dynamically from `information_schema` at startup — no hardcoded table list.
+- Backend loads all REFDATA tables into an in-process `RefDataCache` (Python dict) at startup via `REFDATA.SP_GET_ENUM`. `get()` raises `ValueError` on empty tables.
 - No TTL — REFDATA changes are rare, admin-only. Refresh via `POST /api/v1/refdata/refresh`.
 - Frontend fetches REFDATA via `GET /api/v1/refdata/{table_name}` and caches client-side with TanStack Query (stale-while-revalidate).
 - DB connection: `localhost:5433` via AWS SSM port-forward.

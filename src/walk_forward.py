@@ -63,7 +63,7 @@ class WalkForward:
     def __init__(self, data, split_ratio, config, *, fee_bps=None):
         """
         Args:
-            data: DataFrame with 'price' and 'factor' columns.
+            data: dict[str, DataFrame] keyed by internal_cusip.
             split_ratio: Fraction of data used for in-sample (0.0–1.0).
             config: StrategyConfig with indicator_name, signal_func, trading_period.
             fee_bps: Transaction fee in basis points.
@@ -71,20 +71,22 @@ class WalkForward:
         if not 0.0 < split_ratio < 1.0:
             raise ValueError(f"split_ratio must be between 0 and 1, got {split_ratio}")
 
-        self.data = data
+        self.all_data = data
+        self.data = data[config.internal_cusip]
+
         self.split_ratio = split_ratio
         self.config = config
         self.fee_bps = fee_bps
 
-        self.split_idx = int(len(data) * split_ratio)
-        if self.split_idx < 2 or self.split_idx >= len(data) - 1:
+        self.split_idx = int(len(self.data) * split_ratio)
+        if self.split_idx < 2 or self.split_idx >= len(self.data) - 1:
             raise ValueError(
                 f"Split produces empty partition: split_idx={self.split_idx}, "
-                f"data length={len(data)}"
+                f"data length={len(self.data)}"
             )
 
         logger.info("Walk-forward split: %d in-sample, %d out-of-sample (ratio=%.2f)",
-                     self.split_idx, len(data) - self.split_idx, split_ratio)
+                     self.split_idx, len(self.data) - self.split_idx, split_ratio)
 
     def run(self, window_values, signal_values):
         """Run walk-forward test.
@@ -101,12 +103,18 @@ class WalkForward:
             WalkForwardResult with in-sample/out-of-sample metrics.
             Multi-factor: ``best_window`` and ``best_signal`` are tuples.
         """
-        is_data = self.data.iloc[:self.split_idx].copy().reset_index(drop=True)
-        oos_data = self.data.iloc[self.split_idx:].copy().reset_index(drop=True)
+        is_data_dict = {
+            t: df.iloc[:self.split_idx].copy().reset_index(drop=True)
+            for t, df in self.all_data.items()
+        }
+        oos_data_dict = {
+            t: df.iloc[self.split_idx:].copy().reset_index(drop=True)
+            for t, df in self.all_data.items()
+        }
 
         # ── In-sample: optimize on training split ───────────────────
         opt_result = ParametersOptimization(
-            is_data, self.config, fee_bps=self.fee_bps,
+            is_data_dict, self.config, fee_bps=self.fee_bps,
         ).run(window_values, signal_values)
 
         best_window, best_signal = self._extract_best(opt_result.best)
@@ -115,8 +123,8 @@ class WalkForward:
                     best_window, best_signal, opt_result.best['sharpe'])
 
         # ── Evaluate IS and OOS with best params ────────────────────
-        is_metrics = self._evaluate(is_data, best_window, best_signal)
-        oos_metrics = self._evaluate(oos_data, best_window, best_signal)
+        is_metrics = self._evaluate(is_data_dict, best_window, best_signal)
+        oos_metrics = self._evaluate(oos_data_dict, best_window, best_signal)
         overfitting_ratio = self._overfitting_ratio(is_metrics, oos_metrics)
 
         logger.info("Out-of-sample Sharpe=%.4f, Overfitting ratio=%.4f",
@@ -124,7 +132,7 @@ class WalkForward:
 
         # ── Full-period equity curve ─────────────────────────────────
         full_perf = Performance(
-            self.data.copy(), self.config, best_window, best_signal,
+            self.all_data, self.config, best_window, best_signal,
             fee_bps=self.fee_bps,
         )
         full_perf.enrich_performance()

@@ -194,6 +194,13 @@
         <rollback><sql>DELETE FROM REFDATA.APP_METRIC;</sql></rollback>
     </changeSet>
 
+    <changeSet id="116-refdata-drop-ticker-mapping" author="alfcheun" context="refdata" runOnChange="false">
+        <sql>DROP TABLE IF EXISTS REFDATA.TICKER_MAPPING;</sql>
+        <rollback>
+            <sqlFile path="tables/TICKER_MAPPING.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        </rollback>
+    </changeSet>
+
     <changeSet id="160-refdata-proc-sp-get-enum" author="alfcheun" context="refdata" runOnChange="true">
         <sqlFile path="procedures/SP_GET_ENUM.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
         <rollback><sql>DROP PROCEDURE IF EXISTS REFDATA.SP_GET_ENUM;</sql></rollback>

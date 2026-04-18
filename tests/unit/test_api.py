@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def client():
     """FastAPI test client with REFDATA cache stubbed."""
-    with patch("api.services.refdata_cache.psycopg"):
+    with patch("src.data.psycopg"):
         from api.main import app
         app.state.refdata_cache = MagicMock()
         app.state.refdata_cache.get.side_effect = lambda table: {
@@ -59,7 +59,7 @@ class TestDataEndpoint:
         mock_yf.get_historical_price = mock_get
 
         resp = client.post("/api/v1/backtest/data", json={
-            "symbol": "BTC-USD",
+            "internal_cusip": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-01-03",
         })
@@ -71,7 +71,7 @@ class TestDataEndpoint:
 
     @pytest.mark.skip(reason="/backtest/data endpoint is disabled")
     def test_data_missing_fields(self, client):
-        resp = client.post("/api/v1/backtest/data", json={"symbol": "BTC-USD"})
+        resp = client.post("/api/v1/backtest/data", json={"internal_cusip": "btc-usd"})
         assert resp.status_code == 422
 
 
@@ -100,7 +100,7 @@ class TestOptimizeEndpoint:
         mock_opt_cls.return_value = mock_opt
 
         resp = client.post("/api/v1/backtest/optimize", json={
-            "symbol": "BTC-USD",
+            "internal_cusip": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
             "mode": "single",
@@ -117,7 +117,7 @@ class TestOptimizeEndpoint:
 
     def test_optimize_invalid_strategy(self, client):
         resp = client.post("/api/v1/backtest/optimize", json={
-            "symbol": "BTC-USD",
+            "internal_cusip": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
             "mode": "single",
@@ -167,7 +167,7 @@ class TestOptimizeStreamEndpoint:
         mock_opt_cls.return_value = mock_opt
 
         with client.stream("POST", "/api/v1/backtest/optimize/stream", json={
-            "symbol": "BTC-USD", "start": "2024-01-01", "end": "2024-12-31",
+            "internal_cusip": "btc-usd", "start": "2024-01-01", "end": "2024-12-31",
             "mode": "single", "trading_period": 365,
             "indicator": "get_bollinger_band", "strategy": "momentum",
             "window_range": {"min": 10, "max": 20, "step": 10},
@@ -234,7 +234,7 @@ class TestPerformanceEndpoint:
         mock_perf_cls.return_value = mock_perf
 
         resp = client.post("/api/v1/backtest/performance", json={
-            "symbol": "BTC-USD",
+            "internal_cusip": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
             "mode": "single",
@@ -288,7 +288,7 @@ class TestWalkForwardEndpoint:
         mock_wf_cls.return_value = mock_wf
 
         resp = client.post("/api/v1/backtest/walk-forward", json={
-            "symbol": "BTC-USD",
+            "internal_cusip": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
             "mode": "single",

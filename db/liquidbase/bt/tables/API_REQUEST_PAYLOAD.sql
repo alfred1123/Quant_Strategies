@@ -6,8 +6,6 @@
 CREATE TABLE BT.API_REQUEST_PAYLOAD (
     API_REQ_ID     UUID NOT NULL,
     API_REQ_VID    INTEGER NOT NULL,
-    RANGE_START_TS TIMESTAMPTZ NOT NULL,   -- full history start this VID covers
-    RANGE_END_TS   TIMESTAMPTZ NOT NULL,   -- full history end this VID covers
     PAYLOAD        JSONB NOT NULL,         -- complete merged history
     USER_ID        TEXT,
     CREATED_AT     TIMESTAMPTZ NOT NULL,

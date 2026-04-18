@@ -144,7 +144,7 @@ class ParametersOptimization:
             signal = trial.suggest_categorical("signal", search_space["signal"])
             try:
                 perf = Performance(
-                    self.data.copy(), self.config,
+                    self.data, self.config,
                     window, signal, fee_bps=self.fee_bps,
                 )
                 perf.enrich_performance()
@@ -259,7 +259,7 @@ class ParametersOptimization:
 
             try:
                 perf = Performance(
-                    self.data.copy(), self.config,
+                    self.data, self.config,
                     tuple(windows), tuple(signals), fee_bps=self.fee_bps,
                 )
                 perf.enrich_performance()

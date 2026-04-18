@@ -17,15 +17,15 @@ from api.config import load_config
 # load_config() initialises logging, loads .env or SSM, and returns the DB conninfo
 DB_CONNINFO = load_config()
 
-from api.services.refdata_cache import RefDataCache  # noqa: E402
 from api.routers import backtest, refdata  # noqa: E402
+from src.data import BacktestCache, RefDataCache  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: load REFDATA cache.  Shutdown: no-op."""
+    """Startup: load REFDATA cache + BacktestCache.  Shutdown: no-op."""
     cache = RefDataCache(DB_CONNINFO)
     try:
         cache.load_all()
@@ -33,6 +33,7 @@ async def lifespan(app: FastAPI):
         logger.exception("Failed to connect to REFDATA database — "
                          "server will start but REFDATA endpoints will be empty")
     app.state.refdata_cache = cache
+    app.state.backtest_cache = BacktestCache(DB_CONNINFO, refdata=cache)
     yield
 
 

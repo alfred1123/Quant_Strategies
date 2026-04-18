@@ -2,12 +2,13 @@ CREATE OR REPLACE PROCEDURE BT.SP_INS_API_REQUEST(
     IN  IN_API_REQ_ID        UUID,
     IN  IN_APP_ID            INTEGER,
     IN  IN_APP_METRIC_ID     INTEGER,
-    IN  IN_TM_INTERVAL_ID   INTEGER,
-    IN  IN_PRODUCT_GROUP_ID  INTEGER,
+    IN  IN_TM_INTERVAL_ID    INTEGER,
+    IN  IN_PRODUCT_GRP_ID    INTEGER,
     IN  IN_RANGE_START_TS    TIMESTAMPTZ,
     IN  IN_RANGE_END_TS      TIMESTAMPTZ,
     IN  IN_PAYLOAD           JSONB,
     IN  IN_USER_ID           TEXT,
+    IN  IN_INTERNAL_CUSIP    TEXT DEFAULT NULL,
     OUT OUT_SQLSTATE         TEXT,
     OUT OUT_SQLMSG           TEXT,
     OUT OUT_SQLERRMC         TEXT
@@ -26,7 +27,7 @@ BEGIN
     OUT_SQLERRMC := 'Stored Procedure completed successfully';
 
     V_OTHER_TEXT := 'IN_API_REQ_ID=' || COALESCE(IN_API_REQ_ID::TEXT, '')
-                 || ', IN_PRODUCT_GROUP_ID=' || COALESCE(IN_PRODUCT_GROUP_ID::TEXT, '');
+                 || ', IN_PRODUCT_GRP_ID=' || COALESCE(IN_PRODUCT_GRP_ID::TEXT, '');
 
     -- Step 10: Resolve VID — get current max, or start at 1
     OUT_SQLMSG := '10';
@@ -50,7 +51,8 @@ BEGIN
         APP_ID,
         APP_METRIC_ID,
         TM_INTERVAL_ID,
-        PRODUCT_GROUP_ID,
+        INTERNAL_CUSIP,
+        PRODUCT_GRP_ID,
         RANGE_START_TS,
         RANGE_END_TS,
         TRANSACT_FROM_TS,
@@ -63,7 +65,8 @@ BEGIN
         IN_APP_ID,
         IN_APP_METRIC_ID,
         IN_TM_INTERVAL_ID,
-        IN_PRODUCT_GROUP_ID,
+        IN_INTERNAL_CUSIP,
+        IN_PRODUCT_GRP_ID,
         IN_RANGE_START_TS,
         IN_RANGE_END_TS,
         V_START_TS,
@@ -77,16 +80,12 @@ BEGIN
     INSERT INTO BT.API_REQUEST_PAYLOAD (
         API_REQ_ID,
         API_REQ_VID,
-        RANGE_START_TS,
-        RANGE_END_TS,
         PAYLOAD,
         USER_ID,
         CREATED_AT
     ) VALUES (
         IN_API_REQ_ID,
         V_VID,
-        IN_RANGE_START_TS,
-        IN_RANGE_END_TS,
         IN_PAYLOAD,
         IN_USER_ID,
         NOW()

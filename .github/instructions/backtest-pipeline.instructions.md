@@ -21,7 +21,7 @@ from strat import StrategyConfig, SignalDirection, SubStrategy
 
 # Legacy single-factor (backward compatible):
 config = StrategyConfig(
-    ticker="BTC-USD",
+    internal_cusip="btc-usd.crypto",
     indicator_name="get_bollinger_band",
     signal_func=SignalDirection.momentum_band_signal,
     trading_period=365,
@@ -29,7 +29,7 @@ config = StrategyConfig(
 
 # Single-factor with self-describing SubStrategy:
 config = StrategyConfig.single(
-    "BTC-USD", "get_bollinger_band",
+    "btc-usd.crypto", "get_bollinger_band",
     SignalDirection.momentum_band_signal, 365,
     window=20, signal=1.0,
 )
@@ -38,12 +38,12 @@ config = StrategyConfig.single(
 sub1 = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
 sub2 = SubStrategy("get_rsi", "reversion_band_signal", 14, 0.5)
 config = StrategyConfig(
-    "AAPL", "get_sma", SignalDirection.momentum_band_signal, 252,
+    "aapl.nyse", "get_sma", SignalDirection.momentum_band_signal, 252,
     conjunction="AND", substrategies=(sub1, sub2),
 )
 ```
 
-**Fields**: `ticker`, `indicator_name`, `signal_func`, `trading_period`, `strategy_id` (auto-UUID), `name`, `conjunction` ("AND"/"OR"), `substrategies` (tuple of `SubStrategy`).
+**Fields**: `internal_cusip`, `indicator_name`, `signal_func`, `trading_period`, `strategy_id` (auto-UUID), `name`, `conjunction` ("AND"/"OR"), `substrategies` (tuple of `SubStrategy`).
 
 **Transaction fees are NOT part of the config** — they vary by platform and are passed separately via `fee_bps`.
 

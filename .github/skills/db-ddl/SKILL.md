@@ -54,7 +54,7 @@ db/liquidbase/
     │   ├── ORDER_STATE.sql
     │   ├── TRANS_STATE.sql
     │   ├── API_LIMIT.sql
-    │   └── TICKER_MAPPING.sql
+    │   └── APP_METRIC.sql
     └── data/                      # REFDATA seed INSERT files
         ├── ASSET_TYPE.sql
         ├── CONJUNCTION.sql
@@ -162,6 +162,17 @@ Before committing a DDL file:
 11. File is named `<TABLE_NAME>.sql` and placed in the correct schema folder
 
 ## Stored Procedure Conventions
+
+### Query Construction Priority (SP_GET_*)
+
+- Prefer `INNER JOIN`-based queries first.
+- Avoid `LEFT JOIN` unless optional-row behavior is explicitly required by the business result.
+- Use CTEs only as a last resort when the query cannot be expressed cleanly with joins/subqueries.
+- For "latest/current" row filtering, prioritize status columns over max-timestamp heuristics:
+    - First choice: `IS_CURRENT_IND = 'Y'` (when available)
+    - Otherwise: `TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'`
+- Keep current-state predicates on the base table (`WHERE` clause) before joining payload/detail tables.
+- `SP_GET_*` result sets should not expose `TRANSACT_FROM_TS` or `TRANSACT_TO_TS`; use them only for internal filtering.
 
 ### Procedure Naming
 

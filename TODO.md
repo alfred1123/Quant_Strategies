@@ -81,13 +81,13 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 | 10 | **TypeScript UI** | Do it now. FastAPI backend (shared with Trade API) + React/TS frontend. Replaces Streamlit. | Phase 8 |
 | 11 | **UUID version** | UUID v7 (time-ordered) via `uuid_extensions` package. Switch to stdlib `uuid.uuid7()` when Python 3.14 stable (Oct 2026). | strat.py |
 | 12 | **DB naming convention** | `SCHEMA.TABLE` format. Schemas: `CORE_ADMIN.`, `BT.`, `TRADE.`, `REFDATA.`, `INST.`. Columns UPPER_CASE. PKs: `<TABLE>_ID`. Audit: `USER_ID`, `CREATED_AT`/`UPDATED_AT`. Flags: `CHAR(1)`, no default, no CHECK. Soft versioning: `IS_CURRENT_IND`. DB name: `quantdb`. No CHECK constraints anywhere — validation at app layer. Procedure params: `IN_XXX`/`OUT_XXX`. | design doc §7, data-sql instructions |
-| 13 | **DB tables** | `BT.STRATEGY`, `BT.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`, `REFDATA.TICKER_MAPPING`. | design doc §7 |
-| 14 | **Ticker mapping** | `REFDATA.TICKER_MAPPING` maps data-source symbols (e.g. `"AAPL"`) to broker-specific symbols (e.g. `"US.AAPL"` for Futu). Queried at deployment time. | design doc §7 |
+| 13 | **DB tables** | `BT.STRATEGY`, `BT.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`. `REFDATA.TICKER_MAPPING` dropped — replaced by `INST.PRODUCT_XREF`. | design doc §7 |
+| 14 | **Ticker mapping** | ~~`REFDATA.TICKER_MAPPING`~~ retired. Vendor-symbol mapping now lives in `INST.PRODUCT_XREF` (one row per product × app). | design doc §7 |
 | 15 | **Broker adapter pattern** | `TradeAdapter` abstract interface. `FutuAdapter` wraps existing `FutuTrader`. `DeploymentConfig.broker` enum selects adapter at runtime. "FUTU" = broker name, not app name. | design doc §5, Phase 7 |
 | 16 | **AWS infrastructure** | EC2 t4g.small (Graviton ARM, ~$7/mo reserved). RDS PostgreSQL 16 Serverless v2 (scales to zero, ~$5-15/mo). Native `CREATE SCHEMA` supports `SCHEMA.TABLE` convention. Total ~$15-25/mo. | design doc §11 |
 | 17 | **Local dev DB** | SQLite or Docker Postgres locally. Switch via `DB_URL` env var. | design doc §11 |
 | 18 | **Risk checks** | Kill switch, paper-first default, max position, stop loss, cash check, signal validation, duplicate guard. | design doc §4 |
-| 19 | **No direct DML** | All writes to application tables must go through stored procedures (`CALL schema.procedure(...)`). Direct `INSERT`/`UPDATE`/`DELETE` in Python or FastAPI is forbidden. Liquibase seed `<sql>` changesets are the only exception. `SELECT` queries are unrestricted. | AGENTS.md, `api/services/refdata_cache.py` |
+| 19 | **No direct DML** | All writes to application tables must go through stored procedures (`CALL schema.procedure(...)`). Direct `INSERT`/`UPDATE`/`DELETE` in Python or FastAPI is forbidden. Liquibase seed `<sql>` changesets are the only exception. `SELECT` queries are unrestricted. | AGENTS.md |
 
 ---
 
@@ -108,7 +108,7 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 - **Deployed:** PostgreSQL 17 on `localhost:5433`, database `quantdb`.
 - **Schemas:** `CORE_ADMIN`, `REFDATA`, `BT`, `TRADE` — all created and populated via Liquibase.
 - **Per-schema Liquibase deployment:** Each schema has its own `liquibase.properties` with `liquibase-schema-name`, giving independent `databasechangelog` tracking per schema. Master changelog (`quantdb-changelog.xml`) handles only schema/extension creation.
-- **Tables deployed:** `CORE_ADMIN.LOG_PROC_DETAIL`, 9 REFDATA tables (APP, TM_INTERVAL, ASSET_TYPE, INDICATOR, SIGNAL_TYPE, ORDER_STATE, TRANS_STATE, API_LIMIT, TICKER_MAPPING), 4 BT tables (STRATEGY, RESULT, API_REQUEST, API_REQUEST_PAYLOAD), 3 TRADE tables (DEPLOYMENT, LOG, TRANSACTION).
+- **Tables deployed:** `CORE_ADMIN.LOG_PROC_DETAIL`, 10 REFDATA tables (APP, TM_INTERVAL, ASSET_TYPE, INDICATOR, SIGNAL_TYPE, ORDER_STATE, TRANS_STATE, API_LIMIT, DATA_COLUMN, CONJUNCTION, APP_METRIC — TICKER_MAPPING dropped), 4 BT tables (STRATEGY, RESULT, API_REQUEST, API_REQUEST_PAYLOAD), 3 TRADE tables (DEPLOYMENT, LOG, TRANSACTION), 4 INST tables (PRODUCT, PRODUCT_XREF, PRODUCT_GRP, PRODUCT_GRP_MEMBER).
 - **Procedures deployed:**
   - `CORE_ADMIN.CORE_INS_LOG_PROC` — central logging for all stored procedures.
   - `REFDATA.SP_GET_ENUM` — generic REFCURSOR procedure to SELECT * FROM any REFDATA table by name (app startup cache loading); validates table via `pg_tables`, safe dynamic SQL with `format('%I', LOWER(...))`.
@@ -142,7 +142,7 @@ All agreed decisions in one place. Referenced by conflict # from the original di
   - `FutuAdapter` — wraps existing `FutuTrader` from `src/trade.py` (HK/US equities).
   - Future: `BybitAdapter` — resume from `backup/deco/bybit._trade.py` (crypto).
   - `DeploymentConfig.broker` enum value (e.g. `"FUTU"`, `"BYBIT"`) selects which adapter to instantiate at runtime.
-- Broker-specific symbols (e.g. `"US.AAPL"`) resolved from `ticker_mapping` DB table using `StrategyConfig.ticker` + `DeploymentConfig.broker`.
+- Broker-specific symbols (e.g. `"US.AAPL"`) resolved from `INST.PRODUCT_XREF` using `StrategyConfig.internal_cusip` + `DeploymentConfig.broker`.
 - Signal execution loop: fetch data → compute indicators → combine via conjunction → risk checks → execute via adapter.
 - Endpoints: strategies CRUD, deployments CRUD, execution log, backtest results storage.
 - Risk checks: kill switch, paper-first default, max position, stop loss, cash check, signal validation, duplicate guard.

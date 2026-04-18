@@ -480,9 +480,10 @@ The project uses **PostgreSQL 17** with Liquibase for schema management. Each sc
 | Schema | Purpose |
 |--------|--------|
 | `CORE_ADMIN` | Logging infrastructure (`LOG_PROC_DETAIL` table, `CORE_INS_LOG_PROC` procedure) |
-| `REFDATA` | Reference data (`APP`, `TICKER_MAPPING`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, etc.) + `SP_GET_ENUM` procedure for cache loading |
+| `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, etc.) + `SP_GET_ENUM` procedure for cache loading |
 | `BT` | Backtest results (`STRATEGY`, `RESULT`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert procedures (`SP_INS_STRATEGY`, `SP_INS_RESULT`, `SP_INS_API_REQUEST`, `SP_INS_API_REQUEST_PAYLOAD`) |
 | `TRADE` | Live trading tables (`DEPLOYMENT`, `LOG`, `TRANSACTION`) — procedures deferred |
+| `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) |
 
 **Conventions:**
 
@@ -504,6 +505,7 @@ cd core_admin && source ../../../.env && liquibase --defaults-file=liquibase.pro
 cd ../refdata  && source ../../../.env && liquibase --defaults-file=liquibase.properties update
 cd ../bt       && source ../../../.env && liquibase --defaults-file=liquibase.properties update
 cd ../trade    && source ../../../.env && liquibase --defaults-file=liquibase.properties update
+cd ../inst     && source ../../../.env && liquibase --defaults-file=liquibase.properties update
 ```
 
 See `.github/skills/liquibase/SKILL.md` for full conventions and pitfalls.

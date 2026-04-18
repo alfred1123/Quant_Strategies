@@ -65,7 +65,7 @@ Two top-level objects: `StrategyConfig` (what to compute) and `DeploymentConfig`
 | `strategy_id` | string (UUID) | Unique identifier, auto-generated |
 | `name` | string | Human-readable name; auto-generated from indicator+strategy if empty |
 | `version` | int | Incremented on parameter changes; original preserved for audit |
-| `ticker` | string | Data-source symbol the strategy was backtested on (e.g. `"BTC-USD"`, `"AAPL"`). Broker-specific symbols live in DeploymentConfig; mapping stored in `ticker_mapping` DB table. |
+| `ticker` | string | Data-source symbol the strategy was backtested on (e.g. `"BTC-USD"`, `"AAPL"`). Broker-specific symbols live in DeploymentConfig; mapping stored in `INST.PRODUCT_XREF`. |
 | `conjunction` | `"AND"` \| `"OR"` | How substrategy positions combine (flat enum for now) |
 | `trading_period` | int | 365 (crypto) or 252 (equity) — for annualization |
 | `substrategies` | array | 1–2 substrategy objects (expandable later) |
@@ -420,18 +420,8 @@ CREATE TABLE TRADE.LOG (
 
 -- ── REFDATA schema ──
 
--- Maps data-source symbols to broker-specific symbols.
--- Avoids hardcoding the mapping; queried at deployment time.
-CREATE TABLE REFDATA.TICKER_MAPPING (
-    TICKER_MAPPING_ID INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    DATA_TICKER       TEXT NOT NULL,        -- e.g. "AAPL", "BTC-USD"
-    BROKER            TEXT NOT NULL,        -- e.g. "FUTU", "BYBIT"
-    BROKER_TICKER     TEXT NOT NULL,        -- e.g. "US.AAPL", "BTCUSDT"
-    MARKET            TEXT,                 -- e.g. "US", "HK", "CRYPTO"
-    USER_ID           TEXT,
-    CREATED_AT        TIMESTAMPTZ,
-    UNIQUE (DATA_TICKER, BROKER)
-);
+-- TICKER_MAPPING has been dropped. Vendor-symbol mapping now lives in INST.PRODUCT_XREF.
+-- See docs/architecture/database.md for the INST schema design.
 ```
 
 ---

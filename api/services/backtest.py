@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 import src.data as _data_module
-from src.strat import SignalDirection, StrategyConfig, SubStrategy, resolve_signal_func
+from src.strat import SignalDirection, StrategyConfig, SubStrategy,  resolve_signal_func
 from src.perf import Performance
 from src.param_opt import ParametersOptimization
 from src.walk_forward import WalkForward

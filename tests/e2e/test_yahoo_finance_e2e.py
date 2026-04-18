@@ -39,7 +39,7 @@ class TestYahooFinanceContract:
     """Validate that the real Yahoo Finance API returns the expected schema."""
 
     def test_equity_returns_t_v_columns(self, yf):
-        df = yf.get_historical_price("AAPL", "2025-01-01", "2025-03-31")
+        df = yf.get_historical_price("aapl", "2025-01-01", "2025-03-31")
 
         assert isinstance(df, pd.DataFrame)
         assert list(df.columns) == ["t", "v"]
@@ -57,12 +57,12 @@ class TestYahooFinanceContract:
         assert (df["v"] > 0).all()
 
     def test_dates_sorted_ascending(self, yf):
-        df = yf.get_historical_price("AAPL", "2025-01-01", "2025-03-31")
+        df = yf.get_historical_price("aapl", "2025-01-01", "2025-03-31")
         dates = df["t"].tolist()
         assert dates == sorted(dates)
 
     def test_etf_supported(self, yf):
-        df = yf.get_historical_price("SPY", "2025-01-01", "2025-03-31")
+        df = yf.get_historical_price("spy", "2025-01-01", "2025-03-31")
         assert len(df) > 0
         assert list(df.columns) == ["t", "v"]
 
@@ -72,7 +72,7 @@ class TestYahooFinanceContract:
 
     def test_long_history_available(self, yf):
         """Yahoo Finance should provide multi-year data."""
-        df = yf.get_historical_price("AAPL", "2020-01-01", "2025-12-31")
+        df = yf.get_historical_price("aapl", "2020-01-01", "2025-12-31")
         assert len(df) > 1000  # ~5 years of trading days
 
 
@@ -85,7 +85,7 @@ class TestFullPipelineE2E:
     @pytest.fixture(scope="class")
     def aapl_data(self, yf):
         """Fetch AAPL data for pipeline tests."""
-        price = yf.get_historical_price("AAPL", "2023-01-01", "2025-12-31")
+        price = yf.get_historical_price("aapl", "2023-01-01", "2025-12-31")
         df = pd.DataFrame({
             "price": price["v"].values,
             "factor": price["v"].values,
@@ -94,7 +94,7 @@ class TestFullPipelineE2E:
 
     @pytest.fixture
     def equity_config(self):
-        return StrategyConfig(ticker="AAPL",
+        return StrategyConfig(internal_cusip="aapl",
             indicator_name="get_sma",
             signal_func=Strategy.momentum_band_signal,
             trading_period=252,
@@ -111,7 +111,7 @@ class TestFullPipelineE2E:
         assert result["Max Drawdown"] >= 0
 
     def test_bollinger_reversion_produces_valid_metrics(self, aapl_data):
-        config = StrategyConfig(ticker="AAPL",
+        config = StrategyConfig(internal_cusip="aapl",
             indicator_name="get_bollinger_band",
             signal_func=Strategy.reversion_band_signal,
             trading_period=252,
@@ -123,7 +123,7 @@ class TestFullPipelineE2E:
         assert perf.get_max_drawdown() >= 0
 
     def test_ema_momentum_produces_valid_metrics(self, aapl_data):
-        config = StrategyConfig(ticker="AAPL",
+        config = StrategyConfig(internal_cusip="aapl",
             indicator_name="get_ema",
             signal_func=Strategy.momentum_band_signal,
             trading_period=252,
@@ -157,14 +157,14 @@ class TestParamOptE2E:
 
     @pytest.fixture(scope="class")
     def spy_data(self, yf):
-        price = yf.get_historical_price("SPY", "2023-01-01", "2025-12-31")
+        price = yf.get_historical_price("spy", "2023-01-01", "2025-12-31")
         return pd.DataFrame({
             "price": price["v"].values,
             "factor": price["v"].values,
         })
 
     def test_grid_search_returns_results(self, spy_data):
-        config = StrategyConfig(ticker="SPY",
+        config = StrategyConfig(internal_cusip="spy",
             indicator_name="get_sma",
             signal_func=Strategy.momentum_band_signal,
             trading_period=252,
@@ -187,14 +187,14 @@ class TestWalkForwardE2E:
 
     @pytest.fixture(scope="class")
     def spy_data(self, yf):
-        price = yf.get_historical_price("SPY", "2020-01-01", "2025-12-31")
+        price = yf.get_historical_price("spy", "2020-01-01", "2025-12-31")
         return pd.DataFrame({
             "price": price["v"].values,
             "factor": price["v"].values,
         })
 
     def test_walk_forward_produces_result(self, spy_data):
-        config = StrategyConfig(ticker="SPY",
+        config = StrategyConfig(internal_cusip="spy",
             indicator_name="get_sma",
             signal_func=Strategy.momentum_band_signal,
             trading_period=252,
@@ -209,7 +209,7 @@ class TestWalkForwardE2E:
         assert isinstance(result.overfitting_ratio, float)
 
     def test_walk_forward_summary_dataframe(self, spy_data):
-        config = StrategyConfig(ticker="SPY",
+        config = StrategyConfig(internal_cusip="spy",
             indicator_name="get_bollinger_band",
             signal_func=Strategy.reversion_band_signal,
             trading_period=252,

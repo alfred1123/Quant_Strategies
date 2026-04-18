@@ -12,16 +12,201 @@ BybitData class moved to backup/deco/ — platform decommissioned.
 """
 
 import os
+import json
 import logging
 import time
+import uuid
 from functools import lru_cache
 
 import futu
 import pandas as pd
+import psycopg
 import requests
 from dotenv import load_dotenv
 
+from db import DbGateway
+
 logger = logging.getLogger(__name__)
+
+
+# ── REFDATA cache ────────────────────────────────────────────────────────────
+
+_REFDATA_EXCLUDE = frozenset({"databasechangelog", "databasechangeloglock"})
+
+
+class RefDataCache(DbGateway):
+    """In-process cache for REFDATA tables.
+
+    Thread-safe for reads (immutable snapshot after load).
+    Tables are discovered dynamically from ``information_schema.tables``.
+    """
+
+    def __init__(self, conninfo: str):
+        super().__init__(conninfo)
+        self._store: dict[str, list[dict]] = {}
+
+    def _discover_tables(self, cur) -> list[str]:
+        """Return REFDATA table names from the catalog, excluding Liquibase internals."""
+        cur.execute(
+            "SELECT table_name \
+                FROM information_schema.tables \
+                WHERE table_schema = 'refdata' \
+                    AND table_type = 'BASE TABLE' \
+                ORDER BY table_name"
+            )
+        return [r[0] for r in cur.fetchall() if r[0] not in _REFDATA_EXCLUDE]
+
+    def load_all(self) -> None:
+        """Fetch every REFDATA table into memory via SP_GET_ENUM."""
+        with psycopg.connect(self._conninfo) as conn, conn.cursor() as cur:
+            tables = self._discover_tables(cur)
+            for table in tables:
+                try:
+                    self._store[table] = self._drain_cursor(cur, "CALL REFDATA.SP_GET_ENUM(%s, NULL, NULL, NULL, NULL)", (table,))
+                except Exception:
+                    logger.warning("Failed to load REFDATA.%s — SP_GET_ENUM may not support it yet", table, exc_info=True)
+                    self._store[table] = []
+        logger.info("RefDataCache loaded %d tables: %s", len(self._store), sorted(self._store))
+
+    def get(self, table: str) -> list[dict]:
+        if table not in self._store:
+            raise ValueError(f"Unknown REFDATA table: {table}")
+        rows = self._store[table]
+        if not rows:
+            raise ValueError(f"REFDATA.{table.upper()} is empty — check SP_GET_ENUM or seed data")
+        return rows
+
+    def get_indicator_defaults(self) -> dict[str, dict]:
+        """Return ``{method_name: {win_min, win_max, ..., is_bounded_ind}}``."""
+        result = {}
+        for r in self.get("indicator"):
+            result[r["method_name"]] = {
+                "win_min": r.get("win_min"),
+                "win_max": r.get("win_max"),
+                "win_step": r.get("win_step"),
+                "sig_min": float(r["sig_min"]) if r.get("sig_min") is not None else None,
+                "sig_max": float(r["sig_max"]) if r.get("sig_max") is not None else None,
+                "sig_step": float(r["sig_step"]) if r.get("sig_step") is not None else None,
+                "is_bounded_ind": r.get("is_bounded_ind"),
+            }
+        return result
+
+    def resolve_app_id(self, name: str) -> int | None:
+        """Resolve a data-source name (e.g. 'yahoo') to its APP_ID."""
+        for r in self.get("app"):
+            if r["name"] == name:
+                return r["app_id"]
+        return None
+
+    def refresh(self) -> None:
+        self.load_all()
+
+
+# ── BT cache ─────────────────────────────────────────────────────────────────
+
+class BacktestCache(DbGateway):
+    """BT cache read/write via stored procedures.
+
+    Inherits connection handling and cursor protocol from ``DbGateway``.
+    Uses ``RefDataCache`` for denormalized ID lookups (APP_ID, etc.).
+    """
+
+    REQUIRED_COVERAGE_YEARS = 10
+
+    def __init__(self, conninfo: str, refdata: RefDataCache, user_id: str = "alfcheun") -> None:
+        super().__init__(conninfo, user_id)
+        self.refdata = refdata
+
+    # ── helpers ─────────────────────────────────────────────────────────
+
+    def _coverage_years(self, rows: list[dict]) -> float:
+        """Return cached data range in years, or 0.0 if unknown."""
+        if not rows:
+            return 0.0
+        start = rows[0].get("range_start_ts")
+        end = rows[0].get("range_end_ts")
+        if not start or not end:
+            return 0.0
+        return (end - start).days / 365.25
+
+    # ── proc wrappers ──────────────────────────────────────────────────
+
+    def _get_api_request(self, app_id, app_metric_id, tm_interval_id, internal_cusip) -> list[dict]:
+        return self._call_get("CALL BT.SP_GET_API_REQUEST(%s, %s, %s, %s, NULL, NULL, NULL, NULL)", (app_id, app_metric_id, tm_interval_id, internal_cusip))
+
+    def _insert_api_request(self, api_req_id, app_id, app_metric_id, tm_interval_id, product_grp_id, start_ts, end_ts, payload_json, internal_cusip):
+        self._call_write("CALL BT.SP_INS_API_REQUEST(%s::uuid, %s, %s, %s, %s, %s::timestamptz, %s::timestamptz, %s::jsonb, %s, %s, NULL, NULL, NULL)", (api_req_id, app_id, app_metric_id, tm_interval_id, product_grp_id, start_ts, end_ts, payload_json, self.user_id, internal_cusip))
+
+    # ── public API ───────────────────────────────────────────────────────
+
+    def load_cached_api_payload(
+        self,
+        app_id: int | None = None,
+        app_metric_id: int | None = None,
+        tm_interval_id: int | None = None,
+        internal_cusip: str | None = None,
+    ) -> pd.DataFrame | None:
+        """Load cached payload via SP_GET_API_REQUEST.
+
+        Returns a DataFrame built from the JSONB ``payload`` column, or
+        ``None`` when no matching row exists or the cached range is less
+        than ``REQUIRED_COVERAGE_YEARS``.
+        """
+        try:
+            rows = self._get_api_request(app_id, app_metric_id, tm_interval_id, internal_cusip)
+        except RuntimeError:
+            return None
+
+        if not rows:
+            return None
+
+        coverage = self._coverage_years(rows)
+        if coverage < self.REQUIRED_COVERAGE_YEARS:
+            logger.info("Cached range %.1f yr < %d yr required — cache miss", coverage, self.REQUIRED_COVERAGE_YEARS)
+            return None
+
+        payload = rows[0].get("payload")
+        if not payload:
+            return None
+        return pd.DataFrame(payload)
+
+    def persist_api_request_payload(
+        self,
+        app_id: int | None = None,
+        app_metric_id: int | None = None,
+        tm_interval_id: int | None = None,
+        product_grp_id: int | None = None,
+        range_start: str = "",
+        range_end: str = "",
+        payload_df: pd.DataFrame | None = None,
+        internal_cusip: str | None = None,
+    ) -> None:
+        """Insert a new API request version via SP_INS_API_REQUEST.
+
+        Skips the insert when the existing cache already covers
+        ``REQUIRED_COVERAGE_YEARS``.  Otherwise generates a new UUID —
+        the unique index on (APP_ID, APP_METRIC_ID, TM_INTERVAL_ID,
+        INTERNAL_CUSIP) with TRANSACT_TO_TS='9999-12-31' guarantees one
+        current row, and SP_INS closes the old row automatically.
+        """
+        # Guard — skip if cache already has sufficient range
+        try:
+            existing = self._get_api_request(app_id, app_metric_id, tm_interval_id, internal_cusip)
+        except RuntimeError:
+            existing = []
+        coverage = self._coverage_years(existing)
+        if coverage >= self.REQUIRED_COVERAGE_YEARS:
+            logger.info("Cache already covers %.1f yr — skipping persist", coverage)
+            return
+        # TODO: append new data to existing payload to extend range (future)
+        api_req_id = str(uuid.uuid4())
+        payload_json = json.dumps(payload_df.to_dict(orient="records")) if payload_df is not None else None
+        start_ts = f"{range_start} 00:00:00+00"
+        end_ts = f"{range_end} 00:00:00+00"
+        try:
+            self._insert_api_request(api_req_id, app_id, app_metric_id, tm_interval_id, product_grp_id, start_ts, end_ts, payload_json, internal_cusip)
+        except RuntimeError:
+            pass  # already logged in _call_write
 
 
 class FutuOpenD:

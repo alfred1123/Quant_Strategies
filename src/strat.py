@@ -21,34 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Indicator defaults — sensible window/signal bounds per indicator
-# ---------------------------------------------------------------------------
-
-INDICATOR_DEFAULTS = {
-    "get_sma": {
-        "win_min": 5, "win_max": 200, "win_step": 5,
-        "sig_min": 0.0, "sig_max": 0.10, "sig_step": 0.01,
-    },
-    "get_ema": {
-        "win_min": 5, "win_max": 200, "win_step": 5,
-        "sig_min": 0.0, "sig_max": 0.10, "sig_step": 0.01,
-    },
-    "get_rsi": {
-        "win_min": 5, "win_max": 50, "win_step": 1,
-        "sig_min": 0.0, "sig_max": 100.0, "sig_step": 5.0,
-    },
-    "get_bollinger_band": {
-        "win_min": 10, "win_max": 100, "win_step": 5,
-        "sig_min": 0.25, "sig_max": 2.50, "sig_step": 0.25,
-    },
-    "get_stochastic_oscillator": {
-        "win_min": 5, "win_max": 50, "win_step": 5,
-        "sig_min": 0.0, "sig_max": 100.0, "sig_step": 5.0,
-    },
-}
-
-
-# ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
 
@@ -64,6 +36,7 @@ class SubStrategy:
     window: int                # indicator lookback period
     signal: float              # threshold
     data_column: str = "v"     # which raw column becomes 'factor'
+    internal_cusip: str | None = None  # indicator underlying; None = use StrategyConfig.internal_cusip
 
     def resolve_signal_func(self) -> Callable:
         """Resolve ``signal_func_name`` to an actual callable on ``SignalDirection``."""
@@ -80,12 +53,12 @@ class StrategyConfig:
     ``strategy_id`` links this config to DeploymentConfig and DB records
     (``BT.STRATEGY.STRATEGY_ID``).
 
-    ``ticker`` records the data-source symbol the strategy was backtested on
-    (e.g. ``"BTC-USD"`` for Yahoo Finance).  Broker-specific symbols
-    (e.g. ``"US.AAPL"`` for Futu) live in DeploymentConfig; the mapping
-    between them is stored in ``REFDATA.TICKER_MAPPING``.
+    ``internal_cusip`` records the stable product identifier from
+    ``INST.PRODUCT.INTERNAL_CUSIP`` (format ``symbol.exchange``,
+    always lowercase, e.g. ``"btc-usd.crypto"``, ``"aapl.nyse"``).
+    Vendor-specific symbols are resolved via ``INST.PRODUCT_XREF``.
     """
-    ticker: str                # Data-source symbol, e.g. "BTC-USD", "AAPL"
+    internal_cusip: str        # INST.PRODUCT.INTERNAL_CUSIP, e.g. "btc-usd.crypto"
     indicator_name: str        # TechnicalAnalysis method name, e.g. "get_bollinger_band"
     signal_func: Callable      # e.g. SignalDirection.momentum_band_signal
     trading_period: int        # 365 (crypto) or 252 (equity)
@@ -95,7 +68,7 @@ class StrategyConfig:
     substrategies: tuple = ()  # tuple[SubStrategy, ...]; empty = single-factor legacy
 
     @classmethod
-    def single(cls, ticker, indicator_name, signal_func, trading_period,
+    def single(cls, internal_cusip, indicator_name, signal_func, trading_period,
                window=20, signal=1.0, data_column="v", **kwargs):
         """Convenience constructor for the common single-indicator case.
 
@@ -110,13 +83,21 @@ class StrategyConfig:
             data_column=data_column,
         )
         return cls(
-            ticker=ticker,
+            internal_cusip=internal_cusip,
             indicator_name=indicator_name,
             signal_func=signal_func,
             trading_period=trading_period,
             substrategies=(sub,),
             **kwargs,
         )
+
+    def get_internal_cusips(self) -> set:
+        """Return all unique internal CUSIPs needed by this strategy."""
+        cusips = {self.internal_cusip}
+        for sub in self.substrategies:
+            if sub.internal_cusip is not None:
+                cusips.add(sub.internal_cusip)
+        return cusips
 
     def get_substrategies(self):
         """Return substrategies, synthesizing one from top-level fields if empty."""
@@ -533,7 +514,7 @@ def strategy_to_json(config: StrategyConfig, window=None, signal=None) -> dict:
         "name": name,
         "version": 1,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "ticker": config.ticker,
+        "internal_cusip": config.internal_cusip,
         "conjunction": config.conjunction,
         "trading_period": config.trading_period,
         "substrategies": [
@@ -544,19 +525,20 @@ def strategy_to_json(config: StrategyConfig, window=None, signal=None) -> dict:
                 "window": s.window,
                 "signal": s.signal,
                 "data_column": s.data_column,
+                **({"internal_cusip": s.internal_cusip} if s.internal_cusip else {}),
             }
             for i, s in enumerate(subs)
         ],
     }
 
 
-def backtest_results_to_json(strategy_id, perf, ticker, start, end, fee_bps):
+def backtest_results_to_json(strategy_id, perf, internal_cusip, start, end, fee_bps):
     """Serialize backtest Performance metrics to JSON."""
     return {
         "strategy_id": strategy_id,
         "run_at": datetime.now(timezone.utc).isoformat(),
         "data_range": {"start": start, "end": end},
-        "ticker_backtested": ticker,
+        "internal_cusip": internal_cusip,
         "fee_bps": fee_bps,
         "metrics": perf.get_strategy_performance().to_dict(),
         "buy_hold_metrics": perf.get_buy_hold_performance().to_dict(),
@@ -564,6 +546,6 @@ def backtest_results_to_json(strategy_id, perf, ticker, start, end, fee_bps):
 
 
 def _auto_name(config, subs):
-    """Generate a short name: ``{ticker}_strategy_{id_prefix}``."""
+    """Generate a short name: ``{internal_cusip}_strategy_{id_prefix}``."""
     short_id = config.strategy_id[:8]
-    return f"{config.ticker}_strategy_{short_id}"
+    return f"{config.internal_cusip}_strategy_{short_id}"

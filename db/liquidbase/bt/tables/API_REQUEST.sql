@@ -6,7 +6,8 @@ CREATE TABLE BT.API_REQUEST (
     APP_ID             INTEGER,
     APP_METRIC_ID      INTEGER,
     TM_INTERVAL_ID     INTEGER,
-    PRODUCT_GROUP_ID   INTEGER,
+    INTERNAL_CUSIP     TEXT,
+    PRODUCT_GRP_ID     INTEGER,
     RANGE_START_TS     TIMESTAMPTZ,          -- earliest date across all versions
     RANGE_END_TS       TIMESTAMPTZ,          -- latest date across all versions
     TRANSACT_FROM_TS   TIMESTAMPTZ,          -- version effective from

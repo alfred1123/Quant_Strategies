@@ -33,6 +33,9 @@ class Performance:
         self._subs = config.get_substrategies()
         self._is_multi = len(self._subs) > 1
 
+        self.all_data = data
+        self.data = data[config.internal_cusip].copy()
+
         if window is not None and signal is not None:
             # Legacy/grid-search caller: window/signal passed explicitly
             self.window = window
@@ -51,7 +54,6 @@ class Performance:
             self.signal = self._signals if self._is_multi else self._signals[0]
 
         self._metric_window = max(self._windows)
-        self.data = data
 
         logger.debug("Performance init: window=%s, signal=%s, "
                      "trading_period=%s, fee_bps=%s, multi_factor=%s",
@@ -72,6 +74,12 @@ class Performance:
         return self
 
     def _enrich_single_factor(self):
+        sub = self._subs[0]
+        sub_cusip = sub.internal_cusip or self.config.internal_cusip
+        # Cross-product: indicator computed from a different product's DataFrame
+        if sub_cusip != self.config.internal_cusip:
+            sub_df = self.all_data[sub_cusip]
+            self.data['factor'] = sub_df[sub.data_column].reindex(self.data.index)
         ta = TechnicalAnalysis(self.data)
         self.data = ta.data
         self.indicator_func = getattr(ta, self.config.indicator_name)
@@ -91,12 +99,13 @@ class Performance:
         positions = []
         for i, sub in enumerate(self._subs):
             idx = i + 1
-            # Per-factor column: factorN from the sub's data_column
-            self.data[f'factor{idx}'] = self.data[sub.data_column]
+            sub_cusip = sub.internal_cusip or self.config.internal_cusip
+            sub_df = self.all_data[sub_cusip]
+            # Per-factor column: factorN from the sub's data_column on resolved DataFrame
+            factor_vals = sub_df[sub.data_column].reindex(self.data.index)
+            self.data[f'factor{idx}'] = factor_vals
             # Build a TA instance on this factor's data
-            cols = list(dict.fromkeys(['price', 'factor', sub.data_column]))
-            sub_data = self.data[cols].copy()
-            sub_data['factor'] = self.data[sub.data_column]
+            sub_data = pd.DataFrame({'factor': factor_vals})
             ta = TechnicalAnalysis(sub_data)
             indicator_func = getattr(ta, sub.indicator_name)
             indicator_vals = indicator_func(self._windows[i])

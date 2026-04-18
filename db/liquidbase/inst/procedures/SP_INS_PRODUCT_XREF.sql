@@ -1,0 +1,85 @@
+CREATE OR REPLACE PROCEDURE INST.SP_INS_PRODUCT_XREF(
+    IN  IN_PRODUCT_XREF_ID INTEGER,
+    IN  IN_PRODUCT_ID      INTEGER,
+    IN  IN_APP_ID          INTEGER,
+    IN  IN_VENDOR_SYMBOL   TEXT,
+    IN  IN_USER_ID         TEXT,
+    OUT OUT_SQLSTATE        TEXT,
+    OUT OUT_SQLMSG          TEXT,
+    OUT OUT_SQLERRMC        TEXT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    V_START_TS   TIMESTAMPTZ := CURRENT_TIMESTAMP;
+    V_OTHER_TEXT TEXT;
+    V_VID        INTEGER;
+    V_LOG_STATE  TEXT;
+    V_LOG_MSG    TEXT;
+BEGIN
+    OUT_SQLSTATE := '00000';
+    OUT_SQLMSG   := '0';
+    OUT_SQLERRMC := 'Stored Procedure completed successfully';
+
+    V_OTHER_TEXT := 'IN_PRODUCT_XREF_ID=' || COALESCE(IN_PRODUCT_XREF_ID::TEXT, '')
+                 || ', IN_PRODUCT_ID=' || COALESCE(IN_PRODUCT_ID::TEXT, '')
+                 || ', IN_VENDOR_SYMBOL=' || COALESCE(IN_VENDOR_SYMBOL, '');
+
+    -- Step 10: Resolve VID — get current max, or start at 1
+    OUT_SQLMSG := '10';
+    SELECT COALESCE(MAX(PRODUCT_XREF_VID), 0) + 1
+      INTO V_VID
+      FROM INST.PRODUCT_XREF
+     WHERE PRODUCT_XREF_ID = IN_PRODUCT_XREF_ID;
+
+    -- Step 20: Close old current row — set TRANSACT_TO_TS
+    OUT_SQLMSG := '20';
+    UPDATE INST.PRODUCT_XREF
+       SET TRANSACT_TO_TS = V_START_TS
+     WHERE PRODUCT_XREF_ID = IN_PRODUCT_XREF_ID
+       AND TRANSACT_TO_TS  = TIMESTAMPTZ '9999-12-31';
+
+    -- Step 30: Insert new version as current
+    OUT_SQLMSG := '30';
+    INSERT INTO INST.PRODUCT_XREF (
+        PRODUCT_XREF_ID,
+        PRODUCT_XREF_VID,
+        TRANSACT_FROM_TS,
+        TRANSACT_TO_TS,
+        PRODUCT_ID,
+        APP_ID,
+        VENDOR_SYMBOL,
+        USER_ID,
+        CREATED_AT
+    ) VALUES (
+        IN_PRODUCT_XREF_ID,
+        V_VID,
+        V_START_TS,
+        TIMESTAMPTZ '9999-12-31',
+        IN_PRODUCT_ID,
+        IN_APP_ID,
+        IN_VENDOR_SYMBOL,
+        IN_USER_ID,
+        NOW()
+    );
+
+    OUT_SQLMSG := '40';
+    CALL CORE_ADMIN.CORE_INS_LOG_PROC('INST', 'SP_INS_PRODUCT_XREF', V_START_TS, NULL, V_OTHER_TEXT, IN_USER_ID, V_LOG_STATE, V_LOG_MSG);
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DECLARE
+            V_DETAIL  TEXT;
+            V_CONTEXT TEXT;
+        BEGIN
+            GET STACKED DIAGNOSTICS
+                OUT_SQLSTATE = RETURNED_SQLSTATE,
+                OUT_SQLERRMC = MESSAGE_TEXT,
+                V_DETAIL     = PG_EXCEPTION_DETAIL,
+                V_CONTEXT    = PG_EXCEPTION_CONTEXT;
+
+            RAISE WARNING '[SP_INS_PRODUCT_XREF] % (SQLSTATE: %). Detail: %. Context: %. Params: %',
+                OUT_SQLERRMC, OUT_SQLSTATE, V_DETAIL, V_CONTEXT, V_OTHER_TEXT;
+        END;
+END;
+$$;

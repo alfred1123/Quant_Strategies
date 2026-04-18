@@ -575,7 +575,7 @@ Every dropdown / radio / selectbox in the current Streamlit UI maps to a `REFDAT
 | Conjunction radio | `["AND", "OR"]` literal | `REFDATA.CONJUNCTION` | `DISPLAY_NAME` (label), `NAME` (value) |
 | Grid search defaults | `INDICATOR_DEFAULTS` in `strat.py` | `REFDATA.INDICATOR` | `WIN_MIN`, `WIN_MAX`, `WIN_STEP`, `SIG_MIN`, `SIG_MAX`, `SIG_STEP` (columns on same table) |
 | Broker selectbox (Phase 7) | not yet built | `REFDATA.APP` | `NAME` (label) |
-| Ticker mapping (Phase 7) | not yet built | `REFDATA.TICKER_MAPPING` | `DATA_TICKER` → `BROKER_TICKER` |
+| Vendor symbol lookup (Phase 7) | not yet built | `INST.PRODUCT_XREF` | `VENDOR_SYMBOL` per `(PRODUCT_ID, APP_ID)` |
 
 ### 11.2 REFDATA REST Endpoint
 
@@ -652,12 +652,9 @@ import psycopg
 
 logger = logging.getLogger(__name__)
 
-# Allow-list of tables the cache can load (prevents SQL injection)
-REFDATA_TABLES = frozenset({
-    "indicator", "signal_type", "asset_type", "data_column",
-    "conjunction", "ticker_mapping", "app",
-    "api_limit", "tm_interval", "order_state", "trans_state",
-})
+# Tables are now discovered dynamically from information_schema.
+# No hardcoded REFDATA_TABLES frozenset.
+# TICKER_MAPPING has been dropped — see INST.PRODUCT_XREF.
 
 
 class RefDataCache:
