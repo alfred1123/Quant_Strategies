@@ -17,7 +17,9 @@ import type {
 } from '../types/backtest';
 
 const DEFAULT_CONFIG: BacktestConfig = {
-  symbol: 'btc-usd.crypto',
+  symbol: 'btcusdt.crypto',
+  vendorSymbol: '',
+  dataSource: 'yahoo',
   start: '2016-01-01',
   end: new Date().toISOString().slice(0, 10),
   assetType: '',
@@ -42,39 +44,44 @@ const DEFAULT_CONFIG: BacktestConfig = {
   splitRatio: 0.5,
 };
 
+/** vendorSymbol takes priority; falls back to product cusip */
+const effectiveSymbol = (cfg: BacktestConfig) => cfg.vendorSymbol || cfg.symbol;
+
 function buildOptimizeRequest(cfg: BacktestConfig): OptimizeRequest {
   const f0 = cfg.factors[0];
+  const ds = cfg.dataSource || undefined;
   if (cfg.factors.length <= 1) {
     return {
-      symbol: cfg.symbol, start: cfg.start, end: cfg.end,
+      symbol: effectiveSymbol(cfg), start: cfg.start, end: cfg.end,
       mode: 'single', trading_period: cfg.tradingPeriod, fee_bps: cfg.feeBps,
-      indicator: f0.indicator, strategy: f0.strategy,
+      data_source: ds, indicator: f0.indicator, strategy: f0.strategy,
       window_range: f0.window_range, signal_range: f0.signal_range,
     };
   }
   return {
-    symbol: cfg.symbol, start: cfg.start, end: cfg.end,
+    symbol: effectiveSymbol(cfg), start: cfg.start, end: cfg.end,
     mode: 'multi', trading_period: cfg.tradingPeriod, fee_bps: cfg.feeBps,
-    conjunction: cfg.conjunction, factors: cfg.factors,
+    data_source: ds, conjunction: cfg.conjunction, factors: cfg.factors,
   };
 }
 
 function buildPerformanceRequest(cfg: BacktestConfig, row: Top10Row): PerformanceRequest {
   const f0 = cfg.factors[0];
+  const ds = cfg.dataSource || undefined;
   if (cfg.factors.length <= 1) {
     return {
-      symbol: cfg.symbol, start: cfg.start, end: cfg.end,
+      symbol: effectiveSymbol(cfg), start: cfg.start, end: cfg.end,
       mode: 'single', trading_period: cfg.tradingPeriod, fee_bps: cfg.feeBps,
-      indicator: f0.indicator, strategy: f0.strategy,
+      data_source: ds, indicator: f0.indicator, strategy: f0.strategy,
       window: row.window as number, signal: row.signal as number,
     };
   }
   const windows = Object.keys(row).filter(k => k.startsWith('window_')).map(k => row[k] as number);
   const signals = Object.keys(row).filter(k => k.startsWith('signal_')).map(k => row[k] as number);
   return {
-    symbol: cfg.symbol, start: cfg.start, end: cfg.end,
+    symbol: effectiveSymbol(cfg), start: cfg.start, end: cfg.end,
     mode: 'multi', trading_period: cfg.tradingPeriod, fee_bps: cfg.feeBps,
-    conjunction: cfg.conjunction, factors: cfg.factors,
+    data_source: ds, conjunction: cfg.conjunction, factors: cfg.factors,
     windows, signals,
   };
 }
@@ -143,7 +150,7 @@ export default function BacktestPage() {
   };
 
   const validate = (): string | null => {
-    if (!config.symbol.trim()) return 'Product is required.';
+    if (!config.symbol.trim() && !config.vendorSymbol.trim()) return 'Product or vendor symbol is required.';
     if (!config.assetType) return 'Asset type is required.';
     for (let i = 0; i < config.factors.length; i++) {
       if (!config.factors[i].indicator) return `Factor ${i + 1}: indicator is required.`;
@@ -212,7 +219,7 @@ export default function BacktestPage() {
     const url = URL.createObjectURL(new Blob([perfResult.perf_csv], { type: 'text/csv' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `perf_${config.symbol}.csv`;
+    a.download = `perf_${effectiveSymbol(config)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -285,7 +292,7 @@ export default function BacktestPage() {
             {/* Run summary bar */}
             <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
               <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center">
-                <Chip label={config.symbol} color="primary" size="small" />
+                <Chip label={effectiveSymbol(config)} color="primary" size="small" />
                 <Chip label={`${config.start} → ${config.end}`} size="small" variant="outlined" />
                 <Chip label={`${optimizeResult.valid} / ${optimizeResult.total_trials} valid trials`} size="small" variant="outlined" />
                 <Chip label={`Best Sharpe: ${(optimizeResult.best?.sharpe ?? 0).toFixed(4)}`} color="success" size="small" />

@@ -2,10 +2,10 @@ import React from 'react';
 import {
   Drawer, Box, Typography, TextField, Select, MenuItem, Autocomplete,
   FormControl, InputLabel, Button, Divider, IconButton, Stack, CircularProgress,
-  FormControlLabel, Checkbox, Slider,
+  FormControlLabel, Checkbox, Slider, Alert,
 } from '@mui/material';
-import { useIndicators, useSignalTypes, useAssetTypes, useConjunctions, useDataColumns } from '../api/refdata';
-import { useProducts } from '../api/inst';
+import { useIndicators, useSignalTypes, useAssetTypes, useConjunctions, useDataColumns, useApps } from '../api/refdata';
+import { useProducts, useProductXrefs } from '../api/inst';
 import type { ProductRow } from '../types/refdata';
 import { countSteps } from '../utils/grid';
 import type { BacktestConfig, FactorConfig, RangeParam } from '../types/backtest';
@@ -25,9 +25,25 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   const { data: assetTypes = [] } = useAssetTypes();
   const { data: conjunctions = [] } = useConjunctions();
   const { data: dataColumns = [] } = useDataColumns();
+  const { data: apps = [] } = useApps();
   const { data: products = [] } = useProducts();
 
   const selectedProduct = products.find(p => p.internal_cusip === config.symbol) ?? null;
+  // Controlled input text for the Product Autocomplete
+  const productInputValue = selectedProduct
+    ? `${selectedProduct.display_nm} (${selectedProduct.internal_cusip})`
+    : config.symbol; // freeSolo raw text, or '' when vendorSymbol clears it
+  const { data: xrefs = [] } = useProductXrefs(selectedProduct?.product_id ?? null);
+  const resolvedSymbol = xrefs.find(x => {
+    const app = apps.find(a => a.name === config.dataSource);
+    return app && x.app_id === app.app_id;
+  })?.vendor_symbol ?? '';
+
+  // Warn when a product is selected but has no xref for the chosen data source
+  const hasXrefMismatch = !!selectedProduct && !!config.dataSource && !resolvedSymbol;
+
+  // Displayed vendor symbol: manual override takes priority, then resolved from product+app
+  const displayedVendor = config.vendorSymbol || resolvedSymbol;
 
   const set = (patch: Partial<BacktestConfig>) => onChange({ ...config, ...patch });
 
@@ -89,7 +105,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   const completeFactor = (f: FactorConfig) => Boolean(f.indicator && f.strategy);
 
   const missingFields: string[] = [];
-  if (!config.symbol.trim()) missingFields.push('Product');
+  if (!config.symbol.trim() && !config.vendorSymbol.trim()) missingFields.push('Product or Vendor Symbol');
   if (!config.assetType) missingFields.push('Asset Type');
   config.factors.forEach((f, i) => {
     const label = config.factors.length > 1 ? `Factor ${i + 1} ` : '';
@@ -126,18 +142,21 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
       {/* Row 1: base params */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
         <Autocomplete<ProductRow, false, false, true>
-          size="small" freeSolo sx={{ width: 250 }}
+          size="small" freeSolo sx={{ width: 300 }}
+          slotProps={{ listbox: { sx: { maxHeight: 360, minWidth: 320 } } }}
           options={products}
           value={selectedProduct}
+          inputValue={productInputValue}
           getOptionLabel={(opt) => typeof opt === 'string' ? opt : `${opt.display_nm} (${opt.internal_cusip})`}
           isOptionEqualToValue={(opt, val) => opt.internal_cusip === val.internal_cusip}
           onChange={(_, val) => {
-            if (!val) set({ symbol: '' });
-            else if (typeof val === 'string') set({ symbol: val });
-            else set({ symbol: val.internal_cusip });
+            if (!val) set({ symbol: '', vendorSymbol: '' });
+            else if (typeof val === 'string') set({ symbol: val, vendorSymbol: '' });
+            else set({ symbol: val.internal_cusip, vendorSymbol: '' });
           }}
           onInputChange={(_, val, reason) => {
-            if (reason === 'input') set({ symbol: val });
+            if (reason === 'input') set({ symbol: val, vendorSymbol: '' });
+            // 'reset' and 'clear' are handled by the controlled inputValue
           }}
           renderInput={(params) => <TextField {...params} label="Product" />}
           renderOption={(props, opt) => (
@@ -148,6 +167,33 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
               </Box>
             </li>
           )}
+        />
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Data Source</InputLabel>
+          <Select
+            value={config.dataSource} label="Data Source"
+            onChange={e => set({ dataSource: e.target.value })}
+          >
+            {apps.map(a => (
+              <MenuItem key={a.app_id} value={a.name}>{a.display_name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        {resolvedSymbol && !config.vendorSymbol && (
+          <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
+            → {resolvedSymbol}
+          </Typography>
+        )}
+        <TextField
+          label="Vendor Symbol" size="small"
+          value={displayedVendor}
+          sx={{ width: 160 }}
+          onChange={e => {
+            const v = e.target.value;
+            // Typing a vendor symbol clears the product selection
+            set({ vendorSymbol: v, symbol: '' });
+          }}
+          slotProps={{ inputLabel: { shrink: true } }}
         />
         <TextField
           label="Start" size="small" type="date" value={config.start} sx={{ width: 155 }}
@@ -203,6 +249,12 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
           </Box>
         )}
       </Box>
+
+      {hasXrefMismatch && !config.vendorSymbol && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          No vendor symbol mapping for <strong>{selectedProduct?.display_nm}</strong> on <strong>{config.dataSource}</strong>. Enter a vendor symbol manually or choose a different data source.
+        </Alert>
+      )}
 
       <Divider sx={{ mb: 2 }} />
 

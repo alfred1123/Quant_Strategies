@@ -14,7 +14,9 @@ export interface FactorConfig {
 }
 
 export interface BacktestConfig {
-  symbol: string;
+  symbol: string;       // internal_cusip from product dropdown
+  vendorSymbol: string; // direct vendor symbol override (e.g. BTC-USD)
+  dataSource: string;
   start: string;
   end: string;
   assetType: string;

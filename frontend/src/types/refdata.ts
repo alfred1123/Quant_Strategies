@@ -30,6 +30,14 @@ export interface DataColumnRow {
   display_name: string;
 }
 
+export interface AppRow {
+  app_id: number;
+  name: string;
+  display_name: string;
+  class_name: string;
+  description: string | null;
+}
+
 export interface ProductRow {
   product_id: number;
   product_vid: number;
@@ -39,4 +47,12 @@ export interface ProductRow {
   exchange: string | null;
   ccy: string;
   description: string | null;
+}
+
+export interface XrefRow {
+  product_xref_id: number;
+  product_xref_vid: number;
+  product_id: number;
+  app_id: number;
+  vendor_symbol: string;
 }

@@ -59,7 +59,7 @@ class TestDataEndpoint:
         mock_yf.get_historical_price = mock_get
 
         resp = client.post("/api/v1/backtest/data", json={
-            "internal_cusip": "btc-usd",
+            "symbol": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-01-03",
         })
@@ -71,7 +71,7 @@ class TestDataEndpoint:
 
     @pytest.mark.skip(reason="/backtest/data endpoint is disabled")
     def test_data_missing_fields(self, client):
-        resp = client.post("/api/v1/backtest/data", json={"internal_cusip": "btc-usd"})
+        resp = client.post("/api/v1/backtest/data", json={"symbol": "btc-usd"})
         assert resp.status_code == 422
 
 
@@ -100,7 +100,7 @@ class TestOptimizeEndpoint:
         mock_opt_cls.return_value = mock_opt
 
         resp = client.post("/api/v1/backtest/optimize", json={
-            "internal_cusip": "btc-usd",
+            "symbol": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
             "mode": "single",
@@ -117,7 +117,7 @@ class TestOptimizeEndpoint:
 
     def test_optimize_invalid_strategy(self, client):
         resp = client.post("/api/v1/backtest/optimize", json={
-            "internal_cusip": "btc-usd",
+            "symbol": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
             "mode": "single",
@@ -167,7 +167,7 @@ class TestOptimizeStreamEndpoint:
         mock_opt_cls.return_value = mock_opt
 
         with client.stream("POST", "/api/v1/backtest/optimize/stream", json={
-            "internal_cusip": "btc-usd", "start": "2024-01-01", "end": "2024-12-31",
+            "symbol": "btc-usd", "start": "2024-01-01", "end": "2024-12-31",
             "mode": "single", "trading_period": 365,
             "indicator": "get_bollinger_band", "strategy": "momentum",
             "window_range": {"min": 10, "max": 20, "step": 10},
@@ -234,7 +234,7 @@ class TestPerformanceEndpoint:
         mock_perf_cls.return_value = mock_perf
 
         resp = client.post("/api/v1/backtest/performance", json={
-            "internal_cusip": "btc-usd",
+            "symbol": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
             "mode": "single",
@@ -288,7 +288,7 @@ class TestWalkForwardEndpoint:
         mock_wf_cls.return_value = mock_wf
 
         resp = client.post("/api/v1/backtest/walk-forward", json={
-            "internal_cusip": "btc-usd",
+            "symbol": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
             "mode": "single",

@@ -65,7 +65,7 @@ def _build_config(req, cache) -> StrategyConfig:
             req.strategy, req.indicator, indicator_rows, signal_type_rows,
         )
         return StrategyConfig(
-            ticker=req.symbol,
+            internal_cusip=req.symbol,
             indicator_name=req.indicator,
             signal_func=func,
             trading_period=req.trading_period,
@@ -87,7 +87,7 @@ def _build_config(req, cache) -> StrategyConfig:
         indicator_rows, signal_type_rows,
     )
     return StrategyConfig(
-        ticker=req.symbol,
+        internal_cusip=req.symbol,
         indicator_name=req.factors[0].indicator,
         signal_func=first_func,
         trading_period=req.trading_period,
@@ -117,10 +117,11 @@ def _build_param_ranges(req):
 
 def run_optimize(req: OptimizeRequest, cache, callback=None) -> OptimizeResponse:
     df = _fetch_df(req.symbol, req.start, req.end, req.data_source, cache)
+    data_dict = {req.symbol: df}
     callbacks = [callback] if callback else []
     config = _build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
-    opt = ParametersOptimization(df.copy(), config, fee_bps=req.fee_bps)
+    opt = ParametersOptimization(data_dict, config, fee_bps=req.fee_bps)
     result = opt.run(window_list, signal_list, callbacks=callbacks)
 
     return OptimizeResponse(
@@ -167,6 +168,7 @@ async def stream_optimize(req: OptimizeRequest, cache):
     def _run():
         try:
             df = _fetch_df(req.symbol, req.start, req.end, req.data_source, cache)
+            data_dict = {req.symbol: df}
             config = _build_config(req, cache)
             window_list, signal_list = _build_param_ranges(req)
 
@@ -178,7 +180,7 @@ async def stream_optimize(req: OptimizeRequest, cache):
                     "best_sharpe": round(best, 4) if best is not None else None,
                 }))
 
-            opt = ParametersOptimization(df.copy(), config, fee_bps=req.fee_bps)
+            opt = ParametersOptimization(data_dict, config, fee_bps=req.fee_bps)
             result = opt.run(window_list, signal_list, callbacks=[on_trial])
 
             resp = OptimizeResponse(
@@ -216,11 +218,12 @@ async def stream_optimize(req: OptimizeRequest, cache):
 
 def run_performance(req: PerformanceRequest, cache) -> PerformanceResponse:
     df = _fetch_df(req.symbol, req.start, req.end, req.data_source, cache)
+    data_dict = {req.symbol: df}
     config = _build_config(req, cache)
     window = req.window if req.mode == "single" else tuple(req.windows)
     signal = req.signal if req.mode == "single" else tuple(req.signals)
 
-    perf = Performance(df.copy(), config, window, signal, fee_bps=req.fee_bps)
+    perf = Performance(data_dict, config, window, signal, fee_bps=req.fee_bps)
     perf.enrich_performance()
 
     strat_metrics = perf.get_strategy_performance().replace({np.nan: None}).to_dict()
@@ -252,10 +255,11 @@ def run_performance(req: PerformanceRequest, cache) -> PerformanceResponse:
 
 def run_walk_forward(req: WalkForwardRequest, cache) -> WalkForwardResponse:
     df = _fetch_df(req.symbol, req.start, req.end, req.data_source, cache)
+    data_dict = {req.symbol: df}
     config = _build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
 
-    wf = WalkForward(df.copy(), req.split_ratio, config, fee_bps=req.fee_bps)
+    wf = WalkForward(data_dict, req.split_ratio, config, fee_bps=req.fee_bps)
     result = wf.run(window_list, signal_list)
 
     # Build equity curve from the full-period data stored in WalkForwardResult
