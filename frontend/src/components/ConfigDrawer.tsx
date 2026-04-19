@@ -6,9 +6,90 @@ import {
 } from '@mui/material';
 import { useIndicators, useSignalTypes, useAssetTypes, useConjunctions, useDataColumns, useApps } from '../api/refdata';
 import { useProducts, useProductXrefs } from '../api/inst';
-import type { ProductRow } from '../types/refdata';
+import type { ProductRow, AssetTypeRow, AppRow } from '../types/refdata';
 import { countSteps } from '../utils/grid';
 import type { BacktestConfig, FactorConfig, RangeParam } from '../types/backtest';
+
+/** Self-contained row for factor Product / Data Source / Vendor Symbol with own xref hook. */
+function FactorProductRow({
+  factor, index, products, apps, updateFactor,
+}: {
+  factor: FactorConfig;
+  index: number;
+  products: ProductRow[];
+  apps: AppRow[];
+  updateFactor: (i: number, patch: Partial<FactorConfig>) => void;
+}) {
+  const factorProduct = products.find(p => p.internal_cusip === factor.symbol) ?? null;
+  const { data: factorXrefs = [] } = useProductXrefs(factorProduct?.product_id ?? null);
+  const factorVendorOptions = factorXrefs.map(x => x.vendor_symbol);
+  const resolvedFactorVendor = factorXrefs.find(x => {
+    const app = apps.find(a => a.name === factor.data_source);
+    return app && x.app_id === app.app_id;
+  })?.vendor_symbol ?? '';
+  const displayedFactorVendor = factor.vendor_symbol || resolvedFactorVendor;
+
+  return (
+    <Stack direction="row" spacing={1} alignItems="center">
+      <Autocomplete<ProductRow, false, false, true>
+        size="small" freeSolo sx={{ width: 260 }}
+        slotProps={{ listbox: { sx: { maxHeight: 360, minWidth: 320 } } }}
+        options={products}
+        value={factorProduct}
+        inputValue={
+          (() => {
+            const fp = products.find(p => p.internal_cusip === factor.symbol);
+            return fp ? `${fp.display_nm} (${fp.internal_cusip})` : (factor.symbol || '');
+          })()
+        }
+        getOptionLabel={(opt) => typeof opt === 'string' ? opt : `${opt.display_nm} (${opt.internal_cusip})`}
+        isOptionEqualToValue={(opt, val) => opt.internal_cusip === val.internal_cusip}
+        onChange={(_, val) => {
+          if (!val) updateFactor(index, { symbol: undefined, vendor_symbol: undefined });
+          else if (typeof val === 'string') updateFactor(index, { symbol: val, vendor_symbol: undefined });
+          else updateFactor(index, { symbol: val.internal_cusip, vendor_symbol: undefined });
+        }}
+        onInputChange={(_, val, reason) => {
+          if (reason === 'input') updateFactor(index, { symbol: val, vendor_symbol: undefined });
+        }}
+        renderInput={(params) => <TextField {...params} label="Product" />}
+        renderOption={(props, opt) => (
+          <li {...props} key={opt.internal_cusip}>
+            <Box>
+              <Typography variant="body2">{opt.display_nm}</Typography>
+              <Typography variant="caption" color="text.secondary">{opt.internal_cusip}</Typography>
+            </Box>
+          </li>
+        )}
+      />
+      <FormControl size="small" sx={{ minWidth: 130 }}>
+        <InputLabel>Data Source</InputLabel>
+        <Select
+          value={factor.data_source || ''}
+          label="Data Source"
+          onChange={e => updateFactor(index, { data_source: e.target.value || undefined })}
+        >
+          {apps.map(a => (
+            <MenuItem key={a.app_id} value={a.name}>{a.display_name}</MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <Autocomplete<string, false, false, true>
+        size="small" freeSolo sx={{ width: 160 }}
+        options={factorVendorOptions}
+        value={displayedFactorVendor || null}
+        inputValue={displayedFactorVendor}
+        onInputChange={(_, val, reason) => {
+          if (reason === 'input') updateFactor(index, { vendor_symbol: val || undefined });
+        }}
+        onChange={(_, val) => {
+          updateFactor(index, { vendor_symbol: val || undefined });
+        }}
+        renderInput={(params) => <TextField {...params} label="Vendor Symbol" slotProps={{ inputLabel: { shrink: true } }} />}
+      />
+    </Stack>
+  );
+}
 
 interface Props {
   open: boolean;
@@ -39,11 +120,17 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
     return app && x.app_id === app.app_id;
   })?.vendor_symbol ?? '';
 
+  // All unique vendor symbols from xrefs for autocomplete
+  const vendorSymbolOptions = xrefs.map(x => x.vendor_symbol);
+
   // Warn when a product is selected but has no xref for the chosen data source
   const hasXrefMismatch = !!selectedProduct && !!config.dataSource && !resolvedSymbol;
 
   // Displayed vendor symbol: manual override takes priority, then resolved from product+app
   const displayedVendor = config.vendorSymbol || resolvedSymbol;
+
+  // Selected asset type object for Autocomplete
+  const selectedAssetType = assetTypes.find(a => a.display_name === config.assetType) ?? null;
 
   const set = (patch: Partial<BacktestConfig>) => onChange({ ...config, ...patch });
 
@@ -87,6 +174,9 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
       data_column: 'price',
       window_range: { min: first?.win_min ?? 5, max: first?.win_max ?? 100, step: first?.win_step ?? 5 },
       signal_range: { min: first?.sig_min ?? 0, max: first?.sig_max ?? 0, step: first?.sig_step ?? 1 },
+      symbol: config.symbol,
+      vendor_symbol: config.vendorSymbol || undefined,
+      data_source: config.dataSource || undefined,
     };
     set({ factors: [...config.factors, newFactor] });
   };
@@ -150,9 +240,17 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
           getOptionLabel={(opt) => typeof opt === 'string' ? opt : `${opt.display_nm} (${opt.internal_cusip})`}
           isOptionEqualToValue={(opt, val) => opt.internal_cusip === val.internal_cusip}
           onChange={(_, val) => {
-            if (!val) set({ symbol: '', vendorSymbol: '' });
-            else if (typeof val === 'string') set({ symbol: val, vendorSymbol: '' });
-            else set({ symbol: val.internal_cusip, vendorSymbol: '' });
+            if (!val) {
+              set({ symbol: '', vendorSymbol: '' });
+            } else if (typeof val === 'string') {
+              set({ symbol: val, vendorSymbol: '' });
+            } else {
+              const at = assetTypes.find(a => a.asset_type_id === val.asset_type_id);
+              set({
+                symbol: val.internal_cusip, vendorSymbol: '',
+                ...(at ? { assetType: at.display_name, tradingPeriod: at.trading_period } : {}),
+              });
+            }
           }}
           onInputChange={(_, val, reason) => {
             if (reason === 'input') set({ symbol: val, vendorSymbol: '' });
@@ -179,21 +277,19 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
             ))}
           </Select>
         </FormControl>
-        {resolvedSymbol && !config.vendorSymbol && (
-          <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
-            → {resolvedSymbol}
-          </Typography>
-        )}
-        <TextField
-          label="Vendor Symbol" size="small"
-          value={displayedVendor}
-          sx={{ width: 160 }}
-          onChange={e => {
-            const v = e.target.value;
-            // Typing a vendor symbol clears the product selection
-            set({ vendorSymbol: v, symbol: '' });
+        <Autocomplete<string, false, false, true>
+          size="small" freeSolo sx={{ width: 200 }}
+          options={vendorSymbolOptions}
+          value={displayedVendor || null}
+          inputValue={displayedVendor}
+          onInputChange={(_, val, reason) => {
+            if (reason === 'input') set({ vendorSymbol: val, symbol: '' });
           }}
-          slotProps={{ inputLabel: { shrink: true } }}
+          onChange={(_, val) => {
+            if (!val) set({ vendorSymbol: '', symbol: '' });
+            else set({ vendorSymbol: val, symbol: '' });
+          }}
+          renderInput={(params) => <TextField {...params} label="Vendor Symbol" slotProps={{ inputLabel: { shrink: true } }} />}
         />
         <TextField
           label="Start" size="small" type="date" value={config.start} sx={{ width: 155 }}
@@ -205,20 +301,18 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
           onChange={e => set({ end: e.target.value })}
           slotProps={{ inputLabel: { shrink: true } }}
         />
-        <FormControl size="small" sx={{ minWidth: 150 }}>
-          <InputLabel>Asset Type</InputLabel>
-          <Select
-            value={config.assetType} label="Asset Type"
-            onChange={e => {
-              const at = assetTypes.find(a => a.display_name === e.target.value);
-              set({ assetType: e.target.value, tradingPeriod: at?.trading_period ?? 365 });
-            }}
-          >
-            {assetTypes.map(a => (
-              <MenuItem key={a.display_name} value={a.display_name}>{a.display_name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <Autocomplete<AssetTypeRow, false, false, false>
+          size="small" sx={{ width: 180 }}
+          options={assetTypes}
+          value={selectedAssetType}
+          getOptionLabel={(opt) => opt.display_name}
+          isOptionEqualToValue={(opt, val) => opt.display_name === val.display_name}
+          onChange={(_, val) => {
+            if (!val) set({ assetType: '', tradingPeriod: 365 });
+            else set({ assetType: val.display_name, tradingPeriod: val.trading_period });
+          }}
+          renderInput={(params) => <TextField {...params} label="Asset Type" />}
+        />
         <TextField
           label="Fee (bps)" size="small" type="number" value={config.feeBps} sx={{ width: 100 }}
           onChange={e => set({ feeBps: Number(e.target.value) })}
@@ -254,6 +348,15 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
         <Alert severity="warning" sx={{ mb: 2 }}>
           No vendor symbol mapping for <strong>{selectedProduct?.display_nm}</strong> on <strong>{config.dataSource}</strong>. Enter a vendor symbol manually or choose a different data source.
         </Alert>
+      )}
+
+      {config.factors.some(f => !f.symbol && !f.vendor_symbol) && (
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+          alert_internal_cusip not configured on {config.factors
+            .map((f, i) => (!f.symbol && !f.vendor_symbol) ? `Factor ${i + 1}` : null)
+            .filter(Boolean).join(', ')
+          } — will use main product.
+        </Typography>
       )}
 
       <Divider sx={{ mb: 2 }} />
@@ -294,6 +397,11 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
                   )}
                 </Box>
                 <Stack spacing={1}>
+                  {/* Factor-level product override (pair trade) */}
+                  <FactorProductRow
+                    factor={factor} index={i} products={products} apps={apps}
+                    updateFactor={updateFactor}
+                  />
                   <Stack direction="row" spacing={1} flexWrap="wrap">
                     <FormControl size="small" sx={{ minWidth: 120, flex: 1 }}>
                       <InputLabel>Data Column</InputLabel>
@@ -352,12 +460,12 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
       <Divider sx={{ my: 2 }} />
 
       {/* Footer: missing fields + trial count + Run */}
+      {missingFields.length > 0 && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Cannot run — missing: <strong>{missingFields.join(', ')}</strong>
+        </Alert>
+      )}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-        {missingFields.length > 0 && (
-          <Typography variant="caption" color="error" fontWeight={500}>
-            Missing: {missingFields.join(', ')}
-          </Typography>
-        )}
         {isRunnable && (
           <Typography variant="caption" color="text.secondary">
             {cappedTrials.toLocaleString()} trials{isCapped ? ` (capped from ${totalTrials.toLocaleString()} combos)` : ''}

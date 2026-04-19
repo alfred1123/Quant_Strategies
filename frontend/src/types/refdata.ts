@@ -16,6 +16,8 @@ export interface SignalTypeRow {
 }
 
 export interface AssetTypeRow {
+  asset_type_id: number;
+  name: string;
   display_name: string;
   trading_period: number;
 }

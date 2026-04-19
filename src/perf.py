@@ -79,6 +79,7 @@ class Performance:
         # Cross-product: indicator computed from a different product's DataFrame
         if sub_cusip != self.config.internal_cusip:
             sub_df = self.all_data[sub_cusip]
+            self._validate_factor_coverage(sub_df, sub_cusip)
             self.data['factor'] = sub_df[sub.data_column].reindex(self.data.index)
         ta = TechnicalAnalysis(self.data)
         self.data = ta.data
@@ -101,6 +102,8 @@ class Performance:
             idx = i + 1
             sub_cusip = sub.internal_cusip or self.config.internal_cusip
             sub_df = self.all_data[sub_cusip]
+            if sub_cusip != self.config.internal_cusip:
+                self._validate_factor_coverage(sub_df, sub_cusip)
             # Per-factor column: factorN from the sub's data_column on resolved DataFrame
             factor_vals = sub_df[sub.data_column].reindex(self.data.index)
             self.data[f'factor{idx}'] = factor_vals
@@ -124,6 +127,26 @@ class Performance:
                                      strengths=indicator_strengths)
         self.data['FinalPosition'] = combined
 
+    def _validate_factor_coverage(self, factor_df, factor_cusip):
+        """Raise if the factor has fewer trading days than the main product.
+
+        A factor with fewer trading days (e.g. 252-day equity factor for a
+        365-day crypto product) would produce excessive NaN gaps after
+        ``reindex``, making indicator/signal calculations unreliable.
+        """
+        main_dates = set(self.data.index)
+        factor_dates = set(factor_df.index)
+        missing = main_dates - factor_dates
+        coverage = 1.0 - len(missing) / len(main_dates) if main_dates else 1.0
+        if coverage < 0.80:
+            raise ValueError(
+                f"Factor '{factor_cusip}' covers only {coverage:.0%} of main product "
+                f"'{self.config.internal_cusip}' dates "
+                f"({len(factor_dates)} vs {len(main_dates)} trading days). "
+                f"Cannot use a product with fewer trading days as a factor "
+                f"for a product with more trading days."
+            )
+
     def _compute_pnl_columns(self):
         self.data['FinalPosition_x1'] = self.data['FinalPosition'].shift(1)
         self.data['trade'] = abs(self.data['FinalPosition'] - self.data['FinalPosition_x1'])
@@ -146,11 +169,11 @@ class Performance:
     
     # take account that nan leading zeros
     def get_annualized_return(self):
-        annualized_return = self.data.loc[self._metric_window:len(self.data)-1,'pnl'].mean() * self.trading_period
+        annualized_return = self.data.iloc[self._metric_window:]['pnl'].mean() * self.trading_period
         return annualized_return
         
     def get_sharpe_ratio(self):
-        pnl = self.data.loc[self._metric_window:len(self.data)-1, 'pnl']
+        pnl = self.data.iloc[self._metric_window:]['pnl']
         std = pnl.std()
         if std == 0 or np.isnan(std):
             logger.debug("Sharpe ratio undefined (zero or NaN std for pnl)")
@@ -167,7 +190,7 @@ class Performance:
         if max_dd == 0 or np.isnan(max_dd):
             logger.debug("Calmar ratio undefined (zero or NaN max drawdown)")
             return np.nan
-        calmar_ratio = self.data.loc[self._metric_window:len(self.data)-1,'pnl'].mean() / max_dd
+        calmar_ratio = self.data.iloc[self._metric_window:]['pnl'].mean() / max_dd
         return calmar_ratio
     
     def get_buy_hold_total_return(self):
@@ -175,11 +198,11 @@ class Performance:
         return total_return
     
     def get_buy_hold_annualized_return(self):
-        annualized_return = self.data.loc[self._metric_window:len(self.data)-1,'buy_hold'].mean() * self.trading_period
+        annualized_return = self.data.iloc[self._metric_window:]['buy_hold'].mean() * self.trading_period
         return annualized_return
     
     def get_buy_hold_sharpe_ratio(self):
-        bh = self.data.loc[self._metric_window:len(self.data)-1, 'buy_hold']
+        bh = self.data.iloc[self._metric_window:]['buy_hold']
         std = bh.std()
         if std == 0 or np.isnan(std):
             logger.debug("Buy-hold Sharpe ratio undefined (zero or NaN std)")
@@ -196,7 +219,7 @@ class Performance:
         if max_dd == 0 or np.isnan(max_dd):
             logger.debug("Buy-hold Calmar ratio undefined (zero or NaN max drawdown)")
             return np.nan
-        calmar_ratio = self.data.loc[self._metric_window:len(self.data)-1,'buy_hold'].mean() / max_dd
+        calmar_ratio = self.data.iloc[self._metric_window:]['buy_hold'].mean() / max_dd
         return calmar_ratio
     
     def get_strategy_performance(self):

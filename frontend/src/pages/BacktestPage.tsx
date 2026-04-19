@@ -9,10 +9,10 @@ import Top10Table from '../components/Top10Table';
 import MetricsCards from '../components/MetricsCards';
 import HeatmapChart from '../components/HeatmapChart';
 import EquityCurveChart from '../components/EquityCurveChart';
-import { runOptimizeStream, runPerformance, runWalkForward } from '../api/backtest';
+import { runOptimizeStream, runPerformance } from '../api/backtest';
 import type {
   BacktestConfig, OptimizeResponse, PerformanceResponse, Top10Row,
-  OptimizeRequest, PerformanceRequest, WalkForwardRequest, WalkForwardResponse,
+  OptimizeRequest, PerformanceRequest, WalkForwardResponse,
   OptimizeProgress,
 } from '../types/backtest';
 
@@ -38,6 +38,8 @@ const DEFAULT_CONFIG: BacktestConfig = {
       data_column: 'price',
       window_range: { min: 5, max: 100, step: 5 },
       signal_range: { min: 0.25, max: 2.5, step: 0.25 },
+      symbol: 'btcusdt.crypto',
+      data_source: 'yahoo',
     },
   ],
   walkForward: true,
@@ -50,18 +52,21 @@ const effectiveSymbol = (cfg: BacktestConfig) => cfg.vendorSymbol || cfg.symbol;
 function buildOptimizeRequest(cfg: BacktestConfig): OptimizeRequest {
   const f0 = cfg.factors[0];
   const ds = cfg.dataSource || undefined;
+  const base = {
+    symbol: effectiveSymbol(cfg), start: cfg.start, end: cfg.end,
+    trading_period: cfg.tradingPeriod, fee_bps: cfg.feeBps, data_source: ds,
+    walk_forward: cfg.walkForward, split_ratio: cfg.splitRatio,
+  };
   if (cfg.factors.length <= 1) {
     return {
-      symbol: effectiveSymbol(cfg), start: cfg.start, end: cfg.end,
-      mode: 'single', trading_period: cfg.tradingPeriod, fee_bps: cfg.feeBps,
-      data_source: ds, indicator: f0.indicator, strategy: f0.strategy,
+      ...base, mode: 'single' as const,
+      indicator: f0.indicator, strategy: f0.strategy,
       window_range: f0.window_range, signal_range: f0.signal_range,
     };
   }
   return {
-    symbol: effectiveSymbol(cfg), start: cfg.start, end: cfg.end,
-    mode: 'multi', trading_period: cfg.tradingPeriod, fee_bps: cfg.feeBps,
-    data_source: ds, conjunction: cfg.conjunction, factors: cfg.factors,
+    ...base, mode: 'multi' as const,
+    conjunction: cfg.conjunction, factors: cfg.factors,
   };
 }
 
@@ -94,10 +99,6 @@ function rowLabel(row: Top10Row, cfg: BacktestConfig): string {
     .join(', ');
 }
 
-function buildWalkForwardRequest(cfg: BacktestConfig): WalkForwardRequest {
-  return { ...buildOptimizeRequest(cfg), split_ratio: cfg.splitRatio };
-}
-
 function overfitColor(ratio: number | null): 'success' | 'warning' | 'error' | 'default' {
   if (ratio == null || isNaN(ratio)) return 'default';
   if (ratio < 0.3) return 'success';
@@ -108,7 +109,7 @@ function overfitColor(ratio: number | null): 'success' | 'warning' | 'error' | '
 function overfitLabel(ratio: number | null): string {
   if (ratio == null || isNaN(ratio)) return 'N/A';
   if (ratio < 0.3) return 'Low Risk';
-  if (ratio < 0.5) return 'Moderate';
+  if (ratio < 0.7) return 'Moderate';
   return 'High Risk';
 }
 
@@ -129,7 +130,6 @@ export default function BacktestPage() {
   const [error, setError] = useState<string | null>(null);
   const [analysisTab, setAnalysisTab] = useState(0);
   const [wfResult, setWfResult] = useState<WalkForwardResponse | null>(null);
-  const [isRunningWf, setIsRunningWf] = useState(false);
   const [optProgress, setOptProgress] = useState<OptimizeProgress | null>(null);
 
   const loadPerf = async (row: Top10Row, index: number, cfg: BacktestConfig) => {
@@ -181,26 +181,20 @@ export default function BacktestPage() {
       );
       setOptProgress(null);
       setOptimizeResult(result);
-      // Fire walk-forward and performance in parallel
-      const promises: Promise<void>[] = [];
-      if (result.top10?.length > 0) {
-        promises.push(loadPerf(result.top10[0], 0, config));
+
+      // Use inline performance from the stream result
+      if (result.performance) {
+        setPerfResult(result.performance);
+        if (result.top10?.length > 0) {
+          setSelectedIndex(0);
+          setSelectedRow(result.top10[0]);
+        }
       }
-      if (config.walkForward) {
-        promises.push((async () => {
-          setIsRunningWf(true);
-          try {
-            const wf = await runWalkForward(buildWalkForwardRequest(config));
-            setWfResult(wf);
-          } catch (e: unknown) {
-            console.error('[BacktestPage] walk-forward error:', e);
-            // non-blocking — don't overwrite the main error
-          } finally {
-            setIsRunningWf(false);
-          }
-        })());
+
+      // Use inline walk-forward from the stream result
+      if (result.walk_forward) {
+        setWfResult(result.walk_forward);
       }
-      await Promise.all(promises);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Optimization failed';
       console.error('[BacktestPage] handleRun error:', e);
@@ -351,7 +345,7 @@ export default function BacktestPage() {
                     >
                       <Tab label="Equity Curve" />
                       {config.factors.length <= 1 && <Tab label="Heatmap" />}
-                      {(wfResult || isRunningWf) && <Tab label="Walk-Forward" />}
+                      {wfResult && <Tab label="Walk-Forward" />}
                     </Tabs>
 
                     {analysisTab === 0 && (
@@ -361,9 +355,8 @@ export default function BacktestPage() {
                       <HeatmapChart grid={optimizeResult.grid} mode="single" />
                     )}
                     {/* Walk-Forward tab — index depends on whether Heatmap tab exists */}
-                    {analysisTab === (config.factors.length <= 1 ? 2 : 1) && (wfResult || isRunningWf) && (
+                    {analysisTab === (config.factors.length <= 1 ? 2 : 1) && wfResult && (
                       <Box>
-                        {isRunningWf && <LinearProgress sx={{ mb: 2 }} />}
                         {wfResult && (
                           <>
                             {/* Best params + overfitting ratio */}

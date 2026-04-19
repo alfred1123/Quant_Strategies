@@ -104,11 +104,11 @@ class WalkForward:
             Multi-factor: ``best_window`` and ``best_signal`` are tuples.
         """
         is_data_dict = {
-            t: df.iloc[:self.split_idx].copy().reset_index(drop=True)
+            t: df.iloc[:self.split_idx].copy()
             for t, df in self.all_data.items()
         }
         oos_data_dict = {
-            t: df.iloc[self.split_idx:].copy().reset_index(drop=True)
+            t: df.iloc[self.split_idx:].copy()
             for t, df in self.all_data.items()
         }
 

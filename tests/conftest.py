@@ -3,6 +3,11 @@ import pandas as pd
 import numpy as np
 
 
+def _daily_index(n, start="2020-01-01"):
+    """Generate a daily DatetimeIndex for n rows."""
+    return pd.date_range(start, periods=n, freq="D", name="datetime")
+
+
 @pytest.fixture
 def sample_price_series():
     """Simple monotonically increasing price series for basic tests."""
@@ -29,7 +34,7 @@ def sample_ohlc_df():
         "Close": close,
         "price": close,
         "factor": close,
-    })
+    }, index=_daily_index(n))
 
 
 @pytest.fixture
@@ -51,7 +56,7 @@ def trending_up_df():
         "Close": prices,
         "High": prices + 1,
         "Low": prices - 1,
-    })
+    }, index=_daily_index(n))
 
 
 @pytest.fixture
@@ -65,7 +70,7 @@ def trending_down_df():
         "Close": prices,
         "High": prices + 1,
         "Low": prices - 1,
-    })
+    }, index=_daily_index(n))
 
 
 @pytest.fixture
@@ -83,4 +88,4 @@ def multi_factor_df():
         "Close": close,
         "High": close + np.abs(np.random.randn(n) * 0.3),
         "Low": close - np.abs(np.random.randn(n) * 0.3),
-    })
+    }, index=_daily_index(n))

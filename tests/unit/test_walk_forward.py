@@ -22,7 +22,7 @@ def _make_synthetic_data(n=500, seed=42):
         "Close": close,
         "High": close + np.abs(np.random.randn(n) * 0.5),
         "Low": close - np.abs(np.random.randn(n) * 0.5),
-    })
+    }, index=pd.date_range("2020-01-01", periods=n, freq="D", name="datetime"))
 
 
 class TestWalkForwardInit:
@@ -178,7 +178,7 @@ def _make_multi_factor_data(n=500, seed=42):
         "Close": close,
         "High": close + np.abs(np.random.randn(n) * 0.5),
         "Low": close - np.abs(np.random.randn(n) * 0.5),
-    })
+    }, index=pd.date_range("2020-01-01", periods=n, freq="D", name="datetime"))
 
 
 def _multi_factor_config():

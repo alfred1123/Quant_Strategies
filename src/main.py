@@ -198,14 +198,15 @@ def main(args=None):
     price = yf.get_historical_price(args.symbol, args.start, args.end)
 
     df = pd.DataFrame({
-        'datetime': price['t'],
+        'datetime': pd.to_datetime(price['t']),
         'price':    price['v'],
         'factor':   price['v'],
         **{col: price[col] for col in ('Open', 'High', 'Low', 'Close', 'Volume')
            if col in price.columns},
     })
+    df = df.set_index('datetime').sort_index()
     logger.info("Loaded %d daily bars: %s → %s",
-                len(df), df['datetime'].iloc[0], df['datetime'].iloc[-1])
+                len(df), df.index[0], df.index[-1])
 
     data_dict = {cusip: df}
 
@@ -222,7 +223,7 @@ def main(args=None):
                 perf.get_buy_hold_performance())
 
     perf_path = os.path.join(args.outdir, f'perf_{tag}.csv')
-    perf.data.to_csv(perf_path, index=False)
+    perf.data.reset_index().to_csv(perf_path, index=False)
     logger.info("Daily PnL saved to %s", perf_path)
 
     # ── Parameter optimisation ──────────────────────────────────────
@@ -269,10 +270,11 @@ def main(args=None):
                                       args.sig_step))
 
         wf_df = pd.DataFrame({
-            'datetime': price['t'],
+            'datetime': pd.to_datetime(price['t']),
             'price':    price['v'],
             'factor':   price['v'],
         })
+        wf_df = wf_df.set_index('datetime').sort_index()
         wf_data_dict = {cusip: wf_df}
 
         wf = WalkForward(

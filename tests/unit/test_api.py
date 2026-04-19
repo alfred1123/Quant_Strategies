@@ -16,6 +16,8 @@ def client():
     with patch("src.data.psycopg"):
         from api.main import app
         app.state.refdata_cache = MagicMock()
+        app.state.instrument_cache = MagicMock()
+        app.state.instrument_cache.get_product_by_cusip.return_value = None
         app.state.refdata_cache.get.side_effect = lambda table: {
             "indicator": [
                 {"display_name": "SMA", "method_name": "get_sma", "is_bounded_ind": "N"},
@@ -82,10 +84,9 @@ class TestOptimizeEndpoint:
     @patch("api.services.backtest._fetch_df")
     def test_optimize_single(self, mock_fetch, mock_opt_cls, client):
         mock_fetch.return_value = pd.DataFrame({
-            "datetime": ["2024-01-01"] * 100,
             "price": np.linspace(100, 200, 100),
             "factor": np.linspace(100, 200, 100),
-        })
+        }, index=pd.date_range("2024-01-01", periods=100, freq="D", name="datetime"))
         mock_opt = MagicMock()
         from param_opt import OptimizeResult
         _df = pd.DataFrame({"window": [10, 20], "signal": [0.01, 0.02], "sharpe": [1.5, 1.8]})
@@ -133,18 +134,31 @@ class TestOptimizeEndpoint:
 # ── /api/v1/backtest/optimize/stream (SSE) ──────────────────────────
 
 class TestOptimizeStreamEndpoint:
+    @patch("api.services.backtest._build_wf_response")
+    @patch("api.services.backtest._build_perf_response")
     @patch("api.services.backtest.ParametersOptimization")
     @patch("api.services.backtest._fetch_df")
-    def test_stream_emits_init_progress_and_result(self, mock_fetch, mock_opt_cls, client):
+    def test_stream_emits_init_progress_and_result(self, mock_fetch, mock_opt_cls,
+                                                    mock_perf_resp, mock_wf_resp, client):
         """SSE endpoint should emit init, progress events, and a final result."""
         import json as _json
         mock_fetch.return_value = pd.DataFrame({
-            "datetime": ["2024-01-01"] * 100,
             "price": np.linspace(100, 200, 100),
             "factor": np.linspace(100, 200, 100),
-        })
+        }, index=pd.date_range("2024-01-01", periods=100, freq="D", name="datetime"))
         _df = pd.DataFrame({"window": [10, 20], "signal": [0.01, 0.02], "sharpe": [1.5, 1.8]})
         from param_opt import OptimizeResult
+        from api.schemas.backtest import PerformanceResponse, WalkForwardResponse
+        mock_perf_resp.return_value = PerformanceResponse(
+            strategy_metrics={"Sharpe Ratio": 1.8},
+            buy_hold_metrics={"Sharpe Ratio": 0.5},
+            equity_curve=[], perf_csv="",
+        )
+        mock_wf_resp.return_value = WalkForwardResponse(
+            best_window=20, best_signal=0.02,
+            is_metrics={"Sharpe Ratio": 1.5}, oos_metrics={"Sharpe Ratio": 0.8},
+            overfitting_ratio=0.47, equity_curve=[], split_date="2024-06-30",
+        )
         mock_opt = MagicMock()
         # Simulate optuna calling the callback for each trial
         def fake_run(windows, signals, callbacks=None):
@@ -172,6 +186,7 @@ class TestOptimizeStreamEndpoint:
             "indicator": "get_bollinger_band", "strategy": "momentum",
             "window_range": {"min": 10, "max": 20, "step": 10},
             "signal_range": {"min": 0.01, "max": 0.02, "step": 0.01},
+            "walk_forward": True, "split_ratio": 0.5,
         }) as resp:
             assert resp.status_code == 200
             assert "text/event-stream" in resp.headers["content-type"]
@@ -194,7 +209,13 @@ class TestOptimizeStreamEndpoint:
         assert events[0]["data"]["total"] > 0
         assert "progress" in event_types
         assert event_types[-1] == "result"
-        assert events[-1]["data"]["best"]["sharpe"] == 1.8
+        result_data = events[-1]["data"]
+        assert result_data["best"]["sharpe"] == 1.8
+        # Inline performance and walk-forward should be present
+        assert result_data["performance"] is not None
+        assert result_data["performance"]["strategy_metrics"]["Sharpe Ratio"] == 1.8
+        assert result_data["walk_forward"] is not None
+        assert result_data["walk_forward"]["overfitting_ratio"] == pytest.approx(0.47)
 
 
 # ── /api/v1/backtest/performance ────────────────────────────────────
@@ -204,10 +225,9 @@ class TestPerformanceEndpoint:
     @patch("api.services.backtest._fetch_df")
     def test_performance_single(self, mock_fetch, mock_perf_cls, client):
         mock_fetch.return_value = pd.DataFrame({
-            "datetime": ["2024-01-01"] * 100,
             "price": np.linspace(100, 200, 100),
             "factor": np.linspace(100, 200, 100),
-        })
+        }, index=pd.date_range("2024-01-01", periods=100, freq="D", name="datetime"))
         mock_perf = MagicMock()
         mock_perf.enrich_performance.return_value = mock_perf
         mock_perf.get_strategy_performance.return_value = pd.Series({
@@ -225,12 +245,12 @@ class TestPerformanceEndpoint:
             "Calmar Ratio": 1.7,
         })
         mock_perf.data = pd.DataFrame({
-            "datetime": ["2024-01-01", "2024-01-02", "2024-01-03"],
             "cumu": [0.01, 0.02, 0.03],
             "buy_hold_cumu": [0.01, 0.015, 0.02],
             "dd": [0.0, 0.0, 0.0],
             "buy_hold_dd": [0.0, 0.0, 0.0],
-        })
+        }, index=pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]))
+        mock_perf.data.index.name = "datetime"
         mock_perf_cls.return_value = mock_perf
 
         resp = client.post("/api/v1/backtest/performance", json={
@@ -257,10 +277,9 @@ class TestWalkForwardEndpoint:
     @patch("api.services.backtest._fetch_df")
     def test_walk_forward_single(self, mock_fetch, mock_wf_cls, client):
         mock_fetch.return_value = pd.DataFrame({
-            "datetime": [f"2024-01-{i+1:02d}" for i in range(100)],
             "price": np.linspace(100, 200, 100),
             "factor": np.linspace(100, 200, 100),
-        })
+        }, index=pd.date_range("2024-01-01", periods=100, freq="D", name="datetime"))
 
         # Mock WalkForward.run()
         mock_wf = MagicMock()
@@ -278,12 +297,11 @@ class TestWalkForwardEndpoint:
         })
         result.overfitting_ratio = 0.47
         result.full_equity_df = pd.DataFrame({
-            "datetime": [f"2024-01-{i+1:02d}" for i in range(100)],
             "cumu": np.linspace(0, 0.5, 100),
             "buy_hold_cumu": np.linspace(0, 0.4, 100),
             "dd": np.zeros(100),
             "buy_hold_dd": np.zeros(100),
-        })
+        }, index=pd.date_range("2024-01-01", periods=100, freq="D", name="datetime"))
         mock_wf.run.return_value = result
         mock_wf_cls.return_value = mock_wf
 

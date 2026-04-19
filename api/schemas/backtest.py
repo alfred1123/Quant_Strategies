@@ -22,6 +22,9 @@ class FactorConfig(BaseModel):
     data_column: str = "price"
     window_range: RangeParam
     signal_range: RangeParam
+    symbol: str | None = None          # internal_cusip for cross-product factor
+    vendor_symbol: str | None = None   # direct vendor symbol override
+    data_source: str | None = None     # per-factor data source override
 
 
 # ── Requests ────────────────────────────────────────────────────────
@@ -48,6 +51,9 @@ class OptimizeRequest(BaseModel):
     # Multi-factor
     conjunction: str | None = None
     factors: list[FactorConfig] | None = None
+    # Walk-forward (run inline with optimization when True)
+    walk_forward: bool = False
+    split_ratio: float = 0.5
 
 
 class PerformanceRequest(BaseModel):
@@ -83,15 +89,6 @@ class DataResponse(BaseModel):
     data: list[dict]
 
 
-class OptimizeResponse(BaseModel):
-    total_trials: int
-    valid: int
-    best: dict
-    top10: list[dict]
-    grid: list[dict]
-    optuna_plots: dict | None = None
-
-
 class EquityPoint(BaseModel):
     datetime: str
     cumu: float
@@ -115,3 +112,16 @@ class WalkForwardResponse(BaseModel):
     overfitting_ratio: float | None
     equity_curve: list[EquityPoint]
     split_date: str
+
+
+class OptimizeResponse(BaseModel):
+    total_trials: int
+    valid: int
+    best: dict
+    top10: list[dict]
+    grid: list[dict]
+    optuna_plots: dict | None = None
+    # Inline performance for best params (when available)
+    performance: PerformanceResponse | None = None
+    # Inline walk-forward (when walk_forward=True in request)
+    walk_forward: WalkForwardResponse | None = None

@@ -11,6 +11,9 @@ export interface FactorConfig {
   data_column: string;
   window_range: RangeParam;
   signal_range: RangeParam;
+  symbol?: string;         // internal_cusip for cross-product factor (pair trade)
+  vendor_symbol?: string;  // direct vendor symbol override for this factor
+  data_source?: string;    // per-factor data source override
 }
 
 export interface BacktestConfig {
@@ -51,6 +54,9 @@ export interface OptimizeRequest {
   signal_range?: RangeParam;
   conjunction?: string;
   factors?: FactorConfig[];
+  // Walk-forward (run inline with optimization when true)
+  walk_forward?: boolean;
+  split_ratio?: number;
 }
 
 export interface PerformanceRequest {
@@ -84,6 +90,10 @@ export interface OptimizeResponse {
   best: Top10Row;
   top10: Top10Row[];
   grid: Top10Row[];
+  // Inline performance for best params (when available)
+  performance?: PerformanceResponse;
+  // Inline walk-forward (when walk_forward=true in request)
+  walk_forward?: WalkForwardResponse;
 }
 
 export interface OptimizeProgress {

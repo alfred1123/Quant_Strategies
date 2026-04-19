@@ -34,7 +34,7 @@ def synthetic_market_data():
         "Close": close,
         "High": high,
         "Low": low,
-    })
+    }, index=pd.date_range("2020-01-01", periods=n, freq="D", name="datetime"))
 
 
 class TestFullBacktestPipeline:
@@ -285,7 +285,7 @@ class TestTradingPeriodVariants:
         perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0)
         perf.enrich_performance()
         ann_ret = perf.get_annualized_return()
-        daily_mean = perf.data.loc[20:len(perf.data) - 1, "pnl"].mean()
+        daily_mean = perf.data.iloc[20:]['pnl'].mean()
         assert ann_ret == pytest.approx(daily_mean * 365)
 
 
@@ -300,7 +300,7 @@ class TestEdgeCases:
         df = pd.DataFrame({
             "price": prices, "factor": prices, "Close": prices,
             "High": prices + 1, "Low": prices - 1,
-        })
+        }, index=pd.date_range("2020-01-01", periods=n, freq="D", name="datetime"))
         config = StrategyConfig("test", "get_bollinger_band", Strategy.momentum_band_signal, 252)
         perf = Performance({"test": df}, config, 20, 1.0)
         perf.enrich_performance()
@@ -315,7 +315,7 @@ class TestEdgeCases:
         df = pd.DataFrame({
             "price": prices, "factor": prices, "Close": prices,
             "High": prices, "Low": prices,
-        })
+        }, index=pd.date_range("2020-01-01", periods=n, freq="D", name="datetime"))
         config = StrategyConfig("test", "get_sma", Strategy.momentum_band_signal, 252)
         perf = Performance({"test": df}, config, 10, 0.5)
         perf.enrich_performance()
@@ -332,7 +332,7 @@ class TestEdgeCases:
         df = pd.DataFrame({
             "price": prices, "factor": prices, "Close": prices,
             "High": prices + 5, "Low": prices - 5,
-        })
+        }, index=pd.date_range("2020-01-01", periods=n, freq="D", name="datetime"))
         config = StrategyConfig("test", "get_bollinger_band", Strategy.momentum_band_signal, 252)
         perf = Performance({"test": df}, config, 20, 1.0)
         perf.enrich_performance()
@@ -346,7 +346,7 @@ class TestCLIMainIntegration:
 
     def test_main_produces_output_files(self, synthetic_market_data):
         mock_price = pd.DataFrame({
-            "t": [f"2021-01-{i+1:02d}" for i in range(len(synthetic_market_data))],
+            "t": pd.date_range("2021-01-01", periods=len(synthetic_market_data), freq="D").strftime("%Y-%m-%d"),
             "v": synthetic_market_data["price"].values,
         })
 
@@ -378,7 +378,7 @@ class TestCLIMainIntegration:
 
     def test_main_with_grid_search_produces_heatmap(self, synthetic_market_data):
         mock_price = pd.DataFrame({
-            "t": [f"2021-01-{i+1:02d}" for i in range(len(synthetic_market_data))],
+            "t": pd.date_range("2021-01-01", periods=len(synthetic_market_data), freq="D").strftime("%Y-%m-%d"),
             "v": synthetic_market_data["price"].values,
         })
 
@@ -481,7 +481,7 @@ class TestWalkForwardPipeline:
     def test_walk_forward_cli_produces_output(self, synthetic_market_data):
         """CLI main() with --walk-forward produces wf_ CSV."""
         mock_price = pd.DataFrame({
-            "t": [f"2021-01-{i+1:02d}" for i in range(len(synthetic_market_data))],
+            "t": pd.date_range("2021-01-01", periods=len(synthetic_market_data), freq="D").strftime("%Y-%m-%d"),
             "v": synthetic_market_data["price"].values,
         })
 
@@ -667,7 +667,7 @@ class TestMultiFactorPipeline:
             "Close": close,
             "High": close + np.abs(np.random.randn(n) * 0.3),
             "Low": close - np.abs(np.random.randn(n) * 0.3),
-        })
+        }, index=pd.date_range("2020-01-01", periods=n, freq="D", name="datetime"))
 
     def test_two_factor_and_pipeline(self, multi_factor_market_data):
         sub_a = SubStrategy("get_sma", "momentum_band_signal", 10, 0.5, "v")
@@ -743,7 +743,7 @@ class TestMultiFactorGridSearch:
             "Close": close,
             "High": close + np.abs(np.random.randn(n) * 0.3),
             "Low": close - np.abs(np.random.randn(n) * 0.3),
-        })
+        }, index=pd.date_range("2020-01-01", periods=n, freq="D", name="datetime"))
 
     def test_optimize_multi_end_to_end(self, multi_factor_market_data):
         sub_a = SubStrategy("get_sma", "momentum_band_signal", 10, 0.5, "v")
@@ -812,6 +812,7 @@ class TestCrossProductPipeline:
     def cross_product_data(self):
         np.random.seed(42)
         n = 300
+        idx = pd.date_range("2020-01-01", periods=n, freq="D", name="datetime")
         btc = 100 + np.cumsum(np.random.randn(n) * 0.5)
         eth = 50 + np.cumsum(np.random.randn(n) * 0.3)
         return {
@@ -820,13 +821,13 @@ class TestCrossProductPipeline:
                 "Close": btc,
                 "High": btc + np.abs(np.random.randn(n) * 0.3),
                 "Low": btc - np.abs(np.random.randn(n) * 0.3),
-            }),
+            }, index=idx),
             "eth-usd": pd.DataFrame({
                 "price": eth, "factor": eth, "v": eth,
                 "Close": eth,
                 "High": eth + np.abs(np.random.randn(n) * 0.3),
                 "Low": eth - np.abs(np.random.randn(n) * 0.3),
-            }),
+            }, index=idx),
         }
 
     def test_cross_product_single_factor(self, cross_product_data):
