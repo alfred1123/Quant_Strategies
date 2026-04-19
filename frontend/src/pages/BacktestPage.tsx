@@ -17,7 +17,7 @@ import type {
 } from '../types/backtest';
 
 const DEFAULT_CONFIG: BacktestConfig = {
-  symbol: 'BTC-USD',
+  symbol: 'btc-usd.crypto',
   start: '2016-01-01',
   end: new Date().toISOString().slice(0, 10),
   assetType: '',
@@ -143,7 +143,7 @@ export default function BacktestPage() {
   };
 
   const validate = (): string | null => {
-    if (!config.symbol.trim()) return 'Symbol is required.';
+    if (!config.symbol.trim()) return 'Product is required.';
     if (!config.assetType) return 'Asset type is required.';
     for (let i = 0; i < config.factors.length; i++) {
       if (!config.factors[i].indicator) return `Factor ${i + 1}: indicator is required.`;

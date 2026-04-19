@@ -17,8 +17,8 @@ from api.config import load_config
 # load_config() initialises logging, loads .env or SSM, and returns the DB conninfo
 DB_CONNINFO = load_config()
 
-from api.routers import backtest, refdata  # noqa: E402
-from src.data import BacktestCache, RefDataCache  # noqa: E402
+from api.routers import backtest, inst, refdata  # noqa: E402
+from src.data import BacktestCache, InstrumentCache, RefDataCache  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,12 @@ async def lifespan(app: FastAPI):
                          "server will start but REFDATA endpoints will be empty")
     app.state.refdata_cache = cache
     app.state.backtest_cache = BacktestCache(DB_CONNINFO, refdata=cache)
+    inst = InstrumentCache(DB_CONNINFO)
+    try:
+        inst.load_all()
+    except Exception:
+        logger.exception("Failed to load INST data — product endpoints will be empty")
+    app.state.instrument_cache = inst
     yield
 
 
@@ -52,6 +58,7 @@ app.add_middleware(
 )
 
 app.include_router(backtest.router, prefix="/api/v1")
+app.include_router(inst.router, prefix="/api/v1")
 app.include_router(refdata.router, prefix="/api/v1")
 
 

@@ -540,3 +540,92 @@ class TestNasdaqDataLink:
         mock_get_table.assert_called_once_with(
             "WIKI/PRICES", paginate=True, ticker="AAPL",
         )
+
+
+class TestInstrumentCache:
+    """Unit tests for InstrumentCache — all DB calls mocked."""
+
+    SAMPLE_PRODUCTS = [
+        {"product_id": 1, "product_vid": 1, "is_current_ind": "Y",
+         "internal_cusip": "btc-usd.crypto", "display_nm": "Bitcoin",
+         "asset_type_id": 1, "exchange": None, "ccy": "USD", "description": None},
+        {"product_id": 2, "product_vid": 1, "is_current_ind": "Y",
+         "internal_cusip": "eth-usd.crypto", "display_nm": "Ethereum",
+         "asset_type_id": 1, "exchange": None, "ccy": "USD", "description": None},
+    ]
+
+    SAMPLE_XREFS = [
+        {"product_xref_id": 1, "product_xref_vid": 1, "product_id": 1,
+         "internal_cusip": "btc-usd.crypto", "display_nm": "Bitcoin",
+         "app_id": 1, "vendor_symbol": "BTC-USD", "is_current_ind": "Y"},
+        {"product_xref_id": 2, "product_xref_vid": 1, "product_id": 1,
+         "internal_cusip": "btc-usd.crypto", "display_nm": "Bitcoin",
+         "app_id": 2, "vendor_symbol": "BTC", "is_current_ind": "Y"},
+        {"product_xref_id": 3, "product_xref_vid": 1, "product_id": 2,
+         "internal_cusip": "eth-usd.crypto", "display_nm": "Ethereum",
+         "app_id": 1, "vendor_symbol": "ETH-USD", "is_current_ind": "Y"},
+    ]
+
+    @pytest.fixture()
+    def cache(self):
+        from data import InstrumentCache
+        c = InstrumentCache.__new__(InstrumentCache)
+        c._conninfo = "dummy"
+        c.user_id = "test"
+        c._products = list(self.SAMPLE_PRODUCTS)
+        c._xrefs = list(self.SAMPLE_XREFS)
+        return c
+
+    def test_get_products_returns_all(self, cache):
+        assert len(cache.get_products()) == 2
+
+    def test_get_product_by_id_found(self, cache):
+        p = cache.get_product_by_id(1)
+        assert p["internal_cusip"] == "btc-usd.crypto"
+
+    def test_get_product_by_id_not_found(self, cache):
+        assert cache.get_product_by_id(999) is None
+
+    def test_get_product_by_cusip_found(self, cache):
+        p = cache.get_product_by_cusip("eth-usd.crypto")
+        assert p["product_id"] == 2
+
+    def test_get_product_by_cusip_not_found(self, cache):
+        assert cache.get_product_by_cusip("nonexistent") is None
+
+    def test_get_xrefs_unfiltered(self, cache):
+        assert len(cache.get_xrefs()) == 3
+
+    def test_get_xrefs_by_product_id(self, cache):
+        xrefs = cache.get_xrefs(product_id=1)
+        assert len(xrefs) == 2
+        assert all(x["product_id"] == 1 for x in xrefs)
+
+    def test_get_xrefs_by_app_id(self, cache):
+        xrefs = cache.get_xrefs(app_id=1)
+        assert len(xrefs) == 2
+        assert all(x["app_id"] == 1 for x in xrefs)
+
+    def test_get_xrefs_by_product_and_app(self, cache):
+        xrefs = cache.get_xrefs(product_id=1, app_id=2)
+        assert len(xrefs) == 1
+        assert xrefs[0]["vendor_symbol"] == "BTC"
+
+    def test_resolve_vendor_symbol_found(self, cache):
+        assert cache.resolve_vendor_symbol(1, 1) == "BTC-USD"
+        assert cache.resolve_vendor_symbol(1, 2) == "BTC"
+        assert cache.resolve_vendor_symbol(2, 1) == "ETH-USD"
+
+    def test_resolve_vendor_symbol_not_found(self, cache):
+        assert cache.resolve_vendor_symbol(2, 2) is None
+        assert cache.resolve_vendor_symbol(999, 1) is None
+
+    @patch("data.DbGateway._call_get")
+    def test_load_all_calls_both_procs(self, mock_call_get):
+        from data import InstrumentCache
+        mock_call_get.side_effect = [self.SAMPLE_PRODUCTS, self.SAMPLE_XREFS]
+        c = InstrumentCache("dummy")
+        c.load_all()
+        assert len(c.get_products()) == 2
+        assert len(c.get_xrefs()) == 3
+        assert mock_call_get.call_count == 2

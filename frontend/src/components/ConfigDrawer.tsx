@@ -1,10 +1,12 @@
 import React from 'react';
 import {
-  Drawer, Box, Typography, TextField, Select, MenuItem,
+  Drawer, Box, Typography, TextField, Select, MenuItem, Autocomplete,
   FormControl, InputLabel, Button, Divider, IconButton, Stack, CircularProgress,
   FormControlLabel, Checkbox, Slider,
 } from '@mui/material';
 import { useIndicators, useSignalTypes, useAssetTypes, useConjunctions, useDataColumns } from '../api/refdata';
+import { useProducts } from '../api/inst';
+import type { ProductRow } from '../types/refdata';
 import { countSteps } from '../utils/grid';
 import type { BacktestConfig, FactorConfig, RangeParam } from '../types/backtest';
 
@@ -23,6 +25,9 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   const { data: assetTypes = [] } = useAssetTypes();
   const { data: conjunctions = [] } = useConjunctions();
   const { data: dataColumns = [] } = useDataColumns();
+  const { data: products = [] } = useProducts();
+
+  const selectedProduct = products.find(p => p.internal_cusip === config.symbol) ?? null;
 
   const set = (patch: Partial<BacktestConfig>) => onChange({ ...config, ...patch });
 
@@ -84,7 +89,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   const completeFactor = (f: FactorConfig) => Boolean(f.indicator && f.strategy);
 
   const missingFields: string[] = [];
-  if (!config.symbol.trim()) missingFields.push('Symbol');
+  if (!config.symbol.trim()) missingFields.push('Product');
   if (!config.assetType) missingFields.push('Asset Type');
   config.factors.forEach((f, i) => {
     const label = config.factors.length > 1 ? `Factor ${i + 1} ` : '';
@@ -120,9 +125,29 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
 
       {/* Row 1: base params */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-        <TextField
-          label="Symbol" size="small" value={config.symbol} sx={{ width: 130 }}
-          onChange={e => set({ symbol: e.target.value })}
+        <Autocomplete<ProductRow, false, false, true>
+          size="small" freeSolo sx={{ width: 250 }}
+          options={products}
+          value={selectedProduct}
+          getOptionLabel={(opt) => typeof opt === 'string' ? opt : `${opt.display_nm} (${opt.internal_cusip})`}
+          isOptionEqualToValue={(opt, val) => opt.internal_cusip === val.internal_cusip}
+          onChange={(_, val) => {
+            if (!val) set({ symbol: '' });
+            else if (typeof val === 'string') set({ symbol: val });
+            else set({ symbol: val.internal_cusip });
+          }}
+          onInputChange={(_, val, reason) => {
+            if (reason === 'input') set({ symbol: val });
+          }}
+          renderInput={(params) => <TextField {...params} label="Product" />}
+          renderOption={(props, opt) => (
+            <li {...props} key={opt.internal_cusip}>
+              <Box>
+                <Typography variant="body2">{opt.display_nm}</Typography>
+                <Typography variant="caption" color="text.secondary">{opt.internal_cusip}</Typography>
+              </Box>
+            </li>
+          )}
         />
         <TextField
           label="Start" size="small" type="date" value={config.start} sx={{ width: 155 }}

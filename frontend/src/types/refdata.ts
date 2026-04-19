@@ -29,3 +29,14 @@ export interface DataColumnRow {
   column_name: string;
   display_name: string;
 }
+
+export interface ProductRow {
+  product_id: number;
+  product_vid: number;
+  internal_cusip: string;
+  display_nm: string;
+  asset_type_id: number;
+  exchange: string | null;
+  ccy: string;
+  description: string | null;
+}
