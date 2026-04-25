@@ -51,9 +51,9 @@ export default function FactorCard({
   return (
     <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2, bgcolor: 'background.paper' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-        <Typography variant="caption" fontWeight={600}>
+        <Typography variant="caption" sx={{ fontWeight: 600 }}>
           Factor {index + 1}
-          <Typography component="span" variant="caption" color="text.secondary" fontWeight={400}>
+          <Typography component="span" variant="caption" color="text.secondary" sx={{ fontWeight: 400 }}>
             {' '}— {trials.toLocaleString()} grid pts
           </Typography>
         </Typography>
@@ -81,7 +81,7 @@ export default function FactorCard({
           apps={apps}
         />
 
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
           <FormControl size="small" sx={{ minWidth: 120, flex: 1 }}>
             <InputLabel>Data Column</InputLabel>
             <Select value={factor.data_column} label="Data Column"

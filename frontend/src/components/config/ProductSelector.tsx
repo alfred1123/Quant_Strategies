@@ -61,7 +61,7 @@ export default function ProductSelector({
   const displayedVendor = value.vendorSymbol || resolvedVendor;
 
   return (
-    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+    <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
       <Autocomplete<ProductRow, false, false, true>
         size="small" freeSolo sx={{ width: productWidth }}
         slotProps={{ listbox: { sx: { maxHeight: 360, minWidth: 320 } } }}
@@ -108,23 +108,21 @@ export default function ProductSelector({
           ))}
         </Select>
       </FormControl>
-      <Autocomplete<string, false, false, true>
-        size="small" freeSolo sx={{ width: vendorWidth }}
-        options={vendorOptions}
-        value={displayedVendor || null}
-        inputValue={displayedVendor}
-        onInputChange={(_, val, reason) => {
+      <TextField
+        size="small" label="Vendor Symbol" sx={{ width: vendorWidth }}
+        slotProps={{ inputLabel: { shrink: true }, htmlInput: { list: `vendor-options-${value.dataSource ?? 'none'}` } }}
+        value={displayedVendor}
+        onChange={e => {
+          const v = e.target.value;
           // Typing a vendor symbol clears the product (vendor wins).
-          if (reason === 'input') onChange({ vendorSymbol: val || undefined, symbol: undefined });
+          onChange({ vendorSymbol: v || undefined, symbol: undefined });
         }}
-        onChange={(_, val) => {
-          if (!val) onChange({ vendorSymbol: undefined, symbol: undefined });
-          else onChange({ vendorSymbol: val, symbol: undefined });
-        }}
-        renderInput={(params) => (
-          <TextField {...params} label="Vendor Symbol" slotProps={{ inputLabel: { shrink: true } }} />
-        )}
       />
+      {/* Native datalist provides lightweight suggestions without the
+          MUI Autocomplete focus-ref issues. */}
+      <datalist id={`vendor-options-${value.dataSource ?? 'none'}`}>
+        {vendorOptions.map(v => <option key={v} value={v} />)}
+      </datalist>
     </Stack>
   );
 }

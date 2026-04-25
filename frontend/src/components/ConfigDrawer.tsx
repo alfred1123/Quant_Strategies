@@ -84,14 +84,14 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
       anchor="top"
       open={open}
       onClose={onClose}
-      PaperProps={{ sx: { p: 3, maxHeight: '85vh', overflowY: 'auto', position: 'relative' } }}
+      slotProps={{ paper: { sx: { p: 3, maxHeight: '85vh', overflowY: 'auto', position: 'relative' } } }}
     >
       <IconButton onClick={onClose} size="small" sx={{ position: 'absolute', top: 12, right: 12 }}>✕</IconButton>
 
       {/* Header */}
-      <Box mb={3}>
-        <Typography variant="h6" fontWeight={700}>Configure Backtest</Typography>
-        <Typography variant="body2" color="text.secondary" mt={0.5}>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700 }}>Configure Backtest</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           Set the backtest parameters and factor grid below, then run the optimization.
         </Typography>
       </Box>
