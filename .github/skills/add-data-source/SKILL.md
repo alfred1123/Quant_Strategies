@@ -151,32 +151,40 @@ Verify 10+ years of data are available for backtesting (5 years testing + 5 year
 
 ---
 
-## Paid / Rate-Limited Data Sources — Persist API Responses
+## Paid / Rate-Limited Data Sources \u2014 Rate-Limit Guard
 
-For any data source that is **not free** (or has tight rate limits), every API
-response must be persisted to `BT.API_REQUEST_PAYLOAD` so that repeated
-backtests never re-fetch the same data from the provider.
+Data-source classes do **not** persist API responses themselves. The central
+`BacktestCache` (see [src/data.py](../../../src/data.py) and
+[docs/design/separate-underlying.md](../../../docs/design/separate-underlying.md))
+caches every provider payload in `BT.API_REQUEST` / `BT.API_REQUEST_PAYLOAD`
+and only invokes the data-source class when the user explicitly ticks
+**Refresh dataset** in the UI. From the data-source's perspective, every call
+to `get_historical_price` is a real provider hit.
+
+For rate-limited / paid providers, that means each `get_historical_price` call
+must first verify the provider quota.
 
 ### Data flow
 
 ```
-1. Check DB for existing payload  ──► SP_GET_API_REQUEST_WITH_PAYLOAD
-                                         │
-                              ┌──────────┴──────────┐
-                         payload exists         no payload / stale range
-                              │                       │
-                       return from DB           2. Check rate limit ──► SP_GET_API_LIMIT_CHK
-                                                      │
-                                                ┌─────┴─────┐
-                                           OUT_ALLOWED='Y'  'N'
-                                                │            │
-                                           3. Fetch API   raise RateLimitError
-                                                │
-                                           4. Merge with previous payload (if any)
-                                                │
-                                           5. SP_INS_API_REQUEST + SP_INS_API_REQUEST_PAYLOAD
-                                                │
-                                           6. Return merged DataFrame
+UI request \u2014\u2192 BacktestCache.get_or_fetch_payload(refresh=False|True)
+                  \u2502
+        \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524
+   refresh=False           refresh=True
+   (read-only)             (user opted in)
+        \u2502                        \u2502
+   serve cached row        call data_source.get_historical_price(...)
+   or raise CacheMiss               \u2502
+                            1. Rate-limit check  \u2500\u2500\u2500\u2500\u2500\u2500\u25BA SP_GET_API_LIMIT_CHK
+                                     \u2502
+                               \u250C\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2510
+                          OUT_ALLOWED='Y'   'N'
+                                     \u2502        \u2502
+                            2. Fetch from API   raise RateLimitError
+                                     \u2502
+                            3. Return ['t', 'v'] DataFrame
+                                     \u2502
+                            (BacktestCache then persists via SP_INS_API_REQUEST)
 ```
 
 ### DB tables involved
@@ -194,195 +202,47 @@ backtests never re-fetch the same data from the provider.
 
 | Procedure | Direction | Purpose |
 |-----------|-----------|---------|
-| `BT.SP_GET_API_REQUEST_WITH_PAYLOAD(IN_API_REQ_ID)` | **Read** | Returns the current API_REQUEST joined with its latest payload. Use to check if data already exists before calling the provider API. || `BT.SP_GET_API_LIMIT_CHK(IN_APP_ID)` | **Read** | Check all `REFDATA.API_LIMIT` rules for the provider. Returns `OUT_ALLOWED='Y'` if safe to call, `'N'` with breach details if any limit is exceeded. **Must be called before every provider API request.** || `BT.SP_INS_API_REQUEST(IN_API_REQ_ID, IN_APP_ID, IN_APP_METRIC_ID, IN_TM_INTERVAL_ID, IN_SYMBOL, IN_FULL_RANGE_START, IN_FULL_RANGE_END, IN_USER_ID)` | **Write** | Upsert subscription metadata (bumps VID, flips old row to `IS_CURRENT_IND='N'`). |
-| `BT.SP_INS_API_REQUEST_PAYLOAD(IN_API_REQ_ID, IN_API_REQ_VID, IN_RANGE_START_TS, IN_RANGE_END_TS, IN_PAYLOAD, IN_USER_ID)` | **Write** | Store the complete merged history as JSONB. |
+| `BT.SP_GET_API_REQUEST` | **Read** | Returns the current `API_REQUEST` row joined with its JSONB payload, filtered by `(APP_ID, APP_METRIC_ID, TM_INTERVAL_ID, INTERNAL_CUSIP)`. |
+| `BT.SP_GET_API_LIMIT_CHK(IN_APP_ID)` | **Read** | Check all `REFDATA.API_LIMIT` rules for the provider. Returns `OUT_ALLOWED='Y'` if safe to call, `'N'` with breach details if any limit is exceeded. **Must be called before every provider API request.** |
+| `BT.SP_INS_API_REQUEST` | **Write** | Combined header + JSONB payload insert. Bumps `API_REQ_VID` and closes the prior current row in one call. |
 
 ### Implementation pattern
 
-The class must implement a **cache-first** strategy. On `get_historical_price`:
+**Caching is centralised in `BacktestCache.get_or_fetch_payload(refresh=False|True)` — do NOT re-implement per-source cache logic.** Each new data-source class only needs a clean `get_historical_price(symbol, start, end)` that always hits the upstream provider and returns a normalised `["t", "v"]` DataFrame. The service layer wraps the call in a `fetcher` closure and passes it to `BacktestCache`, which decides (based on the user's *Refresh dataset* checkbox) whether to call the closure at all and whether to persist a new version.
 
-1. **Lookup** — call `SP_GET_API_REQUEST_WITH_PAYLOAD` with the deterministic
-   `API_REQ_ID` (UUID v5 from namespace + `"{app_name}:{symbol}:{metric}:{interval}"`).
-2. **Hit** — if the stored `RANGE_END_TS` already covers the requested
-   `end_date`, deserialise the JSONB payload directly into the DataFrame and
-   return. No API call.
-3. **Rate-limit check** — call `SP_GET_API_LIMIT_CHK(APP_ID)`. If
-   `OUT_ALLOWED = 'N'`, raise a `RateLimitError` with breach details
-   (`OUT_LIMIT_TYPE`, `OUT_CURRENT_CNT`, `OUT_MAX_VALUE`). **Never skip this.**
-4. **Miss / stale** — fetch only the **delta** (from `RANGE_END_TS + 1 day`
-   to `end_date`) from the provider API.
-5. **Merge** — concatenate previous payload rows with new rows, deduplicate on
-   date, sort ascending.
-6. **Persist** — call `SP_INS_API_REQUEST` (bumps VID) then
-   `SP_INS_API_REQUEST_PAYLOAD` (stores merged JSONB).
-7. **Return** — filter the merged DataFrame to `[start_date, end_date]` and
-   return `['t', 'v']`.
+A new data-source class therefore needs:
+
+1. **Constructor** — load the API key from `.env`, validate, hold any session/client.
+2. **`get_historical_price(symbol, start_date, end_date)`** — fetch directly from the provider, normalise to a DataFrame with at least columns `t` (date) and `v` (price). No DB calls.
+3. **Optional rate-limit guard** — for paid/rate-limited providers, call `BT.SP_GET_API_LIMIT_CHK(APP_ID)` at the top of `get_historical_price` and raise `RateLimitError` if `OUT_ALLOWED='N'`. This is independent of the cache — it protects the provider quota even when *Refresh dataset* is ticked.
 
 ```python
-import json
-import uuid
-from datetime import datetime, timedelta
-
-import psycopg
-
-# Deterministic UUID namespace for API_REQ_ID
-_NDL_UUID_NS = uuid.UUID("a1b2c3d4-0000-0000-0000-000000000000")  # project-specific
-
-def _make_api_req_id(app_name: str, symbol: str, metric: str, interval: str) -> uuid.UUID:
-    """Deterministic UUID v5 so the same subscription always maps to the same PK."""
-    return uuid.uuid5(_NDL_UUID_NS, f"{app_name}:{symbol}:{metric}:{interval}")
-
-
-class RateLimitError(RuntimeError):
-    """Raised when SP_GET_API_LIMIT_CHK returns OUT_ALLOWED='N'."""
-
-
 class PaidSourceExample:
 
-    APP_ID = 4  # nasdaq_data_link — must match REFDATA.APP seed
+    APP_ID = 4  # nasdaq_data_link \u2014 must match REFDATA.APP seed
 
-    def __init__(self, conninfo: str) -> None:
-        self._conninfo = conninfo
-        # ... validate API key from .env ...
+    def __init__(self) -> None:
+        load_dotenv()
+        self._api_key = os.getenv("NDL_API_KEY")
+        if not self._api_key:
+            raise ValueError("NDL_API_KEY must be set in .env")
+        # Optional: hold a DB conninfo only if you implement the rate-limit guard.
 
-    def get_historical_price(self, symbol, start_date, end_date):
-        api_req_id = _make_api_req_id("nasdaq_data_link", symbol, "price", "daily")
+    def get_historical_price(self, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+        # Optional rate-limit check (paid / quota-bound providers only).
+        # self._check_rate_limit()
 
-        # 1. Check DB for existing payload
-        existing = self._load_payload(api_req_id)
-
-        if existing is not None:
-            stored_end = existing["range_end"]
-            if stored_end >= end_date:
-                # Full cache hit — no API call needed
-                return self._filter(existing["rows"], start_date, end_date)
-            # Partial hit — fetch delta only
-            fetch_start = (datetime.strptime(stored_end, "%Y-%m-%d")
-                           + timedelta(days=1)).strftime("%Y-%m-%d")
-        else:
-            fetch_start = start_date
-
-        # 2. Rate-limit check — must pass before any provider API call
-        self._check_rate_limit()
-
-        # 3. Fetch delta from provider API
-        new_rows = self._fetch_from_api(symbol, fetch_start, end_date)
-
-        # 4. Merge
-        if existing is not None:
-            merged = existing["rows"] + new_rows
-        else:
-            merged = new_rows
-        # Deduplicate on date, keep latest
-        seen = {}
-        for row in merged:
-            seen[row["t"]] = row["v"]
-        merged = [{"t": t, "v": v} for t, v in sorted(seen.items())]
-
-        # 5. Persist via stored procedures
-        range_start = merged[0]["t"]
-        range_end = merged[-1]["t"]
-        vid = self._persist(api_req_id, symbol, range_start, range_end, merged)
-
-        # 6. Return filtered
-        return self._filter(merged, start_date, end_date)
-
-    def _check_rate_limit(self) -> None:
-        """Call SP_GET_API_LIMIT_CHK. Raises RateLimitError if any limit breached."""
-        with psycopg.connect(self._conninfo) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "CALL BT.SP_GET_API_LIMIT_CHK(%s, NULL, NULL, NULL, NULL, NULL, NULL, NULL)",
-                    (self.APP_ID,),
-                )
-                row = cur.fetchone()
-                # OUT params: OUT_ALLOWED, OUT_LIMIT_TYPE, OUT_CURRENT_CNT,
-                #             OUT_MAX_VALUE, OUT_SQLSTATE, OUT_SQLMSG, OUT_SQLERRMC
-                allowed = row[0]
-                if allowed != 'Y':
-                    limit_type = row[1]
-                    current_cnt = row[2]
-                    max_value = row[3]
-                    raise RateLimitError(
-                        f"Rate limit breached for APP_ID={self.APP_ID}: "
-                        f"{limit_type} {current_cnt}/{max_value}"
-                    )
-
-    def _load_payload(self, api_req_id: uuid.UUID) -> dict | None:
-        """Call SP_GET_API_REQUEST_WITH_PAYLOAD. Returns None on miss."""
-        with psycopg.connect(self._conninfo) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "CALL BT.SP_GET_API_REQUEST_WITH_PAYLOAD(%s, NULL, NULL, NULL, NULL)",
-                    (str(api_req_id),),
-                )
-                row = cur.fetchone()
-                cursor_name, sqlstate = row[0], row[1]
-                if sqlstate != "00000":
-                    return None
-                cur.execute(f'FETCH ALL FROM "{cursor_name}"')
-                rows = cur.fetchall()
-                cur.execute(f'CLOSE "{cursor_name}"')
-                if not rows:
-                    return None
-                # Columns: API_REQ_ID, API_REQ_VID, APP_ID, APP_METRIC_ID,
-                #          TM_INTERVAL_ID, SYMBOL, FULL_RANGE_START,
-                #          FULL_RANGE_END, RANGE_START_TS, RANGE_END_TS, PAYLOAD
-                r = rows[0]
-                payload_json = r[10]  # PAYLOAD column
-                if payload_json is None:
-                    return None
-                return {
-                    "vid": r[1],
-                    "range_start": r[8].strftime("%Y-%m-%d") if r[8] else None,
-                    "range_end": r[9].strftime("%Y-%m-%d") if r[9] else None,
-                    "rows": payload_json,  # already parsed from JSONB by psycopg
-                }
-
-    def _persist(self, api_req_id, symbol, range_start, range_end, merged):
-        """Call SP_INS_API_REQUEST then SP_INS_API_REQUEST_PAYLOAD."""
-        with psycopg.connect(self._conninfo) as conn:
-            with conn.cursor() as cur:
-                # Insert/version the subscription
-                cur.execute(
-                    "CALL BT.SP_INS_API_REQUEST(%s, %s, %s, %s, %s, %s, %s, %s, NULL, NULL, NULL)",
-                    (str(api_req_id), APP_ID, APP_METRIC_ID, TM_INTERVAL_ID,
-                     symbol, range_start, range_end, USER_ID),
-                )
-                row = cur.fetchone()
-                # sqlstate at index 0
-                if row[0] != "00000":
-                    raise RuntimeError(f"SP_INS_API_REQUEST failed: {row}")
-
-                # Get new VID (max for this req)
-                cur.execute(
-                    "SELECT MAX(API_REQ_VID) FROM BT.API_REQUEST WHERE API_REQ_ID = %s",
-                    (str(api_req_id),),
-                )
-                vid = cur.fetchone()[0]
-
-                # Store payload
-                cur.execute(
-                    "CALL BT.SP_INS_API_REQUEST_PAYLOAD(%s, %s, %s, %s, %s::jsonb, %s, NULL, NULL, NULL)",
-                    (str(api_req_id), vid, range_start, range_end,
-                     json.dumps(merged), USER_ID),
-                )
-                row = cur.fetchone()
-                if row[0] != "00000":
-                    raise RuntimeError(f"SP_INS_API_REQUEST_PAYLOAD failed: {row}")
-            conn.commit()
-        return vid
-
-    @staticmethod
-    def _filter(rows, start_date, end_date):
-        """Filter merged rows to requested range and return pipeline DataFrame."""
-        import pandas as pd
-        filtered = [r for r in rows if start_date <= r["t"] <= end_date]
-        df = pd.DataFrame(filtered)
+        # Hit the provider for the full requested range. The BacktestCache
+        # layer decides whether this method is even called \u2014 you do not
+        # check the cache here.
+        rows = self._fetch_from_api(symbol, start_date, end_date)
+        df = pd.DataFrame(rows)
         df.columns = ["t", "v"]
         df["v"] = df["v"].astype(float)
         return df.reset_index(drop=True)
 ```
+
+See `BacktestCache.get_or_fetch_payload` in [src/data.py](../../../src/data.py) and the design doc [docs/design/separate-underlying.md](../../../docs/design/separate-underlying.md) for how the cache wraps your class.
 
 ### REFDATA seed data checklist
 
@@ -401,28 +261,8 @@ When adding a paid source, add seed rows to these files:
 In addition to the standard tests (see above), paid sources need:
 
 ```python
-class Test<SourceName>Persistence:
-    """Tests for DB persistence (cache-first pattern)."""
-
-    @patch("<db connect>")
-    def test_returns_from_cache_on_full_hit(self, mock_conn):
-        """Verify no API call when DB payload covers the full date range."""
-
-    @patch("<db connect>")
-    @patch("<api fetch>")
-    def test_fetches_delta_on_partial_hit(self, mock_api, mock_conn):
-        """Verify only the missing date range is fetched from the API."""
-
-    @patch("<db connect>")
-    @patch("<api fetch>")
-    def test_persists_merged_payload(self, mock_api, mock_conn):
-        """Verify SP_INS_API_REQUEST and SP_INS_API_REQUEST_PAYLOAD are called
-        with the correct merged payload."""
-
-    @patch("<db connect>")
-    @patch("<api fetch>")
-    def test_full_miss_fetches_entire_range(self, mock_api, mock_conn):
-        """Verify full range is fetched when no prior payload exists."""
+class Test<SourceName>RateLimit:
+    """Verify the rate-limit guard around the provider API call."""
 
     @patch("<db connect>")
     def test_rate_limit_check_blocks_when_breached(self, mock_conn):
@@ -432,6 +272,8 @@ class Test<SourceName>Persistence:
     @patch("<db connect>")
     @patch("<api fetch>")
     def test_rate_limit_check_passes_before_api_call(self, mock_api, mock_conn):
-        """Verify SP_GET_API_LIMIT_CHK is called before the provider API
-        on cache miss. Mock returns ('Y', ...) to allow the fetch."""
+        """Verify SP_GET_API_LIMIT_CHK is called before the provider API.
+        Mock returns ('Y', ...) to allow the fetch."""
 ```
+
+> **Note:** Cache hit / miss / merge / persistence behaviour is covered centrally by `tests/unit/test_data.py::TestBacktestCacheGetOrFetch`. Do **not** re-test it per data source.

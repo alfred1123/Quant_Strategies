@@ -85,8 +85,7 @@ cd ../inst     && source ../../../.env && liquibase --defaults-file=liquibase.pr
 | `SP_GET_ENUM` | `REFDATA` | Generic REFCURSOR select for any REFDATA table |
 | `SP_INS_STRATEGY` | `BT` | Soft-versioning insert (auto-VID + IS_CURRENT_IND flip) |
 | `SP_INS_RESULT` | `BT` | Append-only insert (references STRATEGY_VID) |
-| `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert |
-| `SP_INS_API_REQUEST_PAYLOAD` | `BT` | Append-only into yearly-partitioned table |
+| `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`) |
 
 ## Directory Layout
 

@@ -406,7 +406,7 @@ User selects:
 Backend:
   1. Collect unique tickers: {"SPY", "^VIX"}
   2. Fetch two DataFrames: {"SPY": df_spy, "^VIX": df_vix}
-     (each goes through cache-first flow above)
+     (each goes through the two-mode `BacktestCache.get_or_fetch_payload` flow above)
   3. Compute RSI on df_vix, SMA on df_spy (same ref as trading)
   4. Reindex indicator values to df_spy's index
   5. Merge signals, run PnL on SPY prices

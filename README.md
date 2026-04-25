@@ -292,6 +292,14 @@ All backtest endpoints accept `"mode": "single"` or `"mode": "multi"` in the req
 **REFDATA cache:**  
 All REFDATA tables are loaded into an in-process dict at startup (`RefDataCache`). The cache is attached to `app.state` and passed to every service call. Refresh without restart via `POST /refdata/refresh`.
 
+**Provider data cache (`BacktestCache`):**  
+Provider price/metric payloads are cached in `BT.API_REQUEST` / `BT.API_REQUEST_PAYLOAD` and consumed via `BacktestCache.get_or_fetch_payload(..., refresh=False|True)`. The mode is driven by a single **"Refresh dataset"** checkbox in the UI:
+
+- **Unchecked (default)** — read-only. Returns the cached slice if it covers the requested range, else 400 with the limiting ticker named.
+- **Checked** — fetches the full requested range from the provider and inserts a new soft-version via `SP_INS_API_REQUEST` (re-using the cached `api_req_id` so the SP closes the prior `API_REQ_VID`). No prefix/suffix gap math — versions are intent-driven so `API_REQUEST_PAYLOAD` row count stays bounded.
+
+A date-range intersection guard runs across all products + factors after fetch and rejects requests where their common coverage doesn't span `[start, end]`. See [docs/design/separate-underlying.md](docs/design/separate-underlying.md) for the full design and future work (delta-row storage, scheduled purge of closed versions).
+
 ---
 
 ### Paper Trading with Futu OpenD
@@ -512,7 +520,7 @@ The project uses **PostgreSQL 17** with Liquibase for schema management. Each sc
 |--------|--------|
 | `CORE_ADMIN` | Logging infrastructure (`LOG_PROC_DETAIL` table, `CORE_INS_LOG_PROC` procedure) |
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, etc.) + `SP_GET_ENUM` procedure for cache loading |
-| `BT` | Backtest results (`STRATEGY`, `RESULT`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert procedures (`SP_INS_STRATEGY`, `SP_INS_RESULT`, `SP_INS_API_REQUEST`, `SP_INS_API_REQUEST_PAYLOAD`) |
+| `BT` | Backtest results (`STRATEGY`, `RESULT`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert procedures (`SP_INS_STRATEGY`, `SP_INS_RESULT`, `SP_INS_API_REQUEST` — single combined header+payload insert) |
 | `TRADE` | Live trading tables (`DEPLOYMENT`, `LOG`, `TRANSACTION`) — procedures deferred |
 | `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) |
 
