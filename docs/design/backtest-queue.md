@@ -592,4 +592,66 @@ Implement a durable FIFO queue with:
 3. SSE queue updates
 4. frontend separation between editable draft and submitted jobs
 
+## 20. Technology Choice — Why Postgres, Not Kafka or Redis
+
+This section documents why the queue is built on PostgreSQL rather than a dedicated broker.
+
+### 20.1 What we actually need
+
+| Need | Required by Quant Strategies today |
+|------|-----------------------------------|
+| Durable job state across API restarts | Yes |
+| FIFO ordering with backpressure | Yes |
+| At-most-one worker pulling at a time | Yes (Phase 1) |
+| Live progress events to one browser session | Yes (SSE) |
+| Multi-consumer fan-out of the same event stream | No |
+| Millions of events / second | No |
+| Cross-service event distribution | No |
+| Schema registry, partitions, consumer groups | No |
+
+### 20.2 Why not Kafka
+
+Kafka solves problems we do not have:
+
+1. **Operational weight.** Kafka requires a broker cluster, KRaft (or ZooKeeper), partition planning, retention policies, and typically a schema registry. None of this is justified for a single-tenant FastAPI backend.
+2. **Wrong primitive.** Kafka is a high-throughput append-only log designed for fan-out to many independent consumers. Our queue has exactly one consumer (the worker process) and needs `SELECT ... FOR UPDATE SKIP LOCKED` semantics, which a log does not natively provide.
+3. **Volume mismatch.** A backtest job is one row every few seconds at most. Kafka starts to pay back at thousands of events per second.
+4. **No existing dependency.** Adding Kafka means a new container, new credentials, new monitoring surface — versus reusing the Postgres cluster we already operate on AWS RDS.
+
+Kafka would only become interesting if we later add (a) a live tick-data ingestion pipeline fanning out to multiple strategy processes, or (b) cross-service event distribution between FastAPI, a separate execution gateway, and an audit store.
+
+### 20.3 Why not Redis (RQ / Streams)
+
+Redis-based queues (RQ, Celery+Redis, Redis Streams) are a reasonable middle ground but were rejected for v1:
+
+1. **New stateful service.** Redis would become a second piece of infrastructure that must be backed up, monitored, and access-controlled — for a workload Postgres can already handle.
+2. **No transactional coupling.** A backtest job completion needs to (a) update job state, (b) write rows into `BT.RESULT` / `BT.API_REQUEST_PAYLOAD`. With Postgres-backed jobs this is one transaction. With Redis it becomes a two-phase coordination problem.
+3. **Loss of SQL inspection.** Operators can already `SELECT * FROM BT.BACKTEST_JOB WHERE STATUS = 'failed'` from psql. With Redis we would need a separate inspection tool.
+
+Redis becomes worth re-evaluating if (a) job submission rate grows past a few per second sustained, or (b) we need pub/sub fan-out for live progress to many browser tabs.
+
+### 20.4 Why Postgres fits
+
+1. **Already operated.** The cluster, credentials, backups, and migration tooling (Liquibase) are in place.
+2. **`SELECT ... FOR UPDATE SKIP LOCKED`** gives exactly the dequeue semantics we need with no extra library.
+3. **`LISTEN` / `NOTIFY`** can drive live SSE updates without a separate broker.
+4. **Transactional integrity** between job state and result rows is free.
+5. **No new failure mode** — if Postgres is down the API is already down.
+
+Throughput ceiling on a single Aurora instance for this pattern is comfortably in the hundreds of jobs per second, well beyond our requirements.
+
+### 20.5 Lighter still — when even a queue is overkill
+
+If usage stays single-user and one optimization at a time is acceptable, a `concurrency_limit` semaphore in `api/services/backtest.py` is sufficient and adds zero schema. The full queue design in this document is justified once any of the following becomes true:
+
+1. Multiple users submitting concurrently
+2. The user wants to enqueue several runs and walk away
+3. Optimizations routinely exceed a few minutes and tying up a uvicorn worker becomes painful
+
+Until then, the queue can be implemented behind the same API surface (POST returns a job id immediately) so the migration is transparent to the frontend.
+
+### 20.6 Decision
+
+Postgres-backed FIFO queue, single worker, `LISTEN/NOTIFY` for live updates. Re-evaluate Redis if submission rate or fan-out grows; re-evaluate Kafka only if a live market-data ingestion pipeline is added.
+
 This satisfies the user requirement that the UI remains editable while a long backtest is running, while also addressing the Python threading limitation correctly by using a separate process for CPU-bound execution.
