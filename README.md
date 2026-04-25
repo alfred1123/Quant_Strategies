@@ -202,6 +202,37 @@ cd frontend && npm run dev
 
 Open `http://localhost:5173` in your browser.
 
+### Support Startup Script
+
+For support or restart workflows, use the unified executable control script:
+
+```bash
+# Development mode
+./scripts/appctl dev start
+./scripts/appctl dev status
+./scripts/appctl dev restart
+./scripts/appctl dev stop
+./scripts/appctl dev kill
+
+# Production-style mode
+./scripts/appctl prod start
+./scripts/appctl prod status
+./scripts/appctl prod restart
+./scripts/appctl prod stop
+./scripts/appctl prod kill
+```
+
+Behavior:
+
+- `dev` runs FastAPI with reload on port `8000` and Vite dev server on port `5173`
+- `prod` runs FastAPI without reload on port `8000` and Vite preview on port `4173`
+- `stop` attempts graceful shutdown and escalates if needed
+- `kill` sends immediate hard termination
+- PID files are written to `log/run/`
+- Logs are written to `log/backend.log` and `log/frontend.log`
+
+This script is intended as an immediate operator-support entrypoint. For a hardened production deployment later, prefer `systemd`, containers, or a process supervisor in front of the same commands.
+
 **Features:**
 - **⚙ Configure** button in the topbar opens a collapsible left drawer with all backtest settings
 - **Dropdowns** (indicator, strategy, asset type, conjunction) are populated live from `REFDATA` tables

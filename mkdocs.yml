@@ -78,6 +78,7 @@ nav:
       - Running Tests: guides/testing.md
   - Design Docs:
       - Backtest API: design/backtest-api.md
+      - Backtest Queue: design/backtest-queue.md
       - Trade API: design/trade-api.md
       - TypeScript Migration: design/ts-migration.md
       - Backtest Speed: design/backtest-speed.md
