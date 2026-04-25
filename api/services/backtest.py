@@ -13,8 +13,10 @@ import threading
 
 import numpy as np
 import pandas as pd
+from fastapi import HTTPException
 
 import src.data as _data_module
+from src.data import BacktestCache
 from src.strat import SignalDirection, StrategyConfig, SubStrategy,  resolve_signal_func
 from src.perf import Performance
 from src.param_opt import ParametersOptimization
@@ -30,13 +32,20 @@ logger = logging.getLogger(__name__)
 
 # ── Data fetching ────────────────────────────────────────────────────────────
 
-def _fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_cache=None) -> pd.DataFrame:
+def _fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_cache=None, bt_cache=None, refresh: bool = False) -> pd.DataFrame:
     """Fetch prices using the data source class registered in REFDATA.APP.
 
     If *symbol* is an internal_cusip registered in INST.PRODUCT, the vendor
     symbol for the chosen data source is resolved automatically via
     ``InstrumentCache``.  Falls back to using *symbol* as-is when no
     instrument mapping exists (e.g. user typed a raw ticker).
+
+    When ``bt_cache`` is provided, delegates to
+    ``BacktestCache.get_or_fetch_payload``. With ``refresh=False``
+    (default) the call is cache-only and raises ``CacheMissError``
+    (translated to HTTP 400 by the caller) if the cache cannot satisfy
+    the request. With ``refresh=True`` the provider is hit for the full
+    range and a new ``API_REQUEST`` version is inserted.
 
     Returns a DataFrame indexed by ``datetime`` (DatetimeIndex) so that
     cross-product ``reindex`` aligns rows by date, not by integer position.
@@ -57,18 +66,38 @@ def _fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_c
 
     cls = getattr(_data_module, app["class_name"])
     src = cls()
-    price = src.get_historical_price(ticker, start, end)
-    if hasattr(src.get_historical_price, "cache_clear"):
-        src.get_historical_price.cache_clear()
-    df = pd.DataFrame({
-        "datetime": pd.to_datetime(price["t"]),
-        "price": price["v"],
-        "factor": price["v"],
-        **{col: price[col] for col in ("Open", "High", "Low", "Close", "Volume")
-           if col in price.columns},
-    })
-    df = df.set_index("datetime").sort_index()
-    return df
+
+    def _provider_fetch(s: str, e: str) -> pd.DataFrame:
+        """Hit the upstream provider for an arbitrary sub-range."""
+        price = src.get_historical_price(ticker, s, e)
+        if hasattr(src.get_historical_price, "cache_clear"):
+            src.get_historical_price.cache_clear()
+        df = pd.DataFrame({
+            "datetime": pd.to_datetime(price["t"]),
+            "price": price["v"],
+            "factor": price["v"],
+            **{col: price[col] for col in ("Open", "High", "Low", "Close", "Volume")
+               if col in price.columns},
+        })
+        return df.set_index("datetime").sort_index()
+
+    # DB-backed cache path
+    if bt_cache is not None:
+        app_id = app["app_id"]
+        app_metric_id = bt_cache.refdata.resolve_app_metric_id(app_id, "price")
+        if app_metric_id is not None:
+            return bt_cache.get_or_fetch_payload(
+                app_id=app_id,
+                app_metric_id=app_metric_id,
+                internal_cusip=symbol,
+                range_start=start,
+                range_end=end,
+                fetcher=_provider_fetch,
+                refresh=refresh,
+            )
+
+    # Fallback: no cache wired (e.g. unit tests, no DB)
+    return _provider_fetch(start, end)
 
 
 # ── Config builders ──────────────────────────────────────────────────────────
@@ -138,12 +167,30 @@ def _build_param_ranges(req):
 # ── Inline result builders (shared by stream_optimize and standalone endpoints) ──
 
 
-def _build_data_dict(req, cache, inst_cache=None) -> dict[str, pd.DataFrame]:
+def _build_data_dict(req, cache, inst_cache=None, bt_cache=None) -> dict[str, pd.DataFrame]:
     """Fetch the main product and any cross-product factor data.
+
+    Honours ``req.refresh_dataset``: when True, every product + factor is
+    refetched from the provider so they share the same snapshot date
+    range. When False, all are served from cache only — a miss on any
+    one ticker raises HTTP 400 (so the user knows to tick *Refresh
+    dataset*).
+
+    After fetching, the **intersection** of available datetime indexes
+    across all tickers is enforced. If the intersection does not span
+    the requested range, raises HTTP 400 listing the limiting ticker.
 
     Returns a dict keyed by symbol/cusip → DataFrame (DatetimeIndex).
     """
-    main_df = _fetch_df(req.symbol, req.start, req.end, req.data_source, cache, inst_cache)
+    refresh = bool(getattr(req, "refresh_dataset", False))
+
+    def _fetch(sym: str, ds: str) -> pd.DataFrame:
+        try:
+            return _fetch_df(sym, req.start, req.end, ds, cache, inst_cache, bt_cache, refresh=refresh)
+        except BacktestCache.CacheMissError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    main_df = _fetch(req.symbol, req.data_source)
     data_dict = {req.symbol: main_df}
 
     if req.mode == "multi" and req.factors:
@@ -151,9 +198,50 @@ def _build_data_dict(req, cache, inst_cache=None) -> dict[str, pd.DataFrame]:
             cusip = (f.vendor_symbol or f.symbol) if (f.symbol or f.vendor_symbol) else None
             if cusip and cusip not in data_dict:
                 ds = f.data_source or req.data_source
-                data_dict[cusip] = _fetch_df(cusip, req.start, req.end, ds, cache, inst_cache)
+                data_dict[cusip] = _fetch(cusip, ds)
 
+    _enforce_date_sync(data_dict, req.start, req.end)
     return data_dict
+
+
+def _enforce_date_sync(data_dict: dict[str, pd.DataFrame], req_start: str, req_end: str) -> None:
+    """Ensure all products + factors share the same date coverage.
+
+    A backtest aligns DataFrames via ``reindex`` on the main product's
+    index; a factor that's missing dates the main product has produces
+    NaN bars and silently corrupts results. This guard fails fast
+    instead.
+    """
+    if len(data_dict) <= 1:
+        return
+    req_s = pd.Timestamp(req_start, tz="UTC")
+    req_e = pd.Timestamp(req_end, tz="UTC")
+    bounds: dict[str, tuple[pd.Timestamp, pd.Timestamp]] = {}
+    for sym, df in data_dict.items():
+        if df.empty:
+            raise HTTPException(status_code=400, detail=f"No data returned for {sym!r}.")
+        idx = df.index
+        if idx.tz is None:
+            idx = idx.tz_localize("UTC")
+        bounds[sym] = (idx.min(), idx.max())
+    starts = {s: lo for s, (lo, _) in bounds.items()}
+    ends = {s: hi for s, (_, hi) in bounds.items()}
+    common_start = max(starts.values())
+    common_end = min(ends.values())
+    if common_start > req_s or common_end < req_e:
+        limiting_start = max(starts, key=starts.get)
+        limiting_end = min(ends, key=ends.get)
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Date ranges across products+factors do not align with "
+                f"requested [{req_start}, {req_end}]. "
+                f"Common coverage = [{common_start.date()}, {common_end.date()}]. "
+                f"Latest start: {limiting_start!r} ({starts[limiting_start].date()}); "
+                f"earliest end: {limiting_end!r} ({ends[limiting_end].date()}). "
+                f"Tick 'Refresh dataset' to fetch matching ranges."
+            ),
+        )
 
 def _build_perf_response(data_dict, config, best, fee_bps) -> PerformanceResponse:
     """Run Performance for the best params and return a PerformanceResponse."""
@@ -244,8 +332,8 @@ def _build_wf_response(data_dict, config, window_list, signal_list,
 
 # ── Optimize ─────────────────────────────────────────────────────────────────
 
-def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None) -> OptimizeResponse:
-    data_dict = _build_data_dict(req, cache, inst_cache)
+def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None, bt_cache=None) -> OptimizeResponse:
+    data_dict = _build_data_dict(req, cache, inst_cache, bt_cache)
     callbacks = [callback] if callback else []
     config = _build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
@@ -281,7 +369,7 @@ def _sse_event(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-async def stream_optimize(req: OptimizeRequest, cache, inst_cache=None):
+async def stream_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache=None):
     """Async generator yielding SSE events for optimization progress.
 
     Events:
@@ -295,7 +383,7 @@ async def stream_optimize(req: OptimizeRequest, cache, inst_cache=None):
 
     def _run():
         try:
-            data_dict = _build_data_dict(req, cache, inst_cache)
+            data_dict = _build_data_dict(req, cache, inst_cache, bt_cache)
             config = _build_config(req, cache)
             window_list, signal_list = _build_param_ranges(req)
 
@@ -366,8 +454,8 @@ async def stream_optimize(req: OptimizeRequest, cache, inst_cache=None):
 
 # ── Performance ───────────────────────────────────────────────────────────────
 
-def run_performance(req: PerformanceRequest, cache, inst_cache=None) -> PerformanceResponse:
-    data_dict = _build_data_dict(req, cache, inst_cache)
+def run_performance(req: PerformanceRequest, cache, inst_cache=None, bt_cache=None) -> PerformanceResponse:
+    data_dict = _build_data_dict(req, cache, inst_cache, bt_cache)
     config = _build_config(req, cache)
 
     window = req.window if req.mode == "single" else tuple(req.windows)
@@ -379,8 +467,8 @@ def run_performance(req: PerformanceRequest, cache, inst_cache=None) -> Performa
 
 # ── Walk-Forward ──────────────────────────────────────────────────────────────
 
-def run_walk_forward(req: WalkForwardRequest, cache, inst_cache=None) -> WalkForwardResponse:
-    data_dict = _build_data_dict(req, cache, inst_cache)
+def run_walk_forward(req: WalkForwardRequest, cache, inst_cache=None, bt_cache=None) -> WalkForwardResponse:
+    data_dict = _build_data_dict(req, cache, inst_cache, bt_cache)
     config = _build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
 

@@ -44,6 +44,7 @@ const DEFAULT_CONFIG: BacktestConfig = {
   ],
   walkForward: true,
   splitRatio: 0.5,
+  refreshDataset: false,
 };
 
 /** vendorSymbol takes priority; falls back to product cusip */
@@ -55,6 +56,7 @@ function buildOptimizeRequest(cfg: BacktestConfig): OptimizeRequest {
   const base = {
     symbol: effectiveSymbol(cfg), start: cfg.start, end: cfg.end,
     trading_period: cfg.tradingPeriod, fee_bps: cfg.feeBps, data_source: ds,
+    refresh_dataset: cfg.refreshDataset,
     walk_forward: cfg.walkForward, split_ratio: cfg.splitRatio,
   };
   if (cfg.factors.length <= 1) {
@@ -77,7 +79,8 @@ function buildPerformanceRequest(cfg: BacktestConfig, row: Top10Row): Performanc
     return {
       symbol: effectiveSymbol(cfg), start: cfg.start, end: cfg.end,
       mode: 'single', trading_period: cfg.tradingPeriod, fee_bps: cfg.feeBps,
-      data_source: ds, indicator: f0.indicator, strategy: f0.strategy,
+      data_source: ds, refresh_dataset: cfg.refreshDataset,
+      indicator: f0.indicator, strategy: f0.strategy,
       window: row.window as number, signal: row.signal as number,
     };
   }
@@ -86,7 +89,8 @@ function buildPerformanceRequest(cfg: BacktestConfig, row: Top10Row): Performanc
   return {
     symbol: effectiveSymbol(cfg), start: cfg.start, end: cfg.end,
     mode: 'multi', trading_period: cfg.tradingPeriod, fee_bps: cfg.feeBps,
-    data_source: ds, conjunction: cfg.conjunction, factors: cfg.factors,
+    data_source: ds, refresh_dataset: cfg.refreshDataset,
+    conjunction: cfg.conjunction, factors: cfg.factors,
     windows, signals,
   };
 }

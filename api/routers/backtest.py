@@ -21,7 +21,8 @@ router = APIRouter(prefix="/backtest", tags=["backtest"])
 def optimize(req: OptimizeRequest, request: Request):
     try:
         return svc.run_optimize(req, request.app.state.refdata_cache,
-                                inst_cache=request.app.state.instrument_cache)
+                                inst_cache=request.app.state.instrument_cache,
+                                bt_cache=getattr(request.app.state, "backtest_cache", None))
     except Exception as exc:
         logger.exception("Optimization failed")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -32,8 +33,9 @@ async def optimize_stream(req: OptimizeRequest, request: Request):
     """SSE endpoint streaming per-trial progress during optimization."""
     cache = request.app.state.refdata_cache
     inst = request.app.state.instrument_cache
+    bt = getattr(request.app.state, "backtest_cache", None)
     return StreamingResponse(
-        svc.stream_optimize(req, cache, inst_cache=inst),
+        svc.stream_optimize(req, cache, inst_cache=inst, bt_cache=bt),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -43,7 +45,8 @@ async def optimize_stream(req: OptimizeRequest, request: Request):
 def performance(req: PerformanceRequest, request: Request):
     try:
         return svc.run_performance(req, request.app.state.refdata_cache,
-                                   inst_cache=request.app.state.instrument_cache)
+                                   inst_cache=request.app.state.instrument_cache,
+                                   bt_cache=getattr(request.app.state, "backtest_cache", None))
     except Exception as exc:
         logger.exception("Performance calculation failed")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -53,7 +56,8 @@ def performance(req: PerformanceRequest, request: Request):
 def walk_forward(req: WalkForwardRequest, request: Request):
     try:
         return svc.run_walk_forward(req, request.app.state.refdata_cache,
-                                    inst_cache=request.app.state.instrument_cache)
+                                    inst_cache=request.app.state.instrument_cache,
+                                    bt_cache=getattr(request.app.state, "backtest_cache", None))
     except Exception as exc:
         logger.exception("Walk-forward test failed")
         raise HTTPException(status_code=400, detail=str(exc)) from exc

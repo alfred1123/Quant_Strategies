@@ -342,52 +342,58 @@ This means the full history of every subscription is retained — each VID is a 
 
 | Method | Role |
 |--------|------|
-| `load_cached_api_payload(app_id, app_metric_id, tm_interval_id, internal_cusip)` | Read path. Calls `SP_GET_API_REQUEST`, checks if cached range ≥ 10 years, returns `pd.DataFrame` from JSONB or `None`. |
-| `persist_api_request_payload(app_id, app_metric_id, tm_interval_id, product_grp_id, range_start, range_end, payload_df, internal_cusip)` | Write path. Skips if cache already covers ≥ 10 yr. Otherwise generates UUID, serialises DataFrame → JSON, calls `SP_INS_API_REQUEST`. |
+| `get_or_fetch_payload(*, app_id, app_metric_id, internal_cusip, range_start, range_end, fetcher, refresh=False, ...)` | Two-mode orchestrator. With `refresh=False` (default — read-only) returns the cached slice if the cached range fully covers the request, otherwise raises `BacktestCache.CacheMissError` (translated to HTTP 400 by the service layer). With `refresh=True` calls `fetcher(range_start, range_end)` for the **full** requested range and inserts a new version via `SP_INS_API_REQUEST` (re-using the cached `api_req_id` so the SP bumps `API_REQ_VID`). |
 
-Coverage threshold: `BacktestCache.REQUIRED_COVERAGE_YEARS = 10`. Both read and write paths use this to decide cache hit/miss.
+The mode is driven by a single UI checkbox **"Refresh dataset"** on the trading-product card. When unchecked, no provider calls and no DB writes occur — versions of `BT.API_REQUEST` only grow when the user explicitly opts in. This keeps `API_REQUEST_PAYLOAD` row count bounded and old partitions easy to drop.
 
-### Cache-first flow
+### Cache flow
 
 ```
-data source .get_historical_price(ticker, start, end)
+get_or_fetch_payload(..., refresh)
   │
-  ├─ 1. load_cached_api_payload(app_id, metric_id, interval_id, cusip)
-  │       ↓
-  │    SP_GET_API_REQUEST → rows
-  │       ↓
-  │    coverage ≥ 10 yr?  ── YES → deserialise JSONB → return DataFrame
-  │       │
-  │       NO (cache miss)
-  │       ↓
-  ├─ 2. Fetch from provider API (full range)
-  │       ↓
-  ├─ 3. persist_api_request_payload(app_id, metric_id, interval_id, …, payload_df)
-  │       ↓
-  │    SP_INS_API_REQUEST → close old VID, insert new VID + payload
-  │       ↓
-  └─ 4. Return DataFrame
+  ├─ 1. SP_GET_API_REQUEST → cached row (range_start_ts, range_end_ts, payload)
+  │
+  ├─ refresh=False (read-only)
+  │     ├─ covers? → return cached_df.loc[req_start:req_end]
+  │     └─ miss   → raise CacheMissError → HTTP 400 to client
+  │
+  └─ refresh=True (write — user opt-in)
+        ├─ fetcher(req_start, req_end)  # full range, no gap math
+        ├─ SP_INS_API_REQUEST(api_req_id=cached_id or new uuid,
+        │                     range=[req_start, req_end],
+        │                     payload=fetched)
+        │     └─ closes old VID, inserts new VID + payload
+        └─ return fetched.loc[req_start:req_end]
 ```
 
-### Impact of separate underlyings
+### Date sync across products + factors
 
-With the separate-underlying design, a single backtest may touch **N distinct tickers**. Each ticker resolves to a separate `(APP_ID, APP_METRIC_ID, TM_INTERVAL_ID, INTERNAL_CUSIP)` tuple, producing N independent cache lookups and potential API fetches. The flow per ticker is identical — the `data_dict` builder in `main.py` (or `api/services/backtest.py`) iterates `config.get_tickers()` and calls the data source once per unique ticker. The data source internally calls `load_cached_api_payload` before hitting the provider.
+A backtest with N products/factors aligns DataFrames via `reindex` on the main product's index. If a factor is missing dates the main product has, the result silently corrupts. `_build_data_dict` in `api/services/backtest.py` therefore enforces an **intersection check** after fetching: the common `[max(starts), min(ends)]` across all tickers must cover the requested `[start, end]`, else 400 with the limiting ticker named.
 
-```python
-# Example: multi-ticker data fetch with caching
-data_dict = {}
-for ticker in config.get_tickers():     # {"SPY", "^VIX"}
-    data_dict[ticker] = source.get(ticker, start, end)
-    #  └─ internally: load_cached_api_payload() → cache hit or fetch+persist
-```
+### Future work — minimise provider traffic without payload duplication
 
-### FastAPI integration (Phase 7+)
+The current design fetches the full requested range whenever `refresh=True`. For non-price metrics (where the JSONB `API_REQUEST_PAYLOAD` is the only home — see "Future work" in the database doc for moving price into a normalised `BT.PRICE_BAR` table), this is the right trade-off today: one user-driven version per refresh, no churn from incidental range nudges.
 
-The FastAPI backend creates `BacktestCache` at startup (`api/main.py` lifespan). The backtest service will call `load_cached_api_payload` / `persist_api_request_payload` on behalf of API requests. Currently no `api/` code calls these methods — wiring is a Phase 7+ task.
+Eventually we'll want **delta-row storage** for those metrics — instead of one current row per `(app, metric, interval, cusip)` holding the whole payload, allow multiple current rows each covering a disjoint date range. The read path becomes `union all current rows for the key`, and `refresh=True` only fetches the missing prefix/suffix and inserts it as a new delta row. This gives "minimal API call" without re-introducing the payload duplication that the current single-row design avoids.
+
+Not in scope for this PR — flagged here so the next data-layer change can target it.
+
+### Future work — scheduled purge of closed versions
+
+Soft-versioning means `BT.API_REQUEST` and `BT.API_REQUEST_PAYLOAD` accumulate closed rows (`TRANSACT_TO_TS < '9999-12-31'`) every time a user ticks *Refresh dataset*. The current schema has **no scheduled purge** — closed rows live until the partition is manually dropped. Two pieces of work are needed before automating this:
+
+1. **Repartitioning by `TRANSACT_TO_TS`** (or a dedicated archive flag column) instead of `CREATED_AT`. The current `pg_partman` yearly partitions on `CREATED_AT` cleanly drop *all* versions written in a given year — both still-current and closed — which is wrong: we want to keep current rows regardless of age. Splitting current vs. closed into separate partition trees (or moving closed rows to an archive table on close) is required first.
+2. **Retention policy + scheduler.** Decide how long closed versions are kept (e.g. 90 days for audit replay), then drive purges via `pg_cron` or an external scheduled job calling a new `BT.SP_PURGE_CLOSED_API_REQUESTS(retention_days)` procedure that does whole-partition `DROP` rather than per-row `DELETE`.
+
+This is a meaningful chunk of work — partition migrations on a populated table need a careful online plan (`pg_partman` partition-add + data-copy + cutover). Tracking separately; the *Refresh dataset* checkbox above intentionally minimises closed-row creation in the meantime so the eventual migration has less to chew through.
+
+### FastAPI integration
+
+The FastAPI backend creates `BacktestCache` at startup (`api/main.py` lifespan). `_fetch_df` in `api/services/backtest.py` is the sole caller — it always routes through `get_or_fetch_payload` when `bt_cache` is wired, falling back to a direct provider call only when the DB is unavailable (e.g. unit tests).
 
 ### Partition maintenance
 
-`API_REQUEST_PAYLOAD` is partitioned by `CREATED_AT` (yearly, via `pg_partman`). Purge path = `DROP TABLE <partition>`. No TTL policy yet — partitions grow until manually dropped.
+`API_REQUEST_PAYLOAD` is partitioned by `CREATED_AT` (yearly, via `pg_partman`). Purge path = `DROP TABLE <partition>`. No TTL policy yet — partitions grow until manually dropped. See the "Scheduled purge of closed versions" future-work section above for why automated dropping is non-trivial under the current partition key.
 
 ## Data Flow (after)
 

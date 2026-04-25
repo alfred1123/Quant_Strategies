@@ -320,6 +320,16 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
         <FormControlLabel
           control={
             <Checkbox
+              size="small" checked={config.refreshDataset}
+              onChange={e => set({ refreshDataset: e.target.checked })}
+            />
+          }
+          label={<Typography variant="body2">Refresh dataset</Typography>}
+          title="When checked, refetch all product+factor data from the provider and store a new version. When unchecked, serve from cache only."
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
               size="small" checked={config.walkForward}
               onChange={e => set({ walkForward: e.target.checked })}
             />

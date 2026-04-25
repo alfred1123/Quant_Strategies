@@ -43,6 +43,10 @@ class OptimizeRequest(BaseModel):
     trading_period: int
     fee_bps: float = 5.0
     data_source: str = "yahoo"  # REFDATA.APP.NAME
+    # Cache control — when True, refetch every product+factor from the
+    # provider and insert a new BT.API_REQUEST version. When False
+    # (default), serve from cache only and 400 on miss.
+    refresh_dataset: bool = False
     # Single-factor
     indicator: str | None = None
     strategy: str | None = None
@@ -64,6 +68,8 @@ class PerformanceRequest(BaseModel):
     trading_period: int
     fee_bps: float = 5.0
     data_source: str = "yahoo"  # REFDATA.APP.NAME
+    # See OptimizeRequest.refresh_dataset.
+    refresh_dataset: bool = False
     # Single-factor
     indicator: str | None = None
     strategy: str | None = None

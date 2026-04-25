@@ -8,7 +8,7 @@ CREATE OR REPLACE PROCEDURE BT.SP_INS_API_REQUEST(
     IN  IN_RANGE_END_TS      TIMESTAMPTZ,
     IN  IN_PAYLOAD           JSONB,
     IN  IN_USER_ID           TEXT,
-    IN  IN_INTERNAL_CUSIP    TEXT DEFAULT NULL,
+    IN  IN_INTERNAL_CUSIP    TEXT,
     OUT OUT_SQLSTATE         TEXT,
     OUT OUT_SQLMSG           TEXT,
     OUT OUT_SQLERRMC         TEXT
@@ -80,12 +80,16 @@ BEGIN
     INSERT INTO BT.API_REQUEST_PAYLOAD (
         API_REQ_ID,
         API_REQ_VID,
+        RANGE_START_TS,
+        RANGE_END_TS,
         PAYLOAD,
         USER_ID,
         CREATED_AT
     ) VALUES (
         IN_API_REQ_ID,
         V_VID,
+        IN_RANGE_START_TS,
+        IN_RANGE_END_TS,
         IN_PAYLOAD,
         IN_USER_ID,
         NOW()

@@ -1,11 +1,16 @@
-// UI form state
+// ─────────────────────────────────────────────────────────────────────────
+// Form state types
+// ─────────────────────────────────────────────────────────────────────────
+
 export interface RangeParam {
   min: number;
   max: number;
   step: number;
 }
 
+/** Cross-product factor (used in mode='multi'). */
 export interface FactorConfig {
+  // ── factor-only ──
   indicator: string;
   strategy: string;
   data_column: string;
@@ -16,61 +21,96 @@ export interface FactorConfig {
   data_source?: string;    // per-factor data source override
 }
 
+/** Top-level backtest form. */
 export interface BacktestConfig {
+  // ── trading product (product-only) ──
   symbol: string;       // internal_cusip from product dropdown
   vendorSymbol: string; // direct vendor symbol override (e.g. BTC-USD)
   dataSource: string;
+  assetType: string;
+
+  // ── shared controls (apply to product + every factor) ──
   start: string;
   end: string;
-  assetType: string;
   tradingPeriod: number;
   feeBps: number;
+  /** When true, refetch all product+factor data from the provider and
+   *  insert a new BT.API_REQUEST version. When false (default), serve
+   *  from cache only — backend returns 400 if the cache misses. */
+  refreshDataset: boolean;
+
+  // ── single-factor mode ──
   mode: 'single' | 'multi';
-  // single-factor
   indicator: string;
   strategy: string;
   windowRange: RangeParam;
   signalRange: RangeParam;
-  // multi-factor
+
+  // ── multi-factor mode ──
   conjunction: string;
   factors: FactorConfig[];
-  // walk-forward
+
+  // ── walk-forward (analysis option) ──
   walkForward: boolean;
   splitRatio: number;
 }
 
-// API types (snake_case matches backend Pydantic models)
+// ─────────────────────────────────────────────────────────────────────────
+// API request types (snake_case to match backend Pydantic models)
+// ─────────────────────────────────────────────────────────────────────────
+
 export interface OptimizeRequest {
+  // ── trading product ──
   symbol: string;
+  data_source?: string;
+
+  // ── shared (product + factors) ──
   start: string;
   end: string;
-  mode: 'single' | 'multi';
   trading_period: number;
   fee_bps: number;
-  data_source?: string;
+  refresh_dataset?: boolean;
+
+  // ── strategy/mode ──
+  mode: 'single' | 'multi';
+
+  // ── single-factor ──
   indicator?: string;
   strategy?: string;
   window_range?: RangeParam;
   signal_range?: RangeParam;
+
+  // ── multi-factor ──
   conjunction?: string;
   factors?: FactorConfig[];
-  // Walk-forward (run inline with optimization when true)
+
+  // ── walk-forward (run inline when true) ──
   walk_forward?: boolean;
   split_ratio?: number;
 }
 
 export interface PerformanceRequest {
+  // ── trading product ──
   symbol: string;
+  data_source?: string;
+
+  // ── shared ──
   start: string;
   end: string;
-  mode: 'single' | 'multi';
   trading_period: number;
   fee_bps: number;
-  data_source?: string;
+  refresh_dataset?: boolean;
+
+  // ── strategy/mode ──
+  mode: 'single' | 'multi';
+
+  // ── single-factor ──
   indicator?: string;
   strategy?: string;
   window?: number;
   signal?: number;
+
+  // ── multi-factor ──
   conjunction?: string;
   factors?: FactorConfig[];
   windows?: number[];

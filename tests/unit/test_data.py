@@ -629,3 +629,153 @@ class TestInstrumentCache:
         assert len(c.get_products()) == 2
         assert len(c.get_xrefs()) == 3
         assert mock_call_get.call_count == 2
+
+
+class TestBacktestCacheGetOrFetch:
+    """Two-mode cache orchestrator: refresh=False (read-only) vs refresh=True (fetch+insert)."""
+
+    @staticmethod
+    def _make_cache():
+        from data import BacktestCache
+        c = BacktestCache.__new__(BacktestCache)
+        c.user_id = "tester"
+        c.refdata = MagicMock()
+        return c
+
+    @staticmethod
+    def _df(dates, prices):
+        idx = pd.to_datetime(dates)
+        return pd.DataFrame({"price": prices}, index=pd.DatetimeIndex(idx, name="datetime"))
+
+    @classmethod
+    def _cached_row(cls, start, end, prices=None):
+        dates = pd.date_range(start, end)
+        if prices is None:
+            prices = list(range(len(dates)))
+        df = cls._df(dates, prices)
+        return {
+            "api_req_id": "11111111-1111-1111-1111-111111111111",
+            "range_start_ts": pd.Timestamp(start, tz="UTC"),
+            "range_end_ts": pd.Timestamp(end, tz="UTC"),
+            "payload": df.reset_index().assign(
+                datetime=lambda d: d["datetime"].dt.strftime("%Y-%m-%d")
+            ).to_dict(orient="records"),
+        }
+
+    # ── refresh=False: read-only ───────────────────────────────────────
+
+    def test_readonly_cache_covers_request(self):
+        c = self._make_cache()
+        c._get_api_request = MagicMock(return_value=[self._cached_row("2024-01-01", "2024-01-10")])
+        c._insert_api_request = MagicMock()
+        fetcher = MagicMock()
+
+        out = c.get_or_fetch_payload(
+            app_id=1, app_metric_id=2, internal_cusip="X",
+            range_start="2024-01-03", range_end="2024-01-07",
+            fetcher=fetcher, refresh=False,
+        )
+
+        fetcher.assert_not_called()
+        c._insert_api_request.assert_not_called()
+        assert len(out) == 5
+
+    def test_readonly_cache_miss_raises(self):
+        from data import BacktestCache
+        c = self._make_cache()
+        c._get_api_request = MagicMock(return_value=[])
+        c._insert_api_request = MagicMock()
+        fetcher = MagicMock()
+
+        with pytest.raises(BacktestCache.CacheMissError) as exc_info:
+            c.get_or_fetch_payload(
+                app_id=1, app_metric_id=2, internal_cusip="X",
+                range_start="2024-01-01", range_end="2024-01-10",
+                fetcher=fetcher, refresh=False,
+            )
+        fetcher.assert_not_called()
+        c._insert_api_request.assert_not_called()
+        assert "Refresh dataset" in str(exc_info.value)
+
+    def test_readonly_partial_coverage_raises(self):
+        from data import BacktestCache
+        c = self._make_cache()
+        c._get_api_request = MagicMock(return_value=[self._cached_row("2024-01-05", "2024-01-08")])
+        c._insert_api_request = MagicMock()
+        fetcher = MagicMock()
+
+        with pytest.raises(BacktestCache.CacheMissError):
+            c.get_or_fetch_payload(
+                app_id=1, app_metric_id=2, internal_cusip="X",
+                range_start="2024-01-01", range_end="2024-01-10",
+                fetcher=fetcher, refresh=False,
+            )
+        fetcher.assert_not_called()
+        c._insert_api_request.assert_not_called()
+
+    # ── refresh=True: full fetch + insert ──────────────────────────────
+
+    def test_refresh_full_fetch_when_cache_empty(self):
+        c = self._make_cache()
+        c._get_api_request = MagicMock(return_value=[])
+        c._insert_api_request = MagicMock()
+        fetched = self._df(pd.date_range("2024-01-01", "2024-01-05"), [10, 11, 12, 13, 14])
+        fetcher = MagicMock(return_value=fetched)
+
+        out = c.get_or_fetch_payload(
+            app_id=1, app_metric_id=2, internal_cusip="X",
+            range_start="2024-01-01", range_end="2024-01-05",
+            fetcher=fetcher, refresh=True,
+        )
+
+        fetcher.assert_called_once_with("2024-01-01", "2024-01-05")
+        c._insert_api_request.assert_called_once()
+        assert len(out) == 5
+
+    def test_refresh_reuses_cached_api_req_id(self):
+        c = self._make_cache()
+        c._get_api_request = MagicMock(return_value=[self._cached_row("2024-01-01", "2024-01-05")])
+        c._insert_api_request = MagicMock()
+        fetched = self._df(pd.date_range("2024-01-01", "2024-01-10"), list(range(10)))
+        fetcher = MagicMock(return_value=fetched)
+
+        c.get_or_fetch_payload(
+            app_id=1, app_metric_id=2, internal_cusip="X",
+            range_start="2024-01-01", range_end="2024-01-10",
+            fetcher=fetcher, refresh=True,
+        )
+
+        # SP closes old VID and bumps via the same UUID
+        assert c._insert_api_request.call_args.kwargs["api_req_id"] == "11111111-1111-1111-1111-111111111111"
+
+    def test_refresh_does_not_compute_gap_ranges(self):
+        """refresh=True always asks fetcher for the full requested range — no prefix/suffix logic."""
+        c = self._make_cache()
+        c._get_api_request = MagicMock(return_value=[self._cached_row("2024-01-05", "2024-01-08")])
+        c._insert_api_request = MagicMock()
+        fetched = self._df(pd.date_range("2024-01-01", "2024-01-10"), list(range(10)))
+        fetcher = MagicMock(return_value=fetched)
+
+        c.get_or_fetch_payload(
+            app_id=1, app_metric_id=2, internal_cusip="X",
+            range_start="2024-01-01", range_end="2024-01-10",
+            fetcher=fetcher, refresh=True,
+        )
+
+        fetcher.assert_called_once_with("2024-01-01", "2024-01-10")
+        assert c._insert_api_request.call_count == 1
+
+    def test_refresh_empty_provider_no_insert(self):
+        c = self._make_cache()
+        c._get_api_request = MagicMock(return_value=[])
+        c._insert_api_request = MagicMock()
+        fetcher = MagicMock(return_value=pd.DataFrame())
+
+        out = c.get_or_fetch_payload(
+            app_id=1, app_metric_id=2, internal_cusip="X",
+            range_start="2024-01-01", range_end="2024-01-05",
+            fetcher=fetcher, refresh=True,
+        )
+
+        c._insert_api_request.assert_not_called()
+        assert out.empty

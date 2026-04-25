@@ -17,6 +17,7 @@ import logging
 import time
 import uuid
 from functools import lru_cache
+from typing import Callable
 
 import futu
 import pandas as pd
@@ -96,6 +97,17 @@ class RefDataCache(DbGateway):
         for r in self.get("app"):
             if r["name"] == name:
                 return r["app_id"]
+        return None
+
+    def resolve_app_metric_id(self, app_id: int, metric_nm: str = "price") -> int | None:
+        """Resolve (APP_ID, METRIC_NM) to APP_METRIC_ID."""
+        try:
+            rows = self.get("app_metric")
+        except ValueError:
+            return None
+        for r in rows:
+            if r["app_id"] == app_id and r["metric_nm"] == metric_nm:
+                return r["app_metric_id"]
         return None
 
     def refresh(self) -> None:
@@ -189,7 +201,9 @@ class BacktestCache(DbGateway):
     Uses ``RefDataCache`` for denormalized ID lookups (APP_ID, etc.).
     """
 
-    REQUIRED_COVERAGE_YEARS = 10
+    # Hardcoded default — daily bars. All callers omit tm_interval_id; this
+    # constant is the single source of truth until a multi-interval UI lands.
+    DEFAULT_TM_INTERVAL_ID = 1
 
     def __init__(self, conninfo: str, refdata: RefDataCache, user_id: str = "alfcheun") -> None:
         super().__init__(conninfo, user_id)
@@ -197,15 +211,37 @@ class BacktestCache(DbGateway):
 
     # ── helpers ─────────────────────────────────────────────────────────
 
-    def _coverage_years(self, rows: list[dict]) -> float:
-        """Return cached data range in years, or 0.0 if unknown."""
-        if not rows:
-            return 0.0
-        start = rows[0].get("range_start_ts")
-        end = rows[0].get("range_end_ts")
-        if not start or not end:
-            return 0.0
-        return (end - start).days / 365.25
+    @staticmethod
+    def _to_utc(ts) -> pd.Timestamp | None:
+        """Coerce a string/Timestamp/None to a UTC pd.Timestamp."""
+        if ts is None or ts == "":
+            return None
+        out = pd.Timestamp(ts)
+        return out.tz_convert("UTC") if out.tzinfo else out.tz_localize("UTC")
+
+    @staticmethod
+    def _payload_to_df(payload) -> pd.DataFrame:
+        """Convert JSONB payload (list of records) to a DataFrame indexed by datetime (UTC)."""
+        if not payload:
+            return pd.DataFrame()
+        df = pd.DataFrame(payload)
+        if "datetime" in df.columns:
+            df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
+            df = df.set_index("datetime").sort_index()
+        return df
+
+    @staticmethod
+    def _to_utc_index(df: pd.DataFrame) -> pd.DataFrame:
+        """Ensure DataFrame's DatetimeIndex is tz-aware UTC."""
+        if df.empty or not isinstance(df.index, pd.DatetimeIndex):
+            return df
+        if df.index.tz is None:
+            df = df.copy()
+            df.index = df.index.tz_localize("UTC")
+        else:
+            df = df.copy()
+            df.index = df.index.tz_convert("UTC")
+        return df
 
     # ── proc wrappers ──────────────────────────────────────────────────
 
@@ -213,78 +249,152 @@ class BacktestCache(DbGateway):
         return self._call_get("CALL BT.SP_GET_API_REQUEST(%s, %s, %s, %s, NULL, NULL, NULL, NULL)", (app_id, app_metric_id, tm_interval_id, internal_cusip))
 
     def _insert_api_request(self, api_req_id, app_id, app_metric_id, tm_interval_id, product_grp_id, start_ts, end_ts, payload_json, internal_cusip):
-        self._call_write("CALL BT.SP_INS_API_REQUEST(%s::uuid, %s, %s, %s, %s, %s::timestamptz, %s::timestamptz, %s::jsonb, %s, %s, NULL, NULL, NULL)", (api_req_id, app_id, app_metric_id, tm_interval_id, product_grp_id, start_ts, end_ts, payload_json, self.user_id, internal_cusip))
+        # Deployed BT.SP_INS_API_REQUEST signature:
+        #   (uuid, integer, integer, integer, integer, timestamptz, timestamptz, jsonb, text, text)
+        self._call_write(
+            "CALL BT.SP_INS_API_REQUEST("
+            "%s::uuid, %s::integer, %s::integer, %s::integer, %s::integer, "
+            "%s::timestamptz, %s::timestamptz, %s::jsonb, %s::text, %s::text, "
+            "NULL::text, NULL::text, NULL::text)",
+            (api_req_id, app_id, app_metric_id, tm_interval_id, product_grp_id,
+             start_ts, end_ts, payload_json, self.user_id, internal_cusip),
+        )
 
     # ── public API ───────────────────────────────────────────────────────
 
-    def load_cached_api_payload(
+    class CacheMissError(RuntimeError):
+        """Raised when ``refresh=False`` but the cache cannot satisfy the request."""
+
+        def __init__(self, internal_cusip: str | None, requested: tuple[str, str], cached: tuple[pd.Timestamp, pd.Timestamp] | None):
+            self.internal_cusip = internal_cusip
+            self.requested = requested
+            self.cached = cached
+            if cached is None:
+                msg = (f"No cached data for {internal_cusip!r} covering "
+                       f"[{requested[0]}, {requested[1]}]. "
+                       f"Tick 'Refresh dataset' to fetch from the provider.")
+            else:
+                msg = (f"Cached range for {internal_cusip!r} is "
+                       f"[{cached[0].date()}, {cached[1].date()}] which does not cover "
+                       f"requested [{requested[0]}, {requested[1]}]. "
+                       f"Tick 'Refresh dataset' to fetch from the provider.")
+            super().__init__(msg)
+
+    def get_or_fetch_payload(
         self,
-        app_id: int | None = None,
-        app_metric_id: int | None = None,
-        tm_interval_id: int | None = None,
-        internal_cusip: str | None = None,
-    ) -> pd.DataFrame | None:
-        """Load cached payload via SP_GET_API_REQUEST.
-
-        Returns a DataFrame built from the JSONB ``payload`` column, or
-        ``None`` when no matching row exists or the cached range is less
-        than ``REQUIRED_COVERAGE_YEARS``.
-        """
-        try:
-            rows = self._get_api_request(app_id, app_metric_id, tm_interval_id, internal_cusip)
-        except RuntimeError:
-            return None
-
-        if not rows:
-            return None
-
-        coverage = self._coverage_years(rows)
-        if coverage < self.REQUIRED_COVERAGE_YEARS:
-            logger.info("Cached range %.1f yr < %d yr required — cache miss", coverage, self.REQUIRED_COVERAGE_YEARS)
-            return None
-
-        payload = rows[0].get("payload")
-        if not payload:
-            return None
-        return pd.DataFrame(payload)
-
-    def persist_api_request_payload(
-        self,
-        app_id: int | None = None,
-        app_metric_id: int | None = None,
-        tm_interval_id: int | None = None,
+        *,
+        app_id: int,
+        app_metric_id: int,
+        internal_cusip: str | None,
+        range_start: str,
+        range_end: str,
+        fetcher: Callable[[str, str], pd.DataFrame],
+        refresh: bool = False,
         product_grp_id: int | None = None,
-        range_start: str = "",
-        range_end: str = "",
-        payload_df: pd.DataFrame | None = None,
-        internal_cusip: str | None = None,
-    ) -> None:
-        """Insert a new API request version via SP_INS_API_REQUEST.
+        tm_interval_id: int | None = None,
+    ) -> pd.DataFrame:
+        """Return data covering ``[range_start, range_end]``.
 
-        Skips the insert when the existing cache already covers
-        ``REQUIRED_COVERAGE_YEARS``.  Otherwise generates a new UUID —
-        the unique index on (APP_ID, APP_METRIC_ID, TM_INTERVAL_ID,
-        INTERNAL_CUSIP) with TRANSACT_TO_TS='9999-12-31' guarantees one
-        current row, and SP_INS closes the old row automatically.
+        Two modes, controlled by ``refresh``:
+
+        * ``refresh=False`` (default — read-only):
+          Read the current cached row via ``SP_GET_API_REQUEST``. If it
+          fully covers the requested range, return the slice. Otherwise
+          raise :class:`BacktestCache.CacheMissError`. The provider is
+          **never** called and **no** new version is inserted.
+
+        * ``refresh=True`` (write — opt-in via UI checkbox):
+          Call ``fetcher(range_start, range_end)`` for the **full**
+          requested range and insert a new version via
+          ``SP_INS_API_REQUEST``. The cached ``api_req_id`` is reused
+          (so the SP closes the old ``API_REQ_VID`` and bumps to a new
+          one); a new UUID is allocated only when no prior version
+          exists. No prefix/suffix gap math — the user explicitly asked
+          for a refresh, so we replace the dataset wholesale.
+
+        Note:
+            We deliberately do **not** create a new version on
+            incidental range extensions. Versions are intent-driven so
+            ``API_REQUEST_PAYLOAD`` row count stays bounded and old
+            partitions can be dropped cleanly. See
+            ``docs/design/separate-underlying.md`` § "Future work" for
+            the planned delta-row layout that will minimise provider
+            traffic for non-price metrics without re-introducing
+            payload duplication.
         """
-        # Guard — skip if cache already has sufficient range
+        if tm_interval_id is None:
+            tm_interval_id = self.DEFAULT_TM_INTERVAL_ID
+
+        req_start = self._to_utc(range_start)
+        req_end = self._to_utc(range_end)
+
+        # 1. Look up existing version
         try:
             existing = self._get_api_request(app_id, app_metric_id, tm_interval_id, internal_cusip)
         except RuntimeError:
             existing = []
-        coverage = self._coverage_years(existing)
-        if coverage >= self.REQUIRED_COVERAGE_YEARS:
-            logger.info("Cache already covers %.1f yr — skipping persist", coverage)
-            return
-        # TODO: append new data to existing payload to extend range (future)
-        api_req_id = str(uuid.uuid4())
-        payload_json = json.dumps(payload_df.to_dict(orient="records")) if payload_df is not None else None
-        start_ts = f"{range_start} 00:00:00+00"
-        end_ts = f"{range_end} 00:00:00+00"
+
+        cached_df = pd.DataFrame()
+        cached_start = cached_end = None
+        cached_id = None
+        if existing:
+            row = existing[0]
+            cached_id = row.get("api_req_id")
+            cached_start = self._to_utc(row.get("range_start_ts"))
+            cached_end = self._to_utc(row.get("range_end_ts"))
+            cached_df = self._payload_to_df(row.get("payload"))
+
+        covers = (
+            cached_start is not None
+            and cached_end is not None
+            and cached_start <= req_start
+            and cached_end >= req_end
+        )
+
+        # ── Mode 1: read-only ────────────────────────────────────────────
+        if not refresh:
+            if not covers:
+                cached_bounds = (cached_start, cached_end) if cached_start is not None else None
+                raise self.CacheMissError(internal_cusip, (range_start, range_end), cached_bounds)
+            logger.info(
+                "Cache hit (read-only): %s [%s, %s] covers [%s, %s]",
+                internal_cusip, cached_start.date(), cached_end.date(), range_start, range_end,
+            )
+            return cached_df.loc[req_start:req_end]
+
+        # ── Mode 2: refresh — fetch full range, insert new version ───────
+        logger.info(
+            "Refresh requested: fetching %s [%s, %s] from provider",
+            internal_cusip, range_start, range_end,
+        )
+        fetched = fetcher(range_start, range_end)
+        if fetched is None or fetched.empty:
+            logger.warning("Provider returned empty data for %s — no new version inserted", internal_cusip)
+            return pd.DataFrame()
+        fetched = self._to_utc_index(fetched)
+
+        api_req_id = str(cached_id) if cached_id is not None else str(uuid.uuid4())
+        payload_records = (
+            fetched.reset_index()
+            .assign(datetime=lambda d: d["datetime"].dt.strftime("%Y-%m-%d %H:%M:%S"))
+            .to_dict(orient="records")
+        )
         try:
-            self._insert_api_request(api_req_id, app_id, app_metric_id, tm_interval_id, product_grp_id, start_ts, end_ts, payload_json, internal_cusip)
+            self._insert_api_request(
+                api_req_id=api_req_id,
+                app_id=app_id,
+                app_metric_id=app_metric_id,
+                tm_interval_id=tm_interval_id,
+                product_grp_id=product_grp_id,
+                start_ts=req_start.strftime("%Y-%m-%d %H:%M:%S+00"),
+                end_ts=req_end.strftime("%Y-%m-%d %H:%M:%S+00"),
+                payload_json=json.dumps(payload_records),
+                internal_cusip=internal_cusip,
+            )
         except RuntimeError:
             pass  # already logged in _call_write
+
+        return fetched.loc[req_start:req_end]
 
 
 class FutuOpenD:
