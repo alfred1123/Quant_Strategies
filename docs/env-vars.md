@@ -15,6 +15,7 @@ cp .env.example .env
 | `QUANTDB_PORT` | Optional | PostgreSQL port (default: `5433`). |
 | `QUANTDB_USERNAME` | Optional | Database user for quantdb. |
 | `QUANTDB_PASSWORD` | Optional | Database password. |
+| `QUANTDB_CONNINFO` | Optional | Full libpq connection string. **Overrides** the four `QUANTDB_*` vars above. Must include `sslmode=require`. Use only when you need non-standard libpq options (e.g. `connect_timeout`, `application_name`). Leave unset for normal dev/prod — the four split vars are preferred. |
 
 !!! note
     **Yahoo Finance requires no API key** — it is the default and recommended data source for getting started.
