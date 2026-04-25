@@ -30,9 +30,9 @@ function FactorProductRow({
   const displayedFactorVendor = factor.vendor_symbol || resolvedFactorVendor;
 
   return (
-    <Stack direction="row" spacing={1} alignItems="center">
+    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
       <Autocomplete<ProductRow, false, false, true>
-        size="small" freeSolo sx={{ width: 260 }}
+        size="small" freeSolo sx={{ width: 300 }}
         slotProps={{ listbox: { sx: { maxHeight: 360, minWidth: 320 } } }}
         options={products}
         value={factorProduct}
@@ -62,7 +62,7 @@ function FactorProductRow({
           </li>
         )}
       />
-      <FormControl size="small" sx={{ minWidth: 130 }}>
+      <FormControl size="small" sx={{ width: 150 }}>
         <InputLabel>Data Source</InputLabel>
         <Select
           value={factor.data_source || ''}
@@ -75,15 +75,17 @@ function FactorProductRow({
         </Select>
       </FormControl>
       <Autocomplete<string, false, false, true>
-        size="small" freeSolo sx={{ width: 160 }}
+        size="small" freeSolo sx={{ width: 200 }}
         options={factorVendorOptions}
         value={displayedFactorVendor || null}
         inputValue={displayedFactorVendor}
         onInputChange={(_, val, reason) => {
-          if (reason === 'input') updateFactor(index, { vendor_symbol: val || undefined });
+          // Typing a vendor symbol clears the factor product (mirrors trading-row behavior).
+          if (reason === 'input') updateFactor(index, { vendor_symbol: val || undefined, symbol: undefined });
         }}
         onChange={(_, val) => {
-          updateFactor(index, { vendor_symbol: val || undefined });
+          if (!val) updateFactor(index, { vendor_symbol: undefined, symbol: undefined });
+          else updateFactor(index, { vendor_symbol: val, symbol: undefined });
         }}
         renderInput={(params) => <TextField {...params} label="Vendor Symbol" slotProps={{ inputLabel: { shrink: true } }} />}
       />
