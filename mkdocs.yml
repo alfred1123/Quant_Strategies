@@ -83,4 +83,5 @@ nav:
       - TypeScript Migration: design/ts-migration.md
       - Backtest Speed: design/backtest-speed.md
       - Alternative Data Sources: design/alt-data-sources.md
+      - Separate Underlying & Cache: design/separate-underlying.md
   - Decisions: decisions.md
