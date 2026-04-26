@@ -132,21 +132,19 @@ Key parameters to review in `params/prod.json`:
 ## Existing infrastructure
 
 The templates codify the current live setup. If deploying fresh,
-they produce an equivalent environment. For the **existing** resources
-(already running before these templates were created):
+they produce an equivalent environment. The following resources are
+managed by CloudFormation:
 
-| Resource | Live ID | Notes |
-|----------|---------|-------|
-| VPC | `vpc-06e76bd6f283ed4a4` | Default VPC (not managed by CFN) |
-| EC2 | `i-0b94cad1ba4f0f928` | `tradingServer`, t2.micro |
-| Aurora cluster | `quantdb-cluster` | Serverless v2, 0.5–2.0 ACU |
-| IAM role | `EC2-SSM-Role` | SSM access |
-| Key pair | `tradingServerKey` | SSH access |
-
-These are **not imported** into CloudFormation. The templates are the
-canonical definition for spinning up new environments or rebuilding
-after a disaster. To avoid conflicts, use a different `Project` prefix
-when deploying alongside existing resources (e.g. `PROJECT=quant-v2`).
+| Stack | Resource | Live ID | Notes |
+|-------|----------|---------|-------|
+| — | VPC | `vpc-06e76bd6f283ed4a4` | Default VPC (not managed by CFN) |
+| `quant-network` | EC2 SG | `sg-0c48c9010eaf84372` | Web + SSH |
+| `quant-network` | RDS SG | `sg-0278c603461bbf8fa` | Postgres from EC2 only |
+| `quant-database` | Aurora cluster | `quantdb-cluster` | Imported; Serverless v2, 0.5–2.0 ACU |
+| `quant-compute` | EC2 | `i-096f85bf84852cce3` | `quant-server`, t4g.small ARM |
+| `quant-compute` | IAM role | `quant-ec2-role` | SSM access |
+| `quant-compute` | EIP | `52.221.3.230` | Static public IP |
+| — | Key pair | `tradingServerKey` | SSH access (not managed by CFN) |
 
 ---
 

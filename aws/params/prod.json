@@ -9,7 +9,7 @@
   { "ParameterKey": "MaxACU",               "ParameterValue": "2.0" },
   { "ParameterKey": "MasterUsername",        "ParameterValue": "postgres" },
 
-  { "ParameterKey": "InstanceType",         "ParameterValue": "t2.micro" },
+  { "ParameterKey": "InstanceType",         "ParameterValue": "t4g.small" },
   { "ParameterKey": "KeyPairName",          "ParameterValue": "tradingServerKey" },
   { "ParameterKey": "SubnetId",             "ParameterValue": "subnet-065b627612dcd0b33" },
   { "ParameterKey": "AppEnv",               "ParameterValue": "prod" }

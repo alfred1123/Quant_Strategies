@@ -5,9 +5,7 @@
 
 set -uo pipefail
 
-# Old (tradingServer): i-0b94cad1ba4f0f928
-# New (quant-server, CFN-managed): i-061072460ffb1500f
-TARGET_INSTANCE="i-0b94cad1ba4f0f928"
+TARGET_INSTANCE="i-096f85bf84852cce3"
 RDS_HOST="quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com"
 REMOTE_PORT="5432"
 LOCAL_PORT="5433"
