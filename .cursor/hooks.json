@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": ".cursor/hooks/ssm-port-forward.sh",
+        "timeout": 10
+      }
+    ]
+  }
+}
