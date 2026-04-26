@@ -1,0 +1,25 @@
+# TLS overlay — add HTTPS via Let's Encrypt.
+#
+# Requires a domain name. Layer on top of base + prod:
+#   export DOMAIN=yourdomain.com
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.tls.yml up -d --build
+
+services:
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:?Set DOMAIN for TLS}
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/templates/nginx.conf.template:ro
+      - certbot-conf:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot:ro
+    command: >
+      /bin/sh -c "
+        envsubst '$$DOMAIN' < /etc/nginx/templates/nginx.conf.template > /etc/nginx/nginx.conf &&
+        nginx -g 'daemon off;'
+      "
+
+  certbot:
+    profiles: []

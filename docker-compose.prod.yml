@@ -1,8 +1,11 @@
-# Production override — TLS, SSM secrets, certbot.
+# Production override — API secrets via SSM, direct RDS access.
 #
-# Usage on EC2:
-#   export DOMAIN=yourdomain.com
+# Usage on EC2 (HTTP-only, no domain):
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# To add TLS later, layer docker-compose.tls.yml on top:
+#   export DOMAIN=yourdomain.com
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.tls.yml up -d --build
 
 services:
   api:
@@ -11,24 +14,3 @@ services:
       - USE_SSM=1
       - QUANTDB_HOST=quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com
       - QUANTDB_PORT=5432
-
-  nginx:
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      - DOMAIN=${DOMAIN:-localhost}
-    volumes:
-      - ./docker/nginx/nginx.conf:/etc/nginx/templates/nginx.conf.template:ro
-      - certbot-conf:/etc/letsencrypt:ro
-      - certbot-www:/var/www/certbot:ro
-    # envsubst replaces $DOMAIN in the template; NGINX_ENVSUBST_OUTPUT_DIR
-    # tells the nginx image to write the processed file as the main config.
-    command: >
-      /bin/sh -c "
-        envsubst '$$DOMAIN' < /etc/nginx/templates/nginx.conf.template > /etc/nginx/nginx.conf &&
-        nginx -g 'daemon off;'
-      "
-
-  certbot:
-    profiles: []
