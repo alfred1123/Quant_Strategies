@@ -60,8 +60,8 @@ jobs:
             --timeout-seconds 300 \
             --parameters commands='[
               "cd /opt/quant",
-              "sudo -u ec2-user git fetch origin main",
-              "sudo -u ec2-user git reset --hard origin/main",
+              "git -c safe.directory=/opt/quant fetch origin main",
+              "git -c safe.directory=/opt/quant reset --hard origin/main",
               "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --remove-orphans",
               "docker image prune -f"
             ]' \
