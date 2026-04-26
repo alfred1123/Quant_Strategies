@@ -17,6 +17,9 @@ echo "=== Verifying Docker ==="
 docker --version
 docker compose version
 
+echo "=== Configuring git ==="
+sudo git config --global --add safe.directory "$APP_DIR"
+
 echo "=== Cloning repo ==="
 if [ -d "$APP_DIR/.git" ]; then
   echo "  repo already exists, pulling latest..."

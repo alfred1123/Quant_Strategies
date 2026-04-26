@@ -9,6 +9,8 @@ services:
     environment:
       - APP_ENV=prod
       - USE_SSM=1
+      - QUANTDB_HOST=quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com
+      - QUANTDB_PORT=5432
 
   nginx:
     ports:

@@ -138,6 +138,7 @@ Resources:
           # ── App directory ─────────────────────────────────────────
           mkdir -p /opt/quant
           chown ec2-user:ec2-user /opt/quant
+          git config --global --add safe.directory /opt/quant
 
           echo "User-data complete" | tee /var/log/user-data-done.log
 

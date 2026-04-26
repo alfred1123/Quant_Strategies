@@ -9,7 +9,8 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -84,3 +85,16 @@ app.include_router(refdata.router, prefix="/api/v1", dependencies=[Depends(requi
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def readiness(request: Request):
+    """Liveness = /health.  Readiness = /health/ready (includes DB)."""
+    import psycopg
+    try:
+        with psycopg.connect(request.app.state.db_conninfo, connect_timeout=3) as conn:
+            conn.execute("SELECT 1")
+        return {"status": "ok", "db": "connected"}
+    except Exception as exc:
+        logger.warning("Readiness check failed: %s", exc)
+        return JSONResponse({"status": "degraded", "db": str(exc)}, status_code=503)
