@@ -310,7 +310,7 @@ export default function BacktestPage({ currentUser }: { currentUser: CurrentUser
 
             {/* Top 10 table */}
             <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-              <Typography variant="subtitle1" fontWeight={600} mb={1}>Top 10 Parameter Combinations</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }} mb={1}>Top 10 Parameter Combinations</Typography>
               <Top10Table
                 result={optimizeResult}
                 selectedIndex={selectedIndex}
@@ -324,7 +324,7 @@ export default function BacktestPage({ currentUser }: { currentUser: CurrentUser
               <Paper variant="outlined" sx={{ p: 3 }}>
                 {/* Analysis header */}
                 <Stack direction="row" alignItems="center" spacing={2} mb={2}>
-                  <Typography variant="subtitle1" fontWeight={600}>Analysis</Typography>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Analysis</Typography>
                   {viewingLabel && (
                     <Chip label={viewingLabel} size="small" variant="outlined" color="primary" />
                   )}
@@ -389,11 +389,11 @@ export default function BacktestPage({ currentUser }: { currentUser: CurrentUser
 
                             {/* IS vs OOS metrics comparison table */}
                             <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-                              <Typography variant="subtitle2" fontWeight={600} mb={1}>In-Sample vs Out-of-Sample</Typography>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>In-Sample vs Out-of-Sample</Typography>
                               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1 }}>
-                                <Typography variant="caption" fontWeight={600}>Metric</Typography>
-                                <Typography variant="caption" fontWeight={600}>In-Sample</Typography>
-                                <Typography variant="caption" fontWeight={600}>Out-of-Sample</Typography>
+                                <Typography variant="caption" sx={{ fontWeight: 600 }}>Metric</Typography>
+                                <Typography variant="caption" sx={{ fontWeight: 600 }}>In-Sample</Typography>
+                                <Typography variant="caption" sx={{ fontWeight: 600 }}>Out-of-Sample</Typography>
                                 {Object.keys(wfResult.is_metrics).map(key => (
                                   <Box key={key} sx={{ display: 'contents' }}>
                                     <Typography variant="body2">{key}</Typography>

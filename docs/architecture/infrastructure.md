@@ -186,6 +186,67 @@ prevents accidental deletion (disable it manually first if you really mean to).
 
 ---
 
+## CI/CD — GitHub Actions
+
+Push to `main` triggers an automated deploy pipeline (`.github/workflows/deploy.yml`):
+
+```
+push to main → run tests → SSM Run Command → EC2 pulls + rebuilds containers
+```
+
+### How it works
+
+1. **Test job** — runs `pytest tests/unit/` on GitHub's runner
+2. **Deploy job** — uses AWS credentials to send an SSM `RunShellScript` command to the EC2
+3. **On the EC2** — `git pull`, `docker compose up -d --build`, prune old images
+
+No SSH keys needed — deploy uses SSM Run Command (same IAM role the EC2 already has).
+
+### GitHub setup (one-time)
+
+**Secrets** (repo → Settings → Secrets and variables → Actions → Secrets):
+
+| Secret | Value | How to get it |
+|--------|-------|---------------|
+| `AWS_ACCESS_KEY_ID` | IAM user access key | Create a deploy IAM user with `ssm:SendCommand` + `ssm:GetCommandInvocation` |
+| `AWS_SECRET_ACCESS_KEY` | IAM user secret key | Same IAM user |
+
+**Variables** (repo → Settings → Secrets and variables → Actions → Variables):
+
+| Variable | Value |
+|----------|-------|
+| `EC2_INSTANCE_ID` | `i-096f85bf84852cce3` |
+
+**Environment**: Create a `production` environment (repo → Settings → Environments) for deploy approvals (optional).
+
+### Bootstrap the EC2 (one-time)
+
+Before the first deploy, run on the EC2:
+
+```bash
+# SSH or SSM session into the instance, then:
+bash /opt/quant/aws/scripts/bootstrap-ec2.sh
+```
+
+Or remotely via SSM:
+
+```bash
+aws ssm send-command \
+  --instance-ids i-096f85bf84852cce3 \
+  --document-name AWS-RunShellScript \
+  --parameters 'commands=["curl -fsSL https://raw.githubusercontent.com/alfred1123/Quant_Strategies/main/aws/scripts/bootstrap-ec2.sh | sudo -u ec2-user bash"]' \
+  --profile alfcheun --region ap-southeast-1
+```
+
+### Manual deploy
+
+```bash
+# Trigger from GitHub (no code push needed)
+gh workflow run deploy
+```
+
+---
+
 ## Future: ECS migration
 
 When the workload outgrows a single EC2 (e.g. independent queue worker

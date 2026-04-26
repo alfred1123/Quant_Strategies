@@ -123,12 +123,17 @@ Resources:
           systemctl enable --now docker
           usermod -aG docker ec2-user
 
-          # Docker Compose plugin (v2)
+          # Docker Compose plugin (v2) + Buildx
           mkdir -p /usr/local/lib/docker/cli-plugins
           ARCH=$(uname -m)
           curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-${!ARCH}" \
             -o /usr/local/lib/docker/cli-plugins/docker-compose
           chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+          BUILDX_VERSION="v0.21.2"
+          curl -fsSL "https://github.com/docker/buildx/releases/download/${!BUILDX_VERSION}/buildx-${!BUILDX_VERSION}.linux-${!ARCH}" \
+            -o /usr/local/lib/docker/cli-plugins/docker-buildx
+          chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
 
           # ── App directory ─────────────────────────────────────────
           mkdir -p /opt/quant

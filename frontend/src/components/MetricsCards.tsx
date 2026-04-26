@@ -29,7 +29,7 @@ function MetricCard({ title, metrics, highlight }: CardProps) {
         {Object.entries(metrics).map(([k, v]) => (
           <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
             <Typography variant="body2" color="text.secondary">{k}</Typography>
-            <Typography variant="body2" fontWeight={500}>{fmt(k, v)}</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>{fmt(k, v)}</Typography>
           </div>
         ))}
       </CardContent>
