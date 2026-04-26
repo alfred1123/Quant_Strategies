@@ -11,12 +11,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from api.config import load_config
 
 # load_config() initialises logging, loads .env or SSM, and returns the DB conninfo
 DB_CONNINFO = load_config()
 
+from api.auth.router import limiter as auth_limiter, router as auth_router  # noqa: E402
+from api.auth.service import AuthService  # noqa: E402
 from api.routers import backtest, inst, refdata  # noqa: E402
 from src.data import BacktestCache, InstrumentCache, RefDataCache  # noqa: E402
 
@@ -26,6 +30,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: load REFDATA cache + BacktestCache.  Shutdown: no-op."""
+    # Build the AuthService first so a missing JWT_SECRET fails the boot.
+    app.state.auth_service = AuthService()
+    app.state.db_conninfo = DB_CONNINFO
     cache = RefDataCache(DB_CONNINFO)
     try:
         cache.load_all()
@@ -49,6 +56,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# slowapi: per-route rate limits (e.g. /auth/login). The limiter instance is
+# shared with api.auth.router so its @limiter.limit decorators take effect.
+app.state.limiter = auth_limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173").split(","),
@@ -57,6 +69,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(backtest.router, prefix="/api/v1")
 app.include_router(inst.router, prefix="/api/v1")
 app.include_router(refdata.router, prefix="/api/v1")

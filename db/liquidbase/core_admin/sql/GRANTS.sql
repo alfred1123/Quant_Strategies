@@ -32,6 +32,7 @@ GRANT EXECUTE ON ALL ROUTINES IN SCHEMA TRADE   TO quant_app;
 -- CORE_ADMIN: app may execute ONLY the two auth-related procs.
 -- (Listed by name so admin SPs are NOT granted by an "ALL ROUTINES" sweep.)
 GRANT EXECUTE ON PROCEDURE CORE_ADMIN.SP_GET_APP_USER_BY_USERNAME(TEXT, OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT) TO quant_app;
+GRANT EXECUTE ON PROCEDURE CORE_ADMIN.SP_GET_APP_USER_BY_ID(UUID, OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT)       TO quant_app;
 GRANT EXECUTE ON PROCEDURE CORE_ADMIN.SP_UPD_APP_USER_LAST_LOGIN(UUID, OUT TEXT, OUT TEXT, OUT TEXT)             TO quant_app;
 
 -- ---------------------------------------------------------------------------

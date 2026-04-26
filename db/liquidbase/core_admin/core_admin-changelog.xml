@@ -38,6 +38,11 @@
         <rollback><sql>DROP PROCEDURE IF EXISTS CORE_ADMIN.SP_UPD_APP_USER_LAST_LOGIN;</sql></rollback>
     </changeSet>
 
+    <changeSet id="046-core-admin-proc-get-app-user-by-id" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_GET_APP_USER_BY_ID.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS CORE_ADMIN.SP_GET_APP_USER_BY_ID;</sql></rollback>
+    </changeSet>
+
     <changeSet id="042-core-admin-proc-ins-app-user" author="alfcheun" context="proc" runOnChange="true">
         <sqlFile path="procedures/SP_INS_APP_USER.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
         <rollback><sql>DROP PROCEDURE IF EXISTS CORE_ADMIN.SP_INS_APP_USER;</sql></rollback>

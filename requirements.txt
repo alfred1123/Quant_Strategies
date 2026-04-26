@@ -14,6 +14,9 @@ fastapi
 uvicorn[standard]
 psycopg[binary]
 httpx
+argon2-cffi
+pyjwt[crypto]
+slowapi
 pytest
 boto3
 mkdocs-material

@@ -1,0 +1,54 @@
+CREATE OR REPLACE PROCEDURE CORE_ADMIN.SP_GET_APP_USER_BY_ID(
+    IN  IN_APP_USER_ID   UUID,
+    OUT OUT_RESULT       REFCURSOR,
+    OUT OUT_SQLSTATE     TEXT,
+    OUT OUT_SQLMSG       TEXT,
+    OUT OUT_SQLERRMC     TEXT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    V_START_TS   TIMESTAMPTZ := CURRENT_TIMESTAMP;
+    V_OTHER_TEXT TEXT;
+    V_LOG_STATE  TEXT;
+    V_LOG_MSG    TEXT;
+BEGIN
+    OUT_SQLSTATE := '00000';
+    OUT_SQLMSG   := '0';
+    OUT_SQLERRMC := 'Stored Procedure completed successfully';
+
+    V_OTHER_TEXT := 'IN_APP_USER_ID=' || COALESCE(IN_APP_USER_ID::TEXT, '');
+
+    OUT_SQLMSG := '10';
+    OUT_RESULT := 'sp_get_app_user_by_id_cursor';
+
+    OPEN OUT_RESULT FOR
+        SELECT
+            APP_USER_ID,
+            USERNAME,
+            PASSWORD_HASH,
+            IS_ACTIVE_IND,
+            SESSION_GEN
+          FROM CORE_ADMIN.APP_USER
+         WHERE APP_USER_ID = IN_APP_USER_ID;
+
+    OUT_SQLMSG := '20';
+    CALL CORE_ADMIN.CORE_INS_LOG_PROC('CORE_ADMIN', 'SP_GET_APP_USER_BY_ID', V_START_TS, NULL, V_OTHER_TEXT, NULL, V_LOG_STATE, V_LOG_MSG);
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DECLARE
+            V_DETAIL  TEXT;
+            V_CONTEXT TEXT;
+        BEGIN
+            GET STACKED DIAGNOSTICS
+                OUT_SQLSTATE = RETURNED_SQLSTATE,
+                OUT_SQLERRMC = MESSAGE_TEXT,
+                V_DETAIL     = PG_EXCEPTION_DETAIL,
+                V_CONTEXT    = PG_EXCEPTION_CONTEXT;
+
+            RAISE WARNING '[SP_GET_APP_USER_BY_ID] % (SQLSTATE: %). Detail: %. Context: %. Params: %',
+                OUT_SQLERRMC, OUT_SQLSTATE, V_DETAIL, V_CONTEXT, V_OTHER_TEXT;
+        END;
+END;
+$$;

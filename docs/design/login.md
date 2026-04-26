@@ -317,7 +317,7 @@ Username is **not** in the token. The `require_user` dependency resolves `app_us
 ```python
 class LoginRequest(BaseModel):
     username: constr(min_length=1, max_length=64, strip_whitespace=True, to_lower=True)
-    password: constr(min_length=8, max_length=128)
+    password: constr(min_length=12, max_length=128)
 ```
 
 Hard upper bounds prevent a 100 MB POST from triggering Argon2 on giant input — cheap DoS guard.

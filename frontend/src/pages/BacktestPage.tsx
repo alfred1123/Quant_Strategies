@@ -9,7 +9,9 @@ import Top10Table from '../components/Top10Table';
 import MetricsCards from '../components/MetricsCards';
 import HeatmapChart from '../components/HeatmapChart';
 import EquityCurveChart from '../components/EquityCurveChart';
+import UserMenu from '../components/UserMenu';
 import { runOptimizeStream, runPerformance } from '../api/backtest';
+import type { CurrentUser } from '../api/auth';
 import type {
   BacktestConfig, OptimizeResponse, PerformanceResponse, Top10Row,
   OptimizeRequest, PerformanceRequest, WalkForwardResponse,
@@ -122,7 +124,7 @@ function formatMetric(v: number | null | undefined): string {
   return v.toFixed(4);
 }
 
-export default function BacktestPage() {
+export default function BacktestPage({ currentUser }: { currentUser: CurrentUser }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [config, setConfig] = useState<BacktestConfig>(DEFAULT_CONFIG);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -237,6 +239,7 @@ export default function BacktestPage() {
           <Button variant="outlined" onClick={() => setDrawerOpen(true)}>
             ⚙ Configure
           </Button>
+          <UserMenu user={currentUser} />
         </Toolbar>
       </AppBar>
 
