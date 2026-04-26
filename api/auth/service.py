@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import time
 from threading import Lock
 from uuid import UUID
@@ -19,6 +20,40 @@ from api.auth.models import CurrentUser
 from api.auth.repo import AuthRepo
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_jwt_secret(explicit: str | None) -> str:
+    """Return the JWT signing secret, auto-generating in dev mode if absent.
+
+    Production (``APP_ENV=prod``) always requires an explicit secret —
+    either passed as ``explicit`` or via the ``JWT_SECRET`` env var.
+
+    In dev mode (default), a missing secret is auto-generated so that new
+    developers can start the API without manual setup.  The generated
+    secret is written back to ``JWT_SECRET`` in the process environment
+    so all components in the same process see the same value; however it
+    does **not** persist across restarts — each boot gets a fresh secret
+    and all prior JWTs become invalid (acceptable for local dev).
+    """
+    secret = explicit if explicit is not None else os.getenv("JWT_SECRET")
+    if secret:
+        return secret
+
+    is_prod = os.getenv("APP_ENV", "dev").lower() == "prod"
+    if is_prod:
+        raise RuntimeError(
+            "JWT_SECRET is not set. Generate one with `openssl rand -base64 32` "
+            "and add it to .env (or SSM /quant/<env>/JWT_SECRET)."
+        )
+
+    secret = secrets.token_urlsafe(32)
+    os.environ["JWT_SECRET"] = secret
+    logger.warning(
+        "JWT_SECRET was not set — auto-generated a random dev secret. "
+        "Sessions will not survive restarts. "
+        "Run `openssl rand -base64 32` and add JWT_SECRET to .env to persist."
+    )
+    return secret
 
 
 class AuthService:
@@ -40,13 +75,7 @@ class AuthService:
         *,
         hasher: PasswordHasher | None = None,
     ) -> None:
-        secret = jwt_secret if jwt_secret is not None else os.getenv("JWT_SECRET")
-        if not secret:
-            raise RuntimeError(
-                "JWT_SECRET is not set. Generate one with `openssl rand -base64 32` "
-                "and add it to .env (or SSM /quant/<env>/JWT_SECRET)."
-            )
-        self._jwt_secret: str = secret
+        self._jwt_secret: str = _resolve_jwt_secret(jwt_secret)
         self._hasher: PasswordHasher = hasher or PasswordHasher(
             memory_cost=65536, time_cost=3, parallelism=4
         )

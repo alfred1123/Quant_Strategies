@@ -308,7 +308,7 @@ The default value `user_id="alfcheun"` in [src/db.py](src/db.py) and [src/data.p
 }
 ```
 
-Signed with HS256, key from `JWT_SECRET` env var (added to SSM `/quant/prod/JWT_SECRET`, generated with `openssl rand -base64 32`). Rotation = generate a new key, restart — all tokens invalidate.
+Signed with HS256, key from `JWT_SECRET` env var (added to SSM `/quant/prod/JWT_SECRET`, generated with `openssl rand -base64 32`). In dev mode (`APP_ENV` unset or `dev`), the API auto-generates a random secret when `JWT_SECRET` is absent — sessions won't survive restarts but new developers can run the API immediately. Production (`APP_ENV=prod`) requires an explicit secret and fails fast without one. Rotation = generate a new key, restart — all tokens invalidate.
 
 Username is **not** in the token. The `require_user` dependency resolves `app_user_id → username` from the cached lookup. This means renaming a user later doesn't invalidate their session.
 
@@ -384,7 +384,7 @@ Global response interceptor: on `401`, evict `auth/me` and redirect to `/login`.
 |---|---|
 | Invalid credentials | `401`, generic message. Always run Argon2 verify against a precomputed dummy hash even if the user doesn't exist (timing-attack hardening — see §11.1). |
 | User deactivated | Next request → cache miss or refresh → `401`, redirect to `/login`. Worst-case latency 5 s. |
-| `JWT_SECRET` rotated | All users logged out on next request. |
+| `JWT_SECRET` rotated / auto-generated | All users logged out on next request (dev mode: every restart). |
 | DB unreachable during login | `503`. SPA shows "Service unavailable, retry". |
 | DB unreachable during request | The 5 s cache means requests within the window still succeed; afterwards `503`. |
 | Brute force on `/auth/login` | **Layered rate limit**: see §11.2. |
@@ -457,7 +457,7 @@ Both branches do the same Argon2 work, so `/auth/login` has the same latency pro
 5. **SSM**: change `/quant/prod/QUANTDB_USERNAME` from `postgres` → `quant_app` and rotate `/quant/prod/QUANTDB_PASSWORD` to `quant_app`'s password.
 6. **Seed admin user** via a Liquibase changeset that calls `SP_INS_APP_USER` (context `dev` only). Prod runs the `CALL` manually as `quant_admin` after generating a fresh hash with the helper script. **Prod password is never committed.**
 7. **Helper script** `scripts/hash_password.py` — reads password from stdin (no echo, via `getpass`), prints Argon2id PHC string. Doc warns against online hash generators.
-8. **Add `JWT_SECRET`** to `/quant/prod/JWT_SECRET` (SSM SecureString, 32 random bytes base64). EC2 instance role reads it at process start; not written to `.env` in prod.
+8. **Add `JWT_SECRET`** to `/quant/prod/JWT_SECRET` (SSM SecureString, 32 random bytes base64). EC2 instance role reads it at process start; not written to `.env` in prod. In dev mode, `JWT_SECRET` is auto-generated if absent (see `_resolve_jwt_secret` in `api/auth/service.py`).
 9. **Backend**: add `api/auth/` module (login router, JWT helpers, `require_user` dep, repo, service). Add `argon2-cffi`, `pyjwt[cryptography]`, `slowapi` to `requirements.txt`.
 10. **Wire `Depends(require_user)`** into existing routers. Replace every `user_id="alfcheun"` with `user.username`. Remove the `="alfcheun"` default in [src/db.py](src/db.py) and [src/data.py](src/data.py) — parameter becomes required.
 11. **Frontend**: add `/login` route + `<App>` mount-time `me` check + axios 401 interceptor + user menu.
