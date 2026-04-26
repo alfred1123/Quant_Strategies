@@ -1,0 +1,23 @@
+[
+  {
+    "ResourceType": "AWS::RDS::DBSubnetGroup",
+    "LogicalResourceId": "DbSubnetGroup",
+    "ResourceIdentifier": {
+      "DBSubnetGroupName": "rds-ec2-db-subnet-group-1"
+    }
+  },
+  {
+    "ResourceType": "AWS::RDS::DBCluster",
+    "LogicalResourceId": "AuroraCluster",
+    "ResourceIdentifier": {
+      "DBClusterIdentifier": "quantdb-cluster"
+    }
+  },
+  {
+    "ResourceType": "AWS::RDS::DBInstance",
+    "LogicalResourceId": "AuroraInstance",
+    "ResourceIdentifier": {
+      "DBInstanceIdentifier": "quantdb-instance-1"
+    }
+  }
+]

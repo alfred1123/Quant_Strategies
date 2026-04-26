@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  Quant Strategies — Aurora PostgreSQL Serverless v2 cluster.
+  Quant Strategies - Aurora PostgreSQL Serverless v2 cluster.
   Single-instance, single-AZ to minimize cost.
 
 Parameters:
@@ -38,18 +38,20 @@ Parameters:
     Default: postgres
     NoEcho: true
 
-  # Resolved from SSM SecureString at deploy time.
   MasterUserPassword:
     Type: String
     NoEcho: true
+    Default: "import-placeholder"
     Description: >-
-      Master password. Pass via --parameter-overrides or resolve from SSM
-      (e.g. resolve:ssm-secure:/quant/prod/QUANTDB_PASSWORD).
+      Master password. Required for new clusters; ignored during import.
+      Pass via --parameter-overrides or resolve from SSM.
 
 Resources:
   DbSubnetGroup:
+    DeletionPolicy: Retain
     Type: AWS::RDS::DBSubnetGroup
     Properties:
+      DBSubnetGroupName: rds-ec2-db-subnet-group-1
       DBSubnetGroupDescription: !Sub "${Project} Aurora subnet group"
       SubnetIds: !Ref SubnetIds
       Tags:
@@ -58,7 +60,7 @@ Resources:
 
   AuroraCluster:
     Type: AWS::RDS::DBCluster
-    DeletionPolicy: Snapshot
+    DeletionPolicy: Retain
     UpdateReplacePolicy: Snapshot
     Properties:
       DBClusterIdentifier: !Sub "${Project}db-cluster"
@@ -82,6 +84,7 @@ Resources:
           Value: !Sub "${Project}db-cluster"
 
   AuroraInstance:
+    DeletionPolicy: Retain
     Type: AWS::RDS::DBInstance
     Properties:
       DBInstanceIdentifier: !Sub "${Project}db-instance-1"

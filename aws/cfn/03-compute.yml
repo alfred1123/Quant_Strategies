@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  Quant Strategies — EC2 compute instance with IAM role for SSM
+  Quant Strategies - EC2 compute instance with IAM role for SSM
   parameter access and Docker pre-installed via user-data.
 
 Parameters:
@@ -42,7 +42,7 @@ Parameters:
 
   Ec2RdsSecurityGroupId:
     Type: AWS::EC2::SecurityGroup::Id
-    Description: Security group granting EC2 → RDS connectivity
+    Description: Security group granting EC2 to RDS connectivity
     Default: ""
 
   AppEnv:

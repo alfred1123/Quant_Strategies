@@ -26,7 +26,7 @@ Resources:
   Ec2Sg:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Sub "${Project} — EC2 web + SSH"
+      GroupDescription: !Sub "${Project} - EC2 web + SSH"
       VpcId: !Ref VpcId
       Tags:
         - Key: Name
@@ -41,7 +41,7 @@ Resources:
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
-          Description: HTTP (Let's Encrypt + redirect)
+          Description: HTTP (LetsEncrypt + redirect)
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
@@ -53,7 +53,7 @@ Resources:
   RdsSg:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Sub "${Project} — Aurora Postgres from EC2 only"
+      GroupDescription: !Sub "${Project} - Aurora Postgres from EC2 only"
       VpcId: !Ref VpcId
       Tags:
         - Key: Name
