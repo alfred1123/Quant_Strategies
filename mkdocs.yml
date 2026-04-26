@@ -70,6 +70,7 @@ nav:
       - React Frontend: architecture/frontend.md
       - Database: architecture/database.md
       - Infrastructure: architecture/infrastructure.md
+      - Dev vs Prod Config: architecture/dev-vs-prod.md
   - Guides:
       - CLI Backtest: guides/cli-backtest.md
       - Indicators & Strategies: guides/indicators-strategies.md
