@@ -1,9 +1,9 @@
 """Auth router — POST /login, POST /logout, GET /me.
 
-Cookie attributes are conditional on ``APP_ENV``:
-- production: ``HttpOnly + Secure + SameSite=Strict + Path=/api``
-- dev (no APP_ENV or APP_ENV=dev): drops ``Secure`` so the cookie works
-  over plain http://localhost.
+Cookie attributes:
+- ``HttpOnly + SameSite=Lax + Path=/api`` always.
+- ``Secure`` is set when ``COOKIE_SECURE=1`` (default in prod with TLS).
+  For HTTP-only prod deploys, set ``COOKIE_SECURE=0`` explicitly.
 """
 
 from __future__ import annotations
@@ -38,29 +38,34 @@ _GENERIC_LOGIN_FAILURE = HTTPException(
 )
 
 
-def _is_prod() -> bool:
+def _cookie_secure() -> bool:
+    flag = os.getenv("COOKIE_SECURE", "").strip()
+    if flag:
+        return flag == "1"
     return os.getenv("APP_ENV", "dev").lower() == "prod"
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
+    secure = _cookie_secure()
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
         max_age=AuthService.JWT_TTL_SECONDS,
         path="/api",
         httponly=True,
-        secure=_is_prod(),
-        samesite="strict",
+        secure=secure,
+        samesite="strict" if secure else "lax",
     )
 
 
 def _clear_session_cookie(response: Response) -> None:
+    secure = _cookie_secure()
     response.delete_cookie(
         key=COOKIE_NAME,
         path="/api",
         httponly=True,
-        secure=_is_prod(),
-        samesite="strict",
+        secure=secure,
+        samesite="strict" if secure else "lax",
     )
 
 

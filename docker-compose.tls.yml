@@ -5,6 +5,10 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.tls.yml up -d --build
 
 services:
+  api:
+    environment:
+      - COOKIE_SECURE=1
+
   nginx:
     ports:
       - "80:80"
