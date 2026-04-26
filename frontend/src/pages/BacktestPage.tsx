@@ -261,7 +261,7 @@ export default function BacktestPage({ currentUser }: { currentUser: CurrentUser
               value={optProgress?.trial ? (optProgress.trial / optProgress.total) * 100 : undefined}
               sx={{ mb: 2, maxWidth: 420, mx: 'auto' }}
             />
-            <Typography color="text.secondary">
+            <Typography sx={{ color: 'text.secondary' }}>
               {optProgress?.trial
                 ? `Trial ${optProgress.trial} / ${optProgress.total}${optProgress.best_sharpe != null ? ` · Best Sharpe: ${optProgress.best_sharpe.toFixed(4)}` : ''}`
                 : 'Running optimization…'}
@@ -277,8 +277,8 @@ export default function BacktestPage({ currentUser }: { currentUser: CurrentUser
         {/* Empty state */}
         {!isOptimizing && !optimizeResult && !error && (
           <Box sx={{ textAlign: 'center', py: 14 }}>
-            <Typography variant="h5" color="text.secondary" gutterBottom>No results yet</Typography>
-            <Typography color="text.secondary" mb={3}>
+            <Typography variant="h5" sx={{ color: 'text.secondary' }} gutterBottom>No results yet</Typography>
+            <Typography sx={{ color: 'text.secondary', mb: 3 }}>
               Click Configure to set parameters and run an optimization.
             </Typography>
             <Button variant="contained" size="large" onClick={() => setDrawerOpen(true)}>
@@ -292,7 +292,7 @@ export default function BacktestPage({ currentUser }: { currentUser: CurrentUser
           <>
             {/* Run summary bar */}
             <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-              <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center">
+              <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
                 <Chip label={effectiveSymbol(config)} color="primary" size="small" />
                 <Chip label={`${config.start} → ${config.end}`} size="small" variant="outlined" />
                 <Chip label={`${optimizeResult.valid} / ${optimizeResult.total_trials} valid trials`} size="small" variant="outlined" />
@@ -310,7 +310,7 @@ export default function BacktestPage({ currentUser }: { currentUser: CurrentUser
 
             {/* Top 10 table */}
             <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600 }} mb={1}>Top 10 Parameter Combinations</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Top 10 Parameter Combinations</Typography>
               <Top10Table
                 result={optimizeResult}
                 selectedIndex={selectedIndex}
@@ -323,7 +323,7 @@ export default function BacktestPage({ currentUser }: { currentUser: CurrentUser
             {(isLoadingPerf || perfResult) && (
               <Paper variant="outlined" sx={{ p: 3 }}>
                 {/* Analysis header */}
-                <Stack direction="row" alignItems="center" spacing={2} mb={2}>
+                <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Analysis</Typography>
                   {viewingLabel && (
                     <Chip label={viewingLabel} size="small" variant="outlined" color="primary" />
@@ -367,7 +367,7 @@ export default function BacktestPage({ currentUser }: { currentUser: CurrentUser
                         {wfResult && (
                           <>
                             {/* Best params + overfitting ratio */}
-                            <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center" mb={2}>
+                            <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
                               <Chip
                                 label={`Best Window: ${Array.isArray(wfResult.best_window) ? wfResult.best_window.join(', ') : wfResult.best_window}`}
                                 size="small" variant="outlined"

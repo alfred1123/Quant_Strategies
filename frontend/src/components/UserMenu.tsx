@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
-  Avatar, Button, IconButton, Menu, MenuItem,
-  ListItemIcon, ListItemText, Divider, Typography,
+  Avatar, IconButton, Menu, MenuItem,
+  ListItemText, Divider,
 } from '@mui/material';
 import { useLogout, type CurrentUser } from '../api/auth';
 
@@ -41,7 +41,7 @@ export default function UserMenu({ user }: UserMenuProps) {
           <ListItemText
             primary={user.username}
             secondary="Signed in"
-            primaryTypographyProps={{ fontWeight: 600 }}
+            slotProps={{ primary: { sx: { fontWeight: 600 } } }}
           />
         </MenuItem>
         <Divider />
