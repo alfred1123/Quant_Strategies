@@ -71,6 +71,11 @@ db/liquidbase/
 - Primary keys: `<TABLE>_ID` — `UUID` for entities, `INTEGER GENERATED ALWAYS AS IDENTITY` for sequences
 - Version columns: `<TABLE>_VID INTEGER` (e.g. `STRATEGY_VID`)
 - Name columns: `<TABLE>_NM TEXT` (e.g. `STRATEGY_NM`)
+- **Monotonic counters vs row-version**: pick the right suffix.
+  - `_VID` = **row-version id** for soft-versioned tables. Implies historical rows exist (`IS_CURRENT_IND` flips, composite PK `(<TABLE>_ID, <TABLE>_VID)`). Each bump = a new row.
+  - `_GEN` = **generation counter** on a single mutable row. Used to invalidate something held outside the DB (bearer tokens, cache entries, leases). No history kept; the integer value is opaque. Example: `APP_USER.SESSION_GEN` — bumped on password change / deactivation / logout-everywhere to invalidate all outstanding JWTs.
+  - Do **not** use `_VERSION` as a column suffix — it's ambiguous between these two concepts. Use `_VID` or `_GEN`.
+  - Do **not** use `_VID` for a counter that doesn't produce a new row.
 - Audit columns (every table): `USER_ID TEXT`, `CREATED_AT TIMESTAMPTZ`. Use `UPDATED_AT TIMESTAMPTZ` only on tables where rows are genuinely mutated (e.g. REFDATA lookup tables). Do **not** add `UPDATED_AT` solely for `IS_CURRENT_IND` flips — soft-versioning inserts a new row with a new `CREATED_AT` instead.
 - `CREATED_AT` is **never** an input parameter on `SP_INS_*` procedures. Always use `NOW()` (UTC) in the INSERT VALUES clause. The database records the actual insert time, not a caller-supplied timestamp.
 - Audit columns (`CREATED_AT`, `UPDATED_AT`, `USER_ID`) are **internal** — they exist on every table for diagnostics and auditing but are **excluded from `SP_GET_*` result sets**. GET procedures return only domain/business columns. Callers that need audit data should query the table directly.

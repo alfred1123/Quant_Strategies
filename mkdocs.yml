@@ -84,4 +84,5 @@ nav:
       - Backtest Speed: design/backtest-speed.md
       - Alternative Data Sources: design/alt-data-sources.md
       - Separate Underlying & Cache: design/separate-underlying.md
+      - Login & Authentication: design/login.md
   - Decisions: decisions.md
