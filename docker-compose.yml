@@ -1,0 +1,48 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quant-api
+    restart: unless-stopped
+    environment:
+      - APP_ENV=${APP_ENV:-dev}
+      - USE_SSM=${USE_SSM:-}
+      - AWS_REGION=${AWS_REGION:-ap-southeast-1}
+    env_file:
+      - path: .env
+        required: false
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+    container_name: quant-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # ── Production TLS (activate with --profile prod) ──────────────────
+  certbot:
+    image: certbot/certbot:latest
+    container_name: quant-certbot
+    profiles: [prod]
+    volumes:
+      - certbot-conf:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'
+
+volumes:
+  certbot-conf:
+  certbot-www:

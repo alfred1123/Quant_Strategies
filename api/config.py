@@ -30,16 +30,20 @@ _LOG_FILE = os.path.join(_LOG_DIR, 'bt_app.log')
 
 
 def setup_logging(*, debug: bool = False) -> None:
-    os.makedirs(_LOG_DIR, exist_ok=True)
     level = logging.DEBUG if debug else logging.INFO
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+
+    # In containers (APP_ENV=prod or USE_SSM=1), log to stdout only.
+    # Locally, also write to a file for convenience.
+    if os.getenv("APP_ENV", "dev").lower() != "prod" and not os.getenv("USE_SSM"):
+        os.makedirs(_LOG_DIR, exist_ok=True)
+        handlers.append(logging.FileHandler(_LOG_FILE))
+
     logging.basicConfig(
         level=level,
         format=LOG_FORMAT,
         datefmt=LOG_DATEFMT,
-        handlers=[
-            logging.FileHandler(_LOG_FILE),
-            logging.StreamHandler(),
-        ],
+        handlers=handlers,
     )
 
 

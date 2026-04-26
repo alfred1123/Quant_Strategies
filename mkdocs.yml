@@ -69,6 +69,7 @@ nav:
       - FastAPI Backend: architecture/api.md
       - React Frontend: architecture/frontend.md
       - Database: architecture/database.md
+      - Infrastructure: architecture/infrastructure.md
   - Guides:
       - CLI Backtest: guides/cli-backtest.md
       - Indicators & Strategies: guides/indicators-strategies.md

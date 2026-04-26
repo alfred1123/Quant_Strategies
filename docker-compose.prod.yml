@@ -1,0 +1,32 @@
+# Production override — TLS, SSM secrets, certbot.
+#
+# Usage on EC2:
+#   export DOMAIN=yourdomain.com
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+services:
+  api:
+    environment:
+      - APP_ENV=prod
+      - USE_SSM=1
+
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:?Set DOMAIN for TLS}
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/templates/nginx.conf.template:ro
+      - certbot-conf:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot:ro
+    # envsubst replaces $DOMAIN in the template; NGINX_ENVSUBST_OUTPUT_DIR
+    # tells the nginx image to write the processed file as the main config.
+    command: >
+      /bin/sh -c "
+        envsubst '$$DOMAIN' < /etc/nginx/templates/nginx.conf.template > /etc/nginx/nginx.conf &&
+        nginx -g 'daemon off;'
+      "
+
+  certbot:
+    profiles: []

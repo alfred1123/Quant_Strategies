@@ -1,0 +1,16 @@
+[
+  { "ParameterKey": "Project",              "ParameterValue": "quant" },
+  { "ParameterKey": "VpcId",                "ParameterValue": "vpc-06e76bd6f283ed4a4" },
+  { "ParameterKey": "SshCidr",              "ParameterValue": "0.0.0.0/0" },
+
+  { "ParameterKey": "SubnetIds",            "ParameterValue": "subnet-02af8d40f30f28470,subnet-0ceaeeeb823c9fd58,subnet-0b6483cb4b2fd5fbb" },
+  { "ParameterKey": "EngineVersion",        "ParameterValue": "17.9" },
+  { "ParameterKey": "MinACU",               "ParameterValue": "0.5" },
+  { "ParameterKey": "MaxACU",               "ParameterValue": "2.0" },
+  { "ParameterKey": "MasterUsername",        "ParameterValue": "postgres" },
+
+  { "ParameterKey": "InstanceType",         "ParameterValue": "t2.micro" },
+  { "ParameterKey": "KeyPairName",          "ParameterValue": "tradingServerKey" },
+  { "ParameterKey": "SubnetId",             "ParameterValue": "subnet-065b627612dcd0b33" },
+  { "ParameterKey": "AppEnv",               "ParameterValue": "prod" }
+]

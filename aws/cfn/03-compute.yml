@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Quant Strategies — EC2 compute instance with IAM role for SSM
+  parameter access and Docker pre-installed via user-data.
+
+Parameters:
+  Project:
+    Type: String
+    Default: quant
+
+  InstanceType:
+    Type: String
+    Default: t4g.small
+    AllowedValues:
+      - t2.micro
+      - t4g.micro
+      - t4g.small
+      - t4g.medium
+    Description: >-
+      t2.micro = free-tier (x86, 1 GiB).
+      t4g.small = Graviton ARM (2 GiB, ~$7/mo reserved). Recommended minimum.
+      t4g.medium = Graviton ARM (4 GiB, ~$14/mo). Good headroom for queue worker.
+
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: >-
+      SSM-resolved latest Amazon Linux 2023 AMI.
+      For ARM (t4g.*) change to al2023-ami-kernel-default-arm64.
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Existing EC2 key pair for SSH access
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public subnet for the EC2 instance
+
+  Ec2SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security group for web + SSH access
+
+  Ec2RdsSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security group granting EC2 → RDS connectivity
+    Default: ""
+
+  AppEnv:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, prod]
+
+Conditions:
+  HasRdsLink: !Not [!Equals [!Ref Ec2RdsSecurityGroupId, ""]]
+
+Resources:
+  # ── IAM ──────────────────────────────────────────────────────────────
+  Ec2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${Project}-ec2-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: ssm-read-app-params
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParametersByPath
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/quant/*"
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    "kms:ViaService": !Sub "ssm.${AWS::Region}.amazonaws.com"
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub "${Project}-ec2-profile"
+      Roles:
+        - !Ref Ec2Role
+
+  # ── EC2 ──────────────────────────────────────────────────────────────
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref AmiId
+      KeyName: !Ref KeyPairName
+      SubnetId: !Ref SubnetId
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroupIds: !If
+        - HasRdsLink
+        - - !Ref Ec2SecurityGroupId
+          - !Ref Ec2RdsSecurityGroupId
+        - - !Ref Ec2SecurityGroupId
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-server"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+
+          # ── System updates ────────────────────────────────────────
+          dnf update -y -q
+
+          # ── Docker ────────────────────────────────────────────────
+          dnf install -y docker git
+          systemctl enable --now docker
+          usermod -aG docker ec2-user
+
+          # Docker Compose plugin (v2)
+          mkdir -p /usr/local/lib/docker/cli-plugins
+          ARCH=$(uname -m)
+          curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-${!ARCH}" \
+            -o /usr/local/lib/docker/cli-plugins/docker-compose
+          chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+          # ── App directory ─────────────────────────────────────────
+          mkdir -p /opt/quant
+          chown ec2-user:ec2-user /opt/quant
+
+          echo "User-data complete" | tee /var/log/user-data-done.log
+
+  Eip:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref Instance
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-eip"
+
+Outputs:
+  InstanceId:
+    Value: !Ref Instance
+
+  PublicIp:
+    Value: !Ref Eip
+    Export:
+      Name: !Sub "${Project}-public-ip"
+
+  InstanceRoleArn:
+    Value: !GetAtt Ec2Role.Arn

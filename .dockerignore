@@ -1,0 +1,44 @@
+# Version control
+.git
+.gitignore
+
+# Python
+env/
+.venv/
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+
+# Node / frontend (built separately in nginx image)
+frontend/node_modules
+frontend/dist
+
+# IDE
+.cursor
+.vscode
+*.swp
+
+# Docs / non-runtime
+docs/
+*.md
+mkdocs.yml
+LICENSE
+
+# Infrastructure (not needed in app image)
+aws/
+db/
+backup/
+scripts/
+
+# Env / secrets
+.env
+.env.*
+
+# Logs / runtime artifacts
+log/
+*.log
+
+# Tests
+tests/

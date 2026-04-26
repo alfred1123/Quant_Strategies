@@ -9,7 +9,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -19,6 +19,7 @@ from api.config import load_config
 # load_config() initialises logging, loads .env or SSM, and returns the DB conninfo
 DB_CONNINFO = load_config()
 
+from api.auth.dependencies import require_user  # noqa: E402
 from api.auth.router import limiter as auth_limiter, router as auth_router  # noqa: E402
 from api.auth.service import AuthService  # noqa: E402
 from api.routers import backtest, inst, refdata  # noqa: E402
@@ -50,10 +51,15 @@ async def lifespan(app: FastAPI):
     yield
 
 
+_is_prod = os.getenv("APP_ENV", "dev").lower() == "prod"
+
 app = FastAPI(
     title="Quant Backtest API",
     version="0.1.0",
     lifespan=lifespan,
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
+    openapi_url=None if _is_prod else "/openapi.json",
 )
 
 # slowapi: per-route rate limits (e.g. /auth/login). The limiter instance is
@@ -70,9 +76,9 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/api/v1")
-app.include_router(backtest.router, prefix="/api/v1")
-app.include_router(inst.router, prefix="/api/v1")
-app.include_router(refdata.router, prefix="/api/v1")
+app.include_router(backtest.router, prefix="/api/v1", dependencies=[Depends(require_user)])
+app.include_router(inst.router, prefix="/api/v1", dependencies=[Depends(require_user)])
+app.include_router(refdata.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 
 
 @app.get("/health")

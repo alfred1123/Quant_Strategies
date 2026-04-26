@@ -11,7 +11,6 @@ BACKEND_LOG_FILE="$LOG_DIR/backend.log"
 FRONTEND_LOG_FILE="$LOG_DIR/frontend.log"
 BACKEND_PORT=8000
 DEV_FRONTEND_PORT=5173
-PROD_FRONTEND_PORT=4173
 
 MODE="${1:-}"
 ACTION="${2:-}"
@@ -23,14 +22,15 @@ Usage:
   ./scripts/appctl.sh <dev|prod> <start|stop|kill|restart|status>
 
 Examples:
-  ./scripts/appctl dev start
+  ./scripts/appctl dev start       # local dev (uvicorn + Vite)
   ./scripts/appctl dev kill
-  ./scripts/appctl prod restart
+  ./scripts/appctl prod start      # Docker Compose (api + nginx + certbot)
   ./scripts/appctl prod status
 
 Notes:
-  - dev mode runs FastAPI with --reload and Vite dev server.
-  - prod mode runs FastAPI without --reload and Vite preview server.
+  - dev mode runs FastAPI with --reload and Vite dev server (no Docker).
+  - prod mode uses Docker Compose (api + nginx + TLS).
+    Requires: docker, DOMAIN env var for TLS.
   - PIDs are stored under log/run/ and logs under log/.
 EOF
 }
@@ -45,9 +45,44 @@ if [[ "$ACTION" != "start" && "$ACTION" != "stop" && "$ACTION" != "kill" && "$AC
   exit 1
 fi
 
-mkdir -p "$RUN_DIR" "$LOG_DIR"
-
 cd "$ROOT_DIR"
+
+# ── Prod mode delegates to Docker Compose ─────────────────────────────
+if [[ "$MODE" == "prod" ]]; then
+  COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
+
+  case "$ACTION" in
+    start)
+      echo "Starting production containers..."
+      docker compose $COMPOSE_FILES up -d --build
+      echo ""
+      echo "Mode: prod (Docker Compose)"
+      echo "Site: https://${DOMAIN:-<set DOMAIN>}"
+      echo "Logs: docker compose $COMPOSE_FILES logs -f"
+      ;;
+    stop)
+      docker compose $COMPOSE_FILES down
+      echo "Stopped production containers."
+      ;;
+    kill)
+      docker compose $COMPOSE_FILES down --remove-orphans
+      echo "Killed production containers."
+      ;;
+    restart)
+      docker compose $COMPOSE_FILES down
+      docker compose $COMPOSE_FILES up -d --build
+      echo "Restarted production containers."
+      ;;
+    status)
+      echo "Mode: prod (Docker Compose)"
+      docker compose $COMPOSE_FILES ps
+      ;;
+  esac
+  exit 0
+fi
+
+# ── Dev mode runs bare processes ──────────────────────────────────────
+mkdir -p "$RUN_DIR" "$LOG_DIR"
 
 if [[ ! -f "$ROOT_DIR/env/bin/activate" ]]; then
   echo "Missing virtualenv at env/. Run ./setup.sh first." >&2
@@ -57,27 +92,15 @@ fi
 source "$ROOT_DIR/env/bin/activate"
 
 backend_command() {
-  if [[ "$MODE" == "dev" ]]; then
-    printf '%s' "cd '$ROOT_DIR' && source '$ROOT_DIR/env/bin/activate' && uvicorn api.main:app --reload --port 8000"
-  else
-    printf '%s' "cd '$ROOT_DIR' && source '$ROOT_DIR/env/bin/activate' && uvicorn api.main:app --host 0.0.0.0 --port 8000"
-  fi
+  printf '%s' "cd '$ROOT_DIR' && source '$ROOT_DIR/env/bin/activate' && uvicorn api.main:app --reload --port 8000"
 }
 
 frontend_command() {
-  if [[ "$MODE" == "dev" ]]; then
-    printf '%s' "cd '$ROOT_DIR/frontend' && npm run dev -- --host 0.0.0.0"
-  else
-    printf '%s' "cd '$ROOT_DIR/frontend' && npm run build && npm run preview -- --host 0.0.0.0 --port 4173"
-  fi
+  printf '%s' "cd '$ROOT_DIR/frontend' && npm run dev -- --host 0.0.0.0"
 }
 
 frontend_port() {
-  if [[ "$MODE" == "dev" ]]; then
-    printf '%s' "$DEV_FRONTEND_PORT"
-  else
-    printf '%s' "$PROD_FRONTEND_PORT"
-  fi
+  printf '%s' "$DEV_FRONTEND_PORT"
 }
 
 pid_is_running() {
@@ -198,14 +221,9 @@ case "$ACTION" in
   start)
     start_service "backend" "$BACKEND_PID_FILE" "$BACKEND_LOG_FILE" "$(backend_command)" "$BACKEND_PORT"
     start_service "frontend" "$FRONTEND_PID_FILE" "$FRONTEND_LOG_FILE" "$(frontend_command)" "$(frontend_port)"
-    echo "Mode: $MODE"
-    if [[ "$MODE" == "dev" ]]; then
-      echo "Backend:  http://127.0.0.1:8000"
-      echo "Frontend: http://127.0.0.1:5173"
-    else
-      echo "Backend:  http://127.0.0.1:8000"
-      echo "Frontend: http://127.0.0.1:4173"
-    fi
+    echo "Mode: dev"
+    echo "Backend:  http://127.0.0.1:8000"
+    echo "Frontend: http://127.0.0.1:5173"
     ;;
   stop)
     stop_service "frontend" "$FRONTEND_PID_FILE" "$(frontend_port)"
@@ -220,8 +238,8 @@ case "$ACTION" in
     "$0" "$MODE" start
     ;;
   status)
-    echo "Mode: $MODE"
-    echo "Command: ./scripts/$SELF_CMD $MODE <start|stop|kill|restart|status>"
+    echo "Mode: dev"
+    echo "Command: ./scripts/$SELF_CMD dev <start|stop|kill|restart|status>"
     status_service "backend" "$BACKEND_PID_FILE" "$BACKEND_PORT"
     status_service "frontend" "$FRONTEND_PID_FILE" "$(frontend_port)"
     echo "Backend log:  $BACKEND_LOG_FILE"

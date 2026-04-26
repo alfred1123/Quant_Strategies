@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Quant Strategies — Aurora PostgreSQL Serverless v2 cluster.
+  Single-instance, single-AZ to minimize cost.
+
+Parameters:
+  Project:
+    Type: String
+    Default: quant
+
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: >-
+      At least 2 subnets in different AZs for the DB subnet group.
+      Use private subnets when available.
+
+  RdsSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security group allowing Postgres from EC2
+
+  EngineVersion:
+    Type: String
+    Default: "17.9"
+    Description: Aurora PostgreSQL engine version
+
+  MinACU:
+    Type: Number
+    Default: 0.5
+    Description: Minimum Aurora Capacity Units (scales to near-zero cost when idle)
+
+  MaxACU:
+    Type: Number
+    Default: 2.0
+    Description: Maximum Aurora Capacity Units
+
+  MasterUsername:
+    Type: String
+    Default: postgres
+    NoEcho: true
+
+  # Resolved from SSM SecureString at deploy time.
+  MasterUserPassword:
+    Type: String
+    NoEcho: true
+    Description: >-
+      Master password. Pass via --parameter-overrides or resolve from SSM
+      (e.g. resolve:ssm-secure:/quant/prod/QUANTDB_PASSWORD).
+
+Resources:
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub "${Project} Aurora subnet group"
+      SubnetIds: !Ref SubnetIds
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-db-subnet-group"
+
+  AuroraCluster:
+    Type: AWS::RDS::DBCluster
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBClusterIdentifier: !Sub "${Project}db-cluster"
+      Engine: aurora-postgresql
+      EngineVersion: !Ref EngineVersion
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      DatabaseName: quantdb
+      Port: 5432
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref RdsSecurityGroupId
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: !Ref MinACU
+        MaxCapacity: !Ref MaxACU
+      StorageEncrypted: true
+      BackupRetentionPeriod: 7
+      DeletionProtection: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}db-cluster"
+
+  AuroraInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub "${Project}db-instance-1"
+      DBClusterIdentifier: !Ref AuroraCluster
+      DBInstanceClass: db.serverless
+      Engine: aurora-postgresql
+      PubliclyAccessible: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}db-instance-1"
+
+Outputs:
+  ClusterEndpoint:
+    Value: !GetAtt AuroraCluster.Endpoint.Address
+    Export:
+      Name: !Sub "${Project}-db-endpoint"
+
+  ClusterPort:
+    Value: !GetAtt AuroraCluster.Endpoint.Port
+    Export:
+      Name: !Sub "${Project}-db-port"
+
+  ClusterArn:
+    Value: !Sub "arn:aws:rds:${AWS::Region}:${AWS::AccountId}:cluster:${AuroraCluster}"
