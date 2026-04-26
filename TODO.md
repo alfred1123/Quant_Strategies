@@ -84,7 +84,7 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 | 13 | **DB tables** | `BT.STRATEGY`, `BT.RESULT`, `TRADE.DEPLOYMENT`, `TRADE.LOG`. `REFDATA.TICKER_MAPPING` dropped — replaced by `INST.PRODUCT_XREF`. | design doc §7 |
 | 14 | **Ticker mapping** | ~~`REFDATA.TICKER_MAPPING`~~ retired. Vendor-symbol mapping now lives in `INST.PRODUCT_XREF` (one row per product × app). | design doc §7 |
 | 15 | **Broker adapter pattern** | `TradeAdapter` abstract interface. `FutuAdapter` wraps existing `FutuTrader`. `DeploymentConfig.broker` enum selects adapter at runtime. "FUTU" = broker name, not app name. | design doc §5, Phase 7 |
-| 16 | **AWS infrastructure** | EC2 t4g.small (Graviton ARM, ~$7/mo reserved). RDS PostgreSQL 16 Serverless v2 (scales to zero, ~$5-15/mo). Native `CREATE SCHEMA` supports `SCHEMA.TABLE` convention. Total ~$15-25/mo. | design doc §11 |
+| 16 | **AWS infrastructure** | EC2 t4g.small (Graviton ARM, ~$7/mo reserved). RDS PostgreSQL 17.9 Serverless v2 (scales to zero, ~$5-15/mo). Managed via CloudFormation (`aws/cfn/`). Total ~$15-25/mo. | design doc §11, infrastructure.md |
 | 17 | **Local dev DB** | SQLite or Docker Postgres locally. Switch via `DB_URL` env var. | design doc §11 |
 | 18 | **Risk checks** | Kill switch, paper-first default, max position, stop loss, cash check, signal validation, duplicate guard. | design doc §4 |
 | 19 | **No direct DML** | All writes to application tables must go through stored procedures (`CALL schema.procedure(...)`). Direct `INSERT`/`UPDATE`/`DELETE` in Python or FastAPI is forbidden. Liquibase seed `<sql>` changesets are the only exception. `SELECT` queries are unrestricted. | AGENTS.md |
@@ -105,7 +105,7 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 ### Phase 6 — DB schema + persistence ✅
 
 - ~~RDS PostgreSQL 16 Serverless v2 in production; SQLite or Docker Postgres locally (decision #16, #17).~~
-- **Deployed:** PostgreSQL 17 on `localhost:5433`, database `quantdb`.
+- **Deployed:** Aurora PostgreSQL 17.9 Serverless v2 on `localhost:5433` (via SSM port-forward), database `quantdb`. Managed by CloudFormation (`quant-database` stack).
 - **Schemas:** `CORE_ADMIN`, `REFDATA`, `BT`, `TRADE` — all created and populated via Liquibase.
 - **Per-schema Liquibase deployment:** Each schema has its own `liquibase.properties` with `liquibase-schema-name`, giving independent `databasechangelog` tracking per schema. Master changelog (`quantdb-changelog.xml`) handles only schema/extension creation.
 - **Tables deployed:** `CORE_ADMIN.LOG_PROC_DETAIL`, 10 REFDATA tables (APP, TM_INTERVAL, ASSET_TYPE, INDICATOR, SIGNAL_TYPE, ORDER_STATE, TRANS_STATE, API_LIMIT, DATA_COLUMN, CONJUNCTION, APP_METRIC — TICKER_MAPPING dropped), 4 BT tables (STRATEGY, RESULT, API_REQUEST, API_REQUEST_PAYLOAD), 3 TRADE tables (DEPLOYMENT, LOG, TRANSACTION), 4 INST tables (PRODUCT, PRODUCT_XREF, PRODUCT_GRP, PRODUCT_GRP_MEMBER).
@@ -165,7 +165,7 @@ All agreed decisions in one place. Referenced by conflict # from the original di
 
 ## Overall (non-phase items)
 
-1. CI/CD to deploy to production
+1. CI/CD to deploy to production (Docker images → EC2 via `docker compose`)
 2. Hard coded options in main.py should be stored in the object script originated.
 3. Logging: all modules now follow log_config.py pattern. ✓
 4. **Backtest speed optimization** — design doc at `docs/design-backtest-speed.md`. Key findings: numpy-only Sharpe (O-1) + indicator cache (O-2) = ~120× speedup per trial. Implementation deferred.

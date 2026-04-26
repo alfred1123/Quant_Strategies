@@ -196,7 +196,7 @@ localhost:5433  ──── SSM Port Forward ──── RDS PostgreSQL (quant
                      (VS Code task)        quantdb-cluster.*.rds.amazonaws.com:5432
 ```
 
-- SSM port-forward runs as a VS Code background task (`SSM Port Forward (quantdb:5433)`).
+- SSM port-forward runs automatically via Cursor hook (`.cursor/hooks/ssm-port-forward-loop.sh`) or VS Code task (`SSM Port Forward (quantdb:5433)`).
 - Connection requires `sslmode=require` (enforced by RDS `pg_hba.conf`).
 - Credentials come from env vars: `QUANTDB_HOST`, `QUANTDB_PORT`, `QUANTDB_USERNAME`, `QUANTDB_PASSWORD` (set in `.env`).
 

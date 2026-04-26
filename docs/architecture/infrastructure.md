@@ -45,7 +45,7 @@ SSM Parameter Store supplies secrets (`JWT_SECRET`, DB credentials) at app start
 
 ```
 aws/
-├── README.md                  ← you are here
+├── import-db-resources.json   ← resource mapping used during Aurora import
 ├── deploy.sh                  ← deploy / update all stacks
 ├── cfn/
 │   ├── 01-network.yml         ← security groups (EC2 + RDS)
@@ -120,12 +120,12 @@ All stack parameters have defaults. Override per-environment via `params/<env>.j
 
 Key parameters to review in `params/prod.json`:
 
-| Parameter | Default | Notes |
+| Parameter | Current | Notes |
 |-----------|---------|-------|
-| `InstanceType` | `t2.micro` | Upgrade to `t4g.small` when adding Docker workloads |
+| `InstanceType` | `t4g.small` | Graviton ARM (2 GiB, ~$7/mo reserved) |
+| `AmiId` | Latest AL2023 ARM | `al2023-ami-kernel-default-arm64` (auto-resolved via SSM) |
 | `SshCidr` | `0.0.0.0/0` | Restrict to your IP for production |
 | `MinACU` / `MaxACU` | 0.5 / 2.0 | Aurora scaling range (cost vs headroom) |
-| `AmiId` | Latest AL2023 x86 | Change to `al2023-ami-kernel-default-arm64` for Graviton |
 
 ---
 
@@ -180,9 +180,9 @@ aws cloudformation delete-stack --stack-name quant-database   # DeletionPolicy: 
 aws cloudformation delete-stack --stack-name quant-network
 ```
 
-The database stack has `DeletionPolicy: Snapshot` — Aurora takes a
-final snapshot before deletion. `DeletionProtection: true` prevents
-accidental deletion (disable it manually first if you really mean to).
+The database stack has `DeletionPolicy: Retain` — Aurora resources are
+kept even if the stack is deleted (imported resources). `DeletionProtection: true`
+prevents accidental deletion (disable it manually first if you really mean to).
 
 ---
 

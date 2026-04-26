@@ -505,15 +505,15 @@ pass `window` and `signal` explicitly to `strategy_to_json(cfg, window=20, signa
 
 **Why Graviton**: Entire stack is Python — no x86 dependency. ARM is cheaper and faster for Python workloads.
 
-### Database — RDS PostgreSQL 16 (Serverless v2)
+### Database — Aurora PostgreSQL 17.9 (Serverless v2)
 
 | Spec | Value |
 |------|-------|
-| Engine | PostgreSQL 16 |
-| Min ACU | 0 (scales to zero when idle) |
+| Engine | Aurora PostgreSQL 17.9 |
+| Min ACU | 0.5 |
 | Max ACU | 2 |
 | Cost | ~$0.12/ACU-hour when active |
-| Storage | 20 GB gp3 (~$2.30/mo) |
+| Storage | gp3 (~$2.30/mo) |
 
 **Why Postgres over SQLite**:
 - Native `CREATE SCHEMA` — `BT.`, `TRADE.`, `REFDATA.` schemas work natively
@@ -545,8 +545,8 @@ pass `window` and `signal` explicitly to `strategy_to_json(cfg, window=20, signa
             │
             ▼
 ┌───────────────────────┐          ┌──────────┐
-│  RDS PostgreSQL       │          │ Exchange │
-│  Serverless v2        │          │ (Futu /  │
+│  Aurora PostgreSQL    │          │ Exchange │
+│  17.9 Serverless v2   │          │ (Futu /  │
 │  ┌─────────────────┐  │          │  Bybit)  │
 │  │ BT.*            │  │          └──────────┘
 │  │ TRADE.*         │  │               ▲
