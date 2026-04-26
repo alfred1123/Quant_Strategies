@@ -5,3 +5,11 @@ driver=org.postgresql.Driver
 #   liquibase --username=<user> --password=<pass> update
 #   export LIQUIBASE_COMMAND_USERNAME=<user>
 #   export LIQUIBASE_COMMAND_PASSWORD=<pass>
+
+# Liquibase MUST run as the cluster master user (e.g. postgres / Aurora master)
+# because the 005-core-admin-roles changeset issues CREATE ROLE and the
+# 099-core-admin-grants changeset issues GRANTs across all schemas.
+#
+# Login users (quant_app, quant_admin) are provisioned manually outside
+# Liquibase — their passwords never appear in this changelog or in env vars
+# during deploy. See docs/design/login.md §7.3.

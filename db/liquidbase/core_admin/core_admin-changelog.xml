@@ -5,6 +5,10 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
+    <!-- Login users (quant_app, quant_admin) are provisioned manually outside
+         Liquibase to keep their passwords off disk. See docs/design/login.md
+         §7.3. This changelog only manages their GRANTs. -->
+
     <!-- ========== CORE_ADMIN tables ========== -->
 
     <changeSet id="010-core-admin-log-proc-detail" author="alfcheun" context="core_admin" runOnChange="false">
@@ -12,11 +16,71 @@
         <rollback><sql>DROP TABLE IF EXISTS CORE_ADMIN.LOG_PROC_DETAIL;</sql></rollback>
     </changeSet>
 
+    <changeSet id="030-core-admin-app-user" author="alfcheun" context="core_admin" runOnChange="false">
+        <sqlFile path="tables/APP_USER.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS CORE_ADMIN.APP_USER;</sql></rollback>
+    </changeSet>
+
     <!-- ========== CORE_ADMIN procedures ========== -->
 
     <changeSet id="020-core-admin-proc-ins-log-proc" author="alfcheun" context="proc" runOnChange="true">
         <sqlFile path="procedures/CORE_INS_LOG_PROC.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
         <rollback><sql>DROP PROCEDURE IF EXISTS CORE_ADMIN.CORE_INS_LOG_PROC;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="040-core-admin-proc-get-app-user-by-username" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_GET_APP_USER_BY_USERNAME.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS CORE_ADMIN.SP_GET_APP_USER_BY_USERNAME;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="041-core-admin-proc-upd-app-user-last-login" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_UPD_APP_USER_LAST_LOGIN.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS CORE_ADMIN.SP_UPD_APP_USER_LAST_LOGIN;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="042-core-admin-proc-ins-app-user" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_INS_APP_USER.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS CORE_ADMIN.SP_INS_APP_USER;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="043-core-admin-proc-upd-app-user-password" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_UPD_APP_USER_PASSWORD.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS CORE_ADMIN.SP_UPD_APP_USER_PASSWORD;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="044-core-admin-proc-upd-app-user-active" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_UPD_APP_USER_ACTIVE.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS CORE_ADMIN.SP_UPD_APP_USER_ACTIVE;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="045-core-admin-proc-upd-app-user-bump-token" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_UPD_APP_USER_BUMP_TOKEN.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS CORE_ADMIN.SP_UPD_APP_USER_BUMP_TOKEN;</sql></rollback>
+    </changeSet>
+
+    <!-- ========== Grants (runs LAST, after all schemas/tables/procs exist) ========== -->
+    <!-- runOnChange=true so newly added tables/procs in BT/INST/TRADE/REFDATA
+         get the right privileges on every deploy. See docs/design/login.md §7.4. -->
+
+    <changeSet id="099-core-admin-grants" author="alfcheun" context="grant" runOnChange="true">
+        <sqlFile path="sql/GRANTS.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback>
+            <!-- Atomically revoke every privilege held by the two login users.
+                 Roles themselves are NOT dropped — they were provisioned
+                 manually outside Liquibase. -->
+            <sql>
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
+                        EXECUTE 'DROP OWNED BY quant_app CASCADE';
+                    END IF;
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_admin') THEN
+                        EXECUTE 'DROP OWNED BY quant_admin CASCADE';
+                    END IF;
+                END
+                $$;
+            </sql>
+        </rollback>
     </changeSet>
 
 </databaseChangeLog>

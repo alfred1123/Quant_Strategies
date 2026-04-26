@@ -1,0 +1,63 @@
+CREATE OR REPLACE PROCEDURE CORE_ADMIN.SP_INS_APP_USER(
+    IN  IN_USERNAME       TEXT,
+    IN  IN_PASSWORD_HASH  TEXT,
+    IN  IN_USER_ID        TEXT,
+    OUT OUT_APP_USER_ID   UUID,
+    OUT OUT_SQLSTATE      TEXT,
+    OUT OUT_SQLMSG        TEXT,
+    OUT OUT_SQLERRMC      TEXT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    V_START_TS   TIMESTAMPTZ := CURRENT_TIMESTAMP;
+    V_OTHER_TEXT TEXT;
+    V_LOG_STATE  TEXT;
+    V_LOG_MSG    TEXT;
+BEGIN
+    OUT_SQLSTATE := '00000';
+    OUT_SQLMSG   := '0';
+    OUT_SQLERRMC := 'Stored Procedure completed successfully';
+
+    V_OTHER_TEXT := 'IN_USERNAME=' || COALESCE(IN_USERNAME, '');
+
+    OUT_SQLMSG := '10';
+    OUT_APP_USER_ID := gen_random_uuid();
+
+    OUT_SQLMSG := '20';
+    INSERT INTO CORE_ADMIN.APP_USER (
+        APP_USER_ID,
+        USERNAME,
+        PASSWORD_HASH,
+        IS_ACTIVE_IND,
+        SESSION_GEN,
+        CREATED_AT
+    ) VALUES (
+        OUT_APP_USER_ID,
+        IN_USERNAME,
+        IN_PASSWORD_HASH,
+        'Y',
+        1,
+        NOW()
+    );
+
+    OUT_SQLMSG := '30';
+    CALL CORE_ADMIN.CORE_INS_LOG_PROC('CORE_ADMIN', 'SP_INS_APP_USER', V_START_TS, NULL, V_OTHER_TEXT, IN_USER_ID, V_LOG_STATE, V_LOG_MSG);
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DECLARE
+            V_DETAIL  TEXT;
+            V_CONTEXT TEXT;
+        BEGIN
+            GET STACKED DIAGNOSTICS
+                OUT_SQLSTATE = RETURNED_SQLSTATE,
+                OUT_SQLERRMC = MESSAGE_TEXT,
+                V_DETAIL     = PG_EXCEPTION_DETAIL,
+                V_CONTEXT    = PG_EXCEPTION_CONTEXT;
+
+            RAISE WARNING '[SP_INS_APP_USER] % (SQLSTATE: %). Detail: %. Context: %. Params: %',
+                OUT_SQLERRMC, OUT_SQLSTATE, V_DETAIL, V_CONTEXT, V_OTHER_TEXT;
+        END;
+END;
+$$;
