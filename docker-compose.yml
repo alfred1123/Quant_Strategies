@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     environment:
       - APP_ENV=${APP_ENV:-dev}
-      - USE_SSM=${USE_SSM:-}
+      - USE_SSM=${USE_SSM:-1}
       - AWS_REGION=${AWS_REGION:-ap-southeast-1}
     env_file:
       - path: .env

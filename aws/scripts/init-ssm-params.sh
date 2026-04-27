@@ -47,12 +47,23 @@ put_secret() {
 echo "=== Bootstrapping SSM parameters under ${PREFIX}/ ==="
 echo ""
 
+# Environment-aware defaults
+if [[ "$ENV" == "dev" ]]; then
+  DB_HOST="localhost"
+  DB_PORT="5433"
+  CORS="http://localhost:5173"
+else
+  DB_HOST="quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com"
+  DB_PORT="5432"
+  CORS="https://yourdomain.com"
+fi
+
 # Plain-text parameters
-put "QUANTDB_HOST"    "quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com"
-put "QUANTDB_PORT"    "5432"
+put "QUANTDB_HOST"    "$DB_HOST"
+put "QUANTDB_PORT"    "$DB_PORT"
 put "FUTU_HOST"       "127.0.0.1"
 put "FUTU_PORT"       "11111"
-put "CORS_ORIGINS"    "https://yourdomain.com"
+put "CORS_ORIGINS"    "$CORS"
 
 # Secrets (prompted)
 put_secret "QUANTDB_USERNAME" "DB username"

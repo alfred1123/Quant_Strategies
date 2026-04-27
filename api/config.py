@@ -113,7 +113,11 @@ def load_config(debug: bool = False) -> str:
     use_ssm = os.getenv("USE_SSM", "").strip() == "1"
     if use_ssm:
         env = os.getenv("APP_ENV", "dev")
-        _load_from_ssm(env)
+        try:
+            _load_from_ssm(env)
+        except Exception as exc:
+            logger.warning("SSM unavailable (%s), falling back to .env", exc)
+            _load_from_dotenv()
     else:
         _load_from_dotenv()
 
