@@ -73,6 +73,7 @@ nav:
       - Dev vs Prod Config: architecture/dev-vs-prod.md
   - Guides:
       - CLI Backtest: guides/cli-backtest.md
+      - New User Guide (Website): guides/new-user-website.md
       - Indicators & Strategies: guides/indicators-strategies.md
       - Paper Trading (Futu): guides/trading.md
       - Adding Indicators: guides/adding-indicators.md
