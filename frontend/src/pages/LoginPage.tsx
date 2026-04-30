@@ -3,6 +3,7 @@ import {
   Alert, Box, Button, Card, CardContent, CircularProgress,
   Stack, TextField, Typography,
 } from '@mui/material';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useLogin } from '../api/auth';
 
 export default function LoginPage() {
@@ -10,6 +11,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const login = useLogin();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const redirectTo = (location.state as { from?: Location })?.from?.pathname ?? '/';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,9 +22,10 @@ export default function LoginPage() {
     login.mutate(
       { username: username.trim(), password },
       {
+        onSuccess: () => {
+          navigate(redirectTo, { replace: true });
+        },
         onError: err => {
-          // The axios interceptor already extracted the FastAPI `detail`.
-          // For 429 (rate-limited) we show a friendlier message.
           const msg = err instanceof Error ? err.message : String(err);
           if (msg.toLowerCase().includes('rate limit')) {
             setErrorMsg('Too many login attempts. Try again in a few minutes.');

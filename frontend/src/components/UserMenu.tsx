@@ -3,6 +3,7 @@ import {
   Avatar, IconButton, Menu, MenuItem,
   ListItemText, Divider,
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import { useLogout, type CurrentUser } from '../api/auth';
 
 interface UserMenuProps {
@@ -13,6 +14,7 @@ interface UserMenuProps {
 export default function UserMenu({ user }: UserMenuProps) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const logout = useLogout();
+  const navigate = useNavigate();
   const open = Boolean(anchorEl);
 
   const initial = (user.username[0] ?? '?').toUpperCase();
@@ -48,7 +50,9 @@ export default function UserMenu({ user }: UserMenuProps) {
         <MenuItem
           onClick={() => {
             setAnchorEl(null);
-            logout.mutate();
+            logout.mutate(undefined, {
+              onSettled: () => navigate('/login', { replace: true }),
+            });
           }}
           disabled={logout.isPending}
         >

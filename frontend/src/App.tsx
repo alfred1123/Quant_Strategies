@@ -1,4 +1,5 @@
 import { Box, CircularProgress, ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import BacktestPage from './pages/BacktestPage';
 import LoginPage from './pages/LoginPage';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -18,38 +19,73 @@ const darkTheme = createTheme({
   },
 });
 
-/**
- * Top-level route guard (login.md §9.1).
- *
- * Single mount-time `GET /auth/me` call:
- *   - loading → centered spinner
- *   - null    → <LoginPage />
- *   - user    → <BacktestPage />
- *
- * The axios 401 interceptor mutates the same query, so a session expiring
- * mid-use immediately demotes the SPA back to the login screen.
- */
-function Gate() {
-  const me = useMe();
+function FullPageSpinner() {
+  return (
+    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+      <CircularProgress />
+    </Box>
+  );
+}
 
-  if (me.isLoading) {
-    return (
-      <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
-        <CircularProgress />
-      </Box>
-    );
+/**
+ * Wrapper that protects a route behind authentication.
+ * While the auth check is in-flight it shows a spinner; once resolved,
+ * unauthenticated visitors are redirected to `/login`.
+ */
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const me = useMe();
+  const location = useLocation();
+
+  if (me.isLoading) return <FullPageSpinner />;
+  if (!me.data) return <Navigate to="/login" state={{ from: location }} replace />;
+  return children;
+}
+
+/**
+ * Wrapper for the login route. Already-authenticated users are bounced
+ * back to wherever they came from (or `/` by default).
+ */
+function GuestOnly({ children }: { children: React.ReactNode }) {
+  const me = useMe();
+  const location = useLocation();
+
+  if (me.isLoading) return <FullPageSpinner />;
+
+  if (me.data) {
+    const from = (location.state as { from?: Location })?.from?.pathname ?? '/';
+    return <Navigate to={from} replace />;
   }
-  if (!me.data) return <LoginPage />;
-  return <BacktestPage currentUser={me.data} />;
+  return children;
 }
 
 export default function App() {
   return (
-    <ThemeProvider theme={darkTheme}>
-      <CssBaseline />
-      <ErrorBoundary>
-        <Gate />
-      </ErrorBoundary>
-    </ThemeProvider>
+    <BrowserRouter>
+      <ThemeProvider theme={darkTheme}>
+        <CssBaseline />
+        <ErrorBoundary>
+          <Routes>
+            <Route
+              path="/login"
+              element={
+                <GuestOnly>
+                  <LoginPage />
+                </GuestOnly>
+              }
+            />
+            <Route
+              path="/"
+              element={
+                <RequireAuth>
+                  <BacktestPage />
+                </RequireAuth>
+              }
+            />
+            {/* Any unknown path → redirect to root (which checks auth) */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ErrorBoundary>
+      </ThemeProvider>
+    </BrowserRouter>
   );
 }

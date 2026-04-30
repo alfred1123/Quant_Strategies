@@ -42,6 +42,12 @@ apiClient.interceptors.response.use(
 
     if (status === 401) {
       queryClient.setQueryData(ME_QUERY_KEY, null);
+      // Push the browser to /login so a mid-session 401 doesn't leave the
+      // user staring at a broken page. This runs outside React so we use
+      // the History API directly.
+      if (window.location.pathname !== '/login') {
+        window.location.replace('/login');
+      }
     }
     return Promise.reject(new ApiError(message, status));
   },

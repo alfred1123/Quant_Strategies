@@ -11,7 +11,7 @@ import HeatmapChart from '../components/HeatmapChart';
 import EquityCurveChart from '../components/EquityCurveChart';
 import UserMenu from '../components/UserMenu';
 import { runOptimizeStream, runPerformance } from '../api/backtest';
-import type { CurrentUser } from '../api/auth';
+import { useMe } from '../api/auth';
 import type {
   BacktestConfig, OptimizeResponse, PerformanceResponse, Top10Row,
   WalkForwardResponse, OptimizeProgress,
@@ -56,7 +56,8 @@ function isAbortError(err: unknown): boolean {
   return err instanceof Error && err.name === 'AbortError';
 }
 
-export default function BacktestPage({ currentUser }: { currentUser: CurrentUser }) {
+export default function BacktestPage() {
+  const { data: currentUser } = useMe();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [config, setConfig] = useState<BacktestConfig>(DEFAULT_CONFIG);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -196,7 +197,7 @@ export default function BacktestPage({ currentUser }: { currentUser: CurrentUser
           <Button variant="outlined" onClick={() => setDrawerOpen(true)}>
             ⚙ Configure
           </Button>
-          <UserMenu user={currentUser} />
+          {currentUser && <UserMenu user={currentUser} />}
         </Toolbar>
       </AppBar>
 
