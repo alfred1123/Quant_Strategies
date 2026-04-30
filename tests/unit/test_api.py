@@ -1,23 +1,40 @@
 """Tests for the FastAPI backtest endpoints.
 
 Mocks the src/ pipeline modules so no real data fetching happens.
+Auth is bypassed via ``app.dependency_overrides[require_user]`` — every
+test runs as a synthetic CurrentUser without needing JWT cookies.
 """
 
 import pytest
 import pandas as pd
 import numpy as np
+from uuid import uuid4
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 
 @pytest.fixture
 def client():
-    """FastAPI test client with REFDATA cache stubbed."""
+    """FastAPI test client with REFDATA, instrument cache, AND auth stubbed.
+
+    Three things must be in place for protected routes to be reachable:
+      * ``app.state.refdata_cache`` / ``instrument_cache`` (data deps)
+      * ``app.state.auth_service`` (read by ``get_auth_service`` even when
+        ``require_user`` itself is overridden, because other deps may pick
+        it up)
+      * ``app.dependency_overrides[require_user]`` returning a synthetic
+        ``CurrentUser`` so the JWT cookie path is bypassed.
+    """
     with patch("src.data.psycopg"):
         from api.main import app
+        from api.auth.dependencies import require_user
+        from api.auth.models import CurrentUser
+
         app.state.refdata_cache = MagicMock()
         app.state.instrument_cache = MagicMock()
         app.state.instrument_cache.get_product_by_cusip.return_value = None
+        app.state.auth_service = MagicMock()
+        app.state.db_conninfo = "postgresql://test"
         app.state.refdata_cache.get.side_effect = lambda table: {
             "indicator": [
                 {"display_name": "SMA", "method_name": "get_sma", "is_bounded_ind": "N"},
@@ -32,7 +49,13 @@ def client():
                 {"name": "yahoo", "display_name": "Yahoo Finance", "class_name": "YahooFinance"},
             ],
         }.get(table, [])
-        yield TestClient(app)
+
+        fake_user = CurrentUser(app_user_id=uuid4(), username="test", session_gen=1)
+        app.dependency_overrides[require_user] = lambda: fake_user
+        try:
+            yield TestClient(app)
+        finally:
+            app.dependency_overrides.clear()
 
 
 # ── /health ─────────────────────────────────────────────────────────
