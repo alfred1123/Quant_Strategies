@@ -14,6 +14,7 @@ A single-page React + TypeScript application that replaces the Streamlit dashboa
 | Language | TypeScript | 6 |
 | Component Library | MUI (Material UI) | 9 |
 | Data Fetching | TanStack React Query | 5 |
+| Routing | React Router | 7 |
 | HTTP Client | Axios | 1 |
 | Charting | Plotly.js 3 + react-plotly.js 2 | — |
 | Tests | Vitest 4 + Testing Library + happy-dom | — |
@@ -43,14 +44,15 @@ Open `http://localhost:5173`. The Vite dev server proxies `/api` requests to the
 - Analysis panel: side-by-side metrics cards + Sharpe heatmap + equity curve + drawdown chart
 - **Walk-forward analysis** — in-sample vs out-of-sample comparison with overfitting ratio
 - **CSV download** of full grid search results
-- **Authentication** — cookie-based login; 401 interceptor auto-redirects to login page
+- **Authentication** — cookie-based login; 401 interceptor auto-redirects to `/login`
+- **Client-side routing** — `/login` (guest-only) and `/` (auth-required) as separate URLs via `react-router-dom`
 
 ## Project Structure
 
 ```
 frontend/src/
 ├── main.tsx              # React root — mounts <App />
-├── App.tsx               # Theme, auth gate, top-level layout
+├── App.tsx               # BrowserRouter, theme, RequireAuth/GuestOnly route guards
 ├── index.css             # Global styles
 │
 ├── types/                # TypeScript interfaces (no logic)
@@ -71,7 +73,9 @@ frontend/src/
 ├── utils/
 │   ├── grid.ts            # countSteps() — calculates grid search trial count
 │   ├── format.ts          # overfitColor/Label, formatMetric, rowLabel
-│   └── requestBuilders.ts # effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest
+│   ├── requestBuilders.ts # effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest
+│   ├── top10.ts           # isSingleFactorRow, readNumber, multiFactorParams (type-safe Top10Row accessors)
+│   └── validate.ts        # validateBacktestConfig, firstValidationError
 │
 ├── test/
 │   ├── setup.ts           # Vitest global setup (jest-dom matchers)
@@ -132,8 +136,9 @@ Once you know these shapes, every function signature and component prop makes se
 
 ### Layer 5: Pages (`pages/`) — orchestration
 
-- **`BacktestPage.tsx`** — The main page. Owns all state (`useState` for config, results, progress, errors). Wires `ConfigDrawer` → `buildOptimizeRequest()` → `runOptimizeStream()` → results components. This is the file to read to understand the full data flow.
-- **`App.tsx`** — Auth gate: loading spinner → `LoginPage` → `BacktestPage`. Also sets up the MUI dark theme.
+- **`BacktestPage.tsx`** — The main page. Owns all state (`useState` for config, results, progress, errors). Wires `ConfigDrawer` → `buildOptimizeRequest()` → `runOptimizeStream()` → results components. This is the file to read to understand the full data flow. Reads `currentUser` from `useMe()` hook directly.
+- **`App.tsx`** — Sets up `BrowserRouter`, MUI dark theme, and `ErrorBoundary`. Defines two route wrappers: `RequireAuth` (redirects to `/login` if not authenticated) and `GuestOnly` (redirects to `/` if already authenticated). Routes: `/login` → `LoginPage`, `/` → `BacktestPage`, `/*` → redirect to `/`.
+- **`LoginPage.tsx`** — Login form. On success, navigates to `/` (or the page that triggered the auth redirect via `location.state.from`).
 - **`main.tsx`** — Mounts `<App />` inside `<QueryClientProvider>` and `<StrictMode>`.
 
 ## Key Patterns
@@ -163,9 +168,9 @@ const set = (patch: Partial<BacktestConfig>) =>
 2. `result` → resolves the promise with the final `OptimizeResponse`
 3. `error` → rejects with an error message
 
-### Auth via cookie + interceptor
+### Auth via cookie + interceptor + routing
 
-Login sets an `HttpOnly` cookie (`qs_token`). The Axios interceptor watches for 401 responses and clears the cached user (`queryClient.setQueryData(['auth', 'me'], null)`), which triggers React to re-render the login page.
+Login sets an `HttpOnly` cookie (`qs_token`). The Axios interceptor watches for 401 responses, clears the cached user (`queryClient.setQueryData(['auth', 'me'], null)`), and calls `window.location.replace('/login')` to redirect the browser. The `RequireAuth` route wrapper in `App.tsx` also redirects unauthenticated users to `/login` on initial page load, preserving the original URL in `location.state.from` so the user returns there after signing in.
 
 ## REFDATA Integration
 

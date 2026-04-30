@@ -20,10 +20,15 @@ The frontend is small and consistent (MUI + TanStack Query + thin axios client).
 
 ```mermaid
 flowchart LR
-    App[App.tsx] --> Gate
-    Gate -->|loading| Spinner
-    Gate -->|null| LoginPage
-    Gate -->|user| BacktestPage
+    App[App.tsx] --> BrowserRouter
+    BrowserRouter -->|/login| GuestOnly
+    BrowserRouter -->|/| RequireAuth
+    GuestOnly -->|loading| Spinner
+    GuestOnly -->|authed| "Redirect /"
+    GuestOnly -->|guest| LoginPage
+    RequireAuth -->|loading| Spinner
+    RequireAuth -->|guest| "Redirect /login"
+    RequireAuth -->|authed| BacktestPage
     BacktestPage --> ConfigDrawer
     ConfigDrawer --> FactorCard
     ConfigDrawer --> ProductSelector
@@ -118,3 +123,4 @@ Items deferred from the hardening pass, ordered by approximate impact:
 - **No Zod** — SSE payloads are validated with hand-written narrowers. Adding a runtime-schema dependency is overkill for four event shapes; if a fifth or sixth event type appears the calculus may flip.
 - **`ApiError` over status codes only** — `apiClient` throws `ApiError(message, status)` so callers can branch on either `instanceof ApiError` or `err.status === 401`. Keeps backward-compat with consumers that just want `err.message` for display.
 - **Discriminated union over Zod-style parser for `Top10Row`** — The shape is fixed by the backend; a TypeScript discriminated union plus `utils/top10.ts` accessors gives compile-time safety without runtime overhead.
+- **`react-router-dom` for route separation** — Login (`/login`) and backtest (`/`) now live at distinct URLs via `BrowserRouter`. `RequireAuth` and `GuestOnly` route wrappers handle redirects. `BacktestPage` reads `currentUser` from `useMe()` directly (no prop drilling). Logout and 401 interceptor both navigate to `/login`. Nginx `try_files` already covers client-side routing fallback.
