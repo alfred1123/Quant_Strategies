@@ -1,8 +1,10 @@
 # Design: Queued Background Backtests
 
-**Status:** Draft — not yet implemented. Direction (Postgres-backed FIFO + LISTEN/NOTIFY) ratified in [decision #26](../decisions.md).
-**Date:** 2026-04-25
-**Scope:** `api/`, `frontend/`, `db/liquidbase/bt/`
+**Status:** Draft v2 — not yet implemented. Direction (Postgres-backed FIFO + `LISTEN/NOTIFY`) ratified in [decision #26](../decisions.md). v2 incorporates review feedback (drop VID, slim procedures, cooperative cancel in Phase 1, explicit module placement).
+**Date:** 2026-04-30
+**Scope:** `src/jobs.py`, `api/queue/`, `api/routers/jobs.py`, `frontend/`, `db/liquidbase/bt/`
+
+---
 
 ## 1. Problem
 
@@ -10,243 +12,238 @@ Large backtests and parameter optimizations are CPU-heavy. A run with 20,000 ite
 
 1. The user can only focus on one optimization at a time.
 2. There is no persistent queue of pending jobs.
-3. There is no backend-managed notion of `queued`, `running`, `completed`, `failed`, or `cancelled`.
-4. The UI cannot safely continue editing, adding, or removing queued strategies while one run is in progress.
+3. There is no backend-managed notion of `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, or `CANCELLED`.
+4. The UI cannot continue editing or queueing strategies while one run is in progress.
 
 There is also an implementation constraint:
 
-1. Python threads do not provide useful CPU parallelism for heavy pure-Python or mixed pandas/numpy workloads because of the GIL.
+1. Python threads do not provide useful CPU parallelism for heavy pure-Python or mixed pandas/numpy workloads (GIL).
 2. A thread is still useful for request detachment or I/O orchestration, but not as the main scaling primitive for many large concurrent backtests.
+
+---
 
 ## 2. Goals
 
-### Functional goals
+### Functional
 
 1. The backend accepts multiple backtest jobs and runs them one at a time in queue order.
-2. The UI shows a queue table on the right side with `queued`, `running`, `completed`, `failed`, and `cancelled` jobs.
-3. The running job shows progress as iterations completed vs total iterations remaining.
+2. The UI shows a queue panel with `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED` jobs.
+3. The running job shows progress as iterations completed vs total.
 4. The user can add more jobs while another job is running.
-5. The user can remove queued jobs while another job is running.
+5. The user can cancel any job (queued **or** running) from the UI.
 6. The running job automatically advances to the next queued job when complete.
 7. Completed jobs retain summary and result references.
 
-### UX goals
+### UX
 
-1. Editing the current strategy config must remain independent from submitted jobs.
-2. The queue must update live without requiring manual refresh.
-3. The user must be able to inspect the currently running job and completed jobs separately from the editable draft form.
+1. Editing the current strategy config never mutates submitted jobs.
+2. The queue updates live without manual refresh.
+3. The user can inspect any job (running or historical) separately from the editable draft form.
 
-### Technical goals
+### Technical
 
 1. Use process-based execution for CPU-bound optimization work.
 2. Persist queue state in PostgreSQL so jobs survive API restarts.
-3. Reuse existing backtest pipeline and existing BT persistence procedures where possible.
-4. Preserve the existing SSE model where practical.
+3. Reuse existing backtest pipeline and existing `BT.SP_INS_STRATEGY` / `BT.SP_INS_RESULT` procedures.
+4. Drive live updates via PostgreSQL `LISTEN/NOTIFY`, not polling.
+
+---
 
 ## 3. Non-Goals
 
-1. Running many backtests concurrently in the first version.
-2. Distributed scheduling across many worker hosts.
+1. Running many backtests concurrently in v1.
+2. Distributed scheduling across multiple worker hosts.
 3. Replacing the current optimization logic.
-4. Introducing Celery, Redis, or external queue infrastructure in the first version.
+4. Introducing Celery, Redis, or external queue infrastructure.
+5. Auto-retry of failed jobs (manual retry only).
 
-## 4. Constraints and Observations
+---
 
-### Current backend
+## 4. Module Placement
 
-The current backend already supports per-trial progress streaming for a single optimization request through SSE and a worker thread. That is sufficient for interactive single-run feedback, but it is not a durable queue.
+The queue spans the DB layer, the FastAPI process, and the React frontend. Following the existing repo pattern (`BacktestCache` lives in `src/data.py` even though only the API uses it):
 
-### Current frontend
+| Component | Location | Reason |
+|---|---|---|
+| `BacktestJobRepo` (`DbGateway` subclass — wraps SP calls and read queries) | `src/jobs.py` | Pure DB access. Reusable from tests, debug CLIs, and any future inspection tool. No FastAPI dependency. |
+| `BacktestJobManager` (lifespan-owned coordinator, `LISTEN/NOTIFY` consumer, child-process supervisor) | `api/queue/manager.py` | Tightly coupled to FastAPI lifespan. No meaning outside the API process. |
+| Worker entry point | `api/queue/worker.py` | Spawned as a child process. Imports the pipeline from `src/`. |
+| HTTP endpoints | `api/routers/jobs.py` | Mirrors `routers/backtest.py`. |
+| Pydantic request/response schemas | `api/schemas/jobs.py` | Mirrors `schemas/backtest.py`. |
+| Frontend queue panel + state | `frontend/src/features/queue/` | New feature folder; unlocks the deferred "Backtest feature module" item from the [Frontend Audit](frontend-audit.md). |
 
-The current page holds a single editable config and a single optimization result in local component state. This is good for interactive exploration, but it conflates:
+The CLI (`src/main.py`) is **not** modified — it runs synchronously and has no use for queueing.
 
-1. draft config being edited now
-2. submitted job waiting in queue
-3. running job state
-4. completed result history
+---
 
-### Concurrency model
+## 5. Architecture
 
-Because heavy optimization is CPU-bound, the worker that executes jobs should use a separate process, not only a Python thread. The API process can still use threads or asyncio for coordination, SSE fanout, and DB polling.
+### 5.1 High-level model
 
-## 5. Proposed Architecture
+Three roles inside the same FastAPI deployment unit:
 
-## 5.1 High-level model
+1. **API server** — accepts job submissions, queue mutations, queue queries, and SSE subscriptions.
+2. **Job manager** — runs inside FastAPI lifespan. Reacts to `LISTEN/NOTIFY` events. Spawns and supervises one worker process at a time. Maintains in-memory SSE subscriber lists.
+3. **Worker process** — executes exactly one backtest job in a separate Python process. Writes progress and terminal state directly to the DB via stored procedures.
 
-Introduce three backend roles inside the same deployment unit:
+```mermaid
+flowchart LR
+    UI[React UI] -->|POST /jobs| API[FastAPI router]
+    API -->|SP_INS_BACKTEST_JOB + NOTIFY| DB[(PostgreSQL)]
+    DB -->|NOTIFY job_enqueued| Mgr[BacktestJobManager<br/>LISTEN consumer]
+    Mgr -->|SP_CLAIM_NEXT_JOB| DB
+    Mgr -->|spawn| Worker[Worker process]
+    Worker -->|SP_UPD_PROGRESS / NOTIFY| DB
+    Worker -->|SP_UPD_TERMINAL + INS_STRATEGY + INS_RESULT| DB
+    DB -->|NOTIFY job_progress| Mgr
+    Mgr -->|SSE| UI
+```
 
-1. API server
-Accepts job submissions, queue mutations, queue queries, and job event streams.
+### 5.2 Why a single worker first
 
-2. Queue coordinator
-Runs inside FastAPI lifespan. Polls the DB for due work, assigns the next queued job when no job is running, and maintains in-memory subscriber lists for SSE clients.
+The requested behaviour is explicitly serial: one job runs, then the next queued job starts. A single worker matches this and avoids resource contention, duplicate data fetches, and CPU starvation. Multi-worker scaling is a future concern.
 
-3. Backtest worker process
-Executes exactly one backtest job at a time in a separate Python process. Reports progress back to the coordinator.
+### 5.3 Why process-based execution
 
-Version 1 keeps a single worker slot.
+1. Avoids GIL contention for CPU-heavy backtest loops.
+2. Prevents a long optimization from blocking the API event loop.
+3. Provides a clean failure boundary — a worker crash doesn't take down the API.
 
-## 5.2 Why a single worker first
+Recommended primitive: `multiprocessing.Process` (not `ProcessPoolExecutor`). Explicit lifecycle control makes cancellation, timeout, and termination cleaner than a pooled future.
 
-The requested behavior is explicitly serial:
+### 5.4 Why `LISTEN/NOTIFY` over polling
 
-1. one strategy backtest runs
-2. when it completes, the next queued job starts
+The original draft proposed a 1-second polling loop. With `NOTIFY` triggered on every state change we react in <10 ms with zero idle DB load. A slow watchdog poll (every 30 s) is kept only as a safety net for missed notifications (e.g. transient connection drop).
 
-That matches a single-process worker model and avoids resource contention, duplicate data fetches, and multi-job CPU starvation.
-
-## 5.3 Why process-based execution
-
-1. It avoids GIL contention for CPU-heavy backtest loops.
-2. It prevents a long optimization from blocking the API event loop.
-3. It provides a cleaner failure boundary than running heavy work directly in the API process.
-
-Recommended primitive:
-
-1. `concurrent.futures.ProcessPoolExecutor(max_workers=1)` for initial implementation, or
-2. `multiprocessing.Process` plus an IPC queue for explicit lifecycle control.
-
-Recommendation: start with `multiprocessing.Process` because it makes cancellation, heartbeat, and explicit progress messaging easier to control than a pooled future.
+---
 
 ## 6. Data Model
 
-Add persistent queue tables under `BT`.
+Two new tables under the `BT` schema.
 
-## 6.1 `BT.BACKTEST_JOB`
+### 6.1 `BT.BACKTEST_JOB`
 
-Purpose: durable queue item and job lifecycle record.
+Purpose: durable queue item and current job state. **One row per job, mutated in place** (no soft-versioning — the audit trail lives in `BACKTEST_JOB_EVENT`).
 
-Proposed columns:
+| Column | Type | Notes |
+|---|---|---|
+| `BACKTEST_JOB_ID` | `UUID` | PK. UUID v7 (time-ordered). |
+| `BACKTEST_JOB_NM` | `TEXT` | Optional display name. Auto-generated from request if blank, like `STRATEGY_NM`. |
+| `JOB_STATE` | `TEXT` | `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`. |
+| `PRIORITY` | `INTEGER` | Default `100`. Lower = sooner. `Run Now` enqueues with `0`. Dequeue order: `(PRIORITY, CREATED_AT)`. |
+| `CANCEL_REQUESTED_IND` | `CHAR(1)` | Default `'N'`. Set to `'Y'` to ask a `RUNNING` worker to exit cleanly. |
+| `TIMEOUT_SECONDS` | `INTEGER` | Default `1800` (30 min). Worker self-terminates if exceeded. Coordinator marks stale `RUNNING` jobs as `FAILED` on startup if `STARTED_AT + TIMEOUT_SECONDS < now()`. |
+| `REQUEST_JSON` | `JSONB` | Authoritative replayable input — full optimize request payload. |
+| `SUMMARY_JSON` | `JSONB` | User-facing summary for queue table rendering (symbol, mode, indicator, strategy, total_trials). Computed at enqueue. |
+| `PROGRESS_JSON` | `JSONB` | Overwritten in place. `{ trial, total, best_sharpe, started_at }`. |
+| `RESULT_JSON` | `JSONB` | Compact summary for queue display only (best params, top metrics). Full analytics fetched via `BT.RESULT`. |
+| `ERROR_JSON` | `JSONB` | `{ type, message, traceback }` on failure. |
+| `STRATEGY_VID` | `INTEGER` | Nullable FK → `BT.STRATEGY(STRATEGY_VID)`. Set on completion. Lets "view result" load the canonical strategy. |
+| `RESULT_ID` | `BIGINT` | Nullable FK → `BT.RESULT(RESULT_ID)`. Set on completion. |
+| `STARTED_AT` | `TIMESTAMPTZ` | Set on `RUNNING` transition. |
+| `FINISHED_AT` | `TIMESTAMPTZ` | Set on terminal transition. |
+| `USER_ID` | `TEXT` | The submitting user. Indexed. |
+| `CREATED_AT` | `TIMESTAMPTZ` | Default `now()`. |
+| `UPDATED_AT` | `TIMESTAMPTZ` | Updated on every state mutation. |
 
-1. `BACKTEST_JOB_ID UUID`
-2. `BACKTEST_JOB_VID INTEGER`
-3. `BACKTEST_JOB_NM TEXT`
-4. `JOB_STATE TEXT`
-Allowed values: `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`
-5. `QUEUE_POS INTEGER`
-6. `REQUEST_JSON JSONB`
-Full optimize request payload submitted from the UI.
-7. `SUMMARY_JSON JSONB`
-User-facing summary for quick rendering in queue table.
-8. `PROGRESS_JSON JSONB`
-Current trial, total trials, best Sharpe, ETA if available.
-9. `RESULT_JSON JSONB`
-Small result summary only, not full chart payload.
-10. `ERROR_JSON JSONB`
-Failure details if the job fails.
-11. `STARTED_AT TIMESTAMPTZ`
-12. `FINISHED_AT TIMESTAMPTZ`
-13. `USER_ID TEXT`
-14. `CREATED_AT TIMESTAMPTZ`
+Indexes:
 
-Notes:
+- `(USER_ID, JOB_STATE, PRIORITY, CREATED_AT)` — supports both per-user queue listing and the dequeue scan.
+- `(JOB_STATE, STARTED_AT)` partial index `WHERE JOB_STATE = 'RUNNING'` — supports stale-job recovery scan.
 
-1. `REQUEST_JSON` is the authoritative replayable input.
-2. `RESULT_JSON` is for queue/history display only; detailed analytics can still be loaded from BT result records or recomputed via existing endpoints.
+**Removed from v1:**
 
-## 6.2 `BT.BACKTEST_JOB_EVENT`
+- ~~`BACKTEST_JOB_VID`~~ — soft-versioning is for things like `STRATEGY` where edit history matters. A job has a state machine, not a version history.
+- ~~`QUEUE_POS`~~ — computed on read via `ROW_NUMBER() OVER (ORDER BY PRIORITY, CREATED_AT) WHERE JOB_STATE = 'QUEUED'`. Storing it would race with concurrent inserts/cancels.
 
-Purpose: append-only progress and audit log.
+### 6.2 `BT.BACKTEST_JOB_EVENT`
 
-Proposed columns:
+Purpose: append-only audit log of **state transitions only** — not per-trial progress.
 
-1. `BACKTEST_JOB_ID UUID`
-2. `BACKTEST_JOB_EVENT_ID INTEGER GENERATED IDENTITY`
-3. `EVENT_TYPE TEXT`
-Examples: `ENQUEUED`, `STARTED`, `PROGRESS`, `COMPLETED`, `FAILED`, `CANCELLED`
-4. `EVENT_AT TIMESTAMPTZ`
-5. `PAYLOAD_JSON JSONB`
-6. `USER_ID TEXT`
-7. `CREATED_AT TIMESTAMPTZ`
+| Column | Type | Notes |
+|---|---|---|
+| `BACKTEST_JOB_EVENT_ID` | `BIGINT GENERATED ALWAYS AS IDENTITY` | PK. Monotonic — supports SSE `Last-Event-ID` resume. |
+| `BACKTEST_JOB_ID` | `UUID` | FK → `BACKTEST_JOB`. |
+| `EVENT_TYPE` | `TEXT` | `ENQUEUED`, `STARTED`, `COMPLETED`, `FAILED`, `CANCELLED`, `CANCEL_REQUESTED`, `TIMEOUT`. |
+| `PAYLOAD_JSON` | `JSONB` | Optional event-specific detail. |
+| `USER_ID` | `TEXT` | Who triggered the event (system or user). |
+| `CREATED_AT` | `TIMESTAMPTZ` | Default `now()`. |
 
-This table supports:
+Indexed on `(BACKTEST_JOB_ID, BACKTEST_JOB_EVENT_ID)`.
 
-1. SSE replay from last event id if needed later
-2. audit trail
-3. debugging long-running jobs
+**No per-trial events** — that would be ~20k rows per large optimization. Per-trial progress lives in `BACKTEST_JOB.PROGRESS_JSON`, overwritten in place.
 
-## 6.3 Existing BT tables
+### 6.3 Existing BT tables
 
-Continue to use existing persistence for strategy/result snapshots:
+Untouched. The queue **orchestrates** but does not replace:
 
-1. strategy versioning via `BT.SP_INS_STRATEGY`
-2. run metrics persistence via `BT.SP_INS_RESULT`
+1. `BT.STRATEGY` (versioned) via `BT.SP_INS_STRATEGY`
+2. `BT.RESULT` (append-only) via `BT.SP_INS_RESULT`
 
-The queue tables do not replace those procedures. They orchestrate them.
+The job row links to those records via `STRATEGY_VID` + `RESULT_ID` after completion.
+
+---
 
 ## 7. Stored Procedures
 
-Following the repository rule that application writes must go through stored procedures, add procedures such as:
+Six procedures (down from the original eight).
 
-1. `BT.SP_INS_BACKTEST_JOB`
-2. `BT.SP_UPD_BACKTEST_JOB_STATE`
-3. `BT.SP_UPD_BACKTEST_JOB_PROGRESS`
-4. `BT.SP_CANCEL_BACKTEST_JOB`
-5. `BT.SP_DEL_BACKTEST_JOB`
-Only for queued jobs in first version
-6. `BT.SP_INS_BACKTEST_JOB_EVENT`
-7. `BT.SP_GET_BACKTEST_JOB`
-8. `BT.SP_GET_BACKTEST_JOB_QUEUE`
+| Procedure | Purpose | Triggers `NOTIFY` |
+|---|---|---|
+| `BT.SP_INS_BACKTEST_JOB` | Enqueue a job. Inserts row + `ENQUEUED` event. | `job_enqueued` |
+| `BT.SP_CLAIM_NEXT_JOB` | Atomic dequeue. `SELECT ... FOR UPDATE SKIP LOCKED` on the next `QUEUED` row, transition to `RUNNING`, set `STARTED_AT`, insert `STARTED` event. Returns the claimed job (or null). | `job_started` |
+| `BT.SP_UPD_BACKTEST_JOB_PROGRESS` | In-place update of `PROGRESS_JSON` + `UPDATED_AT`. No event row. | `job_progress` |
+| `BT.SP_UPD_BACKTEST_JOB_TERMINAL` | One call writes `JOB_STATE` (`COMPLETED`/`FAILED`/`CANCELLED`/`TIMEOUT`) + `RESULT_JSON` or `ERROR_JSON` + `STRATEGY_VID` + `RESULT_ID` + `FINISHED_AT` + corresponding event row. | `job_completed` / `job_failed` / `job_cancelled` |
+| `BT.SP_CANCEL_BACKTEST_JOB` | If `JOB_STATE = QUEUED`: transition to `CANCELLED` directly. If `RUNNING`: set `CANCEL_REQUESTED_IND = 'Y'` and insert `CANCEL_REQUESTED` event (worker observes flag at next checkpoint). | `job_cancelled` or `job_cancel_requested` |
+| `BT.SP_INS_BACKTEST_JOB_EVENT` | Append-only event insert. Called internally by the procedures above. | varies by event type |
 
-State transition rules:
+Reads (`GET /jobs`, `GET /jobs/{id}`) use plain `SELECT` per the project's "SELECT queries are unrestricted" rule.
 
-1. `QUEUED -> RUNNING`
-2. `RUNNING -> COMPLETED`
-3. `RUNNING -> FAILED`
-4. `QUEUED -> CANCELLED`
-5. `RUNNING -> CANCEL_REQUESTED` may be added later, but first version can disallow cancel of running jobs.
+### State transitions
 
-## 8. Backend API Design
+```
+                   ┌──────────┐
+                   │  QUEUED  │
+                   └────┬─────┘
+              ┌─────────┴─────────┐
+              ▼                   ▼
+       ┌───────────┐        ┌──────────┐
+       │ CANCELLED │        │ RUNNING  │
+       └───────────┘        └────┬─────┘
+                                 │
+                  ┌──────────────┼──────────────┬─────────────┐
+                  ▼              ▼              ▼             ▼
+           ┌───────────┐ ┌────────────┐ ┌───────────┐ ┌──────────┐
+           │ COMPLETED │ │   FAILED   │ │ CANCELLED │ │ TIMEOUT  │
+           └───────────┘ └────────────┘ └───────────┘ └──────────┘
+```
 
-## 8.1 New endpoints
+Terminal states (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`) are immutable. To re-run, the user submits a new job (Phase 2 adds a one-click "Retry" that copies `REQUEST_JSON`).
 
-### Queue mutation
+---
 
-1. `POST /api/v1/backtest/jobs`
-Enqueue a new backtest job.
+## 8. Backend API
 
-2. `DELETE /api/v1/backtest/jobs/{job_id}`
-Remove a queued job.
-If job is already running, return `409` in v1.
+All endpoints require auth (`require_user`).
 
-3. `POST /api/v1/backtest/jobs/{job_id}/cancel`
-Cancel a queued job. Optional in v1 if delete is enough.
+### 8.1 Endpoints
 
-### Queue reads
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/v1/backtest/jobs` | Enqueue. Returns `{ job_id, queue_pos }`. **Rate limit:** caller may have at most 20 `QUEUED` jobs at a time → `429` otherwise. |
+| `GET` | `/api/v1/backtest/jobs` | List queue + recent history (last 50 terminal jobs). Supports `?state=RUNNING` etc. filter. |
+| `GET` | `/api/v1/backtest/jobs/{job_id}` | Full job detail incl. `REQUEST_JSON`, current progress, links to result. |
+| `GET` | `/api/v1/backtest/jobs/{job_id}/result` | Resolves `STRATEGY_VID` + `RESULT_ID` → returns the same payload shape as today's `POST /backtest/optimize` response, so the existing analysis components reuse unchanged. |
+| `POST` | `/api/v1/backtest/jobs/{job_id}/cancel` | Cancels a `QUEUED` or `RUNNING` job (cooperative for running). Idempotent. |
+| `DELETE` | `/api/v1/backtest/jobs/{job_id}` | Hard delete a terminal-state job from history. Returns `409` if not terminal. |
+| `GET` | `/api/v1/backtest/jobs/stream` | SSE stream of queue events. Supports `Last-Event-ID` header backed by `BACKTEST_JOB_EVENT_ID` for reconnection. |
 
-1. `GET /api/v1/backtest/jobs`
-Return queue and recent history.
-
-2. `GET /api/v1/backtest/jobs/{job_id}`
-Return detailed job status and summary.
-
-3. `GET /api/v1/backtest/jobs/{job_id}/result`
-Return persisted result summary or resolved BT result record.
-
-### Live updates
-
-1. `GET /api/v1/backtest/jobs/stream`
-SSE stream for queue-level updates.
-
-Event types:
-
-1. `snapshot`
-Full queue snapshot on connect.
-2. `job_enqueued`
-3. `job_started`
-4. `job_progress`
-5. `job_completed`
-6. `job_failed`
-7. `job_cancelled`
-8. `job_removed`
-
-## 8.2 Request shapes
-
-### Enqueue request
+### 8.2 Enqueue request
 
 ```json
 {
   "job_name": "BTC Bollinger 2016-now",
+  "priority": "normal",
   "request": {
     "symbol": "BTC-USD",
     "start": "2016-01-01",
@@ -265,7 +262,9 @@ Full queue snapshot on connect.
 }
 ```
 
-### Queue row response
+`priority` is `"normal"` (→ DB priority `100`) or `"high"` (→ DB priority `0`, jumps the queue). The frontend's "Add to Queue" sends `normal`; "Run Now" sends `high`.
+
+### 8.3 Queue row response
 
 ```json
 {
@@ -273,13 +272,15 @@ Full queue snapshot on connect.
   "job_name": "BTC Bollinger 2016-now",
   "state": "RUNNING",
   "queue_pos": 0,
+  "priority": "normal",
   "submitted_at": "2026-04-25T12:00:00Z",
   "started_at": "2026-04-25T12:00:03Z",
   "summary": {
     "symbol": "BTC-USD",
     "mode": "single",
     "indicator": "bollinger",
-    "strategy": "momentum"
+    "strategy": "momentum",
+    "total_trials": 20000
   },
   "progress": {
     "trial": 734,
@@ -287,319 +288,267 @@ Full queue snapshot on connect.
     "remaining": 19266,
     "pct": 3.67,
     "best_sharpe": 1.4321
-  }
+  },
+  "cancel_requested": false
 }
 ```
 
-## 9. Queue Coordinator Design
+### 8.4 SSE event types
 
-## 9.1 Startup
+| Event | When | Payload |
+|---|---|---|
+| `snapshot` | On connect | Full queue + recent history rows |
+| `job_enqueued` | After `SP_INS_BACKTEST_JOB` | Full row |
+| `job_started` | After `SP_CLAIM_NEXT_JOB` | Full row |
+| `job_progress` | Throttled by worker | `{ job_id, progress }` |
+| `job_completed` / `job_failed` / `job_cancelled` / `job_timeout` | Terminal transition | Full row |
+| `job_cancel_requested` | User asked to cancel a running job | `{ job_id }` |
 
-Create a `BacktestJobManager` in FastAPI lifespan. Responsibilities:
+Each SSE event includes `id: <BACKTEST_JOB_EVENT_ID>` so reconnects can resume via `Last-Event-ID`.
 
-1. load initial queue snapshot
-2. start a polling loop
-3. own the worker-process handle
-4. own SSE subscriber queues
+---
 
-## 9.2 Polling loop
+## 9. Job Manager (coordinator)
 
-Every short interval, for example 1 second:
+`BacktestJobManager` is created in FastAPI lifespan and torn down on shutdown.
 
-1. if no running job exists, fetch the next queued job by queue position and creation time
-2. atomically transition it to `RUNNING`
-3. spawn worker process
-4. consume progress messages from worker IPC queue
-5. persist progress state periodically, not necessarily every trial
-6. when worker exits, persist terminal state and start next job
+### 9.1 Startup
 
-## 9.3 IPC messages from worker
+1. Open a dedicated psycopg connection in autocommit mode for `LISTEN`.
+2. `LISTEN job_enqueued, job_progress, job_completed, job_failed, job_cancelled, job_cancel_requested`.
+3. Run **stale-job recovery**: any `RUNNING` job with `STARTED_AT + TIMEOUT_SECONDS < now()` (or no live worker process) → mark `FAILED` with reason `restart_during_run`. **Don't auto-requeue** (non-idempotent side effects already written to `BT.RESULT` would double up).
+4. Try to claim and start the next `QUEUED` job (in case one was added while the API was down).
 
-```json
-{ "type": "started", "job_id": "..." }
-{ "type": "progress", "job_id": "...", "trial": 10, "total": 20000, "best_sharpe": 1.02 }
-{ "type": "completed", "job_id": "...", "result": { ... } }
-{ "type": "failed", "job_id": "...", "error": { ... } }
-```
+### 9.2 Event loop
 
-## 9.4 Progress persistence policy
+The manager runs a single asyncio task that:
 
-Do not write to DB on every trial for large jobs. That would create avoidable write pressure.
+1. Awaits notifications on the `LISTEN` connection.
+2. On `job_enqueued` or `job_completed`/`job_failed`/`job_cancelled` (anything that frees the slot) — if no worker is currently running, attempt `SP_CLAIM_NEXT_JOB` and spawn the worker if one is returned.
+3. On `job_progress` — fan out to subscribed SSE clients.
+4. On `job_cancel_requested` — the running worker observes the flag itself; the manager just relays the SSE event.
 
-Persist progress on either:
+A separate watchdog task wakes every 30 s and:
 
-1. every N trials, for example every 25 or 50, or
-2. every T seconds, for example every 1 second, whichever comes first
+1. Re-runs stale-job recovery.
+2. If the worker handle is `None` but a `QUEUED` job exists, attempt to claim again (catches missed notifications).
 
-SSE can still publish in-memory updates more frequently.
+### 9.3 Worker supervision
 
-## 10. Execution Flow
+- `multiprocessing.Process` with `target=run_worker, args=(job_id, db_conninfo, ...)`.
+- Manager retains the `Process` handle and the `job_id`.
+- On process exit:
+  - If the worker wrote a terminal state → fine, NOTIFY arrives, slot frees.
+  - If the worker died without writing terminal state → manager calls `SP_UPD_BACKTEST_JOB_TERMINAL(state='FAILED', error={crash, exit_code})`.
 
-## 10.1 Submit
+### 9.4 SSE fanout
 
-1. User edits draft config in the UI.
-2. User clicks `Add to Queue`.
-3. Frontend sends enqueue request.
-4. Backend persists `QUEUED` job.
-5. SSE notifies all clients.
+A simple in-memory `set[asyncio.Queue]` of subscriber queues. Each connected SSE client gets its own queue. The `LISTEN` task `put`s each event onto every subscriber queue. Disconnections clean up via `finally`.
 
-## 10.2 Run
+---
 
-1. Coordinator detects no active running job.
-2. Coordinator claims the next queued job.
-3. Worker process reconstructs the existing `OptimizeRequest`.
-4. Worker calls the existing optimization pipeline.
-5. Per-trial callback emits progress messages.
-6. On completion:
-   - persist strategy via `BT.SP_INS_STRATEGY`
-   - persist result via `BT.SP_INS_RESULT`
-   - update queue job to `COMPLETED`
-   - publish completion event
-7. Coordinator starts the next queued job.
+## 10. Worker process
 
-## 10.3 Remove while another job runs
+`api/queue/worker.py` exposes a `run(job_id, db_conninfo)` entry point that runs in the child process.
 
-1. User removes a queued row from the right-side table.
-2. Backend validates that the target job is still `QUEUED`.
-3. Backend marks it `CANCELLED` or deletes it, depending on retention preference.
-4. Queue positions are normalized.
-5. Running job continues uninterrupted.
+### 10.1 Flow
 
-## 11. Frontend Design
+1. Open its own DB connection (separate from the API's pool).
+2. `SELECT REQUEST_JSON, TIMEOUT_SECONDS FROM BT.BACKTEST_JOB WHERE BACKTEST_JOB_ID = :id`.
+3. Reconstruct the existing `OptimizeRequest` Pydantic model.
+4. Set up a deadline: `deadline = now + TIMEOUT_SECONDS`.
+5. Call the existing optimization pipeline (`api.services.backtest.run_optimize`) with a per-trial callback.
 
-## 11.1 State split
+### 10.2 Per-trial callback
 
-Split frontend state into three concerns:
+Throttled — runs the body only when:
 
-1. `draftConfig`
-The editable form in the drawer.
+- `trial % PROGRESS_EVERY_N_TRIALS == 0` (default 25), **or**
+- `now() - last_progress_at > PROGRESS_EVERY_T_SECONDS` (default 1.0)
 
-2. `queue`
-Live list of backend job rows.
+When it runs:
 
-3. `selectedJob`
-The queue/history row currently being inspected in the results panel.
+1. `SP_UPD_BACKTEST_JOB_PROGRESS(job_id, trial, total, best_sharpe)`.
+2. Re-read `CANCEL_REQUESTED_IND` and check the deadline:
+   - `CANCEL_REQUESTED_IND = 'Y'` → raise `JobCancelled`.
+   - `now() > deadline` → raise `JobTimeout`.
 
-Current `config` state in `BacktestPage.tsx` becomes `draftConfig`.
+### 10.3 Termination
 
-## 11.2 Layout
+- **Normal completion:** `SP_INS_STRATEGY` → `SP_INS_RESULT` → `SP_UPD_BACKTEST_JOB_TERMINAL(state='COMPLETED', result=summary, strategy_vid=..., result_id=...)`.
+- **`JobCancelled`:** `SP_UPD_BACKTEST_JOB_TERMINAL(state='CANCELLED')`.
+- **`JobTimeout`:** `SP_UPD_BACKTEST_JOB_TERMINAL(state='TIMEOUT', error={...})`.
+- **Any other exception:** `SP_UPD_BACKTEST_JOB_TERMINAL(state='FAILED', error={type, message, traceback})`.
 
-Current page is vertically stacked. Proposed layout:
+The worker process exits with code 0 on terminal state written, non-zero on crash.
 
-1. left main column
-Draft config, selected job results, charts, completed-job analysis.
+---
 
-2. right side panel
-Queue table with pending/running/recent jobs.
+## 11. Frontend
 
-Desktop layout:
+### 11.1 State split
 
-1. main content: about 70%
-2. queue panel: about 30%
+| State | Owner | Source |
+|---|---|---|
+| `draftConfig` | `BacktestPage` (replaces today's `config`) | `useState` |
+| `queue` | `useJobsStream()` hook | TanStack Query + SSE |
+| `selectedJobId` | `BacktestPage` | URL param `?job=<uuid>` |
 
-Mobile layout:
+URL-driven `selectedJobId` makes job views shareable and survives refresh.
 
-1. queue panel collapses under main content or into a drawer.
+### 11.2 Layout
 
-## 11.3 Queue table columns
+| Region | Width | Content |
+|---|---|---|
+| Left main column | ~70% desktop | Draft config drawer trigger + selected job's results (charts, metrics, top-10 table) |
+| Right side panel | ~30% desktop | Queue table (running, queued, recent terminal) |
 
-1. position
-2. state
-3. name
-4. symbol
-5. factor summary
-6. submitted time
-7. progress bar
-8. trials left
-9. best Sharpe so far
-10. actions
+Mobile: queue collapses into a bottom sheet or a tab.
 
-Actions:
+### 11.3 Queue table columns
 
-1. remove for queued jobs
-2. inspect for completed/running jobs
-3. retry for failed jobs later
+| Column | Notes |
+|---|---|
+| State | Coloured chip (grey/blue/green/red/orange) |
+| Position | Empty for non-queued |
+| Name | Click → loads result into main panel |
+| Symbol + factor summary | One-liner |
+| Submitted | Relative time ("2 min ago") |
+| Progress | Bar + `734 / 20000` for running; full bar for completed; empty for queued |
+| Best Sharpe | Live for running, final for completed |
+| Actions | Cancel (queued or running) · Retry (failed/cancelled — Phase 2) · Delete (terminal only) |
 
-## 11.4 Progress bar behavior
+### 11.4 Editable UI while jobs run
 
-For running job:
+- Editing the draft form never mutates submitted jobs.
+- "Add to Queue" snapshots the current draft into a new job (priority `normal`).
+- "Run Now" snapshots and enqueues with priority `high` — bumps to head of queue but does **not** preempt the running job.
+- Clicking a queue row sets `selectedJobId`; the right panel highlights it; the main panel shows that job's result.
+- Closing the drawer doesn't lose the draft — it's preserved in component state.
 
-1. `value = trial / total * 100`
-2. label `734 / 20000`
-3. secondary caption `19266 left`
+### 11.5 SSE reconnection
 
-For queued jobs:
+`useJobsStream()` stores the latest `BACKTEST_JOB_EVENT_ID` it processed. On reconnect it sends `Last-Event-ID` so the server can replay missed events from `BT.BACKTEST_JOB_EVENT`.
 
-1. empty bar or queued badge only
+---
 
-For completed jobs:
+## 12. Failure handling
 
-1. full bar with completed badge
+| Scenario | Behaviour |
+|---|---|
+| Worker raises | `SP_UPD_BACKTEST_JOB_TERMINAL(state='FAILED', error={...})` → SSE `job_failed` → manager picks next queued job. |
+| Worker crashes (process exit ≠ 0 with no terminal state written) | Manager writes `FAILED` with `{reason: 'worker_crash', exit_code}`. |
+| Worker exceeds `TIMEOUT_SECONDS` | Worker self-terminates with `TIMEOUT` state. If worker is unresponsive, manager kills the process after `TIMEOUT_SECONDS + 60` and writes `FAILED`. |
+| API restart during a `RUNNING` job | On startup, mark stale `RUNNING` jobs `FAILED` with reason `restart_during_run`. **Never auto-requeue** — `BT.RESULT` writes from the partial run may already exist. User retries explicitly. |
+| DB unreachable mid-run | Worker's progress writes will fail; on its next attempt, the worker exits non-zero. API marks `FAILED` once it can reach the DB again. |
+| Many users hammer enqueue | `429` after 20 `QUEUED` jobs per user. |
 
-## 11.5 Editable UI while jobs run
+---
 
-This requirement is critical. The UI must not bind the form directly to the running job.
+## 13. Test strategy
 
-Rules:
+| Layer | Tests |
+|---|---|
+| DB (`tests/integration/test_jobs_db.py`) | Each procedure round-trip. Concurrent `SP_CLAIM_NEXT_JOB` from two transactions claims at most one job (`FOR UPDATE SKIP LOCKED` correctness). Cancel of QUEUED transitions directly; cancel of RUNNING flips the flag. Stale-job recovery query. |
+| Worker (`tests/unit/test_worker.py`) | Stub the optimization pipeline. Test progress throttling, cancellation observation, timeout enforcement, terminal state writes for each exit path. |
+| Manager (`tests/unit/test_job_manager.py`) | Mock psycopg `LISTEN` connection. Test event-driven claim, watchdog claim on missed notification, fanout to multiple SSE subscribers, stale-job recovery on startup. |
+| API (`tests/unit/test_jobs_api.py`) | Auth, rate limiting (20 queued cap), enqueue → list → cancel → delete flow. SSE reconnect with `Last-Event-ID`. |
+| Frontend (`useJobsStream.test.tsx`) | Apply each event type to local state. Reconnect carries `Last-Event-ID`. Cancel button calls the API. |
 
-1. Editing the draft form never mutates already queued jobs.
-2. Clicking `Add to Queue` snapshots the current draft into a new submitted job.
-3. Removing a queued job affects only that queued item.
-4. The results area shows the selected job, not necessarily the draft.
+---
 
-This means the form remains fully usable while one job is running and others are queued.
-
-## 11.6 User actions
-
-Primary CTA changes from `Run Optimization` to two actions:
-
-1. `Run Now`
-If no active running job and queue empty, enqueue and allow immediate start.
-
-2. `Add to Queue`
-Always enqueue the current draft.
-
-Optional future action:
-
-1. `Save Draft`
-
-## 12. Live Update Transport
-
-Use SSE for queue updates in version 1.
-
-Reasons:
-
-1. The app already uses SSE patterns for optimization progress.
-2. Queue updates are server-to-client only.
-3. Browser and FastAPI support is straightforward.
-
-One queue stream endpoint broadcasts all queue changes. The frontend maintains local queue state by applying events.
-
-## 13. Result Inspection Model
-
-When a job completes:
-
-1. queue row changes to `COMPLETED`
-2. user can click the row
-3. frontend loads detailed result payload for that job
-
-Detailed result handling options:
-
-1. store compact result pointers in `BT.BACKTEST_JOB.RESULT_JSON` and fetch detailed metrics/charts through a result endpoint
-2. store enough rendered response JSON directly in the job record for quick inspection
-
-Recommendation:
-
-1. persist small summary in job table
-2. persist canonical strategy/result in existing BT tables
-3. load detailed analytics via dedicated API when the user selects a completed job
-
-## 14. Failure Handling
-
-### Job failure
-
-If a job fails:
-
-1. mark `FAILED`
-2. persist error payload
-3. publish `job_failed`
-4. automatically continue to next queued job
-
-### API restart
-
-Because queue state is persisted:
-
-1. queued jobs remain queued
-2. a job previously marked `RUNNING` should be recovered on startup
-
-Recovery policy in v1:
-
-1. on startup, any stale `RUNNING` jobs become `FAILED` with restart reason, or
-2. they are moved back to `QUEUED`
-
-Recommendation: move stale `RUNNING` to `QUEUED` if no partial result persistence exists.
-
-## 15. Performance Considerations
+## 14. Performance considerations
 
 1. Single worker prevents CPU oversubscription.
-2. DB progress writes should be throttled.
-3. SSE payloads should be compact.
-4. Queue list endpoint should return only current queue plus recent history, not all historical jobs.
+2. DB progress writes throttled to ~1/s (or every 25 trials) regardless of trial rate.
+3. SSE payloads are small (~500 B); no chart data on the stream.
+4. Queue list endpoint returns at most current queue + 50 most-recent terminal jobs. Older history loaded on demand.
+5. `LISTEN/NOTIFY` is in-process to PostgreSQL — no extra hop.
 
-## 16. Security and Multi-User Readiness
+---
 
-Even if current use is single-user, include `USER_ID` on queue rows so the design can later support:
+## 15. Security
 
-1. per-user queues
-2. filtered history
-3. access control
+1. All queue endpoints under `require_user`.
+2. `USER_ID` stamped on every job and event. Read endpoints filter by user (admins later).
+3. `REQUEST_JSON` is treated as data — no `eval`, no SP that interprets it directly.
+4. Rate limit: max 20 `QUEUED` jobs per user.
+5. Cancel/delete authorized only for the owning user.
 
-## 17. Phased Implementation Plan
+---
 
-## Phase 1: Single-instance durable queue
+## 16. Phased implementation plan
 
-1. Add queue tables and procedures
-2. Add job manager in API lifespan
-3. Add single worker process
-4. Add enqueue/list/remove endpoints
-5. Add queue SSE endpoint
-6. Add right-side queue panel in frontend
-7. Keep existing single-run analysis rendering for completed selected job
+Each slice is independently shippable.
 
-Outcome:
+### Slice A — Schema + procedures (1–2 days)
 
-1. one running job
-2. many queued jobs
-3. add/remove while running
-4. live progress bar and iterations left
+1. Liquibase changesets for `BT.BACKTEST_JOB`, `BT.BACKTEST_JOB_EVENT` and indexes.
+2. The 6 procedures in §7, each with proper `LANGUAGE plpgsql` + `EXCEPTION WHEN OTHERS` + `CORE_INS_LOG_PROC`.
+3. `src/jobs.py` — `BacktestJobRepo` (DbGateway subclass) wrapping the procedures and reads.
+4. Integration tests against the live DB.
 
-## Phase 2: Better history and retry
+### Slice B — Manager + worker (2–3 days)
 
-1. add completed/failed tabs
-2. add retry action
-3. add queue reorder endpoint
-4. add persisted event history view
+1. `api/queue/manager.py` and `api/queue/worker.py` per §9–§10.
+2. Wire into FastAPI lifespan in `api/main.py`.
+3. Stale-job recovery on startup.
+4. Cooperative cancel + timeout enforcement.
+5. Unit tests with mocked subprocess.
 
-## Phase 3: Running job cancel and resumability
+### Slice C — HTTP API + SSE (1–2 days)
 
-1. cooperative cancel for running worker
-2. heartbeat and stale job recovery
-3. optional partial result persistence
+1. `api/routers/jobs.py`, `api/schemas/jobs.py`.
+2. `Last-Event-ID` SSE replay from the events table.
+3. Auth + rate limiting.
+4. Integration tests against the real procedures from Slice A.
 
-## 18. Open Questions
+### Slice D — Frontend queue panel (2–3 days)
 
-1. Should removing a queued job hard-delete it, or mark it `CANCELLED` for auditability?
-Recommendation: mark `CANCELLED`.
+1. New `frontend/src/features/queue/` folder.
+2. `useJobsStream()` hook, queue panel component, cancel button, retry placeholder.
+3. URL-driven `selectedJobId`.
+4. Replace `Run Optimization` button with `Add to Queue` + `Run Now`.
+5. Move existing analysis rendering to be driven by `selectedJobId` instead of local state.
 
-2. Should the queue be global or per user?
-Recommendation: model for per-user now, even if initially filtered to one user.
+### Phase 2 — quality of life (after Phase 1 is stable)
 
-3. Should we allow queue reorder in v1?
-Recommendation: no. FIFO first.
+1. Retry button (copies `REQUEST_JSON` into a new job).
+2. Queue reorder (drag and drop) — adds `priority` to the API.
+3. Per-job event log viewer (reads `BACKTEST_JOB_EVENT` table).
+4. Search/filter terminal history.
 
-4. Should the running job be cancellable in v1?
-Recommendation: no. Defer until cooperative cancel is designed.
+### Phase 3 — scale-out (only if needed)
 
-5. Should detailed chart data be stored in the queue table?
-Recommendation: no. Store summaries in queue, canonical metrics in BT result tables.
+1. Multi-worker via configurable slot count (`SELECT ... FOR UPDATE SKIP LOCKED` already supports this).
+2. Heartbeat-based stale detection finer than `TIMEOUT_SECONDS`.
+3. Optional partial result persistence so a restart can resume mid-run.
 
-## 19. Recommendation
+---
 
-Implement a durable FIFO queue with:
+## 17. Open questions
 
-1. PostgreSQL-backed job state
-2. a single process-based worker
-3. SSE queue updates
-4. frontend separation between editable draft and submitted jobs
+1. **Removing terminal jobs — hard delete or soft delete?** Recommendation: hard delete (the events table preserves the audit trail).
+2. **Per-user queue or global queue?** Recommendation: global queue, but `USER_ID` stamped and surfaced. A single trader running multiple strategies is the v1 reality.
+3. **Run Now jumping the queue — fair?** Recommendation: yes for single-tenant. Revisit if multi-user.
+4. **Should the queue stream multiplex with the existing optimize SSE?** Recommendation: no. Keep them separate — different lifetimes (queue stream is connection-long; optimize stream is run-long).
 
-## 20. Technology Choice — Why Postgres, Not Kafka or Redis
+---
+
+## 18. Recommendation
+
+Build slices A → B → C → D in order. Each is independently reviewable and merges to `main` without breaking the existing single-shot `POST /backtest/optimize` path (which remains as a fallback throughout Phase 1).
+
+---
+
+## 19. Technology choice — Why Postgres, not Kafka or Redis
 
 This section documents why the queue is built on PostgreSQL rather than a dedicated broker.
 
-### 20.1 What we actually need
+### 19.1 What we actually need
 
 | Need | Required by Quant Strategies today |
-|------|-----------------------------------|
+|---|---|
 | Durable job state across API restarts | Yes |
 | FIFO ordering with backpressure | Yes |
 | At-most-one worker pulling at a time | Yes (Phase 1) |
@@ -609,49 +558,45 @@ This section documents why the queue is built on PostgreSQL rather than a dedica
 | Cross-service event distribution | No |
 | Schema registry, partitions, consumer groups | No |
 
-### 20.2 Why not Kafka
+### 19.2 Why not Kafka
 
 Kafka solves problems we do not have:
 
-1. **Operational weight.** Kafka requires a broker cluster, KRaft (or ZooKeeper), partition planning, retention policies, and typically a schema registry. None of this is justified for a single-tenant FastAPI backend.
-2. **Wrong primitive.** Kafka is a high-throughput append-only log designed for fan-out to many independent consumers. Our queue has exactly one consumer (the worker process) and needs `SELECT ... FOR UPDATE SKIP LOCKED` semantics, which a log does not natively provide.
-3. **Volume mismatch.** A backtest job is one row every few seconds at most. Kafka starts to pay back at thousands of events per second.
-4. **No existing dependency.** Adding Kafka means a new container, new credentials, new monitoring surface — versus reusing the Postgres cluster we already operate on AWS RDS.
+1. **Operational weight.** Kafka requires a broker cluster, KRaft (or ZooKeeper), partition planning, retention policies, and typically a schema registry. Not justified for a single-tenant FastAPI backend.
+2. **Wrong primitive.** Kafka is a high-throughput append-only log designed for fan-out to many independent consumers. Our queue has exactly one consumer and needs `SELECT ... FOR UPDATE SKIP LOCKED` semantics, which a log does not natively provide.
+3. **Volume mismatch.** A backtest job is one row every few seconds at most.
+4. **No existing dependency.** Adding Kafka means a new container, credentials, monitoring surface — versus reusing the Postgres cluster we already operate.
 
-Kafka would only become interesting if we later add (a) a live tick-data ingestion pipeline fanning out to multiple strategy processes, or (b) cross-service event distribution between FastAPI, a separate execution gateway, and an audit store.
+Kafka becomes interesting only if we add (a) a live tick-data ingestion pipeline, or (b) cross-service event distribution.
 
-### 20.3 Why not Redis (RQ / Streams)
+### 19.3 Why not Redis
 
-Redis-based queues (RQ, Celery+Redis, Redis Streams) are a reasonable middle ground but were rejected for v1:
+1. **New stateful service.** Another piece of infrastructure to back up, monitor, secure.
+2. **No transactional coupling.** Job-completion writes (job state + `BT.RESULT`) become a two-phase coordination problem instead of one transaction.
+3. **Loss of SQL inspection.** `SELECT * FROM BT.BACKTEST_JOB WHERE JOB_STATE = 'FAILED'` from psql is invaluable for debugging.
 
-1. **New stateful service.** Redis would become a second piece of infrastructure that must be backed up, monitored, and access-controlled — for a workload Postgres can already handle.
-2. **No transactional coupling.** A backtest job completion needs to (a) update job state, (b) write rows into `BT.RESULT` / `BT.API_REQUEST_PAYLOAD`. With Postgres-backed jobs this is one transaction. With Redis it becomes a two-phase coordination problem.
-3. **Loss of SQL inspection.** Operators can already `SELECT * FROM BT.BACKTEST_JOB WHERE STATUS = 'failed'` from psql. With Redis we would need a separate inspection tool.
+Redis is worth re-evaluating if (a) submission rate grows past several per second sustained, or (b) we need pub/sub fan-out for live progress to many browser tabs simultaneously.
 
-Redis becomes worth re-evaluating if (a) job submission rate grows past a few per second sustained, or (b) we need pub/sub fan-out for live progress to many browser tabs.
+### 19.4 Why Postgres fits
 
-### 20.4 Why Postgres fits
-
-1. **Already operated.** The cluster, credentials, backups, and migration tooling (Liquibase) are in place.
-2. **`SELECT ... FOR UPDATE SKIP LOCKED`** gives exactly the dequeue semantics we need with no extra library.
-3. **`LISTEN` / `NOTIFY`** can drive live SSE updates without a separate broker.
+1. **Already operated.** Cluster, credentials, backups, Liquibase migrations all in place.
+2. **`SELECT ... FOR UPDATE SKIP LOCKED`** gives the dequeue semantics for free.
+3. **`LISTEN/NOTIFY`** drives live SSE without a broker.
 4. **Transactional integrity** between job state and result rows is free.
-5. **No new failure mode** — if Postgres is down the API is already down.
+5. **No new failure mode** — if Postgres is down, the API is already down.
 
-Throughput ceiling on a single Aurora instance for this pattern is comfortably in the hundreds of jobs per second, well beyond our requirements.
+Throughput ceiling on a single Aurora instance for this pattern is comfortably in the hundreds of jobs per second, well beyond requirements.
 
-### 20.5 Lighter still — when even a queue is overkill
+### 19.5 Lighter still — when even a queue is overkill
 
-If usage stays single-user and one optimization at a time is acceptable, a `concurrency_limit` semaphore in `api/services/backtest.py` is sufficient and adds zero schema. The full queue design in this document is justified once any of the following becomes true:
+If usage stays single-user and one optimization at a time is acceptable, an `asyncio.Semaphore(1)` in `api/services/backtest.py` is sufficient and adds zero schema. The full design above is justified once any of:
 
 1. Multiple users submitting concurrently
 2. The user wants to enqueue several runs and walk away
 3. Optimizations routinely exceed a few minutes and tying up a uvicorn worker becomes painful
 
-Until then, the queue can be implemented behind the same API surface (POST returns a job id immediately) so the migration is transparent to the frontend.
+The current usage already meets condition 2, which is why this design moves forward.
 
-### 20.6 Decision
+### 19.6 Decision
 
-Postgres-backed FIFO queue, single worker, `LISTEN/NOTIFY` for live updates. Re-evaluate Redis if submission rate or fan-out grows; re-evaluate Kafka only if a live market-data ingestion pipeline is added.
-
-This satisfies the user requirement that the UI remains editable while a long backtest is running, while also addressing the Python threading limitation correctly by using a separate process for CPU-bound execution.
+Postgres-backed FIFO queue, single worker, `LISTEN/NOTIFY` for live updates, cooperative cancel and timeout in Phase 1. Re-evaluate Redis if submission rate or fan-out grows; re-evaluate Kafka only if a live market-data ingestion pipeline is added.
