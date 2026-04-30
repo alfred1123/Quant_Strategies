@@ -16,13 +16,13 @@ environment after a deploy or onboard quickly.
 | `QUANTDB_PASSWORD` | shared DB password | same | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | `APP_ENV` | `dev` (default) | `prod` | `docker-compose.prod.yml` |
 | `USE_SSM` | `1` (default) | `1` | `docker-compose.yml` (default for both) |
-| `COOKIE_SECURE` | not set (defaults `false`) | `0` (HTTP) / `1` (HTTPS) | `docker-compose.prod.yml` / `docker-compose.tls.yml` |
+| `COOKIE_SECURE` | unset (defaults to `APP_ENV == prod`) | `0` (HTTP) / `1` (HTTPS) | `docker-compose.prod.yml` / `docker-compose.tls.yml` |
 | `CORS_ORIGINS` | `http://localhost:5173` | `http://localhost:5173,http://52.221.3.230` | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | `JWT_SECRET` | shared dev secret from SSM | fixed value from SSM | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | DB access method | SSM port-forward tunnel | Direct VPC connection | Network topology |
 | Nginx config | `nginx.dev.conf` (HTTP only) | Same (HTTP) or `nginx.conf` (TLS via `docker-compose.tls.yml`) | `docker/nginx/` |
 | Swagger UI | enabled (`/docs`) | disabled | `api/main.py` checks `APP_ENV` |
-| Logging | stdout + file (`log/bt_app.log`) | stdout only | `api/config.py` checks `APP_ENV` |
+| Logging | stdout, plus file (`log/bt_app.log`) when running locally **without** `USE_SSM=1` | stdout only | `api/config.py` `setup_logging()` |
 
 ---
 

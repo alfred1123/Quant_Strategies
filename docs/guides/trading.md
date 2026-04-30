@@ -1,6 +1,7 @@
 # Paper Trading with Futu OpenD
 
-The **Trading** tab in the Streamlit dashboard lets you connect to a running Futu OpenD gateway and execute orders in paper (simulate) or live mode — directly from your backtest results.
+!!! note "Status"
+    The Futu paper-trading flow is currently a **Python-only utility** in `src/trade.py`. It is **not exposed in the React SPA** at the moment. Use it from a Python shell, notebook, or script.
 
 ## Prerequisites
 
@@ -13,31 +14,10 @@ The **Trading** tab in the Streamlit dashboard lets you connect to a running Fut
    FUTU_PORT=11111
    ```
 
-## Paper Trading Walkthrough
-
-1. Launch the FastAPI backend: `cd api && uvicorn main:app --reload`
-2. Open the React frontend at `http://localhost:5173`
-3. Configure:
-     - **Futu Symbol** — use Futu format: `US.AAPL`, `US.WEAT`, `HK.00700`
-     - **Quantity** — number of shares per order
-     - **Paper Trading** — toggle ON (enabled by default)
-4. Click **Connect to Futu OpenD**
-
-## Placing Orders
-
-**Manual orders:**
-
-- Select Side (BUY/SELL), Type (MARKET/LIMIT), and optionally a Limit Price
-- Click **Place Order** — routes to Futu's paper trading environment
-
-**Strategy-driven orders:**
-
-- Set Window and Signal parameters
-- Click **Generate Signal & Execute** — the dashboard runs the pipeline on latest data, reads the position signal, and places orders to match
-
-## From Python (without the dashboard)
+## From Python
 
 ```python
+# Run from the src/ directory (or add it to PYTHONPATH)
 from trade import FutuTrader
 
 with FutuTrader(paper=True) as trader:
@@ -46,10 +26,28 @@ with FutuTrader(paper=True) as trader:
 
     print(trader.get_positions())
 
-    trader.apply_signal("US.AAPL", signal_value=1, qty=10)  # go long
+    # Apply a backtest signal: +1 = long, -1 = short, 0 = flat
+    trader.apply_signal("US.AAPL", signal_value=1, qty=10)
 
     trader.cancel_all_orders()
 ```
 
+## Symbol Format
+
+Futu uses prefixed symbols:
+
+- US equities/ETFs: `US.AAPL`, `US.SPY`
+- HK equities: `HK.00700`
+- Crypto-like contracts vary by region — see Futu OpenD docs.
+
+## Tips
+
 !!! tip
     Futu's paper trading environment simulates realistic fills during market hours. Outside trading hours, market orders will queue until the next session opens.
+
+!!! warning
+    Live trading (`paper=False`) places real orders. Always confirm `paper=True` until you have explicitly tested the full pipeline end-to-end.
+
+## Roadmap
+
+A trading panel may be added back to the React SPA in a future phase. Until then, this guide covers the supported entry point.

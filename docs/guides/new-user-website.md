@@ -4,10 +4,10 @@ This guide walks you through using the Quant Strategies website at [http://52.22
 
 ## Current Limitations
 
-- **Yahoo Finance only** — this is the only data source available.
 - **Daily data only** — results are based on daily price data.
-- **Yahoo Finance symbols only** — use the vendor symbol as it appears on Yahoo Finance (e.g. `BTC-USD`, `AAPL`).
-- **Products are admin-managed** — the list of available products is manually entered by the administrator. If a product you need is missing, contact your administrator.
+- **Vendor symbol must match the data source** — when you type a Vendor Symbol manually, it must match the format expected by the selected data source (for Yahoo Finance: `BTC-USD`, `AAPL`, `0700.HK`).
+- **Products and data sources are admin-managed** — the list of available products and data sources is manually entered by the administrator. If a product or source you need is missing, contact your administrator.
+- **No email or self-service password reset** — all account changes go through the administrator.
 
 ## 1) Login
 
@@ -28,9 +28,10 @@ Click the **Configure & Run** button (or the **Configure** button in the top bar
 In the settings panel, fill in:
 
 1. **Product** — pick from the dropdown list, or
-2. **Vendor Symbol** — type the Yahoo Finance symbol directly (e.g. `BTC-USD`, `AAPL`, `0700.HK`).
+2. **Vendor Symbol** — type the symbol directly using the format expected by the data source (e.g. `BTC-USD`, `AAPL`, `0700.HK` for Yahoo Finance).
+3. **Data Source** — pick the source for this run (admin controls which sources are enabled).
 
-If the product you want is not in the list, enter it manually in the Vendor Symbol field using the Yahoo Finance symbol, or ask your administrator to add it.
+If the product you want is not in the list, enter it manually in the Vendor Symbol field, or ask your administrator to add it.
 
 ## 4) Set Date Range and Asset Type
 
@@ -43,7 +44,7 @@ If the product you want is not in the list, enter it manually in the Vendor Symb
 Each backtest needs at least one factor. Fill in:
 
 1. **Indicator** — the technical indicator to use (e.g. SMA, EMA, RSI, Bollinger).
-2. **Strategy** — the trading rule (e.g. crossover, threshold).
+2. **Strategy** — the trading rule (e.g. **Momentum** or **Reversion**).
 3. **Data Column** — choose Price or Volume.
 4. **Window Range** — set Min, Max, and Step for the lookback window.
 5. **Signal Range** — set Min, Max, and Step for the signal threshold.
@@ -56,7 +57,7 @@ You can optionally add a second factor by clicking **+ Add Factor** and choosing
 
 - **Fee (bps)** — trading fee in basis points (default is fine for most tests).
 - **Refresh dataset** — check this to re-download fresh data; leave unchecked to use cached data.
-- **Walk-Forward** — check this to run an overfitting test that splits data into training and testing periods.
+- **Walk-Forward** — runs an overfitting test that splits data into training and testing periods. **On by default**; uncheck to skip.
 
 ## 7) Run the Backtest
 

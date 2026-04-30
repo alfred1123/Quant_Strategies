@@ -41,7 +41,7 @@ cp .env.example .env   # then edit with your keys
 ## Running
 
 ```bash
-# Terminal 1 — FastAPI backend
+# Terminal 1 — FastAPI backend (defaults to port 8000)
 source env/bin/activate
 uvicorn api.main:app --reload
 
@@ -50,6 +50,14 @@ cd frontend && npm run dev
 ```
 
 Open `http://localhost:5173`. The UI lets you configure symbol, dates, indicator, strategy, parameters, and run grid-search optimization or single backtests — all from a collapsible side drawer. Dropdowns are populated live from the REFDATA database.
+
+### Login required
+
+The SPA requires an authenticated session. All `/api/v1/*` routes (except auth and `/health`) reject unauthenticated requests with 401, which redirects you to the login page.
+
+User accounts are **admin-managed** — there is no signup endpoint. Provisioning a new user is documented in [Login & Authentication](design/login.md).
+
+For **dev**, `JWT_SECRET` is auto-generated each startup if unset (sessions invalidate on restart). For **prod** it must be set via SSM (`/quant/prod/JWT_SECRET`) — see [Environment Variables](env-vars.md#authentication-jwt).
 
 ## Serving the Wiki Locally
 

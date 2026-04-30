@@ -1,7 +1,7 @@
 # Design: Queued Background Backtests
 
-**Status:** Draft  
-**Date:** 2026-04-25  
+**Status:** Draft — not yet implemented. Direction (Postgres-backed FIFO + LISTEN/NOTIFY) ratified in [decision #26](../decisions.md).
+**Date:** 2026-04-25
 **Scope:** `api/`, `frontend/`, `db/liquidbase/bt/`
 
 ## 1. Problem

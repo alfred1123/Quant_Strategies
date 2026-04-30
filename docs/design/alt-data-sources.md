@@ -1,6 +1,6 @@
 # Design Doc: Alternative Data Sources
 
-**Status:** Draft
+**Status:** Partially implemented (Glassnode + NasdaqDataLink classes exist in `src/data.py`; FMP/MarineTraffic/Aviationstack are still proposals).
 **Date:** 2026-04-15
 **Scope:** `src/data.py`, `api/`, REFDATA
 
@@ -365,10 +365,10 @@ class <Source>:
 
 ### Pipeline wiring
 
-1. **REFDATA registration:** Add row to `REFDATA.DATA_SOURCE` table (new) or extend `REFDATA.ASSET_TYPE` with source-specific types.
-2. **`main.py` dispatch:** Add source to the data-fetch dispatch logic.
-3. **API endpoint:** `GET /api/v1/data/{source}/{symbol}` for frontend access.
-4. **env var:** `<SOURCE>_API_KEY` in `.env` and SSM Parameter Store (`/quant/{env}/<source>_api_key`).
+1. **REFDATA registration:** Add a row to `REFDATA.APP` (the canonical app/data-source table — not a separate `DATA_SOURCE` table). The `App` row drives the `Data Source` dropdown in the SPA (`useApps()` hook).
+2. **`main.py` dispatch:** Add source to the data-fetch dispatch logic. (CLI currently hard-wires `YahooFinance`; see [CLI Backtest](../guides/cli-backtest.md).)
+3. **API access:** Pulls already happen indirectly through `BacktestCache.get_or_fetch_payload()`. A direct `GET /api/v1/data/{source}/{symbol}` endpoint is **not** exposed today.
+4. **env var:** `<SOURCE>_API_KEY` in `.env` and SSM Parameter Store (`/quant/{env}/<SOURCE>_API_KEY`).
 
 ### Rate limiting
 
@@ -383,18 +383,19 @@ class <Source>:
 
 ## 6. REFDATA Changes
 
-New rows needed when each source is implemented:
+Add a new row to **`REFDATA.APP`** (single source-of-truth for data-source dropdowns) per provider — wrapped in a Liquibase changeset:
 
 ```sql
--- REFDATA.DATA_SOURCE (new table or extend ASSET_TYPE)
 -- FMP
-INSERT INTO REFDATA.DATA_SOURCE (SOURCE_NM, DISPLAY_NAME, BASE_URL, AUTH_TYPE)
-VALUES ('FMP', 'Financial Modeling Prep', 'https://financialmodelingprep.com/api', 'API_KEY');
+INSERT INTO REFDATA.APP (NAME, DISPLAY_NAME, USER_ID, UPDATED_AT)
+VALUES ('fmp', 'Financial Modeling Prep', 'alfcheun', now());
 
 -- Nasdaq Data Link
-INSERT INTO REFDATA.DATA_SOURCE (SOURCE_NM, DISPLAY_NAME, BASE_URL, AUTH_TYPE)
-VALUES ('NASDAQ_DATA_LINK', 'Nasdaq Data Link', 'https://data.nasdaq.com/api/v3', 'API_KEY');
+INSERT INTO REFDATA.APP (NAME, DISPLAY_NAME, USER_ID, UPDATED_AT)
+VALUES ('nasdaq_data_link', 'Nasdaq Data Link', 'alfcheun', now());
 ```
+
+The frontend's `useApps()` hook will pick them up automatically after `POST /api/v1/refdata/refresh`.
 
 ---
 

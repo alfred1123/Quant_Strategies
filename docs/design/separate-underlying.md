@@ -1,7 +1,7 @@
 # Design: Separate Indicator Underlying from Trading Underlying
 
-**Status:** Draft — pending review  
-**Date:** 2026-04-18  
+**Status:** Partially implemented. Decision [#21 INTERNAL_CUSIP](../decisions.md) defines the canonical product identifier; `INST.PRODUCT` and `INST.PRODUCT_XREF` are live (decisions #20, #22). Per-sub-strategy override of the indicator underlying (the bulk of this design) has not yet been wired through `StrategyConfig` / `SubStrategy`.
+**Date:** 2026-04-18
 **Author:** alfcheun
 
 ## Problem

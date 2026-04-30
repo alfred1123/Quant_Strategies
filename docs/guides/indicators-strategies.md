@@ -1,5 +1,8 @@
 # Indicators & Strategies
 
+!!! note "Scope"
+    Indicators and strategies described here are available via the **API/web UI**. The **CLI** (`python main.py`) currently exposes a subset — see [CLI Backtest](cli-backtest.md) for the supported flags.
+
 ## Available Indicators
 
 All indicators operate on the `factor` column (which is set to `price` or `volume` depending on the data column selection).

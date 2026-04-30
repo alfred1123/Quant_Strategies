@@ -2,6 +2,9 @@
 
 A single-page React + TypeScript application that replaces the Streamlit dashboard as the primary UI.
 
+!!! note "See also"
+    The [Frontend Code Audit](../design/frontend-audit.md) lists known design issues and remediation directions.
+
 ## Tech Stack
 
 | Layer | Technology | Version |
@@ -10,10 +13,12 @@ A single-page React + TypeScript application that replaces the Streamlit dashboa
 | Build Tool | Vite | 8 |
 | Language | TypeScript | 6 |
 | Component Library | MUI (Material UI) | 9 |
-| CSS | Tailwind CSS | 4 |
 | Data Fetching | TanStack React Query | 5 |
 | HTTP Client | Axios | 1 |
-| Charting | Plotly.js (react-plotly.js) | 3 |
+| Charting | Plotly.js 3 + react-plotly.js 2 | — |
+| Tests | Vitest 4 + Testing Library + happy-dom | — |
+
+See `frontend/package.json` for exact pinned versions.
 
 ## Starting the Dev Server
 
@@ -22,7 +27,7 @@ A single-page React + TypeScript application that replaces the Streamlit dashboa
 cd frontend && npm run dev
 ```
 
-Open `http://localhost:5173`. The Vite dev server proxies `/api/v1` requests to the backend.
+Open `http://localhost:5173`. The Vite dev server proxies `/api` requests to the backend (default `http://localhost:8000`, overridable via `VITE_API_URL`).
 
 ## Features
 
@@ -64,7 +69,13 @@ frontend/src/
 │   └── Plot.ts           # Plotly CJS interop wrapper
 │
 ├── utils/
-│   └── grid.ts           # countSteps() — calculates grid search trial count
+│   ├── grid.ts            # countSteps() — calculates grid search trial count
+│   ├── format.ts          # overfitColor/Label, formatMetric, rowLabel
+│   └── requestBuilders.ts # effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest
+│
+├── test/
+│   ├── setup.ts           # Vitest global setup (jest-dom matchers)
+│   └── wrapper.tsx        # renderWithProviders helper (QueryClient + MUI theme)
 │
 ├── components/           # Reusable UI components
 │   ├── ConfigDrawer.tsx  # Top drawer — composes ProductSelector + FactorCards
@@ -184,3 +195,5 @@ Available npm scripts:
 | `npm run build` | Type-check with `tsc -b` then build for production |
 | `npm run lint` | Run ESLint |
 | `npm run preview` | Preview the production build locally |
+| `npm test` | Run all Vitest tests once |
+| `npm run test:watch` | Vitest in watch mode |

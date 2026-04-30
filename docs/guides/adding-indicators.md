@@ -21,15 +21,18 @@ To add a new technical indicator to the backtest pipeline, follow this pattern.
 
     ```sql
     INSERT INTO REFDATA.INDICATOR (
-        METHOD_NAME, DISPLAY_NAME, IS_BOUNDED_IND,
+        NAME, METHOD_NAME, DISPLAY_NAME, DESCRIPTION, IS_BOUNDED_IND,
         WIN_MIN, WIN_MAX, WIN_STEP, SIG_MIN, SIG_MAX, SIG_STEP,
         USER_ID, UPDATED_AT
     ) VALUES (
-        'get_my_indicator', 'My Indicator', 'N',
+        'my_indicator', 'get_my_indicator', 'My Indicator', 'Short description',
+        'N',
         5, 100, 5, 0.25, 2.50, 0.25,
         'alfcheun', now()
     );
     ```
+
+    `NAME` is the canonical short name (NOT NULL); `METHOD_NAME` must match the method on `TechnicalAnalysis` exactly.
 
 4. **Write tests** in `tests/unit/test_strat.py` — verify output shape, edge cases, NaN handling.
 

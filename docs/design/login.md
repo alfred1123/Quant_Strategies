@@ -1,14 +1,14 @@
 # Login & Authentication — Design Doc (v1-minimal)
 
-Status: **Draft**
+Status: **Implemented (Phase 1)** — current behavior in `api/auth/`. Phases 2 & 3 below remain proposed.
 Owner: alfcheun
-Related: [decisions #16, #18](../decisions.md), [backtest-queue.md](backtest-queue.md), [trade-api.md](trade-api.md)
+Related: [decision #19 (no direct DML)](../decisions.md), [decision #27 (authentication)](../decisions.md), [trade-api.md](trade-api.md)
 
 ---
 
 ## 1. Problem
 
-Today the app has **no authentication**. The hardcoded user `alfcheun` is baked into [src/db.py](src/db.py) (`user_id: str = "alfcheun"`) and propagated into every `USER_ID` audit column. The FastAPI backend accepts any caller — anyone with the URL can run backtests, read all `BT.RESULT` rows, and (once the trade API is wired) trigger orders.
+Today the app has **no authentication**. The hardcoded user `alfcheun` is baked into `src/db.py` (`user_id: str = "alfcheun"`) and propagated into every `USER_ID` audit column. The FastAPI backend accepts any caller — anyone with the URL can run backtests, read all `BT.RESULT` rows, and (once the trade API is wired) trigger orders.
 
 Before public hosting (Tier 1 in the deployment ladder), the app must require a login. This doc covers the **smallest possible** design that:
 
@@ -55,7 +55,7 @@ Before public hosting (Tier 1 in the deployment ladder), the app must require a 
 
 - Backend is FastAPI (async, Pydantic v2). Frontend is React 19 + TanStack Query, served separately by Vite in dev and (in prod) by nginx.
 - `api/config.py` already has SSM/.env loader — JWT signing key fits there.
-- Audit columns (`USER_ID TEXT`) exist on every table per [AGENTS.md](AGENTS.md). Today they receive `"alfcheun"`. We just need to plumb a real value.
+- Audit columns (`USER_ID TEXT`) exist on every table per `AGENTS.md`. Today they receive `"alfcheun"`. We just need to plumb a real value.
 - All writes go through SPs (no direct DML). **Login itself reads a user table — `SELECT` is allowed directly per project conventions.** User provisioning runs as Liquibase changesets — that is the documented exception to the no-direct-DML rule.
 - HTTPS is mandatory for cookie-based auth. Tier 1 deployment already plans nginx + Let's Encrypt; this doc assumes that's in place.
 - **Uvicorn must bind to `127.0.0.1` only** — never `0.0.0.0` — so cleartext credentials never travel outside the box without TLS.
@@ -85,9 +85,9 @@ Before public hosting (Tier 1 in the deployment ladder), the app must require a 
 ### 5.1 Trust model
 
 - **Single trust boundary**: nginx terminates TLS, forwards to uvicorn over loopback. No service-to-service auth needed inside the box.
-- **Cookie**: `qs_token`, `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api`. Lifetime 7 days; refresh on activity.
-- **Why `SameSite=Strict`** (not `Lax`): the app touches a trade API. `Strict` blocks the cookie on *any* cross-site request — including top-level navigations — so a malicious link cannot trigger an authenticated state-changing call. Trade-off: a user clicking an external link to the app (e.g. from email or Slack) lands on `/login` even if they have a valid session, and must navigate forward manually. Acceptable for an internal tool.
-- **CSRF**: not required while the SPA is same-origin and `SameSite=Strict` is enforced. The deprecated `X-Requested-With: XMLHttpRequest` heuristic is **not** used — it is a legacy CORS side effect, not a real defense. If the SPA ever moves to a different origin, switch to a double-submit CSRF token.
+- **Cookie**: `qs_token`, `HttpOnly`, `Secure` (when `COOKIE_SECURE=1` or `APP_ENV=prod`), `SameSite=lax` in HTTP dev / `SameSite=strict` once `Secure=True`, `Path=/api`. Lifetime 7 days; refresh on activity. Implementation: `api/auth/router.py` `_set_cookie()`.
+- **Why dynamic `SameSite`**: pure HTTP dev needs `Lax` so the cookie survives navigation; HTTPS prod uses `Strict` so a malicious link cannot trigger an authenticated state-changing call to the trade API. Trade-off: a prod user clicking an external link to the app lands on `/login` even with a valid session and must navigate forward manually. Acceptable for an internal tool.
+- **CSRF**: not required while the SPA is same-origin and `SameSite=Strict` is enforced in prod. The deprecated `X-Requested-With: XMLHttpRequest` heuristic is **not** used. If the SPA ever moves to a different origin, switch to a double-submit CSRF token.
 
 ### 5.2 Why JWT and not server-side sessions
 
@@ -132,6 +132,7 @@ No schema changes elsewhere. The hardcoded `"alfcheun"` becomes the actual logge
 | SP | Purpose | Called by |
 |---|---|---|
 | `CORE_ADMIN.SP_GET_APP_USER_BY_USERNAME` | Returns `APP_USER_ID, USERNAME, PASSWORD_HASH, IS_ACTIVE_IND, SESSION_GEN`. | App (login) |
+| `CORE_ADMIN.SP_GET_APP_USER_BY_ID` | Same fields, looked up by `APP_USER_ID`. Used by `require_user` for cookie verification. | App (every protected request) |
 | `CORE_ADMIN.SP_UPD_APP_USER_LAST_LOGIN` | Update `LAST_LOGIN_AT`. Fire-and-forget on every successful login. | App |
 | `CORE_ADMIN.SP_INS_APP_USER` | Insert a new user. Inputs: `IN_USERNAME`, `IN_PASSWORD_HASH`, `IN_USER_ID` (creator, for audit log only). Generates `APP_USER_ID` (UUID), defaults `IS_ACTIVE_IND='Y'`, `SESSION_GEN=1`. | Admin |
 | `CORE_ADMIN.SP_UPD_APP_USER_PASSWORD` | Set new `PASSWORD_HASH` and bump `SESSION_GEN`. Inputs: `IN_USERNAME`, `IN_PASSWORD_HASH`, `IN_USER_ID`. | Admin |
@@ -246,7 +247,7 @@ GRANT EXECUTE ON PROCEDURE CORE_ADMIN.SP_UPD_APP_USER_BUMP_TOKEN(TEXT, TEXT, ...
 
 `quant_app` cannot `SELECT`, `INSERT`, `UPDATE`, or `DELETE` any table directly — every read and every write flows through an `SP_*` procedure that runs `SECURITY DEFINER` (or whose owner has the needed privileges). A compromised app process cannot exfiltrate raw rows, create users, or change passwords; it can only invoke the procs we have explicitly defined.
 
-> **Migration impact**: existing code that does direct `SELECT` against tables (e.g. `RefDataCache`, instrument lookups, backtest result reads) must be replaced with `SP_GET_*` procedures before the new grants take effect. Track in [TODO.md](TODO.md).
+> **Migration impact**: existing code that does direct `SELECT` against tables (e.g. `RefDataCache`, instrument lookups, backtest result reads) must be replaced with `SP_GET_*` procedures before the new grants take effect. Track in repo `TODO.md`.
 
 > **Future**: when a third login user is needed (e.g. `quant_worker`), refactor into NOLOGIN group roles (`quant_app_role`, `quant_admin_role`) and grant them to the login users. Deferred until justified.
 
@@ -294,7 +295,7 @@ def run_backtest(cfg: BacktestConfig, user: CurrentUser = Depends(require_user))
     ...
 ```
 
-The default value `user_id="alfcheun"` in [src/db.py](src/db.py) and [src/data.py](src/data.py) is **removed entirely** (the parameter becomes required). No backward compat per AGENTS.md.
+The default value `user_id="alfcheun"` in `src/db.py` and `src/data.py` is **removed entirely** (the parameter becomes required). No backward compat per `AGENTS.md`.
 
 ### 8.3 JWT shape
 
@@ -428,7 +429,7 @@ Both branches do the same Argon2 work, so `/auth/login` has the same latency pro
 
 - [x] Passwords hashed with Argon2id (`argon2-cffi`), default `memory_cost=65536, time_cost=3, parallelism=4`.
 - [x] Password hashes generated **only** via `scripts/hash_password.py` running locally — never via online tools.
-- [x] Cookies `HttpOnly + Secure + SameSite=Strict + Path=/api`.
+- [x] Cookies `HttpOnly + Secure + SameSite=Strict + Path=/api` in prod; `Lax` (no `Secure`) in HTTP dev. See `api/auth/router.py` `_set_cookie()`.
 - [x] HTTPS enforced at nginx (HSTS header).
 - [x] Uvicorn binds to `127.0.0.1` only — never accept TLS-stripped traffic.
 - [x] JWT signed (HS256) with secret from SSM, never committed.
@@ -459,10 +460,10 @@ Both branches do the same Argon2 work, so `/auth/login` has the same latency pro
 7. **Helper script** `scripts/hash_password.py` — reads password from stdin (no echo, via `getpass`), prints Argon2id PHC string. Doc warns against online hash generators.
 8. **Add `JWT_SECRET`** to `/quant/prod/JWT_SECRET` (SSM SecureString, 32 random bytes base64). EC2 instance role reads it at process start; not written to `.env` in prod. In dev mode, `JWT_SECRET` is auto-generated if absent (see `_resolve_jwt_secret` in `api/auth/service.py`).
 9. **Backend**: add `api/auth/` module (login router, JWT helpers, `require_user` dep, repo, service). Add `argon2-cffi`, `pyjwt[cryptography]`, `slowapi` to `requirements.txt`.
-10. **Wire `Depends(require_user)`** into existing routers. Replace every `user_id="alfcheun"` with `user.username`. Remove the `="alfcheun"` default in [src/db.py](src/db.py) and [src/data.py](src/data.py) — parameter becomes required.
+10. **Wire `Depends(require_user)`** into existing routers. Replace every `user_id="alfcheun"` with `user.username`. Remove the `="alfcheun"` default in `src/db.py` and `src/data.py` — parameter becomes required.
 11. **Frontend**: add `/login` route + `<App>` mount-time `me` check + axios 401 interceptor + user menu.
 12. **Tests**: unit tests for JWT encode/decode + Argon2 verify (incl. dummy-hash branch) + each admin SP; integration test for login → protected endpoint → logout flow.
-13. **Docs**: update [README.md](README.md) auth section, [docs/architecture/api.md](docs/architecture/api.md) endpoint list, [docs/env-vars.md](docs/env-vars.md) (`JWT_SECRET`), [docs/decisions.md](docs/decisions.md) decision #27, [scripts/README.md](scripts/README.md) for the hash helper.
+13. **Docs**: update repo `README.md` auth section, [API Reference](../architecture/api.md) endpoint list, [Environment Variables](../env-vars.md) (`JWT_SECRET`), [Decisions Log](../decisions.md) decision #27, repo `scripts/README.md` for the hash helper.
 
 ---
 
