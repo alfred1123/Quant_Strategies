@@ -107,19 +107,26 @@ def _fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_c
 # an unknown name is sent directly to the API — no extra validation needed.
 
 def _build_config(req, cache) -> StrategyConfig:
+    """Build a StrategyConfig from a unified factor-list request.
+
+    A 1-element ``factors`` list collapses to ``Performance``'s
+    single-factor path (``_is_multi=False``) but still carries
+    cross-product info (per-factor ``symbol`` / ``vendor_symbol`` /
+    ``data_column``) on the ``SubStrategy``.
+
+    ``conjunction`` is required when there are 2+ factors and ignored
+    (defaulted to ``"AND"`` internally) when there is only one — the
+    field is meaningless in that case.
+    """
     indicator_rows = cache.get("indicator")
     signal_type_rows = cache.get("signal_type")
 
-    if req.mode == "single":
-        func = resolve_signal_func(
-            req.strategy, req.indicator, indicator_rows, signal_type_rows,
+    if len(req.factors) >= 2 and not req.conjunction:
+        raise HTTPException(
+            status_code=422,
+            detail="`conjunction` is required when more than one factor is provided.",
         )
-        return StrategyConfig(
-            internal_cusip=req.symbol,
-            indicator_name=req.indicator,
-            signal_func=func,
-            trading_period=req.trading_period,
-        )
+
     substrategies = [
         SubStrategy(
             indicator_name=f.indicator,
@@ -133,13 +140,13 @@ def _build_config(req, cache) -> StrategyConfig:
         )
         for f in req.factors
     ]
+    first = req.factors[0]
     first_func = resolve_signal_func(
-        req.factors[0].strategy, req.factors[0].indicator,
-        indicator_rows, signal_type_rows,
+        first.strategy, first.indicator, indicator_rows, signal_type_rows,
     )
     return StrategyConfig(
         internal_cusip=req.symbol,
-        indicator_name=req.factors[0].indicator,
+        indicator_name=first.indicator,
         signal_func=first_func,
         trading_period=req.trading_period,
         conjunction=req.conjunction or "AND",
@@ -150,14 +157,14 @@ def _build_config(req, cache) -> StrategyConfig:
 def _build_param_ranges(req):
     """Return (window_list, signal_list) shaped for ParametersOptimization.run() / WalkForward.run().
 
-    Single mode: flat tuples.
-    Multi mode: lists of tuples, one per factor.
+    1-factor: flat tuples (dispatches to ``optimize()``, returns rows
+              keyed ``window`` / ``signal``).
+    2+ factors: lists of tuples (dispatches to ``optimize_multi()``,
+                returns rows keyed ``window_0`` / ``signal_0`` / ...).
     """
-    if req.mode == "single":
-        return (
-            req.window_range.to_values(as_int=True),
-            req.signal_range.to_values(),
-        )
+    if len(req.factors) == 1:
+        f = req.factors[0]
+        return f.window_range.to_values(as_int=True), f.signal_range.to_values()
     return (
         [f.window_range.to_values(as_int=True) for f in req.factors],
         [f.signal_range.to_values() for f in req.factors],
@@ -193,12 +200,11 @@ def _build_data_dict(req, cache, inst_cache=None, bt_cache=None) -> dict[str, pd
     main_df = _fetch(req.symbol, req.data_source)
     data_dict = {req.symbol: main_df}
 
-    if req.mode == "multi" and req.factors:
-        for f in req.factors:
-            cusip = (f.vendor_symbol or f.symbol) if (f.symbol or f.vendor_symbol) else None
-            if cusip and cusip not in data_dict:
-                ds = f.data_source or req.data_source
-                data_dict[cusip] = _fetch(cusip, ds)
+    for f in req.factors:
+        cusip = (f.vendor_symbol or f.symbol) if (f.symbol or f.vendor_symbol) else None
+        if cusip and cusip not in data_dict:
+            ds = f.data_source or req.data_source
+            data_dict[cusip] = _fetch(cusip, ds)
 
     _enforce_date_sync(data_dict, req.start, req.end)
     return data_dict
@@ -244,21 +250,25 @@ def _enforce_date_sync(data_dict: dict[str, pd.DataFrame], req_start: str, req_e
         )
 
 def _build_perf_response(data_dict, config, best, fee_bps) -> PerformanceResponse:
-    """Run Performance for the best params and return a PerformanceResponse."""
-    n_subs = len(config.get_substrategies()) if config.get_substrategies() else 1
-    if n_subs > 1:
-        # Multi-factor: best may have window_0/signal_0 keys (from optimizer)
-        # or a single window/signal tuple (from standalone endpoint).
-        w = best.get("window")
-        s = best.get("signal")
-        if isinstance(w, (tuple, list)):
-            window, signal = tuple(w), tuple(s)
-        else:
-            window = tuple(best.get(f"window_{i}", w) for i in range(n_subs))
-            signal = tuple(best.get(f"signal_{i}", s) for i in range(n_subs))
+    """Run Performance for the best params and return a PerformanceResponse.
+
+    ``best`` may be:
+      * a row dict from ``optimize()`` (1 factor): ``{window, signal, sharpe}``;
+      * a row dict from ``optimize_multi()`` (2+): ``{window_0, signal_0, ...}``;
+      * an explicit dict from ``run_performance``: ``{window, signal}`` where
+        the values are scalars (1 factor) or tuples (2+).
+    """
+    n_subs = len(config.get_substrategies())
+    w = best.get("window")
+    s = best.get("signal")
+    if isinstance(w, (tuple, list)):
+        window, signal = tuple(w), tuple(s)
+    elif n_subs > 1:
+        window = tuple(best.get(f"window_{i}", w) for i in range(n_subs))
+        signal = tuple(best.get(f"signal_{i}", s) for i in range(n_subs))
     else:
-        window = best.get("window")
-        signal = best.get("signal")
+        window = w
+        signal = s
 
     perf = Performance(data_dict, config, window, signal, fee_bps=fee_bps)
     perf.enrich_performance()
@@ -353,15 +363,10 @@ def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None, bt
 def _compute_total_trials(req: OptimizeRequest) -> int:
     """Pre-compute the number of trials that optuna will run."""
     from src.param_opt import OPTUNA_MAX_TRIALS
-    if req.mode == "single":
-        w = req.window_range.to_values(as_int=True)
-        s = req.signal_range.to_values()
-        total = len(w) * len(s)
-    else:
-        total = math.prod(
-            len(f.window_range.to_values(as_int=True)) * len(f.signal_range.to_values())
-            for f in req.factors
-        )
+    total = math.prod(
+        len(f.window_range.to_values(as_int=True)) * len(f.signal_range.to_values())
+        for f in req.factors
+    )
     return min(total, OPTUNA_MAX_TRIALS)
 
 
@@ -458,11 +463,22 @@ def run_performance(req: PerformanceRequest, cache, inst_cache=None, bt_cache=No
     data_dict = _build_data_dict(req, cache, inst_cache, bt_cache)
     config = _build_config(req, cache)
 
-    window = req.window if req.mode == "single" else tuple(req.windows)
-    signal = req.signal if req.mode == "single" else tuple(req.signals)
-    best = {"window": window, "signal": signal}
+    if len(req.factors) != len(req.windows) or len(req.factors) != len(req.signals):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"factors / windows / signals length mismatch: "
+                f"{len(req.factors)} factors, {len(req.windows)} windows, "
+                f"{len(req.signals)} signals."
+            ),
+        )
 
-    return _build_perf_response(data_dict, config, best, req.fee_bps)
+    if len(req.factors) == 1:
+        window, signal = req.windows[0], req.signals[0]
+    else:
+        window, signal = tuple(req.windows), tuple(req.signals)
+
+    return _build_perf_response(data_dict, config, {"window": window, "signal": signal}, req.fee_bps)
 
 
 # ── Walk-Forward ──────────────────────────────────────────────────────────────

@@ -138,29 +138,58 @@ Response:
 POST /api/v1/backtest/optimize
 ```
 
-Request:
+All requests use a unified `factors: FactorConfig[]` shape — single-factor is a 1-element list (no `conjunction`), multi-factor is 2+ elements **with** a `conjunction`.
+
+Single-factor request (1-element `factors`, `conjunction` omitted):
 ```json
 {
   "symbol": "BTC-USD",
   "start": "2016-01-01",
   "end": "2026-04-01",
-  "mode": "single",
-  "indicator": "get_bollinger_band",
-  "strategy": "momentum_band_signal",
   "trading_period": 365,
   "fee_bps": 5.0,
-  "window_range": {"min": 5, "max": 100, "step": 5},
-  "signal_range": {"min": 0.25, "max": 2.50, "step": 0.25}
+  "factors": [
+    {
+      "indicator": "get_bollinger_band",
+      "strategy": "momentum",
+      "data_column": "price",
+      "window_range": {"min": 5, "max": 100, "step": 5},
+      "signal_range": {"min": 0.25, "max": 2.50, "step": 0.25}
+    }
+  ]
 }
 ```
 
-Multi-factor request:
+Cross-product single-factor (trade SPY, signal off VIX) — note `symbol` / `vendor_symbol` on the factor:
+```json
+{
+  "symbol": "spy.equity_us",
+  "start": "2016-01-01",
+  "end": "2026-04-01",
+  "trading_period": 252,
+  "fee_bps": 5.0,
+  "data_source": "yahoo",
+  "factors": [
+    {
+      "symbol": "vix.equity_us",
+      "vendor_symbol": "^VIX",
+      "data_source": "yahoo",
+      "data_column": "price",
+      "indicator": "get_rsi",
+      "strategy": "reversion",
+      "window_range": {"min": 14, "max": 14, "step": 1},
+      "signal_range": {"min": 70, "max": 70, "step": 1}
+    }
+  ]
+}
+```
+
+Multi-factor request (same shape, more elements):
 ```json
 {
   "symbol": "BTC-USD",
   "start": "2016-01-01",
   "end": "2026-04-01",
-  "mode": "multi",
   "trading_period": 365,
   "fee_bps": 5.0,
   "conjunction": "AND",
@@ -231,13 +260,19 @@ Request:
   "symbol": "BTC-USD",
   "start": "2016-01-01",
   "end": "2026-04-01",
-  "mode": "single",
-  "indicator": "get_bollinger_band",
-  "strategy": "momentum_band_signal",
   "trading_period": 365,
   "fee_bps": 5.0,
-  "window": 20,
-  "signal": 1.0
+  "factors": [
+    {
+      "indicator": "get_bollinger_band",
+      "strategy": "momentum",
+      "data_column": "price",
+      "window_range": {"min": 20, "max": 20, "step": 1},
+      "signal_range": {"min": 1.0, "max": 1.0, "step": 1}
+    }
+  ],
+  "windows": [20],
+  "signals": [1.0]
 }
 ```
 
@@ -296,12 +331,9 @@ Response:
 | Streamlit (app.py) | React Component | Notes |
 |---|---|---|
 | Sidebar: symbol, dates, asset type, fee | `<Sidebar>` | Controlled form state |
-| Sidebar: indicator, strategy, window, signal | `<Sidebar>` single-factor section | |
-| Sidebar: grid search ranges (win/sig min/max/step) | `<Sidebar>` grid section | |
-| Sidebar: multi-factor config (Add/Remove Factor) | `<Sidebar>` → dynamic `<FactorRow>` list | |
-| Sidebar: conjunction radio (AND/OR) | `<Sidebar>` radio group | |
+| Sidebar: factor list (1+ rows: indicator, strategy, data column, window/signal ranges) | `<Sidebar>` → dynamic `<FactorRow>` list | One row = "single factor", 2+ rows = "multi factor" |
+| Sidebar: conjunction radio (AND/OR) | `<Sidebar>` radio group | Shown only when 2+ factors |
 | Sidebar: walk-forward checkbox + split slider | `<Sidebar>` checkboxes section | |
-| Mode radio (Single/Multi) | `<Sidebar>` or page-level toggle | |
 | "Run Pipeline" button | `<PipelineRunner>` | Triggers POST or WebSocket |
 | Progress bar (trial N / total) | `<PipelineRunner>` → progress bar | Fed by WebSocket stream |
 | Best params success banner | `<OptGrid>` header alert | |
@@ -440,45 +472,43 @@ class RangeParam(BaseModel):
     step: float
 
 class FactorConfig(BaseModel):
-    indicator: str          # e.g. "get_bollinger_band"
-    strategy: str           # e.g. "momentum_band_signal"
+    # Where the indicator reads from (optional; defaults to the
+    # request-level trade asset). Set these to compute the indicator
+    # on a different product than the trade asset (cross-product
+    # signals, e.g. trade SPY but signal off VIX RSI).
+    symbol: str | None = None          # internal CUSIP, e.g. "vix.equity_us"
+    vendor_symbol: str | None = None   # direct vendor-symbol override, e.g. "^VIX"
+    data_source: str | None = None     # REFDATA.APP.NAME override
     data_column: str = "price"
+
+    # What the indicator computes
+    indicator: str          # e.g. "get_bollinger_band"
+    strategy: str           # e.g. "momentum"
     window_range: RangeParam
     signal_range: RangeParam
 
 class OptimizeRequest(BaseModel):
-    symbol: str
+    symbol: str             # trade asset
     start: str              # "YYYY-MM-DD"
     end: str
-    mode: str               # "single" | "multi"
     trading_period: int     # 365 | 252
     fee_bps: float = 5.0
-    # Single-factor fields
-    indicator: str | None = None
-    strategy: str | None = None
-    window_range: RangeParam | None = None
-    signal_range: RangeParam | None = None
-    # Multi-factor fields
-    conjunction: str | None = None   # "AND" | "OR"
-    factors: list[FactorConfig] | None = None
+    factors: list[FactorConfig] = Field(min_length=1)
+    # Required only when len(factors) >= 2; omit / leave None for single factor.
+    conjunction: str | None = None   # "AND" | "OR" | "FILTER"
+    walk_forward: bool = False
+    split_ratio: float = 0.5
 
 class PerformanceRequest(BaseModel):
-    symbol: str
+    symbol: str             # trade asset
     start: str
     end: str
-    mode: str
     trading_period: int
     fee_bps: float = 5.0
-    # Single-factor
-    indicator: str | None = None
-    strategy: str | None = None
-    window: int | None = None
-    signal: float | None = None
-    # Multi-factor
+    factors: list[FactorConfig] = Field(min_length=1)
     conjunction: str | None = None
-    factors: list[FactorConfig] | None = None
-    windows: list[int] | None = None
-    signals: list[float] | None = None
+    windows: list[int] = Field(min_length=1)   # one per factor
+    signals: list[float] = Field(min_length=1)
 
 class WalkForwardRequest(OptimizeRequest):
     split_ratio: float = 0.5

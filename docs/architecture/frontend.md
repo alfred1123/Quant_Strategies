@@ -36,8 +36,8 @@ Open `http://localhost:5173`. The Vite dev server proxies `/api` requests to the
 - **Dropdowns** (indicator, strategy, asset type, conjunction, data column) populated live from `REFDATA` tables
 - Selecting an **indicator** auto-fills window and signal range defaults from `REFDATA.INDICATOR`
 - **Data Column** selector per factor — choose Price or Volume as the indicator input
-- **Single-factor** and **multi-factor** modes — add up to 2 factors per run
-- **Conjunction** selector (AND / OR / FILTER) between factors
+- **Factor list** — add up to 2 factors per run (1 = single factor, 2 = multi factor); the request always serializes as a `factors: [...]` list, never with separate top-level indicator/window fields
+- **Conjunction** selector (AND / OR / FILTER) — surfaced only when there are 2+ factors
 - **Trial count** shown before running — displays actual trial count with cap awareness (max 10,000)
 - On **Run**: drawer closes, **SSE progress bar** streams real-time trial progress
 - **Top-10 results table** (MUI DataGrid) — best row highlighted; each row has a **View Analysis** button

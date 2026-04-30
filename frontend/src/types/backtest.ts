@@ -8,17 +8,28 @@ export interface RangeParam {
   step: number;
 }
 
-/** Cross-product factor (used in mode='multi'). */
+/**
+ * One factor in a backtest. A 1-element ``factors`` list is the
+ * "single factor" case — there is no separate top-level branch.
+ *
+ * Where the indicator reads from is fully described on the factor
+ * itself — never inferred from the top-level ``symbol`` (which is the
+ * *trade* asset). Set ``symbol`` and/or ``vendor_symbol`` to read the
+ * indicator from a different product than the trade asset
+ * (cross-product / pair-trade signals).
+ */
 export interface FactorConfig {
-  // ── factor-only ──
-  indicator: string;
-  strategy: string;
-  data_column: string;
-  window_range: RangeParam;
-  signal_range: RangeParam;
+  // Where the indicator reads from
   symbol?: string;         // internal_cusip for cross-product factor (pair trade)
   vendor_symbol?: string;  // direct vendor symbol override for this factor
   data_source?: string;    // per-factor data source override
+  data_column: string;
+
+  // What the indicator computes
+  indicator: string;
+  strategy: string;
+  window_range: RangeParam;
+  signal_range: RangeParam;
 }
 
 /** Top-level backtest form. */
@@ -39,14 +50,7 @@ export interface BacktestConfig {
    *  from cache only — backend returns 400 if the cache misses. */
   refreshDataset: boolean;
 
-  // ── single-factor mode ──
-  mode: 'single' | 'multi';
-  indicator: string;
-  strategy: string;
-  windowRange: RangeParam;
-  signalRange: RangeParam;
-
-  // ── multi-factor mode ──
+  // ── factor list (1 = single factor, 2+ = multi factor) ──
   conjunction: string;
   factors: FactorConfig[];
 
@@ -71,18 +75,10 @@ export interface OptimizeRequest {
   fee_bps: number;
   refresh_dataset?: boolean;
 
-  // ── strategy/mode ──
-  mode: 'single' | 'multi';
-
-  // ── single-factor ──
-  indicator?: string;
-  strategy?: string;
-  window_range?: RangeParam;
-  signal_range?: RangeParam;
-
-  // ── multi-factor ──
-  conjunction?: string;
-  factors?: FactorConfig[];
+  // ── factor list ──
+  factors: FactorConfig[];
+  /** Required when 2+ factors; omitted (or null) for single factor. */
+  conjunction?: string | null;
 
   // ── walk-forward (run inline when true) ──
   walk_forward?: boolean;
@@ -101,20 +97,12 @@ export interface PerformanceRequest {
   fee_bps: number;
   refresh_dataset?: boolean;
 
-  // ── strategy/mode ──
-  mode: 'single' | 'multi';
-
-  // ── single-factor ──
-  indicator?: string;
-  strategy?: string;
-  window?: number;
-  signal?: number;
-
-  // ── multi-factor ──
-  conjunction?: string;
-  factors?: FactorConfig[];
-  windows?: number[];
-  signals?: number[];
+  // ── factor list + selected params (one per factor, same order) ──
+  factors: FactorConfig[];
+  /** Required when 2+ factors; omitted (or null) for single factor. */
+  conjunction?: string | null;
+  windows: number[];
+  signals: number[];
 }
 
 /**

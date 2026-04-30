@@ -29,11 +29,6 @@ const DEFAULT_CONFIG: BacktestConfig = {
   assetType: '',
   tradingPeriod: 365,
   feeBps: 5.0,
-  mode: 'single',
-  indicator: '',
-  strategy: '',
-  windowRange: { min: 5, max: 100, step: 5 },
-  signalRange: { min: 0.25, max: 2.5, step: 0.25 },
   conjunction: 'AND',
   factors: [
     {

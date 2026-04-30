@@ -65,7 +65,7 @@ All backtest endpoints are **POST** — they accept a JSON body and return compu
 | Method | Path | Request Schema | Response Schema | What it does |
 |--------|------|---------------|-----------------|-------------|
 | POST | `/backtest/data` | `DataRequest` | `DataResponse` | Fetch historical price data from Yahoo Finance |
-| POST | `/backtest/optimize` | `OptimizeRequest` | `OptimizeResponse` | Run grid-search parameter optimization (single or multi-factor) |
+| POST | `/backtest/optimize` | `OptimizeRequest` | `OptimizeResponse` | Run grid-search parameter optimization over a list of factors (1 = single, 2+ = multi) |
 | POST | `/backtest/performance` | `PerformanceRequest` | `PerformanceResponse` | Run a single backtest with fixed window/signal and return metrics + equity curve |
 | POST | `/backtest/walk-forward` | `WalkForwardRequest` | `WalkForwardResponse` | Run walk-forward overfitting test (train/test split) |
 
@@ -83,8 +83,8 @@ Frontend                    Router                  Service                 Pipe
    │                          │                       │                       │
    │  POST /backtest/optimize │                       │                       │
    │  { symbol, start, end,   │                       │                       │
-   │    indicator, strategy,   │                       │                       │
-   │    window_range, ... }    │                       │                       │
+   │    factors: [...],        │                       │                       │
+   │    conjunction, ... }     │                       │                       │
    │─────────────────────────►│                       │                       │
    │                          │  svc.run_optimize()   │                       │
    │                          │──────────────────────►│                       │
@@ -117,7 +117,8 @@ Business logic bridge between HTTP and the pipeline:
 
 - **`backtest.py`** — Converts Pydantic models → `StrategyConfig` and pipeline calls → Pydantic responses. Handles:
   - `_fetch_df()` — fetches data via `YahooFinance` and returns a pipeline-ready DataFrame.
-  - `_build_single_config()` / `_build_multi_config()` — constructs `StrategyConfig` (with optional `SubStrategy` list for multi-factor).
+  - `_build_config()` — constructs `StrategyConfig` from the unified `factors` list (1 element ⇒ single-factor `Performance` path, 2+ ⇒ multi-factor with `conjunction`).
+  - `_build_param_ranges()` — flattens factor `window_range` / `signal_range` for the optimizer (flat tuples for 1 factor, lists of tuples for 2+).
   - `_resolve_signal_func()` — maps strategy name strings (e.g. `"momentum_band_signal"`) to actual Python functions.
   - `_extract_optuna_plots()` — serializes Optuna visualizations as Plotly JSON for the frontend.
 
@@ -135,39 +136,85 @@ The existing backtest engine, imported directly by the service layer:
 | `param_opt.py` | `ParametersOptimization` — Optuna-based grid/TPE search over window × signal space |
 | `walk_forward.py` | `WalkForward` — train/test split, optimize in-sample, evaluate out-of-sample, overfitting ratio |
 
-## Single-Factor vs Multi-Factor
+## Unified Factor List
 
-The API supports two **modes**:
+There is **no** `mode` discriminator and no separate single-factor branch. Every backtest request carries a `factors: list[FactorConfig]` of length ≥ 1. A "single factor" backtest is just a 1-element list. The same shape lets a caller specify cross-product overrides (compute the indicator on a different symbol than the trade asset, e.g. trade SPY but signal off VIX RSI) regardless of factor count.
 
-### Single-Factor (`mode: "single"`)
-One indicator + one strategy + one window/signal pair.
+### `FactorConfig` fields
+
+| Field | Required | Purpose |
+|------|---------|---------|
+| `symbol` | optional | Internal CUSIP for the **signal source** (e.g. `"vix.equity_us"`). Defaults to the top-level trade asset. |
+| `vendor_symbol` | optional | Direct vendor-symbol override for the signal source (e.g. `"^VIX"`). Bypasses `INST.PRODUCT_XREF` lookup. |
+| `data_source` | optional | Per-factor data source (REFDATA app name). Defaults to the request-level `data_source`. |
+| `data_column` | optional, default `"price"` | Which column of the source DataFrame the indicator reads. |
+| `indicator` | required | TechnicalAnalysis method name (e.g. `"get_bollinger_band"`). |
+| `strategy` | required | Signal type (e.g. `"momentum"`); resolved to `momentum_band_signal` / `momentum_bounded_signal` based on the indicator. |
+| `window_range` / `signal_range` | required | `{min, max, step}` parameter grid for this factor. |
+
+`conjunction` (`"AND"` / `"OR"` / `"FILTER"`) is **required only when there are 2+ factors**; for a single-factor request it must be omitted (or `null`).
+
+### Single factor (1-element list, no `conjunction`)
 ```json
 {
-  "mode": "single",
-  "indicator": "get_bollinger_band",
-  "strategy": "momentum_band_signal",
-  "window_range": { "min": 5, "max": 100, "step": 5 },
-  "signal_range": { "min": 0.25, "max": 2.5, "step": 0.25 }
+  "symbol": "btc-usd.crypto",
+  "start": "2024-01-01",
+  "end": "2024-12-31",
+  "trading_period": 365,
+  "factors": [
+    {
+      "indicator": "get_bollinger_band",
+      "strategy": "momentum",
+      "data_column": "price",
+      "window_range": { "min": 5, "max": 100, "step": 5 },
+      "signal_range": { "min": 0.25, "max": 2.5, "step": 0.25 }
+    }
+  ]
 }
 ```
 
-### Multi-Factor (`mode: "multi"`)
-Multiple indicators combined with a conjunction (`AND` / `OR`). Each factor has its own indicator, strategy, data column, and parameter ranges.
+### Single factor with cross-product (trade SPY, signal off VIX)
 ```json
 {
-  "mode": "multi",
+  "symbol": "spy.equity_us",
+  "start": "2024-01-01",
+  "end": "2024-12-31",
+  "trading_period": 252,
+  "data_source": "yahoo",
+  "factors": [
+    {
+      "symbol": "vix.equity_us",
+      "vendor_symbol": "^VIX",
+      "data_source": "yahoo",
+      "data_column": "price",
+      "indicator": "get_rsi",
+      "strategy": "reversion",
+      "window_range": { "min": 14, "max": 14, "step": 1 },
+      "signal_range": { "min": 70, "max": 70, "step": 1 }
+    }
+  ]
+}
+```
+
+### Multi-factor (2+ elements + `conjunction`)
+```json
+{
+  "symbol": "btc-usd.crypto",
+  "start": "2024-01-01",
+  "end": "2024-12-31",
+  "trading_period": 365,
   "conjunction": "AND",
   "factors": [
     {
       "indicator": "get_bollinger_band",
-      "strategy": "momentum_band_signal",
+      "strategy": "momentum",
       "data_column": "price",
       "window_range": { "min": 10, "max": 50, "step": 5 },
       "signal_range": { "min": 0.5, "max": 2.0, "step": 0.5 }
     },
     {
       "indicator": "get_rsi",
-      "strategy": "reversion_band_signal",
+      "strategy": "reversion",
       "data_column": "price",
       "window_range": { "min": 7, "max": 28, "step": 7 },
       "signal_range": { "min": 20, "max": 40, "step": 5 }
@@ -175,6 +222,8 @@ Multiple indicators combined with a conjunction (`AND` / `OR`). Each factor has 
   ]
 }
 ```
+
+For `/backtest/performance`, the same `factors` list is required plus `windows: list[int]` and `signals: list[float]` (one value per factor, in the same order — typically pulled from a row of the `/optimize` top-10).
 
 ## REFDATA — Single Source of Truth
 

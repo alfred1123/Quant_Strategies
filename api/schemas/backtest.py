@@ -1,7 +1,5 @@
-import math
-
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class RangeParam(BaseModel):
@@ -17,17 +15,36 @@ class RangeParam(BaseModel):
 
 
 class FactorConfig(BaseModel):
-    indicator: str
-    strategy: str
-    data_column: str = "price"
-    window_range: RangeParam
-    signal_range: RangeParam
+    """One factor in a backtest.
+
+    Where the indicator reads from is fully described on the factor
+    itself — never inferred from the request-level ``symbol`` (which is
+    the *trade* asset). Set ``symbol`` (internal CUSIP, e.g.
+    ``"vix.equity_us"``) and/or ``vendor_symbol`` (direct override,
+    e.g. ``"^VIX"``) to read the indicator from a different product
+    than the trade asset (cross-product / pair-trade signals).
+    """
+
+    # Where the indicator reads from
     symbol: str | None = None          # internal_cusip for cross-product factor
     vendor_symbol: str | None = None   # direct vendor symbol override
     data_source: str | None = None     # per-factor data source override
+    data_column: str = "price"
+
+    # What the indicator computes
+    indicator: str
+    strategy: str
+    window_range: RangeParam
+    signal_range: RangeParam
 
 
 # ── Requests ────────────────────────────────────────────────────────
+#
+# Backtest requests are uniformly factor-list shaped. A "single factor"
+# strategy is just a 1-element ``factors`` list — there is no separate
+# top-level indicator/window/signal branch. This keeps cross-product
+# semantics (factor on a different symbol than the trade asset)
+# available regardless of factor count.
 
 class DataRequest(BaseModel):
     symbol: str
@@ -39,7 +56,6 @@ class OptimizeRequest(BaseModel):
     symbol: str
     start: str
     end: str
-    mode: str  # "single" | "multi"
     trading_period: int
     fee_bps: float = 5.0
     data_source: str = "yahoo"  # REFDATA.APP.NAME
@@ -47,14 +63,13 @@ class OptimizeRequest(BaseModel):
     # provider and insert a new BT.API_REQUEST version. When False
     # (default), serve from cache only and 400 on miss.
     refresh_dataset: bool = False
-    # Single-factor
-    indicator: str | None = None
-    strategy: str | None = None
-    window_range: RangeParam | None = None
-    signal_range: RangeParam | None = None
-    # Multi-factor
+    factors: list[FactorConfig] = Field(min_length=1)
+    # ``conjunction`` is only meaningful when len(factors) >= 2 — it is
+    # how the per-factor positions are combined ("AND" / "OR" / "FILTER").
+    # For a 1-factor request it must be ``None`` (sent or omitted is
+    # equivalent); leaving it required would force callers to send a
+    # nonsensical value for the single-factor case.
     conjunction: str | None = None
-    factors: list[FactorConfig] | None = None
     # Walk-forward (run inline with optimization when True)
     walk_forward: bool = False
     split_ratio: float = 0.5
@@ -64,22 +79,17 @@ class PerformanceRequest(BaseModel):
     symbol: str
     start: str
     end: str
-    mode: str
     trading_period: int
     fee_bps: float = 5.0
     data_source: str = "yahoo"  # REFDATA.APP.NAME
     # See OptimizeRequest.refresh_dataset.
     refresh_dataset: bool = False
-    # Single-factor
-    indicator: str | None = None
-    strategy: str | None = None
-    window: int | None = None
-    signal: float | None = None
-    # Multi-factor
+    factors: list[FactorConfig] = Field(min_length=1)
     conjunction: str | None = None
-    factors: list[FactorConfig] | None = None
-    windows: list[int] | None = None
-    signals: list[float] | None = None
+    # One value per factor (same order as ``factors``). Selected by the
+    # caller from a top-10 row after running /optimize.
+    windows: list[int] = Field(min_length=1)
+    signals: list[float] = Field(min_length=1)
 
 
 class WalkForwardRequest(OptimizeRequest):

@@ -248,14 +248,18 @@ All endpoints require auth (`require_user`).
     "symbol": "BTC-USD",
     "start": "2016-01-01",
     "end": "2026-04-25",
-    "mode": "single",
     "trading_period": 365,
     "fee_bps": 5,
     "data_source": "yahoo",
-    "indicator": "bollinger",
-    "strategy": "momentum",
-    "window_range": { "min": 5, "max": 100, "step": 5 },
-    "signal_range": { "min": 0.25, "max": 2.5, "step": 0.25 },
+    "factors": [
+      {
+        "indicator": "bollinger",
+        "strategy": "momentum",
+        "data_column": "price",
+        "window_range": { "min": 5, "max": 100, "step": 5 },
+        "signal_range": { "min": 0.25, "max": 2.5, "step": 0.25 }
+      }
+    ],
     "walk_forward": true,
     "split_ratio": 0.5
   }
@@ -277,9 +281,8 @@ All endpoints require auth (`require_user`).
   "started_at": "2026-04-25T12:00:03Z",
   "summary": {
     "symbol": "BTC-USD",
-    "mode": "single",
-    "indicator": "bollinger",
-    "strategy": "momentum",
+    "n_factors": 1,
+    "factors": [{ "indicator": "bollinger", "strategy": "momentum" }],
     "total_trials": 20000
   },
   "progress": {

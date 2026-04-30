@@ -29,7 +29,7 @@ All endpoints below are mounted under the `/api/v1` prefix.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/v1/backtest/optimize` | Run parameter grid search (single or multi-factor). Returns top-10 results, grid, and best params. |
+| `POST` | `/api/v1/backtest/optimize` | Run parameter grid search over a list of factors. Returns top-10 results, grid, and best params. |
 | `POST` | `/api/v1/backtest/optimize/stream` | SSE-streamed optimization — sends `init`, `progress`, `result`, and `error` events in real time. |
 | `POST` | `/api/v1/backtest/performance` | Run a single backtest at fixed params. Returns equity curve, metrics, and daily P&L. |
 | `POST` | `/api/v1/backtest/walk-forward` | Walk-forward overfitting test. Returns IS/OOS metrics, overfitting ratio, and full equity curve. |
@@ -59,14 +59,23 @@ Protected routers use `Depends(require_user)` to validate the JWT cookie. Unauth
 
 Provisioning new users is admin-only (no signup endpoint) — see [Login & Authentication](../design/login.md) for the runbook.
 
-## Single vs Multi-Factor Mode
+## Factor List (single source of truth)
 
-All backtest endpoints accept `"mode": "single"` or `"mode": "multi"` in the request body:
+All backtest requests use a uniform **factor-list** shape. There is no `mode` discriminator and no separate single-factor branch — a "single factor" backtest is just a 1-element `factors` list. This keeps cross-product semantics (factor on a different symbol than the trade asset, e.g. trade SPY but signal off VIX RSI) available for any factor count.
 
-- **Single mode** — flat `window_range` / `signal_range`
-- **Multi mode** — `factors` list with per-factor ranges and a `data_column` per factor (e.g. `"price"`, `"Volume"`)
+Each `FactorConfig` carries:
 
-The service layer dispatches automatically — no separate endpoints.
+- `symbol` / `vendor_symbol` / `data_source` — **where the indicator reads from** (optional; defaults to the top-level trade asset). Set these when the indicator should be computed from a different product than the one being traded.
+- `data_column` — which column of the source DataFrame becomes the `factor` series (default `"price"`).
+- `indicator` / `strategy` — what to compute and how to turn it into positions.
+- `window_range` / `signal_range` — the parameter grid for this factor.
+
+`conjunction` (`"AND"` / `"OR"` / `"FILTER"`) describes how multiple factors' positions are combined. It is **required only when there are 2+ factors** and must be omitted (or `null`) for a single-factor request — the field is meaningless in that case. The service layer dispatches the optimizer based on `len(factors)`:
+
+- 1 factor → `ParametersOptimization.optimize()` returning rows keyed `window` / `signal`
+- 2+ factors → `ParametersOptimization.optimize_multi()` returning rows keyed `window_0` / `signal_0` / `window_1` / …
+
+For `/performance`, the caller passes `windows: list[int]` and `signals: list[float]` — one value per factor, in the same order.
 
 ## SSE Streaming (`/optimize/stream`)
 

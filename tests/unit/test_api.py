@@ -127,12 +127,16 @@ class TestOptimizeEndpoint:
             "symbol": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
-            "mode": "single",
             "trading_period": 365,
-            "indicator": "get_bollinger_band",
-            "strategy": "momentum",
-            "window_range": {"min": 10, "max": 20, "step": 10},
-            "signal_range": {"min": 0.01, "max": 0.02, "step": 0.01},
+            "factors": [
+                {
+                    "indicator": "get_bollinger_band",
+                    "strategy": "momentum",
+                    "data_column": "price",
+                    "window_range": {"min": 10, "max": 20, "step": 10},
+                    "signal_range": {"min": 0.01, "max": 0.02, "step": 0.01},
+                },
+            ],
         })
         assert resp.status_code == 200
         body = resp.json()
@@ -144,12 +148,16 @@ class TestOptimizeEndpoint:
             "symbol": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
-            "mode": "single",
             "trading_period": 365,
-            "indicator": "get_sma",
-            "strategy": "nonexistent_signal",
-            "window_range": {"min": 10, "max": 20, "step": 10},
-            "signal_range": {"min": 0.01, "max": 0.02, "step": 0.01},
+            "factors": [
+                {
+                    "indicator": "get_sma",
+                    "strategy": "nonexistent_signal",
+                    "data_column": "price",
+                    "window_range": {"min": 10, "max": 20, "step": 10},
+                    "signal_range": {"min": 0.01, "max": 0.02, "step": 0.01},
+                },
+            ],
         })
         assert resp.status_code == 400
 
@@ -205,10 +213,16 @@ class TestOptimizeStreamEndpoint:
 
         with client.stream("POST", "/api/v1/backtest/optimize/stream", json={
             "symbol": "btc-usd", "start": "2024-01-01", "end": "2024-12-31",
-            "mode": "single", "trading_period": 365,
-            "indicator": "get_bollinger_band", "strategy": "momentum",
-            "window_range": {"min": 10, "max": 20, "step": 10},
-            "signal_range": {"min": 0.01, "max": 0.02, "step": 0.01},
+            "trading_period": 365,
+            "factors": [
+                {
+                    "indicator": "get_bollinger_band",
+                    "strategy": "momentum",
+                    "data_column": "price",
+                    "window_range": {"min": 10, "max": 20, "step": 10},
+                    "signal_range": {"min": 0.01, "max": 0.02, "step": 0.01},
+                },
+            ],
             "walk_forward": True, "split_ratio": 0.5,
         }) as resp:
             assert resp.status_code == 200
@@ -280,12 +294,18 @@ class TestPerformanceEndpoint:
             "symbol": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
-            "mode": "single",
             "trading_period": 365,
-            "indicator": "get_bollinger_band",
-            "strategy": "momentum",
-            "window": 20,
-            "signal": 1.0,
+            "factors": [
+                {
+                    "indicator": "get_bollinger_band",
+                    "strategy": "momentum",
+                    "data_column": "price",
+                    "window_range": {"min": 20, "max": 20, "step": 1},
+                    "signal_range": {"min": 1.0, "max": 1.0, "step": 1},
+                },
+            ],
+            "windows": [20],
+            "signals": [1.0],
         })
         assert resp.status_code == 200
         body = resp.json()
@@ -332,13 +352,17 @@ class TestWalkForwardEndpoint:
             "symbol": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
-            "mode": "single",
             "trading_period": 365,
             "split_ratio": 0.5,
-            "indicator": "get_bollinger_band",
-            "strategy": "momentum",
-            "window_range": {"min": 10, "max": 30, "step": 10},
-            "signal_range": {"min": 0.5, "max": 1.5, "step": 0.5},
+            "factors": [
+                {
+                    "indicator": "get_bollinger_band",
+                    "strategy": "momentum",
+                    "data_column": "price",
+                    "window_range": {"min": 10, "max": 30, "step": 10},
+                    "signal_range": {"min": 0.5, "max": 1.5, "step": 0.5},
+                },
+            ],
         })
         assert resp.status_code == 200
         body = resp.json()
