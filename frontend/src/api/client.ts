@@ -12,6 +12,20 @@ export const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+/**
+ * Error thrown by the response interceptor below. Carries the HTTP status
+ * (when one was returned) so callers can branch on `err instanceof ApiError
+ * && err.status === 401` rather than matching the message string.
+ */
+export class ApiError extends Error {
+  readonly status: number | null;
+  constructor(message: string, status: number | null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 // Normalise all API errors: extract FastAPI detail message, log to console.
 // On 401 (anywhere except the /auth/me probe itself), evict the cached
 // current-user so the App-level route guard re-renders the login page.
@@ -23,11 +37,12 @@ apiClient.interceptors.response.use(
       Array.isArray(detail)
         ? detail.map(d => d.msg).join('; ')
         : (detail ?? err.message ?? 'Unknown error');
+    const status = err.response?.status ?? null;
     console.error('[API]', err.config?.method?.toUpperCase(), err.config?.url, '→', message, err);
 
-    if (err.response?.status === 401) {
+    if (status === 401) {
       queryClient.setQueryData(ME_QUERY_KEY, null);
     }
-    return Promise.reject(new Error(message));
+    return Promise.reject(new ApiError(message, status));
   },
 );

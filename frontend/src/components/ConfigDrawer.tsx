@@ -9,6 +9,7 @@ import {
 import { useProducts } from '../api/inst';
 import type { AssetTypeRow } from '../types/refdata';
 import { countSteps } from '../utils/grid';
+import { validateBacktestConfig } from '../utils/validate';
 import type { BacktestConfig, FactorConfig } from '../types/backtest';
 import ProductSelector from './config/ProductSelector';
 import FactorCard from './config/FactorCard';
@@ -17,7 +18,12 @@ interface Props {
   open: boolean;
   onClose: () => void;
   config: BacktestConfig;
-  onChange: (c: BacktestConfig) => void;
+  /**
+   * Accepts either a full replacement or a `(prev) => next` updater. The
+   * updater form is REQUIRED to be safe against multiple synchronous calls
+   * within a single event handler — see the `set()` helper below.
+   */
+  onChange: (next: BacktestConfig | ((prev: BacktestConfig) => BacktestConfig)) => void;
   onRun: () => void;
   isRunning: boolean;
 }
@@ -32,7 +38,19 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   const { data: apps = [] } = useApps();
   const { data: products = [] } = useProducts();
 
-  const set = (patch: Partial<BacktestConfig>) => onChange({ ...config, ...patch });
+  /**
+   * Patch helper.
+   *
+   * MUST use the functional updater form. Some handlers (e.g. picking a
+   * product fires both `onChange({ symbol, vendorSymbol })` AND
+   * `onProductPicked(product)` → `set({ assetType, tradingPeriod })`
+   * synchronously). With a plain `{ ...config, ...patch }` the second call
+   * would close over the stale `config` prop and silently discard the
+   * first update. Functional updates serialize correctly through React's
+   * batching.
+   */
+  const set = (patch: Partial<BacktestConfig>) =>
+    onChange(prev => ({ ...prev, ...patch }));
 
   // ── factor list mutators ──
   const updateFactor = (i: number, patch: Partial<FactorConfig>) =>
@@ -61,15 +79,8 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   const selectedAssetType: AssetTypeRow | null =
     assetTypes.find(a => a.display_name === config.assetType) ?? null;
 
-  const missingFields: string[] = [];
-  if (!config.symbol.trim() && !config.vendorSymbol.trim()) missingFields.push('Product or Vendor Symbol');
-  if (!config.assetType) missingFields.push('Asset Type');
-  config.factors.forEach((f, i) => {
-    const label = config.factors.length > 1 ? `Factor ${i + 1} ` : '';
-    if (!f.indicator) missingFields.push(`${label}Indicator`);
-    if (!f.strategy) missingFields.push(`${label}Strategy`);
-  });
-  const isRunnable = missingFields.length === 0 && config.factors.length >= 1;
+  const missingFields = validateBacktestConfig(config);
+  const isRunnable = missingFields.length === 0;
 
   const totalTrials = config.factors.reduce(
     (acc, f) => acc * countSteps(f.window_range) * countSteps(f.signal_range),
@@ -183,10 +194,10 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
 
       {config.factors.some(f => !f.symbol && !f.vendor_symbol) && (
         <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-          alert_internal_cusip not configured on {config.factors
+          No product set on {config.factors
             .map((f, i) => (!f.symbol && !f.vendor_symbol) ? `Factor ${i + 1}` : null)
             .filter(Boolean).join(', ')
-          } — will use main product.
+          } — will use the main trading product.
         </Typography>
       )}
 

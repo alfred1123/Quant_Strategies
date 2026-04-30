@@ -22,17 +22,23 @@ describe('overfitColor', () => {
 });
 
 describe('overfitLabel', () => {
+  // Thresholds (LOW=0.3, HIGH=0.5) intentionally match overfitColor so the
+  // displayed color and label can never disagree. See OVERFIT_THRESHOLDS in
+  // src/utils/format.ts.
   it('returns N/A for null/NaN', () => {
     expect(overfitLabel(null)).toBe('N/A');
     expect(overfitLabel(NaN)).toBe('N/A');
   });
   it('returns Low Risk below 0.3', () => {
     expect(overfitLabel(0.2)).toBe('Low Risk');
+    expect(overfitLabel(0.29)).toBe('Low Risk');
   });
-  it('returns Moderate for 0.3–0.69', () => {
-    expect(overfitLabel(0.5)).toBe('Moderate');
+  it('returns Moderate for 0.3–0.49', () => {
+    expect(overfitLabel(0.3)).toBe('Moderate');
+    expect(overfitLabel(0.49)).toBe('Moderate');
   });
-  it('returns High Risk at 0.7+', () => {
+  it('returns High Risk at 0.5+', () => {
+    expect(overfitLabel(0.5)).toBe('High Risk');
     expect(overfitLabel(0.7)).toBe('High Risk');
     expect(overfitLabel(1.0)).toBe('High Risk');
   });

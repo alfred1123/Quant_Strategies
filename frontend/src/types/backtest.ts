@@ -117,11 +117,30 @@ export interface PerformanceRequest {
   signals?: number[];
 }
 
-export interface Top10Row {
-  window?: number;
-  signal?: number;
+/**
+ * One row of optimization results. Discriminated by the presence of
+ * `window`/`signal` (single-factor) vs `window_0`/`signal_0`/... (multi-factor).
+ *
+ * Use the helpers in `utils/top10.ts` (`isSingleFactorRow`, `multiFactorParams`)
+ * to read window/signal values safely instead of `as number` casts.
+ */
+export type Top10Row = SingleFactorRow | MultiFactorRow;
+
+export interface SingleFactorRow {
+  window: number;
+  signal: number;
   sharpe: number;
-  [key: string]: unknown;
+  /** Reserved for future per-row metadata; not used for window/signal lookups. */
+  [key: string]: number | string | null | undefined;
+}
+
+export interface MultiFactorRow {
+  sharpe: number;
+  /**
+   * Per-factor params live under `window_0`, `signal_0`, `window_1`, `signal_1`, ...
+   * Keep the index signature wide enough to allow that, but narrow values to numbers.
+   */
+  [key: string]: number | string | null | undefined;
 }
 
 export interface OptimizeResponse {
@@ -130,9 +149,7 @@ export interface OptimizeResponse {
   best: Top10Row;
   top10: Top10Row[];
   grid: Top10Row[];
-  // Inline performance for best params (when available)
   performance?: PerformanceResponse;
-  // Inline walk-forward (when walk_forward=true in request)
   walk_forward?: WalkForwardResponse;
 }
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { apiClient } from './client';
+import { ApiError, apiClient } from './client';
 import { queryClient } from '../lib/queryClient';
 
 export const ME_QUERY_KEY = ['auth', 'me'] as const;
@@ -19,10 +19,9 @@ async function fetchMe(): Promise<CurrentUser | null> {
     const { data } = await apiClient.get<CurrentUser>('/auth/me');
     return data;
   } catch (err) {
-    // The 401 interceptor in client.ts already evicts the cache. We swallow
-    // here so the consumer just sees `data === null` (= "show login page")
-    // rather than a noisy error.
-    if (err instanceof Error && err.message === 'Not authenticated') return null;
+    // Swallow 401 specifically (= "show login page"). Anything else is real.
+    // The 401 interceptor in client.ts has already evicted the cache.
+    if (err instanceof ApiError && err.status === 401) return null;
     throw err;
   }
 }

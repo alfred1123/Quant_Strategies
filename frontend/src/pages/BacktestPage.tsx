@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AppBar, Toolbar, Typography, Button, Box, Alert,
   Chip, Divider, CircularProgress, LinearProgress,
@@ -18,6 +18,7 @@ import type {
 } from '../types/backtest';
 import { effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest } from '../utils/requestBuilders';
 import { overfitColor, overfitLabel, formatMetric, rowLabel } from '../utils/format';
+import { firstValidationError } from '../utils/validate';
 
 const DEFAULT_CONFIG: BacktestConfig = {
   symbol: 'btcusdt.crypto',
@@ -50,6 +51,11 @@ const DEFAULT_CONFIG: BacktestConfig = {
   refreshDataset: false,
 };
 
+/** True when an Error is the result of an AbortController.abort() call. */
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError';
+}
+
 export default function BacktestPage({ currentUser }: { currentUser: CurrentUser }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [config, setConfig] = useState<BacktestConfig>(DEFAULT_CONFIG);
@@ -64,39 +70,62 @@ export default function BacktestPage({ currentUser }: { currentUser: CurrentUser
   const [wfResult, setWfResult] = useState<WalkForwardResponse | null>(null);
   const [optProgress, setOptProgress] = useState<OptimizeProgress | null>(null);
 
+  // ── Lifecycle: cancel any in-flight async work on unmount or new run ──
+  // optimizeAbort tears down the SSE fetch; perfAbort tears down the per-row
+  // POST. perfReqId protects against the late-arriving-response race
+  // (click row A, click row B before A returns: A's response is dropped).
+  const optimizeAbort = useRef<AbortController | null>(null);
+  const perfAbort = useRef<AbortController | null>(null);
+  const perfReqId = useRef(0);
+
+  useEffect(() => {
+    // Cancel anything still running when the page unmounts.
+    return () => {
+      optimizeAbort.current?.abort();
+      perfAbort.current?.abort();
+    };
+  }, []);
+
   const loadPerf = async (row: Top10Row, index: number, cfg: BacktestConfig) => {
+    // Cancel the previous perf request and bump the request id so any late
+    // response from it is discarded even if it slips past the abort.
+    perfAbort.current?.abort();
+    const ctrl = new AbortController();
+    perfAbort.current = ctrl;
+    const reqId = ++perfReqId.current;
+
     setIsLoadingPerf(true);
     setSelectedIndex(index);
     setSelectedRow(row);
     setPerfResult(null);
     try {
-      const perf = await runPerformance(buildPerformanceRequest(cfg, row));
+      const perf = await runPerformance(buildPerformanceRequest(cfg, row), ctrl.signal);
+      if (reqId !== perfReqId.current) return; // a newer request superseded us
       setPerfResult(perf);
     } catch (e: unknown) {
+      if (isAbortError(e) || reqId !== perfReqId.current) return;
       const msg = e instanceof Error ? e.message : 'Performance calculation failed';
       console.error('[BacktestPage] loadPerf error:', e);
       setError(msg);
     } finally {
-      setIsLoadingPerf(false);
+      if (reqId === perfReqId.current) setIsLoadingPerf(false);
     }
-  };
-
-  const validate = (): string | null => {
-    if (!config.symbol.trim() && !config.vendorSymbol.trim()) return 'Product or vendor symbol is required.';
-    if (!config.assetType) return 'Asset type is required.';
-    for (let i = 0; i < config.factors.length; i++) {
-      if (!config.factors[i].indicator) return `Factor ${i + 1}: indicator is required.`;
-      if (!config.factors[i].strategy) return `Factor ${i + 1}: strategy is required.`;
-    }
-    return null;
   };
 
   const handleRun = async () => {
-    const validationError = validate();
+    const validationError = firstValidationError(config);
     if (validationError) {
       setError(validationError);
       return;
     }
+    // Cancel any previous stream / perf request.
+    optimizeAbort.current?.abort();
+    perfAbort.current?.abort();
+    perfReqId.current++;
+
+    const ctrl = new AbortController();
+    optimizeAbort.current = ctrl;
+
     setError(null);
     setIsOptimizing(true);
     setDrawerOpen(false);
@@ -106,15 +135,17 @@ export default function BacktestPage({ currentUser }: { currentUser: CurrentUser
     setSelectedRow(null);
     setWfResult(null);
     setOptProgress(null);
+    setAnalysisTab(0);
     try {
       const result = await runOptimizeStream(
         buildOptimizeRequest(config),
         (p) => setOptProgress(p),
+        ctrl.signal,
       );
+      if (ctrl.signal.aborted) return;
       setOptProgress(null);
       setOptimizeResult(result);
 
-      // Use inline performance from the stream result
       if (result.performance) {
         setPerfResult(result.performance);
         if (result.top10?.length > 0) {
@@ -123,16 +154,16 @@ export default function BacktestPage({ currentUser }: { currentUser: CurrentUser
         }
       }
 
-      // Use inline walk-forward from the stream result
       if (result.walk_forward) {
         setWfResult(result.walk_forward);
       }
     } catch (e: unknown) {
+      if (isAbortError(e) || ctrl.signal.aborted) return;
       const msg = e instanceof Error ? e.message : 'Optimization failed';
       console.error('[BacktestPage] handleRun error:', e);
       setError(msg);
     } finally {
-      setIsOptimizing(false);
+      if (optimizeAbort.current === ctrl) setIsOptimizing(false);
     }
   };
 

@@ -15,6 +15,13 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Type strictness — turning these on systematically catches the kind of
+     * silent shape drift the audit flagged (Top10Row casts, optional chains
+     * masking nulls). Keep `strict: true` ON; do not weaken individual flags
+     * without explicit discussion. */
+    "strict": true,
+    "noImplicitOverride": true,
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,

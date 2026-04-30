@@ -10,11 +10,17 @@ interface Props {
   isLoadingPerf: boolean;
 }
 
+/** Format any cell value defensively — only numbers get toFixed; other types pass through. */
+function formatNumeric(value: unknown, digits: number): string {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '';
+}
+
 export default function Top10Table({ result, selectedIndex, onSelect, isLoadingPerf }: Props) {
   const rows = result.top10.map((r, i) => ({ ...r, id: i }));
 
-  // Build param columns dynamically from first row keys
-  const first = result.top10[0] ?? {};
+  // Build param columns dynamically from first row keys (everything except `sharpe`).
+  // Don't assume all values are numbers — `formatNumeric` handles non-numeric gracefully.
+  const first = (result.top10[0] ?? {}) as Record<string, unknown>;
   const paramCols: GridColDef[] = Object.keys(first)
     .filter(k => k !== 'sharpe')
     .map(k => ({
@@ -22,7 +28,7 @@ export default function Top10Table({ result, selectedIndex, onSelect, isLoadingP
       headerName: k,
       width: 90,
       type: 'number' as const,
-      valueFormatter: (value: number) => (value != null ? value.toFixed(2) : ''),
+      valueFormatter: (value: unknown) => formatNumeric(value, 2),
     }));
 
   const columns: GridColDef[] = [
@@ -32,7 +38,7 @@ export default function Top10Table({ result, selectedIndex, onSelect, isLoadingP
       headerName: 'Sharpe',
       width: 100,
       type: 'number',
-      valueFormatter: (value: number) => (value != null ? value.toFixed(4) : ''),
+      valueFormatter: (value: unknown) => formatNumeric(value, 4),
     },
     {
       field: '_action',

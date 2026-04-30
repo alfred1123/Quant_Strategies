@@ -1,6 +1,9 @@
 # Frontend Code Quality Audit
 
-A prioritized review of issues in the React/TypeScript frontend (`frontend/`), with concrete file references and remediation suggestions. Findings only — no changes have been made as a result of this document.
+A prioritized review of issues in the React/TypeScript frontend (`frontend/`), with concrete file references and remediation suggestions.
+
+!!! success "Status — Hardening pass complete"
+    All **Critical** and **High-priority** items below, plus several **Medium** items, were addressed in the frontend hardening pass. Remaining work is captured at the bottom of this document under "Open follow-ups".
 
 ## TL;DR
 
@@ -38,31 +41,31 @@ flowchart LR
 
 ## Critical issues — likely bug source / runtime risk
 
-- **`Top10Row` index signature hides shape** — `frontend/src/types/backtest.ts` lines 120–125 use `[key: string]: unknown`. Call sites in `requestBuilders.ts` and `Top10Table.tsx` cast with `as number`. Fix: discriminated union for single vs multi rows.
-- **SSE payload not validated** — `frontend/src/api/backtest.ts` lines 59–63 do `JSON.parse(eventData)` then `as OptimizeResponse`. Malformed payload throws inside `processChunk` and silently rejects. Fix: schema validation (Zod) or typed parser.
-- **`response.body!` non-null assertion** — `frontend/src/api/backtest.ts` line 37. Theoretically empty body crashes. Fix: explicit `if (!response.body) reject(...)`.
-- **Concurrent `loadPerf` race** — `frontend/src/pages/BacktestPage.tsx` lines 67–81. Click row A, then row B; if A's response returns last, A's data overwrites B's selection. Fix: `AbortController` per request or monotonic request id.
-- **Optimize stream not aborted on unmount or new run** — `runOptimizeStream` accepts `signal?: AbortSignal` (`frontend/src/api/backtest.ts` lines 17–20) but `BacktestPage.handleRun` never passes one. Risk: progress callbacks fire after unmount.
+- ✅ **`Top10Row` index signature hides shape** *(was `frontend/src/types/backtest.ts` lines 120–125)* — Replaced with a discriminated union `SingleFactorRow | MultiFactorRow` and a `utils/top10.ts` accessor module (`isSingleFactorRow`, `readNumber`, `multiFactorParams`). All call sites (`requestBuilders.ts`, `Top10Table.tsx`, `HeatmapChart.tsx`, `format.ts`) read window/signal through these helpers — no `as number` casts remain.
+- ✅ **SSE payload not validated** *(was `frontend/src/api/backtest.ts` lines 59–63)* — `runOptimizeStream` now hand-parses each event (`init`, `progress`, `result`, `error`) via dedicated narrowers. Malformed JSON or wrong-shape payloads reject with a precise error rather than crashing inside `processChunk`. (Zod was deliberately not added — see Decision below.)
+- ✅ **`response.body!` non-null assertion** *(was `frontend/src/api/backtest.ts` line 37)* — Replaced with an explicit `if (!response.body) reject(...)` plus a `settled`/`reader.cancel()` guard so the loop can't double-resolve.
+- ✅ **Concurrent `loadPerf` race** *(was `frontend/src/pages/BacktestPage.tsx` lines 67–81)* — Per-request `AbortController` plus a monotonic `perfReqId` counter. Late responses from a previous selection are dropped.
+- ✅ **Optimize stream not aborted on unmount or new run** — `BacktestPage` owns an `optimizeAbort` ref. `handleRun` aborts any in-flight stream before starting a new one; an unmount effect aborts on navigation away. `AbortError`s are silently ignored downstream.
 
 ## High-priority issues — maintainability / change risk
 
-- **TypeScript `strict` mode is OFF** — `frontend/tsconfig.app.json` has no `"strict": true`. Weaker than industry standard.
-- **Validation duplicated and divergent** — `validate()` in `frontend/src/pages/BacktestPage.tsx` lines 84–92 vs `missingFields` in `frontend/src/components/ConfigDrawer.tsx` lines 64–72. Easy to drift. Fix: one `validateBacktestConfig()` module.
-- **`analysisTab` not reset on new run** — `frontend/src/pages/BacktestPage.tsx` lines 103–108. Tab index can point at a panel that no longer exists.
-- **SSE uses `fetch`, REST uses `axios`** — Two transports, two error/auth/credential policies. Future header changes must be duplicated. Fix: single transport facade.
-- **`Plot.ts` interop relies on `any`** — `frontend/src/lib/Plot.ts`. Bypasses types at the Plotly boundary.
-- **Fragile auth error string match** — `frontend/src/api/auth.ts` line 25 (`err.message === 'Not authenticated'`). Backend copy change breaks the guard. Fix: status-code check before interceptor wraps.
+- ✅ **TypeScript `strict` mode is OFF** — Enabled in `frontend/tsconfig.app.json` along with `noImplicitOverride`. Build is clean under strict rules.
+- ✅ **Validation duplicated and divergent** — Consolidated into `frontend/src/utils/validate.ts` (`validateBacktestConfig`, `firstValidationError`). `BacktestPage.handleRun` and `ConfigDrawer` both consume it, so the missing-field list cannot drift.
+- ✅ **`analysisTab` not reset on new run** — `handleRun` now sets `setAnalysisTab(0)` alongside the other state resets.
+- ⏳ **SSE uses `fetch`, REST uses `axios`** — Not yet unified (would change call shape across the codebase). Mitigated for now: the SSE `fetch` was given `credentials: 'include'` so the auth cookie travels the same way as `axios.withCredentials`. A single transport facade is captured in **Open follow-ups** below.
+- ✅ **`Plot.ts` interop relies on `any`** — Refactored to a typed `unknown` narrowing pattern (`hasDefault`). No `// eslint-disable @typescript-eslint/no-explicit-any` directive is needed anymore.
+- ✅ **Fragile auth error string match** — `client.ts` now throws a typed `ApiError` carrying `status: number | null`. `fetchMe` checks `err instanceof ApiError && err.status === 401` instead of comparing `err.message === 'Not authenticated'`.
 
 ## Medium-priority issues — code smells
 
-- **`Top10Table` assumes all non-`sharpe` columns are numeric** — `frontend/src/components/Top10Table.tsx` lines 17–26.
-- **Heatmap is O(signals × windows × grid)** — `frontend/src/components/HeatmapChart.tsx` lines 17–21 (`grid.find` inside nested maps). Fix: build a `Map` keyed by `(window,signal)` once.
-- **Magic threshold drift** — `overfitColor` (0.3 / 0.5) vs `overfitLabel` (0.3 / 0.7) in `frontend/src/utils/format.ts` lines 3–14. Color and label can disagree.
-- **`BacktestConfig` has both top-level `indicator/strategy/ranges` AND `factors[]`** — `frontend/src/types/backtest.ts` lines 42–51. UI only edits `factors`. Two sources of truth.
-- **Misleading user copy `alert_internal_cusip`** — `frontend/src/components/ConfigDrawer.tsx` lines 184–189. Looks like debug text.
-- **`FactorCard` casts nullable REFDATA numbers** — `frontend/src/components/config/FactorCard.tsx` lines 44–45 (`sig_min`/`sig_max` are nullable in `frontend/src/types/refdata.ts` lines 7–8).
-- **`ErrorBoundary` "Try Again" only clears boundary state** — Faulty child may remain mounted. Fix: bump `key` to remount subtree.
-- **`MetricsCards` magic metric names** — Hardcoded `PERCENT_KEYS` in `frontend/src/components/MetricsCards.tsx` lines 4–9. Drift if API renames.
+- ✅ **`Top10Table` assumes all non-`sharpe` columns are numeric** — Cell formatter now narrows with `typeof value === 'number' && Number.isFinite(value)`; non-numeric values pass through as empty string instead of crashing `toFixed`.
+- ✅ **Heatmap is O(signals × windows × grid)** — `buildHeatmapMatrix` builds a single `Map` keyed by `${window}|${signal}` in one pass, then materializes the matrix in O(W × S). Extracted as a pure function with unit tests in `HeatmapChart.test.ts`.
+- ✅ **Magic threshold drift** — `overfitColor` and `overfitLabel` now share a single `OVERFIT_THRESHOLDS = { LOW: 0.3, HIGH: 0.5 }` constant; tests in `format.test.ts` cover both bands.
+- ⏳ **`BacktestConfig` has both top-level `indicator/strategy/ranges` AND `factors[]`** — Not yet removed (would touch the public form contract; deferred to the "Backtest feature module" redesign in **Open follow-ups**).
+- ✅ **Misleading user copy `alert_internal_cusip`** — Replaced with "No product set on Factor N — will use the main trading product."
+- ⏳ **`FactorCard` casts nullable REFDATA numbers** — Not addressed in this pass; tracked as **Open follow-ups**. Low impact today (defaults exist) but worth tightening once REFDATA types tighten.
+- ✅ **`ErrorBoundary` "Try Again" only clears boundary state** — Now bumps an internal `resetKey` and renders children inside `<div key={resetKey}>`, which forces React to remount the entire subtree so a re-throwing child gets a fresh attempt.
+- ⏳ **`MetricsCards` magic metric names** — Not addressed; deferred until the backend exposes a canonical metric-units endpoint or the UI gets per-metric formatting from REFDATA.
 
 ## Low-priority — nice-to-have
 
@@ -96,5 +99,22 @@ Whether implemented as classes, functions, or modules is a style choice. Adding 
 Three options in increasing scope:
 
 - **Surgical fixes** — Critical issues only. Small focused PR. Highest bug-prevention per hour invested.
-- **Hardening pass** — Critical + High. Adds strict TS, validation module, abort plumbing. Roughly 1–2 PRs.
+- **Hardening pass** ✅ *delivered* — Critical + High. Adds strict TS, validation module, abort plumbing.
 - **Full redesign** — All three redesigns above, staged over 3–4 PRs. Best long-term shape but the largest effort.
+
+## Open follow-ups
+
+Items deferred from the hardening pass, ordered by approximate impact:
+
+1. **Single transport facade** — Wrap axios + streaming `fetch` so headers, credentials, error normalisation and `ApiError` shape live in one file. Today the SSE `fetch` mirrors the axios policy by hand (`credentials: 'include'`).
+2. **Drop legacy top-level config fields** — `BacktestConfig.indicator/strategy/windowRange/signalRange` are no longer edited by the UI; the form drives `factors[]` exclusively. Removing them is a typed refactor and an opportunity to formalise the request contract.
+3. **Backtest feature module + run-state hook** — Extract `useBacktestRun()` (or a small Zustand store) that owns the optimize stream, abort plumbing, perf load, derived flags and tab state. Removes the remaining god-component pressure in `BacktestPage.tsx`.
+4. **REFDATA-driven metric formatting** — Replace `MetricsCards.PERCENT_KEYS` and `FactorCard`'s nullable `sig_min/max` defaults with values fetched from REFDATA (per the workspace's "REFDATA as Single Source of Truth" decision).
+5. **Bundle/codesplitting** — Vite warns the production bundle exceeds 500 KB; lazy-load `react-plotly.js` and `@mui/x-data-grid` to drop initial JS.
+6. **Tooling debt** — Either adopt Tailwind or remove it (zero `className=` usage today). Move `@rolldown/binding-linux-x64-gnu` out of `dependencies` once the Node 20 / rolldown native binding bug is resolved upstream.
+
+## Decisions made during the hardening pass
+
+- **No Zod** — SSE payloads are validated with hand-written narrowers. Adding a runtime-schema dependency is overkill for four event shapes; if a fifth or sixth event type appears the calculus may flip.
+- **`ApiError` over status codes only** — `apiClient` throws `ApiError(message, status)` so callers can branch on either `instanceof ApiError` or `err.status === 401`. Keeps backward-compat with consumers that just want `err.message` for display.
+- **Discriminated union over Zod-style parser for `Top10Row`** — The shape is fixed by the backend; a TypeScript discriminated union plus `utils/top10.ts` accessors gives compile-time safety without runtime overhead.

@@ -1,34 +1,55 @@
+import { useMemo } from 'react';
 import Plot from '../lib/Plot';
 import type { Top10Row } from '../types/backtest';
+import { isSingleFactorRow } from '../utils/top10';
 
 interface Props {
   grid: Top10Row[];
   mode?: 'single' | 'multi';
 }
 
-export default function HeatmapChart({ grid, mode = 'single' }: Props) {
-  if (!grid || !grid.length || mode !== 'single') return null;
+/** Pure helper — extracted for unit testing without Plotly. */
+export function buildHeatmapMatrix(grid: Top10Row[]): {
+  windows: number[];
+  signals: number[];
+  z: (number | null)[][];
+} {
+  const singleRows = grid.filter(isSingleFactorRow);
 
-  if (!Plot) return <p style={{ color: '#ef5350' }}>Plotly failed to load.</p>;
+  const windowsSet = new Set<number>();
+  const signalsSet = new Set<number>();
+  const sharpeByKey = new Map<string, number>();
 
-  const windows = [...new Set(grid.map(r => r.window as number))].sort((a, b) => a - b);
-  const signals = [...new Set(grid.map(r => r.signal as number))].sort((a, b) => a - b);
+  for (const row of singleRows) {
+    windowsSet.add(row.window);
+    signalsSet.add(row.signal);
+    sharpeByKey.set(`${row.window}|${row.signal}`, row.sharpe);
+  }
 
+  const windows = [...windowsSet].sort((a, b) => a - b);
+  const signals = [...signalsSet].sort((a, b) => a - b);
   const z = signals.map(sig =>
-    windows.map(win => {
-      const row = grid.find(r => r.window === win && r.signal === sig);
-      return (row?.sharpe ?? null) as number | null;
-    })
+    windows.map(win => sharpeByKey.get(`${win}|${sig}`) ?? null),
   );
+
+  return { windows, signals, z };
+}
+
+export default function HeatmapChart({ grid, mode = 'single' }: Props) {
+  const matrix = useMemo(() => buildHeatmapMatrix(grid), [grid]);
+
+  if (!grid || !grid.length || mode !== 'single') return null;
+  if (!Plot) return <p style={{ color: '#ef5350' }}>Plotly failed to load.</p>;
+  if (matrix.windows.length === 0 || matrix.signals.length === 0) return null;
 
   return (
     <Plot
       data={[
         {
           type: 'heatmap',
-          x: windows,
-          y: signals,
-          z: z as unknown as number[][],
+          x: matrix.windows,
+          y: matrix.signals,
+          z: matrix.z as unknown as number[][],
           colorscale: 'RdYlGn',
           zsmooth: 'best',
           colorbar: { title: { text: 'Sharpe' } },

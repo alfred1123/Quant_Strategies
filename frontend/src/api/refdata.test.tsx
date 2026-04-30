@@ -24,13 +24,17 @@ function createWrapper() {
 
 beforeEach(() => vi.clearAllMocks());
 
-const hookTable: [string, typeof useIndicators][] = [
-  ['useIndicators', useIndicators],
-  ['useSignalTypes', useSignalTypes],
-  ['useAssetTypes', useAssetTypes],
-  ['useConjunctions', useConjunctions],
-  ['useDataColumns', useDataColumns],
-  ['useApps', useApps],
+// Each hook returns a different row shape; for the "does it call apiClient.get
+// and surface the data" smoke test we don't care about the row type, so widen
+// to a generic factory that returns *something* truthy via TanStack Query.
+type AnyHook = () => { data: unknown; isSuccess: boolean };
+const hookTable: [string, AnyHook][] = [
+  ['useIndicators', useIndicators as AnyHook],
+  ['useSignalTypes', useSignalTypes as AnyHook],
+  ['useAssetTypes', useAssetTypes as AnyHook],
+  ['useConjunctions', useConjunctions as AnyHook],
+  ['useDataColumns', useDataColumns as AnyHook],
+  ['useApps', useApps as AnyHook],
 ];
 
 describe.each(hookTable)('%s', (_name, hook) => {

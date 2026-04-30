@@ -126,4 +126,86 @@ describe('runOptimizeStream', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('rejects when response body is missing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, body: null }));
+
+    await expect(
+      runOptimizeStream(
+        { symbol: 'X', start: '', end: '', mode: 'single', trading_period: 365, fee_bps: 0 },
+        vi.fn(),
+      ),
+    ).rejects.toThrow('Stream response has no body');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('rejects on malformed SSE payload (invalid JSON)', async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        // Deliberately broken JSON inside the SSE data line.
+        controller.enqueue(new TextEncoder().encode('event: progress\ndata: {not-json\n\n'));
+        controller.close();
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, body: stream }));
+
+    await expect(
+      runOptimizeStream(
+        { symbol: 'X', start: '', end: '', mode: 'single', trading_period: 365, fee_bps: 0 },
+        vi.fn(),
+      ),
+    ).rejects.toThrow(/Malformed SSE payload/);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('rejects on result event with missing required fields', async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        // valid JSON but missing total_trials/valid/best/top10/grid
+        controller.enqueue(new TextEncoder().encode(makeSseChunk('result', { foo: 'bar' })));
+        controller.close();
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, body: stream }));
+
+    await expect(
+      runOptimizeStream(
+        { symbol: 'X', start: '', end: '', mode: 'single', trading_period: 365, fee_bps: 0 },
+        vi.fn(),
+      ),
+    ).rejects.toThrow('Invalid SSE result payload');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('forwards AbortSignal to fetch', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(makeSseChunk('result', {
+            total_trials: 1, valid: 1, best: { sharpe: 1 }, top10: [], grid: [],
+          })));
+          controller.close();
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const ctrl = new AbortController();
+    await runOptimizeStream(
+      { symbol: 'X', start: '', end: '', mode: 'single', trading_period: 365, fee_bps: 0 },
+      vi.fn(),
+      ctrl.signal,
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/backtest/optimize/stream'),
+      expect.objectContaining({ signal: ctrl.signal }),
+    );
+
+    vi.unstubAllGlobals();
+  });
 });
