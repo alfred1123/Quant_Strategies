@@ -1,0 +1,3809 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/design/backtest-queue/">
+      
+      
+        <link rel="prev" href="../backtest-api/">
+      
+      
+        <link rel="next" href="../trade-api/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Backtest Queue - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#design-queued-background-backtests" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Backtest Queue
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/pipeline/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../backtest-api/" class="md-tabs__link">
+          
+  
+  
+  Design Docs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Goals">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#functional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UX
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#technical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Non-Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-module-placement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Module Placement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-high-level-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 High-level model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-why-a-single-worker-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Why a single worker first
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-why-process-based-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Why process-based execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-why-listennotify-over-polling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Why LISTEN/NOTIFY over polling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-data-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Data Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Data Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-btbacktest_job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 BT.BACKTEST_JOB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-btbacktest_job_event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 BT.BACKTEST_JOB_EVENT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-existing-bt-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Existing BT tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-stored-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Stored Procedures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Stored Procedures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#state-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State transitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-backend-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Backend API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Backend API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-enqueue-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Enqueue request
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-queue-row-response" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Queue row response
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-sse-event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 SSE event types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-job-manager-coordinator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Job Manager (coordinator)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Job Manager (coordinator)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 Startup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-event-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Event loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-worker-supervision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Worker supervision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-sse-fanout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.4 SSE fanout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-worker-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Worker process
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Worker process">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-per-trial-callback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 Per-trial callback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-termination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 Termination
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Frontend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Frontend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#111-state-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.1 State split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#112-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.2 Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#113-queue-table-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.3 Queue table columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#114-editable-ui-while-jobs-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.4 Editable UI while jobs run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#115-sse-reconnection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.5 SSE reconnection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-failure-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Failure handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-test-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Test strategy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Performance considerations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Security
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16-phased-implementation-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Phased implementation plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="16. Phased implementation plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#slice-a-schema-procedures-12-days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice A — Schema + procedures (1–2 days)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-b-manager-worker-23-days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice B — Manager + worker (2–3 days)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-c-http-api-sse-12-days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice C — HTTP API + SSE (1–2 days)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-d-frontend-queue-panel-23-days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice D — Frontend queue panel (2–3 days)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-quality-of-life-after-phase-1-is-stable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — quality of life (after Phase 1 is stable)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-scale-out-only-if-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 — scale-out (only if needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18-recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18. Recommendation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#19-technology-choice-why-postgres-not-kafka-or-redis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19. Technology choice — Why Postgres, not Kafka or Redis
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="19. Technology choice — Why Postgres, not Kafka or Redis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#191-what-we-actually-need" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.1 What we actually need
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#192-why-not-kafka" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.2 Why not Kafka
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#193-why-not-redis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.3 Why not Redis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#194-why-postgres-fits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.4 Why Postgres fits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#195-lighter-still-when-even-a-queue-is-overkill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.5 Lighter still — when even a queue is overkill
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#196-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.6 Decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Goals">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#functional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UX
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#technical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Non-Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-module-placement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Module Placement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-high-level-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 High-level model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-why-a-single-worker-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Why a single worker first
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-why-process-based-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Why process-based execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-why-listennotify-over-polling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Why LISTEN/NOTIFY over polling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-data-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Data Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Data Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-btbacktest_job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 BT.BACKTEST_JOB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-btbacktest_job_event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 BT.BACKTEST_JOB_EVENT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-existing-bt-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Existing BT tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-stored-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Stored Procedures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Stored Procedures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#state-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State transitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-backend-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Backend API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Backend API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-enqueue-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Enqueue request
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-queue-row-response" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Queue row response
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-sse-event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 SSE event types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-job-manager-coordinator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Job Manager (coordinator)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Job Manager (coordinator)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 Startup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-event-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Event loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-worker-supervision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Worker supervision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-sse-fanout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.4 SSE fanout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-worker-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Worker process
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Worker process">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-per-trial-callback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 Per-trial callback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-termination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 Termination
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Frontend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Frontend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#111-state-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.1 State split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#112-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.2 Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#113-queue-table-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.3 Queue table columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#114-editable-ui-while-jobs-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.4 Editable UI while jobs run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#115-sse-reconnection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.5 SSE reconnection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-failure-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Failure handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-test-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Test strategy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Performance considerations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Security
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16-phased-implementation-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Phased implementation plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="16. Phased implementation plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#slice-a-schema-procedures-12-days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice A — Schema + procedures (1–2 days)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-b-manager-worker-23-days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice B — Manager + worker (2–3 days)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-c-http-api-sse-12-days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice C — HTTP API + SSE (1–2 days)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-d-frontend-queue-panel-23-days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice D — Frontend queue panel (2–3 days)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-quality-of-life-after-phase-1-is-stable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — quality of life (after Phase 1 is stable)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-scale-out-only-if-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 — scale-out (only if needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18-recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18. Recommendation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#19-technology-choice-why-postgres-not-kafka-or-redis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19. Technology choice — Why Postgres, not Kafka or Redis
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="19. Technology choice — Why Postgres, not Kafka or Redis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#191-what-we-actually-need" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.1 What we actually need
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#192-why-not-kafka" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.2 Why not Kafka
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#193-why-not-redis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.3 Why not Redis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#194-why-postgres-fits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.4 Why Postgres fits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#195-lighter-still-when-even-a-queue-is-overkill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.5 Lighter still — when even a queue is overkill
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#196-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.6 Decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="design-queued-background-backtests">Design: Queued Background Backtests<a class="headerlink" href="#design-queued-background-backtests" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Draft v2 — not yet implemented. Direction (Postgres-backed FIFO + <code>LISTEN/NOTIFY</code>) ratified in <a href="../../decisions/">decision #26</a>. v2 incorporates review feedback (drop VID, slim procedures, cooperative cancel in Phase 1, explicit module placement).
+<strong>Date:</strong> 2026-04-30
+<strong>Scope:</strong> <code>src/jobs.py</code>, <code>api/queue/</code>, <code>api/routers/jobs.py</code>, <code>frontend/</code>, <code>db/liquidbase/bt/</code></p>
+<hr />
+<h2 id="1-problem">1. Problem<a class="headerlink" href="#1-problem" title="Permanent link">&para;</a></h2>
+<p>Large backtests and parameter optimizations are CPU-heavy. A run with 20,000 iterations can take long enough that the current single-run UI becomes limiting:</p>
+<ol>
+<li>The user can only focus on one optimization at a time.</li>
+<li>There is no persistent queue of pending jobs.</li>
+<li>There is no backend-managed notion of <code>QUEUED</code>, <code>RUNNING</code>, <code>COMPLETED</code>, <code>FAILED</code>, or <code>CANCELLED</code>.</li>
+<li>The UI cannot continue editing or queueing strategies while one run is in progress.</li>
+</ol>
+<p>There is also an implementation constraint:</p>
+<ol>
+<li>Python threads do not provide useful CPU parallelism for heavy pure-Python or mixed pandas/numpy workloads (GIL).</li>
+<li>A thread is still useful for request detachment or I/O orchestration, but not as the main scaling primitive for many large concurrent backtests.</li>
+</ol>
+<hr />
+<h2 id="2-goals">2. Goals<a class="headerlink" href="#2-goals" title="Permanent link">&para;</a></h2>
+<h3 id="functional">Functional<a class="headerlink" href="#functional" title="Permanent link">&para;</a></h3>
+<ol>
+<li>The backend accepts multiple backtest jobs and runs them one at a time in queue order.</li>
+<li>The UI shows a queue panel with <code>QUEUED</code>, <code>RUNNING</code>, <code>COMPLETED</code>, <code>FAILED</code>, <code>CANCELLED</code> jobs.</li>
+<li>The running job shows progress as iterations completed vs total.</li>
+<li>The user can add more jobs while another job is running.</li>
+<li>The user can cancel any job (queued <strong>or</strong> running) from the UI.</li>
+<li>The running job automatically advances to the next queued job when complete.</li>
+<li>Completed jobs retain summary and result references.</li>
+</ol>
+<h3 id="ux">UX<a class="headerlink" href="#ux" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Editing the current strategy config never mutates submitted jobs.</li>
+<li>The queue updates live without manual refresh.</li>
+<li>The user can inspect any job (running or historical) separately from the editable draft form.</li>
+</ol>
+<h3 id="technical">Technical<a class="headerlink" href="#technical" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Use process-based execution for CPU-bound optimization work.</li>
+<li>Persist queue state in PostgreSQL so jobs survive API restarts.</li>
+<li>Reuse existing backtest pipeline and existing <code>BT.SP_INS_STRATEGY</code> / <code>BT.SP_INS_RESULT</code> procedures.</li>
+<li>Drive live updates via PostgreSQL <code>LISTEN/NOTIFY</code>, not polling.</li>
+</ol>
+<hr />
+<h2 id="3-non-goals">3. Non-Goals<a class="headerlink" href="#3-non-goals" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Running many backtests concurrently in v1.</li>
+<li>Distributed scheduling across multiple worker hosts.</li>
+<li>Replacing the current optimization logic.</li>
+<li>Introducing Celery, Redis, or external queue infrastructure.</li>
+<li>Auto-retry of failed jobs (manual retry only).</li>
+</ol>
+<hr />
+<h2 id="4-module-placement">4. Module Placement<a class="headerlink" href="#4-module-placement" title="Permanent link">&para;</a></h2>
+<p>The queue spans the DB layer, the FastAPI process, and the React frontend. Following the existing repo pattern (<code>BacktestCache</code> lives in <code>src/data.py</code> even though only the API uses it):</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BacktestJobRepo</code> (<code>DbGateway</code> subclass — wraps SP calls and read queries)</td>
+<td><code>src/jobs.py</code></td>
+<td>Pure DB access. Reusable from tests, debug CLIs, and any future inspection tool. No FastAPI dependency.</td>
+</tr>
+<tr>
+<td><code>BacktestJobManager</code> (lifespan-owned coordinator, <code>LISTEN/NOTIFY</code> consumer, child-process supervisor)</td>
+<td><code>api/queue/manager.py</code></td>
+<td>Tightly coupled to FastAPI lifespan. No meaning outside the API process.</td>
+</tr>
+<tr>
+<td>Worker entry point</td>
+<td><code>api/queue/worker.py</code></td>
+<td>Spawned as a child process. Imports the pipeline from <code>src/</code>.</td>
+</tr>
+<tr>
+<td>HTTP endpoints</td>
+<td><code>api/routers/jobs.py</code></td>
+<td>Mirrors <code>routers/backtest.py</code>.</td>
+</tr>
+<tr>
+<td>Pydantic request/response schemas</td>
+<td><code>api/schemas/jobs.py</code></td>
+<td>Mirrors <code>schemas/backtest.py</code>.</td>
+</tr>
+<tr>
+<td>Frontend queue panel + state</td>
+<td><code>frontend/src/features/queue/</code></td>
+<td>New feature folder; unlocks the deferred "Backtest feature module" item from the <a href="../frontend-audit/">Frontend Audit</a>.</td>
+</tr>
+</tbody>
+</table>
+<p>The CLI (<code>src/main.py</code>) is <strong>not</strong> modified — it runs synchronously and has no use for queueing.</p>
+<hr />
+<h2 id="5-architecture">5. Architecture<a class="headerlink" href="#5-architecture" title="Permanent link">&para;</a></h2>
+<h3 id="51-high-level-model">5.1 High-level model<a class="headerlink" href="#51-high-level-model" title="Permanent link">&para;</a></h3>
+<p>Three roles inside the same FastAPI deployment unit:</p>
+<ol>
+<li><strong>API server</strong> — accepts job submissions, queue mutations, queue queries, and SSE subscriptions.</li>
+<li><strong>Job manager</strong> — runs inside FastAPI lifespan. Reacts to <code>LISTEN/NOTIFY</code> events. Spawns and supervises one worker process at a time. Maintains in-memory SSE subscriber lists.</li>
+<li><strong>Worker process</strong> — executes exactly one backtest job in a separate Python process. Writes progress and terminal state directly to the DB via stored procedures.</li>
+</ol>
+<pre class="mermaid"><code>flowchart LR
+    UI[React UI] --&gt;|POST /jobs| API[FastAPI router]
+    API --&gt;|SP_INS_BACKTEST_JOB + NOTIFY| DB[(PostgreSQL)]
+    DB --&gt;|NOTIFY job_enqueued| Mgr[BacktestJobManager&lt;br/&gt;LISTEN consumer]
+    Mgr --&gt;|SP_CLAIM_NEXT_JOB| DB
+    Mgr --&gt;|spawn| Worker[Worker process]
+    Worker --&gt;|SP_UPD_PROGRESS / NOTIFY| DB
+    Worker --&gt;|SP_UPD_TERMINAL + INS_STRATEGY + INS_RESULT| DB
+    DB --&gt;|NOTIFY job_progress| Mgr
+    Mgr --&gt;|SSE| UI</code></pre>
+<h3 id="52-why-a-single-worker-first">5.2 Why a single worker first<a class="headerlink" href="#52-why-a-single-worker-first" title="Permanent link">&para;</a></h3>
+<p>The requested behaviour is explicitly serial: one job runs, then the next queued job starts. A single worker matches this and avoids resource contention, duplicate data fetches, and CPU starvation. Multi-worker scaling is a future concern.</p>
+<h3 id="53-why-process-based-execution">5.3 Why process-based execution<a class="headerlink" href="#53-why-process-based-execution" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Avoids GIL contention for CPU-heavy backtest loops.</li>
+<li>Prevents a long optimization from blocking the API event loop.</li>
+<li>Provides a clean failure boundary — a worker crash doesn't take down the API.</li>
+</ol>
+<p>Recommended primitive: <code>multiprocessing.Process</code> (not <code>ProcessPoolExecutor</code>). Explicit lifecycle control makes cancellation, timeout, and termination cleaner than a pooled future.</p>
+<h3 id="54-why-listennotify-over-polling">5.4 Why <code>LISTEN/NOTIFY</code> over polling<a class="headerlink" href="#54-why-listennotify-over-polling" title="Permanent link">&para;</a></h3>
+<p>The original draft proposed a 1-second polling loop. With <code>NOTIFY</code> triggered on every state change we react in &lt;10 ms with zero idle DB load. A slow watchdog poll (every 30 s) is kept only as a safety net for missed notifications (e.g. transient connection drop).</p>
+<hr />
+<h2 id="6-data-model">6. Data Model<a class="headerlink" href="#6-data-model" title="Permanent link">&para;</a></h2>
+<p>Two new tables under the <code>BT</code> schema.</p>
+<h3 id="61-btbacktest_job">6.1 <code>BT.BACKTEST_JOB</code><a class="headerlink" href="#61-btbacktest_job" title="Permanent link">&para;</a></h3>
+<p>Purpose: durable queue item and current job state. <strong>One row per job, mutated in place</strong> (no soft-versioning — the audit trail lives in <code>BACKTEST_JOB_EVENT</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BACKTEST_JOB_ID</code></td>
+<td><code>UUID</code></td>
+<td>PK. UUID v7 (time-ordered).</td>
+</tr>
+<tr>
+<td><code>BACKTEST_JOB_NM</code></td>
+<td><code>TEXT</code></td>
+<td>Optional display name. Auto-generated from request if blank, like <code>STRATEGY_NM</code>.</td>
+</tr>
+<tr>
+<td><code>JOB_STATE</code></td>
+<td><code>TEXT</code></td>
+<td><code>QUEUED</code>, <code>RUNNING</code>, <code>COMPLETED</code>, <code>FAILED</code>, <code>CANCELLED</code>.</td>
+</tr>
+<tr>
+<td><code>PRIORITY</code></td>
+<td><code>INTEGER</code></td>
+<td>Default <code>100</code>. Lower = sooner. <code>Run Now</code> enqueues with <code>0</code>. Dequeue order: <code>(PRIORITY, CREATED_AT)</code>.</td>
+</tr>
+<tr>
+<td><code>CANCEL_REQUESTED_IND</code></td>
+<td><code>CHAR(1)</code></td>
+<td>Default <code>'N'</code>. Set to <code>'Y'</code> to ask a <code>RUNNING</code> worker to exit cleanly.</td>
+</tr>
+<tr>
+<td><code>TIMEOUT_SECONDS</code></td>
+<td><code>INTEGER</code></td>
+<td>Default <code>1800</code> (30 min). Worker self-terminates if exceeded. Coordinator marks stale <code>RUNNING</code> jobs as <code>FAILED</code> on startup if <code>STARTED_AT + TIMEOUT_SECONDS &lt; now()</code>.</td>
+</tr>
+<tr>
+<td><code>REQUEST_JSON</code></td>
+<td><code>JSONB</code></td>
+<td>Authoritative replayable input — full optimize request payload.</td>
+</tr>
+<tr>
+<td><code>SUMMARY_JSON</code></td>
+<td><code>JSONB</code></td>
+<td>User-facing summary for queue table rendering (symbol, mode, indicator, strategy, total_trials). Computed at enqueue.</td>
+</tr>
+<tr>
+<td><code>PROGRESS_JSON</code></td>
+<td><code>JSONB</code></td>
+<td>Overwritten in place. <code>{ trial, total, best_sharpe, started_at }</code>.</td>
+</tr>
+<tr>
+<td><code>RESULT_JSON</code></td>
+<td><code>JSONB</code></td>
+<td>Compact summary for queue display only (best params, top metrics). Full analytics fetched via <code>BT.RESULT</code>.</td>
+</tr>
+<tr>
+<td><code>ERROR_JSON</code></td>
+<td><code>JSONB</code></td>
+<td><code>{ type, message, traceback }</code> on failure.</td>
+</tr>
+<tr>
+<td><code>STRATEGY_VID</code></td>
+<td><code>INTEGER</code></td>
+<td>Nullable FK → <code>BT.STRATEGY(STRATEGY_VID)</code>. Set on completion. Lets "view result" load the canonical strategy.</td>
+</tr>
+<tr>
+<td><code>RESULT_ID</code></td>
+<td><code>BIGINT</code></td>
+<td>Nullable FK → <code>BT.RESULT(RESULT_ID)</code>. Set on completion.</td>
+</tr>
+<tr>
+<td><code>STARTED_AT</code></td>
+<td><code>TIMESTAMPTZ</code></td>
+<td>Set on <code>RUNNING</code> transition.</td>
+</tr>
+<tr>
+<td><code>FINISHED_AT</code></td>
+<td><code>TIMESTAMPTZ</code></td>
+<td>Set on terminal transition.</td>
+</tr>
+<tr>
+<td><code>USER_ID</code></td>
+<td><code>TEXT</code></td>
+<td>The submitting user. Indexed.</td>
+</tr>
+<tr>
+<td><code>CREATED_AT</code></td>
+<td><code>TIMESTAMPTZ</code></td>
+<td>Default <code>now()</code>.</td>
+</tr>
+<tr>
+<td><code>UPDATED_AT</code></td>
+<td><code>TIMESTAMPTZ</code></td>
+<td>Updated on every state mutation.</td>
+</tr>
+</tbody>
+</table>
+<p>Indexes:</p>
+<ul>
+<li><code>(USER_ID, JOB_STATE, PRIORITY, CREATED_AT)</code> — supports both per-user queue listing and the dequeue scan.</li>
+<li><code>(JOB_STATE, STARTED_AT)</code> partial index <code>WHERE JOB_STATE = 'RUNNING'</code> — supports stale-job recovery scan.</li>
+</ul>
+<p><strong>Removed from v1:</strong></p>
+<ul>
+<li>~~<code>BACKTEST_JOB_VID</code>~~ — soft-versioning is for things like <code>STRATEGY</code> where edit history matters. A job has a state machine, not a version history.</li>
+<li>~~<code>QUEUE_POS</code>~~ — computed on read via <code>ROW_NUMBER() OVER (ORDER BY PRIORITY, CREATED_AT) WHERE JOB_STATE = 'QUEUED'</code>. Storing it would race with concurrent inserts/cancels.</li>
+</ul>
+<h3 id="62-btbacktest_job_event">6.2 <code>BT.BACKTEST_JOB_EVENT</code><a class="headerlink" href="#62-btbacktest_job_event" title="Permanent link">&para;</a></h3>
+<p>Purpose: append-only audit log of <strong>state transitions only</strong> — not per-trial progress.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BACKTEST_JOB_EVENT_ID</code></td>
+<td><code>BIGINT GENERATED ALWAYS AS IDENTITY</code></td>
+<td>PK. Monotonic — supports SSE <code>Last-Event-ID</code> resume.</td>
+</tr>
+<tr>
+<td><code>BACKTEST_JOB_ID</code></td>
+<td><code>UUID</code></td>
+<td>FK → <code>BACKTEST_JOB</code>.</td>
+</tr>
+<tr>
+<td><code>EVENT_TYPE</code></td>
+<td><code>TEXT</code></td>
+<td><code>ENQUEUED</code>, <code>STARTED</code>, <code>COMPLETED</code>, <code>FAILED</code>, <code>CANCELLED</code>, <code>CANCEL_REQUESTED</code>, <code>TIMEOUT</code>.</td>
+</tr>
+<tr>
+<td><code>PAYLOAD_JSON</code></td>
+<td><code>JSONB</code></td>
+<td>Optional event-specific detail.</td>
+</tr>
+<tr>
+<td><code>USER_ID</code></td>
+<td><code>TEXT</code></td>
+<td>Who triggered the event (system or user).</td>
+</tr>
+<tr>
+<td><code>CREATED_AT</code></td>
+<td><code>TIMESTAMPTZ</code></td>
+<td>Default <code>now()</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Indexed on <code>(BACKTEST_JOB_ID, BACKTEST_JOB_EVENT_ID)</code>.</p>
+<p><strong>No per-trial events</strong> — that would be ~20k rows per large optimization. Per-trial progress lives in <code>BACKTEST_JOB.PROGRESS_JSON</code>, overwritten in place.</p>
+<h3 id="63-existing-bt-tables">6.3 Existing BT tables<a class="headerlink" href="#63-existing-bt-tables" title="Permanent link">&para;</a></h3>
+<p>Untouched. The queue <strong>orchestrates</strong> but does not replace:</p>
+<ol>
+<li><code>BT.STRATEGY</code> (versioned) via <code>BT.SP_INS_STRATEGY</code></li>
+<li><code>BT.RESULT</code> (append-only) via <code>BT.SP_INS_RESULT</code></li>
+</ol>
+<p>The job row links to those records via <code>STRATEGY_VID</code> + <code>RESULT_ID</code> after completion.</p>
+<hr />
+<h2 id="7-stored-procedures">7. Stored Procedures<a class="headerlink" href="#7-stored-procedures" title="Permanent link">&para;</a></h2>
+<p>Six procedures (down from the original eight).</p>
+<table>
+<thead>
+<tr>
+<th>Procedure</th>
+<th>Purpose</th>
+<th>Triggers <code>NOTIFY</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BT.SP_INS_BACKTEST_JOB</code></td>
+<td>Enqueue a job. Inserts row + <code>ENQUEUED</code> event.</td>
+<td><code>job_enqueued</code></td>
+</tr>
+<tr>
+<td><code>BT.SP_CLAIM_NEXT_JOB</code></td>
+<td>Atomic dequeue. <code>SELECT ... FOR UPDATE SKIP LOCKED</code> on the next <code>QUEUED</code> row, transition to <code>RUNNING</code>, set <code>STARTED_AT</code>, insert <code>STARTED</code> event. Returns the claimed job (or null).</td>
+<td><code>job_started</code></td>
+</tr>
+<tr>
+<td><code>BT.SP_UPD_BACKTEST_JOB_PROGRESS</code></td>
+<td>In-place update of <code>PROGRESS_JSON</code> + <code>UPDATED_AT</code>. No event row.</td>
+<td><code>job_progress</code></td>
+</tr>
+<tr>
+<td><code>BT.SP_UPD_BACKTEST_JOB_TERMINAL</code></td>
+<td>One call writes <code>JOB_STATE</code> (<code>COMPLETED</code>/<code>FAILED</code>/<code>CANCELLED</code>/<code>TIMEOUT</code>) + <code>RESULT_JSON</code> or <code>ERROR_JSON</code> + <code>STRATEGY_VID</code> + <code>RESULT_ID</code> + <code>FINISHED_AT</code> + corresponding event row.</td>
+<td><code>job_completed</code> / <code>job_failed</code> / <code>job_cancelled</code></td>
+</tr>
+<tr>
+<td><code>BT.SP_CANCEL_BACKTEST_JOB</code></td>
+<td>If <code>JOB_STATE = QUEUED</code>: transition to <code>CANCELLED</code> directly. If <code>RUNNING</code>: set <code>CANCEL_REQUESTED_IND = 'Y'</code> and insert <code>CANCEL_REQUESTED</code> event (worker observes flag at next checkpoint).</td>
+<td><code>job_cancelled</code> or <code>job_cancel_requested</code></td>
+</tr>
+<tr>
+<td><code>BT.SP_INS_BACKTEST_JOB_EVENT</code></td>
+<td>Append-only event insert. Called internally by the procedures above.</td>
+<td>varies by event type</td>
+</tr>
+</tbody>
+</table>
+<p>Reads (<code>GET /jobs</code>, <code>GET /jobs/{id}</code>) use plain <code>SELECT</code> per the project's "SELECT queries are unrestricted" rule.</p>
+<h3 id="state-transitions">State transitions<a class="headerlink" href="#state-transitions" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>                   ┌──────────┐
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                   │  QUEUED  │
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                   └────┬─────┘
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>              ┌─────────┴─────────┐
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>              ▼                   ▼
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>       ┌───────────┐        ┌──────────┐
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>       │ CANCELLED │        │ RUNNING  │
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>       └───────────┘        └────┬─────┘
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                                 │
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>                  ┌──────────────┼──────────────┬─────────────┐
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>                  ▼              ▼              ▼             ▼
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>           ┌───────────┐ ┌────────────┐ ┌───────────┐ ┌──────────┐
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>           │ COMPLETED │ │   FAILED   │ │ CANCELLED │ │ TIMEOUT  │
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>           └───────────┘ └────────────┘ └───────────┘ └──────────┘
+</code></pre></div>
+<p>Terminal states (<code>COMPLETED</code>, <code>FAILED</code>, <code>CANCELLED</code>, <code>TIMEOUT</code>) are immutable. To re-run, the user submits a new job (Phase 2 adds a one-click "Retry" that copies <code>REQUEST_JSON</code>).</p>
+<hr />
+<h2 id="8-backend-api">8. Backend API<a class="headerlink" href="#8-backend-api" title="Permanent link">&para;</a></h2>
+<p>All endpoints require auth (<code>require_user</code>).</p>
+<h3 id="81-endpoints">8.1 Endpoints<a class="headerlink" href="#81-endpoints" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/backtest/jobs</code></td>
+<td>Enqueue. Returns <code>{ job_id, queue_pos }</code>. <strong>Rate limit:</strong> caller may have at most 20 <code>QUEUED</code> jobs at a time → <code>429</code> otherwise.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/backtest/jobs</code></td>
+<td>List queue + recent history (last 50 terminal jobs). Supports <code>?state=RUNNING</code> etc. filter.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/backtest/jobs/{job_id}</code></td>
+<td>Full job detail incl. <code>REQUEST_JSON</code>, current progress, links to result.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/backtest/jobs/{job_id}/result</code></td>
+<td>Resolves <code>STRATEGY_VID</code> + <code>RESULT_ID</code> → returns the same payload shape as today's <code>POST /backtest/optimize</code> response, so the existing analysis components reuse unchanged.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/backtest/jobs/{job_id}/cancel</code></td>
+<td>Cancels a <code>QUEUED</code> or <code>RUNNING</code> job (cooperative for running). Idempotent.</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/v1/backtest/jobs/{job_id}</code></td>
+<td>Hard delete a terminal-state job from history. Returns <code>409</code> if not terminal.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/backtest/jobs/stream</code></td>
+<td>SSE stream of queue events. Supports <code>Last-Event-ID</code> header backed by <code>BACKTEST_JOB_EVENT_ID</code> for reconnection.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="82-enqueue-request">8.2 Enqueue request<a class="headerlink" href="#82-enqueue-request" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">&quot;job_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;BTC Bollinger 2016-now&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">&quot;priority&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;normal&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">&quot;request&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">&quot;symbol&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;BTC-USD&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">&quot;start&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2016-01-01&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">&quot;end&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-04-25&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">&quot;trading_period&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">365</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">&quot;fee_bps&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">&quot;data_source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;yahoo&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">&quot;factors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">      </span><span class="p">{</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">        </span><span class="nt">&quot;indicator&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;bollinger&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">        </span><span class="nt">&quot;strategy&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;momentum&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">        </span><span class="nt">&quot;data_column&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;price&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">        </span><span class="nt">&quot;window_range&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;min&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;step&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">        </span><span class="nt">&quot;signal_range&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;min&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.25</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.5</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;step&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.25</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">      </span><span class="p">}</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span><span class="p">],</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="nt">&quot;walk_forward&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span><span class="nt">&quot;split_ratio&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.5</span>
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="p">}</span>
+</code></pre></div>
+<p><code>priority</code> is <code>"normal"</code> (→ DB priority <code>100</code>) or <code>"high"</code> (→ DB priority <code>0</code>, jumps the queue). The frontend's "Add to Queue" sends <code>normal</code>; "Run Now" sends <code>high</code>.</p>
+<h3 id="83-queue-row-response">8.3 Queue row response<a class="headerlink" href="#83-queue-row-response" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">&quot;job_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;uuid&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">&quot;job_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;BTC Bollinger 2016-now&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;RUNNING&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">&quot;queue_pos&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">&quot;priority&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;normal&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">&quot;submitted_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-04-25T12:00:00Z&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nt">&quot;started_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-04-25T12:00:03Z&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="nt">&quot;summary&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">&quot;symbol&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;BTC-USD&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nt">&quot;n_factors&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="nt">&quot;factors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="w"> </span><span class="nt">&quot;indicator&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;bollinger&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;strategy&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;momentum&quot;</span><span class="w"> </span><span class="p">}],</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">    </span><span class="nt">&quot;total_trials&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">20000</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">  </span><span class="nt">&quot;progress&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">    </span><span class="nt">&quot;trial&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">734</span><span class="p">,</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">    </span><span class="nt">&quot;total&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">20000</span><span class="p">,</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">    </span><span class="nt">&quot;remaining&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">19266</span><span class="p">,</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span><span class="nt">&quot;pct&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">3.67</span><span class="p">,</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">    </span><span class="nt">&quot;best_sharpe&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.4321</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="w">  </span><span class="nt">&quot;cancel_requested&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="84-sse-event-types">8.4 SSE event types<a class="headerlink" href="#84-sse-event-types" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>When</th>
+<th>Payload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>snapshot</code></td>
+<td>On connect</td>
+<td>Full queue + recent history rows</td>
+</tr>
+<tr>
+<td><code>job_enqueued</code></td>
+<td>After <code>SP_INS_BACKTEST_JOB</code></td>
+<td>Full row</td>
+</tr>
+<tr>
+<td><code>job_started</code></td>
+<td>After <code>SP_CLAIM_NEXT_JOB</code></td>
+<td>Full row</td>
+</tr>
+<tr>
+<td><code>job_progress</code></td>
+<td>Throttled by worker</td>
+<td><code>{ job_id, progress }</code></td>
+</tr>
+<tr>
+<td><code>job_completed</code> / <code>job_failed</code> / <code>job_cancelled</code> / <code>job_timeout</code></td>
+<td>Terminal transition</td>
+<td>Full row</td>
+</tr>
+<tr>
+<td><code>job_cancel_requested</code></td>
+<td>User asked to cancel a running job</td>
+<td><code>{ job_id }</code></td>
+</tr>
+</tbody>
+</table>
+<p>Each SSE event includes <code>id: &lt;BACKTEST_JOB_EVENT_ID&gt;</code> so reconnects can resume via <code>Last-Event-ID</code>.</p>
+<hr />
+<h2 id="9-job-manager-coordinator">9. Job Manager (coordinator)<a class="headerlink" href="#9-job-manager-coordinator" title="Permanent link">&para;</a></h2>
+<p><code>BacktestJobManager</code> is created in FastAPI lifespan and torn down on shutdown.</p>
+<h3 id="91-startup">9.1 Startup<a class="headerlink" href="#91-startup" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Open a dedicated psycopg connection in autocommit mode for <code>LISTEN</code>.</li>
+<li><code>LISTEN job_enqueued, job_progress, job_completed, job_failed, job_cancelled, job_cancel_requested</code>.</li>
+<li>Run <strong>stale-job recovery</strong>: any <code>RUNNING</code> job with <code>STARTED_AT + TIMEOUT_SECONDS &lt; now()</code> (or no live worker process) → mark <code>FAILED</code> with reason <code>restart_during_run</code>. <strong>Don't auto-requeue</strong> (non-idempotent side effects already written to <code>BT.RESULT</code> would double up).</li>
+<li>Try to claim and start the next <code>QUEUED</code> job (in case one was added while the API was down).</li>
+</ol>
+<h3 id="92-event-loop">9.2 Event loop<a class="headerlink" href="#92-event-loop" title="Permanent link">&para;</a></h3>
+<p>The manager runs a single asyncio task that:</p>
+<ol>
+<li>Awaits notifications on the <code>LISTEN</code> connection.</li>
+<li>On <code>job_enqueued</code> or <code>job_completed</code>/<code>job_failed</code>/<code>job_cancelled</code> (anything that frees the slot) — if no worker is currently running, attempt <code>SP_CLAIM_NEXT_JOB</code> and spawn the worker if one is returned.</li>
+<li>On <code>job_progress</code> — fan out to subscribed SSE clients.</li>
+<li>On <code>job_cancel_requested</code> — the running worker observes the flag itself; the manager just relays the SSE event.</li>
+</ol>
+<p>A separate watchdog task wakes every 30 s and:</p>
+<ol>
+<li>Re-runs stale-job recovery.</li>
+<li>If the worker handle is <code>None</code> but a <code>QUEUED</code> job exists, attempt to claim again (catches missed notifications).</li>
+</ol>
+<h3 id="93-worker-supervision">9.3 Worker supervision<a class="headerlink" href="#93-worker-supervision" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>multiprocessing.Process</code> with <code>target=run_worker, args=(job_id, db_conninfo, ...)</code>.</li>
+<li>Manager retains the <code>Process</code> handle and the <code>job_id</code>.</li>
+<li>On process exit:</li>
+<li>If the worker wrote a terminal state → fine, NOTIFY arrives, slot frees.</li>
+<li>If the worker died without writing terminal state → manager calls <code>SP_UPD_BACKTEST_JOB_TERMINAL(state='FAILED', error={crash, exit_code})</code>.</li>
+</ul>
+<h3 id="94-sse-fanout">9.4 SSE fanout<a class="headerlink" href="#94-sse-fanout" title="Permanent link">&para;</a></h3>
+<p>A simple in-memory <code>set[asyncio.Queue]</code> of subscriber queues. Each connected SSE client gets its own queue. The <code>LISTEN</code> task <code>put</code>s each event onto every subscriber queue. Disconnections clean up via <code>finally</code>.</p>
+<hr />
+<h2 id="10-worker-process">10. Worker process<a class="headerlink" href="#10-worker-process" title="Permanent link">&para;</a></h2>
+<p><code>api/queue/worker.py</code> exposes a <code>run(job_id, db_conninfo)</code> entry point that runs in the child process.</p>
+<h3 id="101-flow">10.1 Flow<a class="headerlink" href="#101-flow" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Open its own DB connection (separate from the API's pool).</li>
+<li><code>SELECT REQUEST_JSON, TIMEOUT_SECONDS FROM BT.BACKTEST_JOB WHERE BACKTEST_JOB_ID = :id</code>.</li>
+<li>Reconstruct the existing <code>OptimizeRequest</code> Pydantic model.</li>
+<li>Set up a deadline: <code>deadline = now + TIMEOUT_SECONDS</code>.</li>
+<li>Call the existing optimization pipeline (<code>api.services.backtest.run_optimize</code>) with a per-trial callback.</li>
+</ol>
+<h3 id="102-per-trial-callback">10.2 Per-trial callback<a class="headerlink" href="#102-per-trial-callback" title="Permanent link">&para;</a></h3>
+<p>Throttled — runs the body only when:</p>
+<ul>
+<li><code>trial % PROGRESS_EVERY_N_TRIALS == 0</code> (default 25), <strong>or</strong></li>
+<li><code>now() - last_progress_at &gt; PROGRESS_EVERY_T_SECONDS</code> (default 1.0)</li>
+</ul>
+<p>When it runs:</p>
+<ol>
+<li><code>SP_UPD_BACKTEST_JOB_PROGRESS(job_id, trial, total, best_sharpe)</code>.</li>
+<li>Re-read <code>CANCEL_REQUESTED_IND</code> and check the deadline:</li>
+<li><code>CANCEL_REQUESTED_IND = 'Y'</code> → raise <code>JobCancelled</code>.</li>
+<li><code>now() &gt; deadline</code> → raise <code>JobTimeout</code>.</li>
+</ol>
+<h3 id="103-termination">10.3 Termination<a class="headerlink" href="#103-termination" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Normal completion:</strong> <code>SP_INS_STRATEGY</code> → <code>SP_INS_RESULT</code> → <code>SP_UPD_BACKTEST_JOB_TERMINAL(state='COMPLETED', result=summary, strategy_vid=..., result_id=...)</code>.</li>
+<li><strong><code>JobCancelled</code>:</strong> <code>SP_UPD_BACKTEST_JOB_TERMINAL(state='CANCELLED')</code>.</li>
+<li><strong><code>JobTimeout</code>:</strong> <code>SP_UPD_BACKTEST_JOB_TERMINAL(state='TIMEOUT', error={...})</code>.</li>
+<li><strong>Any other exception:</strong> <code>SP_UPD_BACKTEST_JOB_TERMINAL(state='FAILED', error={type, message, traceback})</code>.</li>
+</ul>
+<p>The worker process exits with code 0 on terminal state written, non-zero on crash.</p>
+<hr />
+<h2 id="11-frontend">11. Frontend<a class="headerlink" href="#11-frontend" title="Permanent link">&para;</a></h2>
+<h3 id="111-state-split">11.1 State split<a class="headerlink" href="#111-state-split" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Owner</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>draftConfig</code></td>
+<td><code>BacktestPage</code> (replaces today's <code>config</code>)</td>
+<td><code>useState</code></td>
+</tr>
+<tr>
+<td><code>queue</code></td>
+<td><code>useJobsStream()</code> hook</td>
+<td>TanStack Query + SSE</td>
+</tr>
+<tr>
+<td><code>selectedJobId</code></td>
+<td><code>BacktestPage</code></td>
+<td>URL param <code>?job=&lt;uuid&gt;</code></td>
+</tr>
+</tbody>
+</table>
+<p>URL-driven <code>selectedJobId</code> makes job views shareable and survives refresh.</p>
+<h3 id="112-layout">11.2 Layout<a class="headerlink" href="#112-layout" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Region</th>
+<th>Width</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Left main column</td>
+<td>~70% desktop</td>
+<td>Draft config drawer trigger + selected job's results (charts, metrics, top-10 table)</td>
+</tr>
+<tr>
+<td>Right side panel</td>
+<td>~30% desktop</td>
+<td>Queue table (running, queued, recent terminal)</td>
+</tr>
+</tbody>
+</table>
+<p>Mobile: queue collapses into a bottom sheet or a tab.</p>
+<h3 id="113-queue-table-columns">11.3 Queue table columns<a class="headerlink" href="#113-queue-table-columns" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>State</td>
+<td>Coloured chip (grey/blue/green/red/orange)</td>
+</tr>
+<tr>
+<td>Position</td>
+<td>Empty for non-queued</td>
+</tr>
+<tr>
+<td>Name</td>
+<td>Click → loads result into main panel</td>
+</tr>
+<tr>
+<td>Symbol + factor summary</td>
+<td>One-liner</td>
+</tr>
+<tr>
+<td>Submitted</td>
+<td>Relative time ("2 min ago")</td>
+</tr>
+<tr>
+<td>Progress</td>
+<td>Bar + <code>734 / 20000</code> for running; full bar for completed; empty for queued</td>
+</tr>
+<tr>
+<td>Best Sharpe</td>
+<td>Live for running, final for completed</td>
+</tr>
+<tr>
+<td>Actions</td>
+<td>Cancel (queued or running) · Retry (failed/cancelled — Phase 2) · Delete (terminal only)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="114-editable-ui-while-jobs-run">11.4 Editable UI while jobs run<a class="headerlink" href="#114-editable-ui-while-jobs-run" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Editing the draft form never mutates submitted jobs.</li>
+<li>"Add to Queue" snapshots the current draft into a new job (priority <code>normal</code>).</li>
+<li>"Run Now" snapshots and enqueues with priority <code>high</code> — bumps to head of queue but does <strong>not</strong> preempt the running job.</li>
+<li>Clicking a queue row sets <code>selectedJobId</code>; the right panel highlights it; the main panel shows that job's result.</li>
+<li>Closing the drawer doesn't lose the draft — it's preserved in component state.</li>
+</ul>
+<h3 id="115-sse-reconnection">11.5 SSE reconnection<a class="headerlink" href="#115-sse-reconnection" title="Permanent link">&para;</a></h3>
+<p><code>useJobsStream()</code> stores the latest <code>BACKTEST_JOB_EVENT_ID</code> it processed. On reconnect it sends <code>Last-Event-ID</code> so the server can replay missed events from <code>BT.BACKTEST_JOB_EVENT</code>.</p>
+<hr />
+<h2 id="12-failure-handling">12. Failure handling<a class="headerlink" href="#12-failure-handling" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Worker raises</td>
+<td><code>SP_UPD_BACKTEST_JOB_TERMINAL(state='FAILED', error={...})</code> → SSE <code>job_failed</code> → manager picks next queued job.</td>
+</tr>
+<tr>
+<td>Worker crashes (process exit ≠ 0 with no terminal state written)</td>
+<td>Manager writes <code>FAILED</code> with <code>{reason: 'worker_crash', exit_code}</code>.</td>
+</tr>
+<tr>
+<td>Worker exceeds <code>TIMEOUT_SECONDS</code></td>
+<td>Worker self-terminates with <code>TIMEOUT</code> state. If worker is unresponsive, manager kills the process after <code>TIMEOUT_SECONDS + 60</code> and writes <code>FAILED</code>.</td>
+</tr>
+<tr>
+<td>API restart during a <code>RUNNING</code> job</td>
+<td>On startup, mark stale <code>RUNNING</code> jobs <code>FAILED</code> with reason <code>restart_during_run</code>. <strong>Never auto-requeue</strong> — <code>BT.RESULT</code> writes from the partial run may already exist. User retries explicitly.</td>
+</tr>
+<tr>
+<td>DB unreachable mid-run</td>
+<td>Worker's progress writes will fail; on its next attempt, the worker exits non-zero. API marks <code>FAILED</code> once it can reach the DB again.</td>
+</tr>
+<tr>
+<td>Many users hammer enqueue</td>
+<td><code>429</code> after 20 <code>QUEUED</code> jobs per user.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="13-test-strategy">13. Test strategy<a class="headerlink" href="#13-test-strategy" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Tests</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DB (<code>tests/integration/test_jobs_db.py</code>)</td>
+<td>Each procedure round-trip. Concurrent <code>SP_CLAIM_NEXT_JOB</code> from two transactions claims at most one job (<code>FOR UPDATE SKIP LOCKED</code> correctness). Cancel of QUEUED transitions directly; cancel of RUNNING flips the flag. Stale-job recovery query.</td>
+</tr>
+<tr>
+<td>Worker (<code>tests/unit/test_worker.py</code>)</td>
+<td>Stub the optimization pipeline. Test progress throttling, cancellation observation, timeout enforcement, terminal state writes for each exit path.</td>
+</tr>
+<tr>
+<td>Manager (<code>tests/unit/test_job_manager.py</code>)</td>
+<td>Mock psycopg <code>LISTEN</code> connection. Test event-driven claim, watchdog claim on missed notification, fanout to multiple SSE subscribers, stale-job recovery on startup.</td>
+</tr>
+<tr>
+<td>API (<code>tests/unit/test_jobs_api.py</code>)</td>
+<td>Auth, rate limiting (20 queued cap), enqueue → list → cancel → delete flow. SSE reconnect with <code>Last-Event-ID</code>.</td>
+</tr>
+<tr>
+<td>Frontend (<code>useJobsStream.test.tsx</code>)</td>
+<td>Apply each event type to local state. Reconnect carries <code>Last-Event-ID</code>. Cancel button calls the API.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="14-performance-considerations">14. Performance considerations<a class="headerlink" href="#14-performance-considerations" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Single worker prevents CPU oversubscription.</li>
+<li>DB progress writes throttled to ~1/s (or every 25 trials) regardless of trial rate.</li>
+<li>SSE payloads are small (~500 B); no chart data on the stream.</li>
+<li>Queue list endpoint returns at most current queue + 50 most-recent terminal jobs. Older history loaded on demand.</li>
+<li><code>LISTEN/NOTIFY</code> is in-process to PostgreSQL — no extra hop.</li>
+</ol>
+<hr />
+<h2 id="15-security">15. Security<a class="headerlink" href="#15-security" title="Permanent link">&para;</a></h2>
+<ol>
+<li>All queue endpoints under <code>require_user</code>.</li>
+<li><code>USER_ID</code> stamped on every job and event. Read endpoints filter by user (admins later).</li>
+<li><code>REQUEST_JSON</code> is treated as data — no <code>eval</code>, no SP that interprets it directly.</li>
+<li>Rate limit: max 20 <code>QUEUED</code> jobs per user.</li>
+<li>Cancel/delete authorized only for the owning user.</li>
+</ol>
+<hr />
+<h2 id="16-phased-implementation-plan">16. Phased implementation plan<a class="headerlink" href="#16-phased-implementation-plan" title="Permanent link">&para;</a></h2>
+<p>Each slice is independently shippable.</p>
+<h3 id="slice-a-schema-procedures-12-days">Slice A — Schema + procedures (1–2 days)<a class="headerlink" href="#slice-a-schema-procedures-12-days" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Liquibase changesets for <code>BT.BACKTEST_JOB</code>, <code>BT.BACKTEST_JOB_EVENT</code> and indexes.</li>
+<li>The 6 procedures in §7, each with proper <code>LANGUAGE plpgsql</code> + <code>EXCEPTION WHEN OTHERS</code> + <code>CORE_INS_LOG_PROC</code>.</li>
+<li><code>src/jobs.py</code> — <code>BacktestJobRepo</code> (DbGateway subclass) wrapping the procedures and reads.</li>
+<li>Integration tests against the live DB.</li>
+</ol>
+<h3 id="slice-b-manager-worker-23-days">Slice B — Manager + worker (2–3 days)<a class="headerlink" href="#slice-b-manager-worker-23-days" title="Permanent link">&para;</a></h3>
+<ol>
+<li><code>api/queue/manager.py</code> and <code>api/queue/worker.py</code> per §9–§10.</li>
+<li>Wire into FastAPI lifespan in <code>api/main.py</code>.</li>
+<li>Stale-job recovery on startup.</li>
+<li>Cooperative cancel + timeout enforcement.</li>
+<li>Unit tests with mocked subprocess.</li>
+</ol>
+<h3 id="slice-c-http-api-sse-12-days">Slice C — HTTP API + SSE (1–2 days)<a class="headerlink" href="#slice-c-http-api-sse-12-days" title="Permanent link">&para;</a></h3>
+<ol>
+<li><code>api/routers/jobs.py</code>, <code>api/schemas/jobs.py</code>.</li>
+<li><code>Last-Event-ID</code> SSE replay from the events table.</li>
+<li>Auth + rate limiting.</li>
+<li>Integration tests against the real procedures from Slice A.</li>
+</ol>
+<h3 id="slice-d-frontend-queue-panel-23-days">Slice D — Frontend queue panel (2–3 days)<a class="headerlink" href="#slice-d-frontend-queue-panel-23-days" title="Permanent link">&para;</a></h3>
+<ol>
+<li>New <code>frontend/src/features/queue/</code> folder.</li>
+<li><code>useJobsStream()</code> hook, queue panel component, cancel button, retry placeholder.</li>
+<li>URL-driven <code>selectedJobId</code>.</li>
+<li>Replace <code>Run Optimization</code> button with <code>Add to Queue</code> + <code>Run Now</code>.</li>
+<li>Move existing analysis rendering to be driven by <code>selectedJobId</code> instead of local state.</li>
+</ol>
+<h3 id="phase-2-quality-of-life-after-phase-1-is-stable">Phase 2 — quality of life (after Phase 1 is stable)<a class="headerlink" href="#phase-2-quality-of-life-after-phase-1-is-stable" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Retry button (copies <code>REQUEST_JSON</code> into a new job).</li>
+<li>Queue reorder (drag and drop) — adds <code>priority</code> to the API.</li>
+<li>Per-job event log viewer (reads <code>BACKTEST_JOB_EVENT</code> table).</li>
+<li>Search/filter terminal history.</li>
+</ol>
+<h3 id="phase-3-scale-out-only-if-needed">Phase 3 — scale-out (only if needed)<a class="headerlink" href="#phase-3-scale-out-only-if-needed" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Multi-worker via configurable slot count (<code>SELECT ... FOR UPDATE SKIP LOCKED</code> already supports this).</li>
+<li>Heartbeat-based stale detection finer than <code>TIMEOUT_SECONDS</code>.</li>
+<li>Optional partial result persistence so a restart can resume mid-run.</li>
+</ol>
+<hr />
+<h2 id="17-open-questions">17. Open questions<a class="headerlink" href="#17-open-questions" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Removing terminal jobs — hard delete or soft delete?</strong> Recommendation: hard delete (the events table preserves the audit trail).</li>
+<li><strong>Per-user queue or global queue?</strong> Recommendation: global queue, but <code>USER_ID</code> stamped and surfaced. A single trader running multiple strategies is the v1 reality.</li>
+<li><strong>Run Now jumping the queue — fair?</strong> Recommendation: yes for single-tenant. Revisit if multi-user.</li>
+<li><strong>Should the queue stream multiplex with the existing optimize SSE?</strong> Recommendation: no. Keep them separate — different lifetimes (queue stream is connection-long; optimize stream is run-long).</li>
+</ol>
+<hr />
+<h2 id="18-recommendation">18. Recommendation<a class="headerlink" href="#18-recommendation" title="Permanent link">&para;</a></h2>
+<p>Build slices A → B → C → D in order. Each is independently reviewable and merges to <code>main</code> without breaking the existing single-shot <code>POST /backtest/optimize</code> path (which remains as a fallback throughout Phase 1).</p>
+<hr />
+<h2 id="19-technology-choice-why-postgres-not-kafka-or-redis">19. Technology choice — Why Postgres, not Kafka or Redis<a class="headerlink" href="#19-technology-choice-why-postgres-not-kafka-or-redis" title="Permanent link">&para;</a></h2>
+<p>This section documents why the queue is built on PostgreSQL rather than a dedicated broker.</p>
+<h3 id="191-what-we-actually-need">19.1 What we actually need<a class="headerlink" href="#191-what-we-actually-need" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Required by Quant Strategies today</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Durable job state across API restarts</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>FIFO ordering with backpressure</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>At-most-one worker pulling at a time</td>
+<td>Yes (Phase 1)</td>
+</tr>
+<tr>
+<td>Live progress events to one browser session</td>
+<td>Yes (SSE)</td>
+</tr>
+<tr>
+<td>Multi-consumer fan-out of the same event stream</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Millions of events / second</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Cross-service event distribution</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Schema registry, partitions, consumer groups</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h3 id="192-why-not-kafka">19.2 Why not Kafka<a class="headerlink" href="#192-why-not-kafka" title="Permanent link">&para;</a></h3>
+<p>Kafka solves problems we do not have:</p>
+<ol>
+<li><strong>Operational weight.</strong> Kafka requires a broker cluster, KRaft (or ZooKeeper), partition planning, retention policies, and typically a schema registry. Not justified for a single-tenant FastAPI backend.</li>
+<li><strong>Wrong primitive.</strong> Kafka is a high-throughput append-only log designed for fan-out to many independent consumers. Our queue has exactly one consumer and needs <code>SELECT ... FOR UPDATE SKIP LOCKED</code> semantics, which a log does not natively provide.</li>
+<li><strong>Volume mismatch.</strong> A backtest job is one row every few seconds at most.</li>
+<li><strong>No existing dependency.</strong> Adding Kafka means a new container, credentials, monitoring surface — versus reusing the Postgres cluster we already operate.</li>
+</ol>
+<p>Kafka becomes interesting only if we add (a) a live tick-data ingestion pipeline, or (b) cross-service event distribution.</p>
+<h3 id="193-why-not-redis">19.3 Why not Redis<a class="headerlink" href="#193-why-not-redis" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>New stateful service.</strong> Another piece of infrastructure to back up, monitor, secure.</li>
+<li><strong>No transactional coupling.</strong> Job-completion writes (job state + <code>BT.RESULT</code>) become a two-phase coordination problem instead of one transaction.</li>
+<li><strong>Loss of SQL inspection.</strong> <code>SELECT * FROM BT.BACKTEST_JOB WHERE JOB_STATE = 'FAILED'</code> from psql is invaluable for debugging.</li>
+</ol>
+<p>Redis is worth re-evaluating if (a) submission rate grows past several per second sustained, or (b) we need pub/sub fan-out for live progress to many browser tabs simultaneously.</p>
+<h3 id="194-why-postgres-fits">19.4 Why Postgres fits<a class="headerlink" href="#194-why-postgres-fits" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Already operated.</strong> Cluster, credentials, backups, Liquibase migrations all in place.</li>
+<li><strong><code>SELECT ... FOR UPDATE SKIP LOCKED</code></strong> gives the dequeue semantics for free.</li>
+<li><strong><code>LISTEN/NOTIFY</code></strong> drives live SSE without a broker.</li>
+<li><strong>Transactional integrity</strong> between job state and result rows is free.</li>
+<li><strong>No new failure mode</strong> — if Postgres is down, the API is already down.</li>
+</ol>
+<p>Throughput ceiling on a single Aurora instance for this pattern is comfortably in the hundreds of jobs per second, well beyond requirements.</p>
+<h3 id="195-lighter-still-when-even-a-queue-is-overkill">19.5 Lighter still — when even a queue is overkill<a class="headerlink" href="#195-lighter-still-when-even-a-queue-is-overkill" title="Permanent link">&para;</a></h3>
+<p>If usage stays single-user and one optimization at a time is acceptable, an <code>asyncio.Semaphore(1)</code> in <code>api/services/backtest.py</code> is sufficient and adds zero schema. The full design above is justified once any of:</p>
+<ol>
+<li>Multiple users submitting concurrently</li>
+<li>The user wants to enqueue several runs and walk away</li>
+<li>Optimizations routinely exceed a few minutes and tying up a uvicorn worker becomes painful</li>
+</ol>
+<p>The current usage already meets condition 2, which is why this design moves forward.</p>
+<h3 id="196-decision">19.6 Decision<a class="headerlink" href="#196-decision" title="Permanent link">&para;</a></h3>
+<p>Postgres-backed FIFO queue, single worker, <code>LISTEN/NOTIFY</code> for live updates, cooperative cancel and timeout in Phase 1. Re-evaluate Redis if submission rate or fan-out grows; re-evaluate Kafka only if a live market-data ingestion pipeline is added.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2921 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/design/separate-underlying/">
+      
+      
+        <link rel="prev" href="../alt-data-sources/">
+      
+      
+        <link rel="next" href="../login/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Separate Underlying & Cache - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#design-separate-indicator-underlying-from-trading-underlying" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Separate Underlying & Cache
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/pipeline/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../backtest-api/" class="md-tabs__link">
+          
+  
+  
+  Design Docs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-principle-avoid-refetching-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Principle — Avoid Refetching Data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-python-backend-implement-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1 — Python Backend (implement first)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 1 — Python Backend (implement first)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1a-substrategy-add-ticker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1a. SubStrategy — add ticker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1b-strategyconfig-keep-ticker-as-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1b. StrategyConfig — keep ticker as-is
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1c-performance__init__-accept-dictstr-pddataframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1c. Performance.__init__ — accept dict[str, pd.DataFrame]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1d-performance_enrich_multi_factor-per-sub-dataframe-lookup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1d. Performance._enrich_multi_factor — per-sub DataFrame lookup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1e-performance_enrich_single_factor-same-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1e. Performance._enrich_single_factor — same pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1f-parametersoptimization-accept-dictstr-pddataframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1f. ParametersOptimization — accept dict[str, pd.DataFrame]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1g-mainpy-build-data-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1g. main.py — build data dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-api-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — API Backend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 2 — API Backend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2a-apischemasbacktestpy-add-symbol-per-factor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2a. api/schemas/backtest.py — add symbol per factor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2b-apiservicesbacktestpy-fetch-unique-symbols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2b. api/services/backtest.py — fetch unique symbols
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-database-all-access-via-stored-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 — Database (all access via stored procedures)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 3 — Database (all access via stored procedures)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#3a-inst-seed-data-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3a. INST seed data + procedures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3a1-product_xref-population-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3a.1. PRODUCT_XREF population model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3b-bt-schema-ticker-product_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3b. BT schema — TICKER → PRODUCT_ID
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3c-update-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3c. Update procedures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3c1-where-procedures-are-applied-in-the-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3c.1. Where procedures are applied in the flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3d-tradedeployment-keep-ticker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3d. TRADE.DEPLOYMENT — keep TICKER
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4 — Frontend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 4 — Frontend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#4a-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4a. Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4b-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4b. UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-data-request-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Data Request Persistence
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="API Data Request Persistence">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#soft-versioning-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Soft-versioning model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stored-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stored procedures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-layer-backtestcache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python layer — BacktestCache
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cache-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#date-sync-across-products-factors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Date sync across products + factors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work-minimise-provider-traffic-without-payload-duplication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work — minimise provider traffic without payload duplication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work-scheduled-purge-of-closed-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work — scheduled purge of closed versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastapi-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FastAPI integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partition-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partition maintenance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-flow-after" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Flow (after)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migration-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration Plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open Questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-principle-avoid-refetching-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Principle — Avoid Refetching Data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-python-backend-implement-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1 — Python Backend (implement first)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 1 — Python Backend (implement first)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1a-substrategy-add-ticker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1a. SubStrategy — add ticker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1b-strategyconfig-keep-ticker-as-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1b. StrategyConfig — keep ticker as-is
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1c-performance__init__-accept-dictstr-pddataframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1c. Performance.__init__ — accept dict[str, pd.DataFrame]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1d-performance_enrich_multi_factor-per-sub-dataframe-lookup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1d. Performance._enrich_multi_factor — per-sub DataFrame lookup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1e-performance_enrich_single_factor-same-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1e. Performance._enrich_single_factor — same pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1f-parametersoptimization-accept-dictstr-pddataframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1f. ParametersOptimization — accept dict[str, pd.DataFrame]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1g-mainpy-build-data-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1g. main.py — build data dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-api-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — API Backend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 2 — API Backend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2a-apischemasbacktestpy-add-symbol-per-factor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2a. api/schemas/backtest.py — add symbol per factor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2b-apiservicesbacktestpy-fetch-unique-symbols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2b. api/services/backtest.py — fetch unique symbols
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-database-all-access-via-stored-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 — Database (all access via stored procedures)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 3 — Database (all access via stored procedures)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#3a-inst-seed-data-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3a. INST seed data + procedures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3a1-product_xref-population-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3a.1. PRODUCT_XREF population model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3b-bt-schema-ticker-product_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3b. BT schema — TICKER → PRODUCT_ID
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3c-update-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3c. Update procedures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3c1-where-procedures-are-applied-in-the-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3c.1. Where procedures are applied in the flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3d-tradedeployment-keep-ticker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3d. TRADE.DEPLOYMENT — keep TICKER
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4 — Frontend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 4 — Frontend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#4a-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4a. Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4b-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4b. UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-data-request-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Data Request Persistence
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="API Data Request Persistence">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#soft-versioning-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Soft-versioning model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stored-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stored procedures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-layer-backtestcache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python layer — BacktestCache
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cache-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#date-sync-across-products-factors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Date sync across products + factors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work-minimise-provider-traffic-without-payload-duplication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work — minimise provider traffic without payload duplication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work-scheduled-purge-of-closed-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work — scheduled purge of closed versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastapi-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FastAPI integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partition-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partition maintenance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-flow-after" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Flow (after)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migration-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration Plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open Questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="design-separate-indicator-underlying-from-trading-underlying">Design: Separate Indicator Underlying from Trading Underlying<a class="headerlink" href="#design-separate-indicator-underlying-from-trading-underlying" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Partially implemented. Decision <a href="../../decisions/">#21 INTERNAL_CUSIP</a> defines the canonical product identifier; <code>INST.PRODUCT</code> and <code>INST.PRODUCT_XREF</code> are live (decisions #20, #22). Per-sub-strategy override of the indicator underlying (the bulk of this design) has not yet been wired through <code>StrategyConfig</code> / <code>SubStrategy</code>.
+<strong>Date:</strong> 2026-04-18
+<strong>Author:</strong> alfcheun</p>
+<h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
+<p>Every backtest currently uses a <strong>single symbol</strong> for both indicator calculation and PnL.
+There is no way to express "compute RSI on VIX but trade SPY", or "use BTC dominance as a signal while trading ETH".</p>
+<p>The same <code>ticker</code> string flows through the entire stack:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Location</th>
+<th>Field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DB</td>
+<td><code>BT.STRATEGY</code></td>
+<td><code>TICKER TEXT</code></td>
+</tr>
+<tr>
+<td>DB</td>
+<td><code>BT.RESULT</code></td>
+<td><code>TICKER TEXT</code></td>
+</tr>
+<tr>
+<td>Python</td>
+<td><code>StrategyConfig</code></td>
+<td><code>ticker: str</code></td>
+</tr>
+<tr>
+<td>Python</td>
+<td><code>SubStrategy</code></td>
+<td><em>(none — inherits from config)</em></td>
+</tr>
+<tr>
+<td>API</td>
+<td><code>OptimizeRequest</code>, <code>PerformanceRequest</code></td>
+<td><code>symbol: str</code></td>
+</tr>
+<tr>
+<td>Frontend</td>
+<td><code>BacktestConfig</code></td>
+<td><code>symbol: string</code></td>
+</tr>
+<tr>
+<td>Frontend</td>
+<td><code>FactorConfig</code></td>
+<td><em>(none)</em></td>
+</tr>
+</tbody>
+</table>
+<p><code>SubStrategy.data_column</code> selects which column (price, volume) from the <em>same</em> DataFrame — it does not select a different underlying.</p>
+<h2 id="goal">Goal<a class="headerlink" href="#goal" title="Permanent link">&para;</a></h2>
+<p>Separate the <strong>trading underlying</strong> (what we buy/sell for PnL) from the <strong>indicator underlying</strong> (what each SubStrategy computes its indicator on).</p>
+<p><strong>Default behaviour:</strong> When a sub-strategy's indicator operates on price data, it defaults to the trading product. Users can override per sub-strategy.</p>
+<h2 id="key-principle-avoid-refetching-data">Key Principle — Avoid Refetching Data<a class="headerlink" href="#key-principle-avoid-refetching-data" title="Permanent link">&para;</a></h2>
+<p>DataFrames are keyed by <strong>ticker string</strong> (e.g. <code>"BTC-USD"</code>, <code>"^VIX"</code>). When a sub-strategy uses the default product (same ticker as the trading product), it reuses the <strong>same DataFrame</strong> — no extra fetch. Only when a sub-strategy overrides with a different ticker does the caller fetch an additional DataFrame.</p>
+<h2 id="design">Design<a class="headerlink" href="#design" title="Permanent link">&para;</a></h2>
+<h3 id="phase-1-python-backend-implement-first">Phase 1 — Python Backend (implement first)<a class="headerlink" href="#phase-1-python-backend-implement-first" title="Permanent link">&para;</a></h3>
+<h4 id="1a-substrategy-add-ticker">1a. <code>SubStrategy</code> — add <code>ticker</code><a class="headerlink" href="#1a-substrategy-add-ticker" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">SubStrategy</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">indicator_name</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">signal_func_name</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">window</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">signal</span><span class="p">:</span> <span class="nb">float</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">data_column</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;v&quot;</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">ticker</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># NEW: indicator underlying</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                                <span class="c1"># None = use StrategyConfig.ticker (default)</span>
+</code></pre></div>
+<p><strong>Default rule:</strong> <code>ticker=None</code> means "same as <code>StrategyConfig.ticker</code>". The caller passes a <code>dict[str, pd.DataFrame]</code> keyed by ticker. When <code>sub.ticker is None</code>, the sub-strategy reads from <code>data[config.ticker]</code> — the <strong>same</strong> DataFrame, no copy, no refetch.</p>
+<h4 id="1b-strategyconfig-keep-ticker-as-is">1b. <code>StrategyConfig</code> — keep <code>ticker</code> as-is<a class="headerlink" href="#1b-strategyconfig-keep-ticker-as-is" title="Permanent link">&para;</a></h4>
+<p><code>StrategyConfig.ticker</code> stays as a string. No change needed now — <code>product_id</code> migration happens in the DB phase.</p>
+<p>Add a helper to collect all unique tickers:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_tickers</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return all unique tickers needed by this strategy.&quot;&quot;&quot;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">tickers</span> <span class="o">=</span> <span class="p">{</span><span class="bp">self</span><span class="o">.</span><span class="n">ticker</span><span class="p">}</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="k">for</span> <span class="n">sub</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">substrategies</span><span class="p">:</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="k">if</span> <span class="n">sub</span><span class="o">.</span><span class="n">ticker</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>            <span class="n">tickers</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">sub</span><span class="o">.</span><span class="n">ticker</span><span class="p">)</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="k">return</span> <span class="n">tickers</span>
+</code></pre></div>
+<h4 id="1c-performance__init__-accept-dictstr-pddataframe">1c. <code>Performance.__init__</code> — accept <code>dict[str, pd.DataFrame]</code><a class="headerlink" href="#1c-performance__init__-accept-dictstr-pddataframe" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Performance</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">signal</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">fee_bps</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>        <span class="c1"># data: dict[str, pd.DataFrame] keyed by ticker</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">all_data</span> <span class="o">=</span> <span class="n">data</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">config</span><span class="o">.</span><span class="n">ticker</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>   <span class="c1"># trading product (PnL source)</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="o">...</span>
+</code></pre></div>
+<ul>
+<li><code>self.data</code> = the <strong>trading</strong> DataFrame (used for PnL, <code>price</code>, <code>chg</code>, buy-hold)</li>
+<li><code>self.all_data</code> = the full dict (each sub-strategy resolves its own)</li>
+</ul>
+<h4 id="1d-performance_enrich_multi_factor-per-sub-dataframe-lookup">1d. <code>Performance._enrich_multi_factor</code> — per-sub DataFrame lookup<a class="headerlink" href="#1d-performance_enrich_multi_factor-per-sub-dataframe-lookup" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">_enrich_multi_factor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="o">...</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_subs</span><span class="p">):</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>        <span class="n">sub_ticker</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">ticker</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">ticker</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>        <span class="n">sub_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">all_data</span><span class="p">[</span><span class="n">sub_ticker</span><span class="p">]</span>     <span class="c1"># same ref if default</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="n">sub_data</span> <span class="o">=</span> <span class="n">sub_df</span><span class="p">[[</span><span class="s1">&#39;factor&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="n">sub_data</span><span class="p">[</span><span class="s1">&#39;factor&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sub_df</span><span class="p">[</span><span class="n">sub</span><span class="o">.</span><span class="n">data_column</span><span class="p">]</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="n">ta</span> <span class="o">=</span> <span class="n">TechnicalAnalysis</span><span class="p">(</span><span class="n">sub_data</span><span class="p">)</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="n">indicator_vals</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">ta</span><span class="p">,</span> <span class="n">sub</span><span class="o">.</span><span class="n">indicator_name</span><span class="p">)(</span><span class="bp">self</span><span class="o">.</span><span class="n">_windows</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        <span class="c1"># Reindex to trading DataFrame&#39;s index</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>        <span class="n">indicator_vals</span> <span class="o">=</span> <span class="n">indicator_vals</span><span class="o">.</span><span class="n">reindex</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>        <span class="o">...</span>
+</code></pre></div>
+<p>When <code>sub.ticker is None</code>, <code>sub_df</code> points to the same <code>self.all_data[config.ticker]</code> — no extra memory, no refetch.</p>
+<h4 id="1e-performance_enrich_single_factor-same-pattern">1e. <code>Performance._enrich_single_factor</code> — same pattern<a class="headerlink" href="#1e-performance_enrich_single_factor-same-pattern" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">_enrich_single_factor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">sub_ticker</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">ticker</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">ticker</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">sub_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">all_data</span><span class="p">[</span><span class="n">sub_ticker</span><span class="p">]</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="o">...</span>
+</code></pre></div>
+<h4 id="1f-parametersoptimization-accept-dictstr-pddataframe">1f. <code>ParametersOptimization</code> — accept <code>dict[str, pd.DataFrame]</code><a class="headerlink" href="#1f-parametersoptimization-accept-dictstr-pddataframe" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ParametersOptimization</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">fee_bps</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">data</span>    <span class="c1"># dict[str, pd.DataFrame]</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>        <span class="o">...</span>
+</code></pre></div>
+<p>Inside <code>objective()</code>, pass <code>self.data</code> (not <code>.copy()</code>) — <code>Performance</code> copies the trading DataFrame internally.</p>
+<h4 id="1g-mainpy-build-data-dict">1g. <code>main.py</code> — build data dict<a class="headerlink" href="#1g-mainpy-build-data-dict" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Fetch all unique tickers needed by the strategy</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">data_dict</span> <span class="o">=</span> <span class="p">{}</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">for</span> <span class="n">ticker</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">get_tickers</span><span class="p">():</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">data_dict</span><span class="p">[</span><span class="n">ticker</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_source</span><span class="o">.</span><span class="n">get_historical_price</span><span class="p">(</span><span class="n">ticker</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">perf</span> <span class="o">=</span> <span class="n">Performance</span><span class="p">(</span><span class="n">data_dict</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">fee_bps</span><span class="o">=</span><span class="n">fee_bps</span><span class="p">)</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">opt</span> <span class="o">=</span> <span class="n">ParametersOptimization</span><span class="p">(</span><span class="n">data_dict</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">fee_bps</span><span class="o">=</span><span class="n">fee_bps</span><span class="p">)</span>
+</code></pre></div>
+<p>For the common single-ticker case, the dict has one entry — no overhead.</p>
+<h3 id="phase-2-api-backend">Phase 2 — API Backend<a class="headerlink" href="#phase-2-api-backend" title="Permanent link">&para;</a></h3>
+<h4 id="2a-apischemasbacktestpy-add-symbol-per-factor">2a. <code>api/schemas/backtest.py</code> — add <code>symbol</code> per factor<a class="headerlink" href="#2a-apischemasbacktestpy-add-symbol-per-factor" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">FactorConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">indicator</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">strategy</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">data_column</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;price&quot;</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">window_range</span><span class="p">:</span> <span class="n">RangeParam</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">signal_range</span><span class="p">:</span> <span class="n">RangeParam</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="n">symbol</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>   <span class="c1"># NEW: None = use request-level symbol</span>
+</code></pre></div>
+<p>Request models keep <code>symbol: str</code> for now. <code>product_id</code> comes in DB phase.</p>
+<h4 id="2b-apiservicesbacktestpy-fetch-unique-symbols">2b. <code>api/services/backtest.py</code> — fetch unique symbols<a class="headerlink" href="#2b-apiservicesbacktestpy-fetch-unique-symbols" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">symbols</span> <span class="o">=</span> <span class="p">{</span><span class="n">req</span><span class="o">.</span><span class="n">symbol</span><span class="p">}</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="p">(</span><span class="n">req</span><span class="o">.</span><span class="n">factors</span> <span class="ow">or</span> <span class="p">[]):</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="k">if</span> <span class="n">f</span><span class="o">.</span><span class="n">symbol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>        <span class="n">symbols</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">symbol</span><span class="p">)</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="n">data</span> <span class="o">=</span> <span class="p">{</span><span class="n">sym</span><span class="p">:</span> <span class="n">_fetch_df</span><span class="p">(</span><span class="n">sym</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span> <span class="k">for</span> <span class="n">sym</span> <span class="ow">in</span> <span class="n">symbols</span><span class="p">}</span>
+</code></pre></div>
+<h3 id="phase-3-database-all-access-via-stored-procedures">Phase 3 — Database (all access via stored procedures)<a class="headerlink" href="#phase-3-database-all-access-via-stored-procedures" title="Permanent link">&para;</a></h3>
+<h4 id="3a-inst-seed-data-procedures">3a. INST seed data + procedures<a class="headerlink" href="#3a-inst-seed-data-procedures" title="Permanent link">&para;</a></h4>
+<p>Seed <code>INST.PRODUCT</code> and <code>INST.PRODUCT_XREF</code> via stored procedures:
+- <code>INST.SP_INS_PRODUCT</code>
+- <code>INST.SP_INS_PRODUCT_XREF</code></p>
+<p>GET procedures for backend:
+- <code>INST.SP_GET_PRODUCT</code> — list/filter products
+- <code>INST.SP_GET_PRODUCT_XREF</code> — resolve vendor symbol by product + app</p>
+<h4 id="3a1-product_xref-population-model">3a.1. PRODUCT_XREF population model<a class="headerlink" href="#3a1-product_xref-population-model" title="Permanent link">&para;</a></h4>
+<p><code>INST.PRODUCT_XREF</code> is the canonical vendor-symbol mapping layer. The long-term design is a <strong>semi-automatic proposal + approval</strong> workflow, not blind auto-insert from vendor feeds.</p>
+<p>Target flow:</p>
+<ol>
+<li>Import vendor instrument master rows into a staging area keyed by <code>APP_ID</code>.</li>
+<li>Run matching rules against <code>INST.PRODUCT</code> and generate candidate mappings with confidence scores.</li>
+<li>Store candidates in an approval queue for review.</li>
+<li>On approval, write the authoritative row to <code>INST.PRODUCT_XREF</code> via <code>INST.SP_INS_PRODUCT_XREF</code>.</li>
+<li>On reject, either discard the proposal or create a new <code>INST.PRODUCT</code> first if the instrument is genuinely new.</li>
+</ol>
+<p>Suggested matching split:</p>
+<ul>
+<li><strong>Auto-propose only</strong>: listed equities with stable exchange+ticker, simple crypto spot pairs, previously-seen vendor symbols for the same <code>APP_ID</code></li>
+<li><strong>Require manual approval</strong>: futures, perpetuals, options, leveraged tokens, delisted/reused symbols, ambiguous exchange aliases</li>
+</ul>
+<p>Implementation note:</p>
+<ul>
+<li>Future DB objects should likely include <code>INST.PRODUCT_XREF_STG</code> and <code>INST.PRODUCT_XREF_PROPOSAL</code> so the approval queue is separated from the authoritative <code>INST.PRODUCT_XREF</code> table.</li>
+<li>Until that workflow is built, <strong>bootstrap/admin population may be done by direct database updates</strong> as an operational shortcut. This is temporary and applies to admin setup only, not application write paths.</li>
+</ul>
+<h4 id="3b-bt-schema-ticker-product_id">3b. BT schema — <code>TICKER</code> → <code>PRODUCT_ID</code><a class="headerlink" href="#3b-bt-schema-ticker-product_id" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">BT</span><span class="p">.</span><span class="n">STRATEGY</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="k">IF</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">EXISTS</span><span class="w"> </span><span class="n">PRODUCT_ID</span><span class="w"> </span><span class="nb">INTEGER</span><span class="p">;</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">UPDATE</span><span class="w"> </span><span class="n">BT</span><span class="p">.</span><span class="n">STRATEGY</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="n">PRODUCT_ID</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">PRODUCT_ID</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="n">INST</span><span class="p">.</span><span class="n">PRODUCT</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">SYMBOL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">TICKER</span><span class="p">;</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">BT</span><span class="p">.</span><span class="n">STRATEGY</span><span class="w"> </span><span class="k">DROP</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="k">IF</span><span class="w"> </span><span class="k">EXISTS</span><span class="w"> </span><span class="n">TICKER</span><span class="p">;</span>
+</code></pre></div>
+<p>Same pattern for <code>BT.RESULT</code>.</p>
+<h4 id="3c-update-procedures">3c. Update procedures<a class="headerlink" href="#3c-update-procedures" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>BT.SP_INS_STRATEGY</code> — <code>IN_TICKER</code> → <code>IN_PRODUCT_ID</code></li>
+<li><code>BT.SP_INS_RESULT</code> — <code>IN_TICKER</code> → <code>IN_PRODUCT_ID</code></li>
+<li>New: <code>BT.SP_GET_STRATEGY</code>, <code>BT.SP_GET_RESULT</code> — backend reads via procedure</li>
+</ul>
+<h4 id="3c1-where-procedures-are-applied-in-the-flow">3c.1. Where procedures are applied in the flow<a class="headerlink" href="#3c1-where-procedures-are-applied-in-the-flow" title="Permanent link">&para;</a></h4>
+<p>Use this sequence during implementation so each layer switches cleanly.</p>
+<ol>
+<li>
+<p><strong>Bootstrap data (admin step, current state):</strong></p>
+<ul>
+<li>Populate <code>INST.PRODUCT</code>, <code>INST.PRODUCT_XREF</code>, <code>INST.PRODUCT_GRP</code>, <code>INST.PRODUCT_GRP_MEMBER</code>.</li>
+<li>For now, direct DB updates are acceptable for bootstrap/admin loading.</li>
+<li>After admin tooling is ready, use <code>INST.SP_INS_PRODUCT</code> and <code>INST.SP_INS_PRODUCT_XREF</code> for new writes.</li>
+</ul>
+</li>
+<li>
+<p><strong>Backend read path (first UI dependency):</strong></p>
+<ul>
+<li>Add <code>INST.SP_GET_PRODUCT</code> for product dropdown/listing.</li>
+<li>Add <code>INST.SP_GET_PRODUCT_XREF</code> (or current-only variant) to resolve vendor symbol by <code>(PRODUCT_ID, APP_ID)</code>.</li>
+<li>API calls these procedures to build UI payloads.</li>
+</ul>
+</li>
+<li>
+<p><strong>Backtest write path (existing BT inserts):</strong></p>
+<ul>
+<li>Update <code>BT.SP_INS_STRATEGY</code> and <code>BT.SP_INS_RESULT</code> to accept product identity (<code>IN_PRODUCT_ID</code>) instead of ticker.</li>
+<li>Keep API/service writing through BT procedures only.</li>
+</ul>
+</li>
+<li>
+<p><strong>Backtest read path (result display):</strong></p>
+<ul>
+<li>Use <code>BT.SP_GET_STRATEGY</code> and <code>BT.SP_GET_RESULT</code> for result/history views.</li>
+<li>UI should not read BT tables directly.</li>
+</ul>
+</li>
+<li>
+<p><strong>Trade deployment symbol resolution:</strong></p>
+<ul>
+<li>On deployment, resolve broker/data-source symbol via <code>INST.SP_GET_PRODUCT_XREF</code> from selected product + app.</li>
+<li>Keep <code>TRADE.DEPLOYMENT</code> ticker field as vendor-facing symbol.</li>
+</ul>
+</li>
+</ol>
+<p>Procedure ownership by UI surface:</p>
+<table>
+<thead>
+<tr>
+<th>UI surface</th>
+<th>API need</th>
+<th>Procedure(s)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Product selector</td>
+<td>List products</td>
+<td><code>INST.SP_GET_PRODUCT</code></td>
+</tr>
+<tr>
+<td>Data source / broker symbol resolution</td>
+<td>Resolve current vendor symbol</td>
+<td><code>INST.SP_GET_PRODUCT_XREF</code></td>
+</tr>
+<tr>
+<td>Backtest run save</td>
+<td>Insert strategy/result rows</td>
+<td><code>BT.SP_INS_STRATEGY</code>, <code>BT.SP_INS_RESULT</code></td>
+</tr>
+<tr>
+<td>Backtest history screen</td>
+<td>Read saved runs</td>
+<td><code>BT.SP_GET_STRATEGY</code>, <code>BT.SP_GET_RESULT</code></td>
+</tr>
+<tr>
+<td>Admin product maintenance</td>
+<td>Create/update mappings</td>
+<td><code>INST.SP_INS_PRODUCT</code>, <code>INST.SP_INS_PRODUCT_XREF</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="3d-tradedeployment-keep-ticker">3d. <code>TRADE.DEPLOYMENT</code> — keep <code>TICKER</code><a class="headerlink" href="#3d-tradedeployment-keep-ticker" title="Permanent link">&para;</a></h4>
+<p>Broker-specific symbol. Resolved from <code>INST.PRODUCT_XREF</code> at deployment time.</p>
+<h3 id="phase-4-frontend">Phase 4 — Frontend<a class="headerlink" href="#phase-4-frontend" title="Permanent link">&para;</a></h3>
+<h4 id="4a-types">4a. Types<a class="headerlink" href="#4a-types" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">export</span><span class="w"> </span><span class="kd">interface</span><span class="w"> </span><span class="nx">FactorConfig</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nx">indicator</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nx">strategy</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="nx">data_column</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span><span class="nx">window_range</span><span class="o">:</span><span class="w"> </span><span class="kt">RangeParam</span><span class="p">;</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">  </span><span class="nx">signal_range</span><span class="o">:</span><span class="w"> </span><span class="kt">RangeParam</span><span class="p">;</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span><span class="nx">symbol?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span><span class="w">             </span><span class="c1">// null/undefined = use trading symbol</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="p">}</span>
+</code></pre></div>
+<h4 id="4b-ui">4b. UI<a class="headerlink" href="#4b-ui" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Current</th>
+<th>After</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Free-text <code>Symbol</code> TextField</td>
+<td><strong>Product dropdown</strong> from INST-backed API endpoint</td>
+</tr>
+<tr>
+<td><em>(none)</em> per factor</td>
+<td>Optional <strong>Symbol override</strong> per sub-strategy (collapsed, defaults to trading symbol)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="api-data-request-persistence">API Data Request Persistence<a class="headerlink" href="#api-data-request-persistence" title="Permanent link">&para;</a></h2>
+<p>Every API call to an external data provider (Yahoo Finance, Glassnode, Nasdaq Data Link, etc.) is persisted so that repeated backtests never re-fetch the same data. This is especially important for paid / rate-limited providers. With the separate-underlying design, a multi-factor strategy may reference <strong>multiple tickers</strong> — each ticker × provider × metric × interval combination gets its own cached row.</p>
+<h3 id="schema">Schema<a class="headerlink" href="#schema" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>BT.API_REQUEST  (header — one current row per subscription)
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  PK: (API_REQ_ID UUID, API_REQ_VID INTEGER)
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>  ──────────────────────────────────────────
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>  APP_ID            → REFDATA.APP           (which provider)
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>  APP_METRIC_ID     → REFDATA.APP_METRIC    (which metric: ohlcv, on-chain, …)
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>  TM_INTERVAL_ID    → REFDATA.TM_INTERVAL   (daily, 1h, …)
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>  INTERNAL_CUSIP    TEXT                     (product identifier)
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>  PRODUCT_GRP_ID    INTEGER                  (future: group-level requests)
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>  RANGE_START_TS    TIMESTAMPTZ              (earliest date across all versions)
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>  RANGE_END_TS      TIMESTAMPTZ              (latest date across all versions)
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>  TRANSACT_FROM_TS  TIMESTAMPTZ              (version effective from)
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>  TRANSACT_TO_TS    TIMESTAMPTZ              (9999-12-31 when current)
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>  USER_ID, CREATED_AT
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>BT.API_REQUEST_PAYLOAD  (data — JSONB, partitioned yearly via pg_partman)
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>  PK: (API_REQ_ID, API_REQ_VID, CREATED_AT)
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>  ──────────────────────────────────────────
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>  PAYLOAD  JSONB                             (complete merged history)
+</code></pre></div>
+<p><strong>Relationship:</strong> <code>API_REQUEST</code> 1 → N <code>API_REQUEST_PAYLOAD</code> on <code>(API_REQ_ID, API_REQ_VID)</code>.</p>
+<p><strong>Unique partial index</strong> on <code>API_REQUEST</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">UNIQUE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">UX_API_REQUEST_CURRENT_SUBSCRIPTION</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="k">ON</span><span class="w"> </span><span class="n">BT</span><span class="p">.</span><span class="n">API_REQUEST</span><span class="w"> </span><span class="p">(</span><span class="n">APP_ID</span><span class="p">,</span><span class="w"> </span><span class="n">APP_METRIC_ID</span><span class="p">,</span><span class="w"> </span><span class="n">TM_INTERVAL_ID</span><span class="p">,</span><span class="w"> </span><span class="n">INTERNAL_CUSIP</span><span class="p">)</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">NULLS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">DISTINCT</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="k">WHERE</span><span class="w"> </span><span class="n">TRANSACT_TO_TS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TIMESTAMPTZ</span><span class="w"> </span><span class="s1">&#39;9999-12-31&#39;</span><span class="p">;</span>
+</code></pre></div>
+<p>This guarantees exactly <strong>one current row</strong> per subscription key.</p>
+<h3 id="soft-versioning-model">Soft-versioning model<a class="headerlink" href="#soft-versioning-model" title="Permanent link">&para;</a></h3>
+<p>When new data is persisted, <code>SP_INS_API_REQUEST</code> does not update in place — it:</p>
+<ol>
+<li>Resolves the next <code>API_REQ_VID</code> (<code>MAX + 1</code> or <code>1</code> if first).</li>
+<li>Closes the old current row by setting <code>TRANSACT_TO_TS = now()</code>.</li>
+<li>Inserts a new row with <code>TRANSACT_TO_TS = '9999-12-31'</code>.</li>
+<li>Inserts the payload into <code>API_REQUEST_PAYLOAD</code> for the same VID.</li>
+<li>Logs via <code>CORE_ADMIN.CORE_INS_LOG_PROC</code>.</li>
+</ol>
+<p>This means the full history of every subscription is retained — each VID is a snapshot of the merged dataset at that point in time.</p>
+<h3 id="stored-procedures">Stored procedures<a class="headerlink" href="#stored-procedures" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Procedure</th>
+<th>Direction</th>
+<th>Status</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BT.SP_INS_API_REQUEST</code></td>
+<td>Write</td>
+<td><strong>Deployed</strong></td>
+<td>Combined header + payload insert (steps 1–5 above)</td>
+</tr>
+<tr>
+<td><code>BT.SP_GET_API_REQUEST</code></td>
+<td>Read</td>
+<td><strong>Deployed</strong></td>
+<td>Return current rows filtered by (APP_ID, APP_METRIC_ID, TM_INTERVAL_ID, INTERNAL_CUSIP), joined with payload</td>
+</tr>
+</tbody>
+</table>
+<h3 id="python-layer-backtestcache">Python layer — <code>BacktestCache</code><a class="headerlink" href="#python-layer-backtestcache" title="Permanent link">&para;</a></h3>
+<p><code>BacktestCache</code> in <code>src/data.py</code> (inherits <code>DbGateway</code>) is the only consumer of these SPs.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_or_fetch_payload(*, app_id, app_metric_id, internal_cusip, range_start, range_end, fetcher, refresh=False, ...)</code></td>
+<td>Two-mode orchestrator. With <code>refresh=False</code> (default — read-only) returns the cached slice if the cached range fully covers the request, otherwise raises <code>BacktestCache.CacheMissError</code> (translated to HTTP 400 by the service layer). With <code>refresh=True</code> calls <code>fetcher(range_start, range_end)</code> for the <strong>full</strong> requested range and inserts a new version via <code>SP_INS_API_REQUEST</code> (re-using the cached <code>api_req_id</code> so the SP bumps <code>API_REQ_VID</code>).</td>
+</tr>
+</tbody>
+</table>
+<p>The mode is driven by a single UI checkbox <strong>"Refresh dataset"</strong> on the trading-product card. When unchecked, no provider calls and no DB writes occur — versions of <code>BT.API_REQUEST</code> only grow when the user explicitly opts in. This keeps <code>API_REQUEST_PAYLOAD</code> row count bounded and old partitions easy to drop.</p>
+<h3 id="cache-flow">Cache flow<a class="headerlink" href="#cache-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>get_or_fetch_payload(..., refresh)
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>  │
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>  ├─ 1. SP_GET_API_REQUEST → cached row (range_start_ts, range_end_ts, payload)
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>  │
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>  ├─ refresh=False (read-only)
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>  │     ├─ covers? → return cached_df.loc[req_start:req_end]
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>  │     └─ miss   → raise CacheMissError → HTTP 400 to client
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>  │
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>  └─ refresh=True (write — user opt-in)
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>        ├─ fetcher(req_start, req_end)  # full range, no gap math
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>        ├─ SP_INS_API_REQUEST(api_req_id=cached_id or new uuid,
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>        │                     range=[req_start, req_end],
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>        │                     payload=fetched)
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>        │     └─ closes old VID, inserts new VID + payload
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>        └─ return fetched.loc[req_start:req_end]
+</code></pre></div>
+<h3 id="date-sync-across-products-factors">Date sync across products + factors<a class="headerlink" href="#date-sync-across-products-factors" title="Permanent link">&para;</a></h3>
+<p>A backtest with N products/factors aligns DataFrames via <code>reindex</code> on the main product's index. If a factor is missing dates the main product has, the result silently corrupts. <code>_build_data_dict</code> in <code>api/services/backtest.py</code> therefore enforces an <strong>intersection check</strong> after fetching: the common <code>[max(starts), min(ends)]</code> across all tickers must cover the requested <code>[start, end]</code>, else 400 with the limiting ticker named.</p>
+<h3 id="future-work-minimise-provider-traffic-without-payload-duplication">Future work — minimise provider traffic without payload duplication<a class="headerlink" href="#future-work-minimise-provider-traffic-without-payload-duplication" title="Permanent link">&para;</a></h3>
+<p>The current design fetches the full requested range whenever <code>refresh=True</code>. For non-price metrics (where the JSONB <code>API_REQUEST_PAYLOAD</code> is the only home — see "Future work" in the database doc for moving price into a normalised <code>BT.PRICE_BAR</code> table), this is the right trade-off today: one user-driven version per refresh, no churn from incidental range nudges.</p>
+<p>Eventually we'll want <strong>delta-row storage</strong> for those metrics — instead of one current row per <code>(app, metric, interval, cusip)</code> holding the whole payload, allow multiple current rows each covering a disjoint date range. The read path becomes <code>union all current rows for the key</code>, and <code>refresh=True</code> only fetches the missing prefix/suffix and inserts it as a new delta row. This gives "minimal API call" without re-introducing the payload duplication that the current single-row design avoids.</p>
+<p>Not in scope for this PR — flagged here so the next data-layer change can target it.</p>
+<h3 id="future-work-scheduled-purge-of-closed-versions">Future work — scheduled purge of closed versions<a class="headerlink" href="#future-work-scheduled-purge-of-closed-versions" title="Permanent link">&para;</a></h3>
+<p>Soft-versioning means <code>BT.API_REQUEST</code> and <code>BT.API_REQUEST_PAYLOAD</code> accumulate closed rows (<code>TRANSACT_TO_TS &lt; '9999-12-31'</code>) every time a user ticks <em>Refresh dataset</em>. The current schema has <strong>no scheduled purge</strong> — closed rows live until the partition is manually dropped. Two pieces of work are needed before automating this:</p>
+<ol>
+<li><strong>Repartitioning by <code>TRANSACT_TO_TS</code></strong> (or a dedicated archive flag column) instead of <code>CREATED_AT</code>. The current <code>pg_partman</code> yearly partitions on <code>CREATED_AT</code> cleanly drop <em>all</em> versions written in a given year — both still-current and closed — which is wrong: we want to keep current rows regardless of age. Splitting current vs. closed into separate partition trees (or moving closed rows to an archive table on close) is required first.</li>
+<li><strong>Retention policy + scheduler.</strong> Decide how long closed versions are kept (e.g. 90 days for audit replay), then drive purges via <code>pg_cron</code> or an external scheduled job calling a new <code>BT.SP_PURGE_CLOSED_API_REQUESTS(retention_days)</code> procedure that does whole-partition <code>DROP</code> rather than per-row <code>DELETE</code>.</li>
+</ol>
+<p>This is a meaningful chunk of work — partition migrations on a populated table need a careful online plan (<code>pg_partman</code> partition-add + data-copy + cutover). Tracking separately; the <em>Refresh dataset</em> checkbox above intentionally minimises closed-row creation in the meantime so the eventual migration has less to chew through.</p>
+<h3 id="fastapi-integration">FastAPI integration<a class="headerlink" href="#fastapi-integration" title="Permanent link">&para;</a></h3>
+<p>The FastAPI backend creates <code>BacktestCache</code> at startup (<code>api/main.py</code> lifespan). <code>_fetch_df</code> in <code>api/services/backtest.py</code> is the sole caller — it always routes through <code>get_or_fetch_payload</code> when <code>bt_cache</code> is wired, falling back to a direct provider call only when the DB is unavailable (e.g. unit tests).</p>
+<h3 id="partition-maintenance">Partition maintenance<a class="headerlink" href="#partition-maintenance" title="Permanent link">&para;</a></h3>
+<p><code>API_REQUEST_PAYLOAD</code> is partitioned by <code>CREATED_AT</code> (yearly, via <code>pg_partman</code>). Purge path = <code>DROP TABLE &lt;partition&gt;</code>. No TTL policy yet — partitions grow until manually dropped. See the "Scheduled purge of closed versions" future-work section above for why automated dropping is non-trivial under the current partition key.</p>
+<h2 id="data-flow-after">Data Flow (after)<a class="headerlink" href="#data-flow-after" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>User selects:
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>  Trading symbol:  SPY
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  Factor 1:        RSI on ^VIX (ticker=&quot;^VIX&quot;)   ← overridden
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>  Factor 2:        SMA on SPY  (ticker=None)      ← defaults to trading symbol
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>Backend:
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>  1. Collect unique tickers: {&quot;SPY&quot;, &quot;^VIX&quot;}
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>  2. Fetch two DataFrames: {&quot;SPY&quot;: df_spy, &quot;^VIX&quot;: df_vix}
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>     (each goes through the two-mode `BacktestCache.get_or_fetch_payload` flow above)
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>  3. Compute RSI on df_vix, SMA on df_spy (same ref as trading)
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>  4. Reindex indicator values to df_spy&#39;s index
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>  5. Merge signals, run PnL on SPY prices
+</code></pre></div>
+<h2 id="migration-plan">Migration Plan<a class="headerlink" href="#migration-plan" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Scope</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1</strong></td>
+<td><strong>Python backend</strong> — SubStrategy.ticker, Performance/ParamOpt accept <code>dict[str, DataFrame]</code>, main.py builds data dict</td>
+</tr>
+<tr>
+<td><strong>2</strong></td>
+<td><strong>API</strong> — FactorConfig.symbol, service fetches unique symbols</td>
+</tr>
+<tr>
+<td><strong>3</strong></td>
+<td><strong>Database</strong> — INST seed + procedures, BT ALTER (TICKER → PRODUCT_ID), SP_GET_* procedures</td>
+</tr>
+<tr>
+<td><strong>4</strong></td>
+<td><strong>Frontend</strong> — Product dropdown, per-factor symbol override</td>
+</tr>
+<tr>
+<td><strong>5</strong></td>
+<td>Tests — unit + integration across all layers</td>
+</tr>
+</tbody>
+</table>
+<h2 id="open-questions">Open Questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<ol>
+<li>~~<strong>Should <code>REFDATA.TICKER_MAPPING</code> be retired now or later?</strong>~~ <strong>Resolved</strong>: Dropped via Liquibase changeset <code>116-refdata-drop-ticker-mapping</code>. <code>INST.PRODUCT_XREF</code> is the replacement.</li>
+<li><strong>Walk-forward:</strong> Currently single-symbol. Same <code>dict[str, DataFrame]</code> pattern applies?</li>
+<li><strong>Seed data scope:</strong> Start minimal (5–10 products) or bulk-load?</li>
+<li><strong>Approval threshold:</strong> What confidence score should allow auto-proposal without extra heuristics by asset class?</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

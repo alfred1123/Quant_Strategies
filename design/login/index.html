@@ -1,0 +1,3164 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/design/login/">
+      
+      
+        <link rel="prev" href="../separate-underlying/">
+      
+      
+        <link rel="next" href="../frontend-audit/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Login & Authentication - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#login-authentication-design-doc-v1-minimal" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Login & Authentication
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/pipeline/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../backtest-api/" class="md-tabs__link">
+          
+  
+  
+  Design Docs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Goals">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#functional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#non-functional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-functional
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-non-goals-v1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Non-Goals (v1)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-constraints-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Constraints &amp; Observations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-proposed-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Proposed Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Proposed Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-trust-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Trust model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-why-jwt-and-not-server-side-sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Why JWT and not server-side sessions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-data-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Data Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Data Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-core_adminapp_user" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 CORE_ADMIN.APP_USER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-existing-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Existing tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-stored-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Stored Procedures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Stored Procedures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-admin-runbook-sp-only-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Admin runbook (SP-only operations)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-postgres-roles-vs-application-users-two-identity-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Postgres roles vs application users — two identity layers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-postgres-login-users" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Postgres login users
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-grants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Grants
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#75-optional-postgres-side-audit-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.5 Optional: Postgres-side audit context
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-api-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. API Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. API Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-new-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 New endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-existing-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Existing endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-jwt-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 JWT shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-pydantic-input-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 Pydantic input validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-frontend-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Frontend Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Frontend Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-route-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 Route guard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-login-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Login page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-logout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Logout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-axios-interceptor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.4 Axios interceptor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-performance-caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Performance &amp; Caching
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-failure-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Failure Handling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Failure Handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#112-rate-limiting-defense-in-depth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.2 Rate limiting (defense in depth)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#111-timing-attack-hardening-concrete-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.1 Timing-attack hardening (concrete pattern)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-security-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Security Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-migration-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Migration Plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-phased-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Phased Plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="14. Phased Plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-auth-in-place-this-doc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1 — Auth in place (this doc)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-multi-user-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — Multi-user isolation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-self-service-richer-auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 — Self-service &amp; richer auth
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-future-proofing-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Future-proofing notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Open Questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Recommendation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Goals">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#functional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#non-functional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-functional
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-non-goals-v1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Non-Goals (v1)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-constraints-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Constraints &amp; Observations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-proposed-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Proposed Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Proposed Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-trust-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Trust model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-why-jwt-and-not-server-side-sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Why JWT and not server-side sessions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-data-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Data Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Data Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-core_adminapp_user" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 CORE_ADMIN.APP_USER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-existing-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Existing tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-stored-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Stored Procedures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Stored Procedures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-admin-runbook-sp-only-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Admin runbook (SP-only operations)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-postgres-roles-vs-application-users-two-identity-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Postgres roles vs application users — two identity layers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-postgres-login-users" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Postgres login users
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-grants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Grants
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#75-optional-postgres-side-audit-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.5 Optional: Postgres-side audit context
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-api-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. API Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. API Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-new-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 New endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-existing-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Existing endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-jwt-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 JWT shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-pydantic-input-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 Pydantic input validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-frontend-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Frontend Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Frontend Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-route-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 Route guard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-login-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Login page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-logout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Logout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-axios-interceptor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.4 Axios interceptor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-performance-caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Performance &amp; Caching
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-failure-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Failure Handling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Failure Handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#112-rate-limiting-defense-in-depth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.2 Rate limiting (defense in depth)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#111-timing-attack-hardening-concrete-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.1 Timing-attack hardening (concrete pattern)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-security-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Security Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-migration-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Migration Plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-phased-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Phased Plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="14. Phased Plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-auth-in-place-this-doc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1 — Auth in place (this doc)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-multi-user-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — Multi-user isolation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-self-service-richer-auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 — Self-service &amp; richer auth
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-future-proofing-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Future-proofing notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Open Questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Recommendation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="login-authentication-design-doc-v1-minimal">Login &amp; Authentication — Design Doc (v1-minimal)<a class="headerlink" href="#login-authentication-design-doc-v1-minimal" title="Permanent link">&para;</a></h1>
+<p>Status: <strong>Implemented (Phase 1)</strong> — current behavior in <code>api/auth/</code>. Phases 2 &amp; 3 below remain proposed.
+Owner: alfcheun
+Related: <a href="../../decisions/">decision #19 (no direct DML)</a>, <a href="../../decisions/">decision #27 (authentication)</a>, <a href="../trade-api/">trade-api.md</a></p>
+<hr />
+<h2 id="1-problem">1. Problem<a class="headerlink" href="#1-problem" title="Permanent link">&para;</a></h2>
+<p>Today the app has <strong>no authentication</strong>. The hardcoded user <code>alfcheun</code> is baked into <code>src/db.py</code> (<code>user_id: str = "alfcheun"</code>) and propagated into every <code>USER_ID</code> audit column. The FastAPI backend accepts any caller — anyone with the URL can run backtests, read all <code>BT.RESULT</code> rows, and (once the trade API is wired) trigger orders.</p>
+<p>Before public hosting (Tier 1 in the deployment ladder), the app must require a login. This doc covers the <strong>smallest possible</strong> design that:</p>
+<ul>
+<li>Stops anonymous access to all <code>/api/v1/*</code> endpoints (except health + login).</li>
+<li>Replaces the hardcoded <code>user_id</code> with the authenticated user.</li>
+<li>Lays groundwork for true multi-tenancy later, without committing to it now.</li>
+</ul>
+<p><strong>Scoping decision</strong>: users are provisioned <strong>manually by the admin (via Liquibase / <code>psql</code>)</strong>. There is no signup endpoint, no admin-user-management UI, no self-service password change, no email infrastructure. This drops a large amount of code, surface area, and risk that is unnecessary for a 1–3-trusted-user system.</p>
+<hr />
+<h2 id="2-goals">2. Goals<a class="headerlink" href="#2-goals" title="Permanent link">&para;</a></h2>
+<h3 id="functional">Functional<a class="headerlink" href="#functional" title="Permanent link">&para;</a></h3>
+<ol>
+<li>A user must log in to use the SPA.</li>
+<li>Backend rejects unauthenticated API calls with <code>401</code>.</li>
+<li><code>USER_ID</code> audit columns reflect the real logged-in user, not <code>"alfcheun"</code>.</li>
+<li>Admin can disable a compromised account or invalidate all sessions without restarting the app.</li>
+<li>Logout clears credentials client-side and server-side.</li>
+</ol>
+<h3 id="non-functional">Non-functional<a class="headerlink" href="#non-functional" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Stateless server-side (no in-memory session table) — JWT in HTTP-only cookie.</li>
+<li>Passwords stored as Argon2id hash. Never plaintext, never reversible.</li>
+<li>No third-party identity provider.</li>
+<li>No email service (SES/SMTP). No password reset flow.</li>
+<li>Works on the existing single-EC2 + single-RDS topology.</li>
+</ol>
+<hr />
+<h2 id="3-non-goals-v1">3. Non-Goals (v1)<a class="headerlink" href="#3-non-goals-v1" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Self-service signup or password change.</strong> Admin handles everything via SQL.</li>
+<li><strong>Email-based password reset.</strong></li>
+<li><strong>Email as login handle.</strong> Username only. (Trivial to swap later — see §15.)</li>
+<li><strong>Multi-tenancy in queries.</strong> <code>BT.RESULT</code> and <code>INST.PRODUCT</code> remain globally readable to any logged-in user. <code>USER_ID</code> is for audit only — row-level filtering comes in v2.</li>
+<li><strong>Roles / RBAC.</strong> All logged-in users have the same permissions.</li>
+<li><strong>OAuth / SSO / MFA.</strong></li>
+<li><strong>Per-user API quotas.</strong> Covered later in the queue design.</li>
+<li><strong>Per-username failed-login lockout.</strong> With manually-provisioned users and per-IP rate limiting at nginx, the surface is small enough not to warrant lockout state in the schema.</li>
+</ul>
+<hr />
+<h2 id="4-constraints-observations">4. Constraints &amp; Observations<a class="headerlink" href="#4-constraints-observations" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Backend is FastAPI (async, Pydantic v2). Frontend is React 19 + TanStack Query, served separately by Vite in dev and (in prod) by nginx.</li>
+<li><code>api/config.py</code> already has SSM/.env loader — JWT signing key fits there.</li>
+<li>Audit columns (<code>USER_ID TEXT</code>) exist on every table per <code>AGENTS.md</code>. Today they receive <code>"alfcheun"</code>. We just need to plumb a real value.</li>
+<li>All writes go through SPs (no direct DML). <strong>Login itself reads a user table — <code>SELECT</code> is allowed directly per project conventions.</strong> User provisioning runs as Liquibase changesets — that is the documented exception to the no-direct-DML rule.</li>
+<li>HTTPS is mandatory for cookie-based auth. Tier 1 deployment already plans nginx + Let's Encrypt; this doc assumes that's in place.</li>
+<li><strong>Uvicorn must bind to <code>127.0.0.1</code> only</strong> — never <code>0.0.0.0</code> — so cleartext credentials never travel outside the box without TLS.</li>
+<li><strong>All table writes go through stored procedures.</strong> The application DB role is granted <code>EXECUTE</code> on procedures and <code>SELECT</code> on tables — never <code>INSERT/UPDATE/DELETE</code> directly. This removes a class of compromise paths (SQL injection, leaked app credentials, future RBAC errors) and lets schema evolve without re-grant work.</li>
+</ul>
+<hr />
+<h2 id="5-proposed-architecture">5. Proposed Architecture<a class="headerlink" href="#5-proposed-architecture" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌─────────────┐   POST /api/v1/auth/login     ┌─────────────┐
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│  React SPA  │ ───────────────────────────► │  FastAPI    │
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│             │ ◄─── Set-Cookie: token=JWT── │             │
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│             │                              │  ▲          │
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│             │   GET /api/v1/backtest/...   │  │ verify   │
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│             │ ───── Cookie: token ──────► │  │ JWT      │
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│             │ ◄──── 200 / 401 ──────────── │             │
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>└─────────────┘                              └──┬──────────┘
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                                                │
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>                                                ▼
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>                                  ┌──────────────────────────┐
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>                                  │  CORE_ADMIN.APP_USER     │
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                                  │  (id, username, hash)    │
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>                                  └──────────────────────────┘
+</code></pre></div>
+<h3 id="51-trust-model">5.1 Trust model<a class="headerlink" href="#51-trust-model" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Single trust boundary</strong>: nginx terminates TLS, forwards to uvicorn over loopback. No service-to-service auth needed inside the box.</li>
+<li><strong>Cookie</strong>: <code>qs_token</code>, <code>HttpOnly</code>, <code>Secure</code> (when <code>COOKIE_SECURE=1</code> or <code>APP_ENV=prod</code>), <code>SameSite=lax</code> in HTTP dev / <code>SameSite=strict</code> once <code>Secure=True</code>, <code>Path=/api</code>. Lifetime 7 days; refresh on activity. Implementation: <code>api/auth/router.py</code> <code>_set_cookie()</code>.</li>
+<li><strong>Why dynamic <code>SameSite</code></strong>: pure HTTP dev needs <code>Lax</code> so the cookie survives navigation; HTTPS prod uses <code>Strict</code> so a malicious link cannot trigger an authenticated state-changing call to the trade API. Trade-off: a prod user clicking an external link to the app lands on <code>/login</code> even with a valid session and must navigate forward manually. Acceptable for an internal tool.</li>
+<li><strong>CSRF</strong>: not required while the SPA is same-origin and <code>SameSite=Strict</code> is enforced in prod. The deprecated <code>X-Requested-With: XMLHttpRequest</code> heuristic is <strong>not</strong> used. If the SPA ever moves to a different origin, switch to a double-submit CSRF token.</li>
+</ul>
+<h3 id="52-why-jwt-and-not-server-side-sessions">5.2 Why JWT and not server-side sessions<a class="headerlink" href="#52-why-jwt-and-not-server-side-sessions" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>JWT in cookie</th>
+<th>DB-backed session</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Server state</td>
+<td>None</td>
+<td>Session table + cleanup job</td>
+</tr>
+<tr>
+<td>Revocation</td>
+<td>Token version bump on user row</td>
+<td><code>DELETE</code> row</td>
+</tr>
+<tr>
+<td>Multi-instance</td>
+<td>Stateless, scales trivially</td>
+<td>Need shared session store</td>
+</tr>
+<tr>
+<td>Complexity</td>
+<td>Lower for v1</td>
+<td>Higher</td>
+</tr>
+</tbody>
+</table>
+<p>JWT wins for our scale. Immediate revocation comes from the <code>SESSION_GEN</code> column (bearer-token generation counter) embedded in the JWT — bumping it via a one-line <code>UPDATE</code> invalidates all outstanding tokens for that user.</p>
+<hr />
+<h2 id="6-data-model">6. Data Model<a class="headerlink" href="#6-data-model" title="Permanent link">&para;</a></h2>
+<h3 id="61-core_adminapp_user">6.1 <code>CORE_ADMIN.APP_USER</code><a class="headerlink" href="#61-core_adminapp_user" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>APP_USER_ID</code></td>
+<td><code>UUID</code> PK</td>
+<td>UUID v7.</td>
+</tr>
+<tr>
+<td><code>USERNAME</code></td>
+<td><code>TEXT NOT NULL UNIQUE</code></td>
+<td>Login handle. Lowercase enforced at app layer.</td>
+</tr>
+<tr>
+<td><code>PASSWORD_HASH</code></td>
+<td><code>TEXT NOT NULL</code></td>
+<td>Argon2id, encoded as PHC string.</td>
+</tr>
+<tr>
+<td><code>IS_ACTIVE_IND</code></td>
+<td><code>CHAR(1) NOT NULL</code></td>
+<td><code>Y</code>/<code>N</code>. Disable via <code>UPDATE</code>.</td>
+</tr>
+<tr>
+<td><code>SESSION_GEN</code></td>
+<td><code>INT NOT NULL</code></td>
+<td>Bearer-token generation counter. Bump to invalidate all outstanding JWTs (password change, deactivation, log-out-everywhere).</td>
+</tr>
+<tr>
+<td><code>LAST_LOGIN_AT</code></td>
+<td><code>TIMESTAMPTZ</code></td>
+<td>Updated on successful login (best-effort).</td>
+</tr>
+<tr>
+<td><code>CREATED_AT</code></td>
+<td><code>TIMESTAMPTZ</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>UPDATED_AT</code></td>
+<td><code>TIMESTAMPTZ</code></td>
+<td>Genuinely mutable (password change, last-login bump).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>7 application columns.</strong> No <code>USER_ID</code> audit column on this table — <code>APP_USER</code> <em>is</em> the user identity, so a self-referencing audit FK is circular. Audit of who created/modified a user is captured by <code>CORE_ADMIN.LOG_PROC_DETAIL</code> via the SP call. No <code>EMAIL</code>, no <code>ROLE</code>, no <code>FAILED_LOGIN_COUNT</code>, no <code>LOCKED_UNTIL</code>. Adding any of these later is a single Liquibase changeset.</p>
+<h3 id="62-existing-tables">6.2 Existing tables<a class="headerlink" href="#62-existing-tables" title="Permanent link">&para;</a></h3>
+<p>No schema changes elsewhere. The hardcoded <code>"alfcheun"</code> becomes the actual logged-in <code>USERNAME</code> flowing into every existing <code>USER_ID</code> audit column.</p>
+<hr />
+<h2 id="7-stored-procedures">7. Stored Procedures<a class="headerlink" href="#7-stored-procedures" title="Permanent link">&para;</a></h2>
+<p><strong>All writes go through SPs — no direct DML, ever.</strong> This is a deliberate design choice (see §4): the app DB role gets only <code>EXECUTE</code> on procedures and <code>SELECT</code> on tables. Admin operations call the same SPs from <code>psql</code> with <code>CALL</code>. No table-level write grants are ever issued.</p>
+<table>
+<thead>
+<tr>
+<th>SP</th>
+<th>Purpose</th>
+<th>Called by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CORE_ADMIN.SP_GET_APP_USER_BY_USERNAME</code></td>
+<td>Returns <code>APP_USER_ID, USERNAME, PASSWORD_HASH, IS_ACTIVE_IND, SESSION_GEN</code>.</td>
+<td>App (login)</td>
+</tr>
+<tr>
+<td><code>CORE_ADMIN.SP_GET_APP_USER_BY_ID</code></td>
+<td>Same fields, looked up by <code>APP_USER_ID</code>. Used by <code>require_user</code> for cookie verification.</td>
+<td>App (every protected request)</td>
+</tr>
+<tr>
+<td><code>CORE_ADMIN.SP_UPD_APP_USER_LAST_LOGIN</code></td>
+<td>Update <code>LAST_LOGIN_AT</code>. Fire-and-forget on every successful login.</td>
+<td>App</td>
+</tr>
+<tr>
+<td><code>CORE_ADMIN.SP_INS_APP_USER</code></td>
+<td>Insert a new user. Inputs: <code>IN_USERNAME</code>, <code>IN_PASSWORD_HASH</code>, <code>IN_USER_ID</code> (creator, for audit log only). Generates <code>APP_USER_ID</code> (UUID), defaults <code>IS_ACTIVE_IND='Y'</code>, <code>SESSION_GEN=1</code>.</td>
+<td>Admin</td>
+</tr>
+<tr>
+<td><code>CORE_ADMIN.SP_UPD_APP_USER_PASSWORD</code></td>
+<td>Set new <code>PASSWORD_HASH</code> and bump <code>SESSION_GEN</code>. Inputs: <code>IN_USERNAME</code>, <code>IN_PASSWORD_HASH</code>, <code>IN_USER_ID</code>.</td>
+<td>Admin</td>
+</tr>
+<tr>
+<td><code>CORE_ADMIN.SP_UPD_APP_USER_ACTIVE</code></td>
+<td>Set <code>IS_ACTIVE_IND</code> and bump <code>SESSION_GEN</code>. Inputs: <code>IN_USERNAME</code>, <code>IN_IS_ACTIVE_IND</code> (<code>Y</code>/<code>N</code>), <code>IN_USER_ID</code>.</td>
+<td>Admin</td>
+</tr>
+<tr>
+<td><code>CORE_ADMIN.SP_UPD_APP_USER_BUMP_TOKEN</code></td>
+<td>Bump <code>SESSION_GEN</code> only — force logout-everywhere without changing password (lost laptop). Inputs: <code>IN_USERNAME</code>, <code>IN_USER_ID</code>.</td>
+<td>Admin</td>
+</tr>
+</tbody>
+</table>
+<p>Six procedures total. Naming follows the existing project convention (<code>SP_GET_*</code>, <code>SP_INS_*</code>, <code>SP_UPD_*</code>).</p>
+<h3 id="71-admin-runbook-sp-only-operations">7.1 Admin runbook (SP-only operations)<a class="headerlink" href="#71-admin-runbook-sp-only-operations" title="Permanent link">&para;</a></h3>
+<p><strong>⚠️ Never paste a plaintext password into an online "Argon2 hash generator" website.</strong> Doing so leaks the password to whoever runs the site. Always hash locally with <code>scripts/hash_password.py</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Step 1: generate the hash locally (reads from stdin, never echoes the password)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>$<span class="w"> </span>python<span class="w"> </span>scripts/hash_password.py
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>Password:<span class="w"> </span>********<span class="w">                       </span><span class="c1"># not echoed</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nv">$argon2id$v</span><span class="o">=</span><span class="m">19</span><span class="nv">$m</span><span class="o">=</span><span class="m">65536</span>,t<span class="o">=</span><span class="m">3</span>,p<span class="o">=</span><span class="m">4</span>$...$...<span class="w">   </span><span class="c1"># paste this into the CALL below</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">-- Create a new user.</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">CALL</span><span class="w"> </span><span class="n">CORE_ADMIN</span><span class="p">.</span><span class="n">SP_INS_APP_USER</span><span class="p">(</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="n">IN_USERNAME</span><span class="w">       </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;newuser&#39;</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="n">IN_PASSWORD_HASH</span><span class="w">  </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;$argon2id$v=19$m=65536,t=3,p=4$...$...&#39;</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="n">IN_USER_ID</span><span class="w">        </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;alfcheun&#39;</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="p">);</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1">-- Change a user&#39;s password (also invalidates their sessions).</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="k">CALL</span><span class="w"> </span><span class="n">CORE_ADMIN</span><span class="p">.</span><span class="n">SP_UPD_APP_USER_PASSWORD</span><span class="p">(</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="n">IN_USERNAME</span><span class="w">       </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;someone&#39;</span><span class="p">,</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="n">IN_PASSWORD_HASH</span><span class="w">  </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;$argon2id$...&#39;</span><span class="p">,</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="n">IN_USER_ID</span><span class="w">        </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;alfcheun&#39;</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="p">);</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="c1">-- Deactivate / reactivate a user.</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="k">CALL</span><span class="w"> </span><span class="n">CORE_ADMIN</span><span class="p">.</span><span class="n">SP_UPD_APP_USER_ACTIVE</span><span class="p">(</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">    </span><span class="n">IN_USERNAME</span><span class="w">       </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;someone&#39;</span><span class="p">,</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">    </span><span class="n">IN_IS_ACTIVE_IND</span><span class="w">  </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;N&#39;</span><span class="p">,</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span><span class="n">IN_USER_ID</span><span class="w">        </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;alfcheun&#39;</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="p">);</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="c1">-- Force logout-everywhere without changing password.</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="k">CALL</span><span class="w"> </span><span class="n">CORE_ADMIN</span><span class="p">.</span><span class="n">SP_UPD_APP_USER_BUMP_TOKEN</span><span class="p">(</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">    </span><span class="n">IN_USERNAME</span><span class="w">       </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;someone&#39;</span><span class="p">,</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="w">    </span><span class="n">IN_USER_ID</span><span class="w">        </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;alfcheun&#39;</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="p">);</span>
+</code></pre></div>
+<p>The initial admin user is seeded via a Liquibase changeset that calls <code>SP_INS_APP_USER</code> (not raw <code>INSERT</code>) so the same access path is used everywhere.</p>
+<h3 id="72-postgres-roles-vs-application-users-two-identity-layers">7.2 Postgres roles vs application users — two identity layers<a class="headerlink" href="#72-postgres-roles-vs-application-users-two-identity-layers" title="Permanent link">&para;</a></h3>
+<p>There are <strong>two completely separate identity layers</strong>. They are intentionally not 1:1.</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Lives in</th>
+<th>Examples</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Postgres login user</strong></td>
+<td><code>pg_roles</code></td>
+<td><code>quant_app</code>, <code>quant_admin</code></td>
+<td>Authenticates the <em>process</em> (FastAPI / <code>psql</code>) to Postgres. Holds all <code>GRANT</code>s.</td>
+</tr>
+<tr>
+<td><strong>Application user</strong></td>
+<td><code>CORE_ADMIN.APP_USER</code></td>
+<td>one row per human</td>
+<td>Authenticates the <em>human</em> to FastAPI. Drives JWT claims and the <code>USER_ID</code> audit column on every table.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The FastAPI connection pool always logs in as <code>quant_app</code>.</strong> The per-request human identity is carried separately as the <code>IN_USER_ID</code> parameter into every SP call. One Postgres handshake per pooled connection; no per-user reconnect cost.</p>
+<p>Adding a new human = <code>CALL CORE_ADMIN.SP_INS_APP_USER(...)</code>. <strong>No <code>CREATE ROLE</code>, no GRANT changes, no app restart, ever.</strong> That dynamism is the reason we route everything through SPs (§4).</p>
+<h3 id="73-postgres-login-users">7.3 Postgres login users<a class="headerlink" href="#73-postgres-login-users" title="Permanent link">&para;</a></h3>
+<p>Two login users — one for the app, one for the admin. Grants are issued directly to them. Group roles can be introduced later if a third login user appears (e.g. <code>quant_worker</code> for batch jobs).</p>
+<table>
+<thead>
+<tr>
+<th>User</th>
+<th>Type</th>
+<th>Created by</th>
+<th>Used by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>quant_app</code></td>
+<td>LOGIN</td>
+<td><strong>manually</strong> (DBeaver/<code>psql</code>)</td>
+<td>FastAPI process (password stored only in SSM)</td>
+</tr>
+<tr>
+<td><code>quant_admin</code></td>
+<td>LOGIN</td>
+<td><strong>pre-existing</strong> — not created here</td>
+<td>The human admin via <code>psql</code></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">-- Provisioned manually (DBeaver / psql) so the password never lands in any</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1">-- automation or env var:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">ROLE</span><span class="w"> </span><span class="n">quant_app</span><span class="w"> </span><span class="n">LOGIN</span><span class="w"> </span><span class="n">PASSWORD</span><span class="w"> </span><span class="s1">&#39;&lt;typed-at-the-prompt&gt;&#39;</span><span class="p">;</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1">-- quant_admin already exists; only its grants are managed here.</span>
+</code></pre></div>
+<p>Neither user is <code>SUPERUSER</code>, <code>CREATEROLE</code>, or <code>CREATEDB</code>. The Liquibase deploy itself runs as the cluster master — only that role can issue GRANTs and create extensions. The runtime app <strong>never</strong> uses the master.</p>
+<blockquote>
+<p><strong>Why manual provisioning?</strong> Putting the password into a Liquibase property (even one fed from SSM at deploy time) means the secret transits an env var on the deploy host. Provisioning roles by hand keeps the password on exactly two surfaces: the DBA's keystroke and SSM (where the app reads it).</p>
+</blockquote>
+<h3 id="74-grants">7.4 Grants<a class="headerlink" href="#74-grants" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">-- ===== quant_app (the FastAPI process) =====</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1">-- Strict policy: USAGE on schemas + EXECUTE on app-facing procs.</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1">-- NO direct table access (no SELECT/INSERT/UPDATE/DELETE) and NO</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1">-- ALTER DEFAULT PRIVILEGES entries. Every read AND write goes through a</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1">-- stored procedure.</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">USAGE</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">SCHEMA</span><span class="w"> </span><span class="n">CORE_ADMIN</span><span class="p">,</span><span class="w"> </span><span class="n">REFDATA</span><span class="p">,</span><span class="w"> </span><span class="n">BT</span><span class="p">,</span><span class="w"> </span><span class="n">INST</span><span class="p">,</span><span class="w"> </span><span class="n">TRADE</span><span class="w"> </span><span class="k">TO</span><span class="w"> </span><span class="n">quant_app</span><span class="p">;</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1">-- EXECUTE on app-facing procs (the two auth SPs + every business SP).</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">EXECUTE</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">PROCEDURE</span><span class="w"> </span><span class="n">CORE_ADMIN</span><span class="p">.</span><span class="n">SP_GET_APP_USER_BY_USERNAME</span><span class="p">(</span><span class="nb">TEXT</span><span class="p">,</span><span class="w"> </span><span class="p">...)</span><span class="w"> </span><span class="k">TO</span><span class="w"> </span><span class="n">quant_app</span><span class="p">;</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">EXECUTE</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">PROCEDURE</span><span class="w"> </span><span class="n">CORE_ADMIN</span><span class="p">.</span><span class="n">SP_UPD_APP_USER_LAST_LOGIN</span><span class="p">(</span><span class="n">UUID</span><span class="p">,</span><span class="w"> </span><span class="p">...)</span><span class="w">  </span><span class="k">TO</span><span class="w"> </span><span class="n">quant_app</span><span class="p">;</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">EXECUTE</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">ALL</span><span class="w"> </span><span class="n">ROUTINES</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="k">SCHEMA</span><span class="w"> </span><span class="n">BT</span><span class="p">,</span><span class="w"> </span><span class="n">INST</span><span class="p">,</span><span class="w"> </span><span class="n">TRADE</span><span class="p">,</span><span class="w"> </span><span class="n">REFDATA</span><span class="w"> </span><span class="k">TO</span><span class="w"> </span><span class="n">quant_app</span><span class="p">;</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="c1">-- Explicitly NOT granted: the four admin SPs in CORE_ADMIN</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="c1">-- (SP_INS_APP_USER, SP_UPD_APP_USER_PASSWORD, SP_UPD_APP_USER_ACTIVE,</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="c1">--  SP_UPD_APP_USER_BUMP_TOKEN). A compromised quant_app process cannot</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="c1">-- create users or change passwords.</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="c1">-- ===== quant_admin (the human admin via psql) =====</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">USAGE</span><span class="w">   </span><span class="k">ON</span><span class="w"> </span><span class="k">SCHEMA</span><span class="w"> </span><span class="n">CORE_ADMIN</span><span class="w">              </span><span class="k">TO</span><span class="w"> </span><span class="n">quant_admin</span><span class="p">;</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">SELECT</span><span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">CORE_ADMIN</span><span class="p">.</span><span class="n">APP_USER</span><span class="w">            </span><span class="k">TO</span><span class="w"> </span><span class="n">quant_admin</span><span class="p">;</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">EXECUTE</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">PROCEDURE</span><span class="w"> </span><span class="n">CORE_ADMIN</span><span class="p">.</span><span class="n">SP_INS_APP_USER</span><span class="p">(</span><span class="nb">TEXT</span><span class="p">,</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span><span class="w"> </span><span class="p">...)</span><span class="w">             </span><span class="k">TO</span><span class="w"> </span><span class="n">quant_admin</span><span class="p">;</span>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">EXECUTE</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">PROCEDURE</span><span class="w"> </span><span class="n">CORE_ADMIN</span><span class="p">.</span><span class="n">SP_UPD_APP_USER_PASSWORD</span><span class="p">(</span><span class="nb">TEXT</span><span class="p">,</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span><span class="w"> </span><span class="p">...)</span><span class="w">    </span><span class="k">TO</span><span class="w"> </span><span class="n">quant_admin</span><span class="p">;</span>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">EXECUTE</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">PROCEDURE</span><span class="w"> </span><span class="n">CORE_ADMIN</span><span class="p">.</span><span class="n">SP_UPD_APP_USER_ACTIVE</span><span class="p">(</span><span class="nb">TEXT</span><span class="p">,</span><span class="w"> </span><span class="nb">CHAR</span><span class="p">,</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span><span class="w"> </span><span class="p">...)</span><span class="w">      </span><span class="k">TO</span><span class="w"> </span><span class="n">quant_admin</span><span class="p">;</span>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">EXECUTE</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">PROCEDURE</span><span class="w"> </span><span class="n">CORE_ADMIN</span><span class="p">.</span><span class="n">SP_UPD_APP_USER_BUMP_TOKEN</span><span class="p">(</span><span class="nb">TEXT</span><span class="p">,</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span><span class="w"> </span><span class="p">...)</span><span class="w">        </span><span class="k">TO</span><span class="w"> </span><span class="n">quant_admin</span><span class="p">;</span>
+</code></pre></div>
+<p><code>quant_app</code> cannot <code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, or <code>DELETE</code> any table directly — every read and every write flows through an <code>SP_*</code> procedure that runs <code>SECURITY DEFINER</code> (or whose owner has the needed privileges). A compromised app process cannot exfiltrate raw rows, create users, or change passwords; it can only invoke the procs we have explicitly defined.</p>
+<blockquote>
+<p><strong>Migration impact</strong>: existing code that does direct <code>SELECT</code> against tables (e.g. <code>RefDataCache</code>, instrument lookups, backtest result reads) must be replaced with <code>SP_GET_*</code> procedures before the new grants take effect. Track in repo <code>TODO.md</code>.</p>
+<p><strong>Future</strong>: when a third login user is needed (e.g. <code>quant_worker</code>), refactor into NOLOGIN group roles (<code>quant_app_role</code>, <code>quant_admin_role</code>) and grant them to the login users. Deferred until justified.</p>
+</blockquote>
+<h3 id="75-optional-postgres-side-audit-context">7.5 Optional: Postgres-side audit context<a class="headerlink" href="#75-optional-postgres-side-audit-context" title="Permanent link">&para;</a></h3>
+<p>The <code>USER_ID</code> column on every table already records the human (set by the SP from <code>IN_USER_ID</code>). If Postgres triggers, RLS, or <code>pg_stat_activity</code> ever need to see the human directly, set a session GUC at connection checkout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Pool&#39;s post-acquire hook</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">async</span> <span class="k">with</span> <span class="n">pool</span><span class="o">.</span><span class="n">connection</span><span class="p">()</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SET LOCAL app.user_id = </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">user</span><span class="o">.</span><span class="n">username</span><span class="p">,))</span>
+</code></pre></div>
+<p>Then any SP/trigger can read <code>current_setting('app.user_id', true)</code>. <strong>Skip for v1</strong> — add only when there's a concrete need. The GRANT model is unchanged either way.</p>
+<hr />
+<h2 id="8-api-design">8. API Design<a class="headerlink" href="#8-api-design" title="Permanent link">&para;</a></h2>
+<h3 id="81-new-endpoints">8.1 New endpoints<a class="headerlink" href="#81-new-endpoints" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/auth/login</code></td>
+<td>none</td>
+<td>Body <code>{username, password}</code>. On success, sets <code>qs_token</code> cookie and returns <code>{username}</code>.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/auth/logout</code></td>
+<td>required</td>
+<td>Clears cookie (<code>Set-Cookie: qs_token=; Max-Age=0</code>).</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/auth/me</code></td>
+<td>required</td>
+<td>Returns <code>{username}</code>. Used by SPA on page load to detect existing session.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Three endpoints.</strong> No <code>/auth/change-password</code>, no <code>/admin/users</code>.</p>
+<h3 id="82-existing-endpoints">8.2 Existing endpoints<a class="headerlink" href="#82-existing-endpoints" title="Permanent link">&para;</a></h3>
+<p>Every router under <code>/api/v1/*</code> (except <code>/auth/*</code> and <code>/health</code>) gains a <code>Depends(require_user)</code> dependency. The dependency:
+1. Reads <code>qs_token</code> cookie.
+2. Decodes + verifies JWT (signature, <code>exp</code>, <code>iss</code>).
+3. Looks up the user (cached briefly, see §10) — verifies <code>IS_ACTIVE_IND='Y'</code> and <code>SESSION_GEN</code> matches the JWT claim.
+4. Returns a <code>CurrentUser</code> dataclass (<code>username</code>, <code>app_user_id</code>).
+5. On any failure → <code>401 Unauthorized</code>.</p>
+<p>Routers that previously hardcoded <code>user_id="alfcheun"</code> switch to:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nd">@router</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/run&quot;</span><span class="p">)</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">run_backtest</span><span class="p">(</span><span class="n">cfg</span><span class="p">:</span> <span class="n">BacktestConfig</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">CurrentUser</span> <span class="o">=</span> <span class="n">Depends</span><span class="p">(</span><span class="n">require_user</span><span class="p">)):</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">cache</span> <span class="o">=</span> <span class="n">BacktestCache</span><span class="p">(</span><span class="n">conninfo</span><span class="p">,</span> <span class="n">refdata</span><span class="p">,</span> <span class="n">user_id</span><span class="o">=</span><span class="n">user</span><span class="o">.</span><span class="n">username</span><span class="p">)</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="o">...</span>
+</code></pre></div>
+<p>The default value <code>user_id="alfcheun"</code> in <code>src/db.py</code> and <code>src/data.py</code> is <strong>removed entirely</strong> (the parameter becomes required). No backward compat per <code>AGENTS.md</code>.</p>
+<h3 id="83-jwt-shape">8.3 JWT shape<a class="headerlink" href="#83-jwt-shape" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">&quot;sub&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;01957a...e3b1&quot;</span><span class="p">,</span><span class="w">        </span><span class="c1">// APP_USER_ID (UUID, opaque — not the username)</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">&quot;ver&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w">                       </span><span class="c1">// SESSION_GEN at issue time</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">&quot;iat&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1735689600</span><span class="p">,</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">&quot;exp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1736294400</span><span class="p">,</span><span class="w">              </span><span class="c1">// 7 days</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">&quot;iss&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;quant-strategies&quot;</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="p">}</span>
+</code></pre></div>
+<p>Signed with HS256, key from <code>JWT_SECRET</code> env var (added to SSM <code>/quant/prod/JWT_SECRET</code>, generated with <code>openssl rand -base64 32</code>). In dev mode (<code>APP_ENV</code> unset or <code>dev</code>), the API auto-generates a random secret when <code>JWT_SECRET</code> is absent — sessions won't survive restarts but new developers can run the API immediately. Production (<code>APP_ENV=prod</code>) requires an explicit secret and fails fast without one. Rotation = generate a new key, restart — all tokens invalidate.</p>
+<p>Username is <strong>not</strong> in the token. The <code>require_user</code> dependency resolves <code>app_user_id → username</code> from the cached lookup. This means renaming a user later doesn't invalidate their session.</p>
+<h3 id="84-pydantic-input-validation">8.4 Pydantic input validation<a class="headerlink" href="#84-pydantic-input-validation" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">LoginRequest</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">username</span><span class="p">:</span> <span class="n">constr</span><span class="p">(</span><span class="n">min_length</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span> <span class="n">strip_whitespace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">to_lower</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">password</span><span class="p">:</span> <span class="n">constr</span><span class="p">(</span><span class="n">min_length</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
+</code></pre></div>
+<p>Hard upper bounds prevent a 100 MB POST from triggering Argon2 on giant input — cheap DoS guard.</p>
+<hr />
+<h2 id="9-frontend-design">9. Frontend Design<a class="headerlink" href="#9-frontend-design" title="Permanent link">&para;</a></h2>
+<h3 id="91-route-guard">9.1 Route guard<a class="headerlink" href="#91-route-guard" title="Permanent link">&para;</a></h3>
+<p><code>App.tsx</code> uses <code>react-router-dom</code> <code>BrowserRouter</code> with two route wrappers:</p>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Wrapper</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/login</code></td>
+<td><code>GuestOnly</code></td>
+<td>Shows <code>LoginPage</code>. If already authenticated, redirects to <code>/</code> (or the page the user came from via <code>location.state.from</code>).</td>
+</tr>
+<tr>
+<td><code>/</code></td>
+<td><code>RequireAuth</code></td>
+<td>Shows <code>BacktestPage</code>. If not authenticated, redirects to <code>/login</code> (preserving the original URL in <code>state.from</code>).</td>
+</tr>
+<tr>
+<td><code>/*</code></td>
+<td>—</td>
+<td>Catch-all redirects to <code>/</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Both wrappers call <code>useMe()</code> (<code>GET /api/v1/auth/me</code> via TanStack Query) and show a full-page spinner while the check is in-flight.</p>
+<h3 id="92-login-page">9.2 Login page<a class="headerlink" href="#92-login-page" title="Permanent link">&para;</a></h3>
+<p><code>/login</code> — single screen, no app chrome.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>┌─────────────────────────────────┐
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>│  Quant Strategies               │
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>│                                 │
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>│  Username  [_____________]      │
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>│  Password  [_____________]      │
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>│                                 │
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>│  [   Sign in   ]                │
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>│                                 │
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>│  Invalid username or password.  │  ← inline error, no enumeration
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>└─────────────────────────────────┘
+</code></pre></div>
+<ul>
+<li>MUI <code>&lt;Card&gt;</code> centered, <code>maxWidth: 400</code>.</li>
+<li>On submit → <code>POST /api/v1/auth/login</code> → on 200, set <code>auth/me</code> query data, <code>navigate()</code> to <code>/</code> (or the page that triggered the auth redirect).</li>
+<li>Error states: 401 → "Invalid username or password" (single message, <strong>never</strong> distinguishes "no such user" vs "wrong password").</li>
+<li>Loading state: button disabled + spinner.</li>
+<li>No "Forgot password?" link — the page shows a static line: <em>"Forgot password? Contact your administrator."</em></li>
+</ul>
+<h3 id="93-logout">9.3 Logout<a class="headerlink" href="#93-logout" title="Permanent link">&para;</a></h3>
+<p>Header gains a user menu (top-right):
+- Shows username.
+- "Sign out" → <code>POST /api/v1/auth/logout</code> → clear local query cache → <code>navigate('/login', { replace: true })</code>.</p>
+<p>(No "Change password…" item — admin handles it.)</p>
+<h3 id="94-axios-interceptor">9.4 Axios interceptor<a class="headerlink" href="#94-axios-interceptor" title="Permanent link">&para;</a></h3>
+<p>Global response interceptor: on <code>401</code>, evict <code>auth/me</code> query data and call <code>window.location.replace('/login')</code>. Because the interceptor runs outside React (in the Axios layer), it uses the browser's History API directly rather than React Router's <code>navigate()</code>. This handles tokens that expire mid-session — the user is immediately bounced to the login page.</p>
+<hr />
+<h2 id="10-performance-caching">10. Performance &amp; Caching<a class="headerlink" href="#10-performance-caching" title="Permanent link">&para;</a></h2>
+<ul>
+<li>JWT verification is local (HMAC) — sub-millisecond. No DB hit per request.</li>
+<li>The <code>SESSION_GEN + IS_ACTIVE_IND</code> check would add a DB round-trip per request. Mitigation: in-process LRU cache keyed by <code>app_user_id</code> with <strong>5 s TTL</strong>. Worst-case revocation latency: 5 s after the admin runs the <code>UPDATE</code>. Acceptable.</li>
+<li>Argon2id verification on login: ~100 ms (intentional). Login is rare; no concern.</li>
+<li>Concurrency cap on <code>/auth/login</code> (e.g. semaphore of 4) prevents a burst of logins from OOMing the box on Argon2's 64 MB-per-call memory.</li>
+</ul>
+<hr />
+<h2 id="11-failure-handling">11. Failure Handling<a class="headerlink" href="#11-failure-handling" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Invalid credentials</td>
+<td><code>401</code>, generic message. Always run Argon2 verify against a precomputed dummy hash even if the user doesn't exist (timing-attack hardening — see §11.1).</td>
+</tr>
+<tr>
+<td>User deactivated</td>
+<td>Next request → cache miss or refresh → <code>401</code>, redirect to <code>/login</code>. Worst-case latency 5 s.</td>
+</tr>
+<tr>
+<td><code>JWT_SECRET</code> rotated / auto-generated</td>
+<td>All users logged out on next request (dev mode: every restart).</td>
+</tr>
+<tr>
+<td>DB unreachable during login</td>
+<td><code>503</code>. SPA shows "Service unavailable, retry".</td>
+</tr>
+<tr>
+<td>DB unreachable during request</td>
+<td>The 5 s cache means requests within the window still succeed; afterwards <code>503</code>.</td>
+</tr>
+<tr>
+<td>Brute force on <code>/auth/login</code></td>
+<td><strong>Layered rate limit</strong>: see §11.2.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="112-rate-limiting-defense-in-depth">11.2 Rate limiting (defense in depth)<a class="headerlink" href="#112-rate-limiting-defense-in-depth" title="Permanent link">&para;</a></h3>
+<p>Rate limiting is layered so that no single layer is a single point of failure (e.g. nginx misconfig in dev, direct uvicorn in tests):</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Tool</th>
+<th>Rule</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Outer (network)</td>
+<td>nginx <code>limit_req_zone</code></td>
+<td>10 req/min per IP, burst 5, <code>/api/v1/auth/login</code> only</td>
+<td>Cheap — rejects before reaching Python. Protects against IP-pinned floods.</td>
+</tr>
+<tr>
+<td>Inner (app)</td>
+<td><code>slowapi</code> (FastAPI middleware)</td>
+<td>5 attempts / 15 min per IP on <code>/auth/login</code></td>
+<td>Works in dev / tests / direct-uvicorn. Per-route, easy to tune.</td>
+</tr>
+</tbody>
+</table>
+<p>Both fire <code>429 Too Many Requests</code>. The SPA shows: <em>"Too many login attempts. Try again in a few minutes."</em></p>
+<p>Neither layer locks the <strong>account</strong> (no DB state is mutated) — that requires the <code>FAILED_LOGIN_COUNT</code> / <code>LOCKED_UNTIL</code> columns deferred to Phase 3. With manually-provisioned users on a private deployment, IP-based throttle is sufficient.</p>
+<h3 id="111-timing-attack-hardening-concrete-pattern">11.1 Timing-attack hardening (concrete pattern)<a class="headerlink" href="#111-timing-attack-hardening-concrete-pattern" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># api/auth/service.py</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">DUMMY_HASH</span> <span class="o">=</span> <span class="n">PasswordHasher</span><span class="p">()</span><span class="o">.</span><span class="n">hash</span><span class="p">(</span><span class="s2">&quot;not-a-real-password-xyz&quot;</span><span class="p">)</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">verify_credentials</span><span class="p">(</span><span class="n">username</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">password</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AppUser</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">user</span> <span class="o">=</span> <span class="n">repo</span><span class="o">.</span><span class="n">get_app_user_by_username</span><span class="p">(</span><span class="n">username</span><span class="p">)</span>  <span class="c1"># may be None</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">hash_to_verify</span> <span class="o">=</span> <span class="n">user</span><span class="o">.</span><span class="n">password_hash</span> <span class="k">if</span> <span class="n">user</span> <span class="k">else</span> <span class="n">DUMMY_HASH</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>        <span class="n">ph</span><span class="o">.</span><span class="n">verify</span><span class="p">(</span><span class="n">hash_to_verify</span><span class="p">,</span> <span class="n">password</span><span class="p">)</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="k">except</span> <span class="n">VerifyMismatchError</span><span class="p">:</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>        <span class="k">return</span> <span class="kc">None</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>    <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">user</span><span class="o">.</span><span class="n">is_active_ind</span> <span class="o">!=</span> <span class="s2">&quot;Y&quot;</span><span class="p">:</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>        <span class="k">return</span> <span class="kc">None</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>    <span class="k">return</span> <span class="n">user</span>
+</code></pre></div>
+<p>Both branches do the same Argon2 work, so <code>/auth/login</code> has the same latency profile whether or not the username exists.</p>
+<hr />
+<h2 id="12-security-checklist">12. Security Checklist<a class="headerlink" href="#12-security-checklist" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] Passwords hashed with Argon2id (<code>argon2-cffi</code>), default <code>memory_cost=65536, time_cost=3, parallelism=4</code>.</li>
+<li>[x] Password hashes generated <strong>only</strong> via <code>scripts/hash_password.py</code> running locally — never via online tools.</li>
+<li>[x] Cookies <code>HttpOnly + Secure + SameSite=Strict + Path=/api</code> in prod; <code>Lax</code> (no <code>Secure</code>) in HTTP dev. See <code>api/auth/router.py</code> <code>_set_cookie()</code>.</li>
+<li>[x] HTTPS enforced at nginx (HSTS header).</li>
+<li>[x] Uvicorn binds to <code>127.0.0.1</code> only — never accept TLS-stripped traffic.</li>
+<li>[x] JWT signed (HS256) with secret from SSM, never committed.</li>
+<li>[x] <code>JWT_SECRET</code> is read at process start via the EC2 instance role from SSM SecureString. Never written to a <code>.env</code> file in production.</li>
+<li>[x] <code>JWT_SECRET</code> ≥ 32 random bytes (generated with <code>openssl rand -base64 32</code>).</li>
+<li>[x] Pydantic <code>max_length</code> bounds on <code>LoginRequest</code> to cap payload size.</li>
+<li>[x] Generic login error message (no user enumeration).</li>
+<li>[x] Constant-time verify path even when user does not exist (§11.1).</li>
+<li>[x] Layered rate limit on <code>/auth/login</code>: nginx + <code>slowapi</code> (§11.2).</li>
+<li>[x] Session revocation via <code>SESSION_GEN</code> bump (admin SP, see §7.1).</li>
+<li>[x] Logout clears cookie via <code>Set-Cookie: qs_token=; Max-Age=0; HttpOnly; Secure; SameSite=Strict; Path=/api</code>.</li>
+<li>[x] No CORS wildcard. <code>CORS_ORIGINS</code> is exact list of allowed frontends.</li>
+<li>[x] Disable Swagger UI (<code>/api/docs</code>) in prod via <code>app = FastAPI(docs_url=None, redoc_url=None)</code> when <code>APP_ENV=prod</code>.</li>
+<li>[x] CSP header from nginx (<code>default-src 'self'</code>) to mitigate XSS-driven cookie abuse.</li>
+<li>[x] On successful login, call <code>PasswordHasher.check_needs_rehash()</code> — if true, recompute hash and call <code>SP_UPD_APP_USER_PASSWORD</code>. Cheap forward-compat for parameter bumps.</li>
+<li>[x] App DB login (<code>quant_app</code>) has only <code>USAGE</code> on schemas + <code>EXECUTE</code> on app-facing procs (§7.4). <strong>No <code>SELECT</code> or any other table privilege — every read and write goes through an SP.</strong> Admin SPs require <code>quant_admin</code>, used only via <code>psql</code>. Cluster master is never used by the runtime app.</li>
+</ul>
+<hr />
+<h2 id="13-migration-plan">13. Migration Plan<a class="headerlink" href="#13-migration-plan" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Provision login users manually</strong> (one-time, via DBeaver/<code>psql</code> as cluster master): <code>CREATE ROLE quant_app LOGIN PASSWORD '...'</code>. Verify pre-existing <code>quant_admin</code> is present. Passwords are typed at the prompt and immediately mirrored into SSM — they never enter Liquibase or any deploy env var.</li>
+<li><strong>Liquibase changeset</strong> <code>030-core-admin-app-user</code> creates <code>CORE_ADMIN.APP_USER</code> table.</li>
+<li><strong>Liquibase changesets</strong> for the 6 SPs (§7) — one changeset per SP, <code>runOnChange="true"</code>, <code>context="proc"</code>.</li>
+<li><strong>Liquibase changeset</strong> <code>099-core-admin-grants</code> issues all GRANTs directly to <code>quant_app</code> and <code>quant_admin</code> (§7.4), <code>context="grant"</code>, <code>runOnChange="true"</code> so future procs/tables get re-granted on each deploy.</li>
+<li><strong>SSM</strong>: change <code>/quant/prod/QUANTDB_USERNAME</code> from <code>postgres</code> → <code>quant_app</code> and rotate <code>/quant/prod/QUANTDB_PASSWORD</code> to <code>quant_app</code>'s password.</li>
+<li><strong>Seed admin user</strong> via a Liquibase changeset that calls <code>SP_INS_APP_USER</code> (context <code>dev</code> only). Prod runs the <code>CALL</code> manually as <code>quant_admin</code> after generating a fresh hash with the helper script. <strong>Prod password is never committed.</strong></li>
+<li><strong>Helper script</strong> <code>scripts/hash_password.py</code> — reads password from stdin (no echo, via <code>getpass</code>), prints Argon2id PHC string. Doc warns against online hash generators.</li>
+<li><strong>Add <code>JWT_SECRET</code></strong> to <code>/quant/prod/JWT_SECRET</code> (SSM SecureString, 32 random bytes base64). EC2 instance role reads it at process start; not written to <code>.env</code> in prod. In dev mode, <code>JWT_SECRET</code> is auto-generated if absent (see <code>_resolve_jwt_secret</code> in <code>api/auth/service.py</code>).</li>
+<li><strong>Backend</strong>: add <code>api/auth/</code> module (login router, JWT helpers, <code>require_user</code> dep, repo, service). Add <code>argon2-cffi</code>, <code>pyjwt[cryptography]</code>, <code>slowapi</code> to <code>requirements.txt</code>.</li>
+<li><strong>Wire <code>Depends(require_user)</code></strong> into existing routers. Replace every <code>user_id="alfcheun"</code> with <code>user.username</code>. Remove the <code>="alfcheun"</code> default in <code>src/db.py</code> and <code>src/data.py</code> — parameter becomes required.</li>
+<li><strong>Frontend</strong>: add <code>/login</code> route + <code>&lt;App&gt;</code> mount-time <code>me</code> check + axios 401 interceptor + user menu.</li>
+<li><strong>Tests</strong>: unit tests for JWT encode/decode + Argon2 verify (incl. dummy-hash branch) + each admin SP; integration test for login → protected endpoint → logout flow.</li>
+<li><strong>Docs</strong>: update repo <code>README.md</code> auth section, <a href="../../architecture/api/">API Reference</a> endpoint list, <a href="../../env-vars/">Environment Variables</a> (<code>JWT_SECRET</code>), <a href="../../decisions/">Decisions Log</a> decision #27, repo <code>scripts/README.md</code> for the hash helper.</li>
+</ol>
+<hr />
+<h2 id="14-phased-plan">14. Phased Plan<a class="headerlink" href="#14-phased-plan" title="Permanent link">&para;</a></h2>
+<h3 id="phase-1-auth-in-place-this-doc">Phase 1 — Auth in place (this doc)<a class="headerlink" href="#phase-1-auth-in-place-this-doc" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>APP_USER</code> table, login/logout/me endpoints, route guard, manually-provisioned users.</li>
+<li>All authenticated users have full access (no row filtering).</li>
+</ul>
+<h3 id="phase-2-multi-user-isolation">Phase 2 — Multi-user isolation<a class="headerlink" href="#phase-2-multi-user-isolation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add <code>USER_ID</code> filter to BT/INST read queries.</li>
+<li>Per-user <code>BT.RESULT</code> lists in the SPA.</li>
+<li>Add <code>ROLE</code> column; admin user can see everyone's runs.</li>
+</ul>
+<h3 id="phase-3-self-service-richer-auth">Phase 3 — Self-service &amp; richer auth<a class="headerlink" href="#phase-3-self-service-richer-auth" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>EMAIL</code> column + email-as-login-handle.</li>
+<li><code>POST /auth/change-password</code> endpoint + UI modal.</li>
+<li>Admin user-management endpoints (<code>POST /admin/users</code>, etc.).</li>
+<li>Per-username failed-login lockout (<code>FAILED_LOGIN_COUNT</code>, <code>LOCKED_UNTIL</code>).</li>
+<li><code>AUTH_EVENT</code> audit table.</li>
+<li>Eventually: SES + password reset by signed link, OAuth (Google), API keys, MFA (TOTP).</li>
+</ul>
+<hr />
+<h2 id="15-future-proofing-notes">15. Future-proofing notes<a class="headerlink" href="#15-future-proofing-notes" title="Permanent link">&para;</a></h2>
+<p>These shape Phase 1 choices to avoid painful rewrites later:</p>
+<ul>
+<li><strong>JWT <code>sub</code> is <code>APP_USER_ID</code> (UUID), not <code>username</code>.</strong> Renaming a user later does not invalidate their session.</li>
+<li><strong>Adding <code>EMAIL</code> later is a single Liquibase changeset</strong> + <code>SP_GET_APP_USER_BY_EMAIL</code> + a frontend label change. The login service abstraction (§11.1) doesn't care which column it queries.</li>
+<li><strong>Adding <code>ROLE</code> later</strong>: single ALTER TABLE + add to JWT claims + update <code>require_user</code> to expose it on <code>CurrentUser</code>.</li>
+<li><strong>Adding admin endpoints later</strong>: introduce <code>SP_INS_APP_USER</code>, <code>SP_UPD_APP_USER_PASSWORD</code> then. Don't pre-build them now — they'd be untested dead code.</li>
+</ul>
+<hr />
+<h2 id="16-open-questions">16. Open Questions<a class="headerlink" href="#16-open-questions" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Cookie <code>Path=/api</code> vs <code>Path=/</code>?</strong> <code>/api</code> keeps the cookie off static asset requests (smaller header, less log noise). Recommended.</li>
+<li><strong>Should <code>LAST_LOGIN_AT</code> update be fire-and-forget?</strong> Yes — wrap in <code>BackgroundTasks</code> so login latency stays under 150 ms.</li>
+<li><strong>Where does the user menu live?</strong> Header right side, next to existing controls.</li>
+<li><strong>Confirm uvicorn bind address.</strong> The <code>appctl</code> script must launch with <code>--host 127.0.0.1</code>. Verify before going live.</li>
+<li><strong>CSRF tokens on <code>/trade/*</code> writes when those land?</strong> With <code>SameSite=Strict</code> already in place, additional CSRF tokens on trade endpoints are belt-and-braces. Decide when designing the trade router.</li>
+</ol>
+<hr />
+<h2 id="17-recommendation">17. Recommendation<a class="headerlink" href="#17-recommendation" title="Permanent link">&para;</a></h2>
+<p>Build Phase 1 as specified. It's small (~1 backend module, 1 frontend page, 1 table, 2 SPs, 1 helper script) and unblocks <strong>all</strong> public-hosting work in the deployment ladder. Defer Phases 2–3 until there's a real second user or a real need.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
