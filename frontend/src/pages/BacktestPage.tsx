@@ -14,9 +14,10 @@ import { runOptimizeStream, runPerformance } from '../api/backtest';
 import type { CurrentUser } from '../api/auth';
 import type {
   BacktestConfig, OptimizeResponse, PerformanceResponse, Top10Row,
-  OptimizeRequest, PerformanceRequest, WalkForwardResponse,
-  OptimizeProgress,
+  WalkForwardResponse, OptimizeProgress,
 } from '../types/backtest';
+import { effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest } from '../utils/requestBuilders';
+import { overfitColor, overfitLabel, formatMetric, rowLabel } from '../utils/format';
 
 const DEFAULT_CONFIG: BacktestConfig = {
   symbol: 'btcusdt.crypto',
@@ -48,81 +49,6 @@ const DEFAULT_CONFIG: BacktestConfig = {
   splitRatio: 0.5,
   refreshDataset: false,
 };
-
-/** vendorSymbol takes priority; falls back to product cusip */
-const effectiveSymbol = (cfg: BacktestConfig) => cfg.vendorSymbol || cfg.symbol;
-
-function buildOptimizeRequest(cfg: BacktestConfig): OptimizeRequest {
-  const f0 = cfg.factors[0];
-  const ds = cfg.dataSource || undefined;
-  const base = {
-    symbol: effectiveSymbol(cfg), start: cfg.start, end: cfg.end,
-    trading_period: cfg.tradingPeriod, fee_bps: cfg.feeBps, data_source: ds,
-    refresh_dataset: cfg.refreshDataset,
-    walk_forward: cfg.walkForward, split_ratio: cfg.splitRatio,
-  };
-  if (cfg.factors.length <= 1) {
-    return {
-      ...base, mode: 'single' as const,
-      indicator: f0.indicator, strategy: f0.strategy,
-      window_range: f0.window_range, signal_range: f0.signal_range,
-    };
-  }
-  return {
-    ...base, mode: 'multi' as const,
-    conjunction: cfg.conjunction, factors: cfg.factors,
-  };
-}
-
-function buildPerformanceRequest(cfg: BacktestConfig, row: Top10Row): PerformanceRequest {
-  const f0 = cfg.factors[0];
-  const ds = cfg.dataSource || undefined;
-  if (cfg.factors.length <= 1) {
-    return {
-      symbol: effectiveSymbol(cfg), start: cfg.start, end: cfg.end,
-      mode: 'single', trading_period: cfg.tradingPeriod, fee_bps: cfg.feeBps,
-      data_source: ds, refresh_dataset: cfg.refreshDataset,
-      indicator: f0.indicator, strategy: f0.strategy,
-      window: row.window as number, signal: row.signal as number,
-    };
-  }
-  const windows = Object.keys(row).filter(k => k.startsWith('window_')).map(k => row[k] as number);
-  const signals = Object.keys(row).filter(k => k.startsWith('signal_')).map(k => row[k] as number);
-  return {
-    symbol: effectiveSymbol(cfg), start: cfg.start, end: cfg.end,
-    mode: 'multi', trading_period: cfg.tradingPeriod, fee_bps: cfg.feeBps,
-    data_source: ds, refresh_dataset: cfg.refreshDataset,
-    conjunction: cfg.conjunction, factors: cfg.factors,
-    windows, signals,
-  };
-}
-
-function rowLabel(row: Top10Row, cfg: BacktestConfig): string {
-  if (cfg.factors.length <= 1) return `window=${row.window ?? '-'}, signal=${row.signal ?? '-'}`;
-  return Object.keys(row)
-    .filter(k => k.startsWith('window_') || k.startsWith('signal_'))
-    .map(k => `${k}=${row[k]}`)
-    .join(', ');
-}
-
-function overfitColor(ratio: number | null): 'success' | 'warning' | 'error' | 'default' {
-  if (ratio == null || isNaN(ratio)) return 'default';
-  if (ratio < 0.3) return 'success';
-  if (ratio < 0.5) return 'warning';
-  return 'error';
-}
-
-function overfitLabel(ratio: number | null): string {
-  if (ratio == null || isNaN(ratio)) return 'N/A';
-  if (ratio < 0.3) return 'Low Risk';
-  if (ratio < 0.7) return 'Moderate';
-  return 'High Risk';
-}
-
-function formatMetric(v: number | null | undefined): string {
-  if (v == null || isNaN(v)) return 'N/A';
-  return v.toFixed(4);
-}
 
 export default function BacktestPage({ currentUser }: { currentUser: CurrentUser }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
