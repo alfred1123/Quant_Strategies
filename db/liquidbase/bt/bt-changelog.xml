@@ -75,7 +75,15 @@
     <changeSet id="250-bt-proc-sp-get-queue" author="alfcheun" context="proc" runOnChange="true">
         <sqlFile path="procedures/SP_GET_QUEUE.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
         <rollback>
-            <sql>DROP PROCEDURE IF EXISTS bt.sp_get_queue(UUID, UUID, INTEGER, INTEGER, TEXT, INTEGER, REFCURSOR, TEXT, TEXT, TEXT);</sql>
+            <sql>DROP PROCEDURE IF EXISTS bt.sp_get_queue(UUID, UUID, INTEGER, TEXT, INTEGER, REFCURSOR, TEXT, TEXT, TEXT);</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- Active queue rows joined to current strategy version (IS_CURRENT_IND='Y') — for UI terminal display. -->
+    <changeSet id="251-bt-proc-sp-get-queue-for-terminal" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
+        <rollback>
+            <sql>DROP PROCEDURE IF EXISTS bt.sp_get_queue_for_terminal(TEXT, INTEGER, INTEGER, REFCURSOR, TEXT, TEXT, TEXT);</sql>
         </rollback>
     </changeSet>
 

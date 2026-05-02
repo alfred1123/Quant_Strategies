@@ -1,8 +1,8 @@
 # Design: Queued Background Backtests
 
-**Status:** Draft v2 — not yet implemented. Direction (Postgres-backed FIFO + `LISTEN/NOTIFY`) ratified in [decision #26](../decisions.md). v2 incorporates review feedback (drop VID, slim procedures, cooperative cancel in Phase 1, explicit module placement).
-**Date:** 2026-04-30
-**Scope:** `src/jobs.py`, `api/queue/`, `api/routers/jobs.py`, `frontend/`, `db/liquidbase/bt/`
+**Status:** Partially implemented — v4b (BT.QUEUE soft-versioning). Slice A complete; Slice B manager done, worker pending.
+**Date:** 2026-05-03
+**Scope:** `src/jobs.py`, `api/queue/`, `api/routers/backtest.py`, `frontend/`, `db/liquidbase/bt/`
 
 ---
 
@@ -83,21 +83,30 @@ The CLI (`src/main.py`) is **not** modified — it runs synchronously and has no
 Three roles inside the same FastAPI deployment unit:
 
 1. **API server** — accepts job submissions, queue mutations, queue queries, and SSE subscriptions.
-2. **Job manager** — runs inside FastAPI lifespan. Reacts to `LISTEN/NOTIFY` events. Spawns and supervises one worker process at a time. Maintains in-memory SSE subscriber lists.
+2. **Job manager** — runs inside FastAPI lifespan. Reacts to wakeup signals from the router and a 30 s watchdog. Spawns and supervises one worker process at a time. Maintains in-memory SSE subscriber lists.
 3. **Worker process** — executes exactly one backtest job in a separate Python process. Writes progress and terminal state directly to the DB via stored procedures.
 
 ```mermaid
 flowchart LR
-    UI[React UI] -->|POST /jobs| API[FastAPI router]
-    API -->|SP_INS_BACKTEST_JOB + NOTIFY| DB[(PostgreSQL)]
-    DB -->|NOTIFY job_enqueued| Mgr[BacktestJobManager<br/>LISTEN consumer]
-    Mgr -->|SP_CLAIM_NEXT_JOB| DB
+    UI[React UI] -->|POST /backtest/submit| API[FastAPI router]
+    API -->|repo.submit<br/>SP_INS_QUEUE QUEUED| DB[(PostgreSQL<br/>BT.QUEUE)]
+    API -->|notify_enqueued| Mgr[BacktestJobManager<br/>wakeup queue]
+    Mgr -->|claim: SP_INS_QUEUE RUNNING| DB
     Mgr -->|spawn| Worker[Worker process]
-    Worker -->|SP_UPD_PROGRESS / NOTIFY| DB
-    Worker -->|SP_UPD_TERMINAL + INS_STRATEGY + INS_RESULT| DB
-    DB -->|NOTIFY job_progress| Mgr
-    Mgr -->|SSE| UI
+    Worker -->|INSERT BT.RESULT<br/>SP_INS_QUEUE TERMINAL| DB
+    Mgr -->|SSE broadcast| UI
 ```
+
+!!! note "LISTEN/NOTIFY — deferred"
+    The original design used PostgreSQL `LISTEN/NOTIFY` for push-based wakeups. This is **not yet implemented**: `SP_INS_QUEUE` does not call `pg_notify`. Instead the router calls `manager.notify_enqueued()` directly after a successful enqueue. A 30 s watchdog catches any missed wakeups. When `SP_CLAIM_NEXT` is added (multi-instance), switch to a dedicated autocommit psycopg connection with `LISTEN job_enqueued`.
+
+**Submit flow (separation of concerns):**
+
+| Step | Location | Responsibility |
+|---|---|---|
+| 1 | `api/routers/backtest.py` | HTTP boundary: parse + validate request, call `repo.submit()`, notify manager, return 202 |
+| 2 | `src/jobs.py — BacktestJobRepo.submit()` | Business logic: generate `queue_id`, resolve `QUEUED` status ID, call `SP_INS_QUEUE` → `BT.QUEUE` |
+| 3 | `api/queue/manager.py` | Claim loop: `SELECT` next QUEUED row + `SP_INS_QUEUE RUNNING` + spawn worker |
 
 ### 5.2 Why a single worker first
 
@@ -119,117 +128,131 @@ The original draft proposed a 1-second polling loop. With `NOTIFY` triggered on 
 
 ## 6. Data Model
 
-Two new tables under the `BT` schema.
+### 6.1 `BT.QUEUE` (implemented — v4b)
 
-### 6.1 `BT.BACKTEST_JOB`
-
-Purpose: durable queue item and current job state. **One row per job, mutated in place** (no soft-versioning — the audit trail lives in `BACKTEST_JOB_EVENT`).
+Soft-versioned queue table. **One row per state transition** — old rows are closed by setting `TRANSACT_TO_TS = now()`; new rows are inserted with `TRANSACT_TO_TS = '9999-12-31'`. `QUEUE_ID` is stable across transitions; `QUEUE_VID` increments on each transition.
 
 | Column | Type | Notes |
 |---|---|---|
-| `BACKTEST_JOB_ID` | `UUID` | PK. UUID v7 (time-ordered). |
-| `BACKTEST_JOB_NM` | `TEXT` | Optional display name. Auto-generated from request if blank, like `STRATEGY_NM`. |
-| `JOB_STATE` | `TEXT` | `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`. |
-| `PRIORITY` | `INTEGER` | Default `100`. Lower = sooner. `Run Now` enqueues with `0`. Dequeue order: `(PRIORITY, CREATED_AT)`. |
-| `CANCEL_REQUESTED_IND` | `CHAR(1)` | Default `'N'`. Set to `'Y'` to ask a `RUNNING` worker to exit cleanly. |
-| `TIMEOUT_SECONDS` | `INTEGER` | Default `1800` (30 min). Worker self-terminates if exceeded. Coordinator marks stale `RUNNING` jobs as `FAILED` on startup if `STARTED_AT + TIMEOUT_SECONDS < now()`. |
-| `REQUEST_JSON` | `JSONB` | Authoritative replayable input — full optimize request payload. |
-| `SUMMARY_JSON` | `JSONB` | User-facing summary for queue table rendering (symbol, mode, indicator, strategy, total_trials). Computed at enqueue. |
-| `PROGRESS_JSON` | `JSONB` | Overwritten in place. `{ trial, total, best_sharpe, started_at }`. |
-| `RESULT_JSON` | `JSONB` | Compact summary for queue display only (best params, top metrics). Full analytics fetched via `BT.RESULT`. |
-| `ERROR_JSON` | `JSONB` | `{ type, message, traceback }` on failure. |
-| `STRATEGY_VID` | `INTEGER` | Nullable FK → `BT.STRATEGY(STRATEGY_VID)`. Set on completion. Lets "view result" load the canonical strategy. |
-| `RESULT_ID` | `BIGINT` | Nullable FK → `BT.RESULT(RESULT_ID)`. Set on completion. |
-| `STARTED_AT` | `TIMESTAMPTZ` | Set on `RUNNING` transition. |
-| `FINISHED_AT` | `TIMESTAMPTZ` | Set on terminal transition. |
-| `USER_ID` | `TEXT` | The submitting user. Indexed. |
-| `CREATED_AT` | `TIMESTAMPTZ` | Default `now()`. |
-| `UPDATED_AT` | `TIMESTAMPTZ` | Updated on every state mutation. |
+| `QUEUE_ID` | `UUID` | Stable job identity. Generated by the caller (router) before enqueue. |
+| `QUEUE_VID` | `INTEGER` | Increments on each state transition. `(QUEUE_ID, QUEUE_VID)` is PK. |
+| `STRATEGY_ID` | `UUID` | FK → `BT.STRATEGY`. The exact version submitted — never updated mid-queue. |
+| `STRATEGY_VID` | `INTEGER` | Exact strategy version submitted. Join on `(STRATEGY_ID, STRATEGY_VID)` — not `IS_CURRENT_IND`. |
+| `TRANSACT_FROM_TS` | `TIMESTAMPTZ` | Row effective from. |
+| `TRANSACT_TO_TS` | `TIMESTAMPTZ` | `'9999-12-31'` = active row. Set to `now()` on transition. |
+| `QUEUE_STATUS_ID` | `INTEGER` | FK → `REFDATA.QUEUE_STATUS`. |
+| `PRIORITY` | `INTEGER` | Default `100`. Lower = higher priority. `0` = "Run Now". Dequeue order: `(PRIORITY ASC, CREATED_AT ASC)`. |
+| `ERROR_TEXT` | `TEXT` | Error message on FAILED / CANCELLED. |
+| `USER_ID` | `TEXT` | Submitting user. |
+| `CREATED_AT` | `TIMESTAMPTZ` | Row insert time. |
 
-Indexes:
+Active rows: `WHERE TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'`
 
-- `(USER_ID, JOB_STATE, PRIORITY, CREATED_AT)` — supports both per-user queue listing and the dequeue scan.
-- `(JOB_STATE, STARTED_AT)` partial index `WHERE JOB_STATE = 'RUNNING'` — supports stale-job recovery scan.
+### 6.2 `REFDATA.QUEUE_STATUS` (implemented)
 
-**Removed from v1:**
-
-- ~~`BACKTEST_JOB_VID`~~ — soft-versioning is for things like `STRATEGY` where edit history matters. A job has a state machine, not a version history.
-- ~~`QUEUE_POS`~~ — computed on read via `ROW_NUMBER() OVER (ORDER BY PRIORITY, CREATED_AT) WHERE JOB_STATE = 'QUEUED'`. Storing it would race with concurrent inserts/cancels.
-
-### 6.2 `BT.BACKTEST_JOB_EVENT`
-
-Purpose: append-only audit log of **state transitions only** — not per-trial progress.
-
-| Column | Type | Notes |
+| `QUEUE_STATUS_ID` | `NAME` | Notes |
 |---|---|---|
-| `BACKTEST_JOB_EVENT_ID` | `BIGINT GENERATED ALWAYS AS IDENTITY` | PK. Monotonic — supports SSE `Last-Event-ID` resume. |
-| `BACKTEST_JOB_ID` | `UUID` | FK → `BACKTEST_JOB`. |
-| `EVENT_TYPE` | `TEXT` | `ENQUEUED`, `STARTED`, `COMPLETED`, `FAILED`, `CANCELLED`, `CANCEL_REQUESTED`, `TIMEOUT`. |
-| `PAYLOAD_JSON` | `JSONB` | Optional event-specific detail. |
-| `USER_ID` | `TEXT` | Who triggered the event (system or user). |
-| `CREATED_AT` | `TIMESTAMPTZ` | Default `now()`. |
+| 1 | `QUEUED` | Waiting to be claimed |
+| 2 | `RUNNING` | Claimed by manager, worker spawned |
+| 3 | `CANCEL_REQUESTED` | User requested cancel; worker observes at next checkpoint |
+| 4 | `COMPLETED` | Worker finished successfully |
+| 5 | `FAILED` | Worker error or manager crash recovery |
+| 6 | `CANCELLED` | Worker observed cancel request and exited cleanly |
 
-Indexed on `(BACKTEST_JOB_ID, BACKTEST_JOB_EVENT_ID)`.
+IDs are assigned by `IDENTITY` at seed time. `SP_GET_QUEUE_FOR_TERMINAL` uses `QUEUE_STATUS_ID IN (1,2,3)` (active states) — hardcoded to match these seed values.
 
-**No per-trial events** — that would be ~20k rows per large optimization. Per-trial progress lives in `BACKTEST_JOB.PROGRESS_JSON`, overwritten in place.
+### 6.3 `BT.STRATEGY` (existing — unchanged)
 
-### 6.3 Existing BT tables
+Queue rows store `(STRATEGY_ID, STRATEGY_VID)` at submission time. The worker joins on this exact pair — not filtered by `IS_CURRENT_IND` — so queue rows remain valid even if the user updates the strategy mid-queue. `IS_CURRENT_IND` is exposed as `STRAT_CURRENT_IND` in `SP_GET_QUEUE_FOR_TERMINAL` for UI display only.
 
-Untouched. The queue **orchestrates** but does not replace:
+### 6.4 `BT.RESULT` (existing — unchanged)
 
-1. `BT.STRATEGY` (versioned) via `BT.SP_INS_STRATEGY`
-2. `BT.RESULT` (append-only): worker/application **`INSERT`** with **`QUEUE_ID`** + **`PAYLOAD_JSON`** (**no** **`BT.SP_INS_RESULT`** procedure); **`BT.SP_INS_QUEUE`** **`TERMINAL`** closes the **`BT.QUEUE`** row (optional **`IN_RESULT_ID`** for NOTIFY only).
+Worker **`INSERT`s** directly with `QUEUE_ID` + `PAYLOAD_JSON`. No `SP_INS_RESULT` procedure — this is the one table exempt from the "no direct DML" rule per `AGENTS.md`.
 
-Soft-versioned **`BT.QUEUE`** rows link **`STRATEGY_ID`/`STRATEGY_VID`**; **`RESULT.QUEUE_ID`** links the outcome row after completion.
+### 6.5 State transitions (v4b)
+
+```
+              ┌──────────┐
+              │  QUEUED  │
+              └────┬─────┘
+       ┌───────────┴─────────────┐
+       ▼                         ▼
+┌───────────┐            ┌─────────────────┐
+│  RUNNING  │            │   FAILED (*)    │
+└─────┬─────┘            └─────────────────┘
+      │
+      ├── manager marks FAILED on crash
+      │
+      ├──→ CANCEL_REQUESTED ──→ CANCELLED
+      │
+      ├──→ COMPLETED
+      │
+      └──→ FAILED
+```
+
+`(*)` Manager also transitions QUEUED→FAILED on stale-job recovery (API restart).
+Terminal states (`COMPLETED`, `FAILED`, `CANCELLED`) are immutable — new row with closed `TRANSACT_TO_TS` only.
+
+!!! note "v2 draft tables superseded"
+    The earlier draft described `BT.BACKTEST_JOB` and `BT.BACKTEST_JOB_EVENT`. These were **never implemented**. The canonical implementation uses `BT.QUEUE` + `REFDATA.QUEUE_STATUS` as described above.
 
 ---
 
 ## 7. Stored Procedures
 
-!!! note "v4b database implementation (canonical for procedure behavior)"
-    The DDL and **`BT.SP_*`** procedures checked into `db/liquidbase/` match **v4b**: soft-versioned **`BT.QUEUE`**, **`CONFIG_JSON`** on **`BT.STRATEGY`**, slim **`BT.RESULT`**, **`REFDATA.QUEUE_STATUS`**.
+All queue writes go through `BT.SP_INS_QUEUE`. Reads use plain `SELECT` or the two GET procedures. `BT.RESULT` rows are **`INSERT`**ed directly by the worker (no procedure).
 
-    Narrative descriptions of **what each procedure does** live in **[Backtest queue — schema review](backtest-queue-v3-review.md#procedure-reference)**.
+### 7.1 `BT.SP_INS_QUEUE` (implemented — changeset 250)
 
-    **Queue writes:** **`BT.SP_INS_QUEUE`** only — discriminate with **`IN_ACTION`** ∈ **`ENQUEUE`**, **`CLAIM_NEXT`**, **`TERMINAL`**, **`CANCEL`**. **Results:** **`INSERT INTO BT.RESULT`** from the worker, then **`TERMINAL`** (see review doc §Write examples).
+Signature: `IN_QUEUE_ID UUID, IN_STRATEGY_ID UUID, IN_STRATEGY_VID INTEGER, IN_QUEUE_STATUS_ID INTEGER, IN_PRIORITY INTEGER, IN_ERROR_TEXT TEXT, IN_USER_ID TEXT` + 3 OUT params (`OUT_SQLSTATE`, `OUT_SQLMSG`, `OUT_SQLERRMC`).
 
----
+Temporal versioning steps:
+1. `MAX(QUEUE_VID) + 1` for the new VID.
+2. Close current row: `UPDATE SET TRANSACT_TO_TS = now() WHERE TRANSACT_TO_TS = '9999-12-31'`.
+3. Insert new row with `TRANSACT_TO_TS = '9999-12-31'`.
 
-### 7.1 Original v2 draft (superseded for DB filenames)
+Called for every state transition: QUEUED → RUNNING → COMPLETED/FAILED/CANCELLED.
 
-Six procedures from the earliest queue draft (**`BACKTEST_JOB`** table — not how v4 is built):
+!!! note "SP_CLAIM_NEXT — future"
+    An atomic `SP_CLAIM_NEXT` (`SELECT ... FOR UPDATE SKIP LOCKED` + `SP_INS_QUEUE RUNNING` in one transaction) will replace the current two-connection SELECT + call pattern in `BacktestJobManager._claim_next()`. Required before multi-instance deployment.
 
-| Procedure | Purpose | Triggers `NOTIFY` |
+### 7.2 `BT.SP_GET_QUEUE` (implemented — changeset 250)
+
+Dynamic SQL reader. Signature: `IN_QUEUE_ID UUID, IN_STRATEGY_ID UUID, IN_QUEUE_STATUS_ID INTEGER, IN_USER_ID TEXT, IN_LIMIT INTEGER` + 4 OUT params (REFCURSOR + 3 status).
+
+- If `IN_QUEUE_ID` is provided → returns all VIDs for that job (full history).
+- Otherwise → active rows only (`TRANSACT_TO_TS = '9999-12-31'`), all other params optional filters.
+
+Returns: `QUEUE_ID, QUEUE_VID, STRATEGY_ID, STRATEGY_VID, TRANSACT_FROM_TS, QUEUE_STATUS_ID, QUEUE_STATUS, PRIORITY, ERROR_TEXT, USER_ID`.
+
+Used by `BacktestJobRepo.query_queue()`.
+
+### 7.3 `BT.SP_GET_QUEUE_FOR_TERMINAL` (implemented — changeset 251)
+
+Static SQL. Signature: `IN_USER_ID TEXT, IN_QUEUE_STATUS_ID INTEGER, IN_LIMIT INTEGER` + 4 OUT params.
+
+Active rows (`TRANSACT_TO_TS = '9999-12-31'`) with `QUEUE_STATUS_ID IN (1,2,3)` (QUEUED/RUNNING/CANCEL_REQUESTED), joined to `BT.STRATEGY` on exact `(STRATEGY_ID, STRATEGY_VID)` — no `IS_CURRENT_IND` filter, to keep queue rows valid if strategy is updated mid-queue.
+
+Returns: `QUEUE_ID, STRATEGY_ID, STRATEGY_VID, STRATEGY_NM, STRAT_CURRENT_IND, TRANSACT_FROM_TS, QUEUE_STATUS, PRIORITY, USER_ID, CONFIG_JSON, ERROR_TEXT`.
+
+Used by `BacktestJobRepo.query_queue_for_terminal()` for the UI terminal panel.
+
+### 7.4 State transitions reference
+
+| Caller | Action | `IN_QUEUE_STATUS_ID` |
 |---|---|---|
-| `BT.SP_INS_BACKTEST_JOB` | Enqueue a job. Inserts row + `ENQUEUED` event. | `job_enqueued` |
-| `BT.SP_CLAIM_NEXT_JOB` | Atomic dequeue. `SELECT ... FOR UPDATE SKIP LOCKED` on the next `QUEUED` row, transition to `RUNNING`, set `STARTED_AT`, insert `STARTED` event. Returns the claimed job (or null). | `job_started` |
-| `BT.SP_UPD_BACKTEST_JOB_PROGRESS` | In-place update of `PROGRESS_JSON` + `UPDATED_AT`. No event row. | `job_progress` |
-| `BT.SP_UPD_BACKTEST_JOB_TERMINAL` | One call writes `JOB_STATE` (`COMPLETED`/`FAILED`/`CANCELLED`/`TIMEOUT`) + `RESULT_JSON` or `ERROR_JSON` + `STRATEGY_VID` + `RESULT_ID` + `FINISHED_AT` + corresponding event row. | `job_completed` / `job_failed` / `job_cancelled` |
-| `BT.SP_CANCEL_BACKTEST_JOB` | If `JOB_STATE = QUEUED`: transition to `CANCELLED` directly. If `RUNNING`: set `CANCEL_REQUESTED_IND = 'Y'` and insert `CANCEL_REQUESTED` event (worker observes flag at next checkpoint). | `job_cancelled` or `job_cancel_requested` |
-| `BT.SP_INS_BACKTEST_JOB_EVENT` | Append-only event insert. Called internally by the procedures above. | varies by event type |
+| `BacktestJobRepo.submit()` | Enqueue | `QUEUED` (1) |
+| `BacktestJobManager._claim_next()` | Claim | `RUNNING` (2) |
+| Router cancel endpoint | Request cancel on running job | `CANCEL_REQUESTED` (3) |
+| Router cancel endpoint | Cancel queued job directly | `CANCELLED` (6) |
+| Worker — success | Terminal | `COMPLETED` (4) |
+| Worker — exception | Terminal | `FAILED` (5) |
+| Worker — cancel observed | Terminal | `CANCELLED` (6) |
+| Manager — crash recovery | Terminal | `FAILED` (5) |
 
-Reads (`GET /jobs`, `GET /jobs/{id}`) use plain `SELECT` per the project's "SELECT queries are unrestricted" rule.
+### 7.5 v2 draft procedures (superseded — never implemented)
 
-### 7.2 State transitions (v2 draft)
-
-```
-                   ┌──────────┐
-                   │  QUEUED  │
-                   └────┬─────┘
-              ┌─────────┴─────────┐
-              ▼                   ▼
-       ┌───────────┐        ┌──────────┐
-       │ CANCELLED │        │ RUNNING  │
-       └───────────┘        └────┬─────┘
-                                 │
-                  ┌──────────────┼──────────────┬─────────────┐
-                  ▼              ▼              ▼             ▼
-           ┌───────────┐ ┌────────────┐ ┌───────────┐ ┌──────────┐
-           │ COMPLETED │ │   FAILED   │ │ CANCELLED │ │ TIMEOUT  │
-           └───────────┘ └────────────┘ └───────────┘ └──────────┘
-```
-
-Terminal states (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`) are immutable. To re-run, the user submits a new job (Phase 2 adds a one-click "Retry" that copies `REQUEST_JSON`).
+The earlier draft described `SP_INS_BACKTEST_JOB`, `SP_CLAIM_NEXT_JOB`, `SP_UPD_BACKTEST_JOB_PROGRESS`, `SP_UPD_BACKTEST_JOB_TERMINAL`, `SP_CANCEL_BACKTEST_JOB`, `SP_INS_BACKTEST_JOB_EVENT`. **None of these exist in the DB.** They are replaced by `SP_INS_QUEUE` + `SP_GET_QUEUE` + `SP_GET_QUEUE_FOR_TERMINAL`.
 
 ---
 
@@ -324,40 +347,72 @@ Each SSE event includes `id: <BACKTEST_JOB_EVENT_ID>` so reconnects can resume v
 
 ## 9. Job Manager (coordinator)
 
-`BacktestJobManager` is created in FastAPI lifespan and torn down on shutdown.
+`BacktestJobManager` is implemented in `api/queue/manager.py`. It is created in FastAPI lifespan and torn down on shutdown.
 
 ### 9.1 Startup
 
-1. Open a dedicated psycopg connection in autocommit mode for `LISTEN`.
-2. `LISTEN job_enqueued, job_progress, job_completed, job_failed, job_cancelled, job_cancel_requested`.
-3. Run **stale-job recovery**: any `RUNNING` job with `STARTED_AT + TIMEOUT_SECONDS < now()` (or no live worker process) → mark `FAILED` with reason `restart_during_run`. **Don't auto-requeue** (non-idempotent side effects already written to `BT.RESULT` would double up).
-4. Try to claim and start the next `QUEUED` job (in case one was added while the API was down).
+1. Run **stale-job recovery** (synchronous, in executor): any `RUNNING` job with no live worker process → `SP_INS_QUEUE FAILED` with `error_text = "API restarted while job was running"`. Does not auto-requeue.
+2. Try to claim and start the next `QUEUED` job (in case one was added while the API was down).
+3. Start two asyncio background tasks: `_event_loop` and `_watchdog`.
 
-### 9.2 Event loop
+### 9.2 Wakeup mechanism
 
-The manager runs a single asyncio task that:
+Uses `asyncio.Queue[str]` (not `asyncio.Event`) as the internal wakeup channel:
 
-1. Awaits notifications on the `LISTEN` connection.
-2. On `job_enqueued` or `job_completed`/`job_failed`/`job_cancelled` (anything that frees the slot) — if no worker is currently running, attempt `SP_CLAIM_NEXT_JOB` and spawn the worker if one is returned.
-3. On `job_progress` — fan out to subscribed SSE clients.
-4. On `job_cancel_requested` — the running worker observes the flag itself; the manager just relays the SSE event.
+- **Never coalesces** — each `put_nowait` produces one wakeup.
+- **Thread-safe** — callers on other threads use `loop.call_soon_threadsafe(self._wakeup.put_nowait, ...)`.
+- Carries a reason string (`"enqueued"` / `"watchdog"`) for debug logging.
 
-A separate watchdog task wakes every 30 s and:
+### 9.3 Event loop (`_event_loop` task)
 
-1. Re-runs stale-job recovery.
-2. If the worker handle is `None` but a `QUEUED` job exists, attempt to claim again (catches missed notifications).
+```
+loop:
+    reason = await wakeup.get()
+    _handle_worker_exit_if_done()   # crash detection
+    _maybe_claim_and_spawn()        # claim next QUEUED if slot free
+```
 
-### 9.3 Worker supervision
+Wakeup sources:
+- Router → `notify_enqueued()` after successful `repo.submit()`
+- Manager → after worker exit (free slot)
+- Watchdog → every 30 s
 
-- `multiprocessing.Process` with `target=run_worker, args=(job_id, db_conninfo, ...)`.
-- Manager retains the `Process` handle and the `job_id`.
-- On process exit:
-  - If the worker wrote a terminal state → fine, NOTIFY arrives, slot frees.
-  - If the worker died without writing terminal state → manager calls `SP_UPD_BACKTEST_JOB_TERMINAL(state='FAILED', error={crash, exit_code})`.
+### 9.4 Watchdog task (`_watchdog` task)
 
-### 9.4 SSE fanout
+Every 30 s:
+1. `_handle_worker_exit_if_done()` — catch any worker that exited without triggering a wakeup.
+2. `_recover_stale()` — mark orphaned RUNNING jobs FAILED.
+3. `wakeup.put_nowait("watchdog")` — triggers the event loop to attempt a claim.
 
-A simple in-memory `set[asyncio.Queue]` of subscriber queues. Each connected SSE client gets its own queue. The `LISTEN` task `put`s each event onto every subscriber queue. Disconnections clean up via `finally`.
+### 9.5 Claim (`_claim_next`)
+
+```python
+# Connection A — plain SELECT (no FOR UPDATE — single manager, no race)
+SELECT QUEUE_ID, STRATEGY_ID, STRATEGY_VID, PRIORITY, USER_ID
+  FROM BT.QUEUE q JOIN REFDATA.QUEUE_STATUS rs ...
+ WHERE rs.NAME = 'QUEUED' AND TRANSACT_TO_TS = '9999-12-31'
+ ORDER BY PRIORITY ASC, CREATED_AT ASC LIMIT 1
+
+# Connection B — SP_INS_QUEUE RUNNING
+repo.insert_queue(queue_id, ..., status=RUNNING)
+```
+
+Two separate connections are used because `DbGateway` is connection-per-call. This is safe with a single manager. When `SP_CLAIM_NEXT` is added, replace with one atomic call.
+
+### 9.6 Worker supervision
+
+- `multiprocessing.Process(target=run_worker, args=(queue_id, conninfo), daemon=True)`.
+- Manager retains the `Process` handle and `queue_id`.
+- `_handle_worker_exit_if_done()` checks `process.is_alive()` on every wakeup.
+- If the worker exited but the queue row is still `RUNNING` → `SP_INS_QUEUE FAILED` with crash error text.
+- After marking FAILED, posts `"enqueued"` wakeup to claim the next job.
+
+### 9.7 SSE fanout
+
+`set[asyncio.Queue]` of subscriber queues. `subscribe()` returns a new queue; `unsubscribe()` removes it. `broadcast(event)` puts onto every subscriber. SSE router manages subscribe/unsubscribe in `try/finally`.
+
+!!! note "v2 draft LISTEN/NOTIFY details"
+    Sections 9.1–9.4 of the original draft described a dedicated psycopg autocommit connection with `LISTEN job_enqueued`, `job_progress`, etc. This is deferred. The current implementation uses direct `notify_enqueued()` from the router instead.
 
 ---
 
@@ -382,25 +437,21 @@ Throttled — runs the body only when:
 
 When it runs:
 
-1. `SP_UPD_BACKTEST_JOB_PROGRESS(job_id, trial, total, best_sharpe)`.
-2. Re-read `CANCEL_REQUESTED_IND` and check the deadline:
-   - `CANCEL_REQUESTED_IND = 'Y'` → raise `JobCancelled`.
-   - `now() > deadline` → raise `JobTimeout`.
+1. Check `BT.QUEUE` for `CANCEL_REQUESTED` status on this `QUEUE_ID`.
+2. If cancel observed → raise `JobCancelled`.
+3. Check deadline: `now() > deadline` → raise `JobTimeout`.
+4. Fan out progress estimate to manager via shared state (in-memory; manager SSE-broadcasts to clients).
 
 ### 10.3 Termination
 
-*(**v4b DDL:** **`BT.QUEUE`** changes only via **`CALL BT.SP_INS_QUEUE`**; **`BT.RESULT`** rows **`INSERT`** from the worker — see [backtest-queue-v3-review.md](backtest-queue-v3-review.md).)*
+All `BT.QUEUE` transitions go through `SP_INS_QUEUE(IN_QUEUE_STATUS_ID=...)`. `BT.RESULT` is inserted directly before the COMPLETED transition.
 
-The **draft** worker steps below assumed `BACKTEST_JOB` — replace with enqueue/claim/`INSERT BT.RESULT`/`TERMINAL` when implementing against **`BT.QUEUE`**.
+- **Normal completion:** `SP_INS_STRATEGY` → `INSERT INTO BT.RESULT (...) RETURNING RESULT_ID` → `SP_INS_QUEUE(status=COMPLETED)`.
+- **`JobCancelled`:** `SP_INS_QUEUE(status=CANCELLED)`.
+- **`JobTimeout`:** `SP_INS_QUEUE(status=FAILED, error_text='Timeout after N seconds')`.
+- **Any other exception:** `SP_INS_QUEUE(status=FAILED, error_text=formatted traceback)`.
 
-- **Normal completion:** `SP_INS_STRATEGY` → `SP_INS_RESULT` → `SP_UPD_BACKTEST_JOB_TERMINAL(state='COMPLETED', result=summary, strategy_vid=..., result_id=...)`.
-- **`JobCancelled`:** `SP_UPD_BACKTEST_JOB_TERMINAL(state='CANCELLED')`.
-- **`JobTimeout`:** `SP_UPD_BACKTEST_JOB_TERMINAL(state='TIMEOUT', error={...})`.
-- **Any other exception:** `SP_UPD_BACKTEST_JOB_TERMINAL(state='FAILED', error={type, message, traceback})`.
-
-**v4 implementation shape:** enqueue + **`SP_INS_STRATEGY`** as today; on success **`INSERT INTO BT.RESULT`** then **`CALL BT.SP_INS_QUEUE`** with **`IN_ACTION='TERMINAL'`**, **`IN_TERMINAL_NAME='COMPLETED'`**, optional **`IN_RESULT_ID`**; failures use **`TERMINAL`** **`FAILED`** with **`IN_ERROR_TEXT`**; cooperative cancel observes **`CANCEL_REQUESTED`** then **`TERMINAL`** **`CANCELLED`**.
-
-The worker process exits with code 0 on terminal state written, non-zero on crash.
+The worker process exits with code 0 on terminal state written, non-zero on crash. Manager detects non-zero exit + non-terminal DB state → writes FAILED.
 
 ---
 
@@ -501,42 +552,47 @@ Mobile: queue collapses into a bottom sheet or a tab.
 
 Each slice is independently shippable.
 
-### Slice A — Schema + procedures (1–2 days)
+### Slice A — Schema + procedures ✅ Done
 
-1. Liquibase changesets for `BT.BACKTEST_JOB`, `BT.BACKTEST_JOB_EVENT` and indexes.
-2. The 6 procedures in §7, each with proper `LANGUAGE plpgsql` + `EXCEPTION WHEN OTHERS` + `CORE_INS_LOG_PROC`.
-3. `src/jobs.py` — `BacktestJobRepo` (DbGateway subclass) wrapping the procedures and reads.
-4. Integration tests against the live DB.
+1. ~~Liquibase changesets for `BT.QUEUE`, `REFDATA.QUEUE_STATUS` and indexes.~~ (changesets 120, 170, 210, 212, 221, 231, 232, 240, 241)
+2. ~~`SP_INS_QUEUE` (changeset 250), `SP_GET_QUEUE` (changeset 250), `SP_GET_QUEUE_FOR_TERMINAL` (changeset 251).~~
+3. ~~`src/jobs.py` — `BacktestJobRepo` with `query_queue`, `query_queue_for_terminal`, `insert_queue`, `get_status_id`, `insert_result`.~~
+4. Integration tests against the live DB — **pending**.
+5. `BacktestJobRepo.submit()` — **pending** (next step in Slice B).
 
-### Slice B — Manager + worker (2–3 days)
+### Slice B — Manager + worker 🔄 In progress
 
-1. `api/queue/manager.py` and `api/queue/worker.py` per §9–§10.
-2. Wire into FastAPI lifespan in `api/main.py`.
-3. Stale-job recovery on startup.
-4. Cooperative cancel + timeout enforcement.
-5. Unit tests with mocked subprocess.
+1. ~~`api/queue/manager.py` — `BacktestJobManager` with event loop, watchdog, claim, spawn, crash detection, SSE fanout.~~
+2. `api/queue/worker.py` — **pending**.
+3. Wire `BacktestJobManager` into `api/main.py` lifespan — **pending**.
+4. `BacktestJobRepo.submit()` in `src/jobs.py` — **pending**.
+5. Stale-job recovery on startup — implemented in manager, needs live testing.
+6. Cooperative cancel + timeout enforcement — **pending** (worker).
+7. Unit tests — **pending**.
 
-### Slice C — HTTP API + SSE (1–2 days)
+### Slice C — HTTP API + SSE (not started)
 
-1. `api/routers/jobs.py`, `api/schemas/jobs.py`.
-2. `Last-Event-ID` SSE replay from the events table.
-3. Auth + rate limiting.
-4. Integration tests against the real procedures from Slice A.
+1. `api/routers/backtest.py` jobs endpoints (submit, list, cancel).
+2. `api/schemas/jobs.py`.
+3. SSE endpoint + `subscribe`/`unsubscribe` wiring to manager.
+4. Auth + rate limiting.
+5. Integration tests.
 
-### Slice D — Frontend queue panel (2–3 days)
+### Slice D — Frontend queue panel (not started)
 
 1. New `frontend/src/features/queue/` folder.
-2. `useJobsStream()` hook, queue panel component, cancel button, retry placeholder.
+2. `useJobsStream()` hook, queue panel component, cancel button.
 3. URL-driven `selectedJobId`.
 4. Replace `Run Optimization` button with `Add to Queue` + `Run Now`.
-5. Move existing analysis rendering to be driven by `selectedJobId` instead of local state.
+5. Move existing analysis rendering to be driven by `selectedJobId`.
 
-### Phase 2 — quality of life (after Phase 1 is stable)
+### Phase 2 — quality of life (after Phase 1 stable)
 
-1. Retry button (copies `REQUEST_JSON` into a new job).
-2. Queue reorder (drag and drop) — adds `priority` to the API.
-3. Per-job event log viewer (reads `BACKTEST_JOB_EVENT` table).
-4. Search/filter terminal history.
+1. Retry button (copies config into a new job).
+2. Queue reorder (drag and drop).
+3. `SP_CLAIM_NEXT` stored procedure for atomic claim (pre-requisite for multi-instance).
+4. `LISTEN/NOTIFY` wiring in manager to replace direct `notify_enqueued()`.
+5. Per-job event log viewer.
 
 ### Phase 3 — scale-out (only if needed)
 
