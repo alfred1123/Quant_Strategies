@@ -1,22 +1,25 @@
-# Backtest Queue — v3 Schema Review (TEMPORARY)
+# Backtest Queue — v4b Schema Review (TEMPORARY)
 
 **Status:** review-only. After approval this content folds back into [`backtest-queue.md`](backtest-queue.md) and decision #26, then this file is deleted.
-**Updated:** 2026-04-30 (revision 2 — drops cancel flag, slims JSON columns, renames REFDATA, removes defaults).
+**Updated:** 2026-04-30 (revision 3 — v4b: unify into BT.STRATEGY + soft-versioned BT.QUEUE + slim BT.RESULT).
 **Scope:** database layer only (SQL + Liquibase). The Python repo (`src/jobs.py`), API (`api/queue/`), and frontend wait until this is approved.
 
 ---
 
-## What changed since revision 1 (responding to review)
+## What changed since revision 2 (responding to review)
 
 | Concern | Resolution |
 |---|---|
-| Defaults baked into schema | Dropped. `BT.QUEUE.PRIORITY` now has no `DEFAULT`; caller must supply. |
-| `IS_CURRENT_STATE_IND` confusing | Renamed to `IS_CURRENT_IND` to match the existing soft-versioning convention (`BT.STRATEGY`, etc.). The table name disambiguates header vs. status. |
-| `CANCEL_REQUESTED_IND` redundant with status | Dropped the column. Added `CANCEL_REQUESTED` to `REFDATA.QUEUE_STATUS_TYPE` as a non-terminal status. Cancel flow: `SP_CANCEL_QUEUE` flips RUNNING → CANCEL_REQUESTED via the normal status-row mechanism. Worker sees the new state and finalizes. |
-| Too many JSON columns | Cut from 5 to 2. Kept `REQUEST_JSON` (header, immutable input) and `PROGRESS_JSON` (heartbeat). Dropped `SUMMARY_JSON` (UI derives from REQUEST_JSON). Dropped `RESULT_JSON` — full computed metrics already live in `BT.RESULT`, queue carries only `RESULT_ID` FK. Replaced `ERROR_JSON` with plain `ERROR_TEXT`. |
-| `NOTES` not needed | Dropped. The status row sequence is the audit trail; freeform text adds no value. |
-| `REFDATA.QUEUE_STATUS` naming | Renamed to `REFDATA.QUEUE_STATUS_TYPE` (PK `QUEUE_STATUS_TYPE_ID`). FK on `BT.QUEUE_STATUS` is also `QUEUE_STATUS_TYPE_ID` for clarity. |
-| `UPDATED_AT` bumped on flips (caught while reviewing AGENTS.md) | Per AGENTS.md: don't update `UPDATED_AT` for `IS_CURRENT_IND` flips. All `UPDATE … SET IS_CURRENT_IND='N'` now leave `UPDATED_AT` alone — the demoted RUNNING row keeps its last-heartbeat timestamp, which is the right audit answer. |
+| `BT.RESULT` outdated; `BT.QUEUE` / `BT.RESULT` / `BT.STRATEGY` duplicated logic | Consolidated. **BT.STRATEGY** is the soft-versioned definition (CONFIG_JSON = full OptimizeRequest). **BT.QUEUE** is the soft-versioned state log. **BT.RESULT** is a slim payload bag. |
+| `REQUEST_JSON` / `STRAT_JSON` naming on definition table | Renamed to **`CONFIG_JSON`**. |
+| `REFDATA.QUEUE_STATUS_TYPE` naming felt heavy | Renamed back to **`REFDATA.QUEUE_STATUS`**, FK column **`QUEUE_STATUS_ID`**. |
+| `RESULT_ID` on `BT.QUEUE` not available at insert time | Dropped from `BT.QUEUE`. `BT.RESULT.QUEUE_ID` references the queue submission — **workers `INSERT BT.RESULT` directly** (**`AGENTS.md`** carve-out), then **`CALL BT.SP_INS_QUEUE`** with **`IN_ACTION='TERMINAL'`** and optional **`IN_RESULT_ID`** for NOTIFY. |
+| `BT.QUEUE` needed soft versioning to make `IS_CURRENT_IND` meaningful | Done. PK is now `(QUEUE_ID, QUEUE_VID)`. Each state transition inserts a new VID and flips the prior row's `IS_CURRENT_IND` from `'Y'` to `'N'`. |
+| `BT.QUEUE_STATUS` separate table | Removed. The single `BT.QUEUE` table is the state log. |
+| `PROGRESS_JSON` write rate concern | Progress is no longer stored in DB. Coordinator keeps it in-memory and streams via SSE. Cancellation uses OS signals delivered by the coordinator, not DB polling. |
+| `BT.V_QUEUE_CURRENT` view | Removed. Direct queries are simple enough (`WHERE IS_CURRENT_IND = 'Y'`); join to REFDATA when status name is needed. |
+| `SP_RETRY_QUEUE` separate from `SP_INS_QUEUE` | Removed. Retry = new `QUEUE_ID` with VID=1 referencing the same `(STRATEGY_ID, STRATEGY_VID)` — `SP_INS_QUEUE` handles both first-submit and retry. |
+| `SP_UPD_QUEUE_PROGRESS` heartbeat proc | Removed (DB no longer tracks progress). |
 
 ---
 
@@ -24,41 +27,41 @@
 
 ```mermaid
 flowchart LR
-    refdata["REFDATA.QUEUE_STATUS_TYPE<br/>(QUEUED, RUNNING,<br/>CANCEL_REQUESTED,<br/>COMPLETED, FAILED, CANCELLED<br/>+ IS_TERMINAL_IND)"]
-    queue["BT.QUEUE<br/>(header, soft-versioned)<br/>QUEUE_ID + QUEUE_VID<br/>REQUEST_JSON immutable<br/>IS_CURRENT_IND for retries"]
-    qstatus["BT.QUEUE_STATUS<br/>(state log)<br/>append-only state transitions<br/>PROGRESS_JSON updated in place<br/>on the current RUNNING row"]
-    result["BT.RESULT<br/>(existing)"]
+    refdata["REFDATA.QUEUE_STATUS<br/>(QUEUED, RUNNING, CANCEL_REQUESTED,<br/>COMPLETED, FAILED, CANCELLED<br/>+ IS_TERMINAL_IND)"]
+    strat["BT.STRATEGY<br/>(soft-versioned definition)<br/>STRATEGY_ID + STRATEGY_VID PK<br/>CONFIG_JSON (OptimizeRequest)"]
+    queue["BT.QUEUE<br/>(soft-versioned state log)<br/>QUEUE_ID + QUEUE_VID PK<br/>STRATEGY_ID + STRATEGY_VID FK<br/>QUEUE_STATUS_ID FK"]
+    result["BT.RESULT<br/>(slim payload bag)<br/>QUEUE_ID FK<br/>PAYLOAD_JSON"]
 
-    queue -->|"FK QUEUE_ID, QUEUE_VID"| qstatus
-    qstatus -->|"FK QUEUE_STATUS_TYPE_ID"| refdata
-    qstatus -.->|"FK RESULT_ID (only on COMPLETED row)"| result
+    queue -->|"FK STRATEGY_ID,VID"| strat
+    queue -->|"FK QUEUE_STATUS_ID"| refdata
+    result -.->|"FK QUEUE_ID"| queue
 ```
 
 ### Why this shape
 
-1. **Header is immutable per VID.** Once a row is inserted into `BT.QUEUE`, only `IS_CURRENT_IND` ever flips (and only on retry). Saves the row from MVCC churn during long runs.
-2. **Status log is append-only for transitions.** Each state change inserts a new row and flips the prior `IS_CURRENT_IND` from `'Y'` to `'N'`. Full audit trail without a separate event table.
-3. **Progress heartbeats are NOT new rows.** During `RUNNING`, the worker UPDATEs `PROGRESS_JSON` and `UPDATED_AT` on the single current RUNNING row. ~5 rows per job lifetime, even for 20k-trial sweeps.
-4. **REFDATA owns the enum.** `REFDATA.QUEUE_STATUS_TYPE` carries `NAME` + `IS_TERMINAL_IND`. Application code joins to it instead of hard-coding strings.
-5. **Cancellation is a status transition, not a flag.** `SP_CANCEL_QUEUE` flips RUNNING → CANCEL_REQUESTED via the same row-flip mechanism every other transition uses. The worker learns about it because its next `SP_UPD_QUEUE_PROGRESS` returns `OUT_CURRENT_STATUS = 'CANCEL_REQUESTED'`. No flag column to keep in sync.
-6. **No `TIMEOUT_SECONDS`.** Backtest runtime varies (50-trial debug vs 20k-trial walk-forward). Heartbeat watchdog reads `UPDATED_AT` on the current RUNNING row; if older than `STALE_HEARTBEAT_SECONDS` (backend constant, default 300 s) → stale.
-7. **Two JSON columns total.** `REQUEST_JSON` on header (immutable input). `PROGRESS_JSON` on status log (heartbeat-mutable). Errors → plain `ERROR_TEXT`. Computed results → `RESULT_ID` FK to `BT.RESULT`.
+1. **Strategy = definition; queue = state.** `BT.STRATEGY` carries the full `OptimizeRequest` payload in `CONFIG_JSON`. Editing a strategy bumps `STRATEGY_VID` and flips `IS_CURRENT_IND`. No duplication of factors / ranges / conjunction across tables.
+2. **Single state log with soft versioning.** `BT.QUEUE` collapses the v3 split tables into one. PK `(QUEUE_ID, QUEUE_VID)`. Every transition inserts a new VID and flips the prior `IS_CURRENT_IND` — same pattern as `BT.STRATEGY`. ~3 rows per submission lifetime (QUEUED → RUNNING → terminal).
+3. **One queue submission = one stable QUEUE_ID.** Retries / re-runs of the same strategy create new `QUEUE_ID`s with VID=1; strategy ID remains stable. Decouples "definition versioning" from "execution attempts".
+4. **Progress is in-memory.** No `PROGRESS_JSON`, no heartbeat proc. The coordinator streams trial counts to the frontend via SSE; cancellation is delivered by OS signal to the worker process. Keeps the DB write rate at O(transitions), not O(trials).
+5. **`BT.SP_INS_QUEUE`** alone drives **`BT.QUEUE`**. **TERMINAL** does not touch **`BT.RESULT`** — **`INSERT`** the row in application code first, then pass **`IN_RESULT_ID`** **only for NOTIFY enrichment**.
+6. **REFDATA owns the enum.** `REFDATA.QUEUE_STATUS` carries `NAME` + `IS_TERMINAL_IND`. Application code joins instead of hard-coding strings.
+7. **Cancellation is a status transition.** **`IN_ACTION=CANCEL`** on **`BT.SP_INS_QUEUE`** flips RUNNING → CANCEL_REQUESTED the same way the old standalone cancel proc did.
 
 ---
 
 ## DDL
 
-### `REFDATA.QUEUE_STATUS_TYPE`
+### `REFDATA.QUEUE_STATUS`
 
 ```sql
-CREATE TABLE REFDATA.QUEUE_STATUS_TYPE (
-    QUEUE_STATUS_TYPE_ID  INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    NAME                  TEXT NOT NULL,
-    DISPLAY_NAME          TEXT,
-    DESCRIPTION           TEXT,
-    IS_TERMINAL_IND       CHAR(1) NOT NULL,
-    USER_ID               TEXT,
-    UPDATED_AT            TIMESTAMPTZ
+CREATE TABLE REFDATA.QUEUE_STATUS (
+    QUEUE_STATUS_ID  INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    NAME             TEXT NOT NULL,
+    DISPLAY_NAME     TEXT,
+    DESCRIPTION      TEXT,
+    IS_TERMINAL_IND  CHAR(1) NOT NULL,
+    USER_ID          TEXT,
+    UPDATED_AT       TIMESTAMPTZ
 );
 ```
 
@@ -73,134 +76,134 @@ Seed data:
 | 5 | FAILED           | Y | Job raised an unhandled exception or worker crashed. |
 | 6 | CANCELLED        | Y | Job was cancelled by the user (queued or via cooperative cancel). |
 
-### `BT.QUEUE` (header)
+### `BT.STRATEGY` (soft-versioned definition)
+
+```sql
+CREATE TABLE BT.STRATEGY (
+    STRATEGY_ID    UUID NOT NULL,
+    STRATEGY_VID   INTEGER NOT NULL,
+    STRATEGY_NM    TEXT,
+    CONFIG_JSON    JSONB NOT NULL,
+    IS_CURRENT_IND CHAR(1) NOT NULL,
+    USER_ID        TEXT NOT NULL,
+    CREATED_AT     TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (STRATEGY_ID, STRATEGY_VID)
+);
+```
+
+Notes:
+- `CONFIG_JSON` = the full `OptimizeRequest` payload (factors[], ranges, conjunction, ticker, trading_period, …). Single source of truth for "what this backtest is".
+- Editing a strategy = `SP_INS_STRATEGY` with the same `STRATEGY_ID` (bumps VID, flips prior IS_CURRENT_IND).
+- Legacy columns dropped: `TICKER`, `CONJUNCTION`, `TRADING_PERIOD` (now inside CONFIG_JSON).
+
+### `BT.QUEUE` (soft-versioned state log)
 
 ```sql
 CREATE TABLE BT.QUEUE (
-    QUEUE_ID        UUID NOT NULL,
-    QUEUE_VID       INTEGER NOT NULL,
-    QUEUE_NM        TEXT,
-    PRIORITY        INTEGER NOT NULL,
-    REQUEST_JSON    JSONB NOT NULL,
-    IS_CURRENT_IND  CHAR(1) NOT NULL,
-    USER_ID         TEXT NOT NULL,
-    CREATED_AT      TIMESTAMPTZ NOT NULL,
+    QUEUE_ID          UUID NOT NULL,
+    QUEUE_VID         INTEGER NOT NULL,
+    STRATEGY_ID       UUID NOT NULL,
+    STRATEGY_VID      INTEGER NOT NULL,
+    QUEUE_STATUS_ID   INTEGER NOT NULL,
+    IS_CURRENT_IND    CHAR(1) NOT NULL,
+    PRIORITY          INTEGER NOT NULL,
+    ERROR_TEXT        TEXT,
+    USER_ID           TEXT NOT NULL,
+    CREATED_AT        TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (QUEUE_ID, QUEUE_VID)
 );
 
 CREATE INDEX IX_QUEUE_USER_CURRENT
     ON BT.QUEUE (USER_ID, CREATED_AT DESC)
     WHERE IS_CURRENT_IND = 'Y';
-```
-
-Notes:
-- `QUEUE_NM` is optional — auto-derived from `REQUEST_JSON` at the API layer when blank.
-- `PRIORITY` has no DB default — UI passes 100 ("normal") or 0 ("Run Now"). Lower wins.
-- No `SUMMARY_JSON` — UI/API computes display fields from `REQUEST_JSON` at read time.
-- No `UPDATED_AT` — only `IS_CURRENT_IND` ever flips and AGENTS.md says soft-version flips don't justify it.
-
-### `BT.QUEUE_STATUS` (state log)
-
-```sql
-CREATE TABLE BT.QUEUE_STATUS (
-    QUEUE_STATUS_ID         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    QUEUE_ID                UUID NOT NULL,
-    QUEUE_VID               INTEGER NOT NULL,
-    QUEUE_STATUS_TYPE_ID    INTEGER NOT NULL,
-    IS_CURRENT_IND          CHAR(1) NOT NULL,
-    PROGRESS_JSON           JSONB,
-    ERROR_TEXT              TEXT,
-    RESULT_ID               BIGINT,
-    USER_ID                 TEXT,
-    CREATED_AT              TIMESTAMPTZ NOT NULL,
-    UPDATED_AT              TIMESTAMPTZ NOT NULL
-);
-
-CREATE INDEX IX_QUEUE_STATUS_LOOKUP
-    ON BT.QUEUE_STATUS (QUEUE_ID, QUEUE_VID, CREATED_AT DESC);
 
 CREATE INDEX IX_QUEUE_STATUS_CURRENT
-    ON BT.QUEUE_STATUS (QUEUE_STATUS_TYPE_ID, UPDATED_AT)
+    ON BT.QUEUE (QUEUE_STATUS_ID, PRIORITY, CREATED_AT)
     WHERE IS_CURRENT_IND = 'Y';
+
+CREATE INDEX IX_QUEUE_STRATEGY
+    ON BT.QUEUE (STRATEGY_ID, STRATEGY_VID, CREATED_AT DESC);
 ```
 
 Notes:
-- `IS_CURRENT_IND='Y'` flags the latest state row per `(QUEUE_ID, QUEUE_VID)`. Every transition flips the prior current row to `'N'` (without bumping its `UPDATED_AT`) and inserts a new `'Y'` row.
-- `PROGRESS_JSON` is **updated in place** on the current RUNNING row by `SP_UPD_QUEUE_PROGRESS`. No new row per heartbeat.
-- `ERROR_TEXT` is plain text (one line + optional traceback). Set only on FAILED rows.
-- `RESULT_ID` is the FK to `BT.RESULT`. Set only on COMPLETED rows.
-- `UPDATED_AT` doubles as the heartbeat — drives the stale-RUNNING watchdog.
-- No `CANCEL_REQUESTED_IND` — cancellation is signaled by inserting a CANCEL_REQUESTED status row.
-- No `NOTES` — the status sequence itself is the audit trail.
-- No FK from `BT.QUEUE_STATUS.QUEUE_ID/QUEUE_VID` to `BT.QUEUE` in v1 — defer to phase 2 once shape is proven.
+- Soft-versioned. `IS_CURRENT_IND='Y'` flags the latest VID per `QUEUE_ID`. Each transition flips the prior current row to `'N'` (no `UPDATED_AT` bump per AGENTS.md) and inserts a new VID.
+- Lifecycle row count: ~3 (QUEUED → RUNNING → terminal). Plus 1 row for CANCEL_REQUESTED if cancel hits a RUNNING job.
+- `STRATEGY_ID` / `STRATEGY_VID` denormalized on every row (mild redundancy; saves a join on the worker dequeue path).
+- `PRIORITY` denormalized too — **`SP_INS_QUEUE`** **`CLAIM_NEXT`** orders by it without joining `BT.STRATEGY`.
+- No `RESULT_ID` (caller can't supply it at terminal-write time — `BT.RESULT.QUEUE_ID` is the link).
+- No `PROGRESS_JSON`, no `UPDATED_AT` — progress lives in coordinator memory.
 
-### `BT.V_QUEUE_CURRENT` (convenience view)
+### `BT.RESULT` (slim payload bag)
 
 ```sql
-CREATE OR REPLACE VIEW BT.V_QUEUE_CURRENT AS
-SELECT
-    q.QUEUE_ID,
-    q.QUEUE_VID,
-    q.QUEUE_NM,
-    q.PRIORITY,
-    q.REQUEST_JSON,
-    q.USER_ID,
-    q.CREATED_AT             AS SUBMITTED_AT,
-    s.QUEUE_STATUS_ID,
-    s.QUEUE_STATUS_TYPE_ID,
-    rs.NAME                  AS STATUS_NAME,
-    rs.IS_TERMINAL_IND,
-    s.PROGRESS_JSON,
-    s.ERROR_TEXT,
-    s.RESULT_ID,
-    s.CREATED_AT             AS STATE_ENTERED_AT,
-    s.UPDATED_AT             AS LAST_HEARTBEAT_AT
-  FROM BT.QUEUE q
-  JOIN BT.QUEUE_STATUS s
-    ON  q.QUEUE_ID  = s.QUEUE_ID
-    AND q.QUEUE_VID = s.QUEUE_VID
-    AND s.IS_CURRENT_IND = 'Y'
-  JOIN REFDATA.QUEUE_STATUS_TYPE rs
-    ON s.QUEUE_STATUS_TYPE_ID = rs.QUEUE_STATUS_TYPE_ID
- WHERE q.IS_CURRENT_IND = 'Y';
+CREATE TABLE BT.RESULT (
+    RESULT_ID    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    QUEUE_ID     UUID NOT NULL,
+    PAYLOAD_JSON JSONB NOT NULL,
+    USER_ID      TEXT,
+    CREATED_AT   TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IX_RESULT_QUEUE ON BT.RESULT (QUEUE_ID);
 ```
 
-Used by:
-- `list_active()` — `WHERE IS_TERMINAL_IND = 'N'`
-- `list_history()` — `WHERE IS_TERMINAL_IND = 'Y' ORDER BY LAST_HEARTBEAT_AT DESC LIMIT 50`
-- `find_stale_running()` — `WHERE STATUS_NAME = 'RUNNING' AND LAST_HEARTBEAT_AT < NOW() - INTERVAL '%s seconds'`
-- `get_current(queue_id)` — `WHERE QUEUE_ID = %s`
+Notes:
+- One row per COMPLETED submission: application **`INSERT INTO BT.RESULT`**, then **`TERMINAL`** on **`SP_INS_QUEUE`**.
+- `QUEUE_ID` links back to the queue submission. Strategy info is reachable via `BT.QUEUE` (one extra join). Avoids duplicating `STRATEGY_ID` / `STRATEGY_VID`.
+- `PAYLOAD_JSON` merges legacy `METRICS_JSON` + `WALK_FORWARD_JSON` + run metadata (run_at, data_start, data_end, ticker, fee_bps, …) into one document. The API shapes the response.
+- No FK constraint — `BT.QUEUE` PK is composite; the result is associated with the submission, not a single transition. Index covers the lookup.
 
 ---
 
-## Procedures (6 total)
+## Procedures
 
-| Procedure | Purpose | Key behavior |
+Detailed signature: `db/liquidbase/bt/procedures/SP_INS_QUEUE.sql`. Authoring rules: **db-ddl** skill at `.github/skills/db-ddl/SKILL.md`.
+
+**Liquibase checksum note:** changeSet `211-bt-proc-sp-ins-result` became a `DROP PROCEDURE` only. If a dev DB already executed the old SQL file, run `liquibase clearCheckSums` (or equivalent) once for the `bt` changelog.
+
+<a id="procedure-reference"></a>
+
+### Procedure reference
+
+**`BT.SP_INS_STRATEGY`** — unchanged. Versioned strategy row with **`CONFIG_JSON`**. Returns **`OUT_STRATEGY_VID`**.
+
+**`BT.SP_INS_QUEUE`** — **single entry point for every `BT.QUEUE` mutation.** Pass **`IN_ACTION`** (case-insensitive): **`ENQUEUE`**, **`CLAIM_NEXT`**, **`TERMINAL`**, **`CANCEL`**. Pass only the **IN_** parameters relevant to that branch; others may be **`NULL`**.
+
+| `IN_ACTION` | Required `IN_*` (non-null) | Effect |
 |---|---|---|
-| `BT.SP_INS_QUEUE` | First submission. Inserts `BT.QUEUE` (VID=1) + `BT.QUEUE_STATUS` (QUEUED). | Caller supplies PRIORITY (no default). |
-| `BT.SP_RETRY_QUEUE` | Retry. Snapshots current header, flips IS_CURRENT_IND → 'N' (no UPDATED_AT bump), inserts new VID + fresh QUEUED row. | Returns `OUT_NEW_QUEUE_VID`. |
-| `BT.SP_CLAIM_NEXT_QUEUE` | Atomic dequeue. `SELECT … FOR UPDATE SKIP LOCKED` to find next QUEUED row. Demote it (no UPDATED_AT bump), insert RUNNING. | Returns `(QUEUE_ID, QUEUE_VID, REQUEST_JSON, USER_ID)`. |
-| `BT.SP_UPD_QUEUE_PROGRESS` | In-place UPDATE of `PROGRESS_JSON` and `UPDATED_AT` on the current RUNNING row. | Returns `OUT_CURRENT_STATUS` so the worker learns about CANCEL_REQUESTED in the same round-trip. |
-| `BT.SP_INS_QUEUE_TERMINAL` | Demote current row (must be RUNNING or CANCEL_REQUESTED — no UPDATED_AT bump), append terminal row with ERROR_TEXT / RESULT_ID. | Errors out if prior state is anything else. |
-| `BT.SP_CANCEL_QUEUE` | QUEUED → insert CANCELLED row. RUNNING → insert CANCEL_REQUESTED row. CANCEL_REQUESTED / terminal → no-op. | Returns `OUT_PRIOR_STATUS`. |
+| **`ENQUEUE`** | `IN_QUEUE_ID`, `IN_STRATEGY_ID`, `IN_STRATEGY_VID`, `IN_PRIORITY`, `IN_USER_ID` | First row `QUEUE_VID=1`, **QUEUED**. **`bt_queue_enqueued`**. |
+| **`CLAIM_NEXT`** | *(none required; `IN_USER_ID` optional for logging fallback)* | **`FOR UPDATE SKIP LOCKED`** next **QUEUED** current row → **RUNNING**; fills **`OUT_QUEUE_ID`**, **`OUT_QUEUE_VID`**, **`OUT_STRATEGY_ID`**, **`OUT_STRATEGY_VID`**, **`OUT_CONFIG_JSON`**, **`OUT_OWNER_USER_ID`**. Empty queue → **`OUT_QUEUE_ID` IS NULL** and the procedure **returns before** `CORE_INS_LOG_PROC`. **`bt_queue_started`**. |
+| **`TERMINAL`** | `IN_QUEUE_ID`, `IN_TERMINAL_NAME` (`COMPLETED` / `FAILED` / `CANCELLED`), `IN_USER_ID`; `IN_ERROR_TEXT` for failures | Current row must be **RUNNING** or **CANCEL_REQUESTED**. **`BT.RESULT` is not written here** — call site **`INSERT`s the result row first**, then passes optional **`IN_RESULT_ID`** for **`pg_notify` JSON** only. **`bt_queue_completed`** / **`bt_queue_failed`** / **`bt_queue_cancelled`**. |
+| **`CANCEL`** | `IN_QUEUE_ID`, `IN_USER_ID` | **QUEUED** → terminal **CANCELLED**; **RUNNING** → **CANCEL_REQUESTED**; idempotent no-op if already terminal or cancel-pending; **`OUT_PRIOR_STATUS`** populated. **`bt_queue_cancelled`** / **`bt_queue_cancel_requested`**. |
 
-All procedures:
-- Use the project's standard `OUT_SQLSTATE / OUT_SQLMSG / OUT_SQLERRMC` pattern (SQLSTATE first so `DbGateway._call_write` works unchanged).
-- Call `CORE_ADMIN.CORE_INS_LOG_PROC('BT', '<proc_name>', V_START_TS, NULL, V_OTHER_TEXT, IN_USER_ID, V_LOG_STATE, V_LOG_MSG)` on success.
-- Wrap the body in `EXCEPTION WHEN OTHERS THEN GET STACKED DIAGNOSTICS …`.
-- Emit `pg_notify(<channel>, <compact json>)` on state-changing transitions.
+Outputs **`OUT_SQLSTATE`**, **`OUT_SQLMSG`**, **`OUT_SQLERRMC`** on every path; claim / cancel / terminal populate the additional **OUT_** columns listed in the SQL file.
 
-NOTIFY channels:
+**`BT.RESULT`** — **direct `INSERT` from application code** (**`AGENTS.md`** carve-out). No `BT.SP_INS_RESULT` procedure.
 
-| Channel | Emitted by |
+**`CORE_ADMIN.CORE_INS_LOG_PROC`** — still called once on success (except early **`RETURN`** paths: empty **`CLAIM_NEXT`**, idempotent **`CANCEL`**).
+
+---
+
+### Summary
+
+| Artifact | Role |
 |---|---|
-| `bt_queue_enqueued` | `SP_INS_QUEUE`, `SP_RETRY_QUEUE` |
-| `bt_queue_started` | `SP_CLAIM_NEXT_QUEUE` |
-| `bt_queue_progress` | `SP_UPD_QUEUE_PROGRESS` (only on accepted heartbeats) |
-| `bt_queue_cancel_requested` | `SP_CANCEL_QUEUE` (RUNNING branch) |
-| `bt_queue_completed` / `bt_queue_failed` / `bt_queue_cancelled` | `SP_INS_QUEUE_TERMINAL` (and `SP_CANCEL_QUEUE` QUEUED branch for `bt_queue_cancelled`) |
+| `BT.SP_INS_STRATEGY` | Persist versioned strategy (**`CONFIG_JSON`**) |
+| `BT.SP_INS_QUEUE` | **All** `BT.QUEUE` transitions via **`IN_ACTION`** |
+| **`INSERT` `BT.RESULT`** | Payload rows from queue worker (not a stored procedure) |
 
-Payload format: `{"queue_id": "...", "queue_vid": N, "user_id": "..."}` — well under PG's 8000-byte limit.
+**Stored procedure authoring** (db-ddl): `CREATED_AT` **`NOW()`** in SQL `INSERT`s; `SP_INS_QUEUE` does not `CALL` nested BT procedures — only `CORE_INS_LOG_PROC`.
+
+**`pg_notify`** channels (unchanged behaviour, new dispatch site):
+
+| Channel | `IN_ACTION` |
+|---|---|
+| `bt_queue_enqueued` | `ENQUEUE` |
+| `bt_queue_started` | `CLAIM_NEXT` (claimed) |
+| `bt_queue_cancel_requested` | `CANCEL` (RUNNING branch) |
+| `bt_queue_completed` / `bt_queue_failed` / `bt_queue_cancelled` | `TERMINAL` (and `CANCEL` queued→cancelled) |
+
+Payload format: `{"queue_id": "...", "queue_vid": N, "user_id": "...", "result_id": ...}` (keys present as applicable) — under PG's NOTIFY size cap.
 
 ---
 
@@ -208,46 +211,24 @@ Payload format: `{"queue_id": "...", "queue_vid": N, "user_id": "..."}` — well
 
 ```mermaid
 stateDiagram-v2
-    [*] --> QUEUED: SP_INS_QUEUE
-    QUEUED --> RUNNING: SP_CLAIM_NEXT_QUEUE
-    QUEUED --> CANCELLED: SP_CANCEL_QUEUE
-    RUNNING --> COMPLETED: SP_INS_QUEUE_TERMINAL
-    RUNNING --> FAILED: SP_INS_QUEUE_TERMINAL
-    RUNNING --> CANCEL_REQUESTED: SP_CANCEL_QUEUE
-    CANCEL_REQUESTED --> CANCELLED: SP_INS_QUEUE_TERMINAL (worker observes)
+    [*] --> QUEUED: SP_INS_QUEUE ENQUEUE
+    QUEUED --> RUNNING: SP_INS_QUEUE CLAIM_NEXT
+    QUEUED --> CANCELLED: SP_INS_QUEUE CANCEL
+    RUNNING --> COMPLETED: SP_INS_QUEUE TERMINAL
+    RUNNING --> FAILED: SP_INS_QUEUE TERMINAL
+    RUNNING --> CANCEL_REQUESTED: SP_INS_QUEUE CANCEL
+    CANCEL_REQUESTED --> CANCELLED: SP_INS_QUEUE TERMINAL (worker observes signal)
     COMPLETED --> [*]
     FAILED --> [*]
     CANCELLED --> [*]
     note right of RUNNING
-        UPDATED_AT refreshed on every
-        SP_UPD_QUEUE_PROGRESS call.
-        Watchdog flags rows with
-        UPDATED_AT older than
-        STALE_HEARTBEAT_SECONDS (300s).
+        Progress lives in the coordinator
+        in-memory; streamed via SSE.
+        Cancellation arrives via OS signal,
+        not DB poll.
+        BT.RESULT inserted by app before TERMINAL COMPLETED.
     end note
 ```
-
----
-
-## Worker cancel flow (cooperative, no flag column)
-
-```text
-loop forever:
-    do_some_trials()
-    progress = build_progress_payload()
-    out_status = CALL SP_UPD_QUEUE_PROGRESS(queue_id, vid, progress, user_id)
-
-    if out_status == 'RUNNING':
-        continue                         # heartbeat accepted, keep working
-    elif out_status == 'CANCEL_REQUESTED':
-        CALL SP_INS_QUEUE_TERMINAL(queue_id, vid, 'CANCELLED', NULL, NULL, user_id)
-        return                           # exit cleanly
-    else:
-        # Job already terminated externally (watchdog, race) — log and exit.
-        return
-```
-
-The worker never has to query the cancel flag separately; the heartbeat itself is the probe.
 
 ---
 
@@ -255,91 +236,123 @@ The worker never has to query the cancel flag separately; the heartbeat itself i
 
 **Active queue (running + queued, ordered by dequeue priority):**
 ```sql
-SELECT *
-  FROM BT.V_QUEUE_CURRENT
- WHERE IS_TERMINAL_IND = 'N'
- ORDER BY (STATUS_NAME = 'RUNNING') DESC,
-          PRIORITY ASC,
-          SUBMITTED_AT ASC;
+SELECT q.QUEUE_ID, q.QUEUE_VID, q.STRATEGY_ID, q.STRATEGY_VID,
+       q.PRIORITY, rs.NAME AS STATUS_NAME, q.CREATED_AT
+  FROM BT.QUEUE q
+  JOIN REFDATA.QUEUE_STATUS rs USING (QUEUE_STATUS_ID)
+ WHERE q.IS_CURRENT_IND = 'Y'
+   AND rs.IS_TERMINAL_IND = 'N'
+ ORDER BY (rs.NAME = 'RUNNING') DESC,
+          q.PRIORITY ASC,
+          q.CREATED_AT ASC;
 ```
 
-**Per-user history (last 50 terminal rows):**
+**Per-user history (last 50 terminal submissions):**
 ```sql
-SELECT *
-  FROM BT.V_QUEUE_CURRENT
- WHERE IS_TERMINAL_IND = 'Y'
-   AND USER_ID = $1
- ORDER BY LAST_HEARTBEAT_AT DESC
+SELECT q.QUEUE_ID, q.STRATEGY_ID, q.STRATEGY_VID,
+       rs.NAME AS STATUS_NAME, q.ERROR_TEXT, q.CREATED_AT
+  FROM BT.QUEUE q
+  JOIN REFDATA.QUEUE_STATUS rs USING (QUEUE_STATUS_ID)
+ WHERE q.IS_CURRENT_IND  = 'Y'
+   AND rs.IS_TERMINAL_IND = 'Y'
+   AND q.USER_ID          = $1
+ ORDER BY q.CREATED_AT DESC
  LIMIT 50;
 ```
 
-**Stale-RUNNING watchdog:**
+**Full audit trail of one submission:**
 ```sql
-SELECT QUEUE_ID, QUEUE_VID, LAST_HEARTBEAT_AT
-  FROM BT.V_QUEUE_CURRENT
- WHERE STATUS_NAME = 'RUNNING'
-   AND LAST_HEARTBEAT_AT < NOW() - ($1::int * INTERVAL '1 second');
+SELECT q.QUEUE_VID, q.CREATED_AT, rs.NAME AS STATUS,
+       q.ERROR_TEXT
+  FROM BT.QUEUE q
+  JOIN REFDATA.QUEUE_STATUS rs USING (QUEUE_STATUS_ID)
+ WHERE q.QUEUE_ID = $1
+ ORDER BY q.QUEUE_VID ASC;
 ```
 
-**Full audit trail of one job:**
+**Get the result for a completed submission:**
 ```sql
-SELECT s.CREATED_AT, rs.NAME AS STATUS,
-       s.PROGRESS_JSON, s.ERROR_TEXT, s.RESULT_ID
-  FROM BT.QUEUE_STATUS s
-  JOIN REFDATA.QUEUE_STATUS_TYPE rs
-    ON s.QUEUE_STATUS_TYPE_ID = rs.QUEUE_STATUS_TYPE_ID
- WHERE s.QUEUE_ID = $1 AND s.QUEUE_VID = $2
- ORDER BY s.CREATED_AT ASC;
+SELECT r.PAYLOAD_JSON
+  FROM BT.RESULT r
+ WHERE r.QUEUE_ID = $1
+ ORDER BY r.CREATED_AT DESC
+ LIMIT 1;
 ```
 
 ---
 
 ## Write examples (inside the worker / API)
 
-**Enqueue:**
+Unified procedure: always **`CALL BT.SP_INS_QUEUE`** with **`IN_ACTION`** first. **IN**: 9 args after **`IN_ACTION`**; **OUT**: 10 (**`OUT_SQLSTATE` … `OUT_PRIOR_STATUS`**) — see `db/liquidbase/bt/procedures/SP_INS_QUEUE.sql`. Drivers bind placeholders for **`OUT`**; in **`psql`**, wrap in **`DO`** with local variables.
+
+**Submit a new backtest (strategy + enqueue in one transaction):**
+```sql
+CALL BT.SP_INS_STRATEGY(...);
+CALL BT.SP_INS_QUEUE(
+    'ENQUEUE'::text,
+    %s::uuid,    -- IN_QUEUE_ID
+    %s::uuid,    -- IN_STRATEGY_ID
+    %s::integer, -- IN_STRATEGY_VID
+    %s::integer, -- IN_PRIORITY
+    NULL::text, NULL::text, NULL::integer, -- IN_TERMINAL_NAME / IN_ERROR_TEXT / IN_RESULT_ID (unused on ENQUEUE)
+    %s::text,    -- IN_USER_ID
+    NULL::text, NULL::text, NULL::text,   -- OUT_SQLSTATE / OUT_SQLMSG / OUT_SQLERRMC
+    NULL::uuid, NULL::integer, NULL::uuid, NULL::integer, NULL::jsonb, NULL::text, NULL::text
+                                           -- OUT_QUEUE_ID … OUT_PRIOR_STATUS
+);
+```
+
+**Rerun an existing strategy:** same **`ENQUEUE`** row as above with non-null **`IN_QUEUE_ID`**, **`IN_STRATEGY_ID`**, **`IN_STRATEGY_VID`**, **`IN_PRIORITY`**, **`IN_USER_ID`**.
+
+**Coordinator claims next job:**
 ```sql
 CALL BT.SP_INS_QUEUE(
-    %s::uuid,    -- queue_id
-    %s::text,    -- queue_nm
-    %s::integer, -- priority
-    %s::jsonb,   -- request_json
-    %s::text,    -- user_id
-    NULL, NULL, NULL  -- OUT
+    'CLAIM_NEXT'::text,
+    NULL::uuid, NULL::uuid, NULL::integer, NULL::integer,
+    NULL::text, NULL::text, NULL::integer,
+    NULL::text,                          -- IN_USER_ID (positional only; CLAIM_NEXT ignores it)
+    NULL::text, NULL::text, NULL::text,
+    NULL::uuid, NULL::integer, NULL::uuid, NULL::integer, NULL::jsonb, NULL::text, NULL::text
 );
 ```
 
-**Worker progress checkpoint (every ~25 trials or 1s, whichever first):**
+**Worker success** — **1)** `INSERT INTO BT.RESULT (...) VALUES (queue_id, payload, user_id, NOW()) RETURNING RESULT_ID`; **2)** terminal:
 ```sql
-CALL BT.SP_UPD_QUEUE_PROGRESS(
-    %s::uuid, %s::integer,                -- queue_id, queue_vid
-    %s::jsonb,                            -- progress_json
-    %s::text,                             -- user_id
-    NULL, NULL, NULL,                     -- OUT_SQLSTATE / OUT_SQLMSG / OUT_SQLERRMC
-    NULL                                   -- OUT_CURRENT_STATUS
-);
-```
-
-**Worker terminal write on success:**
-```sql
-CALL BT.SP_INS_QUEUE_TERMINAL(
-    %s::uuid, %s::integer,                -- queue_id, queue_vid
+CALL BT.SP_INS_QUEUE(
+    'TERMINAL'::text,
+    %s::uuid, NULL::uuid, NULL::integer, NULL::integer,
     'COMPLETED'::text,
-    NULL::text,                           -- error_text
-    %s::bigint,                           -- result_id (FK to BT.RESULT)
-    %s::text,                             -- user_id
-    NULL, NULL, NULL                      -- OUT
+    NULL::text,
+    %s::integer,  -- IN_RESULT_ID from INSERT … RETURNING (optional; NOTIFY enrichment only)
+    %s::text,     -- IN_USER_ID
+    NULL::text, NULL::text, NULL::text,
+    NULL::uuid, NULL::integer, NULL::uuid, NULL::integer, NULL::jsonb, NULL::text, NULL::text
 );
 ```
 
-**Worker terminal write on failure:**
+**Worker failure:**
 ```sql
-CALL BT.SP_INS_QUEUE_TERMINAL(
-    %s::uuid, %s::integer,
+CALL BT.SP_INS_QUEUE(
+    'TERMINAL'::text,
+    %s::uuid, NULL::uuid, NULL::integer, NULL::integer,
     'FAILED'::text,
-    %s::text,                             -- error_text (message + optional traceback)
-    NULL::bigint,
-    %s::text,
-    NULL, NULL, NULL
+    %s::text,      -- IN_ERROR_TEXT
+    NULL::integer, -- IN_RESULT_ID
+    %s::text,      -- IN_USER_ID
+    NULL::text, NULL::text, NULL::text,
+    NULL::uuid, NULL::integer, NULL::uuid, NULL::integer, NULL::jsonb, NULL::text, NULL::text
+);
+```
+
+**Cancel:**
+```sql
+CALL BT.SP_INS_QUEUE(
+    'CANCEL'::text,
+    %s::uuid, NULL::uuid, NULL::integer, NULL::integer,
+    NULL::text, NULL::text, NULL::integer,
+    %s::text,    -- IN_USER_ID
+    NULL::text, NULL::text, NULL::text,
+    NULL::uuid, NULL::integer, NULL::uuid, NULL::integer, NULL::jsonb, NULL::text, NULL::text
 );
 ```
 
@@ -350,21 +363,30 @@ CALL BT.SP_INS_QUEUE_TERMINAL(
 After review approval, only these files change.
 
 **Created:**
-- `db/liquidbase/refdata/tables/QUEUE_STATUS_TYPE.sql`
-- `db/liquidbase/refdata/data/QUEUE_STATUS_TYPE.sql`
-- `db/liquidbase/bt/tables/QUEUE.sql`
-- `db/liquidbase/bt/tables/QUEUE_STATUS.sql`
-- `db/liquidbase/bt/views/V_QUEUE_CURRENT.sql`
-- Six `db/liquidbase/bt/procedures/SP_*_QUEUE*.sql`
-- New changeset entries in both changelogs
+- `db/liquidbase/refdata/tables/QUEUE_STATUS.sql`
+- `db/liquidbase/refdata/data/QUEUE_STATUS.sql`
+- `db/liquidbase/bt/tables/QUEUE.sql` (rewritten v4)
+- `db/liquidbase/bt/procedures/SP_INS_QUEUE.sql` — unified queue state machine (**`IN_ACTION`**)
+- New / replaced Liquibase changesets (incl. **`211`** `DROP` for removed **`SP_INS_RESULT`**, **`236`** legacy overload **`DROP`s**)
 
-**Deleted (already done in revision 1):**
-- All v2 `BACKTEST_JOB*` artifacts and changesets `220–235`.
+**Reshaped:**
+- `STRATEGY.sql` / **`SP_INS_STRATEGY.sql`** — **`CONFIG_JSON`** model
+- **`RESULT.sql`** — slim **`QUEUE_ID` + `PAYLOAD_JSON`** (**no** **`BT.SP_INS_RESULT`**)
+- **`bt-changelog.xml`** — **`BT.SP_*`** queue helpers collapsed to **`SP_INS_QUEUE`**, removed **`232`/`234`/`235`**
+
+**Deleted:**
+- Separate queue procedure files (**`SP_CLAIM_NEXT_QUEUE`**, **`SP_INS_QUEUE_TERMINAL`**, **`SP_CANCEL_QUEUE`**, **`SP_INS_RESULT`**)
+- `db/liquidbase/refdata/tables/QUEUE_STATUS_TYPE.sql` (renamed)
+- `db/liquidbase/refdata/data/QUEUE_STATUS_TYPE.sql` (renamed)
+- `db/liquidbase/bt/tables/QUEUE_STATUS.sql` (folded into BT.QUEUE)
+- `db/liquidbase/bt/views/V_QUEUE_CURRENT.sql` (no view needed)
+- `db/liquidbase/bt/procedures/SP_RETRY_QUEUE.sql` (folded into SP_INS_QUEUE)
+- `db/liquidbase/bt/procedures/SP_UPD_QUEUE_PROGRESS.sql` (progress moved out of DB)
 
 **Not touched in this slice:**
 - `src/jobs.py` (Python `QueueRepo`)
 - `api/queue/` (manager, worker, lifespan)
 - `api/routers/jobs.py`
 - `frontend/`
-- `docs/design/backtest-queue.md` (canonical doc — folded back after v3 lands)
+- `docs/design/backtest-queue.md` (§6.3, §7 note, §10.3 v4b bridge only — body still draft v2 **`BACKTEST_JOB`** narrative)
 - `docs/decisions.md` (decision #26 — updated alongside the canonical doc)

@@ -222,4 +222,25 @@
         <rollback><sql>DELETE FROM REFDATA.APP_METRIC WHERE APP_ID = 4;</sql></rollback>
     </changeSet>
 
+    <!-- ========== REFDATA backtest queue (v4 design) ========== -->
+
+    <!--
+        v4 cleanup: drop the v3 REFDATA.QUEUE_STATUS_TYPE table if a dev DB
+        applied it. v4 renames it to REFDATA.QUEUE_STATUS. Idempotent.
+    -->
+    <changeSet id="119-refdata-queue-status-type-v3-cleanup" author="alfcheun" context="refdata" runOnChange="false">
+        <sql>DROP TABLE IF EXISTS REFDATA.QUEUE_STATUS_TYPE;</sql>
+        <rollback><sql>-- one-way cleanup.</sql></rollback>
+    </changeSet>
+
+    <changeSet id="120-refdata-queue-status" author="alfcheun" context="refdata" runOnChange="false">
+        <sqlFile path="tables/QUEUE_STATUS.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS REFDATA.QUEUE_STATUS;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="170-refdata-seed-queue-status" author="alfcheun" context="seed" runOnChange="false">
+        <sqlFile path="data/QUEUE_STATUS.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DELETE FROM REFDATA.QUEUE_STATUS;</sql></rollback>
+    </changeSet>
+
 </databaseChangeLog>

@@ -67,7 +67,7 @@ BEGIN
         IN_CCY,
         IN_DESCRIPTION,
         IN_USER_ID,
-        NOW()
+        NOW() AT TIME ZONE 'UTC'
     );
 
     OUT_SQLMSG := '40';

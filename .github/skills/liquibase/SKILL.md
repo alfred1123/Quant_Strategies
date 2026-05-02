@@ -113,7 +113,7 @@ cd db/liquidbase/bt
 source ../../../.env
 liquibase --defaults-file=liquibase.properties status           # Pending changeSets
 liquibase --defaults-file=liquibase.properties history          # Applied changeSets
-liquibase --defaults-file=liquibase.properties rollback-count 1 # Roll back last (bt only)
+ # Roll back last (bt only)
 liquibase --defaults-file=liquibase.properties update-sql       # Dry-run
 ```
 

@@ -212,7 +212,7 @@ Same pattern for `BT.RESULT`.
 #### 3c. Update procedures
 
 - `BT.SP_INS_STRATEGY` — `IN_TICKER` → `IN_PRODUCT_ID`
-- `BT.SP_INS_RESULT` — `IN_TICKER` → `IN_PRODUCT_ID`
+- Completed backtest rows: **`INSERT INTO BT.RESULT`** (worker) + **`CALL BT.SP_INS_QUEUE`** (**`TERMINAL`**) — **no** **`BT.SP_INS_RESULT`** procedure (**see `BT.RESULT` / queue design in Liquibase `db/liquidbase/bt/`**).
 - New: `BT.SP_GET_STRATEGY`, `BT.SP_GET_RESULT` — backend reads via procedure
 
 #### 3c.1. Where procedures are applied in the flow
@@ -230,8 +230,8 @@ Use this sequence during implementation so each layer switches cleanly.
     - API calls these procedures to build UI payloads.
 
 3. **Backtest write path (existing BT inserts):**
-    - Update `BT.SP_INS_STRATEGY` and `BT.SP_INS_RESULT` to accept product identity (`IN_PRODUCT_ID`) instead of ticker.
-    - Keep API/service writing through BT procedures only.
+    - Update `BT.SP_INS_STRATEGY` to accept product identity (`IN_PRODUCT_ID`) instead of ticker.
+    - Persist results with **`INSERT INTO BT.RESULT`** where appropriate; close queue jobs with **`BT.SP_INS_QUEUE`** (**`TERMINAL`**).
 
 4. **Backtest read path (result display):**
     - Use `BT.SP_GET_STRATEGY` and `BT.SP_GET_RESULT` for result/history views.
@@ -247,7 +247,7 @@ Procedure ownership by UI surface:
 |---|---|---|
 | Product selector | List products | `INST.SP_GET_PRODUCT` |
 | Data source / broker symbol resolution | Resolve current vendor symbol | `INST.SP_GET_PRODUCT_XREF` |
-| Backtest run save | Insert strategy/result rows | `BT.SP_INS_STRATEGY`, `BT.SP_INS_RESULT` |
+| Backtest run save | Insert strategy + result rows | `BT.SP_INS_STRATEGY`, **`INSERT BT.RESULT`**, `BT.SP_INS_QUEUE` |
 | Backtest history screen | Read saved runs | `BT.SP_GET_STRATEGY`, `BT.SP_GET_RESULT` |
 | Admin product maintenance | Create/update mappings | `INST.SP_INS_PRODUCT`, `INST.SP_INS_PRODUCT_XREF` |
 

@@ -35,7 +35,7 @@ BEGIN
         IN_PRODUCT_ID,
         IN_IS_ACTIVE_IND,
         IN_USER_ID,
-        NOW()
+        NOW() AT TIME ZONE 'UTC'
     );
 
     OUT_SQLMSG := '20';

@@ -45,10 +45,15 @@ Run backtest-style code from `src/` (imports are relative to that package, e.g. 
 
 ### No Direct DML — Use Stored Procedures
 
-**Never** write raw `INSERT`, `UPDATE`, or `DELETE` statements against application tables in Python, API services, or migration seed scripts. All data mutations must go through the schema's stored procedures (e.g. `BT.SP_INS_STRATEGY`, `BT.SP_INS_RESULT`, `BT.SP_INS_API_REQUEST`, `BT.SP_INS_API_REQUEST_PAYLOAD`).
+**Never** write raw `INSERT`, `UPDATE`, or `DELETE` statements against application tables in Python, API services, or migration seed scripts, **except**:
 
-- Python/FastAPI code must call procedures via `CALL <schema>.<procedure>(...)`.
-- Seed data (Liquibase `<sql>` changesets) is the only exception — it runs once at deploy time and is acceptable as direct `INSERT` within a changelog file.
+- **`BT.RESULT`** (queued backtest completion payloads): **`INSERT`** result rows directly (queue worker returns `RETURNING RESULT_ID`). Keep audit columns aligned with DDL (`NOW()` for `CREATED_AT`, optional `USER_ID`).
+- **`BT.QUEUE`** row transitions — use **`CALL BT.SP_INS_QUEUE(...)` only** with `IN_ACTION` ∈ `ENQUEUE` | `CLAIM_NEXT` | `TERMINAL` | `CANCEL` — no standalone `BT.SP_CLAIM_*` / `SP_CANCEL_*`.
+
+All other mutations use schema stored procedures (e.g. `BT.SP_INS_STRATEGY`, `BT.SP_INS_API_REQUEST`, `BT.SP_INS_API_REQUEST_PAYLOAD`).
+
+- Python/FastAPI code normally calls procedures via `CALL <schema>.<procedure>(...)`.
+- Seed data (Liquibase `<sql>` changesets) is the only broad exception — direct `INSERT` within a changelog at deploy time.
 - If a required procedure does not exist yet, create it first (following the db-ddl skill conventions) before writing the calling code.
 - `SELECT` queries (reads) are fine directly — this rule applies to writes only.
 

@@ -60,7 +60,7 @@ BEGIN
         IN_APP_ID,
         IN_VENDOR_SYMBOL,
         IN_USER_ID,
-        NOW()
+        NOW() AT TIME ZONE 'UTC'
     );
 
     OUT_SQLMSG := '40';

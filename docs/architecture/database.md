@@ -15,10 +15,10 @@ The project uses **PostgreSQL 17** with Liquibase for schema management. Each sc
 ## Conventions
 
 !!! danger "No Direct DML"
-    All writes from Python/FastAPI must call stored procedures via `CALL schema.procedure(...)`. Raw `INSERT`, `UPDATE`, or `DELETE` statements in application code are **forbidden**. Liquibase seed changesets are the only exception. `SELECT` queries are unrestricted.
+    Writes from Python/FastAPI normally go through **`CALL schema.procedure(...)`**. Narrow exceptions documented in **`AGENTS.md`**: **`BT.RESULT`** may use **`INSERT`** from the queue worker; **`BT.QUEUE`** mutations use **`BT.SP_INS_QUEUE`** only (**`IN_ACTION`** discriminates enqueue / claim / terminal / cancel). Liquibase seed changesets may use **`INSERT`** once per deploy.
 
-- **REFDATA reads** — `RefDataCache` loads all REFDATA tables at startup via `CALL REFDATA.SP_GET_ENUM(table_name, ...)`. Never query REFDATA tables directly from application code.
-- If a required write procedure does not exist yet, create it first.
+    - **REFDATA reads** — `RefDataCache` loads all REFDATA tables at startup via `CALL REFDATA.SP_GET_ENUM(table_name, ...)`. Never query REFDATA tables directly from application code.
+    - If a required write procedure does not exist yet, create it first.
 
 ### Column Naming
 
@@ -84,7 +84,9 @@ cd ../inst     && source ../../../.env && liquibase --defaults-file=liquibase.pr
 | `CORE_INS_LOG_PROC` | `CORE_ADMIN` | Central logging for all SPs |
 | `SP_GET_ENUM` | `REFDATA` | Generic REFCURSOR select for any REFDATA table |
 | `SP_INS_STRATEGY` | `BT` | Soft-versioning insert (auto-VID + IS_CURRENT_IND flip) |
-| `SP_INS_RESULT` | `BT` | Append-only insert (references STRATEGY_VID) |
+| `SP_INS_QUEUE` | `BT` | **Unified queue state machine**: `IN_ACTION` = **`ENQUEUE`**, **`CLAIM_NEXT`**, **`TERMINAL`**, **`CANCEL`** — all **`BT.QUEUE`** transitions |
+
+Direct **`INSERT`** into **`BT.RESULT`** permitted for queued job completion payloads (**`AGENTS.md`** carve-out). No **`BT.SP_INS_RESULT`** procedure.
 | `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`) |
 
 ## Directory Layout

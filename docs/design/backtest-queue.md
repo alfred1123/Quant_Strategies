@@ -44,7 +44,7 @@ There is also an implementation constraint:
 
 1. Use process-based execution for CPU-bound optimization work.
 2. Persist queue state in PostgreSQL so jobs survive API restarts.
-3. Reuse existing backtest pipeline and existing `BT.SP_INS_STRATEGY` / `BT.SP_INS_RESULT` procedures.
+3. Reuse existing backtest pipeline with `BT.SP_INS_STRATEGY`; persist completed payloads with **`INSERT INTO BT.RESULT`** and drive queue transitions only through **`CALL BT.SP_INS_QUEUE`** (**`AGENTS.md`**).
 4. Drive live updates via PostgreSQL `LISTEN/NOTIFY`, not polling.
 
 ---
@@ -178,15 +178,26 @@ Indexed on `(BACKTEST_JOB_ID, BACKTEST_JOB_EVENT_ID)`.
 Untouched. The queue **orchestrates** but does not replace:
 
 1. `BT.STRATEGY` (versioned) via `BT.SP_INS_STRATEGY`
-2. `BT.RESULT` (append-only) via `BT.SP_INS_RESULT`
+2. `BT.RESULT` (append-only): worker/application **`INSERT`** with **`QUEUE_ID`** + **`PAYLOAD_JSON`** (**no** **`BT.SP_INS_RESULT`** procedure); **`BT.SP_INS_QUEUE`** **`TERMINAL`** closes the **`BT.QUEUE`** row (optional **`IN_RESULT_ID`** for NOTIFY only).
 
-The job row links to those records via `STRATEGY_VID` + `RESULT_ID` after completion.
+Soft-versioned **`BT.QUEUE`** rows link **`STRATEGY_ID`/`STRATEGY_VID`**; **`RESULT.QUEUE_ID`** links the outcome row after completion.
 
 ---
 
 ## 7. Stored Procedures
 
-Six procedures (down from the original eight).
+!!! note "v4b database implementation (canonical for procedure behavior)"
+    The DDL and **`BT.SP_*`** procedures checked into `db/liquidbase/` match **v4b**: soft-versioned **`BT.QUEUE`**, **`CONFIG_JSON`** on **`BT.STRATEGY`**, slim **`BT.RESULT`**, **`REFDATA.QUEUE_STATUS`**.
+
+    Narrative descriptions of **what each procedure does** live in **[Backtest queue — schema review](backtest-queue-v3-review.md#procedure-reference)**.
+
+    **Queue writes:** **`BT.SP_INS_QUEUE`** only — discriminate with **`IN_ACTION`** ∈ **`ENQUEUE`**, **`CLAIM_NEXT`**, **`TERMINAL`**, **`CANCEL`**. **Results:** **`INSERT INTO BT.RESULT`** from the worker, then **`TERMINAL`** (see review doc §Write examples).
+
+---
+
+### 7.1 Original v2 draft (superseded for DB filenames)
+
+Six procedures from the earliest queue draft (**`BACKTEST_JOB`** table — not how v4 is built):
 
 | Procedure | Purpose | Triggers `NOTIFY` |
 |---|---|---|
@@ -199,7 +210,7 @@ Six procedures (down from the original eight).
 
 Reads (`GET /jobs`, `GET /jobs/{id}`) use plain `SELECT` per the project's "SELECT queries are unrestricted" rule.
 
-### State transitions
+### 7.2 State transitions (v2 draft)
 
 ```
                    ┌──────────┐
@@ -378,10 +389,16 @@ When it runs:
 
 ### 10.3 Termination
 
+*(**v4b DDL:** **`BT.QUEUE`** changes only via **`CALL BT.SP_INS_QUEUE`**; **`BT.RESULT`** rows **`INSERT`** from the worker — see [backtest-queue-v3-review.md](backtest-queue-v3-review.md).)*
+
+The **draft** worker steps below assumed `BACKTEST_JOB` — replace with enqueue/claim/`INSERT BT.RESULT`/`TERMINAL` when implementing against **`BT.QUEUE`**.
+
 - **Normal completion:** `SP_INS_STRATEGY` → `SP_INS_RESULT` → `SP_UPD_BACKTEST_JOB_TERMINAL(state='COMPLETED', result=summary, strategy_vid=..., result_id=...)`.
 - **`JobCancelled`:** `SP_UPD_BACKTEST_JOB_TERMINAL(state='CANCELLED')`.
 - **`JobTimeout`:** `SP_UPD_BACKTEST_JOB_TERMINAL(state='TIMEOUT', error={...})`.
 - **Any other exception:** `SP_UPD_BACKTEST_JOB_TERMINAL(state='FAILED', error={type, message, traceback})`.
+
+**v4 implementation shape:** enqueue + **`SP_INS_STRATEGY`** as today; on success **`INSERT INTO BT.RESULT`** then **`CALL BT.SP_INS_QUEUE`** with **`IN_ACTION='TERMINAL'`**, **`IN_TERMINAL_NAME='COMPLETED'`**, optional **`IN_RESULT_ID`**; failures use **`TERMINAL`** **`FAILED`** with **`IN_ERROR_TEXT`**; cooperative cancel observes **`CANCEL_REQUESTED`** then **`TERMINAL`** **`CANCELLED`**.
 
 The worker process exits with code 0 on terminal state written, non-zero on crash.
 

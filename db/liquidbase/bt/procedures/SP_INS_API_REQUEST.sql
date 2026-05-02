@@ -72,7 +72,7 @@ BEGIN
         V_START_TS,
         TIMESTAMPTZ '9999-12-31',
         IN_USER_ID,
-        NOW()
+        NOW() AT TIME ZONE 'UTC'
     );
 
     -- Step 40: Insert payload row for this VID
@@ -92,7 +92,7 @@ BEGIN
         IN_RANGE_END_TS,
         IN_PAYLOAD,
         IN_USER_ID,
-        NOW()
+        NOW() AT TIME ZONE 'UTC'
     );
 
     OUT_SQLMSG := '50';

@@ -38,7 +38,7 @@ BEGIN
         IN_PASSWORD_HASH,
         'Y',
         1,
-        NOW()
+        NOW() AT TIME ZONE 'UTC'
     );
 
     OUT_SQLMSG := '30';

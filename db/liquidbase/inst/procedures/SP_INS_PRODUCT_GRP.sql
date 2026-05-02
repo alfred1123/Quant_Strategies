@@ -41,7 +41,7 @@ BEGIN
         IN_DISPLAY_NAME,
         IN_DESCRIPTION,
         IN_USER_ID,
-        NOW()
+        NOW() AT TIME ZONE 'UTC'
     );
 
     OUT_SQLMSG := '20';
