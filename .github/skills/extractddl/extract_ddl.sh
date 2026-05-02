@@ -148,22 +148,29 @@ for SCHEMA in "${SCHEMAS[@]}"; do
 
   # ---- Procedures / Functions ----
   echo "[${SCHEMA}] Extracting procedures/functions..."
-  while IFS= read -r ROUTINE; do
+  while IFS=$'\t' read -r ROUTINE OID; do
     [[ -z "${ROUTINE}" ]] && continue
-    OUTFILE="${PROCS_DIR}/${ROUTINE^^}.sql"
-    psql_q "
-      SELECT pg_get_functiondef(p.oid) || ';'
-      FROM pg_proc p
+    # When a schema has multiple overloads of the same name, suffix with the OID
+    # so each variant gets its own file and none is silently dropped.
+    COUNT=$(psql_q "
+      SELECT COUNT(*) FROM pg_proc p
       JOIN pg_namespace n ON n.oid = p.pronamespace
       WHERE n.nspname = '${SCHEMA}' AND p.proname = '${ROUTINE}'
-      LIMIT 1
-    " > "${OUTFILE}"
+    ")
+    if [[ "${COUNT}" -gt 1 ]]; then
+      OUTFILE="${PROCS_DIR}/${ROUTINE^^}_${OID}.sql"
+    else
+      OUTFILE="${PROCS_DIR}/${ROUTINE^^}.sql"
+    fi
+    # pg_get_functiondef captures the full definition including any procedure-level
+    # SET clauses (e.g. plan_cache_mode = 'force_custom_plan') stored in proconfig.
+    psql_q "SELECT pg_get_functiondef(${OID}::oid) || ';'" > "${OUTFILE}"
     echo "  → ${OUTFILE}"
   done < <(psql_q "
-    SELECT p.proname FROM pg_proc p
+    SELECT p.proname, p.oid FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = '${SCHEMA}' AND p.prokind IN ('p','f')
-    ORDER BY p.proname
+    ORDER BY p.proname, p.oid
   ")
 done
 

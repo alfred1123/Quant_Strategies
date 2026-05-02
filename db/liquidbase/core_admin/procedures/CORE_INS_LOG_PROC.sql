@@ -9,6 +9,7 @@ CREATE OR REPLACE PROCEDURE CORE_ADMIN.CORE_INS_LOG_PROC(
     OUT OUT_SQLERRMC    TEXT
 )
 LANGUAGE plpgsql
+SET plan_cache_mode = 'force_generic_plan'
 AS $$
 DECLARE
     V_END_AT    TIMESTAMPTZ;

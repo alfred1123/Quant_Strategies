@@ -1,6 +1,5 @@
 CREATE OR REPLACE PROCEDURE BT.SP_INS_QUEUE(
     IN  IN_QUEUE_ID          UUID,
-    IN  IN_QUEUE_VID         INTEGER,
     IN  IN_STRATEGY_ID       UUID,
     IN  IN_STRATEGY_VID      INTEGER,
     IN  IN_QUEUE_STATUS_ID   INTEGER,
@@ -12,6 +11,7 @@ CREATE OR REPLACE PROCEDURE BT.SP_INS_QUEUE(
     OUT OUT_SQLERRMC         TEXT
 )
 LANGUAGE plpgsql
+SET plan_cache_mode = 'force_generic_plan'
 AS $$
 DECLARE
     V_START_TS   TIMESTAMPTZ := CURRENT_TIMESTAMP;
@@ -25,7 +25,7 @@ BEGIN
     OUT_SQLERRMC := 'Stored Procedure completed successfully';
 
     V_OTHER_TEXT := 'IN_QUEUE_ID=' || COALESCE(IN_QUEUE_ID::TEXT, '')
-                 || ', IN_PRODUCT_GRP_ID=' || COALESCE(IN_PRODUCT_GRP_ID::TEXT, '');
+                 || ', IN_STRATEGY_ID=' || COALESCE(IN_STRATEGY_ID::TEXT, '');
 
     -- Step 10: Resolve VID — get current max, or start at 1
     OUT_SQLMSG := '10';
@@ -37,9 +37,9 @@ BEGIN
     -- Step 20: Close old current row — set TRANSACT_TO_TS to now
     OUT_SQLMSG := '20';
     UPDATE BT.QUEUE
-       SET IS_CURRENT_IND = 'N'
-     WHERE QUEUE_ID     = IN_QUEUE_ID
-       AND IS_CURRENT_IND = 'Y';
+       SET TRANSACT_TO_TS = V_START_TS
+     WHERE QUEUE_ID       = IN_QUEUE_ID
+       AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31';
 
     -- Step 30: Insert new QUEUE version (TRANSACT_TO_TS = 9999-12-31)
     OUT_SQLMSG := '30';
@@ -48,10 +48,11 @@ BEGIN
         QUEUE_VID,
         STRATEGY_ID,
         STRATEGY_VID,
+        TRANSACT_FROM_TS,
+        TRANSACT_TO_TS,
         QUEUE_STATUS_ID,
         PRIORITY,
         ERROR_TEXT,
-        IS_CURRENT_IND,
         USER_ID,
         CREATED_AT
     ) VALUES (
@@ -59,10 +60,11 @@ BEGIN
         V_VID,
         IN_STRATEGY_ID,
         IN_STRATEGY_VID,
+        V_START_TS,
+        TIMESTAMPTZ '9999-12-31',
         IN_QUEUE_STATUS_ID,
         IN_PRIORITY,
         IN_ERROR_TEXT,
-        'Y',
         IN_USER_ID,
         NOW() AT TIME ZONE 'UTC'
     );

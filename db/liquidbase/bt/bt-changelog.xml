@@ -41,11 +41,41 @@
         </rollback>
     </changeSet>
 
-    <!-- Single queue procedure — all mutations via IN_ACTION (see docs/design/backtest-queue-v3-review.md). -->
+    <!-- Single queue procedure — all state transitions via explicit params. -->
     <changeSet id="231-bt-proc-sp-ins-queue" author="alfcheun" context="proc" runOnChange="true">
         <sqlFile path="procedures/SP_INS_QUEUE.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
         <rollback>
-            <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_queue(TEXT, UUID, UUID, INTEGER, INTEGER, TEXT, TEXT, INTEGER, TEXT, TEXT, TEXT, TEXT, UUID, INTEGER, UUID, INTEGER, JSONB, TEXT, TEXT);</sql>
+            <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_queue(UUID, INTEGER, UUID, INTEGER, INTEGER, INTEGER, TEXT, TEXT, TEXT, TEXT, TEXT);</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- Insert a completed backtest result; returns generated RESULT_ID. -->
+    <changeSet id="232-bt-proc-sp-ins-result" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
+        <rollback>
+            <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_result(UUID, JSONB, TEXT, INTEGER, TEXT, TEXT, TEXT);</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- Drop stale procedure overloads left from earlier signatures. -->
+    <changeSet id="240-bt-drop-stale-overloads" author="alfcheun" context="proc" runOnChange="false">
+        <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_queue(UUID, INTEGER, UUID, INTEGER, INTEGER, INTEGER, TEXT, TEXT, TEXT, TEXT, TEXT);</sql>
+        <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_result(UUID, UUID, INTEGER, TIMESTAMPTZ, DATE, DATE, TEXT, NUMERIC, JSONB, JSONB, TEXT, TEXT, TEXT, TEXT);</sql>
+        <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_strategy(UUID, TEXT, TEXT, TEXT, INTEGER, JSONB, TEXT, TEXT, TEXT, TEXT);</sql>
+        <rollback><sql>-- stale overloads; no rollback needed</sql></rollback>
+    </changeSet>
+
+    <!-- Drop remaining stale sp_ins_result overload (wrong signature in 240). -->
+    <changeSet id="241-bt-drop-stale-sp-ins-result" author="alfcheun" context="proc" runOnChange="false">
+        <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_result(UUID, INTEGER, TIMESTAMPTZ, DATE, DATE, TEXT, NUMERIC, JSONB, JSONB, TEXT);</sql>
+        <rollback><sql>-- stale overload; no rollback needed</sql></rollback>
+    </changeSet>
+
+    <!-- Flexible queue reader: single job (all VIDs) or filtered active rows. Dynamic SQL + force_custom_plan. -->
+    <changeSet id="250-bt-proc-sp-get-queue" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_GET_QUEUE.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
+        <rollback>
+            <sql>DROP PROCEDURE IF EXISTS bt.sp_get_queue(UUID, UUID, INTEGER, INTEGER, TEXT, INTEGER, REFCURSOR, TEXT, TEXT, TEXT);</sql>
         </rollback>
     </changeSet>
 

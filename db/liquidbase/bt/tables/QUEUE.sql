@@ -25,8 +25,9 @@ CREATE TABLE BT.QUEUE (
     QUEUE_VID         INTEGER NOT NULL,
     STRATEGY_ID       UUID NOT NULL,
     STRATEGY_VID      INTEGER NOT NULL,
+    TRANSACT_FROM_TS TIMESTAMPTZ NOT NULL,
+    TRANSACT_TO_TS   TIMESTAMPTZ NOT NULL,  -- 9999-12-31 when active
     QUEUE_STATUS_ID   INTEGER NOT NULL,
-    IS_CURRENT_IND    CHAR(1) NOT NULL,
     PRIORITY          INTEGER NOT NULL,
     ERROR_TEXT        TEXT,
     USER_ID           TEXT NOT NULL,
@@ -37,12 +38,12 @@ CREATE TABLE BT.QUEUE (
 -- "Show me my latest queue submissions" — UI history list per user.
 CREATE INDEX IX_QUEUE_USER_CURRENT
     ON BT.QUEUE (USER_ID, CREATED_AT DESC)
-    WHERE IS_CURRENT_IND = 'Y';
+    WHERE TRANSACT_TO_TS = '9999-12-31';
 
 -- Worker dequeue path: find next QUEUED row across all jobs.
 CREATE INDEX IX_QUEUE_STATUS_CURRENT
     ON BT.QUEUE (QUEUE_STATUS_ID, PRIORITY, CREATED_AT)
-    WHERE IS_CURRENT_IND = 'Y';
+    WHERE TRANSACT_TO_TS = '9999-12-31';
 
 -- Strategy → all its queue submissions (for "show runs of this strategy").
 CREATE INDEX IX_QUEUE_STRATEGY

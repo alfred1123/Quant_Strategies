@@ -6,7 +6,7 @@
 -- in-memory cancel signal from the coordinator (DB row exists for audit, but
 -- the running process is signaled out-of-band) and finalizes by inserting a
 -- CANCELLED row via SP_INS_QUEUE (IN_ACTION=CANCEL or TERMINAL).
-INSERT INTO REFDATA.QUEUE_STATUS (NAME, DISPLAY_NAME, DESCRIPTION, IS_TERMINAL_IND, USER_ID, UPDATED_AT)
+INSERT INTO REFDATA.QUEUE_STATUS (NAME, DISPLAY_NAME, DESCRIPTION, USER_ID, UPDATED_AT)
 VALUES
     ('QUEUED',           'Queued',           'Waiting in line for a worker slot.',                                 'alfcheun', now()),
     ('RUNNING',          'Running',          'Worker is executing this job.',                                      'alfcheun', now()),
