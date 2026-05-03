@@ -2,6 +2,9 @@
 
 The `api/` directory contains the FastAPI application that serves the backtest pipeline as a REST API. All `/api/v1/*` routes (except auth and health) require an authenticated session.
 
+!!! note "Queue endpoints live elsewhere"
+    `/api/v1/jobs/*` (the backtest queue) is **not** served by FastAPI. It is owned by the TypeScript coordinator service in `coordinator/` (Bun + Hono). The frontend reaches it through the same `/api` URL prefix; routing happens at the Vite dev proxy and at nginx in production. See [Queued Background Backtests](../design/backtest-queue.md) for the design.
+
 ## Starting the Server
 
 ```bash
