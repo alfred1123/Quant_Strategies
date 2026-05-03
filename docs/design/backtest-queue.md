@@ -775,3 +775,68 @@ Unchanged from previous designs — both are real infrastructure adding ops weig
 ### 19.7 Decision
 
 TypeScript coordinator (Bun + Hono) + Python worker (`src/worker.py`) + PostgreSQL queue. Coordinator owns HTTP for `/jobs/*`, SSE, supervision, LISTEN/NOTIFY. Worker owns one backtest run end to end. FastAPI keeps everything else until a separate decision retires it.
+
+---
+
+## 20. Future migration candidates (beyond the queue)
+
+This slice introduces the coordinator and proves the polyglot boundary. Once it ships, the same pattern can absorb the rest of the FastAPI surface incrementally. Each row below is a **candidate**, not a commitment — order is risk-adjusted, easiest first.
+
+### 20.1 FastAPI router-by-router assessment
+
+| Router | Endpoints | Has numeric compute? | Recommended action | Priority |
+|---|---|---|---|---|
+| `api/routers/refdata.py` | `GET /refdata/{table}`, `POST /refdata/refresh` | No — pure SQL reads + in-process dict | **Port to coordinator.** REFDATA cache becomes the single source of truth in TS. FastAPI version deleted. | 1 (easiest) |
+| `api/routers/inst.py` | `GET /inst/products`, `GET /inst/products/:id/xrefs`, `POST /inst/refresh` | No — pure SQL reads via `InstrumentCache` | **Port to coordinator.** Same shape as REFDATA. | 2 |
+| `api/auth/router.py` | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | No — bcrypt/argon2 verify + JWT sign | **Port to coordinator.** Use `argon2` (Node) and `jose` for JWT. Removes the need to share `JWT_SECRET` across runtimes. | 3 |
+| `api/routers/backtest.py — /performance` | `POST /backtest/performance` | **Yes** — runs `perf.py` (single backtest, returns equity curve + metrics) | **Move to a dedicated Python service** invoked by the coordinator over HTTP, **or** queue it through the existing job system as a "single-trial" job. Recommendation: queue route — reuses the worker. | 4 |
+| `api/routers/backtest.py — /walk-forward` | `POST /backtest/walk-forward` | **Yes** — runs `walk_forward.py` | Same as `/performance`: queue as a single-trial job. The frontend already accepts async job results. | 4 |
+| `api/routers/backtest.py — /optimize` + `/optimize/stream` | Synchronous + SSE | **Yes** — runs `param_opt.py` | **Retire** once the queue is fully wired. Every optimization becomes a queued job. The legacy sync path can stay as an admin-only fallback. | 5 |
+| `api/services/backtest.py` | Internal | **Yes** — orchestrates `data → strat → perf → param_opt` | **Stays in Python.** Becomes the worker entry point that `src/worker.py` calls into. Nothing to port. | n/a |
+| `src/data.py`, `strat.py`, `perf.py`, `param_opt.py`, `walk_forward.py` | Library modules | **Yes** | **Stay in Python forever.** Library ecosystem reasons (§19.3). | n/a |
+
+### 20.2 Migration order — strangler-fig pattern
+
+Once the queue (Slices A–F) is stable:
+
+1. **Refdata port** — coordinator reads `REFDATA.SP_GET_ENUM` and serves `/api/v1/refdata/*`. Frontend repointed via Vite proxy. Delete `api/routers/refdata.py` + `api/services/refdata_cache.py` *(if separate)*. Sanity check: TanStack Query cache invalidation still works.
+2. **Inst port** — same pattern. Delete `api/routers/inst.py`.
+3. **Auth port** — port `qs_token` issue/verify into TS. Frontend unaffected (still sets `HttpOnly` cookie). FastAPI loses its auth middleware. Coordinator becomes the only origin issuing the cookie.
+4. **`/performance` and `/walk-forward` queueing** — extend `BT.QUEUE` with a `JOB_KIND` column (`'OPTIMIZE' | 'PERFORMANCE' | 'WALK_FORWARD'`). Worker dispatches on kind. Frontend submits these as ordinary queue jobs.
+5. **Retire `/optimize` (sync) and `/optimize/stream`** — once all callers are queued. Phase out FastAPI.
+
+After step 5, the FastAPI deployment unit can be removed entirely. The coordinator handles all HTTP. Python only ever runs as a child process under coordinator supervision.
+
+### 20.3 Things that explicitly stay in Python
+
+| Component | Why |
+|---|---|
+| `src/data.py` (data sources, `RefDataCache`, `BacktestCache`) | pandas/numpy DataFrames, vendor SDKs (`futu`, glassnode) are Python-only. |
+| `src/strat.py`, `src/perf.py`, `src/param_opt.py`, `src/walk_forward.py` | Heavy numerics. |
+| `src/db.py` (`DbGateway`) | Used by both worker and any debug CLI. |
+| `src/main.py` (CLI backtest) | Synchronous local-dev tool. No queue benefit. |
+| Liquibase migrations (`db/liquidbase/`) | Java-based, runtime-agnostic. |
+| Any future ML / training scripts | Python ecosystem. |
+
+### 20.4 Components beyond the API to consider
+
+| Component | Current | Long-term option |
+|---|---|---|
+| **Frontend build** (`frontend/vite.config.ts`) | Vite + Vitest | Already TS — no change. Once coordinator exists, consider a top-level `bun`/`pnpm` workspace so `coordinator/` and `frontend/` share `types/`. |
+| **Nginx routing** (`docker/nginx/nginx.conf`) | Routes `/api/*` → FastAPI | Add `location /api/v1/jobs/ { proxy_pass http://coordinator:3001; }` first. Expand as routers port. |
+| **Docker Compose** (`docker-compose.yml`) | `api`, `frontend`, `nginx` | Add `coordinator` service. After full migration, remove `api`. |
+| **CI / CD** (`.github/workflows/`) | Builds Python + frontend | Add coordinator build (Bun image) + tests (`bun test`). |
+| **Observability** | Logging only | Add OpenTelemetry early — Python and TS both export to the same collector. Critical once requests hop runtimes. |
+| **Trade execution** (`backup/deco/`, future `src/trade.py`) | Python (Futu, Bybit SDKs) | **Stays Python** — broker SDKs only ship Python/C++. Coordinator could expose `/api/v1/trade/*` HTTP and dispatch to a long-running Python trade process via the same DB-only contract used for workers. |
+| **Live market data ingestion** (future) | Not built | If/when added, evaluate Go for the ingestion daemon (binary deployable, small footprint). Coordinator stays the HTTP boundary. |
+
+### 20.5 What this enables long-term
+
+- **Independent scaling** — coordinator (I/O) and workers (CPU) scale on different curves. Today's deployment can run 1 coordinator + 1 worker; tomorrow's can run 3 coordinators behind an ALB + 16 workers across hosts without changing application code.
+- **Heterogeneous workers** — `python -m src.worker` today, `python -m src.worker_gpu` for GPU jobs, `cargo run --bin fast_worker` for Rust hot-paths. Same DB contract.
+- **Edge-deployable read paths** — once `/refdata/*` and `/inst/*` are TS, they can be cached at Cloudflare/Vercel edge with no Python in the request path.
+- **Cleaner blast radius** — a worker crash, a coordinator OOM, or a FastAPI bug each affect only their own process. Today everything shares one uvicorn worker.
+
+### 20.6 Non-decision
+
+This section is a **roadmap**, not a commitment. Each future port should be a separate decision with its own design note in `docs/design/`. The only thing this design *commits* to is the queue itself (§1–§19). Everything in §20 is here so the boundary established by the queue is understood as a deliberate stepping stone, not an accident.
