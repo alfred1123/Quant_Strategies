@@ -3,6 +3,30 @@ Description: >-
   Quant Strategies - EC2 compute instance with IAM role for SSM
   parameter access and Docker pre-installed via user-data.
 
+# ── Config / Secrets strategy ─────────────────────────────────────────────
+# All application secrets (DB credentials, JWT_SECRET, API keys) live in
+# AWS SSM Parameter Store under /quant/<env>/<KEY>.
+#
+# Injection pattern (preferred):
+#   - EC2/ECS: IAM role (ssm-read-app-params policy below) grants read access.
+#     Secrets are fetched by the bootstrap script or task definition and
+#     injected as environment variables — apps never call SSM directly.
+#   - Local dev: .env file at project root (gitignored). Bun and python-dotenv
+#     both read it automatically.
+#
+# App contract:
+#   - coordinator (TS): src/config.ts — required() throws at startup if any
+#     required var is missing. Fail fast, no defaults for secrets.
+#   - api (Python): api/config.py — load_config() with USE_SSM=1 fetches from
+#     SSM at startup; falls back to .env for local dev.
+#
+# Adding a new secret:
+#   1. Add to SSM: aws ssm put-parameter --name /quant/prod/<KEY> ...
+#   2. Declare it in the relevant app config (config.ts or config.py).
+#   3. If running on ECS, add to the task definition secrets block.
+#      Nothing else needs to change — the IAM policy covers /quant/*.
+# ─────────────────────────────────────────────────────────────────────────
+
 Parameters:
   Project:
     Type: String

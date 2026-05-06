@@ -32,9 +32,6 @@ logger = logging.getLogger(__name__)
 
 # ── REFDATA cache ────────────────────────────────────────────────────────────
 
-_REFDATA_EXCLUDE = frozenset({"databasechangelog", "databasechangeloglock"})
-
-
 class RefDataCache(DbGateway):
     """In-process cache for REFDATA tables.
 
@@ -53,9 +50,10 @@ class RefDataCache(DbGateway):
                 FROM information_schema.tables \
                 WHERE table_schema = 'refdata' \
                     AND table_type = 'BASE TABLE' \
+                    AND table_name NOT IN ('databasechangelog', 'databasechangeloglock') \
                 ORDER BY table_name"
             )
-        return [r[0] for r in cur.fetchall() if r[0] not in _REFDATA_EXCLUDE]
+        return [r[0] for r in cur.fetchall()]
 
     def load_all(self) -> None:
         """Fetch every REFDATA table into memory via SP_GET_ENUM."""

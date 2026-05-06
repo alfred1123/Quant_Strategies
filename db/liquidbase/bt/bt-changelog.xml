@@ -87,4 +87,22 @@
         </rollback>
     </changeSet>
 
+    <!-- Replace REFCURSOR SPs with FUNCTION RETURNS TABLE for single-round-trip reads. -->
+    <changeSet id="252-bt-fn-get-queue" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="functions/FN_GET_QUEUE.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
+        <rollback><sql>DROP FUNCTION IF EXISTS bt.fn_get_queue(UUID, UUID, INTEGER, TEXT, INTEGER);</sql></rollback>
+    </changeSet>
+
+    <changeSet id="253-bt-fn-get-queue-for-terminal" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="functions/FN_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
+        <rollback><sql>DROP FUNCTION IF EXISTS bt.fn_get_queue_for_terminal(TEXT, INTEGER, INTEGER);</sql></rollback>
+    </changeSet>
+
+    <!-- Drop REFCURSOR procedures superseded by the FUNCTION equivalents above. -->
+    <changeSet id="254-bt-drop-sp-get-queue" author="alfcheun" context="proc" runOnChange="false">
+        <sql>DROP PROCEDURE IF EXISTS bt.sp_get_queue(UUID, UUID, INTEGER, TEXT, INTEGER, REFCURSOR, TEXT, TEXT, TEXT);</sql>
+        <sql>DROP PROCEDURE IF EXISTS bt.sp_get_queue_for_terminal(TEXT, INTEGER, INTEGER, REFCURSOR, TEXT, TEXT, TEXT);</sql>
+        <rollback><sql>-- dropped REFCURSOR procedures; no rollback</sql></rollback>
+    </changeSet>
+
 </databaseChangeLog>

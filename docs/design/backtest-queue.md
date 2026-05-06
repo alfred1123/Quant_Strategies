@@ -69,11 +69,11 @@ Implementation constraints:
 |---|---|---|---|
 | Coordinator entrypoint | `coordinator/src/index.ts` | Bun (or Node 22 LTS) | Boots HTTP server, manager, LISTEN consumer. |
 | HTTP routes (`/api/v1/jobs/*`) | `coordinator/src/http/routes/` | Bun | Hono framework. |
-| SSE fan-out | `coordinator/src/manager/sse.ts` | Bun | `Set<ReadableStreamDefaultController>`. |
-| Job manager (event loop, watchdog, claim) | `coordinator/src/manager/manager.ts` | Bun | Owns the wakeup loop. |
-| Process supervisor (spawn, parse stdout, signal) | `coordinator/src/manager/supervisor.ts` | Bun | `child_process.spawn`. |
-| DB repo (typed SQL) | `coordinator/src/db/repo.ts` | Bun | Uses `postgres` (porsager). |
-| LISTEN consumer (autocommit conn) | `coordinator/src/db/notify.ts` | Bun | Future: when `pg_notify` is added to `SP_INS_QUEUE`. |
+| SSE fan-out | `coordinator/src/queue/sse.ts` | Bun | `Set<ReadableStreamDefaultController>`. |
+| Job manager (event loop, watchdog, claim) | `coordinator/src/queue/manager.ts` | Bun | Owns the wakeup loop. |
+| Process supervisor (spawn, parse stdout, signal) | `coordinator/src/queue/supervisor.ts` | Bun | `child_process.spawn`. |
+| DB repo (typed SQL) | `coordinator/src/queue/repo.ts` | Bun | Uses `postgres` (porsager). |
+| LISTEN consumer (autocommit conn) | `coordinator/src/queue/notify.ts` | Bun | Future: when `pg_notify` is added to `SP_INS_QUEUE`. |
 | Shared zod schemas | `coordinator/src/types/queue.ts` | Bun + frontend | Re-exported by frontend for type-safe fetch. |
 | Python worker entrypoint | `src/worker.py` | CPython | `python -m src.worker <queue_id>`. |
 | Python DB repo (used by worker self-writes) | `src/jobs.py` | CPython | Existing `BacktestJobRepo`. |
@@ -173,11 +173,11 @@ Active rows: `WHERE TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'`.
 | 5 | `FAILED` | Worker error or coordinator crash recovery |
 | 6 | `CANCELLED` | Worker observed cancel request and exited cleanly |
 
-IDs are assigned by `IDENTITY` at seed time. `SP_GET_QUEUE_FOR_TERMINAL` uses `QUEUE_STATUS_ID IN (1,2,3)` (active states) — hardcoded to match these seed values.
+IDs are assigned by `IDENTITY` at seed time. `FN_GET_QUEUE_FOR_TERMINAL` uses `QUEUE_STATUS_ID IN (1,2,3)` (active states) — hardcoded to match these seed values.
 
 ### 6.3 `BT.STRATEGY` (existing — unchanged)
 
-Queue rows store `(STRATEGY_ID, STRATEGY_VID)` at submission time. The worker joins on this exact pair so queue rows remain valid even if the user updates the strategy mid-queue. `IS_CURRENT_IND` is exposed as `STRAT_CURRENT_IND` in `SP_GET_QUEUE_FOR_TERMINAL` for UI display only.
+Queue rows store `(STRATEGY_ID, STRATEGY_VID)` at submission time. The worker joins on this exact pair so queue rows remain valid even if the user updates the strategy mid-queue. `IS_CURRENT_IND` is exposed as `STRAT_CURRENT_IND` in `FN_GET_QUEUE_FOR_TERMINAL` for UI display only.
 
 ### 6.4 `BT.RESULT` (existing — unchanged)
 
@@ -229,26 +229,26 @@ Called for every state transition: QUEUED → RUNNING → COMPLETED/FAILED/CANCE
 !!! note "pg_notify — future"
     `SP_INS_QUEUE` will emit `pg_notify('job_enqueued', queue_id::text)` on QUEUED inserts and `pg_notify('job_cancel_requested', queue_id::text)` on CANCEL_REQUESTED inserts. The coordinator's `db/notify.ts` consumes these. Until that's added, the HTTP route calls `manager.notifyEnqueued()` directly in-process.
 
-### 7.2 `BT.SP_GET_QUEUE` (implemented — changeset 250)
+### 7.2 `BT.FN_GET_QUEUE` (implemented — changeset 252)
 
-Dynamic SQL reader. Signature: `IN_QUEUE_ID UUID, IN_STRATEGY_ID UUID, IN_QUEUE_STATUS_ID INTEGER, IN_USER_ID TEXT, IN_LIMIT INTEGER` + 4 OUT params (REFCURSOR + 3 status).
+Replaces `SP_GET_QUEUE` (REFCURSOR). `FUNCTION RETURNS TABLE` — single round-trip, called with `SELECT * FROM bt.fn_get_queue(...)`. Signature: `IN_QUEUE_ID UUID, IN_STRATEGY_ID UUID, IN_QUEUE_STATUS_ID INTEGER, IN_USER_ID TEXT, IN_LIMIT INTEGER` (all optional via `DEFAULT NULL`).
 
 - If `IN_QUEUE_ID` provided → returns all VIDs for that job (full history).
-- Otherwise → active rows only, all other params optional filters.
+- Otherwise → active rows only (TRANSACT_TO_TS sentinel); all other params are optional filters.
 
 Returns: `QUEUE_ID, QUEUE_VID, STRATEGY_ID, STRATEGY_VID, TRANSACT_FROM_TS, QUEUE_STATUS_ID, QUEUE_STATUS, PRIORITY, ERROR_TEXT, USER_ID`.
 
-Used by `coordinator/src/db/repo.ts — queryQueue()` and (legacy) `BacktestJobRepo.query_queue()`.
+Used by `coordinator/src/queue/repo.ts — queryQueue()` and `BacktestJobRepo.query_queue()` in `src/jobs.py`.
 
-### 7.3 `BT.SP_GET_QUEUE_FOR_TERMINAL` (implemented — changeset 251)
+### 7.3 `BT.FN_GET_QUEUE_FOR_TERMINAL` (implemented — changeset 253)
 
-Static SQL. Signature: `IN_USER_ID TEXT, IN_QUEUE_STATUS_ID INTEGER, IN_LIMIT INTEGER` + 4 OUT params.
+Replaces `SP_GET_QUEUE_FOR_TERMINAL` (REFCURSOR). `FUNCTION RETURNS TABLE` — single round-trip, called with `SELECT * FROM bt.fn_get_queue_for_terminal(...)`. Signature: `IN_USER_ID TEXT, IN_QUEUE_STATUS_ID INTEGER, IN_LIMIT INTEGER` (all optional via `DEFAULT NULL`).
 
 Active rows with `QUEUE_STATUS_ID IN (1,2,3)`, joined to `BT.STRATEGY` on exact `(STRATEGY_ID, STRATEGY_VID)`.
 
 Returns: `QUEUE_ID, STRATEGY_ID, STRATEGY_VID, STRATEGY_NM, STRAT_CURRENT_IND, TRANSACT_FROM_TS, QUEUE_STATUS, PRIORITY, USER_ID, CONFIG_JSON, ERROR_TEXT`.
 
-Used by `coordinator/src/db/repo.ts — queryTerminal()`.
+Used by `coordinator/src/queue/repo.ts — queryTerminal()` and `BacktestJobRepo.query_queue_for_terminal()` in `src/jobs.py`.
 
 ### 7.4 State transition reference
 
@@ -346,28 +346,31 @@ coordinator/
 ├── tsconfig.json
 ├── Dockerfile
 ├── src/
-│   ├── index.ts                  # boot: load REFDATA cache, start manager, start HTTP
+│   ├── index.ts                  # boot: load REFDATA cache, start queue, start HTTP
 │   ├── config.ts                 # env: DB_URL, MAX_WORKERS=1, PYTHON_BIN, JWT_SECRET, LOG_LEVEL
 │   ├── db/
-│   │   ├── client.ts             # postgres.js singleton + autocommit conn for LISTEN
+│   │   └── client.ts             # postgres.js singleton (shared connection pool only)
+│   ├── queue/                    # all job-queue logic — the coordinator's core domain
 │   │   ├── repo.ts               # submit, claimNext, markTerminal, queryQueue, queryTerminal
-│   │   └── notify.ts             # LISTEN job_enqueued / job_cancel_requested
-│   ├── manager/
 │   │   ├── manager.ts            # wakeup queue, event loop, watchdog, stale recovery
 │   │   ├── supervisor.ts         # spawn child process, parse stdout, signal on cancel
-│   │   └── sse.ts                # subscriber set + broadcast
+│   │   ├── sse.ts                # subscriber set + broadcast
+│   │   └── notify.ts             # LISTEN job_enqueued / job_cancel_requested
 │   ├── http/
 │   │   ├── server.ts             # Hono app + auth middleware (verify qs_token JWT)
 │   │   └── routes/
 │   │       ├── jobs.ts
 │   │       └── stream.ts
 │   ├── refdata/
+│   │   ├── repo.ts               # raw SQL for REFDATA tables
 │   │   └── cache.ts              # in-process REFDATA dict (loaded at startup, refresh endpoint)
 │   └── types/
 │       └── queue.ts              # zod schemas — exported for frontend consumption
 └── tests/
-    └── manager.test.ts           # bun:test
+    └── queue.test.ts             # bun:test
 ```
+
+> **Layout rationale:** `src/db/` holds only the shared connection pool — infrastructure with no domain knowledge. All queue-specific logic (SQL, event loop, process supervision, SSE, LISTEN) lives under `src/queue/` — the coordinator's core domain. Future domains (`src/refdata/`, `src/inst/`) follow the same pattern: each owns its own repo + cache alongside its domain logic.
 
 ### 9.2 Startup sequence (`index.ts`)
 
@@ -604,7 +607,7 @@ In production the same routing happens at nginx.
 
 | Layer | Tests |
 |---|---|
-| DB (`tests/integration/test_jobs_db.py`) | Each procedure round-trip from psycopg. State transition correctness. `SP_GET_QUEUE_FOR_TERMINAL` filtering. |
+| DB (`tests/integration/test_jobs_db.py`) | Each procedure/function round-trip from psycopg. State transition correctness. `FN_GET_QUEUE_FOR_TERMINAL` filtering. |
 | Worker (`tests/unit/test_worker.py`) | Stub the optimization pipeline. Test progress throttling, cancellation observation, timeout enforcement, terminal state writes for each exit path. Verify exit codes. |
 | Coordinator manager (`coordinator/tests/manager.test.ts`) | Mock `repo` + `supervisor`. Test event loop, watchdog, stale recovery on startup, SSE fanout, idempotent cancel. |
 | Coordinator HTTP (`coordinator/tests/http.test.ts`) | Auth, rate limiting (20-queued cap), enqueue → list → cancel → delete flow, SSE reconnect with `Last-Event-ID`. |
@@ -642,7 +645,7 @@ Each slice is independently shippable.
 ### Slice A — Schema + procedures ✅ Done
 
 1. ~~Liquibase changesets for `BT.QUEUE`, `REFDATA.QUEUE_STATUS` and indexes.~~ (changesets 120, 170, 210, 212, 221, 231, 232, 240, 241)
-2. ~~`SP_INS_QUEUE` (changeset 250), `SP_GET_QUEUE` (changeset 250), `SP_GET_QUEUE_FOR_TERMINAL` (changeset 251).~~
+2. ~~`SP_INS_QUEUE` (changeset 231), `SP_INS_RESULT` (changeset 232); `FN_GET_QUEUE` (changeset 252), `FN_GET_QUEUE_FOR_TERMINAL` (changeset 253); old REFCURSOR SPs dropped (changeset 254).~~
 3. ~~`src/jobs.py` — `BacktestJobRepo` (read methods used by worker; writes used for terminal transitions).~~
 
 ### Slice B — Coordinator skeleton
