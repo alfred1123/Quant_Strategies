@@ -33,20 +33,25 @@ export async function queryQueue(filters: {
   queueId?: string;
   strategyId?: string;
   statusId?: number;
-  priority?: number;
   userId?: string;
   limit?: number;
 } = {}): Promise<QueueRow[]> {
-  return sql<QueueRow[]>`
-    SELECT * FROM bt.fn_get_queue(
-      ${filters.queueId ?? null}::uuid,
-      ${filters.strategyId ?? null}::uuid,
-      ${filters.statusId ?? null}::integer,
-      ${filters.priority ?? null}::integer,
-      ${filters.userId ?? null}::text,
-      ${filters.limit ?? 50}::integer
-    )
-  `;
+  return sql.begin(async (tx) => {
+    const out = await callProc<SpResult & { out_result: string }>(
+      tx, "bt.sp_get_queue",
+      (db) => db`
+        CALL bt.sp_get_queue(
+          ${filters.queueId ?? null}::uuid,
+          ${filters.strategyId ?? null}::uuid,
+          ${filters.statusId ?? null}::integer,
+          ${filters.userId ?? null}::text,
+          ${filters.limit ?? 50}::integer,
+          NULL, NULL, NULL, NULL
+        )
+      `,
+    );
+    return tx.unsafe<QueueRow[]>(`FETCH ALL FROM "${out.out_result.replace(/"/g, '""')}"`);
+  });
 }
 
 export async function queryTerminal(filters: {

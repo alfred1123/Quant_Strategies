@@ -1,6 +1,6 @@
 import { sql, callProc, type SpResult } from "../db/client";
 
-class RefDataCache {
+export class RefDataCache {
   private store = new Map<string, Record<string, unknown>[]>();
   private async discoverTables(): Promise<string[]> {
     const rows = await sql<{ table_name: string }[]>`

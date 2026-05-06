@@ -87,10 +87,11 @@
         </rollback>
     </changeSet>
 
-    <!-- Replace REFCURSOR SPs with FUNCTION RETURNS TABLE for single-round-trip reads. -->
+    <!-- Revert to REFCURSOR procedure (consistent with SP layer; callProc + FETCH pattern). -->
     <changeSet id="252-bt-fn-get-queue" author="alfcheun" context="proc" runOnChange="true">
-        <sqlFile path="functions/FN_GET_QUEUE.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <rollback><sql>DROP FUNCTION IF EXISTS bt.fn_get_queue(UUID, UUID, INTEGER, TEXT, INTEGER);</sql></rollback>
+        <sql>DROP FUNCTION IF EXISTS bt.fn_get_queue(UUID, UUID, INTEGER, TEXT, INTEGER);</sql>
+        <sqlFile path="procedures/SP_GET_QUEUE.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS bt.sp_get_queue(UUID, UUID, INTEGER, TEXT, INTEGER, REFCURSOR, TEXT, TEXT, TEXT);</sql></rollback>
     </changeSet>
 
     <changeSet id="253-bt-fn-get-queue-for-terminal" author="alfcheun" context="proc" runOnChange="true">
