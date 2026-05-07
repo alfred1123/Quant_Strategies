@@ -88,15 +88,11 @@
     </changeSet>
 
     <!-- Revert to REFCURSOR procedure (consistent with SP layer; callProc + FETCH pattern). -->
-    <changeSet id="252-bt-fn-get-queue" author="alfcheun" context="proc" runOnChange="true">
-        <sql>DROP FUNCTION IF EXISTS bt.fn_get_queue(UUID, UUID, INTEGER, TEXT, INTEGER);</sql>
-        <sqlFile path="procedures/SP_GET_QUEUE.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <rollback><sql>DROP PROCEDURE IF EXISTS bt.sp_get_queue(UUID, UUID, INTEGER, TEXT, INTEGER, REFCURSOR, TEXT, TEXT, TEXT);</sql></rollback>
-    </changeSet>
 
-    <changeSet id="253-bt-fn-get-queue-for-terminal" author="alfcheun" context="proc" runOnChange="true">
-        <sqlFile path="functions/FN_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <rollback><sql>DROP FUNCTION IF EXISTS bt.fn_get_queue_for_terminal(TEXT, INTEGER, INTEGER);</sql></rollback>
+    <!-- Drop stale 3-arg overload (replaced by 2-arg above; CREATE OR REPLACE can't drop params). -->
+    <changeSet id="255-bt-drop-stale-fn-get-queue-for-terminal" author="alfcheun" context="proc" runOnChange="false">
+        <sql>DROP FUNCTION IF EXISTS bt.fn_get_queue_for_terminal(TEXT, INTEGER, INTEGER);</sql>
+        <rollback><sql>-- stale overload; no rollback</sql></rollback>
     </changeSet>
 
     <!-- Drop REFCURSOR procedures superseded by the FUNCTION equivalents above. -->
@@ -104,6 +100,20 @@
         <sql>DROP PROCEDURE IF EXISTS bt.sp_get_queue(UUID, UUID, INTEGER, TEXT, INTEGER, REFCURSOR, TEXT, TEXT, TEXT);</sql>
         <sql>DROP PROCEDURE IF EXISTS bt.sp_get_queue_for_terminal(TEXT, INTEGER, INTEGER, REFCURSOR, TEXT, TEXT, TEXT);</sql>
         <rollback><sql>-- dropped REFCURSOR procedures; no rollback</sql></rollback>
+    </changeSet>
+
+    <!-- Per-user queued-job counter for the rate-limit check (POST /api/v1/jobs). -->
+    <changeSet id="260-bt-proc-sp-get-queued-count" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="procedures/SP_GET_QUEUED_COUNT.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
+        <rollback>
+            <sql>DROP PROCEDURE IF EXISTS bt.sp_get_queued_count(TEXT, INTEGER, INTEGER, TEXT, TEXT, TEXT);</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- REFCURSOR over a single queue_id's rows ordered by (PRIORITY, TRANSACT_FROM_TS). -->
+    <changeSet id="261-bt-drop-sp-get-queued-priority" author="alfcheun" context="proc" runOnChange="false">
+        <sql>DROP PROCEDURE IF EXISTS bt.sp_get_queued_priority(UUID, INTEGER, REFCURSOR, TEXT, TEXT, TEXT);</sql>
+        <rollback><sql>-- removed; queue position is now derived in the coordinator from FN_GET_QUEUE_FOR_TERMINAL</sql></rollback>
     </changeSet>
 
 </databaseChangeLog>

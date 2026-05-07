@@ -1,4 +1,4 @@
-import { sql, callProc, type Sql, type SpResult } from "../db/client";
+import { sql, callProc, type SpResult } from "../db/client";
 
 // read access to database
 
@@ -57,14 +57,12 @@ export async function queryQueue(filters: {
 export async function queryTerminal(filters: {
   userId?: string;
   statusId?: number;
-  limit?: number;
 } = {}): Promise<TerminalRow[]> {
   return sql<TerminalRow[]>`
     SELECT * FROM bt.fn_get_queue_for_terminal(
       ${filters.userId ?? null}::text,
-      ${filters.statusId ?? null}::integer,
-      ${filters.limit ?? 50}::integer
-    )
+      ${filters.statusId ?? null}::integer
+    ) LIMIT 50
   `;
 }
 
@@ -91,5 +89,76 @@ export async function enqueue(params: {
     )
   `);
 }
-  
+
+/** Count active QUEUED rows owned by `userId` — used for the 20-job rate limit. */
+export async function countQueuedForUser(
+  userId: string,
+  queuedStatusId: number,
+): Promise<number> {
+  const out = await callProc<SpResult & { out_count: number }>(
+    sql, "bt.sp_get_queued_count",
+    (db) => db`
+      CALL bt.sp_get_queued_count(
+        ${userId}::text,
+        ${queuedStatusId}::integer,
+        NULL, NULL, NULL, NULL
+      )
+    `,
+  );
+  return Number(out.out_count ?? 0);
+}
+
+export interface ClaimedJob {
+  queue_id: string;
+  strategy_id: string;
+  strategy_vid: number;
+  priority: number;
+  user_id: string;
+}
+
+/**
+ * Claim the head of the QUEUED ranking and transition it to RUNNING.
+ *
+ * Phase 1 (single coordinator, per docs/design/backtest-queue.md §9.4):
+ * read head + write RUNNING in one transaction. Phase 2 will collapse this
+ * into a single atomic `SP_CLAIM_NEXT` (needed for multi-coordinator).
+ *
+ * Returns `null` when the queue is empty.
+ */
+export async function claimNext(
+  queuedStatusId: number,
+  runningStatusId: number,
+): Promise<ClaimedJob | null> {
+  return sql.begin(async (tx) => {
+    const head = await tx<TerminalRow[]>`
+      SELECT * FROM bt.fn_get_queue_for_terminal(
+        ${null}::text,
+        ${queuedStatusId}::integer
+      ) LIMIT 1
+    `;
+    const row = head[0];
+    if (!row) return null;
+
+    await callProc(tx, "bt.sp_ins_queue", (db) => db`
+      CALL bt.sp_ins_queue(
+        ${row.queue_id}::uuid,
+        ${row.strategy_id}::uuid,
+        ${row.strategy_vid}::integer,
+        ${runningStatusId}::integer,
+        ${row.priority}::integer,
+        ${null}::text,
+        ${row.user_id}::text,
+        NULL, NULL, NULL
+      )
+    `);
+
+    return {
+      queue_id: row.queue_id,
+      strategy_id: row.strategy_id,
+      strategy_vid: row.strategy_vid,
+      priority: row.priority,
+      user_id: row.user_id,
+    };
+  });
+}
 

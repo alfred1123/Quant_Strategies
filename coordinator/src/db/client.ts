@@ -1,5 +1,8 @@
-import postgres, { type Sql, type PendingQuery, type Row } from "postgres";
+import postgres, { type Sql, type TransactionSql, type PendingQuery, type Row } from "postgres";
 import { config } from "../config";
+
+/** Either the pool (`sql`) or a transaction handle (`tx` from `sql.begin`). */
+export type SqlExecutor = Sql | TransactionSql;
 
 /** Shared connection pool. */
 export const sql: Sql = postgres(config.QUANTDB_URL, {
@@ -51,9 +54,9 @@ export class StoredProcedureError extends Error {
  * `out_strategy_vid`) returned by procs beyond the standard SpResult shape.
  */
 export async function callProc<T extends SpResult = SpResult>(
-  db: Sql,
+  db: SqlExecutor,
   proc: string,
-  build: (db: Sql) => PendingQuery<Row[]>,
+  build: (db: SqlExecutor) => PendingQuery<Row[]>,
 ): Promise<T> {
   const rows = (await build(db)) as unknown as T[];
   const result = rows[0];
