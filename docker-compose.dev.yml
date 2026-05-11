@@ -1,0 +1,77 @@
+# Local-DB dev support stack — Redis + Coordinator only.
+#
+# This compose file is *only* used when DB_TARGET=local (see scripts/appctl.sh).
+# It is intentionally separate from docker-compose.yml so the rest of the dev
+# loop (uvicorn + vite running natively on the host) is unaffected for
+# teammates who keep DB_TARGET=prod and reach Aurora via the SSM tunnel.
+#
+# What runs here:
+#   * redis     — REFDATA cache, published on host :6379 so the host-side
+#                 uvicorn (api/main.py) can reach it via redis://localhost:6379
+#   * coordinator — Bun service that hydrates Redis from Postgres on boot and
+#                 republishes when REFDATA is bumped. Uses host networking so
+#                 it can reach both local Postgres (127.0.0.1:5432) and Redis
+#                 (127.0.0.1:6379) without an extra docker network.
+#
+# Bring up:
+#     docker compose -f docker-compose.dev.yml up -d
+# Logs:
+#     docker compose -f docker-compose.dev.yml logs -f coordinator
+# Tear down:
+#     docker compose -f docker-compose.dev.yml down
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: quant-dev-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - 128mb
+      - --maxmemory-policy
+      - noeviction
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  coordinator:
+    build:
+      context: ./coordinator
+      dockerfile: Dockerfile
+    container_name: quant-dev-coordinator
+    restart: unless-stopped
+    # host networking so the container can reach the local Postgres on
+    # 127.0.0.1:5432 (installed natively, not in compose) AND Redis on
+    # 127.0.0.1:6379 (mapped above).  Linux/WSL2 only — fine for dev.
+    network_mode: host
+    environment:
+      - PORT=${COORDINATOR_PORT:-3001}
+      - REDIS_URL=redis://127.0.0.1:6379
+      # Local Postgres restored via scripts/dbctl.sh.  Override via .env if
+      # you renamed user/db.  sslmode=disable matches the local cluster's
+      # default pg_hba (no TLS) and matches what api/config.py uses for
+      # DB_TARGET=local.
+      - QUANTDB_URL=${LOCAL_QUANTDB_URL:-postgresql://quant_admin:LetsGetRich888@127.0.0.1:5432/quantdb?sslmode=disable}
+      - JWT_SECRET=${JWT_SECRET:-dev-only-secret-not-for-prod}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bun -e "fetch('http://127.0.0.1:${COORDINATOR_PORT:-3001}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s

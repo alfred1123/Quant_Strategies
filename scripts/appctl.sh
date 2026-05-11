@@ -13,13 +13,43 @@ FRONTEND_LOG_FILE="$LOG_DIR/frontend.log"
 TUNNEL_LOG_FILE="$LOG_DIR/tunnel.log"
 BACKEND_PORT=8000
 DEV_FRONTEND_PORT=5173
-DB_PORT=5433
+
+# Load .env early so DB_TARGET / QUANTDB_* / SSM_* overrides apply in dev too.
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env"
+  set +a
+fi
+
+# DB_TARGET selects where dev's API connects:
+#   prod  → AWS Aurora via SSM port-forward on 127.0.0.1:5433  (default — works for everyone)
+#   local → local Postgres 17 on 127.0.0.1:5432                (requires `./scripts/dbctl.sh reset/restore`)
+DB_TARGET="${DB_TARGET:-prod}"
+
+if [[ "$DB_TARGET" == "local" ]]; then
+  DB_PORT="${LOCAL_DB_PORT:-5432}"
+  LOCAL_DB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
+  LOCAL_DB_NAME="${LOCAL_DB_NAME:-quantdb}"
+  LOCAL_DB_USER="${LOCAL_DB_USER:-quant_admin}"
+  LOCAL_DB_PASSWORD="${LOCAL_DB_PASSWORD:-LetsGetRich888}"
+else
+  DB_PORT=5433
+fi
 
 # AWS SSM port-forward target (override via .env if needed).
 SSM_TARGET_INSTANCE="${SSM_TARGET_INSTANCE:-i-096f85bf84852cce3}"
 SSM_RDS_HOST="${SSM_RDS_HOST:-quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com}"
 SSM_REMOTE_PORT="${SSM_REMOTE_PORT:-5432}"
 SSM_AWS_PROFILE="${SSM_AWS_PROFILE:-alfcheun}"
+
+# Local dev support stack (Redis + coordinator). Only brought up when
+# DB_TARGET=local — teammates on DB_TARGET=prod don't need Docker installed.
+DEV_COMPOSE_FILE="$ROOT_DIR/docker-compose.dev.yml"
+DEV_COMPOSE_PROJECT="quantdev"
+COORDINATOR_PORT="${COORDINATOR_PORT:-3001}"
+LOCAL_QUANTDB_URL="${LOCAL_QUANTDB_URL:-postgresql://${LOCAL_DB_USER:-quant_admin}:${LOCAL_DB_PASSWORD:-LetsGetRich888}@${LOCAL_DB_HOST:-127.0.0.1}:${LOCAL_DB_PORT:-5432}/${LOCAL_DB_NAME:-quantdb}?sslmode=disable}"
+export LOCAL_QUANTDB_URL
 
 MODE="${1:-}"
 ACTION="${2:-}"
@@ -47,8 +77,15 @@ Notes:
   - dev mode runs FastAPI with --reload and Vite dev server (no Docker).
     Redis is optional locally — REFDATA endpoints will 503 until coordinator
     publishes, but auth/login work fine without it.
+  - DB target is selected via DB_TARGET (set in .env or shell):
+      DB_TARGET=prod   → AWS Aurora via SSM tunnel on :5433  (default)
+      DB_TARGET=local  → local Postgres 17 on :5432          (set up via ./scripts/dbctl.sh)
   - 'dev tunnel' manages a single canonical AWS SSM port-forward to RDS so you
     only ever have one reconnect loop running (avoids races on port 5433).
+    Not needed when DB_TARGET=local.
+  - When DB_TARGET=local, 'dev start' also brings up Redis + coordinator via
+    docker-compose.dev.yml so REFDATA endpoints work. 'dev stop|kill' tears it
+    down. Requires docker + docker compose v2 on the host.
   - prod mode loads ./.env when present (set -a) so docker compose can substitute
     QUANTDB_URL, JWT_SECRET, REDIS_URL, COORDINATOR_PORT, etc. The coordinator
     container needs QUANTDB_URL + JWT_SECRET; FastAPI loads SSM inside the api
@@ -153,7 +190,18 @@ backend_command() {
   # connections back to a process that bound only to loopback. Binding to all
   # interfaces makes the API reachable from inside WSL, from Windows, and via
   # the Vite proxy regardless of network mode.
-  printf '%s' "cd '$ROOT_DIR' && source '$ROOT_DIR/env/bin/activate' && uvicorn api.main:app --reload --reload-dir '$ROOT_DIR/api' --reload-dir '$ROOT_DIR/src' --host 0.0.0.0 --port 8000"
+  local db_overrides=""
+  if [[ "$DB_TARGET" == "local" ]]; then
+    # Override DB connection to point at local Postgres (no SSL, no SSM tunnel).
+    # Also disable USE_SSM so the API doesn't try Parameter Store and fall back.
+    db_overrides="export USE_SSM=0 && \
+export QUANTDB_HOST='$LOCAL_DB_HOST' && \
+export QUANTDB_PORT='$DB_PORT' && \
+export QUANTDB_USERNAME='$LOCAL_DB_USER' && \
+export QUANTDB_PASSWORD='$LOCAL_DB_PASSWORD' && \
+export QUANTDB_CONNINFO=\"host=$LOCAL_DB_HOST port=$DB_PORT dbname=$LOCAL_DB_NAME user=$LOCAL_DB_USER password=$LOCAL_DB_PASSWORD sslmode=disable\" && "
+  fi
+  printf '%s' "cd '$ROOT_DIR' && source '$ROOT_DIR/env/bin/activate' && ${db_overrides}uvicorn api.main:app --reload --reload-dir '$ROOT_DIR/api' --reload-dir '$ROOT_DIR/src' --host 0.0.0.0 --port 8000"
 }
 
 frontend_command() {
@@ -175,12 +223,13 @@ tunnel_command() {
 db_reachable() {
   # Real TCP handshake check (don't keep the socket open — SSM port-forward
   # would tunnel the empty connection through to RDS and stall).
+  local host="${LOCAL_DB_HOST:-127.0.0.1}"
   python3 - <<PY 2>/dev/null
 import socket, sys
 s = socket.socket()
 s.settimeout(2)
 try:
-    s.connect(("127.0.0.1", $DB_PORT))
+    s.connect(("$host", $DB_PORT))
     s.close()
     sys.exit(0)
 except Exception:
@@ -365,6 +414,61 @@ status_service() {
   fi
 }
 
+# ── Dev support stack (Redis + coordinator) — DB_TARGET=local only ────
+# Lazily detects docker availability so DB_TARGET=prod users never need it.
+# Uses `sg docker` only if the user is not yet in the docker group (fresh
+# install, current shell hasn't picked up groups yet).
+_compose() {
+  local args=( compose -f "$DEV_COMPOSE_FILE" -p "$DEV_COMPOSE_PROJECT" "$@" )
+  if docker info >/dev/null 2>&1; then
+    docker "${args[@]}"
+  elif command -v sg >/dev/null 2>&1 && getent group docker | grep -q "\b$USER\b"; then
+    sg docker -c "docker $(printf '%q ' "${args[@]}")"
+  else
+    sudo docker "${args[@]}"
+  fi
+}
+
+dev_stack_start() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "WARN: 'docker' not found — Redis + coordinator will not start. REFDATA endpoints will time out." >&2
+    echo "      Install: sudo apt install -y docker.io docker-compose-v2 && sudo usermod -aG docker \$USER" >&2
+    return 0
+  fi
+  if [[ ! -f "$DEV_COMPOSE_FILE" ]]; then
+    echo "WARN: $DEV_COMPOSE_FILE not found — skipping dev support stack." >&2
+    return 0
+  fi
+  echo "Starting dev support stack (redis + coordinator) via $DEV_COMPOSE_FILE ..."
+  _compose up -d --build --remove-orphans 2>&1 | sed 's/^/  /'
+}
+
+dev_stack_stop() {
+  if ! command -v docker >/dev/null 2>&1; then
+    return 0
+  fi
+  if [[ ! -f "$DEV_COMPOSE_FILE" ]]; then
+    return 0
+  fi
+  echo "Stopping dev support stack ..."
+  _compose down --remove-orphans 2>&1 | sed 's/^/  /'
+}
+
+dev_stack_status() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "dev stack: docker not installed (REFDATA endpoints will fail)"
+    return 0
+  fi
+  local out
+  out="$(_compose ps --format 'table {{.Name}}\t{{.Status}}' 2>/dev/null || true)"
+  if [[ -z "$out" ]]; then
+    echo "dev stack: no compose containers (run: ./scripts/appctl.sh dev start)"
+  else
+    echo "dev stack:"
+    echo "$out" | sed 's/^/  /'
+  fi
+}
+
 SELF_CMD="${APPCTL_ENTRYPOINT:-$(basename "$0")}" 
 
 case "$ACTION" in
@@ -401,43 +505,70 @@ case "$ACTION" in
     exit 0
     ;;
   start)
-    # Pre-flight: API lifespan blocks on DB; refuse to start if tunnel is dead.
+    # Pre-flight: API lifespan blocks on DB; refuse to start if it isn't reachable.
     if ! db_reachable; then
-      echo "DB on 127.0.0.1:$DB_PORT is NOT reachable." >&2
-      echo "Start the SSM tunnel first:  ./scripts/appctl.sh dev tunnel start" >&2
+      if [[ "$DB_TARGET" == "local" ]]; then
+        echo "Local Postgres on 127.0.0.1:$DB_PORT is NOT reachable." >&2
+        echo "  - Start it:    sudo systemctl start postgresql" >&2
+        echo "  - Or restore:  ./scripts/dbctl.sh reset && ./scripts/dbctl.sh restore" >&2
+        echo "  - Or switch back to prod DB: unset DB_TARGET in .env (or set DB_TARGET=prod)" >&2
+      else
+        echo "DB on 127.0.0.1:$DB_PORT is NOT reachable." >&2
+        echo "Start the SSM tunnel first:  ./scripts/appctl.sh dev tunnel start" >&2
+        echo "(Or use a local DB: set DB_TARGET=local in .env after running ./scripts/dbctl.sh restore)" >&2
+      fi
       exit 2
+    fi
+    if [[ "$DB_TARGET" == "local" ]]; then
+      dev_stack_start
     fi
     start_service "backend" "$BACKEND_PID_FILE" "$BACKEND_LOG_FILE" "$(backend_command)" "$BACKEND_PORT"
     start_service "frontend" "$FRONTEND_PID_FILE" "$FRONTEND_LOG_FILE" "$(frontend_command)" "$(frontend_port)"
-    echo "Mode: dev"
+    echo "Mode: dev  (DB_TARGET=$DB_TARGET)"
     echo "Backend:  http://127.0.0.1:8000"
     echo "Frontend: http://127.0.0.1:5173"
+    if [[ "$DB_TARGET" == "local" ]]; then
+      echo "Coordinator: http://127.0.0.1:${COORDINATOR_PORT}  (docker-compose.dev.yml)"
+    fi
     ;;
   stop)
     stop_service "frontend" "$FRONTEND_PID_FILE" "$(frontend_port)"
     stop_service "backend" "$BACKEND_PID_FILE" "$BACKEND_PORT"
+    if [[ "$DB_TARGET" == "local" ]]; then
+      dev_stack_stop
+    fi
     ;;
   kill)
     kill_service "frontend" "$FRONTEND_PID_FILE" "$(frontend_port)"
     kill_service "backend" "$BACKEND_PID_FILE" "$BACKEND_PORT"
+    if [[ "$DB_TARGET" == "local" ]]; then
+      dev_stack_stop
+    fi
     ;;
   restart)
     "$0" "$MODE" stop
     "$0" "$MODE" start
     ;;
   status)
-    echo "Mode: dev"
+    echo "Mode: dev  (DB_TARGET=$DB_TARGET)"
     echo "Command: ./scripts/$SELF_CMD dev <start|stop|kill|restart|status|tunnel>"
-    status_service "tunnel"   "$TUNNEL_PID_FILE"   "$DB_PORT"
+    if [[ "$DB_TARGET" == "prod" ]]; then
+      status_service "tunnel"   "$TUNNEL_PID_FILE"   "$DB_PORT"
+    fi
     status_service "backend"  "$BACKEND_PID_FILE"  "$BACKEND_PORT"
     status_service "frontend" "$FRONTEND_PID_FILE" "$(frontend_port)"
     if db_reachable; then
-      echo "DB: reachable on 127.0.0.1:$DB_PORT"
+      echo "DB: reachable on ${LOCAL_DB_HOST:-127.0.0.1}:$DB_PORT  ($DB_TARGET)"
     else
-      echo "DB: UNREACHABLE on 127.0.0.1:$DB_PORT"
+      echo "DB: UNREACHABLE on ${LOCAL_DB_HOST:-127.0.0.1}:$DB_PORT  ($DB_TARGET)"
+    fi
+    if [[ "$DB_TARGET" == "local" ]]; then
+      dev_stack_status
     fi
     echo "Backend log:  $BACKEND_LOG_FILE"
     echo "Frontend log: $FRONTEND_LOG_FILE"
-    echo "Tunnel log:   $TUNNEL_LOG_FILE"
+    if [[ "$DB_TARGET" == "prod" ]]; then
+      echo "Tunnel log:   $TUNNEL_LOG_FILE"
+    fi
     ;;
 esac

@@ -76,7 +76,16 @@ class RedisRefData:
     def __init__(self, redis_url: str) -> None:
         self._url = redis_url
         # decode_responses=True so GET returns str (we'll json.loads it).
-        self._r = redis.Redis.from_url(redis_url, decode_responses=True)
+        # Short connect/read timeouts so REFDATA endpoints fail fast (503 via
+        # ValueError) when Redis is down — otherwise the FastAPI worker hangs
+        # for the OS default (~2 minutes) while the frontend dropdowns sit
+        # empty. retry_on_timeout=False keeps the failure surface deterministic.
+        self._r = redis.Redis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
         self._store: dict[str, list[dict]] = {}
         self._version: str | None = None
 

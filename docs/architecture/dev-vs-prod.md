@@ -116,6 +116,88 @@ docker compose up -d --build
 
 ---
 
+## Optional: point dev at a local Postgres
+
+By default `./scripts/appctl.sh dev start` uses the SSM tunnel on `localhost:5433`
+to reach the shared Aurora cluster. This is the recommended path — every
+teammate gets it for free with just AWS SSO.
+
+If you also want a **local** Postgres (offline work, faster iteration, safe to
+break), the toolchain supports it as an opt-in via `DB_TARGET=local`. Teammates
+without a local DB are unaffected — leaving `DB_TARGET` unset keeps the prod
+tunnel as the default.
+
+### One-time setup
+
+```bash
+# 1. Install Postgres 17 client + server (Ubuntu/WSL example, PGDG repo)
+sudo apt install -y postgresql-17 postgresql-client-17
+
+# 2. Install Docker + compose v2 (used to run Redis + the Bun coordinator
+#    that publishes REFDATA). Skip if you already have Docker.
+sudo apt install -y docker.io docker-compose-v2
+sudo usermod -aG docker "$USER"     # log out/in, or use `sg docker -c ...`
+
+# 3. Create the local quant_admin user + quantdb database
+./scripts/dbctl.sh reset
+
+# 4. Dump prod (uses the SSM tunnel) and restore into local
+./scripts/dbctl.sh dump
+./scripts/dbctl.sh restore        # picks the newest dump in db/dumps/
+```
+
+### Daily usage
+
+```bash
+# Append once to .env (per-developer, gitignored)
+echo 'DB_TARGET=local' >> .env
+
+# Start: brings up uvicorn + vite natively AND
+#   docker-compose.dev.yml (redis + coordinator) automatically.
+# No SSM tunnel needed.
+./scripts/appctl.sh dev start
+
+# Status confirms which target is active + dev stack health
+./scripts/appctl.sh dev status
+#   Mode: dev  (DB_TARGET=local)
+#   backend: running (..., port 8000)
+#   frontend: running (..., port 5173)
+#   DB: reachable on 127.0.0.1:5432  (local)
+#   dev stack:
+#     quant-dev-coordinator   Up (healthy)
+#     quant-dev-redis         Up (healthy)
+```
+
+`./scripts/appctl.sh dev kill` (or `stop`) tears down everything — uvicorn,
+vite, **and** the compose stack — so nothing lingers between sessions.
+
+What runs where:
+
+| Component | Where | Port | Source of truth |
+|-----------|-------|------|-----------------|
+| FastAPI (uvicorn --reload) | host (native) | 8000 | `api/`, `src/` |
+| Vite dev server | host (native) | 5173 | `frontend/` |
+| PostgreSQL 17 | host (native, systemd) | 5432 | `pg_dump` of Aurora |
+| Redis 7 | docker | 6379 | `docker-compose.dev.yml` |
+| Coordinator (Bun) | docker (host network) | 3001 | `docker-compose.dev.yml` |
+
+The coordinator container uses `network_mode: host` so it can reach the
+host-side Postgres at `127.0.0.1:5432` without any extra docker network
+plumbing (Linux/WSL2 only). It hydrates Redis with all REFDATA tables on
+boot — verify with `docker exec quant-dev-redis redis-cli keys 'refdata:*'`.
+
+To switch back to the shared prod DB, comment out / remove `DB_TARGET=local`
+from `.env` (or run `DB_TARGET=prod ./scripts/appctl.sh dev start` for a
+one-off override).
+
+How it works: `appctl.sh` reads `DB_TARGET` and, when set to `local`, exports
+`USE_SSM=0` plus a `QUANTDB_CONNINFO` pointing at `127.0.0.1:5432` with
+`sslmode=disable` before launching uvicorn. `api/config.py` honours
+`QUANTDB_CONNINFO` over the individual `QUANTDB_*` vars, so .env defaults
+remain untouched.
+
+---
+
 ## SSM parameters
 
 Both dev and prod config live in AWS SSM Parameter Store under `/quant/<env>/`.
