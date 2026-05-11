@@ -6,7 +6,9 @@ import os
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
+from api.auth.models import LoginRequest
 from api.auth.service import AuthService, _resolve_jwt_secret
 
 
@@ -67,3 +69,17 @@ class TestAuthServiceInit:
             os.environ.pop("APP_ENV", None)
             svc = AuthService()
             assert svc
+
+
+class TestLoginRequestNormalization:
+    def test_username_trim_and_casefold(self):
+        b = LoginRequest(username="  TestUser  ", password="x" * 12)
+        assert b.username == "testuser"
+
+    def test_password_strip(self):
+        b = LoginRequest(username="u", password=f"  {'a' * 12}  ")
+        assert len(b.password) == 12
+
+    def test_password_strip_too_short_after_strip(self):
+        with pytest.raises(ValidationError):
+            LoginRequest(username="u", password="  short  ")

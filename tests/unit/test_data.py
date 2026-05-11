@@ -620,8 +620,9 @@ class TestInstrumentCache:
         assert cache.resolve_vendor_symbol(2, 2) is None
         assert cache.resolve_vendor_symbol(999, 1) is None
 
-    @patch("data.DbGateway._call_get")
-    def test_load_all_calls_both_procs(self, mock_call_get):
+    @patch("data.psycopg.connect", return_value=MagicMock())
+    @patch("db.DbGateway._call_get")
+    def test_load_all_calls_both_procs(self, mock_call_get, _mock_connect):
         from data import InstrumentCache
         mock_call_get.side_effect = [self.SAMPLE_PRODUCTS, self.SAMPLE_XREFS]
         c = InstrumentCache("dummy")

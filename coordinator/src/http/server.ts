@@ -77,7 +77,7 @@ app.post("/api/v1/jobs", async (c) => {
   // Derive queue_pos from the same ordered list the UI consumes
   // (priority ASC, transact_from_ts ASC). 1 = next to run; 0 if not found.
   const queued = await queryTerminal({ statusId: queuedStatusId });
-  const queuePos = queued.findIndex((r) => r.queue_id === queueId) + 1;
+  const queuePos = queued.findIndex((r) => r.queue_id ==.env= queueId) + 1;
   const res: EnqueueResponse = { queue_id: queueId, queue_pos: queuePos };
   return c.json(res, 201);
 });

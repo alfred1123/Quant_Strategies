@@ -17,7 +17,7 @@ environment after a deploy or onboard quickly.
 | `APP_ENV` | `dev` (default) | `prod` | `docker-compose.prod.yml` |
 | `USE_SSM` | `1` (default) | `1` | `docker-compose.yml` (default for both) |
 | `COOKIE_SECURE` | unset (defaults to `APP_ENV == prod`) | `0` (HTTP) / `1` (HTTPS) | `docker-compose.prod.yml` / `docker-compose.tls.yml` |
-| `CORS_ORIGINS` | `http://localhost:5173` | `http://localhost:5173,http://52.221.3.230` | SSM `/quant/dev/` / SSM `/quant/prod/` |
+| `CORS_ORIGINS` | SSM `/quant/dev/` or `.env` (no in-code default) | SSM `/quant/prod/` (public site URL(s)) | SSM / `.env` |
 | `JWT_SECRET` | shared dev secret from SSM | fixed value from SSM | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | DB access method | SSM port-forward tunnel | Direct VPC connection | Network topology |
 | Nginx config | `nginx.dev.conf` (HTTP only) | Same (HTTP) or `nginx.conf` (TLS via `docker-compose.tls.yml`) | `docker/nginx/` |

@@ -22,6 +22,13 @@ from api.auth.repo import AuthRepo
 logger = logging.getLogger(__name__)
 
 
+def _app_user_row_is_active(user: dict) -> bool:
+    v = user.get("is_active_ind")
+    if v is None:
+        return False
+    return str(v).strip().upper() == "Y"
+
+
 def _resolve_jwt_secret(explicit: str | None) -> str:
     """Return the JWT signing secret, auto-generating in dev mode if absent.
 
@@ -129,7 +136,10 @@ class AuthService:
         except Exception:
             logger.exception("Argon2 verify raised — treating as failed login")
             return None
-        if user is None or user["is_active_ind"] != "Y":
+        if user is None:
+            return None
+        if not _app_user_row_is_active(user):
+            logger.info("login failed: inactive username=%s", username)
             return None
         try:
             if self._hasher.check_needs_rehash(user["password_hash"]):
@@ -182,7 +192,7 @@ class AuthService:
             if user is None:
                 return None
             self.cache_user(user)
-        if user["is_active_ind"] != "Y":
+        if not _app_user_row_is_active(user):
             return None
         if int(user["session_gen"]) != int(claim_session_gen):
             return None

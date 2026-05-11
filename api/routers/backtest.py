@@ -2,62 +2,86 @@
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
+from api.deps import get_data_caches
 from api.schemas.backtest import (
-    DataRequest, DataResponse,
     OptimizeRequest, OptimizeResponse,
     PerformanceRequest, PerformanceResponse,
     WalkForwardRequest, WalkForwardResponse,
 )
 from api.services import backtest as svc
+from src.cache import DataCaches
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/backtest", tags=["backtest"])
 
 @router.post("/optimize", response_model=OptimizeResponse)
-def optimize(req: OptimizeRequest, request: Request):
+def optimize(
+    req: OptimizeRequest,
+    caches: DataCaches = Depends(get_data_caches),
+):
     try:
-        return svc.run_optimize(req, request.app.state.refdata_cache,
-                                inst_cache=request.app.state.instrument_cache,
-                                bt_cache=getattr(request.app.state, "backtest_cache", None))
+        return svc.run_optimize(
+            req,
+            caches.refdata,
+            inst_cache=caches.instrument_cache,
+            bt_cache=caches.backtest_cache,
+        )
     except Exception as exc:
         logger.exception("Optimization failed")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/optimize/stream")
-async def optimize_stream(req: OptimizeRequest, request: Request):
+async def optimize_stream(
+    req: OptimizeRequest,
+    caches: DataCaches = Depends(get_data_caches),
+):
     """SSE endpoint streaming per-trial progress during optimization."""
-    cache = request.app.state.refdata_cache
-    inst = request.app.state.instrument_cache
-    bt = getattr(request.app.state, "backtest_cache", None)
     return StreamingResponse(
-        svc.stream_optimize(req, cache, inst_cache=inst, bt_cache=bt),
+        svc.stream_optimize(
+            req,
+            caches.refdata,
+            inst_cache=caches.instrument_cache,
+            bt_cache=caches.backtest_cache,
+        ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 
 @router.post("/performance", response_model=PerformanceResponse)
-def performance(req: PerformanceRequest, request: Request):
+def performance(
+    req: PerformanceRequest,
+    caches: DataCaches = Depends(get_data_caches),
+):
     try:
-        return svc.run_performance(req, request.app.state.refdata_cache,
-                                   inst_cache=request.app.state.instrument_cache,
-                                   bt_cache=getattr(request.app.state, "backtest_cache", None))
+        return svc.run_performance(
+            req,
+            caches.refdata,
+            inst_cache=caches.instrument_cache,
+            bt_cache=caches.backtest_cache,
+        )
     except Exception as exc:
         logger.exception("Performance calculation failed")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/walk-forward", response_model=WalkForwardResponse)
-def walk_forward(req: WalkForwardRequest, request: Request):
+def walk_forward(
+    req: WalkForwardRequest,
+    caches: DataCaches = Depends(get_data_caches),
+):
     try:
-        return svc.run_walk_forward(req, request.app.state.refdata_cache,
-                                    inst_cache=request.app.state.instrument_cache,
-                                    bt_cache=getattr(request.app.state, "backtest_cache", None))
+        return svc.run_walk_forward(
+            req,
+            caches.refdata,
+            inst_cache=caches.instrument_cache,
+            bt_cache=caches.backtest_cache,
+        )
     except Exception as exc:
         logger.exception("Walk-forward test failed")
         raise HTTPException(status_code=400, detail=str(exc)) from exc

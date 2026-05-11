@@ -1,4 +1,55 @@
 services:
+  redis:
+    # Cache layer for REFDATA snapshots published by the coordinator and
+    # read by the FastAPI app + Python workers. In-memory only — no AOF,
+    # no RDB — because Postgres is the source of truth and the coordinator
+    # rehydrates on boot. See docs/decisions.md (REFDATA caching).
+    image: redis:7-alpine
+    container_name: quant-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction"]
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # Backtest queue coordinator (Bun + Hono). Slice B: GET /api/v1/jobs + /health.
+  # Requires QUANTDB_URL and JWT_SECRET (see .env.example). Postgres often reaches
+  # the container as host.docker.internal when using an SSM tunnel on the host.
+  coordinator:
+    build:
+      context: ./coordinator
+      dockerfile: Dockerfile
+    container_name: quant-coordinator
+    restart: unless-stopped
+    ports:
+      - "${COORDINATOR_PORT:-3001}:3001"
+    environment:
+      - PORT=3001
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - QUANTDB_URL=${QUANTDB_URL}
+      - JWT_SECRET=${JWT_SECRET}
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "bun -e \"fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
   api:
     build:
       context: .
@@ -7,13 +58,20 @@ services:
     restart: unless-stopped
     environment:
       - APP_ENV=${APP_ENV:-dev}
+      # Nginx image serves HTTP on :80 unless TLS overlay is used. Without this, a
+      # .env of APP_ENV=prod yields Secure cookies the browser will not store.
+      - COOKIE_SECURE=${COOKIE_SECURE:-0}
       - USE_SSM=${USE_SSM:-1}
       - AWS_REGION=${AWS_REGION:-ap-southeast-1}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
     env_file:
       - path: .env
         required: false
     expose:
       - "8000"
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
       interval: 30s

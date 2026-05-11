@@ -83,13 +83,12 @@ def login(
     The Argon2 cost is paid on every call (incl. unknown usernames) so the
     response time does not leak username validity — see login.md §11.1.
     """
-    username = body.username.strip().lower()
-    user = auth.verify_credentials(repo, username, body.password)
+    user = auth.verify_credentials(repo, body.username, body.password)
     if user is None:
         # Failed logins are auditable, but the password is never logged.
         logger.info(
             "Login failed for username=%s (ip=%s)",
-            username,
+            body.username,
             get_remote_address(request),
         )
         raise _GENERIC_LOGIN_FAILURE
@@ -102,9 +101,9 @@ def login(
     try:
         repo.update_last_login(user["app_user_id"])
     except Exception:
-        logger.exception("Failed to stamp LAST_LOGIN_AT for user=%s", username)
+        logger.exception("Failed to stamp LAST_LOGIN_AT for user=%s", body.username)
 
-    logger.info("Login OK for username=%s", username)
+    logger.info("Login OK for username=%s", body.username)
     return LoginResponse(username=user["username"])
 
 

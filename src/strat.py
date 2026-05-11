@@ -9,10 +9,11 @@ Pipeline: data.py → strat.py → perf.py → param_opt.py → walk_forward.py
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from typing import Callable
 
 from uuid_extensions import uuid7
+
+from util import utc_now_iso
 
 import numpy as np
 import pandas as pd
@@ -513,7 +514,7 @@ def strategy_to_json(config: StrategyConfig, window=None, signal=None) -> dict:
         "strategy_id": config.strategy_id,
         "name": name,
         "version": 1,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": utc_now_iso(),
         "internal_cusip": config.internal_cusip,
         "conjunction": config.conjunction,
         "trading_period": config.trading_period,
@@ -536,7 +537,7 @@ def backtest_results_to_json(strategy_id, perf, internal_cusip, start, end, fee_
     """Serialize backtest Performance metrics to JSON."""
     return {
         "strategy_id": strategy_id,
-        "run_at": datetime.now(timezone.utc).isoformat(),
+        "run_at": utc_now_iso(),
         "data_range": {"start": start, "end": end},
         "internal_cusip": internal_cusip,
         "fee_bps": fee_bps,

@@ -13,6 +13,7 @@ optuna
 fastapi
 uvicorn[standard]
 psycopg[binary]
+redis
 httpx
 argon2-cffi
 pyjwt[crypto]

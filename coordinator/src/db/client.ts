@@ -45,13 +45,11 @@ export class StoredProcedureError extends Error {
  *
  *   await sql.begin(async (tx) => {
  *     await callProc<SpResult>(tx, "bt.sp_ins_queue",  (db) => db`CALL ...`);
- *     await callProc<SpResult & { out_result_id: number }>(
- *       tx, "bt.sp_ins_result", (db) => db`CALL ...`,
- *     );
+ *     await callProc<SpResult>(tx, "bt.sp_ins_result", (db) => db`CALL ...`);
  *   });
  *
- * The generic `T` lets callers extract extra OUT params (e.g. `out_result_id`,
- * `out_strategy_vid`) returned by procs beyond the standard SpResult shape.
+ * The generic `T` lets callers extract typed OUT params when a proc returns
+ * more than the standard status triplet (uncommon).
  */
 export async function callProc<T extends SpResult = SpResult>(
   db: SqlExecutor,

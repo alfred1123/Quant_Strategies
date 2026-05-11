@@ -139,7 +139,7 @@ No schema changes elsewhere. The hardcoded `"alfcheun"` becomes the actual logge
 | `CORE_ADMIN.SP_UPD_APP_USER_ACTIVE` | Set `IS_ACTIVE_IND` and bump `SESSION_GEN`. Inputs: `IN_USERNAME`, `IN_IS_ACTIVE_IND` (`Y`/`N`), `IN_USER_ID`. | Admin |
 | `CORE_ADMIN.SP_UPD_APP_USER_BUMP_TOKEN` | Bump `SESSION_GEN` only — force logout-everywhere without changing password (lost laptop). Inputs: `IN_USERNAME`, `IN_USER_ID`. | Admin |
 
-Six procedures total. Naming follows the existing project convention (`SP_GET_*`, `SP_INS_*`, `SP_UPD_*`).
+Seven procedures total. Naming follows the existing project convention (`SP_GET_*`, `SP_INS_*`, `SP_UPD_*`).
 
 ### 7.1 Admin runbook (SP-only operations)
 
@@ -226,12 +226,13 @@ Neither user is `SUPERUSER`, `CREATEROLE`, or `CREATEDB`. The Liquibase deploy i
 -- stored procedure.
 GRANT USAGE ON SCHEMA CORE_ADMIN, REFDATA, BT, INST, TRADE TO quant_app;
 
--- EXECUTE on app-facing procs (the two auth SPs + every business SP).
+-- EXECUTE on app-facing CORE_ADMIN auth procs + every business schema.
 GRANT EXECUTE ON PROCEDURE CORE_ADMIN.SP_GET_APP_USER_BY_USERNAME(TEXT, ...) TO quant_app;
+GRANT EXECUTE ON PROCEDURE CORE_ADMIN.SP_GET_APP_USER_BY_ID(UUID, ...)       TO quant_app;
 GRANT EXECUTE ON PROCEDURE CORE_ADMIN.SP_UPD_APP_USER_LAST_LOGIN(UUID, ...)  TO quant_app;
 GRANT EXECUTE ON ALL ROUTINES IN SCHEMA BT, INST, TRADE, REFDATA TO quant_app;
 
--- Explicitly NOT granted: the four admin SPs in CORE_ADMIN
+-- Explicitly NOT granted: admin SPs in CORE_ADMIN
 -- (SP_INS_APP_USER, SP_UPD_APP_USER_PASSWORD, SP_UPD_APP_USER_ACTIVE,
 --  SP_UPD_APP_USER_BUMP_TOKEN). A compromised quant_app process cannot
 -- create users or change passwords.
@@ -275,7 +276,7 @@ Then any SP/trigger can read `current_setting('app.user_id', true)`. **Skip for 
 | `POST` | `/api/v1/auth/logout` | required | Clears cookie (`Set-Cookie: qs_token=; Max-Age=0`). |
 | `GET`  | `/api/v1/auth/me`     | required | Returns `{username}`. Used by SPA on page load to detect existing session. |
 
-**Three endpoints.** No `/auth/change-password`, no `/admin/users`.
+**Three endpoints.** No `/admin/users`.
 
 ### 8.2 Existing endpoints
 

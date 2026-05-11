@@ -45,3 +45,4 @@ site/
 
 # Cursor hook runtime artifacts (logs / PID files); keep hooks.json + scripts tracked
 .cursor/hooks/logs/
+db/dumps/

@@ -375,18 +375,13 @@ CREATE TABLE BT.STRATEGY (
     IS_CURRENT_IND CHAR(1)
 );
 
+-- Current BT.RESULT (see Liquibase db/liquidbase/bt/tables/RESULT.sql)
 CREATE TABLE BT.RESULT (
-    RESULT_ID         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    STRATEGY_ID       UUID NOT NULL,
-    RUN_AT            TIMESTAMPTZ,
-    DATA_START        DATE,
-    DATA_END          DATE,
-    TICKER            TEXT,
-    FEE_BPS           NUMERIC,
-    METRICS_JSON      JSONB NOT NULL,     -- {sharpe, calmar, max_dd, ...}
-    WALK_FORWARD_JSON JSONB,              -- optional
-    USER_ID           TEXT,
-    CREATED_AT        TIMESTAMPTZ
+    RESULT_ID    UUID PRIMARY KEY,        -- client-generated (queue worker)
+    QUEUE_ID     UUID NOT NULL,
+    PAYLOAD_JSON JSONB NOT NULL,
+    USER_ID      TEXT,
+    CREATED_AT   TIMESTAMPTZ NOT NULL
 );
 
 -- ── TRADE schema ──

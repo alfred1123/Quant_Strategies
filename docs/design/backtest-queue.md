@@ -1,6 +1,6 @@
 # Design: Queued Background Backtests
 
-**Status:** v5 — TypeScript coordinator + Python worker. Slice A (DB schema + procedures) complete; coordinator + worker pending.
+**Status:** v5 — TypeScript coordinator + Python worker. Slice A–B complete (DB + coordinator skeleton in Compose); further coordinator/worker slices pending.
 **Date:** 2026-05-03
 **Scope:** `coordinator/` (new TS service), `src/jobs.py`, `src/worker.py` (new), `frontend/`, `db/liquidbase/bt/`
 
@@ -212,7 +212,7 @@ Worker `INSERT`s directly with `QUEUE_ID` + `PAYLOAD_JSON`. No `SP_INS_RESULT` p
 
 All queue writes go through `BT.SP_INS_QUEUE`. Reads use the two GET procedures or plain `SELECT`. `BT.RESULT` rows are `INSERT`ed directly by the worker (no procedure).
 
-### 7.1 `BT.SP_INS_QUEUE` (implemented — changeset 250)
+### 7.1 `BT.SP_INS_QUEUE` (see `bt-002-procedures` in `db/liquidbase/bt/bt-changelog.xml`)
 
 Signature: `IN_QUEUE_ID UUID, IN_STRATEGY_ID UUID, IN_STRATEGY_VID INTEGER, IN_QUEUE_STATUS_ID INTEGER, IN_PRIORITY INTEGER, IN_ERROR_TEXT TEXT, IN_USER_ID TEXT` + 3 OUT params (`OUT_SQLSTATE`, `OUT_SQLMSG`, `OUT_SQLERRMC`).
 
@@ -229,26 +229,26 @@ Called for every state transition: QUEUED → RUNNING → COMPLETED/FAILED/CANCE
 !!! note "pg_notify — future"
     `SP_INS_QUEUE` will emit `pg_notify('job_enqueued', queue_id::text)` on QUEUED inserts and `pg_notify('job_cancel_requested', queue_id::text)` on CANCEL_REQUESTED inserts. The coordinator's `db/notify.ts` consumes these. Until that's added, the HTTP route calls `manager.notifyEnqueued()` directly in-process.
 
-### 7.2 `BT.FN_GET_QUEUE` (implemented — changeset 252)
+### 7.2 `BT.SP_GET_QUEUE` (REFCURSOR — `bt-002-procedures`)
 
-Replaces `SP_GET_QUEUE` (REFCURSOR). `FUNCTION RETURNS TABLE` — single round-trip, called with `SELECT * FROM bt.fn_get_queue(...)`. Signature: `IN_QUEUE_ID UUID, IN_STRATEGY_ID UUID, IN_QUEUE_STATUS_ID INTEGER, IN_USER_ID TEXT, IN_LIMIT INTEGER` (all optional via `DEFAULT NULL`).
+Coordinator `queryQueue()` uses `CALL bt.sp_get_queue(...)` + `FETCH` on the OUT refcursor (not a table function).
 
 - If `IN_QUEUE_ID` provided → returns all VIDs for that job (full history).
-- Otherwise → active rows only (TRANSACT_TO_TS sentinel); all other params are optional filters.
+- Otherwise → active rows only (`TRANSACT_TO_TS` sentinel); other params are optional filters.
 
-Returns: `QUEUE_ID, QUEUE_VID, STRATEGY_ID, STRATEGY_VID, TRANSACT_FROM_TS, QUEUE_STATUS_ID, QUEUE_STATUS, PRIORITY, ERROR_TEXT, USER_ID`.
+`BT.FN_GET_QUEUE` is not deployed; any prior function with that name is dropped by `bt-000-precleanup`.
 
-Used by `coordinator/src/queue/repo.ts — queryQueue()` and `BacktestJobRepo.query_queue()` in `src/jobs.py`.
+### 7.3 `BT.FN_GET_QUEUE_FOR_TERMINAL` (see `bt-003-fn-terminal`)
 
-### 7.3 `BT.FN_GET_QUEUE_FOR_TERMINAL` (implemented — changeset 253)
-
-Replaces `SP_GET_QUEUE_FOR_TERMINAL` (REFCURSOR). `FUNCTION RETURNS TABLE` — single round-trip, called with `SELECT * FROM bt.fn_get_queue_for_terminal(...)`. Signature: `IN_USER_ID TEXT, IN_QUEUE_STATUS_ID INTEGER, IN_LIMIT INTEGER` (all optional via `DEFAULT NULL`).
+`FUNCTION RETURNS TABLE` — `SELECT * FROM bt.fn_get_queue_for_terminal(IN_USER_ID, IN_QUEUE_STATUS_ID)` (both nullable).
 
 Active rows with `QUEUE_STATUS_ID IN (1,2,3)`, joined to `BT.STRATEGY` on exact `(STRATEGY_ID, STRATEGY_VID)`.
 
 Returns: `QUEUE_ID, STRATEGY_ID, STRATEGY_VID, STRATEGY_NM, STRAT_CURRENT_IND, TRANSACT_FROM_TS, QUEUE_STATUS, PRIORITY, USER_ID, CONFIG_JSON, ERROR_TEXT`.
 
-Used by `coordinator/src/queue/repo.ts — queryTerminal()` and `BacktestJobRepo.query_queue_for_terminal()` in `src/jobs.py`.
+Used by `coordinator/src/queue/repo.ts — queryTerminal()` / `claimNext()` and (if present) `BacktestJobRepo.query_queue_for_terminal()` in `src/jobs.py`.
+
+`SP_GET_QUEUE_FOR_TERMINAL` (REFCURSOR) is also deployed for clients that use the stored-procedure + cursor pattern.
 
 ### 7.4 State transition reference
 
@@ -485,13 +485,13 @@ Malformed lines are logged but do not kill the worker.
 
 1. Parse `queue_id` from `sys.argv[1]`. Exit 2 if invalid UUID.
 2. Open psycopg connection from `DB_URL` (no pool).
-3. `SELECT s.config_json FROM bt.queue q JOIN bt.strategy s USING (strategy_id, strategy_vid) WHERE q.queue_id = %s AND q.transact_to_ts = '9999-12-31'`. Exit 2 if no row.
+3. `CALL BT.SP_GET_QUEUE_LATEST(queue_id)` → active `BT.QUEUE` row joined to frozen `CONFIG_JSON` (`BT.STRATEGY` on `STRATEGY_VID`). Exit 2 if no row.
 4. Reconstruct `OptimizeRequest` from `CONFIG_JSON`.
 5. Install `SIGTERM` handler: set `cancel_flag = True` → next callback raises `JobCancelled`.
 6. Set `deadline = now + WORKER_TIMEOUT_SECONDS` (if set).
 7. Emit `started` JSON.
 8. Run `param_opt` with the per-trial callback (§10.5).
-9. On normal completion: `INSERT INTO BT.RESULT (...) RETURNING RESULT_ID`, then `CALL BT.SP_INS_QUEUE(..., COMPLETED, ...)`.
+9. On normal completion: generate `RESULT_ID` (UUID), `CALL BT.SP_INS_RESULT(...)`, then `CALL BT.SP_INS_QUEUE(..., COMPLETED, ...)`.
 10. On `JobCancelled`: `CALL BT.SP_INS_QUEUE(..., CANCELLED, ...)`.
 11. On any other exception: `CALL BT.SP_INS_QUEUE(..., FAILED, error_text=traceback)`.
 12. Emit `terminal` JSON. Exit 0.
@@ -644,17 +644,20 @@ Each slice is independently shippable.
 
 ### Slice A — Schema + procedures ✅ Done
 
-1. ~~Liquibase changesets for `BT.QUEUE`, `REFDATA.QUEUE_STATUS` and indexes.~~ (changesets 120, 170, 210, 212, 221, 231, 232, 240, 241)
-2. ~~`SP_INS_QUEUE` (changeset 231), `SP_INS_RESULT` (changeset 232); `FN_GET_QUEUE` (changeset 252), `FN_GET_QUEUE_FOR_TERMINAL` (changeset 253); old REFCURSOR SPs dropped (changeset 254).~~
+1. ~~Liquibase: squashed `db/liquidbase/bt/bt-changelog.xml` (`bt-000` … `bt-003`) — tables, procedures, `FN_GET_QUEUE_FOR_TERMINAL`, legacy drops.~~
+2. ~~`SP_INS_QUEUE`, `SP_INS_RESULT`, `SP_GET_QUEUE`, `SP_GET_QUEUE_FOR_TERMINAL`, `FN_GET_QUEUE_FOR_TERMINAL`, …~~
 3. ~~`src/jobs.py` — `BacktestJobRepo` (read methods used by worker; writes used for terminal transitions).~~
 
-### Slice B — Coordinator skeleton
+### Slice B — Coordinator skeleton ✅ Done
 
-1. `coordinator/` Bun project: `package.json`, `tsconfig.json`, `Dockerfile`, `bun:test` setup.
-2. `db/client.ts` + `db/repo.ts` — `queryQueue()` only. Hono `GET /jobs` returns real DB rows.
-3. `http/server.ts` — Hono app, `/health`.
-4. `docker-compose.yml` — add `coordinator` service on port 3001.
-5. Smoke test: `curl localhost:3001/api/v1/jobs` returns DB rows.
+1. ~~`coordinator/` Bun project: `package.json`, `tsconfig.json`, `Dockerfile`, `bun:test` setup.~~
+2. ~~`db/client.ts` + `queue/repo.ts` — `queryQueue()`; Hono `GET /api/v1/jobs` returns real DB rows (paths differ slightly from the original `db/repo.ts` sketch).~~
+3. ~~`http/server.ts` — Hono app, `/health`, `/health/ready`.~~
+4. ~~`docker-compose.yml` — `coordinator` service on port **3001** (`COORDINATOR_PORT` override supported).~~
+5. ~~Smoke test: `curl` **examples** (after `docker compose up coordinator` or `bun run start` in `coordinator/` with env set):~~
+   - `curl -sS "http://localhost:3001/health"`
+   - `curl -sS "http://localhost:3001/api/v1/jobs"` — JSON with `rows` when DB is reachable and Liquibase BT objects exist.
+   - **Compose note:** set **`QUANTDB_URL`** and **`JWT_SECRET`** in `.env` (see `.env.example`). For Postgres on the host (SSM tunnel), use something like `host.docker.internal` / the host IP in `QUANTDB_URL`.
 
 ### Slice C — Submit + claim + spawn
 

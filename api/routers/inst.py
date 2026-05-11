@@ -2,7 +2,10 @@
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
+
+from api.deps import get_data_caches
+from src.cache import DataCaches
 
 logger = logging.getLogger(__name__)
 
@@ -10,25 +13,22 @@ router = APIRouter(prefix="/inst", tags=["inst"])
 
 
 @router.get("/products")
-def get_products(request: Request):
-    cache = request.app.state.instrument_cache
-    return cache.get_products()
+def get_products(caches: DataCaches = Depends(get_data_caches)):
+    return caches.instrument_cache.get_products()
 
 
 @router.get("/products/{product_id}/xrefs")
-def get_product_xrefs(product_id: int, request: Request):
-    cache = request.app.state.instrument_cache
-    xrefs = cache.get_xrefs(product_id=product_id)
+def get_product_xrefs(product_id: int, caches: DataCaches = Depends(get_data_caches)):
+    xrefs = caches.instrument_cache.get_xrefs(product_id=product_id)
     if not xrefs:
         raise HTTPException(status_code=404, detail=f"No xrefs for product_id={product_id}")
     return xrefs
 
 
 @router.post("/refresh", status_code=204)
-def refresh_inst(request: Request):
-    cache = request.app.state.instrument_cache
+def refresh_inst(caches: DataCaches = Depends(get_data_caches)):
     try:
-        cache.refresh()
+        caches.instrument_cache.refresh()
     except Exception as exc:
         logger.exception("INST refresh failed")
         raise HTTPException(status_code=503, detail="Failed to refresh INST cache") from exc

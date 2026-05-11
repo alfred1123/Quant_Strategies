@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 import { ApiError, apiClient } from './client';
 import { queryClient } from '../lib/queryClient';
 
@@ -13,15 +14,22 @@ export interface LoginRequest {
   password: string;
 }
 
-/** GET /api/v1/auth/me — returns null when unauthenticated (401 swallowed). */
+/** GET /api/v1/auth/me — returns null when unauthenticated or the probe cannot complete. */
 async function fetchMe(): Promise<CurrentUser | null> {
   try {
-    const { data } = await apiClient.get<CurrentUser>('/auth/me');
+    const { data } = await apiClient.get<CurrentUser>('/auth/me', {
+      // Avoid an infinite shell spinner when the API or DB hangs (see App.tsx GuestOnly).
+      timeout: 15_000,
+    });
     return data;
   } catch (err) {
-    // Swallow 401 specifically (= "show login page"). Anything else is real.
     // The 401 interceptor in client.ts has already evicted the cache.
     if (err instanceof ApiError && err.status === 401) return null;
+    if (axios.isAxiosError(err)) {
+      const noResponse = err.response === undefined;
+      const timedOut = err.code === 'ECONNABORTED';
+      if (timedOut || noResponse) return null;
+    }
     throw err;
   }
 }

@@ -57,10 +57,22 @@ cp .env.example .env
 | `ALPHAVANTAGE_API_KEY` | Optional | Free key from [alphavantage.co](https://www.alphavantage.co/support/#api-key) |
 | `GLASSNODE_API_KEY` | Optional | On-chain crypto metrics |
 | `FUTU_HOST` / `FUTU_PORT` | Optional | Futu OpenD gateway for HK/US equities |
+| `QUANTDB_URL` | Coordinator (Docker) | Full `postgresql://…` URL — see `.env.example` |
 
 **Yahoo Finance requires no API key** — it is the default data source.
 
----
+### Queue coordinator (Docker)
+
+To run the **[backtest queue](docs/design/backtest-queue.md)** coordinator in a container:
+
+```bash
+# .env must include QUANTDB_URL, JWT_SECRET, and a working REDIS_URL (default in compose: redis://redis:6379)
+docker compose up redis coordinator
+curl -sS "http://localhost:3001/health"
+curl -sS "http://localhost:3001/api/v1/jobs"
+```
+
+`QUANTDB_URL` must reach PostgreSQL from inside the container (often `host.docker.internal:5433` when the DB tunnel runs on the host). See `.env.example`.
 
 ## Repository Layout
 
@@ -72,6 +84,8 @@ Quant_Strategies/
 ├── tests/               # Unit, integration, and e2e tests
 ├── docs/                # MkDocs Material wiki
 ├── db/liquidbase/       # Liquibase changelogs (per-schema deployment)
+├── coordinator/         # Bun + Hono backtest queue (Compose service :3001)
+├── docker-compose.yml   # redis, api, nginx, coordinator
 ├── docker/              # Docker + Nginx configs
 ├── .github/workflows/   # CI/CD (tests + deploy)
 └── backup/deco/         # Decommissioned Bybit scripts (reference only)

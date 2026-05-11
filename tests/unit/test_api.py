@@ -18,7 +18,8 @@ def client():
     """FastAPI test client with REFDATA, instrument cache, AND auth stubbed.
 
     Three things must be in place for protected routes to be reachable:
-      * ``app.state.refdata_cache`` / ``instrument_cache`` (data deps)
+      * ``app.state.data_caches`` (``DataCaches`` bundle — routes use ``Depends``)
+      * legacy ``refdata_cache`` / ``instrument_cache`` aliases (same objects)
       * ``app.state.auth_service`` (read by ``get_auth_service`` even when
         ``require_user`` itself is overridden, because other deps may pick
         it up)
@@ -30,12 +31,20 @@ def client():
         from api.auth.dependencies import require_user
         from api.auth.models import CurrentUser
 
-        app.state.refdata_cache = MagicMock()
-        app.state.instrument_cache = MagicMock()
-        app.state.instrument_cache.get_product_by_cusip.return_value = None
-        app.state.auth_service = MagicMock()
-        app.state.db_conninfo = "postgresql://test"
-        app.state.refdata_cache.get.side_effect = lambda table: {
+        ref = MagicMock()
+        inst = MagicMock()
+        inst.get_product_by_cusip.return_value = None
+        bt = MagicMock()
+        caches = MagicMock()
+        caches.refdata = ref
+        caches.instrument_cache = inst
+        caches.backtest_cache = bt
+        app.state.data_caches = caches
+        app.state.refdata_cache = ref
+        app.state.instrument_cache = inst
+        app.state.backtest_cache = bt
+
+        ref.get.side_effect = lambda table: {
             "indicator": [
                 {"display_name": "SMA", "method_name": "get_sma", "is_bounded_ind": "N"},
                 {"display_name": "Bollinger Band", "method_name": "get_bollinger_band", "is_bounded_ind": "N"},
@@ -382,6 +391,6 @@ class TestRefDataEndpoint:
         assert isinstance(body, list)
 
     def test_get_refdata_unknown_table(self, client):
-        client.app.state.refdata_cache.get.side_effect = ValueError("Unknown REFDATA table: foo")
+        client.app.state.data_caches.refdata.get.side_effect = ValueError("Unknown REFDATA table: foo")
         resp = client.get("/api/v1/refdata/foo")
         assert resp.status_code == 404

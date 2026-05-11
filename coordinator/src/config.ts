@@ -7,6 +7,7 @@ const required = (key: string): string => {
 export const config = {
   QUANTDB_URL:       required("QUANTDB_URL"),
   JWT_SECRET:        required("JWT_SECRET"),
+  REDIS_URL:         process.env["REDIS_URL"] ?? "redis://localhost:6379",
   PORT:              Number(process.env["PORT"] ?? 3001),
   MAX_WORKERS:       Number(process.env["MAX_WORKERS"] ?? 1),
   PYTHON_BIN:        process.env["PYTHON_BIN"] ?? "python",

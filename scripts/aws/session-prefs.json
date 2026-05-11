@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0",
+  "description": "Document to hold regional Session Manager settings for the Quant account",
+  "sessionType": "Standard_Stream",
+  "inputs": {
+    "s3BucketName": "",
+    "s3KeyPrefix": "",
+    "s3EncryptionEnabled": true,
+    "cloudWatchLogGroupName": "",
+    "cloudWatchEncryptionEnabled": true,
+    "cloudWatchStreamingEnabled": false,
+    "kmsKeyId": "",
+    "runAsEnabled": false,
+    "runAsDefaultUser": "",
+    "idleSessionTimeout": "60",
+    "maxSessionDuration": "1440",
+    "shellProfile": {
+      "windows": "",
+      "linux": ""
+    }
+  }
+}

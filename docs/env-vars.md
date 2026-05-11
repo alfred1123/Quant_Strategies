@@ -29,6 +29,7 @@ The variables below mirror `.env.example`. Variables with `export` are also sour
 | `QUANTDB_USERNAME` | Yes | Database user. |
 | `QUANTDB_PASSWORD` | Yes | Database password. |
 | `QUANTDB_CONNINFO` | Optional | Full libpq connection string. **Overrides** the four `QUANTDB_*` vars above. Must include `sslmode=require`. Use only when you need non-standard libpq options. |
+| `QUANTDB_CONNECT_TIMEOUT` | Optional | Seconds for Postgres `connect_timeout` added to the DSN when absent (default: `15`). Prevents hung API requests when the tunnel or host is unreachable. |
 | `PGPASSWORD` | Optional | Mirrors `QUANTDB_PASSWORD` so `psql` doesn't prompt interactively. |
 
 ## Liquibase (DB migrations)
@@ -43,7 +44,7 @@ The variables below mirror `.env.example`. Variables with `export` are also sour
 
 | Variable | Required? | Description |
 |---|---|---|
-| `CORS_ORIGINS` | Optional | Comma-separated allowed origins (default covers local Vite dev). |
+| `CORS_ORIGINS` | Optional | Comma-separated allowed origins. **Not set in code** — configure via SSM or `.env` when the browser hits the API from a different origin than the API itself. Leave unset for same-origin only (e.g. nginx bundle, or Vite proxying `/api` to the backend). |
 | `APP_ENV` | Optional | `dev` (default) or `prod`. Affects logging, cookie `Secure`, JWT enforcement. |
 | `USE_SSM` | Optional | `1` (default in `docker-compose.yml`) loads secrets from AWS SSM Parameter Store first, then falls back to `.env`. Set `0` to force `.env`-only mode. |
 | `AWS_REGION` | Optional | Region used when `USE_SSM=1`. Default `ap-southeast-1`. |

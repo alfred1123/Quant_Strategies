@@ -1,4 +1,10 @@
 import { sql, callProc, type SpResult } from "../db/client";
+import {
+  getRedis,
+  REFDATA_INVALIDATE_CHANNEL,
+  REFDATA_KEY,
+  REFDATA_VERSION_KEY,
+} from "../redis/client";
 
 export class RefDataCache {
   private store = new Map<string, Record<string, unknown>[]>();
@@ -48,6 +54,33 @@ export class RefDataCache {
     console.info(
       `[refdata] loaded ${next.size} tables: ${[...next.keys()].sort().join(", ")}`,
     );
+    await this.publish();
+  }
+
+  /** Push the in-memory snapshot to Redis so Python readers see the same data.
+   *
+   * Coordinator is the *only* writer to these keys. FastAPI / workers only
+   * GET. A pipeline keeps the per-table SETs and the version bump atomic
+   * from the writer's perspective (one round-trip).
+   */
+  private async publish(): Promise<void> {
+    let redis;
+    try {
+      redis = await getRedis();
+    } catch (err) {
+      console.warn("[refdata] redis unavailable, skipping publish:", err);
+      return;
+    }
+    const tx = redis.multi();
+    for (const [table, rows] of this.store) {
+      tx.set(REFDATA_KEY(table), JSON.stringify(rows));
+    }
+    tx.incr(REFDATA_VERSION_KEY);
+    await tx.exec();
+    // Best-effort fan-out for long-lived subscribers (FastAPI). Workers
+    // re-read on every spawn, so they don't need the channel.
+    await redis.publish(REFDATA_INVALIDATE_CHANNEL, "*");
+    console.info(`[refdata] published ${this.store.size} tables to redis`);
   }
 
   /** Generic accessor — used by GET /api/v1/refdata/:table later. */

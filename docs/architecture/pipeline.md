@@ -38,7 +38,7 @@ data.py ──► strat.py ──► perf.py ──► param_opt.py ──► wa
 
 | Module | Class / Function | Role |
 |--------|-----------------|------|
-| `db.py` | `DbGateway` | Shared base class for DB repos — `conninfo`, `_call_get`, `_call_write`, `_drain_cursor` |
+| `db.py` | `DbGateway` | Shared base class for DB repos — `conninfo`, `_call_get`, `_call_write` |
 | `data.py` | `RefDataCache(DbGateway)` | In-process cache for REFDATA tables (dynamic discovery via catalog) |
 | `data.py` | `BacktestCache(DbGateway)` | BT schema read/write — two-mode `get_or_fetch_payload(refresh=False|True)`. Read-only mode raises `CacheMissError` on miss; refresh mode fetches the full range and inserts a new `API_REQUEST` version. |
 | `data.py` | `InstrumentCache(DbGateway)` | INST schema cache — products + vendor-symbol xrefs, exposed via `/api/v1/inst/products` |

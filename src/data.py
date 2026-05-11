@@ -30,88 +30,6 @@ from db import DbGateway
 logger = logging.getLogger(__name__)
 
 
-# ── REFDATA cache ────────────────────────────────────────────────────────────
-
-class RefDataCache(DbGateway):
-    """In-process cache for REFDATA tables.
-
-    Thread-safe for reads (immutable snapshot after load).
-    Tables are discovered dynamically from ``information_schema.tables``.
-    """
-
-    def __init__(self, conninfo: str):
-        super().__init__(conninfo)
-        self._store: dict[str, list[dict]] = {}
-
-    def _discover_tables(self, cur) -> list[str]:
-        """Return REFDATA table names from the catalog, excluding Liquibase internals."""
-        cur.execute(
-            "SELECT table_name \
-                FROM information_schema.tables \
-                WHERE table_schema = 'refdata' \
-                    AND table_type = 'BASE TABLE' \
-                    AND table_name NOT IN ('databasechangelog', 'databasechangeloglock') \
-                ORDER BY table_name"
-            )
-        return [r[0] for r in cur.fetchall()]
-
-    def load_all(self) -> None:
-        """Fetch every REFDATA table into memory via SP_GET_ENUM."""
-        with psycopg.connect(self._conninfo) as conn, conn.cursor() as cur:
-            tables = self._discover_tables(cur)
-            for table in tables:
-                try:
-                    self._store[table] = self._drain_cursor(cur, "CALL REFDATA.SP_GET_ENUM(%s, NULL, NULL, NULL, NULL)", (table,))
-                except Exception:
-                    logger.warning("Failed to load REFDATA.%s — SP_GET_ENUM may not support it yet", table, exc_info=True)
-                    self._store[table] = []
-        logger.info("RefDataCache loaded %d tables: %s", len(self._store), sorted(self._store))
-
-    def get(self, table: str) -> list[dict]:
-        if table not in self._store:
-            raise ValueError(f"Unknown REFDATA table: {table}")
-        rows = self._store[table]
-        if not rows:
-            raise ValueError(f"REFDATA.{table.upper()} is empty — check SP_GET_ENUM or seed data")
-        return rows
-
-    def get_indicator_defaults(self) -> dict[str, dict]:
-        """Return ``{method_name: {win_min, win_max, ..., is_bounded_ind}}``."""
-        result = {}
-        for r in self.get("indicator"):
-            result[r["method_name"]] = {
-                "win_min": r.get("win_min"),
-                "win_max": r.get("win_max"),
-                "win_step": r.get("win_step"),
-                "sig_min": float(r["sig_min"]) if r.get("sig_min") is not None else None,
-                "sig_max": float(r["sig_max"]) if r.get("sig_max") is not None else None,
-                "sig_step": float(r["sig_step"]) if r.get("sig_step") is not None else None,
-                "is_bounded_ind": r.get("is_bounded_ind"),
-            }
-        return result
-
-    def resolve_app_id(self, name: str) -> int | None:
-        """Resolve a data-source name (e.g. 'yahoo') to its APP_ID."""
-        for r in self.get("app"):
-            if r["name"] == name:
-                return r["app_id"]
-        return None
-
-    def resolve_app_metric_id(self, app_id: int, metric_nm: str = "price") -> int | None:
-        """Resolve (APP_ID, METRIC_NM) to APP_METRIC_ID."""
-        try:
-            rows = self.get("app_metric")
-        except ValueError:
-            return None
-        for r in rows:
-            if r["app_id"] == app_id and r["metric_nm"] == metric_nm:
-                return r["app_metric_id"]
-        return None
-
-    def refresh(self) -> None:
-        self.load_all()
-
-
 # ── INST cache ───────────────────────────────────────────────────────────────
 
 
@@ -121,12 +39,22 @@ class InstrumentCache(DbGateway):
     Loads all current products and xrefs at startup via stored procedures,
     then serves lookups from memory.  Refresh via ``load_all()`` or
     ``POST /api/v1/inst/refresh``.
+
+    Holds one long-lived ``inst_conn`` for INST SP calls (no per-query connect).
     """
 
     def __init__(self, conninfo: str) -> None:
         super().__init__(conninfo)
         self._products: list[dict] = []
         self._xrefs: list[dict] = []
+        self.inst_conn = psycopg.connect(conninfo)
+
+    def close(self) -> None:
+        """Release the Postgres connection (optional — tests or shutdown)."""
+        try:
+            self.inst_conn.close()
+        except Exception:
+            logger.debug("InstrumentCache.inst_conn close failed", exc_info=True)
 
     # ── load ─────────────────────────────────────────────────────────────
 
@@ -135,10 +63,12 @@ class InstrumentCache(DbGateway):
         self._products = self._call_get(
             "CALL INST.SP_GET_PRODUCT(%s, %s, NULL, NULL, NULL, NULL)",
             (None, None),
+            conn=self.inst_conn,
         )
         self._xrefs = self._call_get(
             "CALL INST.SP_GET_PRODUCT_XREF(%s, %s, %s, NULL, NULL, NULL, NULL)",
             (None, None, None),
+            conn=self.inst_conn,
         )
         logger.info(
             "InstrumentCache loaded %d products, %d xrefs",
@@ -195,17 +125,28 @@ class InstrumentCache(DbGateway):
 class BacktestCache(DbGateway):
     """BT cache read/write via stored procedures.
 
-    Inherits connection handling and cursor protocol from ``DbGateway``.
-    Uses ``RefDataCache`` for denormalized ID lookups (APP_ID, etc.).
+    Uses a long-lived ``bt_conn`` for BT schema SP calls (no per-query connect).
+    Uses a ``RedisRefData`` reader for denormalized ID lookups (APP_ID, etc.).
     """
 
     # Hardcoded default — daily bars. All callers omit tm_interval_id; this
     # constant is the single source of truth until a multi-interval UI lands.
     DEFAULT_TM_INTERVAL_ID = 1
 
-    def __init__(self, conninfo: str, refdata: RefDataCache, user_id: str = "alfcheun") -> None:
+    def __init__(self, conninfo: str, refdata, user_id: str = "alfcheun") -> None:
+        # ``refdata`` duck-types the legacy RefDataCache surface — only
+        # ``.get(table)`` and ``.resolve_app_metric_id(...)`` are used here,
+        # both of which RedisRefData implements identically.
         super().__init__(conninfo, user_id)
         self.refdata = refdata
+        self.bt_conn = psycopg.connect(conninfo)
+
+    def close(self) -> None:
+        """Release the Postgres connection (optional — tests or shutdown)."""
+        try:
+            self.bt_conn.close()
+        except Exception:
+            logger.debug("BacktestCache.bt_conn close failed", exc_info=True)
 
     # ── helpers ─────────────────────────────────────────────────────────
 
@@ -244,7 +185,11 @@ class BacktestCache(DbGateway):
     # ── proc wrappers ──────────────────────────────────────────────────
 
     def _get_api_request(self, app_id, app_metric_id, tm_interval_id, internal_cusip) -> list[dict]:
-        return self._call_get("CALL BT.SP_GET_API_REQUEST(%s, %s, %s, %s, NULL, NULL, NULL, NULL)", (app_id, app_metric_id, tm_interval_id, internal_cusip))
+        return self._call_get(
+            "CALL BT.SP_GET_API_REQUEST(%s, %s, %s, %s, NULL, NULL, NULL, NULL)",
+            (app_id, app_metric_id, tm_interval_id, internal_cusip),
+            conn=self.bt_conn,
+        )
 
     def _insert_api_request(self, api_req_id, app_id, app_metric_id, tm_interval_id, product_grp_id, start_ts, end_ts, payload_json, internal_cusip):
         # Deployed BT.SP_INS_API_REQUEST signature:
@@ -256,6 +201,7 @@ class BacktestCache(DbGateway):
             "NULL::text, NULL::text, NULL::text)",
             (api_req_id, app_id, app_metric_id, tm_interval_id, product_grp_id,
              start_ts, end_ts, payload_json, self.user_id, internal_cusip),
+            conn=self.bt_conn,
         )
 
     # ── public API ───────────────────────────────────────────────────────

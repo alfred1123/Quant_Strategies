@@ -6,8 +6,8 @@ This repository contains Python tooling for **backtesting**, **technical analysi
 
 | Path | Role |
 |------|------|
-| `src/` | Pipeline: `data.py` (sources), `strat.py` (indicators + strategies + signals), `perf.py`, `param_opt.py`, `main.py` (orchestration) |
-| `api/` | FastAPI backend (Phase 7+8) — serves backtest + trade endpoints; imports `src/` modules directly |
+| `src/` | Pipeline: `data.py` (sources), `strat.py` (indicators + strategies + signals), `perf.py`, `param_opt.py`, `util.py` (shared helpers), `main.py` (orchestration) |
+| `api/` | FastAPI backend — `main.py`, `deps.py` (e.g. `DataCaches`), `routers/`, `config.py`; imports `src/` directly |
 | `frontend/` | React/TypeScript SPA (Phase 8) — replaces Streamlit |
 | `docs/` | MkDocs Material wiki — architecture, guides, design docs, decisions log. Serve locally with `mkdocs serve`. |
 | `backup/deco/` | Decommissioned scripts (Bybit live trading — kept for reference) |
@@ -47,7 +47,7 @@ Run backtest-style code from `src/` (imports are relative to that package, e.g. 
 
 **Never** write raw `INSERT`, `UPDATE`, or `DELETE` statements against application tables in Python, API services, or migration seed scripts, **except**:
 
-- **`BT.RESULT`** (queued backtest completion payloads): **`INSERT`** result rows directly (queue worker returns `RETURNING RESULT_ID`). Keep audit columns aligned with DDL (`NOW()` for `CREATED_AT`, optional `USER_ID`).
+- **`BT.RESULT`** (queued backtest completion payloads): use **`CALL BT.SP_INS_RESULT(...)`** with a **client-generated** **`RESULT_ID`** (UUID) — no raw **`INSERT`** into **`BT.RESULT`** from Python/API. Procedure OUT row matches **`BT.SP_INS_QUEUE`**: status triplet only.
 - **`BT.QUEUE`** row transitions — use **`CALL BT.SP_INS_QUEUE(...)` only** with `IN_ACTION` ∈ `ENQUEUE` | `CLAIM_NEXT` | `TERMINAL` | `CANCEL` — no standalone `BT.SP_CLAIM_*` / `SP_CANCEL_*`.
 
 All other mutations use schema stored procedures (e.g. `BT.SP_INS_STRATEGY`, `BT.SP_INS_API_REQUEST`, `BT.SP_INS_API_REQUEST_PAYLOAD`).

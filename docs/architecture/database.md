@@ -15,7 +15,7 @@ The project uses **PostgreSQL 17** with Liquibase for schema management. Each sc
 ## Conventions
 
 !!! danger "No Direct DML"
-    Writes from Python/FastAPI normally go through **`CALL schema.procedure(...)`**. Narrow exceptions documented in **`AGENTS.md`**: **`BT.RESULT`** may use **`INSERT`** from the queue worker; **`BT.QUEUE`** mutations use **`BT.SP_INS_QUEUE`** only (**`IN_ACTION`** discriminates enqueue / claim / terminal / cancel). Liquibase seed changesets may use **`INSERT`** once per deploy.
+    Writes from Python/FastAPI normally go through **`CALL schema.procedure(...)`** (including **`BT.SP_INS_RESULT`** for **`BT.RESULT`**). Exceptions: **`BT.QUEUE`** mutations use **`BT.SP_INS_QUEUE`** only (**`IN_ACTION`** discriminates enqueue / claim / terminal / cancel). Liquibase seed changesets may use **`INSERT`** once per deploy.
 
     - **REFDATA reads** — `RefDataCache` loads all REFDATA tables at startup via `CALL REFDATA.SP_GET_ENUM(table_name, ...)`. Never query REFDATA tables directly from application code.
     - If a required write procedure does not exist yet, create it first.
@@ -77,6 +77,8 @@ cd ../trade    && source ../../../.env && liquibase --defaults-file=liquibase.pr
 cd ../inst     && source ../../../.env && liquibase --defaults-file=liquibase.properties update
 ```
 
+`db/liquidbase/bt/bt-changelog.xml` is a **squashed** baseline (`bt-000` … `bt-003`). Existing databases that were tracked with the old 200-series changeset IDs must be re-baselined (dev: recreate `BT`; prod: `changelogSync` after verifying DDL) — see the comment at the top of that file.
+
 ## Stored Procedures
 
 | Procedure | Schema | Type |
@@ -85,8 +87,11 @@ cd ../inst     && source ../../../.env && liquibase --defaults-file=liquibase.pr
 | `SP_GET_ENUM` | `REFDATA` | Generic REFCURSOR select for any REFDATA table |
 | `SP_INS_STRATEGY` | `BT` | Soft-versioning insert (auto-VID + IS_CURRENT_IND flip) |
 | `SP_INS_QUEUE` | `BT` | **Unified queue state machine**: `IN_ACTION` = **`ENQUEUE`**, **`CLAIM_NEXT`**, **`TERMINAL`**, **`CANCEL`** — all **`BT.QUEUE`** transitions |
-
-Direct **`INSERT`** into **`BT.RESULT`** permitted for queued job completion payloads (**`AGENTS.md`** carve-out). No **`BT.SP_INS_RESULT`** procedure.
+| `SP_GET_QUEUE` | `BT` | Flexible queue reader (REFCURSOR); coordinator `queryQueue` |
+| `SP_GET_QUEUE_FOR_TERMINAL` | `BT` | Active rows + strategy metadata (REFCURSOR) |
+| `FN_GET_QUEUE_FOR_TERMINAL` | `BT` | **Function** — coordinator `claimNext` / `queryTerminal` (`RETURNS TABLE`) |
+| `SP_GET_QUEUE_LATEST` | `BT` | **Queue worker**: active row for one **`QUEUE_ID`** + frozen **`CONFIG_JSON`** (`QUEUE` ⋈ **`STRATEGY`** on **`STRATEGY_VID`**) |
+| `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`**; **`IN_RESULT_ID`** is caller-supplied UUID; OUT row is status triplet only (same shape as **`SP_INS_QUEUE`**) |
 | `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`) |
 
 ## Directory Layout

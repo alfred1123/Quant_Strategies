@@ -76,9 +76,17 @@ def _load_from_dotenv() -> None:
     logger.debug("Loaded config from .env")
 
 
+def _ensure_connect_timeout(conninfo: str, *, seconds: int) -> str:
+    """Append ``connect_timeout`` if the DSN does not already set it."""
+    if "connect_timeout=" in conninfo.lower():
+        return conninfo
+    sep = "" if conninfo.endswith((" ", "\n", "\t")) else " "
+    return f"{conninfo}{sep}connect_timeout={seconds}"
+
+
 def _build_db_conninfo() -> str:
     """Build a psycopg connection string from env vars."""
-    return os.getenv(
+    raw = os.getenv(
         "QUANTDB_CONNINFO",
         "host={host} port={port} dbname=quantdb user={user} password={password} sslmode=require".format(
             host=os.getenv("QUANTDB_HOST", "localhost"),
@@ -87,6 +95,16 @@ def _build_db_conninfo() -> str:
             password=os.getenv("QUANTDB_PASSWORD", ""),
         ),
     )
+    sec = int(os.getenv("QUANTDB_CONNECT_TIMEOUT", "15"))
+    return _ensure_connect_timeout(raw, seconds=sec)
+
+
+DEFAULT_REDIS_URL = "redis://localhost:6379"
+
+
+def get_redis_url() -> str:
+    """Return the Redis URL from env (REDIS_URL), defaulting to localhost."""
+    return os.getenv("REDIS_URL", DEFAULT_REDIS_URL)
 
 
 def load_config(debug: bool = False) -> str:

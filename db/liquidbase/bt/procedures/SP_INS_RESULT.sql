@@ -1,11 +1,11 @@
 CREATE OR REPLACE PROCEDURE BT.SP_INS_RESULT(
-    IN  IN_QUEUE_ID          UUID,
-    IN  IN_PAYLOAD_JSON      JSONB,
-    IN  IN_USER_ID           TEXT,
-    OUT OUT_RESULT_ID        INTEGER,
-    OUT OUT_SQLSTATE         TEXT,
-    OUT OUT_SQLMSG           TEXT,
-    OUT OUT_SQLERRMC         TEXT
+    IN  IN_RESULT_ID       UUID,
+    IN  IN_QUEUE_ID        UUID,
+    IN  IN_PAYLOAD_JSON    JSONB,
+    IN  IN_USER_ID         TEXT,
+    OUT OUT_SQLSTATE       TEXT,
+    OUT OUT_SQLMSG         TEXT,
+    OUT OUT_SQLERRMC       TEXT
 )
 LANGUAGE plpgsql
 SET plan_cache_mode = 'force_generic_plan'
@@ -20,22 +20,24 @@ BEGIN
     OUT_SQLMSG   := '0';
     OUT_SQLERRMC := 'Stored Procedure completed successfully';
 
-    V_OTHER_TEXT := 'IN_QUEUE_ID=' || COALESCE(IN_QUEUE_ID::TEXT, '');
+    V_OTHER_TEXT := 'IN_RESULT_ID=' || COALESCE(IN_RESULT_ID::TEXT, '')
+                 || ', IN_QUEUE_ID=' || COALESCE(IN_QUEUE_ID::TEXT, '');
 
-    -- Step 10: Insert result row; capture generated RESULT_ID
+    -- Step 10: Insert result row (RESULT_ID supplied by caller)
     OUT_SQLMSG := '10';
     INSERT INTO BT.RESULT (
+        RESULT_ID,
         QUEUE_ID,
         PAYLOAD_JSON,
         USER_ID,
         CREATED_AT
     ) VALUES (
+        IN_RESULT_ID,
         IN_QUEUE_ID,
         IN_PAYLOAD_JSON,
         IN_USER_ID,
         NOW() AT TIME ZONE 'UTC'
-    )
-    RETURNING RESULT_ID INTO OUT_RESULT_ID;
+    );
 
     -- Step 20: Audit log
     OUT_SQLMSG := '20';
