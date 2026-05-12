@@ -15,16 +15,28 @@ Backtesting and trading framework for crypto and equity markets. Strategies are 
 git clone https://github.com/alfred1123/Quant_Strategies.git
 cd Quant_Strategies
 ./setup.sh
+cp .env.example .env       # then fill in QUANTDB_PASSWORD, etc.
 
-# 2. Start the FastAPI backend (Terminal 1)
-source env/bin/activate
-uvicorn api.main:app --reload
+# 2. Start the AWS SSM tunnel to shared Aurora (5433 -> RDS:5432)
+./scripts/appctl.sh dev tunnel start
 
-# 3. Start the React frontend (Terminal 2)
-cd frontend && npm run dev
+# 3. Start backend (uvicorn) + frontend (vite)
+./scripts/appctl.sh dev start
 ```
 
 Open `http://localhost:5173`. Login, then configure and run backtests from the UI.
+
+**Optional — work offline against a local Postgres** (no SSM tunnel, no shared DB):
+
+```bash
+sudo apt install -y postgresql-17 docker.io docker-compose-v2
+sudo usermod -aG docker "$USER"   # log out/in
+./scripts/dbctl.sh reset && ./scripts/dbctl.sh dump && ./scripts/dbctl.sh restore
+echo 'DB_TARGET=local' >> .env
+./scripts/appctl.sh dev start    # also brings up Redis + coordinator via docker-compose.dev.yml
+```
+
+See [docs/architecture/dev-vs-prod.md](docs/architecture/dev-vs-prod.md#optional-point-dev-at-a-local-postgres) for details.
 
 **Production:** The app is deployed at `http://52.221.3.230/` via GitHub Actions CI/CD.
 
@@ -36,7 +48,8 @@ Open `http://localhost:5173`. Login, then configure and run backtests from the U
 |---|---|
 | Python 3.12+ | Tested on 3.12.3 |
 | Node.js 24+ | Managed via nvm — `setup.sh` installs from `.nvmrc` |
-| PostgreSQL 17 | Connected via `localhost:5433` (AWS SSM port-forward) |
+| PostgreSQL 17 | Shared Aurora via `localhost:5433` (AWS SSM port-forward), or local install on `:5432` (opt-in via `DB_TARGET=local`) |
+| Docker + compose v2 | Only needed for `DB_TARGET=local` (runs Redis + coordinator) or for the prod stack |
 
 ---
 
@@ -78,17 +91,21 @@ curl -sS "http://localhost:3001/api/v1/jobs"
 
 ```
 Quant_Strategies/
-├── src/                 # Backtesting pipeline (data, strat, perf, param_opt, main)
-├── api/                 # FastAPI backend — backtest + auth endpoints
-├── frontend/            # React + TypeScript SPA (MUI, TanStack Query, Plotly)
-├── tests/               # Unit, integration, and e2e tests
-├── docs/                # MkDocs Material wiki
-├── db/liquidbase/       # Liquibase changelogs (per-schema deployment)
-├── coordinator/         # Bun + Hono backtest queue (Compose service :3001)
-├── docker-compose.yml   # redis, api, nginx, coordinator
-├── docker/              # Docker + Nginx configs
-├── .github/workflows/   # CI/CD (tests + deploy)
-└── backup/deco/         # Decommissioned Bybit scripts (reference only)
+├── src/                       # Backtesting pipeline (data, strat, perf, param_opt, main)
+├── api/                       # FastAPI backend — backtest + auth endpoints
+├── frontend/                  # React + TypeScript SPA (MUI, TanStack Query, Plotly)
+├── tests/                     # Unit, integration, and e2e tests
+├── docs/                      # MkDocs Material wiki
+├── db/liquidbase/             # Liquibase changelogs (per-schema deployment)
+├── coordinator/               # Bun + Hono backtest queue (Compose service :3001)
+├── docker-compose.yml         # prod base — redis, api, nginx, coordinator
+├── docker-compose.prod.yml    # prod overrides (APP_ENV, USE_SSM, COOKIE_SECURE)
+├── docker-compose.dev.yml     # dev support stack — redis + coordinator only (DB_TARGET=local)
+├── docker/                    # Docker + Nginx configs
+├── scripts/appctl.sh          # dev/prod lifecycle (uvicorn, vite, tunnel, compose)
+├── scripts/dbctl.sh           # local Postgres dump/restore/reset
+├── .github/workflows/         # CI/CD (tests + deploy)
+└── backup/deco/               # Decommissioned Bybit scripts (reference only)
 ```
 
 See the [wiki](https://alfred1123.github.io/Quant_Strategies/) for detailed architecture, database schema, API reference, and contributor guides.

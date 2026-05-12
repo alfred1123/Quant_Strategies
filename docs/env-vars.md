@@ -32,6 +32,21 @@ The variables below mirror `.env.example`. Variables with `export` are also sour
 | `QUANTDB_CONNECT_TIMEOUT` | Optional | Seconds for Postgres `connect_timeout` added to the DSN when absent (default: `15`). Prevents hung API requests when the tunnel or host is unreachable. |
 | `PGPASSWORD` | Optional | Mirrors `QUANTDB_PASSWORD` so `psql` doesn't prompt interactively. |
 
+## Dev DB target (scripts/appctl.sh)
+
+These vars only apply to local dev (`./scripts/appctl.sh dev start`). Teammates without a local Postgres can ignore them — leaving `DB_TARGET` unset uses the shared Aurora cluster via the SSM tunnel.
+
+| Variable | Required? | Description |
+|---|---|---|
+| `DB_TARGET` | Optional | `prod` (default) → SSM tunnel on `127.0.0.1:5433` to Aurora. `local` → host-side Postgres 17 on `127.0.0.1:5432` (set up via `./scripts/dbctl.sh`). When `local`, `appctl.sh dev start` ALSO brings up Redis + the Bun coordinator via `docker-compose.dev.yml`. |
+| `LOCAL_DB_HOST` | Optional | Local Postgres host (default `127.0.0.1`). |
+| `LOCAL_DB_PORT` | Optional | Local Postgres port (default `5432`). |
+| `LOCAL_DB_NAME` | Optional | Local DB name (default `quantdb`). |
+| `LOCAL_DB_USER` | Optional | Local user (default `quant_admin`). |
+| `LOCAL_DB_PASSWORD` | Optional | Local user password (default `LetsGetRich888` — change for non-default installs). |
+| `LOCAL_QUANTDB_URL` | Optional | Full `postgresql://…?sslmode=disable` URL passed to the dev coordinator container. Auto-derived from the `LOCAL_DB_*` vars when unset. |
+| `COORDINATOR_PORT` | Optional | Host port for the dev coordinator (default `3001`). |
+
 ## Liquibase (DB migrations)
 
 | Variable | Required? | Description |
