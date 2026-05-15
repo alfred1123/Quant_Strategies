@@ -21,9 +21,10 @@ import pandas as pd
 import pytest
 from dotenv import load_dotenv
 
-from data import AlphaVantage
-from strat import TechnicalAnalysis, Strategy
-from perf import Performance
+from quant.data.sources import AlphaVantage
+from quant.strategy.indicators import TechnicalAnalysis
+from quant.strategy.signals import Strategy
+from quant.strategy.performance import Performance
 
 # Load .env so we can check for the key
 load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))

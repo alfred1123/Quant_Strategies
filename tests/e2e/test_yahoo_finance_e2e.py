@@ -15,11 +15,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from data import YahooFinance
-from strat import Strategy, StrategyConfig
-from perf import Performance
-from param_opt import ParametersOptimization
-from walk_forward import WalkForward
+from quant.data.sources import YahooFinance
+from quant.strategy.signals import Strategy, StrategyConfig
+from quant.strategy.performance import Performance
+from quant.strategy.optimizer import ParametersOptimization
+from quant.strategy.walk_forward import WalkForward
 
 pytestmark = pytest.mark.e2e
 

@@ -122,11 +122,6 @@ def load_config(debug: bool = False) -> str:
     # Initialise logging first so subsequent log calls are formatted
     setup_logging(debug=debug)
 
-    # Add src/ to import path so pipeline modules resolve correctly
-    src_path = os.path.join(os.path.dirname(__file__), os.pardir, "src")
-    if src_path not in sys.path:
-        sys.path.insert(0, src_path)
-
     # Load secrets / config
     use_ssm = os.getenv("USE_SSM", "").strip() == "1"
     if use_ssm:

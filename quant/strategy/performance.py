@@ -14,7 +14,8 @@ import logging
 import pandas as pd
 import numpy as np
 
-from strat import TechnicalAnalysis, StrategyConfig, combine_positions
+from quant.strategy.indicators import TechnicalAnalysis
+from quant.strategy.signals import StrategyConfig, combine_positions
 
 logger = logging.getLogger(__name__)
 

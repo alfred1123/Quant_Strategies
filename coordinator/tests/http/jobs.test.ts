@@ -1,5 +1,13 @@
 import { describe, it, expect } from "bun:test";
-import { app } from "../../src/http/server";
+import { createApp } from "../../src/http/server";
+import type { JobsService } from "../../src/services/jobs";
+
+// All assertions exercise validation that fails BEFORE jobs.enqueueJob is
+// reached, so a throwing stub catches accidental regressions.
+const stubJobs: JobsService = {
+  enqueueJob: async () => { throw new Error("jobs.enqueueJob should not be called"); },
+};
+const app = createApp({ jobs: stubJobs });
 
 // These tests exercise the validation/auth paths of POST /api/v1/jobs that
 // run BEFORE any DB or refdata lookup, so they're safe in the unit suite.

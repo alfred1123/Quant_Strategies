@@ -45,7 +45,7 @@ BEGIN
             INNER JOIN INST.PRODUCT p
                 ON p.PRODUCT_ID = x.PRODUCT_ID
                AND p.IS_CURRENT_IND = 'Y'
-            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'
+            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
             ORDER BY x.PRODUCT_XREF_ID;
 
     ELSIF IN_PRODUCT_XREF_ID IS NOT NULL AND IN_PRODUCT_ID IS NULL AND IN_APP_ID IS NULL THEN
@@ -65,7 +65,7 @@ BEGIN
                         INNER JOIN INST.PRODUCT p
                                 ON p.PRODUCT_ID = x.PRODUCT_ID
                              AND p.IS_CURRENT_IND = 'Y'
-            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'
+            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
               AND x.PRODUCT_XREF_ID = IN_PRODUCT_XREF_ID
             ORDER BY x.PRODUCT_XREF_ID;
 
@@ -86,7 +86,7 @@ BEGIN
                         INNER JOIN INST.PRODUCT p
                                 ON p.PRODUCT_ID = x.PRODUCT_ID
                              AND p.IS_CURRENT_IND = 'Y'
-            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'
+            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
               AND x.PRODUCT_ID = IN_PRODUCT_ID
             ORDER BY x.PRODUCT_XREF_ID;
 
@@ -107,7 +107,7 @@ BEGIN
                         INNER JOIN INST.PRODUCT p
                                 ON p.PRODUCT_ID = x.PRODUCT_ID
                              AND p.IS_CURRENT_IND = 'Y'
-            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'
+            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
               AND x.APP_ID = IN_APP_ID
             ORDER BY x.PRODUCT_XREF_ID;
 
@@ -128,7 +128,7 @@ BEGIN
                         INNER JOIN INST.PRODUCT p
                                 ON p.PRODUCT_ID = x.PRODUCT_ID
                              AND p.IS_CURRENT_IND = 'Y'
-            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'
+            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
               AND x.PRODUCT_XREF_ID = IN_PRODUCT_XREF_ID
               AND x.PRODUCT_ID = IN_PRODUCT_ID
             ORDER BY x.PRODUCT_XREF_ID;
@@ -150,7 +150,7 @@ BEGIN
                         INNER JOIN INST.PRODUCT p
                                 ON p.PRODUCT_ID = x.PRODUCT_ID
                              AND p.IS_CURRENT_IND = 'Y'
-            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'
+            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
               AND x.PRODUCT_XREF_ID = IN_PRODUCT_XREF_ID
               AND x.APP_ID = IN_APP_ID
             ORDER BY x.PRODUCT_XREF_ID;
@@ -172,7 +172,7 @@ BEGIN
                         INNER JOIN INST.PRODUCT p
                                 ON p.PRODUCT_ID = x.PRODUCT_ID
                              AND p.IS_CURRENT_IND = 'Y'
-            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'
+            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
               AND x.PRODUCT_ID = IN_PRODUCT_ID
               AND x.APP_ID = IN_APP_ID
             ORDER BY x.PRODUCT_XREF_ID;
@@ -194,7 +194,7 @@ BEGIN
                         INNER JOIN INST.PRODUCT p
                                 ON p.PRODUCT_ID = x.PRODUCT_ID
                              AND p.IS_CURRENT_IND = 'Y'
-            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'
+            WHERE x.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
               AND x.PRODUCT_XREF_ID = IN_PRODUCT_XREF_ID
               AND x.PRODUCT_ID = IN_PRODUCT_ID
               AND x.APP_ID = IN_APP_ID

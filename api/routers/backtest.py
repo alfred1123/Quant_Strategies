@@ -12,7 +12,7 @@ from api.schemas.backtest import (
     WalkForwardRequest, WalkForwardResponse,
 )
 from api.services import backtest as svc
-from src.cache import DataCaches
+from quant.refdata.bundle import DataCaches
 
 logger = logging.getLogger(__name__)
 

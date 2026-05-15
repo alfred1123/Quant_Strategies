@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from strat import Strategy, StrategyConfig, SubStrategy, SignalDirection
-from perf import Performance
+from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, SignalDirection
+from quant.strategy.performance import Performance
 
 
 _BOLLINGER_CONFIG = StrategyConfig("test", "get_bollinger_band",

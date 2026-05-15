@@ -53,7 +53,7 @@ BEGIN
     IF IN_QUEUE_ID IS NOT NULL THEN
         V_SQL := V_SQL || format(' AND q.QUEUE_ID = %L::uuid', IN_QUEUE_ID);
     ELSE
-        V_SQL := V_SQL || ' AND q.TRANSACT_TO_TS = TIMESTAMPTZ ' || quote_literal('9999-12-31');
+        V_SQL := V_SQL || ' AND q.TRANSACT_TO_TS = TIMESTAMPTZ ' || quote_literal('9999-12-31 00:00:00+00');
     END IF;
 
     IF IN_STRATEGY_ID IS NOT NULL THEN

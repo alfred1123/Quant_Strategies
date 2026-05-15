@@ -12,8 +12,6 @@ import logging
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from api.auth.repo import AuthRepo
 from api.auth.service import AuthService
 from api.config import _build_db_conninfo

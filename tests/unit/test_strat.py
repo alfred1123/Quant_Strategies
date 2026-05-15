@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from strat import (Strategy, StrategyConfig, SubStrategy, SignalDirection,
-                   strategy_to_json, backtest_results_to_json, combine_positions,
-                   resolve_signal_func)
+from quant.strategy.signals import (Strategy, StrategyConfig, SubStrategy, SignalDirection,
+                                    strategy_to_json, backtest_results_to_json, combine_positions,
+                                    resolve_signal_func)
 
 
 class TestMomentumBandSignal:

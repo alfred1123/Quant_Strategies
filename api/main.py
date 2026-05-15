@@ -25,7 +25,7 @@ from api.auth.dependencies import require_user  # noqa: E402
 from api.auth.router import limiter as auth_limiter, router as auth_router  # noqa: E402
 from api.auth.service import AuthService  # noqa: E402
 from api.routers import backtest, inst, refdata  # noqa: E402
-from src.cache import DataCaches  # noqa: E402
+from quant.refdata.bundle import DataCaches  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

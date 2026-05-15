@@ -1,5 +1,12 @@
 import { describe, it, expect } from "bun:test";
-import { app } from "../../src/http/server";
+import { createApp } from "../../src/http/server";
+import type { JobsService } from "../../src/services/jobs";
+
+// Health/404 routes never invoke jobs; an empty stub is sufficient.
+const stubJobs: JobsService = {
+  enqueueJob: async () => { throw new Error("jobs.enqueueJob should not be called"); },
+};
+const app = createApp({ jobs: stubJobs });
 
 describe("GET /health", () => {
   it("returns 200 and ok payload (liveness)", async () => {

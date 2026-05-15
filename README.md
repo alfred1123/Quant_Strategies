@@ -91,7 +91,7 @@ curl -sS "http://localhost:3001/api/v1/jobs"
 
 ```
 Quant_Strategies/
-├── src/                       # Backtesting pipeline (data, strat, perf, param_opt, main)
+├── quant/                     # Backtesting pipeline (data, refdata, strategy, queue, cli)
 ├── api/                       # FastAPI backend — backtest + auth endpoints
 ├── frontend/                  # React + TypeScript SPA (MUI, TanStack Query, Plotly)
 ├── tests/                     # Unit, integration, and e2e tests

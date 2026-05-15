@@ -38,12 +38,12 @@ CREATE TABLE BT.QUEUE (
 -- "Show me my latest queue submissions" — UI history list per user.
 CREATE INDEX IX_QUEUE_USER_CURRENT
     ON BT.QUEUE (USER_ID, CREATED_AT DESC)
-    WHERE TRANSACT_TO_TS = '9999-12-31';
+    WHERE TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00';
 
 -- Worker dequeue path: find next QUEUED row across all jobs.
 CREATE INDEX IX_QUEUE_STATUS_CURRENT
     ON BT.QUEUE (QUEUE_STATUS_ID, PRIORITY, CREATED_AT)
-    WHERE TRANSACT_TO_TS = '9999-12-31';
+    WHERE TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00';
 
 -- Strategy → all its queue submissions (for "show runs of this strategy").
 CREATE INDEX IX_QUEUE_STRATEGY

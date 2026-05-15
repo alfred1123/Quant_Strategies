@@ -1,6 +1,6 @@
 import pytest
 
-from main import parse_args, INDICATORS, STRATEGIES, ASSET_TRADING_PERIODS
+from quant.cli import parse_args, INDICATORS, STRATEGIES, ASSET_TRADING_PERIODS
 
 
 class TestParseArgsDefaults:

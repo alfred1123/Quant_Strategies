@@ -1,9 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { app } from "../../src/http/server";
+import { createApp } from "../../src/http/server";
+import { createJobsService } from "../../src/services/jobs";
+import type { Manager } from "../../src/queue/manager";
 import { refdata } from "../../src/refdata/cache";
 import { enqueue } from "../../src/queue/repo";
 import { MAX_QUEUED_PER_USER } from "../../src/types/queue";
 import { isDbAvailable, cleanQueueRows, newUuid, TEST_USER_ID } from "../helpers";
+
+// Real service + DB. manager.wake() is a no-op; queue loop is not exercised.
+const noopManager = { wake: () => {} } as unknown as Manager;
+const app = createApp({ jobs: createJobsService(noopManager) });
 
 const post = (body: unknown) =>
   app.fetch(new Request("http://localhost/api/v1/jobs", {

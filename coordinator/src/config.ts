@@ -11,6 +11,7 @@ export const config = {
   PORT:              Number(process.env["PORT"] ?? 3001),
   MAX_WORKERS:       Number(process.env["MAX_WORKERS"] ?? 1),
   PYTHON_BIN:        process.env["PYTHON_BIN"] ?? "python",
+  REPO_ROOT:         process.env["REPO_ROOT"] ?? "/app",
   LOG_LEVEL:         process.env["LOG_LEVEL"] ?? "info",
   SHUTDOWN_GRACE_MS: Number(process.env["SHUTDOWN_GRACE_MS"] ?? 10_000),
 };

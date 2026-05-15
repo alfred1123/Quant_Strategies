@@ -53,10 +53,10 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from data import NasdaqDataLink, YahooFinance
-from param_opt import ParametersOptimization
-from perf import Performance
-from strat import SignalDirection, StrategyConfig
+from quant.data.sources import NasdaqDataLink, YahooFinance
+from quant.strategy.optimizer import ParametersOptimization
+from quant.strategy.performance import Performance
+from quant.strategy.signals import SignalDirection, StrategyConfig
 
 LOG_FORMAT = '[%(asctime)s] [%(levelname)s] %(name)s: %(message)s'
 LOG_DATEFMT = '%Y-%m-%d %H:%M:%S'
@@ -77,7 +77,7 @@ def setup_logging(*, debug: bool = False) -> None:
         ],
     )
 
-from walk_forward import WalkForward
+from quant.strategy.walk_forward import WalkForward
 
 logger = logging.getLogger(__name__)
 

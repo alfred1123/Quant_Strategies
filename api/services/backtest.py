@@ -15,12 +15,12 @@ import numpy as np
 import pandas as pd
 from fastapi import HTTPException
 
-import src.data as _data_module
-from src.data import BacktestCache
-from src.strat import SignalDirection, StrategyConfig, SubStrategy,  resolve_signal_func
-from src.perf import Performance
-from src.param_opt import ParametersOptimization
-from src.walk_forward import WalkForward
+import quant.data.sources as _data_module
+from quant.data.backtest_cache import BacktestCache
+from quant.strategy.signals import SignalDirection, StrategyConfig, SubStrategy, resolve_signal_func
+from quant.strategy.performance import Performance
+from quant.strategy.optimizer import ParametersOptimization
+from quant.strategy.walk_forward import WalkForward
 
 from api.schemas.backtest import (
     OptimizeRequest, PerformanceRequest, WalkForwardRequest,
@@ -362,7 +362,13 @@ def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None, bt
 
 def _compute_total_trials(req: OptimizeRequest) -> int:
     """Pre-compute the number of trials that optuna will run."""
-    from src.param_opt import OPTUNA_MAX_TRIALS
+    # NOTE [circular-import]: function-scoped import because moving this to
+    # the module top creates a cycle: api.services.backtest → src.param_opt
+    # → (transitively, via Performance) imports that re-touch api.services.
+    # Proper fix is to extract OPTUNA_MAX_TRIALS into a leaf module (e.g.
+    # src/constants.py) that both ends can import safely. Deferred — needs
+    # a small refactor + test sweep.
+    from quant.strategy.optimizer import OPTUNA_MAX_TRIALS
     total = math.prod(
         len(f.window_range.to_values(as_int=True)) * len(f.signal_range.to_values())
         for f in req.factors

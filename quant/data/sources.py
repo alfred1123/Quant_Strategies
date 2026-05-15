@@ -1,0 +1,305 @@
+"""External data sources for the backtest pipeline.
+
+Supported sources:
+    1. FutuOpenD — HK/US equity via Futu API
+    2. Glassnode — on-chain crypto metrics
+    3. AlphaVantage — equity and crypto price data
+    4. YahooFinance — free equity/crypto/ETF data via yfinance
+    5. NasdaqDataLink — time-series and table data via Nasdaq Data Link API
+
+BybitData class moved to backup/deco/ — platform decommissioned.
+"""
+
+import logging
+import os
+import time
+from functools import lru_cache
+
+import futu
+import pandas as pd
+import requests
+from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
+
+
+class FutuOpenD:
+    """Retrieve equity data from Futu OpenD gateway."""
+
+    def __init__(self) -> None:
+        load_dotenv()
+        self.__host = os.getenv('FUTU_HOST')
+        port_str = os.getenv('FUTU_PORT')
+        if not self.__host or not port_str:
+            raise ValueError("FUTU_HOST and FUTU_PORT must be set in .env")
+        self.__port = int(port_str)
+        self.quote_ctx = futu.OpenQuoteContext(host=self.__host, port=self.__port)
+
+    @lru_cache(maxsize=32)
+    def get_historical_data(self, symbol, start_date, end_date, resolution='K_DAY'):
+        """Retrieve historical kline data from Futu OpenD.
+
+        Args:
+            symbol: Stock symbol (e.g. 'HK.00700').
+            start_date: Start of date range (YYYY-MM-DD).
+            end_date: End of date range (YYYY-MM-DD).
+            resolution: Kline period. Defaults to 'K_DAY'.
+
+        Returns:
+            DataFrame with OHLCV columns.
+
+        Raises:
+            RuntimeError: If the Futu API returns an error.
+        """
+        with self.quote_ctx:
+            ret, data, page_req_key = self.quote_ctx.request_history_kline(
+                symbol, start=start_date, end=end_date,
+                ktype=resolution, autype=futu.AuType.QFQ,
+            )
+        if ret != 0:
+            logger.error("Futu API error (ret=%s): %s", ret, data)
+            raise RuntimeError(f"Futu API error (ret={ret}): {data}")
+        logger.info("FutuOpenD: fetched %d rows for %s", len(data), symbol)
+        return data
+
+
+class Glassnode:
+    """Retrieve on-chain crypto metrics from Glassnode."""
+
+    def __init__(self) -> None:
+        load_dotenv()
+        self.__api_key = os.getenv('GLASSNODE_API_KEY')
+        if not self.__api_key:
+            raise ValueError("GLASSNODE_API_KEY must be set in .env")
+
+    @lru_cache(maxsize=32)
+    def get_historical_price(self, symbol, start_date, end_date, resolution='24h'):
+        """Fetch historical close price from Glassnode.
+
+        Args:
+            symbol: Crypto asset (e.g. 'BTC').
+            start_date: Start date (YYYY-MM-DD).
+            end_date: End date (YYYY-MM-DD).
+            resolution: Data interval. Defaults to '24h'.
+
+        Returns:
+            DataFrame with columns ['t', 'v'].
+
+        Raises:
+            requests.HTTPError: If the API request fails.
+        """
+        since = int(time.mktime(time.strptime(start_date, "%Y-%m-%d")))
+        until = int(time.mktime(time.strptime(end_date, "%Y-%m-%d")))
+
+        res = requests.get(
+            "https://api.glassnode.com/v1/metrics/market/price_usd_close",
+            params={"a": symbol, "s": since, "u": until, "i": resolution},
+            headers={"X-Api-Key": self.__api_key},
+            timeout=30,
+        )
+        res.raise_for_status()
+        df = pd.read_json(res.text, convert_dates=['t'])
+        logger.info("Glassnode: fetched %d rows for %s", len(df), symbol)
+        return df
+
+
+class AlphaVantage:
+    """Retrieve equity and crypto price data from Alpha Vantage."""
+
+    BASE_URL = "https://www.alphavantage.co/query"
+
+    def __init__(self) -> None:
+        load_dotenv()
+        self.__api_key = os.getenv('ALPHAVANTAGE_API_KEY')
+        if not self.__api_key:
+            raise ValueError("ALPHAVANTAGE_API_KEY must be set in .env")
+
+    @lru_cache(maxsize=32)
+    def get_historical_price(self, symbol, start_date, end_date, resolution='daily'):
+        """Fetch daily close prices from Alpha Vantage.
+
+        Automatically detects crypto symbols (BTC, ETH, etc.) and uses the
+        appropriate endpoint (DIGITAL_CURRENCY_DAILY vs TIME_SERIES_DAILY).
+        """
+        crypto_symbols = {
+            'BTC', 'ETH', 'LTC', 'XRP', 'DOGE', 'ADA', 'SOL',
+            'DOT', 'AVAX', 'MATIC', 'LINK', 'UNI', 'BNB',
+        }
+
+        if symbol.upper() in crypto_symbols:
+            df = self._fetch_daily(
+                function="DIGITAL_CURRENCY_DAILY",
+                symbol=symbol,
+                ts_key="Time Series (Digital Currency Daily)",
+                close_field="4a. close (USD)",
+                extra_params={"market": "USD"},
+            )
+        else:
+            df = self._fetch_daily(
+                function="TIME_SERIES_DAILY",
+                symbol=symbol,
+                ts_key="Time Series (Daily)",
+                close_field="4. close",
+            )
+
+        df = df[(df['t'] >= start_date) & (df['t'] <= end_date)]
+        df = df.sort_values('t').reset_index(drop=True)
+        return df
+
+    def _fetch_daily(self, function, symbol, ts_key, close_field, extra_params=None):
+        params = {
+            "function": function,
+            "symbol": symbol,
+            "apikey": self.__api_key,
+        }
+        if extra_params:
+            params.update(extra_params)
+        data = self._request(params)
+        if ts_key not in data:
+            logger.error("AlphaVantage response missing '%s': %s", ts_key, data)
+            raise ValueError(f"AlphaVantage error: {data.get('Error Message', data)}")
+        rows = [
+            {"t": date, "v": float(vals[close_field])}
+            for date, vals in data[ts_key].items()
+        ]
+        logger.info("AlphaVantage: fetched %d rows for %s", len(rows), symbol)
+        return pd.DataFrame(rows)
+
+    def _request(self, params):
+        res = requests.get(self.BASE_URL, params=params, timeout=30)
+        res.raise_for_status()
+        return res.json()
+
+
+class YahooFinance:
+    """Retrieve free historical price data via Yahoo Finance (yfinance).
+
+    No API key required. Supports equities, ETFs, indices, and crypto.
+    yfinance is an unofficial scraper — Yahoo may rate-limit or block
+    requests. This class lazy-imports yfinance, retries on failure, and
+    sleeps between attempts.
+    """
+
+    MAX_RETRIES = 3
+    RETRY_DELAY = 2  # seconds between retries
+
+    @lru_cache(maxsize=32)
+    def get_historical_price(self, symbol, start_date, end_date):
+        """Fetch daily close prices from Yahoo Finance."""
+        import yfinance as yf  # lazy import — avoids import-time network calls
+
+        last_err = None
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            try:
+                ticker = yf.Ticker(symbol)
+                hist = ticker.history(
+                    start=start_date, end=end_date,
+                    auto_adjust=True, timeout=30,
+                )
+                break
+            except Exception as exc:
+                last_err = exc
+                logger.warning("YahooFinance attempt %d/%d failed for '%s': %s",
+                               attempt, self.MAX_RETRIES, symbol, exc)
+                if attempt < self.MAX_RETRIES:
+                    time.sleep(self.RETRY_DELAY * attempt)
+        else:
+            logger.error("YahooFinance exhausted %d retries for '%s'",
+                         self.MAX_RETRIES, symbol)
+            raise RuntimeError(
+                f"Yahoo Finance failed after {self.MAX_RETRIES} attempts "
+                f"for '{symbol}': {last_err}"
+            ) from last_err
+
+        if hist.empty:
+            logger.error("YahooFinance returned no data for '%s' (%s to %s)",
+                         symbol, start_date, end_date)
+            raise ValueError(
+                f"Yahoo Finance returned no data for '{symbol}' "
+                f"({start_date} to {end_date})"
+            )
+
+        df = pd.DataFrame({
+            "t": hist.index.strftime("%Y-%m-%d"),
+            "v": hist["Close"].values,
+        })
+        df["v"] = df["v"].astype(float)
+        for col in ("Open", "High", "Low", "Close", "Volume"):
+            if col in hist.columns:
+                df[col] = hist[col].values.astype(float)
+        logger.info("YahooFinance: fetched %d rows for %s (%s to %s)",
+                    len(df), symbol, start_date, end_date)
+        return df.reset_index(drop=True)
+
+
+class NasdaqDataLink:
+    """Retrieve data from Nasdaq Data Link (formerly Quandl).
+
+    Supports time-series datasets (e.g. CHRIS/CME_CL1, FRED/GDP) and
+    table-based data (e.g. WIKI/PRICES, ZACKS/FC).
+    """
+
+    def __init__(self) -> None:
+        load_dotenv()
+        self.__api_key = os.getenv('NASDAQ_DATA_LINK_API_KEY')
+        if not self.__api_key:
+            raise ValueError("NASDAQ_DATA_LINK_API_KEY must be set in .env")
+        import nasdaqdatalink
+        nasdaqdatalink.ApiConfig.api_key = self.__api_key
+
+    @lru_cache(maxsize=32)
+    def get_historical_price(self, dataset_code, start_date, end_date,
+                             column='Close'):
+        """Fetch time-series data from Nasdaq Data Link."""
+        import nasdaqdatalink
+
+        data = nasdaqdatalink.get(
+            dataset_code,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        if data.empty:
+            raise ValueError(
+                f"Nasdaq Data Link returned no data for '{dataset_code}' "
+                f"({start_date} to {end_date})"
+            )
+
+        col_map = {c.lower(): c for c in data.columns}
+        col_key = column.lower()
+        if col_key in col_map:
+            actual_col = col_map[col_key]
+        else:
+            actual_col = data.columns[-1]
+            logger.warning(
+                "Column '%s' not found in %s; using '%s'",
+                column, dataset_code, actual_col,
+            )
+
+        df = pd.DataFrame({
+            "t": data.index.strftime("%Y-%m-%d"),
+            "v": data[actual_col].values,
+        })
+        df["v"] = df["v"].astype(float)
+        logger.info("NasdaqDataLink: fetched %d rows for %s (%s to %s)",
+                     len(df), dataset_code, start_date, end_date)
+        return df.reset_index(drop=True)
+
+    def get_table_data(self, table_code, **kwargs):
+        """Fetch table (datatable) data from Nasdaq Data Link."""
+        import nasdaqdatalink
+
+        kwargs.setdefault('paginate', True)
+        data = nasdaqdatalink.get_table(table_code, **kwargs)
+        logger.info("NasdaqDataLink: fetched %d rows from table %s",
+                     len(data), table_code)
+        return data
+
+
+if __name__ == "__main__":
+    start = time.time()
+    av = AlphaVantage()
+    data = av.get_historical_price('BTC', '2020-05-11', '2021-04-03')
+    end = time.time()
+    print(f"Elapsed: {end - start:.2f}s")
+    print(data.head())

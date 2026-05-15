@@ -12,10 +12,10 @@ import pandas as pd
 import pytest
 from unittest.mock import patch, MagicMock
 
-from strat import Strategy, StrategyConfig, SubStrategy, strategy_to_json, backtest_results_to_json
-from perf import Performance
-from param_opt import ParametersOptimization
-from walk_forward import WalkForward, WalkForwardResult
+from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, strategy_to_json, backtest_results_to_json
+from quant.strategy.performance import Performance
+from quant.strategy.optimizer import ParametersOptimization
+from quant.strategy.walk_forward import WalkForward, WalkForwardResult
 
 
 @pytest.fixture
@@ -351,12 +351,12 @@ class TestCLIMainIntegration:
         })
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("main.YahooFinance") as mock_yf_cls:
+            with patch("quant.cli.YahooFinance") as mock_yf_cls:
                 mock_yf = MagicMock()
                 mock_yf.get_historical_price.return_value = mock_price
                 mock_yf_cls.return_value = mock_yf
 
-                from main import main, parse_args
+                from quant.cli import main, parse_args
                 args = parse_args([
                     "--symbol", "test",
                     "--indicator", "bollinger",
@@ -383,12 +383,12 @@ class TestCLIMainIntegration:
         })
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("main.YahooFinance") as mock_yf_cls:
+            with patch("quant.cli.YahooFinance") as mock_yf_cls:
                 mock_yf = MagicMock()
                 mock_yf.get_historical_price.return_value = mock_price
                 mock_yf_cls.return_value = mock_yf
 
-                from main import main, parse_args
+                from quant.cli import main, parse_args
                 args = parse_args([
                     "--symbol", "test",
                     "--indicator", "bollinger",
@@ -486,12 +486,12 @@ class TestWalkForwardPipeline:
         })
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("main.YahooFinance") as mock_yf_cls:
+            with patch("quant.cli.YahooFinance") as mock_yf_cls:
                 mock_yf = MagicMock()
                 mock_yf.get_historical_price.return_value = mock_price
                 mock_yf_cls.return_value = mock_yf
 
-                from main import main, parse_args
+                from quant.cli import main, parse_args
                 args = parse_args([
                     "--symbol", "test",
                     "--indicator", "bollinger",

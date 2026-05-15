@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from strat import Strategy, StrategyConfig, SubStrategy, SignalDirection
-from param_opt import ParametersOptimization, OptimizeResult, OPTUNA_MAX_TRIALS
+from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, SignalDirection
+from quant.strategy.optimizer import ParametersOptimization, OptimizeResult, OPTUNA_MAX_TRIALS
 
 
 _BOLLINGER_CONFIG = StrategyConfig("test", "get_bollinger_band",

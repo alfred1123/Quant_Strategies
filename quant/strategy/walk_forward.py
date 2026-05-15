@@ -6,7 +6,7 @@ periods. Optimizes parameters on in-sample via grid search, then evaluates the
 best parameters on out-of-sample to detect overfitting.
 
 Usage:
-    from strat import SignalDirection, StrategyConfig, SubStrategy
+    from quant.strategy.signals import SignalDirection, StrategyConfig, SubStrategy
     # Single-factor
     config = StrategyConfig("BTC-USD", "get_bollinger_band",
                             SignalDirection.momentum_band_signal, 365)
@@ -28,8 +28,8 @@ import logging
 import numpy as np
 import pandas as pd
 
-from param_opt import ParametersOptimization
-from perf import Performance
+from quant.strategy.optimizer import ParametersOptimization
+from quant.strategy.performance import Performance
 
 logger = logging.getLogger(__name__)
 

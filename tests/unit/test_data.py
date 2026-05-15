@@ -6,8 +6,8 @@ from unittest.mock import patch, MagicMock
 
 class TestGlassnode:
     @patch.dict("os.environ", {"GLASSNODE_API_KEY": "test_key"})
-    @patch("data.pd.read_json")
-    @patch("data.requests.get")
+    @patch("quant.data.sources.pd.read_json")
+    @patch("quant.data.sources.requests.get")
     def test_get_historical_price_returns_dataframe(self, mock_get, mock_read_json):
         mock_response = MagicMock()
         mock_response.text = '[{"t":"2020-05-11","v":8500},{"t":"2020-05-12","v":8600}]'
@@ -19,7 +19,7 @@ class TestGlassnode:
         ])
         mock_read_json.return_value = expected_df
 
-        from data import Glassnode
+        from quant.data.sources import Glassnode
         gn = Glassnode()
         gn.get_historical_price.cache_clear()
         df = gn.get_historical_price("BTC", "2020-05-11", "2020-05-13")
@@ -30,15 +30,15 @@ class TestGlassnode:
         assert len(df) == 2
 
     @patch.dict("os.environ", {"GLASSNODE_API_KEY": "test_key"})
-    @patch("data.pd.read_json", return_value=pd.DataFrame({"t": ["x"], "v": [1]}))
-    @patch("data.requests.get")
+    @patch("quant.data.sources.pd.read_json", return_value=pd.DataFrame({"t": ["x"], "v": [1]}))
+    @patch("quant.data.sources.requests.get")
     def test_get_historical_price_calls_api_with_params(self, mock_get, _):
         mock_response = MagicMock()
         mock_response.text = "[]"
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
-        from data import Glassnode
+        from quant.data.sources import Glassnode
         gn = Glassnode()
         gn.get_historical_price.cache_clear()
         gn.get_historical_price("ETH", "2021-01-01", "2021-01-02", "1h")
@@ -53,15 +53,15 @@ class TestGlassnode:
         assert headers["X-Api-Key"] == "test_key"
 
     @patch.dict("os.environ", {"GLASSNODE_API_KEY": "test_key"})
-    @patch("data.pd.read_json", return_value=pd.DataFrame({"t": ["x"], "v": [1]}))
-    @patch("data.requests.get")
+    @patch("quant.data.sources.pd.read_json", return_value=pd.DataFrame({"t": ["x"], "v": [1]}))
+    @patch("quant.data.sources.requests.get")
     def test_get_historical_price_default_resolution(self, mock_get, _):
         mock_response = MagicMock()
         mock_response.text = "[]"
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
-        from data import Glassnode
+        from quant.data.sources import Glassnode
         gn = Glassnode()
         gn.get_historical_price.cache_clear()
         gn.get_historical_price("BTC", "2020-05-11", "2020-05-12")
@@ -70,26 +70,26 @@ class TestGlassnode:
         assert params["i"] == "24h"
 
     def test_init_raises_without_api_key(self, monkeypatch):
-        monkeypatch.setattr("data.load_dotenv", lambda *a, **kw: None)
+        monkeypatch.setattr("quant.data.sources.load_dotenv", lambda *a, **kw: None)
         monkeypatch.delenv("GLASSNODE_API_KEY", raising=False)
-        from data import Glassnode
+        from quant.data.sources import Glassnode
         with pytest.raises(ValueError, match="GLASSNODE_API_KEY"):
             Glassnode()
 
 
 class TestFutuOpenD:
-    @patch("data.load_dotenv", lambda *a, **kw: None)
+    @patch("quant.data.sources.load_dotenv", lambda *a, **kw: None)
     @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
-    @patch("data.futu.OpenQuoteContext")
+    @patch("quant.data.sources.futu.OpenQuoteContext")
     def test_init_loads_env(self, mock_ctx):
-        from data import FutuOpenD
+        from quant.data.sources import FutuOpenD
         futu_src = FutuOpenD()
         assert futu_src._FutuOpenD__host == "127.0.0.1"
         assert futu_src._FutuOpenD__port == 11111
 
-    @patch("data.load_dotenv", lambda *a, **kw: None)
+    @patch("quant.data.sources.load_dotenv", lambda *a, **kw: None)
     @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
-    @patch("data.futu.OpenQuoteContext")
+    @patch("quant.data.sources.futu.OpenQuoteContext")
     def test_get_historical_data_calls_api(self, mock_ctx_cls):
         mock_ctx = MagicMock()
         mock_ctx_cls.return_value = mock_ctx
@@ -98,16 +98,16 @@ class TestFutuOpenD:
         mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
         mock_ctx.__exit__ = MagicMock(return_value=False)
 
-        from data import FutuOpenD
+        from quant.data.sources import FutuOpenD
         futu_src = FutuOpenD()
         futu_src.get_historical_data.cache_clear()
         result = futu_src.get_historical_data("HK.00700", "2021-01-01", "2021-01-31")
 
         assert isinstance(result, pd.DataFrame)
 
-    @patch("data.load_dotenv", lambda *a, **kw: None)
+    @patch("quant.data.sources.load_dotenv", lambda *a, **kw: None)
     @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
-    @patch("data.futu.OpenQuoteContext")
+    @patch("quant.data.sources.futu.OpenQuoteContext")
     def test_get_historical_data_raises_on_error(self, mock_ctx_cls):
         mock_ctx = MagicMock()
         mock_ctx_cls.return_value = mock_ctx
@@ -115,17 +115,17 @@ class TestFutuOpenD:
         mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
         mock_ctx.__exit__ = MagicMock(return_value=False)
 
-        from data import FutuOpenD
+        from quant.data.sources import FutuOpenD
         futu_src = FutuOpenD()
         futu_src.get_historical_data.cache_clear()
         with pytest.raises(RuntimeError, match="Futu API error"):
             futu_src.get_historical_data("HK.00700", "2021-01-01", "2021-01-31")
 
-    @patch("data.load_dotenv", lambda *a, **kw: None)
+    @patch("quant.data.sources.load_dotenv", lambda *a, **kw: None)
     def test_init_raises_without_env_vars(self, monkeypatch):
         monkeypatch.delenv("FUTU_HOST", raising=False)
         monkeypatch.delenv("FUTU_PORT", raising=False)
-        from data import FutuOpenD
+        from quant.data.sources import FutuOpenD
         with pytest.raises(ValueError, match="FUTU_HOST"):
             FutuOpenD()
 
@@ -148,14 +148,14 @@ class TestAlphaVantage:
     }
 
     @patch.dict("os.environ", {"ALPHAVANTAGE_API_KEY": "test_key"})
-    @patch("data.requests.get")
+    @patch("quant.data.sources.requests.get")
     def test_get_equity_price_returns_dataframe(self, mock_get):
         mock_response = MagicMock()
         mock_response.json.return_value = self.EQUITY_RESPONSE
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
-        from data import AlphaVantage
+        from quant.data.sources import AlphaVantage
         av = AlphaVantage()
         av.get_historical_price.cache_clear()
         df = av.get_historical_price("IBM", "2021-01-04", "2021-01-05")
@@ -167,14 +167,14 @@ class TestAlphaVantage:
         assert df.iloc[1]["v"] == 131.01
 
     @patch.dict("os.environ", {"ALPHAVANTAGE_API_KEY": "test_key"})
-    @patch("data.requests.get")
+    @patch("quant.data.sources.requests.get")
     def test_get_crypto_price_returns_dataframe(self, mock_get):
         mock_response = MagicMock()
         mock_response.json.return_value = self.CRYPTO_RESPONSE
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
-        from data import AlphaVantage
+        from quant.data.sources import AlphaVantage
         av = AlphaVantage()
         av.get_historical_price.cache_clear()
         df = av.get_historical_price("BTC", "2021-01-04", "2021-01-05")
@@ -185,14 +185,14 @@ class TestAlphaVantage:
         assert df.iloc[0]["v"] == 33500.0
 
     @patch.dict("os.environ", {"ALPHAVANTAGE_API_KEY": "test_key"})
-    @patch("data.requests.get")
+    @patch("quant.data.sources.requests.get")
     def test_filters_by_date_range(self, mock_get):
         mock_response = MagicMock()
         mock_response.json.return_value = self.EQUITY_RESPONSE
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
-        from data import AlphaVantage
+        from quant.data.sources import AlphaVantage
         av = AlphaVantage()
         av.get_historical_price.cache_clear()
         df = av.get_historical_price("IBM", "2021-01-04", "2021-01-04")
@@ -201,35 +201,35 @@ class TestAlphaVantage:
         assert df.iloc[0]["t"] == "2021-01-04"
 
     @patch.dict("os.environ", {"ALPHAVANTAGE_API_KEY": "test_key"})
-    @patch("data.requests.get")
+    @patch("quant.data.sources.requests.get")
     def test_raises_on_api_error(self, mock_get):
         mock_response = MagicMock()
         mock_response.json.return_value = {"Error Message": "Invalid API call"}
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
-        from data import AlphaVantage
+        from quant.data.sources import AlphaVantage
         av = AlphaVantage()
         av.get_historical_price.cache_clear()
         with pytest.raises(ValueError, match="AlphaVantage error"):
             av.get_historical_price("INVALID", "2021-01-01", "2021-01-02")
 
     def test_init_raises_without_api_key(self, monkeypatch):
-        monkeypatch.setattr("data.load_dotenv", lambda *a, **kw: None)
+        monkeypatch.setattr("quant.data.sources.load_dotenv", lambda *a, **kw: None)
         monkeypatch.delenv("ALPHAVANTAGE_API_KEY", raising=False)
-        from data import AlphaVantage
+        from quant.data.sources import AlphaVantage
         with pytest.raises(ValueError, match="ALPHAVANTAGE_API_KEY"):
             AlphaVantage()
 
     @patch.dict("os.environ", {"ALPHAVANTAGE_API_KEY": "test_key"})
-    @patch("data.requests.get")
+    @patch("quant.data.sources.requests.get")
     def test_uses_correct_endpoint_for_equity(self, mock_get):
         mock_response = MagicMock()
         mock_response.json.return_value = self.EQUITY_RESPONSE
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
-        from data import AlphaVantage
+        from quant.data.sources import AlphaVantage
         av = AlphaVantage()
         av.get_historical_price.cache_clear()
         av.get_historical_price("IBM", "2021-01-04", "2021-01-05")
@@ -238,14 +238,14 @@ class TestAlphaVantage:
         assert params["function"] == "TIME_SERIES_DAILY"
 
     @patch.dict("os.environ", {"ALPHAVANTAGE_API_KEY": "test_key"})
-    @patch("data.requests.get")
+    @patch("quant.data.sources.requests.get")
     def test_uses_correct_endpoint_for_crypto(self, mock_get):
         mock_response = MagicMock()
         mock_response.json.return_value = self.CRYPTO_RESPONSE
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
-        from data import AlphaVantage
+        from quant.data.sources import AlphaVantage
         av = AlphaVantage()
         av.get_historical_price.cache_clear()
         av.get_historical_price("BTC", "2021-01-04", "2021-01-05")
@@ -277,7 +277,7 @@ class TestYahooFinance:
         )
         mock_ticker_cls.return_value = mock_ticker
 
-        from data import YahooFinance
+        from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
         yf_src.get_historical_price.cache_clear()
         df = yf_src.get_historical_price("AAPL", "2021-01-04", "2021-01-05")
@@ -300,7 +300,7 @@ class TestYahooFinance:
         )
         mock_ticker_cls.return_value = mock_ticker
 
-        from data import YahooFinance
+        from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
         yf_src.get_historical_price.cache_clear()
         df = yf_src.get_historical_price("MSFT", "2021-06-15", "2021-06-15")
@@ -315,7 +315,7 @@ class TestYahooFinance:
         )
         mock_ticker_cls.return_value = mock_ticker
 
-        from data import YahooFinance
+        from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
         yf_src.get_historical_price.cache_clear()
         yf_src.get_historical_price("AAPL", "2016-01-01", "2026-01-01")
@@ -332,7 +332,7 @@ class TestYahooFinance:
         mock_ticker.history.return_value = pd.DataFrame()
         mock_ticker_cls.return_value = mock_ticker
 
-        from data import YahooFinance
+        from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
         yf_src.get_historical_price.cache_clear()
         with pytest.raises(ValueError, match="no data"):
@@ -346,7 +346,7 @@ class TestYahooFinance:
         )
         mock_ticker_cls.return_value = mock_ticker
 
-        from data import YahooFinance
+        from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
         yf_src.get_historical_price.cache_clear()
         df = yf_src.get_historical_price("SPY", "2021-01-04", "2021-01-05")
@@ -363,7 +363,7 @@ class TestYahooFinance:
         ]
         mock_ticker_cls.return_value = mock_ticker
 
-        from data import YahooFinance
+        from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
         yf_src.get_historical_price.cache_clear()
         df = yf_src.get_historical_price("AAPL", "2021-01-04", "2021-01-04")
@@ -378,7 +378,7 @@ class TestYahooFinance:
         mock_ticker.history.side_effect = Exception("blocked")
         mock_ticker_cls.return_value = mock_ticker
 
-        from data import YahooFinance
+        from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
         yf_src.get_historical_price.cache_clear()
         with pytest.raises(RuntimeError, match="failed after 3 attempts"):
@@ -405,7 +405,7 @@ class TestNasdaqDataLink:
             ["2021-01-04", "2021-01-05"], [129.41, 131.01],
         )
 
-        from data import NasdaqDataLink
+        from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
         src.get_historical_price.cache_clear()
         df = src.get_historical_price("WIKI/AAPL", "2021-01-04", "2021-01-05")
@@ -424,7 +424,7 @@ class TestNasdaqDataLink:
             ["2021-01-04"], [100.0],
         )
 
-        from data import NasdaqDataLink
+        from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
         src.get_historical_price.cache_clear()
         src.get_historical_price("CHRIS/CME_CL1", "2016-01-01", "2026-01-01")
@@ -441,16 +441,16 @@ class TestNasdaqDataLink:
     def test_raises_on_empty_response(self, mock_get, _mock_cfg):
         mock_get.return_value = pd.DataFrame()
 
-        from data import NasdaqDataLink
+        from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
         src.get_historical_price.cache_clear()
         with pytest.raises(ValueError, match="no data"):
             src.get_historical_price("INVALID/CODE", "2021-01-01", "2021-01-02")
 
     def test_init_raises_without_api_key(self, monkeypatch):
-        monkeypatch.setattr("data.load_dotenv", lambda *a, **kw: None)
+        monkeypatch.setattr("quant.data.sources.load_dotenv", lambda *a, **kw: None)
         monkeypatch.delenv("NASDAQ_DATA_LINK_API_KEY", raising=False)
-        from data import NasdaqDataLink
+        from quant.data.sources import NasdaqDataLink
         with pytest.raises(ValueError, match="NASDAQ_DATA_LINK_API_KEY"):
             NasdaqDataLink()
 
@@ -462,7 +462,7 @@ class TestNasdaqDataLink:
             ["2021-01-04", "2021-01-05"], [100, 200],
         )
 
-        from data import NasdaqDataLink
+        from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
         src.get_historical_price.cache_clear()
         df = src.get_historical_price("WIKI/AAPL", "2021-01-04", "2021-01-05")
@@ -477,7 +477,7 @@ class TestNasdaqDataLink:
             ["2021-06-15"], [150.0],
         )
 
-        from data import NasdaqDataLink
+        from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
         src.get_historical_price.cache_clear()
         df = src.get_historical_price("WIKI/MSFT", "2021-06-15", "2021-06-15")
@@ -494,7 +494,7 @@ class TestNasdaqDataLink:
             {"Value": [42.0], "Settle": [43.0]}, index=idx,
         )
 
-        from data import NasdaqDataLink
+        from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
         src.get_historical_price.cache_clear()
         df = src.get_historical_price("CHRIS/CME_CL1", "2021-01-04", "2021-01-04")
@@ -512,7 +512,7 @@ class TestNasdaqDataLink:
             {"Value": [42.0], "Settle": [43.0]}, index=idx,
         )
 
-        from data import NasdaqDataLink
+        from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
         src.get_historical_price.cache_clear()
         df = src.get_historical_price(
@@ -531,7 +531,7 @@ class TestNasdaqDataLink:
             "close": [129.41, 131.01],
         })
 
-        from data import NasdaqDataLink
+        from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
         df = src.get_table_data("WIKI/PRICES", ticker="AAPL")
 
@@ -568,7 +568,7 @@ class TestInstrumentCache:
 
     @pytest.fixture()
     def cache(self):
-        from data import InstrumentCache
+        from quant.data.instruments import InstrumentCache
         c = InstrumentCache.__new__(InstrumentCache)
         c._conninfo = "dummy"
         c.user_id = "test"
@@ -620,10 +620,10 @@ class TestInstrumentCache:
         assert cache.resolve_vendor_symbol(2, 2) is None
         assert cache.resolve_vendor_symbol(999, 1) is None
 
-    @patch("data.psycopg.connect", return_value=MagicMock())
-    @patch("db.DbGateway._call_get")
+    @patch("quant.data.instruments.psycopg.connect", return_value=MagicMock())
+    @patch("quant.shared.db.DbGateway._call_get")
     def test_load_all_calls_both_procs(self, mock_call_get, _mock_connect):
-        from data import InstrumentCache
+        from quant.data.instruments import InstrumentCache
         mock_call_get.side_effect = [self.SAMPLE_PRODUCTS, self.SAMPLE_XREFS]
         c = InstrumentCache("dummy")
         c.load_all()
@@ -637,7 +637,7 @@ class TestBacktestCacheGetOrFetch:
 
     @staticmethod
     def _make_cache():
-        from data import BacktestCache
+        from quant.data.backtest_cache import BacktestCache
         c = BacktestCache.__new__(BacktestCache)
         c.user_id = "tester"
         c.refdata = MagicMock()
@@ -682,7 +682,7 @@ class TestBacktestCacheGetOrFetch:
         assert len(out) == 5
 
     def test_readonly_cache_miss_raises(self):
-        from data import BacktestCache
+        from quant.data.backtest_cache import BacktestCache
         c = self._make_cache()
         c._get_api_request = MagicMock(return_value=[])
         c._insert_api_request = MagicMock()
@@ -699,7 +699,7 @@ class TestBacktestCacheGetOrFetch:
         assert "Refresh dataset" in str(exc_info.value)
 
     def test_readonly_partial_coverage_raises(self):
-        from data import BacktestCache
+        from quant.data.backtest_cache import BacktestCache
         c = self._make_cache()
         c._get_api_request = MagicMock(return_value=[self._cached_row("2024-01-05", "2024-01-08")])
         c._insert_api_request = MagicMock()

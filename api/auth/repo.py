@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from src.db import DbGateway
+from quant.shared.db import DbGateway
 
 logger = logging.getLogger(__name__)
 

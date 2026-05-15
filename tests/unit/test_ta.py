@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from strat import TechnicalAnalysis
+from quant.strategy.indicators import TechnicalAnalysis
 
 
 class TestSMA:

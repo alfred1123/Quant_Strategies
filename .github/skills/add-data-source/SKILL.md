@@ -114,7 +114,7 @@ Update these files:
 
 | File | Change |
 |------|--------|
-| `src/main.py` | Add to import: `from data import ..., <SourceName>` |
+| `quant/cli.py` | Add to import: `from quant.data.sources import ..., <SourceName>` |
 | `requirements.txt` | Add the library (e.g. `yfinance`, `tiingo`) |
 | `.env.example` | Add placeholder for API key (or note if none needed) |
 | `.github/instructions/backtest-pipeline.instructions.md` | Add class to data.py section |

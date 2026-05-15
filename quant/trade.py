@@ -5,7 +5,7 @@ Futu OpenD gateway.  Both paper (SIMULATE) and live (REAL) environments
 are supported — controlled by the ``paper`` flag.
 
 Usage:
-    from trade import FutuTrader
+    from quant.trade import FutuTrader
 
     trader = FutuTrader(paper=True)          # paper trading
     trader.unlock("your_trade_password")     # unlock (required for real)

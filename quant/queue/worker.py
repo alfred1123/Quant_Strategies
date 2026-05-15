@@ -1,7 +1,7 @@
 """Backtest worker — Slice C minimum (no progress, no cancel, no timeout).
 
 Invocation:
-    python -m src.worker <queue_id>
+    python -m quant.queue.worker <queue_id>
 
 See docs/design/backtest-queue.md §10 for the full contract. This Slice C
 implementation covers steps 1-4 + 7 + 9 + 11-12 only:
@@ -31,21 +31,17 @@ import os
 import sys
 import traceback
 import uuid
+from dataclasses import dataclass
 
-# Project root (api/, coordinator deps) and src/ (db, cache, util) must both
-# be importable before load_config() runs.
-_repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_src_dir = os.path.join(_repo_root, "src")
-for _p in (_repo_root, _src_dir):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-from api.config import load_config  # noqa: E402
+import psycopg
+
+from api.config import load_config, get_redis_url  # noqa: E402
 from api.schemas.backtest import OptimizeRequest  # noqa: E402
 from api.services.backtest import run_optimize  # noqa: E402
 
-from db import DbGateway  # noqa: E402
-from cache import DataCaches  # noqa: E402
-from util import utc_now_iso  # noqa: E402
+from quant.shared.db import DbGateway  # noqa: E402
+from quant.refdata.bundle import DataCaches  # noqa: E402
+from quant.shared.util import utc_now_iso  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -113,8 +109,6 @@ class BacktestWorker:
 
     def run(self, queue_id: uuid.UUID) -> int:
         """Main worker flow. Returns the process exit code."""
-        from api.config import get_redis_url
-
         caches = DataCaches(self._db_url, get_redis_url())
         caches.require_redis()
         caches.load_instruments(soft_fail=True)

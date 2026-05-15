@@ -17,7 +17,7 @@ import optuna
 import pandas as pd
 from optuna.samplers import GridSampler, TPESampler
 
-from perf import Performance
+from quant.strategy.performance import Performance
 
 logger = logging.getLogger(__name__)
 

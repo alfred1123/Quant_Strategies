@@ -75,12 +75,12 @@ Implementation constraints:
 | DB repo (typed SQL) | `coordinator/src/queue/repo.ts` | Bun | Uses `postgres` (porsager). |
 | LISTEN consumer (autocommit conn) | `coordinator/src/queue/notify.ts` | Bun | Future: when `pg_notify` is added to `SP_INS_QUEUE`. |
 | Shared zod schemas | `coordinator/src/types/queue.ts` | Bun + frontend | Re-exported by frontend for type-safe fetch. |
-| Python worker entrypoint | `src/worker.py` | CPython | `python -m src.worker <queue_id>`. |
+| Python worker entrypoint | `quant/queue/worker.py` | CPython | `python -m quant.queue.worker <queue_id>`. |
 | Python DB repo (used by worker self-writes) | `src/jobs.py` | CPython | Existing `BacktestJobRepo`. |
 | Frontend queue panel | `frontend/src/features/queue/` | Browser | TanStack Query + EventSource. |
 | FastAPI `/optimize`, `/refdata`, `/auth`, `/inst` | `api/` | CPython | **Unchanged.** |
 
-The CLI (`src/main.py`) is **not** modified — it runs synchronously with no use for the queue.
+The CLI (`quant/cli.py`) is **not** modified — it runs synchronously with no use for the queue.
 
 `api/queue/` (the previous Python coordinator) is removed.
 
@@ -95,7 +95,7 @@ flowchart LR
     UI[React SPA] -->|/api/v1/jobs/*| Coord[coordinator<br/>Bun + Hono<br/>:3001]
     UI -->|everything else| FA[FastAPI<br/>uvicorn :8000]
     Coord -->|SP_INS_QUEUE QUEUED<br/>SP_INS_QUEUE RUNNING| DB[(PostgreSQL<br/>BT.QUEUE)]
-    Coord -->|spawn child process| Worker[python -m src.worker<br/>queue_id]
+    Coord -->|spawn child process| Worker[python -m quant.queue.worker<br/>queue_id]
     Worker -->|stdout JSON lines| Coord
     Worker -->|INSERT BT.RESULT<br/>SP_INS_QUEUE TERMINAL| DB
     FA -->|reads only| DB
@@ -136,7 +136,7 @@ Documented in §19. Short version: the coordinator is 100% I/O — HTTP, SSE, ch
 | 1 | `coordinator/src/http/routes/jobs.ts` | HTTP boundary: parse + zod-validate, auth check, call `repo.submit()`, notify manager, return 202. |
 | 2 | `coordinator/src/db/repo.ts — submit()` | Generate `queue_id`, resolve `QUEUED` status ID from REFDATA cache, `CALL BT.SP_INS_QUEUE(...)`. |
 | 3 | `coordinator/src/manager/manager.ts` | Wakeup → claim loop: `SELECT` next QUEUED row + `SP_INS_QUEUE RUNNING` + `supervisor.spawn(queue_id)`. |
-| 4 | `coordinator/src/manager/supervisor.ts` | `child_process.spawn('python', ['-m', 'src.worker', queue_id], {env: {DB_URL: ...}})`. |
+| 4 | `coordinator/src/manager/supervisor.ts` | `child_process.spawn('python', ['-m', 'quant.queue.worker', queue_id], {env: {DB_URL: ...}})`. |
 
 ---
 
@@ -424,7 +424,7 @@ When `SP_CLAIM_NEXT` is added (Phase 2) this collapses to one atomic call.
 ### 9.5 Supervisor
 
 ```ts
-const child = spawn(PYTHON_BIN, ['-m', 'src.worker', queueId], {
+const child = spawn(PYTHON_BIN, ['-m', 'quant.queue.worker', queueId], {
   env: { ...process.env, DB_URL, WORKER_PROGRESS_EVERY_N: '25', WORKER_PROGRESS_EVERY_T: '1.0' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -444,12 +444,12 @@ const child = spawn(PYTHON_BIN, ['-m', 'src.worker', queueId], {
 
 ## 10. Worker process — `src/worker.py`
 
-The worker is a normal Python module invoked as `python -m src.worker <queue_id>`. It is the **entire** Python contract the coordinator depends on.
+The worker is a normal Python module invoked as `python -m quant.queue.worker <queue_id>`. It is the **entire** Python contract the coordinator depends on.
 
 ### 10.1 Invocation contract
 
 ```bash
-python -m src.worker <queue_id>
+python -m quant.queue.worker <queue_id>
 ```
 
 | Channel | Use |
@@ -820,7 +820,7 @@ After step 5, the FastAPI deployment unit can be removed entirely. The coordinat
 | `src/data.py` (data sources, `RefDataCache`, `BacktestCache`) | pandas/numpy DataFrames, vendor SDKs (`futu`, glassnode) are Python-only. |
 | `src/strat.py`, `src/perf.py`, `src/param_opt.py`, `src/walk_forward.py` | Heavy numerics. |
 | `src/db.py` (`DbGateway`) | Used by both worker and any debug CLI. |
-| `src/main.py` (CLI backtest) | Synchronous local-dev tool. No queue benefit. |
+| `quant/cli.py` (CLI backtest) | Synchronous local-dev tool. No queue benefit. |
 | Liquibase migrations (`db/liquidbase/`) | Java-based, runtime-agnostic. |
 | Any future ML / training scripts | Python ecosystem. |
 
@@ -839,7 +839,7 @@ After step 5, the FastAPI deployment unit can be removed entirely. The coordinat
 ### 20.5 What this enables long-term
 
 - **Independent scaling** — coordinator (I/O) and workers (CPU) scale on different curves. Today's deployment can run 1 coordinator + 1 worker; tomorrow's can run 3 coordinators behind an ALB + 16 workers across hosts without changing application code.
-- **Heterogeneous workers** — `python -m src.worker` today, `python -m src.worker_gpu` for GPU jobs, `cargo run --bin fast_worker` for Rust hot-paths. Same DB contract.
+- **Heterogeneous workers** — `python -m quant.queue.worker` today, `python -m quant.queue.worker_gpu` for GPU jobs, `cargo run --bin fast_worker` for Rust hot-paths. Same DB contract.
 - **Edge-deployable read paths** — once `/refdata/*` and `/inst/*` are TS, they can be cached at Cloudflare/Vercel edge with no Python in the request path.
 - **Cleaner blast radius** — a worker crash, a coordinator OOM, or a FastAPI bug each affect only their own process. Today everything shares one uvicorn worker.
 

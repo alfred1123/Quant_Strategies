@@ -1,8 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { app } from "../../src/http/server";
+import { createApp } from "../../src/http/server";
+import { createJobsService } from "../../src/services/jobs";
+import type { Manager } from "../../src/queue/manager";
 import { refdata } from "../../src/refdata/cache";
 import { enqueue } from "../../src/queue/repo";
 import { isDbAvailable, cleanQueueRows, newUuid, TEST_USER_ID } from "../helpers";
+
+// Real service against the real DB; manager.wake() is a no-op since these
+// tests don't run the queue loop.
+const noopManager = { wake: () => {} } as unknown as Manager;
+const app = createApp({ jobs: createJobsService(noopManager) });
 
 describe("HTTP routes (integration)", () => {
   let available = false;

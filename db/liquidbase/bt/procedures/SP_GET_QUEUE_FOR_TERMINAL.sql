@@ -46,7 +46,7 @@ BEGIN
               FROM BT.QUEUE q
               JOIN BT.STRATEGY s ON s.STRATEGY_ID  = q.STRATEGY_ID
                                 AND s.STRATEGY_VID = q.STRATEGY_VID
-             WHERE q.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'
+             WHERE q.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
                AND q.QUEUE_STATUS_ID IN (1,2,3)
                AND q.USER_ID = IN_USER_ID
              ORDER BY q.PRIORITY ASC, q.TRANSACT_FROM_TS ASC
@@ -67,7 +67,7 @@ BEGIN
               FROM BT.QUEUE q
               JOIN BT.STRATEGY s ON s.STRATEGY_ID  = q.STRATEGY_ID
                                 AND s.STRATEGY_VID = q.STRATEGY_VID
-             WHERE q.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'
+             WHERE q.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
                AND q.QUEUE_STATUS_ID IN (1,2,3)
              ORDER BY q.PRIORITY ASC, q.TRANSACT_FROM_TS ASC
              LIMIT V_LIMIT;

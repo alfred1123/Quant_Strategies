@@ -34,8 +34,8 @@ Run backtest-style code from `src/` (imports are relative to that package, e.g. 
 ## Logging
 
 - Every module uses `import logging` and `logger = logging.getLogger(__name__)` at the top.
-- Logging format and level are configured **once** in `api/config.py` (`setup_logging()`). `src/main.py` has its own inline copy for standalone CLI use. Do **not** call `logging.basicConfig()` anywhere else.
-- **Entry points only** (`src/main.py`, `api/config.py`) call `setup_logging()`.
+- Logging format and level are configured **once** in `api/config.py` (`setup_logging()`). `quant/cli.py` has its own inline copy for standalone CLI use. Do **not** call `logging.basicConfig()` anywhere else.
+- **Entry points only** (`quant/cli.py`, `api/config.py`) call `setup_logging()`.
 - Library modules **never** call `setup_logging` — they only emit via `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`.
 - Do **not** use `print()` for status output — use the logger at the appropriate level.
 

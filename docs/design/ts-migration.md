@@ -92,8 +92,8 @@ The FastAPI service imports `src/` modules directly (same Python process):
 from src.param_opt import ParametersOptimization
 from src.perf import Performance
 from src.walk_forward import WalkForward
-from src.strat import StrategyConfig, SubStrategy, SignalDirection
-from src.data import YahooFinance
+from quant.strategy.signals import StrategyConfig, SubStrategy, SignalDirection
+from quant.data.sources import YahooFinance
 ```
 
 No duplication of backtest logic — the TypeScript frontend replaces only the presentation layer.

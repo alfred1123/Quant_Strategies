@@ -26,7 +26,7 @@ def client():
       * ``app.dependency_overrides[require_user]`` returning a synthetic
         ``CurrentUser`` so the JWT cookie path is bypassed.
     """
-    with patch("src.data.psycopg"):
+    with patch("quant.data.instruments.psycopg"), patch("quant.data.backtest_cache.psycopg"):
         from api.main import app
         from api.auth.dependencies import require_user
         from api.auth.models import CurrentUser
@@ -120,7 +120,7 @@ class TestOptimizeEndpoint:
             "factor": np.linspace(100, 200, 100),
         }, index=pd.date_range("2024-01-01", periods=100, freq="D", name="datetime"))
         mock_opt = MagicMock()
-        from param_opt import OptimizeResult
+        from quant.strategy.optimizer import OptimizeResult
         _df = pd.DataFrame({"window": [10, 20], "signal": [0.01, 0.02], "sharpe": [1.5, 1.8]})
         mock_opt.run.return_value = OptimizeResult(
             grid_df=_df,
@@ -187,7 +187,7 @@ class TestOptimizeStreamEndpoint:
             "factor": np.linspace(100, 200, 100),
         }, index=pd.date_range("2024-01-01", periods=100, freq="D", name="datetime"))
         _df = pd.DataFrame({"window": [10, 20], "signal": [0.01, 0.02], "sharpe": [1.5, 1.8]})
-        from param_opt import OptimizeResult
+        from quant.strategy.optimizer import OptimizeResult
         from api.schemas.backtest import PerformanceResponse, WalkForwardResponse
         mock_perf_resp.return_value = PerformanceResponse(
             strategy_metrics={"Sharpe Ratio": 1.8},
