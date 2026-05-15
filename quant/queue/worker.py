@@ -33,8 +33,6 @@ import traceback
 import uuid
 from dataclasses import dataclass
 
-import psycopg
-
 from api.config import load_config, get_redis_url  # noqa: E402
 from api.schemas.backtest import OptimizeRequest  # noqa: E402
 from api.services.backtest import run_optimize  # noqa: E402

@@ -20,28 +20,65 @@ logger = logging.getLogger(__name__)
 class DbGateway:
     """Concrete base owning conninfo + SP call helpers.
 
-    Subclasses add proc wrappers and business methods per schema.
+    Encapsulates all psycopg usage. Subclasses add proc wrappers and
+    business methods per schema and **never** import psycopg directly.
+
+    Connection mode is set at construction via ``persistent``:
+
+    - ``persistent=False`` (default) — every call opens and closes a
+      short-lived connection (one connect per call).
+    - ``persistent=True`` — a single connection is opened at init and
+      reused for every call until ``close()`` is invoked. Used by long-
+      lived caches (``InstrumentCache``, ``BacktestCache``).
     """
 
-    def __init__(self, conninfo: str, user_id: str = "alfcheun") -> None:
+    def __init__(
+        self,
+        conninfo: str,
+        user_id: str = "quant_admin",
+        *,
+        persistent: bool = False,
+    ) -> None:
         self._conninfo = conninfo
         self.user_id = user_id
+        self._conn: psycopg.Connection | None = (
+            psycopg.connect(conninfo) if persistent else None
+        )
+
+    # ── lifecycle ────────────────────────────────────────────────────────
+
+    def close(self) -> None:
+        """Release the persistent connection, if any. Safe to call repeatedly."""
+        if self._conn is None:
+            return
+        try:
+            self._conn.close()
+        except Exception:
+            logger.debug("DbGateway connection close failed", exc_info=True)
+        finally:
+            self._conn = None
 
     # ── helpers ──────────────────────────────────────────────────────────
 
-    def _call_get(
-        self,
-        sql: str,
-        params: tuple,
-        *,
-        conn: psycopg.Connection | None = None,
-    ) -> list[dict]:
-        """CALL a SP_GET proc → drain REFCURSOR → return list[dict].
-
-        With ``conn``, uses that connection (caller owns lifecycle + rollback on
-        error). Without ``conn``, opens a short-lived connection.
+    def _run(self, fn):
+        """Execute ``fn(cursor)`` on the held connection (if persistent) or
+        on a fresh short-lived one. Returns ``(result, conn)`` where ``conn``
+        is the held connection or ``None`` for short-lived. Rolls back on
+        error.
         """
-        def _refcur_rows(cur) -> list[dict]:
+        if self._conn is not None:
+            try:
+                with self._conn.cursor() as cur:
+                    return fn(cur), self._conn
+            except Exception:
+                self._conn.rollback()
+                raise
+        with psycopg.connect(self._conninfo) as c, c.cursor() as cur:
+            return fn(cur), None
+
+    def _call_get(self, sql: str, params: tuple) -> list[dict]:
+        """CALL a SP_GET proc → drain REFCURSOR → return ``list[dict]``."""
+        def work(cur) -> list[dict]:
             cur.execute(sql, params)
             status = cur.fetchone()
             cursor_name, sqlstate = status[0], status[1]
@@ -56,29 +93,17 @@ class DbGateway:
             logger.info("_call_get returned %d row(s) — params=%s", len(rows), params)
             return rows
 
-        if conn is not None:
-            try:
-                with conn.cursor() as cur:
-                    return _refcur_rows(cur)
-            except Exception:
-                conn.rollback()
-                raise
-        with psycopg.connect(self._conninfo) as c, c.cursor() as cur:
-            return _refcur_rows(cur)
+        rows, _ = self._run(work)
+        return rows
 
-    def _call_write(
-        self,
-        sql: str,
-        params: tuple,
-        *,
-        conn: psycopg.Connection | None = None,
-    ) -> tuple:
+    def _call_write(self, sql: str, params: tuple) -> tuple:
         """CALL a SP_INS/SP_UPD proc whose OUT row starts with the status triplet.
 
-        With ``conn``, commits/rolls back on that connection. Without ``conn``,
-        uses a short-lived connection (committed by context manager).
+        Commits on the held connection (persistent mode) or via the
+        short-lived connection's commit. Returns trailing OUT values
+        (often empty).
         """
-        def _tail_from_cursor(cur) -> tuple:
+        def work(cur) -> tuple:
             cur.execute(sql, params)
             row = cur.fetchone()
             if row is None or len(row) < 3:
@@ -95,17 +120,31 @@ class DbGateway:
                 raise RuntimeError(f"Proc failed (SQLSTATE {sqlstate}): {sqlerrmc}")
             return row[3:]
 
-        if conn is not None:
-            try:
-                with conn.cursor() as cur:
-                    tail = _tail_from_cursor(cur)
-                conn.commit()
-                logger.info("_call_write committed — params=%s", params)
-                return tail
-            except Exception:
-                conn.rollback()
-                raise
-        with psycopg.connect(self._conninfo) as c, c.cursor() as cur:
-            tail = _tail_from_cursor(cur)
+        tail, held = self._run(work)
+        if held is not None:
+            held.commit()
         logger.info("_call_write committed — params=%s", params)
         return tail
+
+    def _query(self, sql: str, params: tuple = ()) -> list[dict]:
+        """Run a plain SELECT → ``list[dict]``. For introspection / catalog
+        queries that don't go through a stored procedure (e.g. ``information_schema``).
+
+        Per AGENTS.md, this MUST NOT be used for INSERT/UPDATE/DELETE on
+        application tables — those go through SPs via ``_call_write``.
+        """
+        def work(cur) -> list[dict]:
+            cur.execute(sql, params)
+            cols = [desc.name for desc in (cur.description or [])]
+            return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+        rows, _ = self._run(work)
+        return rows
+
+    def health_check(self, *, timeout: int = 3) -> None:
+        """Cheap connectivity probe — raises ``psycopg.Error`` on failure,
+        returns ``None`` on success. Used by the FastAPI readiness endpoint.
+        Always uses a short-lived connection independent of ``persistent``.
+        """
+        with psycopg.connect(self._conninfo, connect_timeout=timeout) as conn:
+            conn.execute("SELECT 1")

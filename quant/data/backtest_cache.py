@@ -12,7 +12,6 @@ import uuid
 from typing import Callable
 
 import pandas as pd
-import psycopg
 
 from quant.shared.db import DbGateway
 
@@ -22,8 +21,9 @@ logger = logging.getLogger(__name__)
 class BacktestCache(DbGateway):
     """BT cache read/write via stored procedures.
 
-    Uses a long-lived ``bt_conn`` for BT schema SP calls (no per-query connect).
-    Uses a ``RedisRefData`` reader for denormalized ID lookups (APP_ID, etc.).
+    Holds a long-lived Postgres connection (managed by ``DbGateway``) for
+    BT schema SP calls so there is no per-query connect overhead. Uses a
+    ``RedisRefData`` reader for denormalized ID lookups (APP_ID, etc.).
     """
 
     # Hardcoded default — daily bars. All callers omit tm_interval_id; this
@@ -34,16 +34,8 @@ class BacktestCache(DbGateway):
         # ``refdata`` duck-types the legacy RefDataCache surface — only
         # ``.get(table)`` and ``.resolve_app_metric_id(...)`` are used here,
         # both of which RedisRefData implements identically.
-        super().__init__(conninfo, user_id)
+        super().__init__(conninfo, user_id, persistent=True)
         self.refdata = refdata
-        self.bt_conn = psycopg.connect(conninfo)
-
-    def close(self) -> None:
-        """Release the Postgres connection (optional — tests or shutdown)."""
-        try:
-            self.bt_conn.close()
-        except Exception:
-            logger.debug("BacktestCache.bt_conn close failed", exc_info=True)
 
     # ── helpers ─────────────────────────────────────────────────────────
 
@@ -85,7 +77,6 @@ class BacktestCache(DbGateway):
         return self._call_get(
             "CALL BT.SP_GET_API_REQUEST(%s, %s, %s, %s, NULL, NULL, NULL, NULL)",
             (app_id, app_metric_id, tm_interval_id, internal_cusip),
-            conn=self.bt_conn,
         )
 
     def _insert_api_request(self, api_req_id, app_id, app_metric_id, tm_interval_id, product_grp_id, start_ts, end_ts, payload_json, internal_cusip):
@@ -98,7 +89,6 @@ class BacktestCache(DbGateway):
             "NULL::text, NULL::text, NULL::text)",
             (api_req_id, app_id, app_metric_id, tm_interval_id, product_grp_id,
              start_ts, end_ts, payload_json, self.user_id, internal_cusip),
-            conn=self.bt_conn,
         )
 
     # ── public API ───────────────────────────────────────────────────────

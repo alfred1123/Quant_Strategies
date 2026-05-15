@@ -2,7 +2,7 @@
 
 **Status:** Draft — not yet implemented (informational analysis only)
 **Date:** 2026-04-15
-**Scope:** `src/param_opt.py`, `src/perf.py`, `src/strat.py`
+**Scope:** `quant/strategy/optimizer.py`, `quant/strategy/performance.py`, `quant/strategy/{indicators,signals}.py`
 
 ## 1. Problem
 

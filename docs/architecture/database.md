@@ -17,7 +17,7 @@ The project uses **PostgreSQL 17** with Liquibase for schema management. Each sc
 !!! danger "No Direct DML"
     Writes from Python/FastAPI normally go through **`CALL schema.procedure(...)`** (including **`BT.SP_INS_RESULT`** for **`BT.RESULT`**). Exceptions: **`BT.QUEUE`** mutations use **`BT.SP_INS_QUEUE`** only (**`IN_ACTION`** discriminates enqueue / claim / terminal / cancel). Liquibase seed changesets may use **`INSERT`** once per deploy.
 
-    - **REFDATA reads** — `RefDataCache` loads all REFDATA tables at startup via `CALL REFDATA.SP_GET_ENUM(table_name, ...)`. Never query REFDATA tables directly from application code.
+    - **REFDATA reads** — application code reads REFDATA via the Redis-backed `RedisRefData` reader (`quant/refdata/reader.py`). Postgres is hit only by the publisher (`quant/refdata/publisher.py`) at startup and on `POST /api/v1/refdata/refresh`, which runs `CALL REFDATA.SP_GET_ENUM(table_name, ...)` per table. Never query REFDATA tables directly from application code.
     - If a required write procedure does not exist yet, create it first.
 
 ### Column Naming

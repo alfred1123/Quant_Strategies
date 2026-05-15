@@ -1,8 +1,9 @@
 # Design: Queued Background Backtests
 
-**Status:** v5 — TypeScript coordinator + Python worker. Slice A–B complete (DB + coordinator skeleton in Compose); further coordinator/worker slices pending.
-**Date:** 2026-05-03
-**Scope:** `coordinator/` (new TS service), `src/jobs.py`, `src/worker.py` (new), `frontend/`, `db/liquidbase/bt/`
+**Status:** v6 (in-progress) — **collapsing the TypeScript coordinator into Python.** `coordinator/` (Bun + Hono) is being deleted; FastAPI takes over `/api/v1/jobs/*` and a long-lived `quant.queue.worker_loop` replaces the TS process supervisor. The Postgres schema, `BT.SP_INS_QUEUE` / `BT.SP_GET_QUEUE_LATEST` contract, and the `BT.RESULT` write path are unchanged from v5 — only the runtime owner changes. See decision #32. The v5 sections below describe the TS architecture as implemented; treat them as historical until this banner is removed.
+
+**Date:** 2026-05-03 (v5) · 2026-05-16 (v6 banner)
+**Scope:** `api/routers/jobs.py` (new), `quant/queue/worker.py`, `quant/queue/worker_loop.py` (new), `quant/queue/wake.py`, `frontend/`, `db/liquidbase/bt/`. **Out:** `coordinator/` (to be deleted).
 
 ---
 
@@ -442,7 +443,7 @@ const child = spawn(PYTHON_BIN, ['-m', 'quant.queue.worker', queueId], {
 
 ---
 
-## 10. Worker process — `src/worker.py`
+## 10. Worker process — `quant/queue/worker.py`
 
 The worker is a normal Python module invoked as `python -m quant.queue.worker <queue_id>`. It is the **entire** Python contract the coordinator depends on.
 

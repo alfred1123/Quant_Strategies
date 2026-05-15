@@ -26,28 +26,35 @@ from api.auth.router import limiter as auth_limiter, router as auth_router  # no
 from api.auth.service import AuthService  # noqa: E402
 from api.routers import backtest, inst, refdata  # noqa: E402
 from quant.refdata.bundle import DataCaches  # noqa: E402
+from quant.refdata.publisher import RefDataPublisher  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: connect REFDATA reader (Redis) + load INST/BT caches.
+    """Startup: publish REFDATA → Redis, build caches, load INST.
 
-    REFDATA is published to Redis by the coordinator — FastAPI only reads.
-    If Redis is unreachable, REFDATA endpoints return 503 at request time;
-    the server still boots so /health stays useful.
+    FastAPI now owns REFDATA publishing (previously the TS coordinator).
+    Publish is best-effort at boot: if Redis or Postgres is unreachable
+    we log a warning and continue so /health stays useful and the admin
+    can call ``POST /api/v1/refdata/refresh`` once the dependency is back.
     """
     # Build the AuthService first so a missing JWT_SECRET fails the boot.
     app.state.auth_service = AuthService()
     app.state.db_conninfo = DB_CONNINFO
     redis_url = get_redis_url()
+    try:
+        n = RefDataPublisher(DB_CONNINFO, redis_url).publish_all()
+        logger.info("REFDATA boot publish: %d tables → %s", n, redis_url)
+    except Exception:
+        logger.warning(
+            "REFDATA boot publish failed — endpoints will 503 until POST /api/v1/refdata/refresh succeeds",
+            exc_info=True,
+        )
     caches = DataCaches(DB_CONNINFO, redis_url)
     if not caches.refdata.ping():
-        logger.warning(
-            "REFDATA Redis at %s is not reachable — endpoints will 503 until coordinator publishes",
-            redis_url,
-        )
+        logger.warning("REFDATA Redis at %s is not reachable", redis_url)
     app.state.data_caches = caches
     app.state.refdata_cache = caches.refdata
     app.state.backtest_cache = caches.backtest_cache
@@ -101,10 +108,9 @@ def health():
 @app.get("/health/ready")
 def readiness(request: Request):
     """Liveness = /health.  Readiness = /health/ready (includes DB)."""
-    import psycopg
+    from quant.shared.db import DbGateway
     try:
-        with psycopg.connect(request.app.state.db_conninfo, connect_timeout=3) as conn:
-            conn.execute("SELECT 1")
+        DbGateway(request.app.state.db_conninfo).health_check(timeout=3)
         return {"status": "ok", "db": "connected"}
     except Exception as exc:
         logger.warning("Readiness check failed: %s", exc)

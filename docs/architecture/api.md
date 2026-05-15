@@ -2,8 +2,8 @@
 
 The `api/` directory contains the FastAPI application that serves the backtest pipeline as a REST API. All `/api/v1/*` routes (except auth and health) require an authenticated session.
 
-!!! note "Queue endpoints live elsewhere"
-    `/api/v1/jobs/*` (the backtest queue) is **not** served by FastAPI. It is owned by the TypeScript coordinator service in `coordinator/` (Bun + Hono). The frontend reaches it through the same `/api` URL prefix; routing happens at the Vite dev proxy and at nginx in production. See [Queued Background Backtests](../design/backtest-queue.md) for the design.
+!!! note "Queue endpoints — migration in progress"
+    `/api/v1/jobs/*` (the backtest queue) is currently served by the TypeScript coordinator in `coordinator/` (Bun + Hono) but is being collapsed into this FastAPI process — see decision #32 and the v6 banner in [Queued Background Backtests](../design/backtest-queue.md). Once cutover lands, all `/api/v1/*` traffic terminates here and `coordinator/` is deleted.
 
 ## Starting the Server
 
@@ -91,16 +91,16 @@ The streaming endpoint uses `StreamingResponse` with Server-Sent Events:
 
 Backend implementation: `queue.Queue` + `threading.Thread` + `asyncio.to_thread` so the worker can stream progress without blocking the event loop.
 
-## Caches: REFDATA and INST
+## Caches: REFDATA, INST, BT
 
-Two in-process caches load at startup:
+At startup the FastAPI lifespan hook builds a `quant.refdata.bundle.DataCaches` bundle wired to Postgres + Redis:
 
-- **`RefDataCache`** — all REFDATA tables loaded via `REFDATA.SP_GET_ENUM`. Discovers tables dynamically from `information_schema`.
-- **`InstrumentCache`** — products + xrefs from the INST schema.
+- **`RefDataPublisher`** (`quant/refdata/publisher.py`) — first runs `publish_all()`, which discovers every `REFDATA.*` table via `information_schema`, calls `REFDATA.SP_GET_ENUM`, and writes JSON snapshots under `refdata:<table>` plus a bumped `refdata:version` key in Redis. The same call is exposed at `POST /api/v1/refdata/refresh` for ad-hoc reseeding.
+- **`RedisRefData`** (`quant/refdata/reader.py`) — read-only accessor used by request handlers and the worker. Checks `refdata:version` on every `get()` and rebuilds its local snapshot lazily on bump, so long-lived processes always see the current REFDATA without pub/sub.
+- **`InstrumentCache`** (`quant/data/instruments.py`) — products + xrefs from the INST schema; loaded at startup and refreshable via `POST /api/v1/inst/refresh`.
+- **`BacktestCache`** (`quant/data/backtest_cache.py`) — BT schema read/write used by the optimize/performance services for the dataset cache.
 
-Both are attached to `app.state` and passed to every service call. Refresh without restart via the `/refresh` endpoints listed above.
-
-If the database is **unreachable at startup**, the backend logs an error and **starts with empty caches** — endpoints that need REFDATA/INST will return 5xx until the database recovers and a refresh runs.
+If Postgres or Redis is **unreachable at startup**, the backend fails fast — REFDATA is required for every dropdown.
 
 ## Project Structure
 
@@ -124,4 +124,4 @@ api/
     └── backtest.py      # _build_config, run_optimize, stream_optimize, etc.
 ```
 
-REFDATA and INST cache classes live in `src/data.py` (shared between the API and the CLI pipeline).
+REFDATA, INST, and BT cache classes live under `quant/refdata/` and `quant/data/` (shared between the API and the worker via `quant/refdata/bundle.py::DataCaches`). All Postgres access goes through `quant/shared/db.py::DbGateway` — no other module in `quant/` or `api/` imports `psycopg`.

@@ -175,7 +175,7 @@ What runs where:
 
 | Component | Where | Port | Source of truth |
 |-----------|-------|------|-----------------|
-| FastAPI (uvicorn --reload) | host (native) | 8000 | `api/`, `src/` |
+| FastAPI (uvicorn --reload) | host (native) | 8000 | `api/`, `quant/` |
 | Vite dev server | host (native) | 5173 | `frontend/` |
 | PostgreSQL 17 | host (native, systemd) | 5432 | `pg_dump` of Aurora |
 | Redis 7 | docker | 6379 | `docker-compose.dev.yml` |

@@ -4,7 +4,7 @@ To add a new trading strategy (signal direction) to the backtest pipeline.
 
 ## Steps
 
-1. **Add the method** to `SignalDirection` in `src/strat.py`:
+1. **Add the method** to `SignalDirection` in `quant/strategy/signals.py`:
 
     ```python
     @staticmethod

@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import logging
 
-import psycopg
-
 from quant.shared.db import DbGateway
 
 logger = logging.getLogger(__name__)
@@ -19,21 +17,14 @@ logger = logging.getLogger(__name__)
 class InstrumentCache(DbGateway):
     """In-process cache for INST product and cross-reference data.
 
-    Holds one long-lived ``inst_conn`` for INST SP calls (no per-query connect).
+    Holds a long-lived Postgres connection (managed by ``DbGateway``) for
+    INST SP calls so there is no per-query connect overhead.
     """
 
     def __init__(self, conninfo: str) -> None:
-        super().__init__(conninfo)
+        super().__init__(conninfo, persistent=True)
         self._products: list[dict] = []
         self._xrefs: list[dict] = []
-        self.inst_conn = psycopg.connect(conninfo)
-
-    def close(self) -> None:
-        """Release the Postgres connection (optional — tests or shutdown)."""
-        try:
-            self.inst_conn.close()
-        except Exception:
-            logger.debug("InstrumentCache.inst_conn close failed", exc_info=True)
 
     # ── load ─────────────────────────────────────────────────────────────
 
@@ -42,12 +33,10 @@ class InstrumentCache(DbGateway):
         self._products = self._call_get(
             "CALL INST.SP_GET_PRODUCT(%s, %s, NULL, NULL, NULL, NULL)",
             (None, None),
-            conn=self.inst_conn,
         )
         self._xrefs = self._call_get(
             "CALL INST.SP_GET_PRODUCT_XREF(%s, %s, %s, NULL, NULL, NULL, NULL)",
             (None, None, None),
-            conn=self.inst_conn,
         )
         logger.info(
             "InstrumentCache loaded %d products, %d xrefs",

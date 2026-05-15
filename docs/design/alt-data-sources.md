@@ -1,8 +1,8 @@
 # Design Doc: Alternative Data Sources
 
-**Status:** Partially implemented (Glassnode + NasdaqDataLink classes exist in `src/data.py`; FMP/MarineTraffic/Aviationstack are still proposals).
+**Status:** Partially implemented (Glassnode + NasdaqDataLink classes exist in `quant/data/sources.py`; FMP/MarineTraffic/Aviationstack are still proposals).
 **Date:** 2026-04-15
-**Scope:** `src/data.py`, `api/`, REFDATA
+**Scope:** `quant/data/sources.py`, `api/`, REFDATA
 
 ---
 
@@ -11,7 +11,7 @@
 Extend the backtest pipeline with **non-market-price** data sources — physical
 and operational metrics that serve as leading/alternative indicators for equity
 and crypto strategies. Each provider will be integrated as a new class in
-`src/data.py` following the existing duck-typed interface
+`quant/data/sources.py` following the existing duck-typed interface
 (`get_historical_price()` → DataFrame `['t', 'v']`).
 
 ```

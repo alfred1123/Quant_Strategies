@@ -338,7 +338,7 @@ This means the full history of every subscription is retained — each VID is a 
 
 ### Python layer — `BacktestCache`
 
-`BacktestCache` in `src/data.py` (inherits `DbGateway`) is the only consumer of these SPs.
+`BacktestCache` in `quant/data/backtest_cache.py` (inherits `DbGateway`) is the only consumer of these SPs.
 
 | Method | Role |
 |--------|------|

@@ -64,7 +64,7 @@ Test files live next to the code they cover (e.g. `src/utils/grid.ts` ↔ `src/u
 
 ## Conventions
 
-- Every change to `src/` or `frontend/src/` must have corresponding test updates.
+- Every change to `quant/` or `frontend/src/` must have corresponding test updates.
 - New functions/classes must have unit tests.
 - Use `tests/conftest.py` fixtures for shared synthetic data on the Python side.
 - Mock external APIs in unit tests — only E2E tests hit real services.

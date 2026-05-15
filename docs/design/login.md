@@ -8,7 +8,7 @@ Related: [decision #19 (no direct DML)](../decisions.md), [decision #27 (authent
 
 ## 1. Problem
 
-Today the app has **no authentication**. The hardcoded user `alfcheun` is baked into `src/db.py` (`user_id: str = "alfcheun"`) and propagated into every `USER_ID` audit column. The FastAPI backend accepts any caller — anyone with the URL can run backtests, read all `BT.RESULT` rows, and (once the trade API is wired) trigger orders.
+Today the app has **no authentication**. The hardcoded user `alfcheun` is baked into `quant/shared/db.py` (`user_id: str = "alfcheun"`) and propagated into every `USER_ID` audit column. The FastAPI backend accepts any caller — anyone with the URL can run backtests, read all `BT.RESULT` rows, and (once the trade API is wired) trigger orders.
 
 Before public hosting (Tier 1 in the deployment ladder), the app must require a login. This doc covers the **smallest possible** design that:
 
@@ -296,7 +296,7 @@ def run_backtest(cfg: BacktestConfig, user: CurrentUser = Depends(require_user))
     ...
 ```
 
-The default value `user_id="alfcheun"` in `src/db.py` and `src/data.py` is **removed entirely** (the parameter becomes required). No backward compat per `AGENTS.md`.
+The default value `user_id="alfcheun"` in `quant/shared/db.py` and `quant/data/` is **removed entirely** (the parameter becomes required). No backward compat per `AGENTS.md`.
 
 ### 8.3 JWT shape
 
@@ -467,7 +467,7 @@ Both branches do the same Argon2 work, so `/auth/login` has the same latency pro
 7. **Helper script** `scripts/hash_password.py` — reads password from stdin (no echo, via `getpass`), prints Argon2id PHC string. Doc warns against online hash generators.
 8. **Add `JWT_SECRET`** to `/quant/prod/JWT_SECRET` (SSM SecureString, 32 random bytes base64). EC2 instance role reads it at process start; not written to `.env` in prod. In dev mode, `JWT_SECRET` is auto-generated if absent (see `_resolve_jwt_secret` in `api/auth/service.py`).
 9. **Backend**: add `api/auth/` module (login router, JWT helpers, `require_user` dep, repo, service). Add `argon2-cffi`, `pyjwt[cryptography]`, `slowapi` to `requirements.txt`.
-10. **Wire `Depends(require_user)`** into existing routers. Replace every `user_id="alfcheun"` with `user.username`. Remove the `="alfcheun"` default in `src/db.py` and `src/data.py` — parameter becomes required.
+10. **Wire `Depends(require_user)`** into existing routers. Replace every `user_id="alfcheun"` with `user.username`. Remove the `="alfcheun"` default in `quant/shared/db.py` and `quant/data/` — parameter becomes required.
 11. **Frontend**: add `/login` route + `<App>` mount-time `me` check + axios 401 interceptor + user menu.
 12. **Tests**: unit tests for JWT encode/decode + Argon2 verify (incl. dummy-hash branch) + each admin SP; integration test for login → protected endpoint → logout flow.
 13. **Docs**: update repo `README.md` auth section, [API Reference](../architecture/api.md) endpoint list, [Environment Variables](../env-vars.md) (`JWT_SECRET`), [Decisions Log](../decisions.md) decision #27, repo `scripts/README.md` for the hash helper.

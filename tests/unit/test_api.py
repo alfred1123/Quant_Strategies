@@ -26,7 +26,7 @@ def client():
       * ``app.dependency_overrides[require_user]`` returning a synthetic
         ``CurrentUser`` so the JWT cookie path is bypassed.
     """
-    with patch("quant.data.instruments.psycopg"), patch("quant.data.backtest_cache.psycopg"):
+    with patch("quant.shared.db.psycopg"):
         from api.main import app
         from api.auth.dependencies import require_user
         from api.auth.models import CurrentUser
@@ -43,6 +43,7 @@ def client():
         app.state.refdata_cache = ref
         app.state.instrument_cache = inst
         app.state.backtest_cache = bt
+        app.state.db_conninfo = "postgresql://stub"
 
         ref.get.side_effect = lambda table: {
             "indicator": [
@@ -394,3 +395,18 @@ class TestRefDataEndpoint:
         client.app.state.data_caches.refdata.get.side_effect = ValueError("Unknown REFDATA table: foo")
         resp = client.get("/api/v1/refdata/foo")
         assert resp.status_code == 404
+
+    def test_post_refdata_refresh_ok(self, client):
+        with patch("api.routers.refdata.RefDataPublisher") as pub_cls:
+            pub_cls.return_value.publish_all.return_value = 5
+            resp = client.post("/api/v1/refdata/refresh")
+        assert resp.status_code == 200
+        assert resp.json() == {"tables": 5}
+        pub_cls.return_value.publish_all.assert_called_once()
+
+    def test_post_refdata_refresh_failure_503(self, client):
+        with patch("api.routers.refdata.RefDataPublisher") as pub_cls:
+            pub_cls.return_value.publish_all.side_effect = RuntimeError("redis down")
+            resp = client.post("/api/v1/refdata/refresh")
+        assert resp.status_code == 503
+        assert "redis down" in resp.json()["detail"]

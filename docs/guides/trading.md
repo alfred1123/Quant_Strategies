@@ -1,7 +1,7 @@
 # Paper Trading with Futu OpenD
 
 !!! note "Status"
-    The Futu paper-trading flow is currently a **Python-only utility** in `src/trade.py`. It is **not exposed in the React SPA** at the moment. Use it from a Python shell, notebook, or script.
+    The Futu paper-trading flow is currently a **Python-only utility** in `quant/trade.py`. It is **not exposed in the React SPA** at the moment. Use it from a Python shell, notebook, or script.
 
 ## Prerequisites
 
@@ -17,8 +17,8 @@
 ## From Python
 
 ```python
-# Run from the src/ directory (or add it to PYTHONPATH)
-from trade import FutuTrader
+# Run from the project root (the `quant` package is on the default PYTHONPATH there)
+from quant.trade import FutuTrader
 
 with FutuTrader(paper=True) as trader:
     result = trader.place_order("US.AAPL", 10, "BUY")

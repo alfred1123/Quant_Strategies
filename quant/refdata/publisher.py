@@ -25,8 +25,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 
-import psycopg
 import redis
 
 from quant.shared.db import DbGateway
@@ -58,18 +58,17 @@ class RefDataPublisher(DbGateway):
     # ── load ────────────────────────────────────────────────────────────
 
     def _discover_tables(self) -> list[str]:
-        with psycopg.connect(self._conninfo) as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT table_name
-                  FROM information_schema.tables
-                 WHERE table_schema = 'refdata'
-                   AND table_type   = 'BASE TABLE'
-                   AND table_name NOT IN ('databasechangelog', 'databasechangeloglock')
-                 ORDER BY table_name
-                """
-            )
-            return [r[0] for r in cur.fetchall()]
+        rows = self._query(
+            """
+            SELECT table_name
+              FROM information_schema.tables
+             WHERE table_schema = 'refdata'
+               AND table_type   = 'BASE TABLE'
+               AND table_name NOT IN ('databasechangelog', 'databasechangeloglock')
+             ORDER BY table_name
+            """
+        )
+        return [r["table_name"] for r in rows]
 
     def _fetch_enum(self, table: str) -> list[dict]:
         """CALL REFDATA.SP_GET_ENUM(table) → list[dict]."""

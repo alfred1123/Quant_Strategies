@@ -5,7 +5,7 @@
 
 ## Overview
 
-The Backtest API is a **FastAPI** server (`api/`) that exposes the Python backtest pipeline (`src/`) as HTTP endpoints. It lets a React/TypeScript frontend (or any HTTP client) run backtests, parameter optimizations, and walk-forward tests without touching Python directly.
+The Backtest API is a **FastAPI** server (`api/`) that exposes the Python backtest pipeline (`quant/`) as HTTP endpoints. It lets a React/TypeScript frontend (or any HTTP client) run backtests, parameter optimizations, and walk-forward tests without touching Python directly.
 
 ```
 ┌──────────────┐       HTTP/JSON        ┌──────────────────────────────────────┐
@@ -19,7 +19,7 @@ The Backtest API is a **FastAPI** server (`api/`) that exposes the Python backte
                                         └──────────────────────────┼───────────┘
                                                                    │ imports
                                                           ┌────────▼────────┐
-                                                          │    src/ pipeline │
+                                                          │    quant/ pipeline│
                                                           │  data → strat   │
                                                           │  → perf → opt   │
                                                           │  → walk_forward │
@@ -124,7 +124,7 @@ Business logic bridge between HTTP and the pipeline:
 
 - **`refdata_cache.py`** — In-process cache for REFDATA tables. One `SELECT * FROM refdata.<table>` per table at startup, stored as `list[dict]`. No TTL — refresh via admin endpoint.
 
-### 3. Pipeline (`src/`)
+### 3. Pipeline (`quant/`)
 
 The existing backtest engine, imported directly by the service layer:
 

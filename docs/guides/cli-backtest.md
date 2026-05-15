@@ -2,45 +2,43 @@
 
 The CLI runs **single-symbol, single-indicator, single-strategy** backtests with optional grid search and walk-forward analysis. Multi-factor backtests (combining indicators with AND/OR/FILTER conjunctions) are only available via the API/web UI.
 
-Run from `src/`:
+Run from the project root:
 
 ```bash
-cd src
-
 # Default: BTC-USD, Bollinger + momentum, full grid search
-python main.py
+python -m quant.cli
 
 # Quick single backtest (skip grid search)
-python main.py --no-grid
+python -m quant.cli --no-grid
 
 # Equity backtest
-python main.py --symbol AAPL --asset equity --window 50 --signal 1.5
+python -m quant.cli --symbol AAPL --asset equity --window 50 --signal 1.5
 
 # Custom date range
-python main.py --symbol ETH-USD --start 2020-01-01 --end 2026-01-01
+python -m quant.cli --symbol ETH-USD --start 2020-01-01 --end 2026-01-01
 
 # Different indicator + strategy
-python main.py --indicator sma --strategy reversion
+python -m quant.cli --indicator sma --strategy reversion
 
 # Custom grid search bounds
-python main.py --win-min 10 --win-max 60 --win-step 10 --sig-min 0.5 --sig-max 2.0
+python -m quant.cli --win-min 10 --win-max 60 --win-step 10 --sig-min 0.5 --sig-max 2.0
 
 # Walk-forward overfitting test
-python main.py --walk-forward --split 0.7
+python -m quant.cli --walk-forward --split 0.7
 
 # Verbose / DEBUG logging
-python main.py -v
+python -m quant.cli -v
 
 # Custom transaction fee (basis points)
-python main.py --fee 10
+python -m quant.cli --fee 10
 
 # Custom output directory
-python main.py --outdir /tmp/results
+python -m quant.cli --outdir /tmp/results
 ```
 
 ## All CLI Options
 
-Run `python main.py --help` for the full list.
+Run `python -m quant.cli --help` for the full list.
 
 | Flag | Default | Description |
 |---|---|---|
@@ -84,10 +82,10 @@ The walk-forward test splits data into **in-sample** (training) and **out-of-sam
 
 ```bash
 # Walk-forward with default 50/50 split
-python main.py --walk-forward
+python -m quant.cli --walk-forward
 
 # 70% in-sample / 30% out-of-sample
-python main.py --walk-forward --split 0.7
+python -m quant.cli --walk-forward --split 0.7
 ```
 
 **Overfitting ratio:** `1 − (OOS Sharpe / IS Sharpe)`. Values near 0 indicate robust parameters; values near 1 indicate the strategy performs much worse out-of-sample.

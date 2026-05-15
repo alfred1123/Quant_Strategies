@@ -1,7 +1,7 @@
 # Design Doc: Strategy JSON → Trade API
 
 !!! info "Status"
-    **Proposed — not implemented.** A `FutuTrader` Python utility exists in `src/trade.py` (see [Paper Trading guide](../guides/trading.md)). The full Strategy-JSON-to-Trade-API flow described here is the long-term direction; persistence, deployment endpoints, and the broker-adapter abstraction have not been built yet.
+    **Proposed — not implemented.** A `FutuTrader` Python utility exists in `quant/trade.py` (see [Paper Trading guide](../guides/trading.md)). The full Strategy-JSON-to-Trade-API flow described here is the long-term direction; persistence, deployment endpoints, and the broker-adapter abstraction have not been built yet.
 
 ## Overview
 
@@ -426,7 +426,7 @@ CREATE TABLE TRADE.LOG (
 
 ## 8. Serialization: StrategyConfig ↔ JSON
 
-Implemented in `src/strat.py` — `strategy_to_json()` and `backtest_results_to_json()`.
+Implemented in `quant/strategy/signals.py` — `strategy_to_json()` and `backtest_results_to_json()`.
 
 ```python
 from strat import StrategyConfig, SubStrategy, strategy_to_json, backtest_results_to_json

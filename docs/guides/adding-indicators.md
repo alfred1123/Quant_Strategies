@@ -4,7 +4,7 @@ To add a new technical indicator to the backtest pipeline, follow this pattern.
 
 ## Steps
 
-1. **Add the method** to `TechnicalAnalysis` in `src/strat.py`:
+1. **Add the method** to `TechnicalAnalysis` in `quant/strategy/indicators.py`:
 
     ```python
     def get_my_indicator(self, period: int) -> pd.Series:
