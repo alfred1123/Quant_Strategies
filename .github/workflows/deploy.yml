@@ -185,7 +185,6 @@ jobs:
               "git reset --hard origin/main",
               "echo \"── AFTER  ──\"",
               "git rev-parse --short HEAD",
-              "docker run --privileged --rm tonistiigi/binfmt --install amd64",
               "DOCKER_BUILDKIT=1 docker compose -f docker-compose.yml -f docker-compose.prod.yml build --pull",
               "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans",
               "docker image prune -f",

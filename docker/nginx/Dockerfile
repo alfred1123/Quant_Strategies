@@ -13,20 +13,19 @@
 # rolldown ships @rolldown/binding-linux-x64-gnu which is glibc-only and
 # fails `npm ci` on musl with EBADPLATFORM.
 #
-# Pinned to linux/amd64 because:
-#   1. The lockfile materializes @rolldown/binding-linux-x64-gnu as a
-#      required entry (npm strips `"optional": true` from selected
-#      bindings during install), so `npm ci` fails on any non-x64 host
-#      regardless of npm version. See npm/cli#4828.
-#   2. The frontend output is static HTML/JS/CSS — arch-agnostic — so
-#      building under x86 emulation on arm64 EC2 (Graviton) is safe.
-#      Emulation adds ~1-2 min to this stage but avoids the npm bug
-#      entirely and keeps deterministic `npm ci`.
-FROM --platform=linux/amd64 node:22-slim AS frontend-build
+# Uses `npm install` (not `npm ci`) because the lockfile materializes
+# @rolldown/binding-linux-x64-gnu as a required node_modules entry
+# (npm strips `"optional": true` from selected bindings, npm/cli#4828),
+# so `npm ci` fails on arm64 hosts (Graviton EC2) regardless of npm
+# version. `npm install` re-resolves optional deps for the current
+# platform and picks the correct rolldown binding. Trade-off: not
+# bit-for-bit reproducible. Long-term fix: build images in CI and push
+# to ECR instead of building on prod.
+FROM node:22-slim AS frontend-build
 
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+RUN npm install --no-audit --no-fund
 COPY frontend/ .
 RUN npm run build
 
