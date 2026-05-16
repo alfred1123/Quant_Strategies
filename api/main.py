@@ -24,39 +24,39 @@ from api.auth.dependencies import require_user  # noqa: E402
 from api.auth.router import limiter as auth_limiter, router as auth_router  # noqa: E402
 from api.auth.service import AuthService  # noqa: E402
 from api.routers import backtest, inst, jobs, refdata  # noqa: E402
-from quant.data.backtest_cache import BacktestCache  # noqa: E402
-from quant.data.instruments import InstrumentCache  # noqa: E402
-from quant.refdata.reader import RedisRefData  # noqa: E402
+from quant.refdata.bundle import DataCaches  # noqa: E402
+from quant.refdata.publisher import RefDataPublisher  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: connect REFDATA reader (Redis) + load INST/BT caches.
+    """Startup: publish REFDATA → Redis, then build DataCaches bundle.
 
-    REFDATA is published to Redis by the coordinator — FastAPI only reads.
-    If Redis is unreachable, REFDATA endpoints return 503 at request time;
-    the server still boots so /health stays useful.
+    Order matters: the publisher seeds ``refdata:<table>`` keys from
+    Postgres so the bundle's ``RedisRefData`` reader (and the worker's)
+    can resolve enums immediately. If Redis is unreachable, REFDATA
+    endpoints will 503 but the server still boots so ``/health`` remains
+    useful for diagnosis.
     """
     # Build the AuthService first so a missing JWT_SECRET fails the boot.
     app.state.auth_service = AuthService()
     app.state.db_conninfo = DB_CONNINFO
+
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-    cache = RedisRefData(redis_url)
-    if not cache.ping():
-        logger.warning(
-            "REFDATA Redis at %s is not reachable — endpoints will 503 until coordinator publishes",
-            redis_url,
-        )
-    app.state.refdata_cache = cache
-    app.state.backtest_cache = BacktestCache(DB_CONNINFO, refdata=cache)
-    inst = InstrumentCache(DB_CONNINFO)
     try:
-        inst.load_all()
+        n = RefDataPublisher(DB_CONNINFO, redis_url).publish_all()
+        logger.info("Published %d REFDATA tables to Redis", n)
     except Exception:
-        logger.exception("Failed to load INST data — product endpoints will be empty")
-    app.state.instrument_cache = inst
+        logger.exception(
+            "RefDataPublisher.publish_all() failed — REFDATA endpoints will 503 "
+            "until POST /api/v1/refdata/refresh succeeds",
+        )
+
+    caches = DataCaches(DB_CONNINFO, redis_url)
+    caches.load_instruments(soft_fail=False)
+    app.state.data_caches = caches
     yield
 
 
