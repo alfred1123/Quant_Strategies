@@ -24,20 +24,18 @@ npm error notsup Unsupported platform for @rolldown/binding-linux-x64-gnu@1.0.x:
 
 ### Root cause
 
-1. Vite 7 uses **rolldown**, which ships per-platform native bindings
-   (`@rolldown/binding-linux-{x64,arm64}-{gnu,musl}`, `darwin-*`, `win32-*`)
-   as `optionalDependencies` on the `rolldown` package.
-2. `package-lock.json` materializes the bindings as explicit
-   `node_modules/...` entries. **npm strips the `"optional": true` flag
-   from these materialized entries** (npm/cli#4828), so `npm ci`
-   treats them as required and fails on any host whose `(os, cpu, libc)`
-   doesn't match a binding present in the lockfile.
-3. Our lockfile was generated on x64-glibc, so it pins
-   `@rolldown/binding-linux-x64-gnu`. Building on arm64 Graviton → EBADPLATFORM.
-4. **`npm ci` is fundamentally broken for this case**, regardless of:
-   - npm version (verified npm 10 and npm 11),
-   - regenerating a multi-arch lockfile (`npm install --os=linux --cpu=x64 --cpu=arm64`) — the bindings are still listed without the optional flag,
-   - alpine vs slim base image (musl vs glibc swap only changes which binding is missing).
+`frontend/package.json` listed `@rolldown/binding-linux-x64-gnu` as a
+**top-level `dependencies` entry**, which makes it required on every
+platform. On arm64 npm correctly refuses it with EBADPLATFORM.
+
+Vite already pulls in `rolldown`, which declares all platform bindings
+(`linux-{x64,arm64}-{gnu,musl}`, `darwin-*`, `win32-*`, …) as
+`optionalDependencies` — npm resolves the correct one at install time.
+The manual pin shadowed that mechanism.
+
+Fix: delete the line from `package.json`, regenerate `package-lock.json`.
+The lockfile's binding entries are then correctly flagged
+`"optional": true` and `npm ci` works cleanly on any arch.
 
 ### Why we're in this position
 
@@ -55,25 +53,16 @@ image — only that local tests pass.
 
 ## Current tactical mitigation (deployed)
 
-In [`docker/nginx/Dockerfile`](../../docker/nginx/Dockerfile):
+Removed the stray `@rolldown/binding-linux-x64-gnu` entry from
+[`frontend/package.json`](../../frontend/package.json) and regenerated
+[`frontend/package-lock.json`](../../frontend/package-lock.json).
+[`docker/nginx/Dockerfile`](../../docker/nginx/Dockerfile) uses normal
+`npm ci`.
 
-```dockerfile
-FROM node:22-slim AS frontend-build
-WORKDIR /app
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm install --no-audit --no-fund
-```
-
-- Switched from `npm ci` → `npm install`. `install` re-resolves optional deps
-  for the current platform at install time, so it picks the correct rolldown
-  binding for whichever arch is building.
-- Trade-offs:
-  - **Not bit-for-bit reproducible** — lockfile is no longer authoritative.
-  - Slightly slower than `npm ci`.
-  - Still builds on the EC2 host, so future native-deps surprises are still
-    possible.
-
-This unblocks deploys today. It is **not the proper fix**.
+This unblocks deploys but doesn't address the underlying anti-pattern of
+building images on the prod host. The class of failure (a future
+optional native dep, a different CPU/libc combo, a stray top-level pin)
+can recur.
 
 ## Proper fix — build in CI, push to ECR, pull on EC2
 
