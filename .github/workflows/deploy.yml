@@ -82,14 +82,21 @@ jobs:
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript \
-            --timeout-seconds 600 \
+            --timeout-seconds 900 \
             --parameters commands='[
+              "set -euo pipefail",
               "cd /opt/quant",
-              "git fetch origin main",
+              "echo \"── BEFORE ──\"",
+              "git rev-parse --short HEAD || true",
+              "git fetch --prune origin main",
               "git reset --hard origin/main",
-              "docker builder prune -af",
-              "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --remove-orphans",
-              "docker image prune -f"
+              "echo \"── AFTER  ──\"",
+              "git rev-parse --short HEAD",
+              "DOCKER_BUILDKIT=1 docker compose -f docker-compose.yml -f docker-compose.prod.yml build --pull",
+              "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans",
+              "docker image prune -f",
+              "echo \"── RUNNING ──\"",
+              "docker compose -f docker-compose.yml -f docker-compose.prod.yml ps"
             ]' \
             --query Command.CommandId \
             --output text)
