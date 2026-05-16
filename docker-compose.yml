@@ -1,9 +1,9 @@
 services:
   redis:
-    # Cache layer for REFDATA snapshots published by the coordinator and
-    # read by the FastAPI app + Python workers. In-memory only — no AOF,
-    # no RDB — because Postgres is the source of truth and the coordinator
-    # rehydrates on boot. See docs/decisions.md (REFDATA caching).
+    # Cache layer for REFDATA snapshots published by FastAPI on boot, plus
+    # the queue wake channel (BLPOP bt:queue:wake) used by the worker. In-
+    # memory only — no AOF, no RDB — because Postgres is the source of truth
+    # and FastAPI rehydrates on boot. See docs/decisions.md (REFDATA caching).
     image: redis:7-alpine
     container_name: quant-redis
     restart: unless-stopped
@@ -17,38 +17,38 @@ services:
       retries: 5
       start_period: 5s
 
-  # Backtest queue coordinator (Bun + Hono). Slice B: GET /api/v1/jobs + /health.
-  # Requires QUANTDB_URL and JWT_SECRET (see .env.example). Postgres often reaches
-  # the container as host.docker.internal when using an SSM tunnel on the host.
-  coordinator:
+  # Backtest queue worker (Python). Long-lived `quant.queue.worker_loop`
+  # daemon that claims QUEUED rows from BT.QUEUE, spawns one
+  # `python -m quant.queue.worker <queue_id>` subprocess per job, and
+  # writes terminal state. Reuses the FastAPI image (`Dockerfile`).
+  #
+  # Boots AFTER api is healthy because `recover_stale` calls
+  # `RedisRefData.resolve_queue_status_id("RUNNING")` immediately, and
+  # FastAPI's lifespan is what publishes REFDATA into Redis. /health/ready
+  # only returns 200 once lifespan completes.
+  #
+  # See docs/design/backtest-queue.md.
+  worker:
     build:
-      context: ./coordinator
+      context: .
       dockerfile: Dockerfile
-    container_name: quant-coordinator
+    container_name: quant-worker
     restart: unless-stopped
-    ports:
-      - "${COORDINATOR_PORT:-3001}:3001"
+    command: ["python", "-m", "quant.queue.worker_loop"]
     environment:
-      - PORT=3001
+      - APP_ENV=${APP_ENV:-dev}
+      - USE_SSM=${USE_SSM:-1}
+      - AWS_REGION=${AWS_REGION:-ap-southeast-1}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - QUANTDB_URL=${QUANTDB_URL}
-      - JWT_SECRET=${JWT_SECRET}
+      - MAX_CONCURRENT_WORKERS=${MAX_CONCURRENT_WORKERS:-1}
     env_file:
       - path: .env
         required: false
     depends_on:
       redis:
         condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "bun -e \"fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
-        ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 25s
+      api:
+        condition: service_healthy
 
   api:
     build:

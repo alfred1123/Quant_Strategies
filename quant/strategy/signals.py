@@ -6,8 +6,6 @@ that link to ``BT.STRATEGY``, the four ``SignalDirection`` static methods
 and JSON serialisation entry points.
 """
 
-from __future__ import annotations
-
 import logging
 from dataclasses import dataclass, field
 from typing import Callable

@@ -5,8 +5,6 @@ then serves lookups from memory. Refresh via ``load_all()`` or
 ``POST /api/v1/inst/refresh``.
 """
 
-from __future__ import annotations
-
 import logging
 
 from quant.shared.db import DbGateway

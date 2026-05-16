@@ -17,8 +17,6 @@ N workers per message (thundering herd against ``claim_next``). LIST + BLPOP
 gives at-most-one wake per token, which matches "one new job, one worker".
 """
 
-from __future__ import annotations
-
 import logging
 
 import redis

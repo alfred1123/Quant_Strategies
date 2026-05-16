@@ -4,8 +4,6 @@ Used identically in FastAPI lifespan and the long-lived worker so the
 same wiring is shared between API and queue processes.
 """
 
-from __future__ import annotations
-
 import logging
 
 from quant.data.backtest_cache import BacktestCache

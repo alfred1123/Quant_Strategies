@@ -1,9 +1,28 @@
 # Design: Queued Background Backtests
 
-**Status:** v6 (in-progress) — **collapsing the TypeScript coordinator into Python.** `coordinator/` (Bun + Hono) is being deleted; FastAPI takes over `/api/v1/jobs/*` and a long-lived `quant.queue.worker_loop` replaces the TS process supervisor. The Postgres schema, `BT.SP_INS_QUEUE` / `BT.SP_GET_QUEUE_LATEST` contract, and the `BT.RESULT` write path are unchanged from v5 — only the runtime owner changes. See decision #32. The v5 sections below describe the TS architecture as implemented; treat them as historical until this banner is removed.
+**Status:** v6 — implemented. The TypeScript coordinator (`coordinator/`, Bun + Hono) was deleted; FastAPI now owns `/api/v1/jobs/*` and a long-lived `quant.queue.worker_loop` daemon supervises per-job worker subprocesses. The Postgres schema, `BT.SP_INS_QUEUE` / `BT.SP_GET_QUEUE_LATEST` contract, and the `BT.RESULT` write path are unchanged from v5 — only the runtime owner changed. See decision #32.
 
-**Date:** 2026-05-03 (v5) · 2026-05-16 (v6 banner)
-**Scope:** `api/routers/jobs.py` (new), `quant/queue/worker.py`, `quant/queue/worker_loop.py` (new), `quant/queue/wake.py`, `frontend/`, `db/liquidbase/bt/`. **Out:** `coordinator/` (to be deleted).
+**Date:** 2026-05-03 (v5) · 2026-05-16 (v6 cutover)
+**Scope (current):** `api/routers/jobs.py`, `api/services/jobs.py`, `api/schemas/jobs.py`, `quant/queue/worker.py`, `quant/queue/worker_loop.py`, `quant/queue/wake.py`, `frontend/src/features/queue/`, `db/liquidbase/bt/`.
+
+> **Reading guide.** Sections describing TypeScript / Bun / Hono / `coordinator/src/...` paths below are **historical (v5)** unless this banner says otherwise. The Python equivalents are: `coordinator/src/http/server.ts` → `api/routers/jobs.py`; `coordinator/src/queue/repo.ts` → `api/services/jobs.py`; `coordinator/src/queue/{manager,spawn}.ts` → `quant/queue/worker_loop.py`; `coordinator/src/refdata/cache.ts` → `quant/refdata/publisher.py`. §19 ("Why TypeScript") is retained as decision history — superseded by #32.
+
+---
+
+## 0. v6 Migration — Done
+
+The four-phase migration completed 2026-05-16:
+
+- **Phase A** — `quant/queue/worker_loop.py` daemon with stale-job recovery + `tests/unit/test_worker_loop.py`.
+- **Phase B** — `api/routers/jobs.py` + `api/services/jobs.py` + `api/schemas/jobs.py` exposing all 5 endpoints under `Depends(require_user)`, with `tests/unit/test_jobs_router.py`.
+- **Phase C** — Compose service `worker` (reuses the FastAPI image, command `python -m quant.queue.worker_loop`); `scripts/appctl.sh` brings Redis up before the backend and the worker after, so REFDATA is in Redis before the worker boots.
+- **Phase D** — `coordinator/` deleted; `.env.example`, `README.md`, `docs/architecture/dev-vs-prod.md` cleaned.
+
+### Open follow-ups (not blocking v6)
+
+1. **`SP_CLAIM_NEXT` stored procedure** (atomic `SELECT … FOR UPDATE SKIP LOCKED` + `SP_INS_QUEUE RUNNING`). Required before running > 1 `worker_loop` replica safely. v6 ships single-replica.
+2. **Per-trial progress (`Slice D`)** — worker emits `{"event":"progress","trial":N,"total":M,...}` JSON to stdout *and* `PUBLISH bt:progress:{queue_id}` on Redis. SSE handler in `api/routers/jobs.py` swaps the 1s DB poll for a Redis subscription. Worker_loop is unaffected.
+3. **`pg_notify` from `SP_INS_QUEUE`** — replaces the Redis BLPOP wake when ready. Already noted in §6.
 
 ---
 
@@ -728,6 +747,8 @@ The TS-coordinator + Python-worker split is the long-term shape (see §19). Doin
 ---
 
 ## 19. Why this architecture (TS coordinator + Python worker + Postgres)
+
+> **Decision history — superseded by #32.** v6 collapsed the TS coordinator into FastAPI; the polyglot split below describes the v5 design and is retained for context only.
 
 This split is the standard polyglot pattern at small scale: a thin gateway in the runtime built for I/O, fanning out to compute services in the runtime built for the workload, with the database as the only shared contract.
 

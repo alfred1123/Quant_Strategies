@@ -20,8 +20,6 @@ Key shape exactly matches the legacy TS coordinator (``refdata:<table>``,
 unchanged.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import os

@@ -13,3 +13,7 @@ services:
       - APP_ENV=prod
       - USE_SSM=1
       - COOKIE_SECURE=0
+  worker:
+    environment:
+      - APP_ENV=prod
+      - USE_SSM=1

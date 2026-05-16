@@ -1,7 +1,5 @@
 """Small shared helpers for the ``src/`` pipeline (keep this module narrow)."""
 
-from __future__ import annotations
-
 from datetime import datetime, timezone
 
 

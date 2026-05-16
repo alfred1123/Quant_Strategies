@@ -4,8 +4,6 @@ Each method returns a ``pd.Series`` aligned with the input DataFrame.
 Pure pandas/numpy — no I/O, no external state.
 """
 
-from __future__ import annotations
-
 import logging
 
 logger = logging.getLogger(__name__)

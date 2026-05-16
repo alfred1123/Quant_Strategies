@@ -4,8 +4,6 @@ Backs the dataset cache that ``run_optimize`` consults before calling out
 to a vendor — see ``docs/design/separate-underlying.md``.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import uuid
@@ -30,7 +28,7 @@ class BacktestCache(DbGateway):
     # constant is the single source of truth until a multi-interval UI lands.
     DEFAULT_TM_INTERVAL_ID = 1
 
-    def __init__(self, conninfo: str, refdata, user_id: str = "alfcheun") -> None:
+    def __init__(self, conninfo: str, refdata, user_id: str = "quant_admin") -> None:
         # ``refdata`` duck-types the legacy RefDataCache surface — only
         # ``.get(table)`` and ``.resolve_app_metric_id(...)`` are used here,
         # both of which RedisRefData implements identically.

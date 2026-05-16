@@ -23,8 +23,6 @@ Exit codes (per §10.1):
     2 — config error (bad argv, missing env, queue row not found, bad JSON).
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import os

@@ -133,8 +133,8 @@ tunnel as the default.
 # 1. Install Postgres 17 client + server (Ubuntu/WSL example, PGDG repo)
 sudo apt install -y postgresql-17 postgresql-client-17
 
-# 2. Install Docker + compose v2 (used to run Redis + the Bun coordinator
-#    that publishes REFDATA). Skip if you already have Docker.
+# 2. Install Docker + compose v2 (used to run Redis + the Python queue
+#    worker that processes backtest jobs). Skip if you already have Docker.
 sudo apt install -y docker.io docker-compose-v2
 sudo usermod -aG docker "$USER"     # log out/in, or use `sg docker -c ...`
 
@@ -153,7 +153,7 @@ sudo usermod -aG docker "$USER"     # log out/in, or use `sg docker -c ...`
 echo 'DB_TARGET=local' >> .env
 
 # Start: brings up uvicorn + vite natively AND
-#   docker-compose.dev.yml (redis + coordinator) automatically.
+#   docker-compose.dev.yml (redis + worker) automatically.
 # No SSM tunnel needed.
 ./scripts/appctl.sh dev start
 
@@ -164,7 +164,7 @@ echo 'DB_TARGET=local' >> .env
 #   frontend: running (..., port 5173)
 #   DB: reachable on 127.0.0.1:5432  (local)
 #   dev stack:
-#     quant-dev-coordinator   Up (healthy)
+#     quant-dev-worker        Up
 #     quant-dev-redis         Up (healthy)
 ```
 
@@ -179,12 +179,15 @@ What runs where:
 | Vite dev server | host (native) | 5173 | `frontend/` |
 | PostgreSQL 17 | host (native, systemd) | 5432 | `pg_dump` of Aurora |
 | Redis 7 | docker | 6379 | `docker-compose.dev.yml` |
-| Coordinator (Bun) | docker (host network) | 3001 | `docker-compose.dev.yml` |
+| Worker (`quant.queue.worker_loop`) | docker (host network) | — | `docker-compose.dev.yml` |
 
-The coordinator container uses `network_mode: host` so it can reach the
-host-side Postgres at `127.0.0.1:5432` without any extra docker network
-plumbing (Linux/WSL2 only). It hydrates Redis with all REFDATA tables on
-boot — verify with `docker exec quant-dev-redis redis-cli keys 'refdata:*'`.
+The worker container uses `network_mode: host` so it can reach the
+host-side Postgres at `127.0.0.1:5432` and the host-side Redis at
+`127.0.0.1:6379` without any extra docker network plumbing (Linux/WSL2
+only). FastAPI hydrates Redis with all REFDATA tables on boot — verify
+with `docker exec quant-dev-redis redis-cli keys 'refdata:*'`. The worker
+then claims `QUEUED` rows from `BT.QUEUE` and spawns one
+`python -m quant.queue.worker <queue_id>` subprocess per job.
 
 To switch back to the shared prod DB, comment out / remove `DB_TARGET=local`
 from `.env` (or run `DB_TARGET=prod ./scripts/appctl.sh dev start` for a

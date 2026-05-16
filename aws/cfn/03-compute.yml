@@ -15,10 +15,10 @@ Description: >-
 #     both read it automatically.
 #
 # App contract:
-#   - coordinator (TS): src/config.ts — required() throws at startup if any
-#     required var is missing. Fail fast, no defaults for secrets.
 #   - api (Python): api/config.py — load_config() with USE_SSM=1 fetches from
 #     SSM at startup; falls back to .env for local dev.
+#   - worker (Python): quant/queue/worker_loop.py — reuses api.config.load_config(),
+#     so the same SSM path covers both containers.
 #
 # Adding a new secret:
 #   1. Add to SSM: aws ssm put-parameter --name /quant/prod/<KEY> ...

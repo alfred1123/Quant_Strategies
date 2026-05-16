@@ -38,14 +38,13 @@ These vars only apply to local dev (`./scripts/appctl.sh dev start`). Teammates 
 
 | Variable | Required? | Description |
 |---|---|---|
-| `DB_TARGET` | Optional | `prod` (default) → SSM tunnel on `127.0.0.1:5433` to Aurora. `local` → host-side Postgres 17 on `127.0.0.1:5432` (set up via `./scripts/dbctl.sh`). When `local`, `appctl.sh dev start` ALSO brings up Redis + the Bun coordinator via `docker-compose.dev.yml`. |
+| `DB_TARGET` | Optional | `prod` (default) → SSM tunnel on `127.0.0.1:5433` to Aurora. `local` → host-side Postgres 17 on `127.0.0.1:5432` (set up via `./scripts/dbctl.sh`). When `local`, `appctl.sh dev start` ALSO brings up Redis + the Python queue worker via `docker-compose.dev.yml`. |
 | `LOCAL_DB_HOST` | Optional | Local Postgres host (default `127.0.0.1`). |
 | `LOCAL_DB_PORT` | Optional | Local Postgres port (default `5432`). |
 | `LOCAL_DB_NAME` | Optional | Local DB name (default `quantdb`). |
 | `LOCAL_DB_USER` | Optional | Local user (default `quant_admin`). |
 | `LOCAL_DB_PASSWORD` | Optional | Local user password (default `LetsGetRich888` — change for non-default installs). |
-| `LOCAL_QUANTDB_URL` | Optional | Full `postgresql://…?sslmode=disable` URL passed to the dev coordinator container. Auto-derived from the `LOCAL_DB_*` vars when unset. |
-| `COORDINATOR_PORT` | Optional | Host port for the dev coordinator (default `3001`). |
+| `MAX_CONCURRENT_WORKERS` | Optional | Max concurrent backtest worker subprocesses spawned by one `quant.queue.worker_loop` (default `1`). Bump only after `SP_CLAIM_NEXT` becomes atomic — see `docs/design/backtest-queue.md` §0. |
 
 ## Liquibase (DB migrations)
 

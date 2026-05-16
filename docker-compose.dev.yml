@@ -1,4 +1,4 @@
-# Local-DB dev support stack — Redis + Coordinator only.
+# Local-DB dev support stack — Redis + queue worker.
 #
 # This compose file is *only* used when DB_TARGET=local (see scripts/appctl.sh).
 # It is intentionally separate from docker-compose.yml so the rest of the dev
@@ -6,17 +6,19 @@
 # teammates who keep DB_TARGET=prod and reach Aurora via the SSM tunnel.
 #
 # What runs here:
-#   * redis     — REFDATA cache, published on host :6379 so the host-side
-#                 uvicorn (api/main.py) can reach it via redis://localhost:6379
-#   * coordinator — Bun service that hydrates Redis from Postgres on boot and
-#                 republishes when REFDATA is bumped. Uses host networking so
-#                 it can reach both local Postgres (127.0.0.1:5432) and Redis
-#                 (127.0.0.1:6379) without an extra docker network.
+#   * redis  — REFDATA cache (FastAPI publishes on boot) + queue wake channel
+#              (BLPOP bt:queue:wake). Mapped to host :6379 so the host-side
+#              uvicorn (api/main.py) and worker container can both reach it.
+#   * worker — Long-lived ``python -m quant.queue.worker_loop`` daemon. Uses
+#              host networking so it can reach both local Postgres
+#              (127.0.0.1:5432) and Redis (127.0.0.1:6379) without an extra
+#              docker network. REFDATA must be published by FastAPI first —
+#              ``appctl.sh dev start`` boots uvicorn before the worker.
 #
 # Bring up:
 #     docker compose -f docker-compose.dev.yml up -d
 # Logs:
-#     docker compose -f docker-compose.dev.yml logs -f coordinator
+#     docker compose -f docker-compose.dev.yml logs -f worker
 # Tear down:
 #     docker compose -f docker-compose.dev.yml down
 
@@ -44,34 +46,28 @@ services:
       retries: 5
       start_period: 5s
 
-  coordinator:
+  worker:
     build:
-      context: ./coordinator
+      context: .
       dockerfile: Dockerfile
-    container_name: quant-dev-coordinator
+    container_name: quant-dev-worker
     restart: unless-stopped
+    command: ["python", "-m", "quant.queue.worker_loop"]
     # host networking so the container can reach the local Postgres on
     # 127.0.0.1:5432 (installed natively, not in compose) AND Redis on
     # 127.0.0.1:6379 (mapped above).  Linux/WSL2 only — fine for dev.
     network_mode: host
     environment:
-      - PORT=${COORDINATOR_PORT:-3001}
       - REDIS_URL=redis://127.0.0.1:6379
-      # Local Postgres restored via scripts/dbctl.sh.  Override via .env if
-      # you renamed user/db.  sslmode=disable matches the local cluster's
-      # default pg_hba (no TLS) and matches what api/config.py uses for
-      # DB_TARGET=local.
-      - QUANTDB_URL=${LOCAL_QUANTDB_URL:-postgresql://quant_admin:LetsGetRich888@127.0.0.1:5432/quantdb?sslmode=disable}
-      - JWT_SECRET=${JWT_SECRET:-dev-only-secret-not-for-prod}
+      - USE_SSM=0
+      - QUANTDB_HOST=${LOCAL_DB_HOST:-127.0.0.1}
+      - QUANTDB_PORT=${LOCAL_DB_PORT:-5432}
+      - QUANTDB_USERNAME=${LOCAL_DB_USER:-quant_admin}
+      - QUANTDB_PASSWORD=${LOCAL_DB_PASSWORD:-LetsGetRich888}
+      - QUANTDB_DATABASE=${LOCAL_DB_NAME:-quantdb}
+      - QUANTDB_SSLMODE=disable
+      - MAX_CONCURRENT_WORKERS=${MAX_CONCURRENT_WORKERS:-1}
       - LOG_LEVEL=${LOG_LEVEL:-info}
     depends_on:
       redis:
         condition: service_healthy
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - bun -e "fetch('http://127.0.0.1:${COORDINATOR_PORT:-3001}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 25s

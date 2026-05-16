@@ -3,7 +3,7 @@
 The `api/` directory contains the FastAPI application that serves the backtest pipeline as a REST API. All `/api/v1/*` routes (except auth and health) require an authenticated session.
 
 !!! note "Queue endpoints — migration in progress"
-    `/api/v1/jobs/*` (the backtest queue) is currently served by the TypeScript coordinator in `coordinator/` (Bun + Hono) but is being collapsed into this FastAPI process — see decision #32 and the v6 banner in [Queued Background Backtests](../design/backtest-queue.md). Once cutover lands, all `/api/v1/*` traffic terminates here and `coordinator/` is deleted.
+    `/api/v1/jobs/*` (the backtest queue) is served by this FastAPI process — see decision #32 and [Queued Background Backtests](../design/backtest-queue.md). The Python `quant.queue.worker_loop` daemon (separate container) consumes jobs from `BT.QUEUE`; all HTTP terminates here.
 
 ## Starting the Server
 

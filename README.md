@@ -33,7 +33,7 @@ sudo apt install -y postgresql-17 docker.io docker-compose-v2
 sudo usermod -aG docker "$USER"   # log out/in
 ./scripts/dbctl.sh reset && ./scripts/dbctl.sh dump && ./scripts/dbctl.sh restore
 echo 'DB_TARGET=local' >> .env
-./scripts/appctl.sh dev start    # also brings up Redis + coordinator via docker-compose.dev.yml
+./scripts/appctl.sh dev start    # also brings up Redis + queue worker via docker-compose.dev.yml
 ```
 
 See [docs/architecture/dev-vs-prod.md](docs/architecture/dev-vs-prod.md#optional-point-dev-at-a-local-postgres) for details.
@@ -49,7 +49,7 @@ See [docs/architecture/dev-vs-prod.md](docs/architecture/dev-vs-prod.md#optional
 | Python 3.12+ | Tested on 3.12.3 |
 | Node.js 24+ | Managed via nvm — `setup.sh` installs from `.nvmrc` |
 | PostgreSQL 17 | Shared Aurora via `localhost:5433` (AWS SSM port-forward), or local install on `:5432` (opt-in via `DB_TARGET=local`) |
-| Docker + compose v2 | Only needed for `DB_TARGET=local` (runs Redis + coordinator) or for the prod stack |
+| Docker + compose v2 | Only needed for `DB_TARGET=local` (runs Redis + queue worker) or for the prod stack |
 
 ---
 
@@ -70,22 +70,27 @@ cp .env.example .env
 | `ALPHAVANTAGE_API_KEY` | Optional | Free key from [alphavantage.co](https://www.alphavantage.co/support/#api-key) |
 | `GLASSNODE_API_KEY` | Optional | On-chain crypto metrics |
 | `FUTU_HOST` / `FUTU_PORT` | Optional | Futu OpenD gateway for HK/US equities |
-| `QUANTDB_URL` | Coordinator (Docker) | Full `postgresql://…` URL — see `.env.example` |
+| `MAX_CONCURRENT_WORKERS` | Optional | Backtest worker subprocesses per `worker_loop` (default `1`) |
 
 **Yahoo Finance requires no API key** — it is the default data source.
 
-### Queue coordinator (Docker)
+### Backtest queue worker (Docker)
 
-To run the **[backtest queue](docs/design/backtest-queue.md)** coordinator in a container:
+The **[backtest queue](docs/design/backtest-queue.md)** runs as a long-lived
+Python daemon (`quant.queue.worker_loop`) that claims `QUEUED` rows from
+`BT.QUEUE` and spawns one `python -m quant.queue.worker <queue_id>`
+subprocess per job. To run it in a container:
 
 ```bash
-# .env must include QUANTDB_URL, JWT_SECRET, and a working REDIS_URL (default in compose: redis://redis:6379)
-docker compose up redis coordinator
-curl -sS "http://localhost:3001/health"
-curl -sS "http://localhost:3001/api/v1/jobs"
+# .env must include working QUANTDB_* credentials and REDIS_URL
+# (default in compose: redis://redis:6379)
+docker compose up redis worker
+docker compose logs -f worker
 ```
 
-`QUANTDB_URL` must reach PostgreSQL from inside the container (often `host.docker.internal:5433` when the DB tunnel runs on the host). See `.env.example`.
+FastAPI publishes REFDATA into Redis on boot, so start the API container
+before (or alongside) the worker. The HTTP surface lives on the API
+container at `/api/v1/jobs/*` — there is no separate coordinator port.
 
 ## Repository Layout
 
@@ -97,10 +102,9 @@ Quant_Strategies/
 ├── tests/                     # Unit, integration, and e2e tests
 ├── docs/                      # MkDocs Material wiki
 ├── db/liquidbase/             # Liquibase changelogs (per-schema deployment)
-├── coordinator/               # Bun + Hono backtest queue (Compose service :3001)
-├── docker-compose.yml         # prod base — redis, api, nginx, coordinator
+├── docker-compose.yml         # prod base — redis, api, worker, nginx
 ├── docker-compose.prod.yml    # prod overrides (APP_ENV, USE_SSM, COOKIE_SECURE)
-├── docker-compose.dev.yml     # dev support stack — redis + coordinator only (DB_TARGET=local)
+├── docker-compose.dev.yml     # dev support stack — redis + worker only (DB_TARGET=local)
 ├── docker/                    # Docker + Nginx configs
 ├── scripts/appctl.sh          # dev/prod lifecycle (uvicorn, vite, tunnel, compose)
 ├── scripts/dbctl.sh           # local Postgres dump/restore/reset

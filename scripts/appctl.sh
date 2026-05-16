@@ -43,13 +43,10 @@ SSM_RDS_HOST="${SSM_RDS_HOST:-quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-
 SSM_REMOTE_PORT="${SSM_REMOTE_PORT:-5432}"
 SSM_AWS_PROFILE="${SSM_AWS_PROFILE:-alfcheun}"
 
-# Local dev support stack (Redis + coordinator). Only brought up when
+# Local dev support stack (Redis + queue worker). Only brought up when
 # DB_TARGET=local — teammates on DB_TARGET=prod don't need Docker installed.
 DEV_COMPOSE_FILE="$ROOT_DIR/docker-compose.dev.yml"
 DEV_COMPOSE_PROJECT="quantdev"
-COORDINATOR_PORT="${COORDINATOR_PORT:-3001}"
-LOCAL_QUANTDB_URL="${LOCAL_QUANTDB_URL:-postgresql://${LOCAL_DB_USER:-quant_admin}:${LOCAL_DB_PASSWORD:-LetsGetRich888}@${LOCAL_DB_HOST:-127.0.0.1}:${LOCAL_DB_PORT:-5432}/${LOCAL_DB_NAME:-quantdb}?sslmode=disable}"
-export LOCAL_QUANTDB_URL
 
 MODE="${1:-}"
 ACTION="${2:-}"
@@ -65,31 +62,29 @@ Examples:
   ./scripts/appctl dev start         # local dev (uvicorn + Vite). Refuses to
                                      # start if the SSM tunnel / DB is down.
   ./scripts/appctl dev kill
-  ./scripts/appctl prod start        # Docker Compose (redis + coordinator + api + nginx)
+  ./scripts/appctl prod start        # Docker Compose (redis + api + worker + nginx)
   ./scripts/appctl prod status
 
 Self-test (after prod start — from project root, .env loaded for compose):
   curl -sS "http://127.0.0.1:8000/health/ready"
-  curl -sS "http://127.0.0.1:${COORDINATOR_PORT:-3001}/health"
-  curl -sS "http://127.0.0.1:${COORDINATOR_PORT:-3001}/api/v1/jobs"
+  curl -sS "http://127.0.0.1:8000/api/v1/jobs"  # requires login cookie
 
 Notes:
   - dev mode runs FastAPI with --reload and Vite dev server (no Docker).
-    Redis is optional locally — REFDATA endpoints will 503 until coordinator
-    publishes, but auth/login work fine without it.
+    Redis is optional locally — REFDATA endpoints will 503 until FastAPI
+    publishes on boot, but auth/login work fine without it.
   - DB target is selected via DB_TARGET (set in .env or shell):
       DB_TARGET=prod   → AWS Aurora via SSM tunnel on :5433  (default)
       DB_TARGET=local  → local Postgres 17 on :5432          (set up via ./scripts/dbctl.sh)
   - 'dev tunnel' manages a single canonical AWS SSM port-forward to RDS so you
     only ever have one reconnect loop running (avoids races on port 5433).
     Not needed when DB_TARGET=local.
-  - When DB_TARGET=local, 'dev start' also brings up Redis + coordinator via
-    docker-compose.dev.yml so REFDATA endpoints work. 'dev stop|kill' tears it
-    down. Requires docker + docker compose v2 on the host.
+  - When DB_TARGET=local, 'dev start' also brings up Redis + the queue worker
+    via docker-compose.dev.yml so the backtest queue runs end-to-end.
+    'dev stop|kill' tears it down. Requires docker + docker compose v2.
   - prod mode loads ./.env when present (set -a) so docker compose can substitute
-    QUANTDB_URL, JWT_SECRET, REDIS_URL, COORDINATOR_PORT, etc. The coordinator
-    container needs QUANTDB_URL + JWT_SECRET; FastAPI loads SSM inside the api
-    container when USE_SSM=1.
+    QUANTDB_URL, JWT_SECRET, REDIS_URL, etc. FastAPI and the worker both load
+    secrets via SSM inside their containers when USE_SSM=1.
   - prod compose matches deploy: docker-compose.yml + docker-compose.prod.yml,
     up -d --build --remove-orphans.
   - PIDs are stored under log/run/ and logs under log/.
@@ -123,32 +118,18 @@ if [[ "$MODE" == "prod" ]]; then
     echo "No .env at repo root — compose will use only exported shell env vars." >&2
   fi
 
-  _coord_port="${COORDINATOR_PORT:-3001}"
-  _preflight_coordinator() {
-    if [[ -z "${QUANTDB_URL:-}" || -z "${JWT_SECRET:-}" ]]; then
-      echo "" >&2
-      echo "WARN: QUANTDB_URL and/or JWT_SECRET unset — coordinator container will fail." >&2
-      echo "      Set them in .env (or export) for local prod stack tests. FastAPI may still start." >&2
-      echo "" >&2
-    fi
-  }
-
   case "$ACTION" in
     start)
-      _preflight_coordinator
       echo "Starting production containers..."
       docker compose $COMPOSE_FILES up -d --build --remove-orphans
       echo ""
       echo "Mode: prod (Docker Compose)"
       echo "Nginx → api:  http://127.0.0.1/ (port 80)  |  api direct: http://127.0.0.1:8000"
-      echo "Coordinator:  http://127.0.0.1:${_coord_port}"
       echo "Site (TLS):   https://${DOMAIN:-<set DOMAIN for certbot profile>}"
       echo "Logs:         docker compose $COMPOSE_FILES logs -f"
       echo ""
       echo "Smoke (optional):"
       echo "  curl -sS \"http://127.0.0.1:8000/health/ready\""
-      echo "  curl -sS \"http://127.0.0.1:${_coord_port}/health\""
-      echo "  curl -sS \"http://127.0.0.1:${_coord_port}/api/v1/jobs\""
       ;;
     stop)
       docker compose $COMPOSE_FILES down
@@ -159,7 +140,6 @@ if [[ "$MODE" == "prod" ]]; then
       echo "Killed production containers."
       ;;
     restart)
-      _preflight_coordinator
       docker compose $COMPOSE_FILES down
       docker compose $COMPOSE_FILES up -d --build --remove-orphans
       echo "Restarted production containers."
@@ -414,7 +394,7 @@ status_service() {
   fi
 }
 
-# ── Dev support stack (Redis + coordinator) — DB_TARGET=local only ────
+# ── Dev support stack (Redis + queue worker) — DB_TARGET=local only ────
 # Lazily detects docker availability so DB_TARGET=prod users never need it.
 # Uses `sg docker` only if the user is not yet in the docker group (fresh
 # install, current shell hasn't picked up groups yet).
@@ -431,7 +411,8 @@ _compose() {
 
 dev_stack_start() {
   if ! command -v docker >/dev/null 2>&1; then
-    echo "WARN: 'docker' not found — Redis + coordinator will not start. REFDATA endpoints will time out." >&2
+    echo "WARN: 'docker' not found — Redis + queue worker will not start." >&2
+    echo "      REFDATA endpoints will fail and queued backtest jobs will not run." >&2
     echo "      Install: sudo apt install -y docker.io docker-compose-v2 && sudo usermod -aG docker \$USER" >&2
     return 0
   fi
@@ -439,8 +420,37 @@ dev_stack_start() {
     echo "WARN: $DEV_COMPOSE_FILE not found — skipping dev support stack." >&2
     return 0
   fi
-  echo "Starting dev support stack (redis + coordinator) via $DEV_COMPOSE_FILE ..."
+  echo "Starting dev support stack (redis + worker) via $DEV_COMPOSE_FILE ..."
   _compose up -d --build --remove-orphans 2>&1 | sed 's/^/  /'
+}
+
+# Bring up Redis only — needed before the backend so REFDATA publish (lifespan)
+# can write to it. The worker is started later via dev_stack_start_worker once
+# the backend has populated REFDATA in Redis.
+dev_stack_start_redis() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "WARN: 'docker' not found — Redis will not start." >&2
+    return 0
+  fi
+  if [[ ! -f "$DEV_COMPOSE_FILE" ]]; then
+    return 0
+  fi
+  echo "Starting dev support stack (redis) via $DEV_COMPOSE_FILE ..."
+  _compose up -d --build --remove-orphans redis 2>&1 | sed 's/^/  /'
+}
+
+# Bring up the queue worker. Assumes Redis is already up and FastAPI has
+# published REFDATA (worker_loop calls resolve_queue_status_id on boot).
+dev_stack_start_worker() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "WARN: 'docker' not found — queue worker will not start." >&2
+    return 0
+  fi
+  if [[ ! -f "$DEV_COMPOSE_FILE" ]]; then
+    return 0
+  fi
+  echo "Starting queue worker via $DEV_COMPOSE_FILE ..."
+  _compose up -d --build --remove-orphans worker 2>&1 | sed 's/^/  /'
 }
 
 dev_stack_stop() {
@@ -520,15 +530,20 @@ case "$ACTION" in
       exit 2
     fi
     if [[ "$DB_TARGET" == "local" ]]; then
-      dev_stack_start
+      # Redis must be up before backend so REFDATA publish (lifespan) succeeds.
+      dev_stack_start_redis
     fi
     start_service "backend" "$BACKEND_PID_FILE" "$BACKEND_LOG_FILE" "$(backend_command)" "$BACKEND_PORT"
     start_service "frontend" "$FRONTEND_PID_FILE" "$FRONTEND_LOG_FILE" "$(frontend_command)" "$(frontend_port)"
+    if [[ "$DB_TARGET" == "local" ]]; then
+      # Backend has published REFDATA → worker can resolve queue_status ids.
+      dev_stack_start_worker
+    fi
     echo "Mode: dev  (DB_TARGET=$DB_TARGET)"
     echo "Backend:  http://127.0.0.1:8000"
     echo "Frontend: http://127.0.0.1:5173"
     if [[ "$DB_TARGET" == "local" ]]; then
-      echo "Coordinator: http://127.0.0.1:${COORDINATOR_PORT}  (docker-compose.dev.yml)"
+      echo "Worker:   docker container quant-dev-worker  (docker-compose.dev.yml)"
     fi
     ;;
   stop)
