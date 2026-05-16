@@ -25,62 +25,36 @@ Exit codes (per §10.1):
 
 import json
 import logging
-import os
 import sys
 import traceback
 import uuid
-from dataclasses import dataclass
 
-from api.config import load_config, get_redis_url  # noqa: E402
-from api.schemas.backtest import OptimizeRequest  # noqa: E402
-from api.services.backtest import run_optimize  # noqa: E402
+from api.config import load_config, get_redis_url
+from api.schemas.backtest import OptimizeRequest
+from api.services.backtest import run_optimize
 
-from quant.shared.db import DbGateway  # noqa: E402
-from quant.refdata.bundle import DataCaches  # noqa: E402
-from quant.shared.util import utc_now_iso  # noqa: E402
+from quant.queue.repo import BtQueueRepo
+from quant.refdata.bundle import DataCaches
+from quant.shared.util import utc_now_iso
 
 logger = logging.getLogger(__name__)
 
 
-class WorkerRepo(DbGateway):
+class WorkerRepo(BtQueueRepo):
     """All BT.* DB access for the worker — REFCURSOR drain + SP write."""
 
     # ── reads ───────────────────────────────────────────────────────────
 
     def fetch_job(self, queue_id: uuid.UUID) -> dict:
         """Active QUEUE row + frozen ``CONFIG_JSON`` via ``BT.SP_GET_QUEUE_LATEST`` (one ``_call_get``)."""
-        rows = self._call_get(
-            "CALL bt.sp_get_queue_latest(%s::uuid, NULL, NULL, NULL, NULL)",
-            (str(queue_id),),
-        )
-        if not rows:
+        row = self.sp_get_queue_latest(queue_id)
+        if row is None:
             raise LookupError(
                 f"no active BT.QUEUE row (or missing frozen STRATEGY) for queue_id={queue_id}"
             )
-        return rows[0]
+        return row
 
     # ── writes ──────────────────────────────────────────────────────────
-
-    def ins_queue(
-        self,
-        queue_id: uuid.UUID,
-        strategy_id: str,
-        strategy_vid: int,
-        status_id: int,
-        priority: int,
-        user_id: str,
-        error_text: str | None,
-    ) -> None:
-        # SP_INS_QUEUE OUT row is (SQLSTATE, MSG, ERRMC) — _call_write returns ().
-        self._call_write(
-            "CALL bt.sp_ins_queue("
-            "%s::uuid, %s::uuid, %s::integer, %s::integer, %s::integer, %s::text, %s::text,"
-            " NULL::text, NULL::text, NULL::text)",
-            (
-                str(queue_id), str(strategy_id), int(strategy_vid),
-                int(status_id), int(priority), error_text, user_id,
-            ),
-        )
 
     def ins_result(
         self, result_id: uuid.UUID, queue_id: uuid.UUID, payload: dict, user_id: str
@@ -133,9 +107,14 @@ class BacktestWorker:
         except Exception:
             err = traceback.format_exc()
             logger.error("optimize failed for queue_id=%s\n%s", queue_id, err)
-            repo.ins_queue(
-                queue_id, job["strategy_id"], job["strategy_vid"],
-                failed_id, job["priority"], job["user_id"], err,
+            repo.sp_ins_queue(
+                queue_id=queue_id,
+                strategy_id=job["strategy_id"],
+                strategy_vid=job["strategy_vid"],
+                status_id=failed_id,
+                priority=job["priority"],
+                user_id=job["user_id"],
+                error_text=err,
             )
             self._emit({
                 "type": "terminal", "queue_id": str(queue_id),
@@ -145,9 +124,13 @@ class BacktestWorker:
 
         result_id = uuid.uuid4()
         repo.ins_result(result_id, queue_id, response.model_dump(), job["user_id"])
-        repo.ins_queue(
-            queue_id, job["strategy_id"], job["strategy_vid"],
-            completed_id, job["priority"], job["user_id"], None,
+        repo.sp_ins_queue(
+            queue_id=queue_id,
+            strategy_id=job["strategy_id"],
+            strategy_vid=job["strategy_vid"],
+            status_id=completed_id,
+            priority=job["priority"],
+            user_id=job["user_id"],
         )
         self._emit({
             "type": "terminal", "queue_id": str(queue_id),

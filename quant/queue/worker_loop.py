@@ -38,22 +38,24 @@ from typing import Callable
 import redis
 
 from api.config import get_redis_url, load_config
+from quant.queue.repo import BtQueueRepo
 from quant.queue.wake import wait_for_wake
 from quant.refdata.reader import RedisRefData
-from quant.shared.db import DbGateway
 
 logger = logging.getLogger(__name__)
 
 
-class WorkerLoopRepo(DbGateway):
+class WorkerLoopRepo(BtQueueRepo):
     """DB calls used by the loop: claim head, list-by-status, mark FAILED."""
 
-    def list_by_status(self, queue_status_id: int) -> list[dict]:
-        """Active QUEUE rows with the given status, priority/time-ordered."""
-        return self._query(
-            "SELECT * FROM bt.fn_get_queue_for_terminal(NULL, %s)",
-            (int(queue_status_id),),
-        )
+    def list_by_status(self, queue_status_id: int, *, limit: int = 1000) -> list[dict]:
+        """Active QUEUE rows with the given status, dequeue-ordered.
+
+        Wraps :meth:`BtQueueRepo.sp_get_queue` with ``queue_id=None`` so the
+        SP scopes to active rows ordered ``(PRIORITY ASC, CREATED_AT ASC)``
+        — the dequeue ranking per ``docs/design/backtest-queue.md`` §6.1.
+        """
+        return self.sp_get_queue(queue_status_id=queue_status_id, limit=limit)
 
     def claim_next(self, queued_status_id: int, running_status_id: int) -> dict | None:
         """Pop the head of the QUEUED ranking → transition RUNNING.
@@ -64,28 +66,20 @@ class WorkerLoopRepo(DbGateway):
         future ``BT.SP_CLAIM_NEXT`` that does both inside one SP.
 
         Returns the claimed job row (dict) or ``None`` when the queue is
-        empty.
+        empty. ``BT.FN_GET_QUEUE_FOR_TERMINAL`` is reserved for UI display
+        — the worker uses ``BT.SP_GET_QUEUE`` (REFCURSOR) instead.
         """
-        rows = self._query(
-            "SELECT * FROM bt.fn_get_queue_for_terminal(NULL, %s) LIMIT 1",
-            (int(queued_status_id),),
-        )
+        rows = self.list_by_status(queued_status_id, limit=1)
         if not rows:
             return None
         row = rows[0]
-        self._call_write(
-            "CALL bt.sp_ins_queue("
-            "%s::uuid, %s::uuid, %s::integer, %s::integer, %s::integer, %s::text, %s::text,"
-            " NULL::text, NULL::text, NULL::text)",
-            (
-                str(row["queue_id"]),
-                str(row["strategy_id"]),
-                int(row["strategy_vid"]),
-                int(running_status_id),
-                int(row["priority"]),
-                None,
-                row["user_id"],
-            ),
+        self.sp_ins_queue(
+            queue_id=row["queue_id"],
+            strategy_id=row["strategy_id"],
+            strategy_vid=int(row["strategy_vid"]),
+            status_id=running_status_id,
+            priority=int(row["priority"]),
+            user_id=row["user_id"],
         )
         return row
 
@@ -99,19 +93,14 @@ class WorkerLoopRepo(DbGateway):
         failed_status_id: int,
         error_text: str,
     ) -> None:
-        self._call_write(
-            "CALL bt.sp_ins_queue("
-            "%s::uuid, %s::uuid, %s::integer, %s::integer, %s::integer, %s::text, %s::text,"
-            " NULL::text, NULL::text, NULL::text)",
-            (
-                str(queue_id),
-                str(strategy_id),
-                int(strategy_vid),
-                int(failed_status_id),
-                int(priority),
-                error_text,
-                user_id,
-            ),
+        self.sp_ins_queue(
+            queue_id=queue_id,
+            strategy_id=strategy_id,
+            strategy_vid=int(strategy_vid),
+            status_id=failed_status_id,
+            priority=int(priority),
+            user_id=user_id,
+            error_text=error_text,
         )
 
 

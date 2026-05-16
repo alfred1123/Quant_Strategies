@@ -5,6 +5,7 @@ import {
   Tabs, Tab, Paper, Stack,
 } from '@mui/material';
 import ConfigDrawer from '../components/ConfigDrawer';
+import JobsTable from '../components/JobsTable';
 import Top10Table from '../components/Top10Table';
 import MetricsCards from '../components/MetricsCards';
 import HeatmapChart from '../components/HeatmapChart';
@@ -63,6 +64,7 @@ export default function BacktestPage() {
   const [selectedRow, setSelectedRow] = useState<Top10Row | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [analysisTab, setAnalysisTab] = useState(0);
+  const [pageTab, setPageTab] = useState(0);
   const [wfResult, setWfResult] = useState<WalkForwardResponse | null>(null);
   const [optProgress, setOptProgress] = useState<OptimizeProgress | null>(null);
 
@@ -194,6 +196,14 @@ export default function BacktestPage() {
           </Button>
           {currentUser && <UserMenu user={currentUser} />}
         </Toolbar>
+        <Tabs
+          value={pageTab}
+          onChange={(_, v) => setPageTab(v)}
+          sx={{ px: 2, borderTop: '1px solid', borderColor: 'divider' }}
+        >
+          <Tab label="Backtest" />
+          <Tab label="Queue" />
+        </Tabs>
       </AppBar>
 
       <ConfigDrawer
@@ -206,6 +216,9 @@ export default function BacktestPage() {
       />
 
       <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
+        {pageTab === 1 && <JobsTable />}
+        {pageTab === 0 && (
+          <>
         {/* Running state */}
         {isOptimizing && (
           <Box sx={{ my: 8, textAlign: 'center' }}>
@@ -367,6 +380,8 @@ export default function BacktestPage() {
                 )}
               </Paper>
             )}
+          </>
+        )}
           </>
         )}
       </Box>

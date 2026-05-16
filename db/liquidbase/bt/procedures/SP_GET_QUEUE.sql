@@ -68,7 +68,16 @@ BEGIN
         V_SQL := V_SQL || format(' AND q.USER_ID = %L', IN_USER_ID);
     END IF;
 
-    V_SQL := V_SQL || ' ORDER BY q.QUEUE_ID, q.QUEUE_VID ASC';
+    -- History view (single QUEUE_ID) → chronological by VID.
+    -- Active-row view → FIFO-by-priority per docs/design/backtest-queue.md
+    -- §6.1 ("Dequeue order: PRIORITY ASC, CREATED_AT ASC"). Backed by the
+    -- BT_QUEUE_STATUS_PRIORITY_IDX btree on (QUEUE_STATUS_ID, PRIORITY,
+    -- CREATED_AT) so worker `LIMIT 1` is an index lookup.
+    IF IN_QUEUE_ID IS NOT NULL THEN
+        V_SQL := V_SQL || ' ORDER BY q.QUEUE_ID, q.QUEUE_VID ASC';
+    ELSE
+        V_SQL := V_SQL || ' ORDER BY q.PRIORITY ASC, q.CREATED_AT ASC';
+    END IF;
     V_SQL := V_SQL || format(' LIMIT %s', V_LIMIT);
 
     OPEN OUT_RESULT FOR EXECUTE V_SQL;

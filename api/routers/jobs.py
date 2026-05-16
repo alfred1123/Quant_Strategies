@@ -21,10 +21,10 @@ from api.schemas.jobs import EnqueueRequest, EnqueueResponse, JobDetail, JobRow
 from api.services.jobs import (
     CancelNotAllowed,
     JobNotFound,
-    JobsRepo,
     JobsService,
     RateLimitError,
 )
+from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ def get_jobs_service(
     caches: DataCaches = Depends(get_data_caches),
 ) -> JobsService:
     """Build a per-request ``JobsService`` against app-wide DB + Redis."""
-    repo = JobsRepo(request.app.state.db_conninfo, user_id="system")
+    repo = BtQueueRepo(request.app.state.db_conninfo, user_id="system")
     return JobsService(repo=repo, refdata=caches.refdata, redis_client=_get_redis(request))
 
 

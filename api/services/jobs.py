@@ -1,10 +1,8 @@
-"""Service + repo for ``/api/v1/jobs/*`` — Phase B v6.
+"""Service for ``/api/v1/jobs/*`` — Phase B v6.
 
-Replaces ``coordinator/src/services/jobs.ts`` and ``coordinator/src/queue/repo.ts``.
-
-Writes go through ``BT.SP_INS_QUEUE`` (per AGENTS.md). Reads use direct
-``SELECT`` on ``BT.QUEUE`` (allowed for reads) for simplicity — the same
-joins the coordinator's TS code performed.
+Replaces ``coordinator/src/services/jobs.ts``. All DB access is delegated
+to :class:`quant.queue.repo.BtQueueRepo`; this module is HTTP-agnostic
+business logic only.
 """
 
 import logging
@@ -19,13 +17,11 @@ from api.schemas.jobs import (
     EnqueueRequest,
     EnqueueResponse,
 )
+from quant.queue.repo import BtQueueRepo
 from quant.queue.wake import publish_wake
 from quant.refdata.reader import RedisRefData
-from quant.shared.db import DbGateway
 
 logger = logging.getLogger(__name__)
-
-ACTIVE_TS = "9999-12-31 00:00:00+00"
 
 
 class RateLimitError(Exception):
@@ -44,124 +40,12 @@ class CancelNotAllowed(Exception):
     """Job is already in a terminal state — router maps to HTTP 409."""
 
 
-class JobsRepo(DbGateway):
-    """Reads + writes for BT.QUEUE / BT.RESULT used by the jobs router."""
-
-    # ── reads (direct SELECT, allowed by AGENTS.md) ─────────────────────
-
-    def count_queued_for_user(self, user_id: str, queued_status_id: int) -> int:
-        rows = self._query(
-            "SELECT COUNT(*)::INTEGER AS n FROM BT.QUEUE"
-            " WHERE TRANSACT_TO_TS = %s::timestamptz"
-            "   AND QUEUE_STATUS_ID = %s"
-            "   AND USER_ID = %s",
-            (ACTIVE_TS, int(queued_status_id), user_id),
-        )
-        return int(rows[0]["n"]) if rows else 0
-
-    def list_for_user(self, user_id: str, limit: int = 50) -> list[dict]:
-        return self._query(
-            "SELECT q.QUEUE_ID, q.QUEUE_VID, q.STRATEGY_ID, q.STRATEGY_VID,"
-            "       s.STRATEGY_NM,"
-            "       q.QUEUE_STATUS_ID,"
-            "       (SELECT NAME FROM REFDATA.QUEUE_STATUS"
-            "         WHERE QUEUE_STATUS_ID = q.QUEUE_STATUS_ID) AS QUEUE_STATUS,"
-            "       q.PRIORITY, q.USER_ID, q.TRANSACT_FROM_TS, q.ERROR_TEXT"
-            "  FROM BT.QUEUE q"
-            "  LEFT JOIN BT.STRATEGY s ON s.STRATEGY_ID = q.STRATEGY_ID"
-            "                         AND s.STRATEGY_VID = q.STRATEGY_VID"
-            " WHERE q.TRANSACT_TO_TS = %s::timestamptz"
-            "   AND q.USER_ID = %s"
-            " ORDER BY q.PRIORITY ASC, q.TRANSACT_FROM_TS ASC"
-            " LIMIT %s",
-            (ACTIVE_TS, user_id, int(limit)),
-        )
-
-    def queued_position(self, queue_id: uuid.UUID, queued_status_id: int) -> int:
-        """1-indexed position in the QUEUED ranking (0 if not found)."""
-        rows = self._query(
-            "WITH ranked AS ("
-            "  SELECT QUEUE_ID, ROW_NUMBER() OVER ("
-            "    ORDER BY PRIORITY ASC, TRANSACT_FROM_TS ASC) AS pos"
-            "    FROM BT.QUEUE"
-            "   WHERE TRANSACT_TO_TS = %s::timestamptz"
-            "     AND QUEUE_STATUS_ID = %s"
-            ") SELECT pos FROM ranked WHERE QUEUE_ID = %s::uuid",
-            (ACTIVE_TS, int(queued_status_id), str(queue_id)),
-        )
-        return int(rows[0]["pos"]) if rows else 0
-
-    def get_active(self, queue_id: uuid.UUID, user_id: str | None = None) -> dict | None:
-        """Active QUEUE row with status/strategy joins. Returns None if not found.
-
-        If ``user_id`` is supplied the lookup is scoped — used by the router
-        to enforce ownership without leaking 404 vs 403.
-        """
-        sql = (
-            "SELECT q.QUEUE_ID, q.QUEUE_VID, q.STRATEGY_ID, q.STRATEGY_VID,"
-            "       s.STRATEGY_NM, s.CONFIG_JSON,"
-            "       q.QUEUE_STATUS_ID,"
-            "       (SELECT NAME FROM REFDATA.QUEUE_STATUS"
-            "         WHERE QUEUE_STATUS_ID = q.QUEUE_STATUS_ID) AS QUEUE_STATUS,"
-            "       q.PRIORITY, q.USER_ID, q.TRANSACT_FROM_TS, q.ERROR_TEXT"
-            "  FROM BT.QUEUE q"
-            "  LEFT JOIN BT.STRATEGY s ON s.STRATEGY_ID = q.STRATEGY_ID"
-            "                         AND s.STRATEGY_VID = q.STRATEGY_VID"
-            " WHERE q.QUEUE_ID = %s::uuid"
-            "   AND q.TRANSACT_TO_TS = %s::timestamptz"
-        )
-        params: tuple = (str(queue_id), ACTIVE_TS)
-        if user_id is not None:
-            sql += " AND q.USER_ID = %s"
-            params = params + (user_id,)
-        rows = self._query(sql, params)
-        return rows[0] if rows else None
-
-    def get_result(self, queue_id: uuid.UUID) -> dict | None:
-        rows = self._query(
-            "SELECT RESULT_ID, RESULT_PAYLOAD"
-            "  FROM BT.RESULT"
-            " WHERE QUEUE_ID = %s::uuid"
-            " ORDER BY CREATED_AT DESC"
-            " LIMIT 1",
-            (str(queue_id),),
-        )
-        return rows[0] if rows else None
-
-    # ── writes (always via SP_INS_QUEUE) ────────────────────────────────
-
-    def ins_queue(
-        self,
-        queue_id: uuid.UUID,
-        strategy_id: uuid.UUID | str,
-        strategy_vid: int,
-        status_id: int,
-        priority: int,
-        user_id: str,
-        error_text: str | None = None,
-    ) -> None:
-        self._call_write(
-            "CALL bt.sp_ins_queue("
-            "%s::uuid, %s::uuid, %s::integer, %s::integer, %s::integer, %s::text, %s::text,"
-            " NULL::text, NULL::text, NULL::text)",
-            (
-                str(queue_id),
-                str(strategy_id),
-                int(strategy_vid),
-                int(status_id),
-                int(priority),
-                error_text,
-                user_id,
-            ),
-        )
-
-
 class JobsService:
     """Business logic for /jobs — HTTP-agnostic."""
 
     def __init__(
         self,
-        repo: JobsRepo,
+        repo: BtQueueRepo,
         refdata: RedisRefData,
         redis_client: redis.Redis,
     ) -> None:
@@ -183,7 +67,7 @@ class JobsService:
             raise RateLimitError(MAX_QUEUED_PER_USER)
 
         queue_id = uuid.uuid4()
-        self._repo.ins_queue(
+        self._repo.sp_ins_queue(
             queue_id=queue_id,
             strategy_id=req.strategy_id,
             strategy_vid=req.strategy_vid,
@@ -229,7 +113,7 @@ class JobsService:
                 f"job {queue_id} is in terminal state {status!r}"
             )
 
-        self._repo.ins_queue(
+        self._repo.sp_ins_queue(
             queue_id=queue_id,
             strategy_id=row["strategy_id"],
             strategy_vid=row["strategy_vid"],
