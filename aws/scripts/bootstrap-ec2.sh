@@ -18,7 +18,9 @@ docker --version
 docker compose version
 
 echo "=== Configuring git ==="
-sudo git config --global --add safe.directory "$APP_DIR"
+# --system so SSM agent (ssm-user) and root both trust the repo, not just
+# the user running bootstrap. --global would only cover root's HOME.
+sudo git config --system --add safe.directory "$APP_DIR"
 
 echo "=== Cloning repo ==="
 if [ -d "$APP_DIR/.git" ]; then

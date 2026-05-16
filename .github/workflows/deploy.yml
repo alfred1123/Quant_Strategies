@@ -12,6 +12,11 @@ on:
       - ".cursor/**"
 
   workflow_dispatch:
+    inputs:
+      deploy_database:
+        description: "Also deploy the database (RDS) CFN stack — dangerous"
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-prod
@@ -60,9 +65,96 @@ jobs:
         run: npm run build
         working-directory: frontend
 
+  cfn:
+    name: deploy CloudFormation
+    needs: [test]
+    runs-on: ubuntu-latest
+    environment: production
+    # All three stacks are safe to auto-deploy on intentional infra commits:
+    #   * Path filter (aws/cfn/** or aws/params/**) means app-only pushes skip.
+    #   * RDS is guarded at the AWS layer: DeletionPolicy=Retain,
+    #     UpdateReplacePolicy=Snapshot, DeletionProtection=true,
+    #     BackupRetentionPeriod=7. Data loss is not reachable from CFN.
+    # The database stack additionally requires the DB_MASTER_PASSWORD secret
+    # to avoid the script's interactive `read -rsp` prompt hanging CI.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # need HEAD~1 for the diff below
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-1
+
+      - name: Detect infra changes
+        id: changes
+        run: |
+          set -euo pipefail
+          force="${{ github.event_name == 'workflow_dispatch' }}"
+          base="${{ github.event.before }}"
+          [[ -z "$base" || "$base" == "0000000000000000000000000000000000000000" ]] && base="HEAD~1"
+
+          changed=$(git diff --name-only "$base" "${{ github.sha }}" 2>/dev/null || true)
+          echo "$changed" | sed 's/^/    /'
+
+          network=false; database=false; compute=false
+          echo "$changed" | grep -qE '^aws/(cfn/01-network\.yml|params/)'  && network=true
+          echo "$changed" | grep -qE '^aws/(cfn/02-database\.yml|params/)' && database=true
+          echo "$changed" | grep -qE '^aws/(cfn/03-compute\.yml|params/)'  && compute=true
+
+          if [[ "$force" == "true" ]]; then
+            network=true; compute=true
+            [[ "${{ inputs.deploy_database }}" == "true" ]] && database=true
+          fi
+
+          echo "network=$network"   >> "$GITHUB_OUTPUT"
+          echo "database=$database" >> "$GITHUB_OUTPUT"
+          echo "compute=$compute"   >> "$GITHUB_OUTPUT"
+
+      - name: Deploy network stack
+        if: steps.changes.outputs.network == 'true'
+        env:
+          APP_ENV: prod
+          AWS_REGION: ap-southeast-1
+        run: bash aws/deploy.sh network
+
+      - name: Deploy database stack
+        if: steps.changes.outputs.database == 'true'
+        env:
+          APP_ENV: prod
+          AWS_REGION: ap-southeast-1
+          DB_MASTER_PASSWORD: ${{ secrets.DB_MASTER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${DB_MASTER_PASSWORD:-}" ]]; then
+            echo "::error::DB_MASTER_PASSWORD secret is required when deploying the database stack"
+            exit 1
+          fi
+          # Inject into params file in-place so deploy.sh picks it up via
+          # its normal override-from-params flow (no script changes needed).
+          python3 -c "
+          import json, os
+          p = 'aws/params/prod.json'
+          arr = json.load(open(p))
+          arr = [x for x in arr if x['ParameterKey'] != 'MasterUserPassword']
+          arr.append({'ParameterKey': 'MasterUserPassword',
+                      'ParameterValue': os.environ['DB_MASTER_PASSWORD']})
+          json.dump(arr, open(p, 'w'))
+          "
+          bash aws/deploy.sh database
+
+      - name: Deploy compute stack
+        if: steps.changes.outputs.compute == 'true'
+        env:
+          APP_ENV: prod
+          AWS_REGION: ap-southeast-1
+        run: bash aws/deploy.sh compute
+
   deploy:
     name: deploy to EC2
-    needs: [test, build]
+    needs: [test, build, cfn]
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -86,6 +178,7 @@ jobs:
             --parameters commands='[
               "set -euo pipefail",
               "cd /opt/quant",
+              "git config --global --add safe.directory /opt/quant",
               "echo \"── BEFORE ──\"",
               "git rev-parse --short HEAD || true",
               "git fetch --prune origin main",
