@@ -2,6 +2,12 @@
 # NOTE: must be a glibc image (node:22-slim, not node:22-alpine) — Vite 7 /
 # rolldown ships @rolldown/binding-linux-x64-gnu which is glibc-only and
 # fails `npm ci` on musl with EBADPLATFORM.
+#
+# The lockfile is regenerated with multi-arch optional native deps via:
+#   cd frontend && rm -rf node_modules package-lock.json
+#   npm install --force --os=linux --cpu=x64 --os=linux --cpu=arm64
+# so `npm ci` picks the correct rolldown binding on both x64 dev machines
+# and arm64 (Graviton) build hosts.
 FROM node:22-slim AS frontend-build
 
 WORKDIR /app
