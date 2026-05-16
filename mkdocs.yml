@@ -89,4 +89,5 @@ nav:
       - Separate Underlying & Cache: design/separate-underlying.md
       - Login & Authentication: design/login.md
       - Frontend Code Audit: design/frontend-audit.md
+      - Deploy Build Pipeline: design/deploy-build-pipeline.md
   - Decisions: decisions.md
