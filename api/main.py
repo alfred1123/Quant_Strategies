@@ -24,8 +24,9 @@ from api.auth.dependencies import require_user  # noqa: E402
 from api.auth.router import limiter as auth_limiter, router as auth_router  # noqa: E402
 from api.auth.service import AuthService  # noqa: E402
 from api.routers import backtest, inst, refdata  # noqa: E402
-from src.data import BacktestCache, InstrumentCache  # noqa: E402
-from src.refdata import RedisRefData  # noqa: E402
+from quant.data.backtest_cache import BacktestCache  # noqa: E402
+from quant.data.instruments import InstrumentCache  # noqa: E402
+from quant.refdata.reader import RedisRefData  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
