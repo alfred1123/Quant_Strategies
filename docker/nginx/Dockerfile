@@ -1,5 +1,8 @@
 # Stage 1: Build React frontend
-FROM node:22-alpine AS frontend-build
+# NOTE: must be a glibc image (node:22-slim, not node:22-alpine) — Vite 7 /
+# rolldown ships @rolldown/binding-linux-x64-gnu which is glibc-only and
+# fails `npm ci` on musl with EBADPLATFORM.
+FROM node:22-slim AS frontend-build
 
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
