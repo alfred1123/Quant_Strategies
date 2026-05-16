@@ -32,6 +32,7 @@ import os
 import signal
 import subprocess
 import sys
+import time
 import uuid
 from typing import Callable
 
@@ -119,6 +120,7 @@ class WorkerLoop:
 
     BLPOP_TIMEOUT_S = 30
     DRAIN_TIMEOUT_S = 30
+    JOB_TIMEOUT_S = 600  # 10 min hard cap per backtest job — presented as FAILED.
 
     def __init__(
         self,
@@ -138,7 +140,9 @@ class WorkerLoop:
         self._repo = repo or WorkerLoopRepo(db_url)
         self._refdata = refdata or RedisRefData(redis_url)
         self._redis = redis_client or redis.Redis.from_url(redis_url)
-        self._active: dict[uuid.UUID, subprocess.Popen] = {}
+        # Tracks (Popen, start_monotonic, job_row) per claimed queue_id so we
+        # can kill + mark FAILED after JOB_TIMEOUT_S.
+        self._active: dict[uuid.UUID, tuple[subprocess.Popen, float, dict]] = {}
         self._running = False
 
     # ── boot recovery ────────────────────────────────────────────────────
@@ -174,10 +178,50 @@ class WorkerLoop:
     # ── per-tick steps ───────────────────────────────────────────────────
 
     def _reap_children(self) -> None:
-        finished = [qid for qid, proc in self._active.items() if proc.poll() is not None]
+        finished = [
+            qid for qid, (proc, _start, _row) in self._active.items()
+            if proc.poll() is not None
+        ]
         for qid in finished:
-            proc = self._active.pop(qid)
+            proc, _start, _row = self._active.pop(qid)
             logger.info("worker %s exited with code %s", qid, proc.returncode)
+
+    def _enforce_timeouts(self) -> None:
+        """Kill workers exceeding JOB_TIMEOUT_S; flip their row to FAILED.
+
+        Mirrors the orphan-recovery path: we own the FAILED transition
+        here because the worker subprocess is being killed mid-flight and
+        cannot write its own terminal row.
+        """
+        now = time.monotonic()
+        failed_id: int | None = None
+        for qid in list(self._active.keys()):
+            proc, start, row = self._active[qid]
+            if proc.poll() is not None:
+                continue  # _reap_children will pick it up next tick
+            if now - start < self.JOB_TIMEOUT_S:
+                continue
+            logger.warning(
+                "worker %s exceeded JOB_TIMEOUT_S=%ds \u2014 killing",
+                qid, self.JOB_TIMEOUT_S,
+            )
+            proc.kill()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                logger.error("worker %s did not exit after SIGKILL", qid)
+            if failed_id is None:
+                failed_id = self._refdata.resolve_queue_status_id("FAILED")
+            self._repo.mark_failed(
+                row["queue_id"],
+                row["strategy_id"],
+                row["strategy_vid"],
+                row["priority"],
+                row["user_id"],
+                failed_id,
+                f"job exceeded {self.JOB_TIMEOUT_S}s timeout",
+            )
+            self._active.pop(qid, None)
 
     def _try_claim_and_spawn(self) -> bool:
         """Claim one job and spawn its worker. Returns True iff a job was spawned."""
@@ -188,13 +232,14 @@ class WorkerLoop:
             return False
         qid = uuid.UUID(str(job["queue_id"]))
         proc = self._spawn(qid)
-        self._active[qid] = proc
+        self._active[qid] = (proc, time.monotonic(), job)
         logger.info("spawned worker for %s (pid=%s)", qid, getattr(proc, "pid", "?"))
         return True
 
     def tick(self) -> None:
-        """One iteration: reap finished children, fill capacity. Non-blocking."""
+        """One iteration: reap finished children, enforce timeouts, fill capacity."""
         self._reap_children()
+        self._enforce_timeouts()
         while self._running and len(self._active) < self.max_concurrent:
             if not self._try_claim_and_spawn():
                 break
@@ -223,7 +268,7 @@ class WorkerLoop:
 
     def _drain(self) -> None:
         """Wait for active children to exit on shutdown; kill survivors."""
-        for qid, proc in list(self._active.items()):
+        for qid, (proc, _start, _row) in list(self._active.items()):
             logger.info("waiting for worker %s to exit before shutdown", qid)
             try:
                 proc.wait(timeout=self.DRAIN_TIMEOUT_S)

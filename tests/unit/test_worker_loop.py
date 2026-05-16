@@ -1,5 +1,6 @@
 """Unit tests for ``quant.queue.worker_loop`` — Phase A v6 daemon."""
 
+import time
 import uuid
 from unittest.mock import MagicMock
 
@@ -53,6 +54,11 @@ def _row(queue_id=None, *, priority=0, sid=None, vid=1, user="u1"):
         "priority": priority,
         "user_id": user,
     }
+
+
+def _track(proc, row=None, *, start=None):
+    """Build the (proc, start_monotonic, row) tuple stored in ``loop._active``."""
+    return (proc, time.monotonic() if start is None else start, row or _row())
 
 
 def _make_loop(*, repo=None, refdata=None, spawn_fn=None, max_concurrent=1):
@@ -162,7 +168,7 @@ class TestTick:
         repo = MagicMock()
         loop = _make_loop(repo=repo, max_concurrent=1)
         loop._running = True
-        loop._active[uuid.uuid4()] = FakeProc()  # already at capacity, still running
+        loop._active[uuid.uuid4()] = _track(FakeProc())  # already at capacity, still running
 
         loop.tick()
 
@@ -176,7 +182,7 @@ class TestTick:
 
         done = FakeProc(returncode=0)
         old_qid = uuid.uuid4()
-        loop._active[old_qid] = done
+        loop._active[old_qid] = _track(done)
 
         loop.tick()
 
@@ -195,6 +201,45 @@ class TestTick:
         repo.claim_next.assert_not_called()
 
 
+# ── _enforce_timeouts ───────────────────────────────────────────────────
+
+
+class TestEnforceTimeouts:
+    def test_kills_and_marks_failed_when_exceeded(self):
+        repo = MagicMock()
+        loop = _make_loop(repo=repo)
+        loop.JOB_TIMEOUT_S = 1
+        proc = FakeProc(returncode=None)
+        row = _row()
+        qid = uuid.UUID(str(row["queue_id"]))
+        # start = 10s in the past → exceeds 1s cap.
+        loop._active[qid] = (proc, time.monotonic() - 10, row)
+
+        loop._enforce_timeouts()
+
+        assert proc.killed
+        assert qid not in loop._active
+        repo.mark_failed.assert_called_once()
+        args = repo.mark_failed.call_args.args
+        assert args[5] == 4  # FAILED status id
+        assert "timeout" in args[6].lower()
+
+    def test_leaves_young_children_alone(self):
+        repo = MagicMock()
+        loop = _make_loop(repo=repo)
+        loop.JOB_TIMEOUT_S = 600
+        proc = FakeProc(returncode=None)
+        row = _row()
+        qid = uuid.UUID(str(row["queue_id"]))
+        loop._active[qid] = (proc, time.monotonic(), row)
+
+        loop._enforce_timeouts()
+
+        assert not proc.killed
+        assert qid in loop._active
+        repo.mark_failed.assert_not_called()
+
+
 # ── _drain ──────────────────────────────────────────────────────────────
 
 
@@ -202,7 +247,7 @@ class TestDrain:
     def test_waits_for_each_active_child(self):
         loop = _make_loop()
         p1, p2 = FakeProc(returncode=0), FakeProc(returncode=0)
-        loop._active = {uuid.uuid4(): p1, uuid.uuid4(): p2}
+        loop._active = {uuid.uuid4(): _track(p1), uuid.uuid4(): _track(p2)}
 
         loop._drain()
 
@@ -215,7 +260,7 @@ class TestDrain:
         loop = _make_loop()
         slow = FakeProc(returncode=None)
         slow.wait = MagicMock(side_effect=subprocess.TimeoutExpired(cmd="x", timeout=1))
-        loop._active = {uuid.uuid4(): slow}
+        loop._active = {uuid.uuid4(): _track(slow)}
 
         loop._drain()
 

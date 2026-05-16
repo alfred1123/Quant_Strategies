@@ -4,7 +4,7 @@ import {
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
-import { useCancelJob, useJobs } from '../api/jobs';
+import { useCancelJob, useJobs, useReenqueueJob } from '../api/jobs';
 import type { JobRow, JobStatus } from '../types/jobs';
 
 const STATUS_COLOR: Record<
@@ -20,6 +20,7 @@ const STATUS_COLOR: Record<
 };
 
 const ACTIVE_STATES: ReadonlySet<JobStatus> = new Set(['QUEUED', 'RUNNING']);
+const REENQUEUE_STATES: ReadonlySet<JobStatus> = new Set(['FAILED', 'CANCELLED']);
 
 const FILTER_STATES: readonly (JobStatus | 'ALL')[] = [
   'ALL', 'QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED',
@@ -33,6 +34,7 @@ export interface JobsTableProps {
 export default function JobsTable({ onView }: JobsTableProps = {}) {
   const jobs = useJobs();
   const cancel = useCancelJob();
+  const reenqueue = useReenqueueJob();
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'ALL'>('ALL');
 
   const rows = useMemo(() => {
@@ -102,7 +104,7 @@ export default function JobsTable({ onView }: JobsTableProps = {}) {
       {
         field: 'actions',
         headerName: '',
-        width: 140,
+        width: 220,
         sortable: false,
         filterable: false,
         renderCell: (p: GridRenderCellParams<JobRow>) => {
@@ -122,6 +124,21 @@ export default function JobsTable({ onView }: JobsTableProps = {}) {
               </Button>
             );
           }
+          if (REENQUEUE_STATES.has(p.row.queue_status)) {
+            const pending =
+              reenqueue.isPending && reenqueue.variables === p.row.queue_id;
+            return (
+              <Button
+                size="small"
+                color="primary"
+                variant="outlined"
+                disabled={pending}
+                onClick={() => reenqueue.mutate(p.row.queue_id)}
+              >
+                {pending ? '\u2026' : 'Re-run'}
+              </Button>
+            );
+          }
           if (p.row.queue_status === 'COMPLETED' && onView) {
             return (
               <Button
@@ -138,7 +155,7 @@ export default function JobsTable({ onView }: JobsTableProps = {}) {
         },
       },
     ],
-    [cancel, onView],
+    [cancel, reenqueue, onView],
   );
 
   return (
@@ -162,6 +179,11 @@ export default function JobsTable({ onView }: JobsTableProps = {}) {
       {cancel.isError && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => cancel.reset()}>
           Cancel failed: {(cancel.error as Error)?.message ?? 'unknown error'}
+        </Alert>
+      )}
+      {reenqueue.isError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => reenqueue.reset()}>
+          Re-run failed: {(reenqueue.error as Error)?.message ?? 'unknown error'}
         </Alert>
       )}
 

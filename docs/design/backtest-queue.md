@@ -281,7 +281,9 @@ Used by `coordinator/src/queue/repo.ts — queryTerminal()` / `claimNext()` and 
 | Worker — success | Terminal | `COMPLETED` (4) |
 | Worker — exception | Terminal | `FAILED` (5) |
 | Worker — observed cancel | Terminal | `CANCELLED` (6) |
-| Coordinator — crash recovery | Terminal | `FAILED` (5) |
+| Worker loop — boot recovery | Terminal | `FAILED` (5) |
+| Worker loop — exceeded `JOB_TIMEOUT_S` (600s) | Terminal | `FAILED` (5) with `ERROR_TEXT="job exceeded 600s timeout"` |
+| FastAPI `POST /jobs/:id/reenqueue` | New submission (same `STRATEGY_ID/VID/PRIORITY`, fresh `QUEUE_ID`) | `QUEUED` (1) |
 
 ---
 
@@ -298,6 +300,7 @@ All endpoints under `/api/v1/jobs/*` are served by the coordinator. Auth: valida
 | `GET` | `/api/v1/jobs/:id` | Full history (all VIDs) of one job. |
 | `GET` | `/api/v1/jobs/:id/result` | Resolves `STRATEGY_VID` + `RESULT_ID` → returns same payload shape as today's FastAPI `POST /backtest/optimize` response. Existing analysis components reuse unchanged. |
 | `POST` | `/api/v1/jobs/:id/cancel` | Cancels QUEUED or RUNNING job. Idempotent. |
+| `POST` | `/api/v1/jobs/:id/reenqueue` | Re-submits a **FAILED** or **CANCELLED** job: same `(STRATEGY_ID, STRATEGY_VID, PRIORITY)`, fresh `QUEUE_ID` with `VID=1`. Returns `{ queue_id, queue_pos }` (HTTP 202). Returns 409 if the source job is not terminal-failed/cancelled, 429 if the per-user QUEUED cap is exceeded, 404 if the source job is not visible to the caller. No `PARENT_QUEUE_ID` link — join by `STRATEGY_ID` (see `IX_QUEUE_STRATEGY`). |
 | `DELETE` | `/api/v1/jobs/:id` | Hard delete a terminal job from history. `409` if not terminal. |
 | `GET` | `/api/v1/jobs/stream` | SSE stream of queue events. |
 | `GET` | `/health` | Coordinator liveness — returns 200 if process up + DB reachable. |

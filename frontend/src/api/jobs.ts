@@ -30,6 +30,13 @@ async function cancelJob(queueId: string): Promise<JobRow> {
   return data;
 }
 
+async function reenqueueJob(queueId: string): Promise<EnqueueResponse> {
+  const { data } = await apiClient.post<EnqueueResponse>(
+    `/jobs/${queueId}/reenqueue`,
+  );
+  return data;
+}
+
 async function enqueueJob(req: EnqueueRequest): Promise<EnqueueResponse> {
   const { data } = await apiClient.post<EnqueueResponse>('/jobs', req);
   return data;
@@ -55,6 +62,20 @@ export function useCancelJob() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: cancelJob,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: JOBS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Re-enqueue a FAILED / CANCELLED job — server submits a new QUEUE row
+ * reusing the original strategy + priority and returns the new queue_id.
+ */
+export function useReenqueueJob() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: reenqueueJob,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: JOBS_QUERY_KEY });
     },

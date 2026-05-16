@@ -184,6 +184,48 @@ class TestCancel:
         assert resp.status_code == 404
 
 
+# ── POST /api/v1/jobs/{id}/reenqueue ────────────────────────────────────
+
+
+class TestReenqueue:
+    def test_happy_path(self, client_and_svc):
+        client, svc, user = client_and_svc
+        src_qid = uuid.uuid4()
+        new_qid = uuid.uuid4()
+        svc.reenqueue.return_value = EnqueueResponse(queue_id=new_qid, queue_pos=2)
+
+        resp = client.post(f"/api/v1/jobs/{src_qid}/reenqueue")
+
+        assert resp.status_code == 202
+        assert resp.json() == {"queue_id": str(new_qid), "queue_pos": 2}
+        svc.reenqueue.assert_called_once_with(str(user.app_user_id), src_qid)
+
+    def test_not_found_returns_404(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        from api.services.jobs import JobNotFound
+        svc.reenqueue.side_effect = JobNotFound("nope")
+
+        resp = client.post(f"/api/v1/jobs/{uuid.uuid4()}/reenqueue")
+        assert resp.status_code == 404
+
+    def test_non_terminal_returns_409(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        from api.services.jobs import ReenqueueNotAllowed
+        svc.reenqueue.side_effect = ReenqueueNotAllowed("running")
+
+        resp = client.post(f"/api/v1/jobs/{uuid.uuid4()}/reenqueue")
+        assert resp.status_code == 409
+
+    def test_rate_limited_returns_429(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        from api.services.jobs import RateLimitError
+        svc.reenqueue.side_effect = RateLimitError(30)
+
+        resp = client.post(f"/api/v1/jobs/{uuid.uuid4()}/reenqueue")
+        assert resp.status_code == 429
+        assert "rate_limited" in resp.json()["detail"]
+
+
 # ── GET /api/v1/jobs/{id}/events (SSE) ──────────────────────────────────
 
 

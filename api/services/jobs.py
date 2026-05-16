@@ -40,6 +40,10 @@ class CancelNotAllowed(Exception):
     """Job is already in a terminal state — router maps to HTTP 409."""
 
 
+class ReenqueueNotAllowed(Exception):
+    """Only FAILED / CANCELLED jobs may be re-enqueued — router maps to HTTP 409."""
+
+
 class JobsService:
     """Business logic for /jobs — HTTP-agnostic."""
 
@@ -138,6 +142,43 @@ class JobsService:
         publish_wake(self._redis)
 
         return self._repo.get_active(queue_id, user_id=user_id) or row
+
+    # ── reenqueue ───────────────────────────────────────────────────────
+
+    def reenqueue(self, user_id: str, queue_id: uuid.UUID) -> EnqueueResponse:
+        """Submit a fresh QUEUE row for a FAILED / CANCELLED job.
+
+        Same ``(STRATEGY_ID, STRATEGY_VID, PRIORITY)`` as the source row;
+        new ``QUEUE_ID`` with ``QUEUE_VID=1``. Per-user QUEUED cap still
+        applies — RateLimitError → 429.
+        """
+        row = self._repo.get_active(queue_id, user_id=user_id)
+        if row is None:
+            raise JobNotFound(str(queue_id))
+
+        status = row["queue_status"]
+        if status not in {"FAILED", "CANCELLED"}:
+            raise ReenqueueNotAllowed(
+                f"job {queue_id} cannot be re-enqueued from state {status!r}"
+            )
+
+        queued_id = self._status("QUEUED")
+        if self._repo.count_queued_for_user(user_id, queued_id) >= MAX_QUEUED_PER_USER:
+            raise RateLimitError(MAX_QUEUED_PER_USER)
+
+        new_queue_id = uuid.uuid4()
+        self._repo.sp_ins_queue(
+            queue_id=new_queue_id,
+            strategy_id=row["strategy_id"],
+            strategy_vid=int(row["strategy_vid"]),
+            status_id=queued_id,
+            priority=int(row["priority"]),
+            user_id=user_id,
+        )
+        publish_wake(self._redis)
+
+        pos = self._repo.queued_position(new_queue_id, queued_id)
+        return EnqueueResponse(queue_id=new_queue_id, queue_pos=pos)
 
     # ── SSE polling ─────────────────────────────────────────────────────
 

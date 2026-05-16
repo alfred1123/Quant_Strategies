@@ -23,6 +23,7 @@ from api.services.jobs import (
     JobNotFound,
     JobsService,
     RateLimitError,
+    ReenqueueNotAllowed,
 )
 from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
@@ -110,6 +111,34 @@ def cancel_job(
     except CancelNotAllowed as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return JobRow(**row)
+
+
+# ── POST /jobs/{id}/reenqueue ───────────────────────────────────────────
+
+
+@router.post(
+    "/{queue_id}/reenqueue",
+    response_model=EnqueueResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def reenqueue_job(
+    queue_id: UUID,
+    user: CurrentUser = Depends(require_user),
+    svc: JobsService = Depends(get_jobs_service),
+) -> EnqueueResponse:
+    """Submit a new QUEUE row reusing the original strategy + priority.
+
+    Allowed only when the source job is FAILED or CANCELLED. Per-user
+    QUEUED cap still applies — returns 429 when exceeded.
+    """
+    try:
+        return svc.reenqueue(str(user.app_user_id), queue_id)
+    except JobNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ReenqueueNotAllowed as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except RateLimitError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
 
 
 # ── GET /jobs/{id}/events (SSE) ─────────────────────────────────────────
