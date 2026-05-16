@@ -178,7 +178,7 @@ jobs:
             --parameters commands='[
               "set -euo pipefail",
               "cd /opt/quant",
-              "git config --global --add safe.directory /opt/quant",
+              "git config --system --add safe.directory /opt/quant",
               "echo \"── BEFORE ──\"",
               "git rev-parse --short HEAD || true",
               "git fetch --prune origin main",
