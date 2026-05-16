@@ -20,6 +20,9 @@ The four-phase migration completed 2026-05-16:
 
 ### Open follow-ups (not blocking v6)
 
+!!! note "UI follow-up"
+    Proposed jobs-table UX: hover preview **plus** right-hand detail drawer (shared payload, deep-link `?job=`). See [Jobs Table Detail UX](jobs-table-detail-ux.md).
+
 1. **`SP_CLAIM_NEXT` stored procedure** (atomic `SELECT … FOR UPDATE SKIP LOCKED` + `SP_INS_QUEUE RUNNING`). Required before running > 1 `worker_loop` replica safely. v6 ships single-replica.
 2. **Per-trial progress (`Slice D`)** — worker emits `{"event":"progress","trial":N,"total":M,...}` JSON to stdout *and* `PUBLISH bt:progress:{queue_id}` on Redis. SSE handler in `api/routers/jobs.py` swaps the 1s DB poll for a Redis subscription. Worker_loop is unaffected.
 3. **`pg_notify` from `SP_INS_QUEUE`** — replaces the Redis BLPOP wake when ready. Already noted in §6.

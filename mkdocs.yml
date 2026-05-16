@@ -82,6 +82,7 @@ nav:
   - Design Docs:
       - Backtest API: design/backtest-api.md
       - Backtest Queue: design/backtest-queue.md
+      - Jobs Table Detail UX: design/jobs-table-detail-ux.md
       - Trade API: design/trade-api.md
       - TypeScript Migration: design/ts-migration.md
       - Backtest Speed: design/backtest-speed.md

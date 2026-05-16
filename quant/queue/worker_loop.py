@@ -120,7 +120,7 @@ class WorkerLoop:
 
     BLPOP_TIMEOUT_S = 30
     DRAIN_TIMEOUT_S = 30
-    JOB_TIMEOUT_S = 600  # 10 min hard cap per backtest job — presented as FAILED.
+    DEFAULT_JOB_TIMEOUT_S = 6000  # 100 min hard cap per backtest job — presented as FAILED.
 
     def __init__(
         self,
@@ -128,6 +128,7 @@ class WorkerLoop:
         redis_url: str,
         *,
         max_concurrent: int = 1,
+        job_timeout_s: int = DEFAULT_JOB_TIMEOUT_S,
         spawn_fn: SpawnFn | None = None,
         repo: WorkerLoopRepo | None = None,
         refdata: RedisRefData | None = None,
@@ -136,6 +137,7 @@ class WorkerLoop:
         self._db_url = db_url
         self._redis_url = redis_url
         self.max_concurrent = max_concurrent
+        self.JOB_TIMEOUT_S = job_timeout_s
         self._spawn = spawn_fn or default_spawn
         self._repo = repo or WorkerLoopRepo(db_url)
         self._refdata = refdata or RedisRefData(redis_url)
@@ -285,7 +287,13 @@ class WorkerLoop:
 def main() -> int:
     db_url = load_config()
     max_concurrent = int(os.getenv("MAX_CONCURRENT_WORKERS", "1"))
-    loop = WorkerLoop(db_url, get_redis_url(), max_concurrent=max_concurrent)
+    job_timeout_s = int(os.getenv("JOB_TIMEOUT_S", str(WorkerLoop.DEFAULT_JOB_TIMEOUT_S)))
+    loop = WorkerLoop(
+        db_url,
+        get_redis_url(),
+        max_concurrent=max_concurrent,
+        job_timeout_s=job_timeout_s,
+    )
     loop.run()
     return 0
 
