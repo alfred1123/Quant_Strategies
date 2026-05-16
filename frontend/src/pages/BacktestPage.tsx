@@ -11,7 +11,8 @@ import MetricsCards from '../components/MetricsCards';
 import HeatmapChart from '../components/HeatmapChart';
 import EquityCurveChart from '../components/EquityCurveChart';
 import UserMenu from '../components/UserMenu';
-import { runOptimizeStream, runPerformance } from '../api/backtest';
+import { runPerformance } from '../api/backtest';
+import { fetchJob, useEnqueueJob } from '../api/jobs';
 import { useMe } from '../api/auth';
 import type {
   BacktestConfig, OptimizeResponse, PerformanceResponse, Top10Row,
@@ -54,9 +55,10 @@ function isAbortError(err: unknown): boolean {
 
 export default function BacktestPage() {
   const { data: currentUser } = useMe();
+  const enqueue = useEnqueueJob();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [config, setConfig] = useState<BacktestConfig>(DEFAULT_CONFIG);
-  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isOptimizing] = useState(false);
   const [isLoadingPerf, setIsLoadingPerf] = useState(false);
   const [optimizeResult, setOptimizeResult] = useState<OptimizeResponse | null>(null);
   const [perfResult, setPerfResult] = useState<PerformanceResponse | null>(null);
@@ -66,7 +68,7 @@ export default function BacktestPage() {
   const [analysisTab, setAnalysisTab] = useState(0);
   const [pageTab, setPageTab] = useState(0);
   const [wfResult, setWfResult] = useState<WalkForwardResponse | null>(null);
-  const [optProgress, setOptProgress] = useState<OptimizeProgress | null>(null);
+  const [optProgress] = useState<OptimizeProgress | null>(null);
 
   // ── Lifecycle: cancel any in-flight async work on unmount or new run ──
   // optimizeAbort tears down the SSE fetch; perfAbort tears down the per-row
@@ -110,58 +112,70 @@ export default function BacktestPage() {
     }
   };
 
+  const handleViewJob = async (queueId: string) => {
+    setError(null);
+    try {
+      const detail = await fetchJob(queueId);
+      if (!detail.result) {
+        setError('Job has no stored result payload.');
+        return;
+      }
+      // Result payload is OptimizeResponse.model_dump() — cast through unknown.
+      const optResult = detail.result as unknown as OptimizeResponse;
+      // Restore the frozen config so summary chips + factor count match.
+      if (detail.config_json) {
+        const cfg = detail.config_json as unknown as Partial<BacktestConfig>;
+        setConfig({ ...DEFAULT_CONFIG, ...cfg });
+      }
+      setOptimizeResult(optResult);
+      setPerfResult(optResult.performance ?? null);
+      setWfResult(optResult.walk_forward ?? null);
+      if (optResult.top10?.length) {
+        setSelectedIndex(0);
+        setSelectedRow(optResult.top10[0]);
+      } else {
+        setSelectedIndex(null);
+        setSelectedRow(null);
+      }
+      setAnalysisTab(0);
+      setPageTab(0);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to load job result';
+      console.error('[BacktestPage] handleViewJob error:', e);
+      setError(msg);
+    }
+  };
+
   const handleRun = async () => {
     const validationError = firstValidationError(config);
     if (validationError) {
       setError(validationError);
       return;
     }
-    // Cancel any previous stream / perf request.
-    optimizeAbort.current?.abort();
+    // Cancel any previous perf request — backtest now runs server-side
+    // via BT.QUEUE, so there's no client-side SSE to abort.
     perfAbort.current?.abort();
     perfReqId.current++;
 
-    const ctrl = new AbortController();
-    optimizeAbort.current = ctrl;
-
     setError(null);
-    setIsOptimizing(true);
     setDrawerOpen(false);
-    setOptimizeResult(null);
-    setPerfResult(null);
-    setSelectedIndex(null);
-    setSelectedRow(null);
-    setWfResult(null);
-    setOptProgress(null);
-    setAnalysisTab(0);
     try {
-      const result = await runOptimizeStream(
-        buildOptimizeRequest(config),
-        (p) => setOptProgress(p),
-        ctrl.signal,
-      );
-      if (ctrl.signal.aborted) return;
-      setOptProgress(null);
-      setOptimizeResult(result);
-
-      if (result.performance) {
-        setPerfResult(result.performance);
-        if (result.top10?.length > 0) {
-          setSelectedIndex(0);
-          setSelectedRow(result.top10[0]);
-        }
-      }
-
-      if (result.walk_forward) {
-        setWfResult(result.walk_forward);
-      }
+      const req = buildOptimizeRequest(config);
+      const strategyNm = `${effectiveSymbol(config)} · ${config.factors
+        .map((f) => `${f.indicator}/${f.strategy}`)
+        .join(config.factors.length > 1 ? ` ${config.conjunction} ` : '')}`;
+      await enqueue.mutateAsync({
+        strategy_nm: strategyNm,
+        config_json: req,
+        priority: 'normal',
+      });
+      // Hand off to the Queue tab — the worker will pick the job up and
+      // the table will repaint via its 3s poll.
+      setPageTab(1);
     } catch (e: unknown) {
-      if (isAbortError(e) || ctrl.signal.aborted) return;
-      const msg = e instanceof Error ? e.message : 'Optimization failed';
+      const msg = e instanceof Error ? e.message : 'Failed to enqueue backtest';
       console.error('[BacktestPage] handleRun error:', e);
       setError(msg);
-    } finally {
-      if (optimizeAbort.current === ctrl) setIsOptimizing(false);
     }
   };
 
@@ -212,11 +226,11 @@ export default function BacktestPage() {
         config={config}
         onChange={setConfig}
         onRun={handleRun}
-        isRunning={isOptimizing}
+        isRunning={enqueue.isPending}
       />
 
       <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
-        {pageTab === 1 && <JobsTable />}
+        {pageTab === 1 && <JobsTable onView={handleViewJob} />}
         {pageTab === 0 && (
           <>
         {/* Running state */}

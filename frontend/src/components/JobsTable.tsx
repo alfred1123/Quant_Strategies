@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Alert, Box, Button, Chip, CircularProgress, Stack, Typography,
 } from '@mui/material';
@@ -21,11 +21,31 @@ const STATUS_COLOR: Record<
 
 const ACTIVE_STATES: ReadonlySet<JobStatus> = new Set(['QUEUED', 'RUNNING']);
 
-export default function JobsTable() {
+const FILTER_STATES: readonly (JobStatus | 'ALL')[] = [
+  'ALL', 'QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED',
+] as const;
+
+export interface JobsTableProps {
+  /** Optional: invoked when the user clicks "View" on a COMPLETED row. */
+  onView?: (queueId: string) => void;
+}
+
+export default function JobsTable({ onView }: JobsTableProps = {}) {
   const jobs = useJobs();
   const cancel = useCancelJob();
+  const [statusFilter, setStatusFilter] = useState<JobStatus | 'ALL'>('ALL');
 
-  const rows = jobs.data ?? [];
+  const rows = useMemo(() => {
+    const all = jobs.data ?? [];
+    if (statusFilter === 'ALL') return all;
+    // CANCELLED chip groups CANCEL_REQUESTED + CANCELLED \u2014 they're the same to a user.
+    if (statusFilter === 'CANCELLED') {
+      return all.filter(
+        (r) => r.queue_status === 'CANCELLED' || r.queue_status === 'CANCEL_REQUESTED',
+      );
+    }
+    return all.filter((r) => r.queue_status === statusFilter);
+  }, [jobs.data, statusFilter]);
 
   const columns: GridColDef<JobRow>[] = useMemo(
     () => [
@@ -82,28 +102,43 @@ export default function JobsTable() {
       {
         field: 'actions',
         headerName: '',
-        width: 110,
+        width: 140,
         sortable: false,
         filterable: false,
         renderCell: (p: GridRenderCellParams<JobRow>) => {
-          if (!p.row || !ACTIVE_STATES.has(p.row.queue_status)) return null;
-          const pending =
-            cancel.isPending && cancel.variables === p.row.queue_id;
-          return (
-            <Button
-              size="small"
-              color="warning"
-              variant="outlined"
-              disabled={pending}
-              onClick={() => cancel.mutate(p.row.queue_id)}
-            >
-              {pending ? '…' : 'Cancel'}
-            </Button>
-          );
+          if (!p.row) return null;
+          if (ACTIVE_STATES.has(p.row.queue_status)) {
+            const pending =
+              cancel.isPending && cancel.variables === p.row.queue_id;
+            return (
+              <Button
+                size="small"
+                color="warning"
+                variant="outlined"
+                disabled={pending}
+                onClick={() => cancel.mutate(p.row.queue_id)}
+              >
+                {pending ? '\u2026' : 'Cancel'}
+              </Button>
+            );
+          }
+          if (p.row.queue_status === 'COMPLETED' && onView) {
+            return (
+              <Button
+                size="small"
+                color="primary"
+                variant="outlined"
+                onClick={() => onView(p.row.queue_id)}
+              >
+                View
+              </Button>
+            );
+          }
+          return null;
         },
       },
     ],
-    [cancel],
+    [cancel, onView],
   );
 
   return (
@@ -129,6 +164,19 @@ export default function JobsTable() {
           Cancel failed: {(cancel.error as Error)?.message ?? 'unknown error'}
         </Alert>
       )}
+
+      <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
+        {FILTER_STATES.map((s) => (
+          <Chip
+            key={s}
+            label={s}
+            size="small"
+            color={statusFilter === s ? 'primary' : 'default'}
+            variant={statusFilter === s ? 'filled' : 'outlined'}
+            onClick={() => setStatusFilter(s)}
+          />
+        ))}
+      </Stack>
 
       <Box sx={{ height: 560 }}>
         <DataGrid

@@ -65,7 +65,7 @@ class TestEnqueue:
         qid = uuid.uuid4()
         svc.enqueue.return_value = EnqueueResponse(queue_id=qid, queue_pos=3)
 
-        body = {"strategy_id": str(uuid.uuid4()), "strategy_vid": 1, "priority": "high"}
+        body = {"strategy_nm": "test", "config_json": {"foo": 1}, "priority": "high"}
         resp = client.post("/api/v1/jobs", json=body)
 
         assert resp.status_code == 202
@@ -75,7 +75,8 @@ class TestEnqueue:
         called_user_id, called_req = svc.enqueue.call_args.args
         assert called_user_id == str(user.app_user_id)
         assert called_req.priority == "high"
-        assert called_req.strategy_vid == 1
+        assert called_req.strategy_nm == "test"
+        assert called_req.config_json == {"foo": 1}
 
     def test_rate_limited_returns_429(self, client_and_svc):
         client, svc, _ = client_and_svc
@@ -84,7 +85,7 @@ class TestEnqueue:
 
         resp = client.post(
             "/api/v1/jobs",
-            json={"strategy_id": str(uuid.uuid4()), "strategy_vid": 1},
+            json={"strategy_nm": "test", "config_json": {}},
         )
         assert resp.status_code == 429
         assert "rate_limited" in resp.json()["detail"]
@@ -93,7 +94,7 @@ class TestEnqueue:
         client, _, _ = client_and_svc
         resp = client.post(
             "/api/v1/jobs",
-            json={"strategy_id": "not-a-uuid", "strategy_vid": 1},
+            json={"config_json": {}},  # missing strategy_nm
         )
         assert resp.status_code == 422
 

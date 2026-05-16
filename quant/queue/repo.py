@@ -1,15 +1,16 @@
-"""Shared SP wrappers + reads for ``BT.QUEUE`` / ``BT.RESULT``.
+"""Shared SP wrappers + reads for ``BT.QUEUE`` / ``BT.RESULT`` / ``BT.STRATEGY``.
 
 All Postgres access for the backtest queue lives on :class:`BtQueueRepo`.
-Writes go through ``BT.SP_INS_QUEUE``. Reads use stored procedures where
-one fits the projection (``sp_get_queue``, ``sp_get_queue_latest``); the
-remaining reads — aggregates, window-function ranking, and joins not
-covered by the SPs — are direct ``SELECT``s on this class so callers
-never inline SQL.
+Writes go through ``BT.SP_INS_QUEUE`` and ``BT.SP_INS_STRATEGY``. Reads
+use stored procedures where one fits the projection
+(``sp_get_queue``, ``sp_get_queue_latest``); the remaining reads —
+aggregates, window-function ranking, and joins not covered by the SPs —
+are direct ``SELECT``s on this class so callers never inline SQL.
 """
 
+import json
 import uuid
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from quant.shared.db import DbGateway
 
@@ -102,6 +103,27 @@ class BtQueueRepo(DbGateway):
             ),
         )
 
+    def sp_ins_strategy(
+        self,
+        *,
+        strategy_id: uuid.UUID | str,
+        strategy_nm: str,
+        config_json: dict[str, Any],
+        user_id: str,
+    ) -> int:
+        """Wrap ``BT.SP_INS_STRATEGY`` — returns the assigned ``STRATEGY_VID``.
+
+        New ``STRATEGY_ID`` ⇒ VID=1; existing ID ⇒ prior current row flipped
+        to ``IS_CURRENT_IND='N'`` and new row inserted as next VID.
+        """
+        (new_vid,) = self._call_write(
+            "CALL bt.sp_ins_strategy("
+            "%s::uuid, %s::text, %s::jsonb, %s::text,"
+            " NULL::text, NULL::text, NULL::text, NULL::integer)",
+            (str(strategy_id), strategy_nm, json.dumps(config_json), user_id),
+        )
+        return int(new_vid)
+
     # ── reads (direct SELECT — no SP covers these projections) ──────────
 
     def count_queued_for_user(self, user_id: str, queued_status_id: int) -> int:
@@ -183,7 +205,7 @@ class BtQueueRepo(DbGateway):
     def get_result(self, queue_id: uuid.UUID | str) -> dict | None:
         """Latest ``BT.RESULT`` row for a queue id."""
         rows = self._query(
-            "SELECT RESULT_ID, RESULT_PAYLOAD"
+            "SELECT RESULT_ID, PAYLOAD_JSON"
             "  FROM BT.RESULT"
             " WHERE QUEUE_ID = %s::uuid"
             " ORDER BY CREATED_AT DESC"

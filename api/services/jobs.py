@@ -66,11 +66,22 @@ class JobsService:
         if self._repo.count_queued_for_user(user_id, queued_id) >= MAX_QUEUED_PER_USER:
             raise RateLimitError(MAX_QUEUED_PER_USER)
 
+        # Persist a frozen BT.STRATEGY snapshot first — SP_INS_QUEUE refs
+        # the exact (strategy_id, strategy_vid) so worker payloads can't
+        # be mutated mid-flight.
+        strategy_id = uuid.uuid4()
+        strategy_vid = self._repo.sp_ins_strategy(
+            strategy_id=strategy_id,
+            strategy_nm=req.strategy_nm,
+            config_json=req.config_json,
+            user_id=user_id,
+        )
+
         queue_id = uuid.uuid4()
         self._repo.sp_ins_queue(
             queue_id=queue_id,
-            strategy_id=req.strategy_id,
-            strategy_vid=req.strategy_vid,
+            strategy_id=strategy_id,
+            strategy_vid=strategy_vid,
             status_id=queued_id,
             priority=PRIORITY_MAP[req.priority],
             user_id=user_id,
@@ -93,7 +104,7 @@ class JobsService:
             raise JobNotFound(str(queue_id))
         result = self._repo.get_result(queue_id)
         if result is not None:
-            row["result"] = result.get("result_payload")
+            row["result"] = result.get("payload_json")
         return row
 
     # ── cancel ──────────────────────────────────────────────────────────

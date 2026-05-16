@@ -20,8 +20,10 @@ PriorityLabel = Literal["normal", "high"]
 
 
 class EnqueueRequest(BaseModel):
-    strategy_id: UUID
-    strategy_vid: int = Field(..., gt=0)
+    """Inline-strategy enqueue: server creates BT.STRATEGY then enqueues."""
+
+    strategy_nm: str = Field(..., min_length=1, max_length=200)
+    config_json: dict[str, Any]
     priority: PriorityLabel = "normal"
 
 

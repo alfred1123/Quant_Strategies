@@ -350,6 +350,27 @@ def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None, bt
     opt = ParametersOptimization(data_dict, config, fee_bps=req.fee_bps)
     result = opt.run(window_list, signal_list, callbacks=callbacks)
 
+    # ── Inline performance for best params ──
+    perf_resp = None
+    if result.n_valid > 0 and result.best:
+        try:
+            perf_resp = _build_perf_response(
+                data_dict, config, result.best, req.fee_bps,
+            )
+        except Exception:
+            logger.warning("Inline performance failed", exc_info=True)
+
+    # ── Inline walk-forward ──
+    wf_resp = None
+    if req.walk_forward and result.n_valid > 0:
+        try:
+            wf_resp = _build_wf_response(
+                data_dict, config, window_list, signal_list,
+                req.split_ratio, req.fee_bps,
+            )
+        except Exception:
+            logger.warning("Inline walk-forward failed", exc_info=True)
+
     return OptimizeResponse(
         total_trials=len(result.grid_df),
         valid=result.n_valid,
@@ -357,6 +378,8 @@ def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None, bt
         top10=result.top10,
         grid=result.grid,
         optuna_plots=result.extract_plots(),
+        performance=perf_resp,
+        walk_forward=wf_resp,
     )
 
 

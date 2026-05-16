@@ -21,3 +21,9 @@ export interface JobRow {
   transact_from_ts: string;
   error_text: string | null;
 }
+
+/** Single-job lookup — adds frozen config + completion payload. */
+export interface JobDetail extends JobRow {
+  config_json: Record<string, unknown> | null;
+  result: Record<string, unknown> | null;
+}

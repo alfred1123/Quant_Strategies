@@ -1,12 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { JobRow } from '../types/jobs';
+import type { JobDetail, JobRow } from '../types/jobs';
+import type { OptimizeRequest } from '../types/backtest';
 
 export const JOBS_QUERY_KEY = ['jobs'] as const;
 
 // Polling cadence — short enough for live status, long enough to keep
 // DB load trivial. SSE per-row is a Phase-D upgrade.
 const POLL_INTERVAL_MS = 3000;
+
+export interface EnqueueRequest {
+  strategy_nm: string;
+  config_json: OptimizeRequest;
+  priority?: 'normal' | 'high';
+}
+
+export interface EnqueueResponse {
+  queue_id: string;
+  queue_pos: number;
+}
 
 async function listJobs(): Promise<JobRow[]> {
   const { data } = await apiClient.get<JobRow[]>('/jobs');
@@ -15,6 +27,16 @@ async function listJobs(): Promise<JobRow[]> {
 
 async function cancelJob(queueId: string): Promise<JobRow> {
   const { data } = await apiClient.post<JobRow>(`/jobs/${queueId}/cancel`);
+  return data;
+}
+
+async function enqueueJob(req: EnqueueRequest): Promise<EnqueueResponse> {
+  const { data } = await apiClient.post<EnqueueResponse>('/jobs', req);
+  return data;
+}
+
+async function getJob(queueId: string): Promise<JobDetail> {
+  const { data } = await apiClient.get<JobDetail>(`/jobs/${queueId}`);
   return data;
 }
 
@@ -37,4 +59,20 @@ export function useCancelJob() {
       qc.invalidateQueries({ queryKey: JOBS_QUERY_KEY });
     },
   });
+}
+
+/** Submit a new backtest job — server creates BT.STRATEGY then BT.QUEUE. */
+export function useEnqueueJob() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: enqueueJob,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: JOBS_QUERY_KEY });
+    },
+  });
+}
+
+/** Fetch one job's frozen config + completion payload (on-demand). */
+export function fetchJob(queueId: string): Promise<JobDetail> {
+  return getJob(queueId);
 }
