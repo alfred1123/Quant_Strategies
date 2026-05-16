@@ -8,13 +8,23 @@
 #   npm install --force --os=linux --cpu=x64 --os=linux --cpu=arm64
 # so `npm ci` picks the correct rolldown binding on both x64 dev machines
 # and arm64 (Graviton) build hosts.
-FROM node:22-slim AS frontend-build
+# Stage 1: Build React frontend
+# NOTE: must be a glibc image (node:22-slim, not node:22-alpine) — Vite 7 /
+# rolldown ships @rolldown/binding-linux-x64-gnu which is glibc-only and
+# fails `npm ci` on musl with EBADPLATFORM.
+#
+# Pinned to linux/amd64 because:
+#   1. The lockfile materializes @rolldown/binding-linux-x64-gnu as a
+#      required entry (npm strips `"optional": true` from selected
+#      bindings during install), so `npm ci` fails on any non-x64 host
+#      regardless of npm version. See npm/cli#4828.
+#   2. The frontend output is static HTML/JS/CSS — arch-agnostic — so
+#      building under x86 emulation on arm64 EC2 (Graviton) is safe.
+#      Emulation adds ~1-2 min to this stage but avoids the npm bug
+#      entirely and keeps deterministic `npm ci`.
+FROM --platform=linux/amd64 node:22-slim AS frontend-build
 
 WORKDIR /app
-# npm 11 required: npm 10's `npm ci` doesn't filter platform-mismatched
-# optional native deps (npm/cli#4828), so it tries to install the x64
-# rolldown binding on arm64 EC2 and fails with EBADPLATFORM.
-RUN npm install -g npm@11
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ .
