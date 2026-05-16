@@ -11,6 +11,10 @@
 FROM node:22-slim AS frontend-build
 
 WORKDIR /app
+# npm 11 required: npm 10's `npm ci` doesn't filter platform-mismatched
+# optional native deps (npm/cli#4828), so it tries to install the x64
+# rolldown binding on arm64 EC2 and fails with EBADPLATFORM.
+RUN npm install -g npm@11
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ .
