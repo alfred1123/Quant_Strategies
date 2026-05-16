@@ -41,11 +41,11 @@ def _fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_c
     instrument mapping exists (e.g. user typed a raw ticker).
 
     When ``bt_cache`` is provided, delegates to
-    ``BacktestCache.get_or_fetch_payload``. With ``refresh=False``
-    (default) the call is cache-only and raises ``CacheMissError``
-    (translated to HTTP 400 by the caller) if the cache cannot satisfy
-    the request. With ``refresh=True`` the provider is hit for the full
-    range and a new ``API_REQUEST`` version is inserted.
+    ``BacktestCache.read_payload`` (when ``refresh=False`` — cache-only,
+    raises ``CacheMissError`` translated to HTTP 400 by the caller if the
+    cache cannot satisfy the request) or ``BacktestCache.refresh_payload``
+    (when ``refresh=True`` — provider is hit for the full range and a new
+    ``API_REQUEST`` version is inserted; SP write failures propagate).
 
     Returns a DataFrame indexed by ``datetime`` (DatetimeIndex) so that
     cross-product ``reindex`` aligns rows by date, not by integer position.
@@ -86,14 +86,21 @@ def _fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_c
         app_id = app["app_id"]
         app_metric_id = bt_cache.refdata.resolve_app_metric_id(app_id, "price")
         if app_metric_id is not None:
-            return bt_cache.get_or_fetch_payload(
+            if refresh:
+                return bt_cache.refresh_payload(
+                    app_id=app_id,
+                    app_metric_id=app_metric_id,
+                    internal_cusip=symbol,
+                    range_start=start,
+                    range_end=end,
+                    fetcher=_provider_fetch,
+                )
+            return bt_cache.read_payload(
                 app_id=app_id,
                 app_metric_id=app_metric_id,
                 internal_cusip=symbol,
                 range_start=start,
                 range_end=end,
-                fetcher=_provider_fetch,
-                refresh=refresh,
             )
 
     # Fallback: no cache wired (e.g. unit tests, no DB)

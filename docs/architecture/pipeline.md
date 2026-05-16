@@ -40,7 +40,7 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/refdata/reader.py` | `RedisRefData` | Read-only REFDATA accessor backed by Redis. Checks `refdata:version` on every `get()` and rebuilds its local snapshot lazily on bump. |
 | `quant/refdata/publisher.py` | `RefDataPublisher(DbGateway)` | The only Postgres → Redis writer for REFDATA. Discovers tables via `information_schema`, `CALL REFDATA.SP_GET_ENUM` per table, writes `refdata:<table>` + bumps `refdata:version`. Invoked from FastAPI lifespan and `POST /api/v1/refdata/refresh`. |
 | `quant/refdata/bundle.py` | `DataCaches` | Composes `RedisRefData` + `InstrumentCache` + `BacktestCache` so API and worker wire identically. |
-| `quant/data/backtest_cache.py` | `BacktestCache(DbGateway)` | BT schema read/write (`persistent=True`) — two-mode `get_or_fetch_payload(refresh=False|True)`. Read-only mode raises `CacheMissError` on miss; refresh mode fetches the full range and inserts a new `API_REQUEST` version. |
+| `quant/data/backtest_cache.py` | `BacktestCache(DbGateway)` | BT schema read/write (`persistent=True`) — split API: `read_payload()` (read-only, raises `CacheMissError` on miss) and `refresh_payload(fetcher=...)` (fetches the full range and inserts a new `API_REQUEST` version; SP write failures propagate). |
 | `quant/data/instruments.py` | `InstrumentCache(DbGateway)` | INST schema cache (`persistent=True`) — products + vendor-symbol xrefs, exposed via `/api/v1/inst/products`. |
 | `quant/data/sources.py` | `YahooFinance`, `AlphaVantage`, `Glassnode`, `FutuOpenD` | Fetch OHLCV data, return normalized DataFrame. |
 | `quant/strategy/indicators.py` | `TechnicalAnalysis` | Calculate indicator values on the `factor` column. |

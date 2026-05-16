@@ -367,7 +367,7 @@ class <Source>:
 
 1. **REFDATA registration:** Add a row to `REFDATA.APP` (the canonical app/data-source table — not a separate `DATA_SOURCE` table). The `App` row drives the `Data Source` dropdown in the SPA (`useApps()` hook).
 2. **`main.py` dispatch:** Add source to the data-fetch dispatch logic. (CLI currently hard-wires `YahooFinance`; see [CLI Backtest](../guides/cli-backtest.md).)
-3. **API access:** Pulls already happen indirectly through `BacktestCache.get_or_fetch_payload()`. A direct `GET /api/v1/data/{source}/{symbol}` endpoint is **not** exposed today.
+3. **API access:** Pulls already happen indirectly through `BacktestCache.read_payload()` / `BacktestCache.refresh_payload()`. A direct `GET /api/v1/data/{source}/{symbol}` endpoint is **not** exposed today.
 4. **env var:** `<SOURCE>_API_KEY` in `.env` and SSM Parameter Store (`/quant/{env}/<SOURCE>_API_KEY`).
 
 ### Rate limiting

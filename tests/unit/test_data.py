@@ -633,7 +633,7 @@ class TestInstrumentCache:
 
 
 class TestBacktestCacheGetOrFetch:
-    """Two-mode cache orchestrator: refresh=False (read-only) vs refresh=True (fetch+insert)."""
+    """Split cache API: read_payload (read-only) and refresh_payload (fetch+insert)."""
 
     @staticmethod
     def _make_cache():
@@ -669,15 +669,12 @@ class TestBacktestCacheGetOrFetch:
         c = self._make_cache()
         c._get_api_request = MagicMock(return_value=[self._cached_row("2024-01-01", "2024-01-10")])
         c._insert_api_request = MagicMock()
-        fetcher = MagicMock()
 
-        out = c.get_or_fetch_payload(
+        out = c.read_payload(
             app_id=1, app_metric_id=2, internal_cusip="X",
             range_start="2024-01-03", range_end="2024-01-07",
-            fetcher=fetcher, refresh=False,
         )
 
-        fetcher.assert_not_called()
         c._insert_api_request.assert_not_called()
         assert len(out) == 5
 
@@ -686,15 +683,12 @@ class TestBacktestCacheGetOrFetch:
         c = self._make_cache()
         c._get_api_request = MagicMock(return_value=[])
         c._insert_api_request = MagicMock()
-        fetcher = MagicMock()
 
         with pytest.raises(BacktestCache.CacheMissError) as exc_info:
-            c.get_or_fetch_payload(
+            c.read_payload(
                 app_id=1, app_metric_id=2, internal_cusip="X",
                 range_start="2024-01-01", range_end="2024-01-10",
-                fetcher=fetcher, refresh=False,
             )
-        fetcher.assert_not_called()
         c._insert_api_request.assert_not_called()
         assert "Refresh dataset" in str(exc_info.value)
 
@@ -703,15 +697,12 @@ class TestBacktestCacheGetOrFetch:
         c = self._make_cache()
         c._get_api_request = MagicMock(return_value=[self._cached_row("2024-01-05", "2024-01-08")])
         c._insert_api_request = MagicMock()
-        fetcher = MagicMock()
 
         with pytest.raises(BacktestCache.CacheMissError):
-            c.get_or_fetch_payload(
+            c.read_payload(
                 app_id=1, app_metric_id=2, internal_cusip="X",
                 range_start="2024-01-01", range_end="2024-01-10",
-                fetcher=fetcher, refresh=False,
             )
-        fetcher.assert_not_called()
         c._insert_api_request.assert_not_called()
 
     # ── refresh=True: full fetch + insert ──────────────────────────────
@@ -723,10 +714,10 @@ class TestBacktestCacheGetOrFetch:
         fetched = self._df(pd.date_range("2024-01-01", "2024-01-05"), [10, 11, 12, 13, 14])
         fetcher = MagicMock(return_value=fetched)
 
-        out = c.get_or_fetch_payload(
+        out = c.refresh_payload(
             app_id=1, app_metric_id=2, internal_cusip="X",
             range_start="2024-01-01", range_end="2024-01-05",
-            fetcher=fetcher, refresh=True,
+            fetcher=fetcher,
         )
 
         fetcher.assert_called_once_with("2024-01-01", "2024-01-05")
@@ -740,27 +731,27 @@ class TestBacktestCacheGetOrFetch:
         fetched = self._df(pd.date_range("2024-01-01", "2024-01-10"), list(range(10)))
         fetcher = MagicMock(return_value=fetched)
 
-        c.get_or_fetch_payload(
+        c.refresh_payload(
             app_id=1, app_metric_id=2, internal_cusip="X",
             range_start="2024-01-01", range_end="2024-01-10",
-            fetcher=fetcher, refresh=True,
+            fetcher=fetcher,
         )
 
         # SP closes old VID and bumps via the same UUID
         assert c._insert_api_request.call_args.kwargs["api_req_id"] == "11111111-1111-1111-1111-111111111111"
 
     def test_refresh_does_not_compute_gap_ranges(self):
-        """refresh=True always asks fetcher for the full requested range — no prefix/suffix logic."""
+        """refresh_payload always asks fetcher for the full requested range — no prefix/suffix logic."""
         c = self._make_cache()
         c._get_api_request = MagicMock(return_value=[self._cached_row("2024-01-05", "2024-01-08")])
         c._insert_api_request = MagicMock()
         fetched = self._df(pd.date_range("2024-01-01", "2024-01-10"), list(range(10)))
         fetcher = MagicMock(return_value=fetched)
 
-        c.get_or_fetch_payload(
+        c.refresh_payload(
             app_id=1, app_metric_id=2, internal_cusip="X",
             range_start="2024-01-01", range_end="2024-01-10",
-            fetcher=fetcher, refresh=True,
+            fetcher=fetcher,
         )
 
         fetcher.assert_called_once_with("2024-01-01", "2024-01-10")
@@ -772,11 +763,32 @@ class TestBacktestCacheGetOrFetch:
         c._insert_api_request = MagicMock()
         fetcher = MagicMock(return_value=pd.DataFrame())
 
-        out = c.get_or_fetch_payload(
+        out = c.refresh_payload(
             app_id=1, app_metric_id=2, internal_cusip="X",
             range_start="2024-01-01", range_end="2024-01-05",
-            fetcher=fetcher, refresh=True,
+            fetcher=fetcher,
         )
 
         c._insert_api_request.assert_not_called()
         assert out.empty
+
+    def test_refresh_propagates_sp_write_failure(self):
+        """Contract: refresh_payload MUST NOT swallow SP write errors.
+
+        Regression guard for the 'silent skip' bug where a failed
+        SP_INS_API_REQUEST returned data to the caller anyway, leaving the
+        DB without a new version while the backtest reported success.
+        """
+        c = self._make_cache()
+        c._get_api_request = MagicMock(return_value=[])
+        c._insert_api_request = MagicMock(side_effect=RuntimeError("Proc failed (SQLSTATE 23505): dup"))
+        fetched = self._df(pd.date_range("2024-01-01", "2024-01-05"), [10, 11, 12, 13, 14])
+        fetcher = MagicMock(return_value=fetched)
+
+        with pytest.raises(RuntimeError, match="SQLSTATE 23505"):
+            c.refresh_payload(
+                app_id=1, app_metric_id=2, internal_cusip="X",
+                range_start="2024-01-01", range_end="2024-01-05",
+                fetcher=fetcher,
+            )
+        c._insert_api_request.assert_called_once()

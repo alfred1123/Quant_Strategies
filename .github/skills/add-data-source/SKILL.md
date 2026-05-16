@@ -167,10 +167,10 @@ must first verify the provider quota.
 ### Data flow
 
 ```
-UI request \u2014\u2192 BacktestCache.get_or_fetch_payload(refresh=False|True)
+UI request \u2014\u2192 BacktestCache.read_payload | refresh_payload(fetcher=...)
                   \u2502
         \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524
-   refresh=False           refresh=True
+   read_payload            refresh_payload
    (read-only)             (user opted in)
         \u2502                        \u2502
    serve cached row        call data_source.get_historical_price(...)
@@ -208,7 +208,7 @@ UI request \u2014\u2192 BacktestCache.get_or_fetch_payload(refresh=False|True)
 
 ### Implementation pattern
 
-**Caching is centralised in `BacktestCache.get_or_fetch_payload(refresh=False|True)` — do NOT re-implement per-source cache logic.** Each new data-source class only needs a clean `get_historical_price(symbol, start, end)` that always hits the upstream provider and returns a normalised `["t", "v"]` DataFrame. The service layer wraps the call in a `fetcher` closure and passes it to `BacktestCache`, which decides (based on the user's *Refresh dataset* checkbox) whether to call the closure at all and whether to persist a new version.
+**Caching is centralised in `BacktestCache.read_payload(...)` / `BacktestCache.refresh_payload(fetcher=..., ...)` — do NOT re-implement per-source cache logic.** Each new data-source class only needs a clean `get_historical_price(symbol, start, end)` that always hits the upstream provider and returns a normalised `["t", "v"]` DataFrame. The service layer wraps the call in a `fetcher` closure; the *Refresh dataset* checkbox decides which method is called (and therefore whether to call the closure at all and whether to persist a new version).
 
 A new data-source class therefore needs:
 
@@ -242,7 +242,7 @@ class PaidSourceExample:
         return df.reset_index(drop=True)
 ```
 
-See `BacktestCache.get_or_fetch_payload` in [src/data.py](../../../src/data.py) and the design doc [docs/design/separate-underlying.md](../../../docs/design/separate-underlying.md) for how the cache wraps your class.
+See `BacktestCache.read_payload` / `BacktestCache.refresh_payload` in [quant/data/backtest_cache.py](../../../quant/data/backtest_cache.py) and the design doc [docs/design/separate-underlying.md](../../../docs/design/separate-underlying.md) for how the cache wraps your class.
 
 ### REFDATA seed data checklist
 

@@ -342,28 +342,31 @@ This means the full history of every subscription is retained — each VID is a 
 
 | Method | Role |
 |--------|------|
-| `get_or_fetch_payload(*, app_id, app_metric_id, internal_cusip, range_start, range_end, fetcher, refresh=False, ...)` | Two-mode orchestrator. With `refresh=False` (default — read-only) returns the cached slice if the cached range fully covers the request, otherwise raises `BacktestCache.CacheMissError` (translated to HTTP 400 by the service layer). With `refresh=True` calls `fetcher(range_start, range_end)` for the **full** requested range and inserts a new version via `SP_INS_API_REQUEST` (re-using the cached `api_req_id` so the SP bumps `API_REQ_VID`). |
+| `read_payload(*, app_id, app_metric_id, internal_cusip, range_start, range_end, ...)` | Read-only. Returns the cached slice if the cached range fully covers the request, otherwise raises `BacktestCache.CacheMissError` (translated to HTTP 400 by the service layer). Never calls the provider, never writes. |
+| `refresh_payload(*, app_id, app_metric_id, internal_cusip, range_start, range_end, fetcher, ...)` | Fetch + persist as a single transactional unit. Calls `fetcher(range_start, range_end)` for the **full** requested range and inserts a new version via `SP_INS_API_REQUEST` (re-using the cached `api_req_id` so the SP bumps `API_REQ_VID`). **SP write failures propagate** — callers must not swallow. |
 
-The mode is driven by a single UI checkbox **"Refresh dataset"** on the trading-product card. When unchecked, no provider calls and no DB writes occur — versions of `BT.API_REQUEST` only grow when the user explicitly opts in. This keeps `API_REQUEST_PAYLOAD` row count bounded and old partitions easy to drop.
+The mode is driven by a single UI checkbox **"Refresh dataset"** on the trading-product card. When unchecked, the service calls `read_payload` so no provider calls and no DB writes occur — versions of `BT.API_REQUEST` only grow when the user explicitly opts in. This keeps `API_REQUEST_PAYLOAD` row count bounded and old partitions easy to drop.
 
 ### Cache flow
 
 ```
-get_or_fetch_payload(..., refresh)
+refresh=False                          refresh=True
+     │                                       │
+read_payload(...)                  refresh_payload(..., fetcher)
   │
   ├─ 1. SP_GET_API_REQUEST → cached row (range_start_ts, range_end_ts, payload)
-  │
-  ├─ refresh=False (read-only)
-  │     ├─ covers? → return cached_df.loc[req_start:req_end]
-  │     └─ miss   → raise CacheMissError → HTTP 400 to client
-  │
-  └─ refresh=True (write — user opt-in)
-        ├─ fetcher(req_start, req_end)  # full range, no gap math
-        ├─ SP_INS_API_REQUEST(api_req_id=cached_id or new uuid,
-        │                     range=[req_start, req_end],
-        │                     payload=fetched)
-        │     └─ closes old VID, inserts new VID + payload
-        └─ return fetched.loc[req_start:req_end]
+  │                                       │
+  ├─ SP_GET_API_REQUEST                   ├─ SP_GET_API_REQUEST
+  │   (find current row)                 │    (resolve cached_id)
+  │                                       │
+  ├─ covers? → return slice               ├─ fetcher(req_start, req_end)
+  └─ miss   → raise CacheMissError       │    # full range, no gap math
+            → HTTP 400                   ├─ SP_INS_API_REQUEST(api_req_id=cached_id or new uuid,
+                                          │                     range=[req_start, req_end],
+                                          │                     payload=fetched)
+                                          │    # closes old VID, inserts new VID + payload
+                                          │    # failure propagates (no swallow)
+                                          └─ return fetched.loc[req_start:req_end]
 ```
 
 ### Date sync across products + factors
@@ -389,7 +392,7 @@ This is a meaningful chunk of work — partition migrations on a populated table
 
 ### FastAPI integration
 
-The FastAPI backend creates `BacktestCache` at startup (`api/main.py` lifespan). `_fetch_df` in `api/services/backtest.py` is the sole caller — it always routes through `get_or_fetch_payload` when `bt_cache` is wired, falling back to a direct provider call only when the DB is unavailable (e.g. unit tests).
+The FastAPI backend creates `BacktestCache` at startup (`api/main.py` lifespan). `_fetch_df` in `api/services/backtest.py` is the sole caller — it dispatches to `refresh_payload(...)` when the user ticks *Refresh dataset* and to `read_payload(...)` otherwise. Falls back to a direct provider call only when the DB is unavailable (e.g. unit tests).
 
 ### Partition maintenance
 
@@ -406,7 +409,7 @@ User selects:
 Backend:
   1. Collect unique tickers: {"SPY", "^VIX"}
   2. Fetch two DataFrames: {"SPY": df_spy, "^VIX": df_vix}
-     (each goes through the two-mode `BacktestCache.get_or_fetch_payload` flow above)
+     (each goes through the split `BacktestCache.read_payload` / `refresh_payload` flow above)
   3. Compute RSI on df_vix, SMA on df_spy (same ref as trading)
   4. Reindex indicator values to df_spy's index
   5. Merge signals, run PnL on SPY prices
