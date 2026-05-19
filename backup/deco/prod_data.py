@@ -23,6 +23,5 @@ class BybitRealTimeData:
         
     def get_data(self):
         return self.exchange.fetchOHLCV(self.symbol, self.interval, self.limit)
-    
-    def 
+
     

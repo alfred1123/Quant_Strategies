@@ -21,3 +21,4 @@ slowapi
 pytest
 boto3
 mkdocs-material
+ccxt
