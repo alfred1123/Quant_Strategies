@@ -91,4 +91,5 @@ nav:
       - Login & Authentication: design/login.md
       - Frontend Code Audit: design/frontend-audit.md
       - Deploy Build Pipeline: design/deploy-build-pipeline.md
+      - Plan to Profit: design/plan-to-profit.md
   - Decisions: decisions.md
