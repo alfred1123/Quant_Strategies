@@ -1,8 +1,8 @@
 # Phase 0.2 — Host Capacity Snapshot
 
 **Date:** 2026-05-20  
-**Host:** `quant-server` — EC2 `i-096f85bf84852cce3` (`52.221.3.230`), **t4g.small** (Graviton ARM)  
-**Safe to add +1 container (trade worker)?** **NO** — upgrade to **t4g.medium** or split TRADE to a second host first.  
+**Host:** `quant-server` — EC2 `i-096f85bf84852cce3` (`52.221.3.230`), **t4g.medium** (Graviton ARM, upgraded from t4g.small)  
+**Safe to add +1 container (trade worker)?** **YES** on t4g.medium with normal backtest overlap; monitor with `capacity_snapshot.sh`.  
 **Safe to add reconcile cron (Phase 2.2)?** **YES** — lightweight daily job; monitor peak memory during backtest queue runs.
 
 Re-run live capture: `bash aws/scripts/capacity_snapshot.sh` on the EC2 (or via SSM). Paste output into §Live capture below.

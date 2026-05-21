@@ -80,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2  # need HEAD~1 for the diff below
+          fetch-depth: 0
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -94,16 +94,28 @@ jobs:
           set -euo pipefail
           force="${{ github.event_name == 'workflow_dispatch' }}"
           base="${{ github.event.before }}"
-          [[ -z "$base" || "$base" == "0000000000000000000000000000000000000000" ]] && base="HEAD~1"
+          if [[ -z "$base" || "$base" == "0000000000000000000000000000000000000000" ]]; then
+            base="HEAD~1"
+          elif ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "${base}"
+          fi
 
-          changed=$(git diff --name-only "$base" "${{ github.sha }}" 2>/dev/null || true)
+          changed=$(git diff --name-only "$base" HEAD)
+          echo "base=${base}"
           echo "$changed" | sed 's/^/    /'
 
           network=false; database=false; compute=false; ecr=false
-          echo "$changed" | grep -qE '^aws/(cfn/00-ecr\.yml|params/)'     && ecr=true
-          echo "$changed" | grep -qE '^aws/(cfn/01-network\.yml|params/)'  && network=true
-          echo "$changed" | grep -qE '^aws/(cfn/02-database\.yml|params/)' && database=true
-          echo "$changed" | grep -qE '^aws/(cfn/03-compute\.yml|params/)'  && compute=true
+          echo "$changed" | grep -qE '^aws/cfn/00-ecr\.yml'      && ecr=true
+          echo "$changed" | grep -qE '^aws/cfn/01-network\.yml'  && network=true
+          echo "$changed" | grep -qE '^aws/cfn/02-database\.yml' && database=true
+          echo "$changed" | grep -qE '^aws/cfn/03-compute\.yml'  && compute=true
+
+          if echo "$changed" | grep -q '^aws/params/prod.json'; then
+            pdiff=$(git diff "$base" HEAD -- aws/params/prod.json)
+            echo "$pdiff" | grep -qE 'VpcId|SshCidr' && network=true
+            echo "$pdiff" | grep -qE 'EngineVersion|MinACU|MaxACU|MasterUsername|SubnetIds' && database=true
+            echo "$pdiff" | grep -qE 'InstanceType|AmiId|KeyPairName|"ParameterKey": "SubnetId"' && compute=true
+          fi
 
           if [[ "$force" == "true" ]]; then
             ecr=true; network=true; compute=true

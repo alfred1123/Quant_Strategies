@@ -132,7 +132,7 @@ Key parameters to review in `params/prod.json`:
 
 | Parameter | Current | Notes |
 |-----------|---------|-------|
-| `InstanceType` | `t4g.small` | Graviton ARM (2 GiB, ~$7/mo reserved) |
+| `InstanceType` | `t4g.medium` | Graviton ARM (4 GiB, ~$14/mo reserved) |
 | `AmiId` | Latest AL2023 ARM | `al2023-ami-kernel-default-arm64` (auto-resolved via SSM) |
 | `SshCidr` | `0.0.0.0/0` | Restrict to your IP for production |
 | `MinACU` / `MaxACU` | 0.5 / 2.0 | Aurora scaling range (cost vs headroom) |
@@ -151,7 +151,7 @@ managed by CloudFormation:
 | `quant-network` | EC2 SG | `sg-0c48c9010eaf84372` | Web + SSH |
 | `quant-network` | RDS SG | `sg-0278c603461bbf8fa` | Postgres from EC2 only |
 | `quant-database` | Aurora cluster | `quantdb-cluster` | Imported; Serverless v2, 0.5–2.0 ACU |
-| `quant-compute` | EC2 | `i-096f85bf84852cce3` | `quant-server`, t4g.small ARM |
+| `quant-compute` | EC2 | `i-096f85bf84852cce3` | `quant-server`, t4g.medium ARM (upgrade from t4g.small) |
 | `quant-compute` | IAM role | `quant-ec2-role` | SSM access |
 | `quant-compute` | EIP | `52.221.3.230` | Static public IP |
 | — | Key pair | `tradingServerKey` | SSH access (not managed by CFN) |

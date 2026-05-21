@@ -43,7 +43,7 @@ quant-server (EC2 t4g.medium, 4 GiB)
 
 **Action before Phase 1.7 live apply**
 
-1. CFN stack update: `InstanceType` → `t4g.medium` in `aws/params/prod.json`, `aws deploy.sh compute`.
+1. CFN stack update: `InstanceType` → `t4g.medium` in `aws/params/prod.json` (**done in repo**; apply via `bash aws/deploy.sh compute` or push to `main` to trigger CI).
 2. **ECR pipeline live:** `00-ecr.yml` stack, CI `buildx` push, EC2 pull-only deploy (no `docker compose build` on prod).
 3. Add `trade` service to `docker-compose.yml` (or prod overlay) when adapter exists — reuses app `Dockerfile` / same ECR `quant-app` image.
 4. Run `aws/scripts/capacity_snapshot.sh` after upgrade to confirm headroom.
@@ -129,7 +129,7 @@ flowchart LR
 | Step | When | Owner |
 |------|------|-------|
 | **ECR CI pipeline** (repos, IAM, workflow, compose `image:`) | **Now** — before Phase 1.4+ | Infra / CI — [checklist](deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file) |
-| Upgrade `quant-server` to t4g.medium | Before Phase 1.7 live apply | Infra / CFN |
+| Upgrade `quant-server` to t4g.medium | **In progress** — params updated; CFN apply pending | Infra / CFN |
 | Build Phase 1 trade compose service on same host | Phase 1.3–1.7 | App |
 | Add reconcile cron on same host | Phase 2.2 | App + ops |
 | Separate TRADE host (same ECR pull) | Phase 3.7 if metrics warrant | Infra |

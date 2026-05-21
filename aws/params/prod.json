@@ -9,7 +9,8 @@
   { "ParameterKey": "MaxACU",               "ParameterValue": "2.0" },
   { "ParameterKey": "MasterUsername",        "ParameterValue": "postgres" },
 
-  { "ParameterKey": "InstanceType",         "ParameterValue": "t4g.small" },
+  { "ParameterKey": "InstanceType",         "ParameterValue": "t4g.medium" },
+  { "ParameterKey": "AmiId",                  "ParameterValue": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64" },
   { "ParameterKey": "KeyPairName",          "ParameterValue": "tradingServerKey" },
   { "ParameterKey": "SubnetId",             "ParameterValue": "subnet-065b627612dcd0b33" },
   { "ParameterKey": "AppEnv",               "ParameterValue": "prod" }
