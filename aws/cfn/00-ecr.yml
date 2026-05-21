@@ -1,0 +1,121 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Quant Strategies — ECR repositories for production container images.
+  Repos: quant-app (api, worker, future trade), quant-nginx (static SPA + proxy).
+  See docs/design/deploy-build-pipeline.md § ECR implementation checklist.
+
+Parameters:
+  Project:
+    Type: String
+    Default: quant
+
+  AppEnv:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, prod]
+
+Resources:
+  AppRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${Project}-app"
+      ImageTagMutability: MUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !Sub |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Expire untagged images after 1 day",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 1
+                },
+                "action": { "type": "expire" }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Keep last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-app"
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref AppEnv
+
+  NginxRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${Project}-nginx"
+      ImageTagMutability: MUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !Sub |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Expire untagged images after 1 day",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 1
+                },
+                "action": { "type": "expire" }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Keep last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-nginx"
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref AppEnv
+
+Outputs:
+  AppRepositoryName:
+    Value: !Ref AppRepository
+    Export:
+      Name: !Sub "${Project}-ecr-app-name"
+
+  AppRepositoryUri:
+    Value: !GetAtt AppRepository.RepositoryUri
+    Export:
+      Name: !Sub "${Project}-ecr-app-uri"
+
+  NginxRepositoryName:
+    Value: !Ref NginxRepository
+    Export:
+      Name: !Sub "${Project}-ecr-nginx-name"
+
+  NginxRepositoryUri:
+    Value: !GetAtt NginxRepository.RepositoryUri
+    Export:
+      Name: !Sub "${Project}-ecr-nginx-uri"

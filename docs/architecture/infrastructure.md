@@ -50,11 +50,16 @@ aws/
 ├── import-db-resources.json   ← resource mapping used during Aurora import
 ├── deploy.sh                  ← deploy / update all stacks
 ├── cfn/
+│   ├── 00-ecr.yml             ← ECR repos quant-app, quant-nginx
 │   ├── 01-network.yml         ← security groups (EC2 + RDS)
 │   ├── 02-database.yml        ← Aurora PostgreSQL Serverless v2
 │   └── 03-compute.yml         ← EC2 + IAM role + EIP
 ├── params/
 │   └── prod.json              ← parameter values for prod
+├── iam/
+│   ├── github-deploy-cfn-policy.json   ← CFN deploy via GitHub Actions
+│   ├── github-deploy-policy.json       ← SSM Run Command deploy
+│   └── github-deploy-ecr-policy.json   ← ECR push (attach before workflow step 3)
 └── scripts/
     ├── bootstrap-ec2.sh     ← one-time EC2 setup
     ├── init-ssm-params.sh   ← bootstrap SSM secrets (run once)
@@ -77,6 +82,7 @@ Stacks must be deployed in order due to cross-stack references.
 
 | # | Stack | Template | Creates |
 |---|-------|----------|---------|
+| 0 | `quant-ecr` | `00-ecr.yml` | ECR repos `quant-app`, `quant-nginx` |
 | 1 | `quant-network` | `01-network.yml` | EC2 SG (22/80/443), RDS SG (5432 from EC2 only) |
 | 2 | `quant-database` | `02-database.yml` | Aurora cluster, serverless instance, DB subnet group |
 | 3 | `quant-compute` | `03-compute.yml` | EC2 instance, IAM role (SSM access), Elastic IP |

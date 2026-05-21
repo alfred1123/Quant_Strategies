@@ -52,17 +52,11 @@ quant-server (EC2 t4g.medium, 4 GiB)
 
 Revisit **only if** post-upgrade live capture shows sustained memory &gt; 85% with trade + one backtest child, or ops wants hard isolation between research queue and live execution.
 
-Then: second small EC2 pulling the same ECR images — see §2.
+Then: second small EC2 pulling the same ECR images — see §2 in [deploy-build-pipeline.md](deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file).
 
 ### ECR deploy pipeline (adopted now)
 
-Prod deploy **does not build on EC2**. Images are built in CI (`linux/arm64`), pushed to ECR (`quant-app`, `quant-nginx`), and pulled on deploy. Implementation checklist: [deploy-build-pipeline.md](deploy-build-pipeline.md) §Implementation plan.
-
-**Why now (revised from defer-until-M1):**
-
-- Eliminates arm64 / native-deps build failures on the prod host (rolldown class of bugs).
-- Faster deploys and sha-based rollback before TRADE container adds more image churn.
-- Phase 1 `trade` service ships as another compose service using the **same** ECR app image — no second pipeline later.
+Prod deploy **does not build on EC2**. Full file-by-file checklist: [deploy-build-pipeline.md § ECR implementation checklist](deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file).
 
 ---
 
@@ -134,7 +128,7 @@ flowchart LR
 
 | Step | When | Owner |
 |------|------|-------|
-| **ECR CI pipeline** (repos, IAM, workflow, compose `image:`) | **Now** — before Phase 1.4+ | Infra / CI |
+| **ECR CI pipeline** (repos, IAM, workflow, compose `image:`) | **Now** — before Phase 1.4+ | Infra / CI — [checklist](deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file) |
 | Upgrade `quant-server` to t4g.medium | Before Phase 1.7 live apply | Infra / CFN |
 | Build Phase 1 trade compose service on same host | Phase 1.3–1.7 | App |
 | Add reconcile cron on same host | Phase 2.2 | App + ops |

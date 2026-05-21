@@ -22,6 +22,7 @@
         "cloudformation:ValidateTemplate"
       ],
       "Resource": [
+        "arn:aws:cloudformation:ap-southeast-1:539163478329:stack/quant-ecr/*",
         "arn:aws:cloudformation:ap-southeast-1:539163478329:stack/quant-network/*",
         "arn:aws:cloudformation:ap-southeast-1:539163478329:stack/quant-database/*",
         "arn:aws:cloudformation:ap-southeast-1:539163478329:stack/quant-compute/*",
@@ -138,6 +139,29 @@
         "ssm:DescribeParameters"
       ],
       "Resource": "arn:aws:ssm:ap-southeast-1:539163478329:parameter/quant/*"
+    },
+    {
+      "Sid": "EcrManageQuantRepos",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:CreateRepository",
+        "ecr:DeleteRepository",
+        "ecr:DescribeRepositories",
+        "ecr:PutLifecyclePolicy",
+        "ecr:GetLifecyclePolicy",
+        "ecr:DeleteLifecyclePolicy",
+        "ecr:PutImageScanningConfiguration",
+        "ecr:TagResource",
+        "ecr:UntagResource",
+        "ecr:ListTagsForResource",
+        "ecr:SetRepositoryPolicy",
+        "ecr:GetRepositoryPolicy",
+        "ecr:DeleteRepositoryPolicy"
+      ],
+      "Resource": [
+        "arn:aws:ecr:ap-southeast-1:539163478329:repository/quant-app",
+        "arn:aws:ecr:ap-southeast-1:539163478329:repository/quant-nginx"
+      ]
     }
   ]
 }

@@ -25,11 +25,12 @@ fi
 
 # ── Stack definitions (order matters) ─────────────────────────────────
 declare -A STACKS=(
+  [ecr]="00-ecr.yml"
   [network]="01-network.yml"
   [database]="02-database.yml"
   [compute]="03-compute.yml"
 )
-ORDERED=(network database compute)
+ORDERED=(ecr network database compute)
 
 deploy_stack() {
   local name="$1"

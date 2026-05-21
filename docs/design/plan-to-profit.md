@@ -893,7 +893,7 @@ Detailed tasks and exit criteria for each row are in [§2 Phased Roadmap](#2-pha
 | 1 | **Backtest side nav taxonomy** | See §4.1 options A/B/C |
 | 2 | **What to store per optimization** | Full equity curve vs summary stats only |
 | 3 | **Sharpe reconcile storage** | Daily snapshot table vs rolling window materialized view |
-| 4 | **ECR cutover for TRADE** | **Resolved (0.3, revised):** **ECR now** — CI build/push, EC2 pull-only; TRADE service reuses `quant-app` image on same EC2. Separate host (3.7) pulls same ECR repos. See [phase-0.3-topology.md](phase-0.3-topology.md), [deploy-build-pipeline.md](deploy-build-pipeline.md). |
+| 4 | **ECR cutover for TRADE** | **Resolved (0.3):** **ECR now** — see [deploy-build-pipeline.md § ECR implementation checklist](deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file). |
 | 5 | **Silent failure policy** | Heartbeat table, external uptime, exchange position reconcile |
 | 6 | **Exchange limit detection** | Post-MVP per exchange |
 
@@ -917,7 +917,7 @@ Notes mentioned alternative profit paths (e.g. horse racing, Poisson/Bernoulli m
 | [Database](../architecture/database.md) | `BT.*`, planned `TRADE.*` |
 | [Frontend](../architecture/frontend.md) | React SPA structure |
 | [Paper Trading guide](../guides/trading.md) | Existing Futu utility (pattern reference) |
-| [Deploy Build Pipeline](deploy-build-pipeline.md) | ECR / CI when containerizing TRADE |
+| [Deploy Build Pipeline](deploy-build-pipeline.md) | ECR file-by-file checklist (adopted, not yet implemented) |
 
 ---
 

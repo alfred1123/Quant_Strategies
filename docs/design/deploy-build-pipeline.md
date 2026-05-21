@@ -144,6 +144,150 @@ can recur.
    - Drop any qemu/buildx steps from the SSM script (no longer building on
      EC2 at all).
 
+---
+
+## ECR implementation checklist (file-by-file)
+
+**Status:** adopted (decision #35) — **not yet implemented** in repo.  
+**Related:** [phase-0.3-topology.md](phase-0.3-topology.md), [infrastructure.md](../architecture/infrastructure.md).
+
+### Deploy flow — before vs after
+
+```
+TODAY:
+  push main → test → (npm build check) → SSM → git pull → docker compose BUILD on EC2 → up
+
+AFTER ECR:
+  push main → test → buildx arm64 → push ECR → SSM → git pull → docker login → PULL → up
+```
+
+**Rollback:** redeploy with a previous `IMAGE_TAG=<older-git-sha>`.
+
+---
+
+### 1. New AWS infrastructure
+
+**Status:** implemented in repo (step 1) — deploy manually or via CI `cfn` job before steps 2–5.
+
+| File | Change |
+|------|--------|
+| **`aws/cfn/00-ecr.yml`** *(new)* | Two private repos: `quant-app`, `quant-nginx`. Lifecycle: keep last 10 tagged images; expire untagged after 1 day. Optional: scan-on-push. |
+| **`aws/deploy.sh`** | Add `[ecr]="00-ecr.yml"` to `STACKS`; deploy **first** in order: `ecr` → `network` → `database` → `compute`. |
+| **`aws/cfn/03-compute.yml`** | Attach managed policy `AmazonEC2ContainerRegistryReadOnly` to `Ec2Role` so EC2 can `docker pull`. |
+| **`aws/iam/github-deploy-ecr-policy.json`** *(new)* | ECR push for CI user `quant_deploy`: `GetAuthorizationToken` + layer upload / `PutImage` scoped to both repo ARNs. |
+
+**One-time ops (outside repo):**
+
+```bash
+# Deploy ECR stack
+bash aws/deploy.sh ecr
+
+# Attach push policy to GitHub deploy IAM user
+aws iam put-user-policy --user-name quant_deploy \
+  --policy-name quant-deploy-ecr \
+  --policy-document file://aws/iam/github-deploy-ecr-policy.json \
+  --profile alfcheun --region ap-southeast-1
+```
+
+---
+
+### 2. Docker Compose
+
+| File | Change |
+|------|--------|
+| **`docker-compose.yml`** | Add `image:` alongside existing `build:` (local dev still builds; prod pulls): |
+| | `api` + `worker` → `${APP_IMAGE:-quant-app:latest}` |
+| | `nginx` → `${NGINX_IMAGE:-quant-nginx:latest}` |
+| **`docker-compose.prod.yml`** | Set ECR URIs + tag from env, e.g. `APP_IMAGE=${AWS_ACCOUNT}.dkr.ecr.ap-southeast-1.amazonaws.com/quant-app:${IMAGE_TAG}` (same pattern for `NGINX_IMAGE`). Update header comment: prod uses **`pull`**, not `--build`. |
+
+`redis` and `certbot` stay on public Hub images — no ECR.
+
+Future **Phase 1.7 `trade`** service reuses the **`quant-app`** ECR image with a different `command:` — no third repo.
+
+---
+
+### 3. GitHub Actions — `.github/workflows/deploy.yml`
+
+| Today | After ECR |
+|-------|-----------|
+| `build` — npm sanity check on runner | **`build-and-push`** — builds and pushes prod images |
+| `deploy` — SSM runs `docker compose build` on EC2 | **`deploy`** — SSM runs `ecr login` → `pull` → `up` only |
+
+**New `build-and-push` job:**
+
+- `docker/setup-qemu-action@v3` + `docker/setup-buildx-action@v3`
+- `aws-actions/amazon-ecr-login@v2`
+- `docker/build-push-action@v6` × 2:
+  - Context `.`, `Dockerfile` → repo `quant-app`, `platforms: linux/arm64`
+  - Context `.`, `docker/nginx/Dockerfile` → repo `quant-nginx`, `platforms: linux/arm64`
+- Tags: `${{ github.sha }}` and `latest`
+
+**`deploy` job — SSM commands (replace build step):**
+
+```bash
+aws ecr get-login-password --region ap-southeast-1 | \
+  docker login --username AWS --password-stdin <acct>.dkr.ecr.ap-southeast-1.amazonaws.com
+cd /opt/quant
+git config --system --add safe.directory /opt/quant
+git fetch --prune origin main && git reset --hard origin/main
+export IMAGE_TAG=<git-sha>
+export APP_IMAGE=<acct>.dkr.ecr.ap-southeast-1.amazonaws.com/quant-app:${IMAGE_TAG}
+export NGINX_IMAGE=<acct>.dkr.ecr.ap-southeast-1.amazonaws.com/quant-nginx:${IMAGE_TAG}
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+docker image prune -f
+```
+
+**Remove from SSM:** `docker compose … build --pull`.
+
+**`cfn` job:** extend infra change detection to include `aws/cfn/00-ecr.yml` → deploy `ecr` stack when that file changes.
+
+**Job graph:** `test` → `build-and-push` → `deploy`; `cfn` runs in parallel with `test` (deploy waits on both).
+
+---
+
+### 4. Dockerfiles
+
+| File | Change |
+|------|--------|
+| **`docker/nginx/Dockerfile`** | Already uses `npm ci` — no change expected. |
+| **`Dockerfile`** (app) | No change — same image for `api`, `worker`, and future `trade`. |
+
+---
+
+### 5. Docs and env (minor)
+
+| File | Change |
+|------|--------|
+| **`docs/architecture/infrastructure.md`** | CI/CD section: build in Actions → ECR → pull on EC2 (replace “build on EC2”). |
+| **`.env.example`** | Document optional `APP_IMAGE` / `NGINX_IMAGE` / `IMAGE_TAG` (set by deploy on prod, not hand-edited). |
+| **`README.md`** | Prod deploy instructions if they still mention `--build`. |
+
+---
+
+### 6. Out of scope for this ECR slice
+
+- ECS cluster / task definitions
+- Second EC2 for TRADE (Phase 3.7 — will pull same ECR repos)
+- Multi-arch images (`linux/amd64`) unless requested later — **arm64 only** for t4g Graviton
+- **`t4g.medium` RAM upgrade** — separate change in `aws/params/prod.json` (Phase 0.3), can land before or after ECR cutover
+
+---
+
+### 7. Suggested PR / rollout order
+
+| Step | Scope | Notes |
+|------|-------|-------|
+| **1** | CFN `00-ecr.yml` + EC2 ECR read on `Ec2Role` + `deploy.sh` | Deploy stack manually first |
+| **2** | Compose `image:` wiring + `docker-compose.prod.yml` env | Local dev unchanged (`build` fallback) |
+| **3** | GitHub workflow `build-and-push` + pull-only deploy | Cutover PR — verify one green deploy |
+| **4** | IAM `github-deploy-ecr-policy.json` + manual apply | Required before step 3 can push |
+| **5** | Doc touch-ups | infrastructure.md, README |
+
+**Cutover:** single deploy to `main` replaces EC2 build with pull. Keep previous git SHA handy for rollback tag.
+
+---
+
 ### Open questions
 
 - Tag strategy: `:sha-<short>` + `:latest`, or also `:prod`? Probably stick to

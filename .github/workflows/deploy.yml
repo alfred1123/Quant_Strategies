@@ -99,19 +99,28 @@ jobs:
           changed=$(git diff --name-only "$base" "${{ github.sha }}" 2>/dev/null || true)
           echo "$changed" | sed 's/^/    /'
 
-          network=false; database=false; compute=false
+          network=false; database=false; compute=false; ecr=false
+          echo "$changed" | grep -qE '^aws/(cfn/00-ecr\.yml|params/)'     && ecr=true
           echo "$changed" | grep -qE '^aws/(cfn/01-network\.yml|params/)'  && network=true
           echo "$changed" | grep -qE '^aws/(cfn/02-database\.yml|params/)' && database=true
           echo "$changed" | grep -qE '^aws/(cfn/03-compute\.yml|params/)'  && compute=true
 
           if [[ "$force" == "true" ]]; then
-            network=true; compute=true
+            ecr=true; network=true; compute=true
             [[ "${{ inputs.deploy_database }}" == "true" ]] && database=true
           fi
 
+          echo "ecr=$ecr"         >> "$GITHUB_OUTPUT"
           echo "network=$network"   >> "$GITHUB_OUTPUT"
           echo "database=$database" >> "$GITHUB_OUTPUT"
           echo "compute=$compute"   >> "$GITHUB_OUTPUT"
+
+      - name: Deploy ECR stack
+        if: steps.changes.outputs.ecr == 'true'
+        env:
+          APP_ENV: prod
+          AWS_REGION: ap-southeast-1
+        run: bash aws/deploy.sh ecr
 
       - name: Deploy network stack
         if: steps.changes.outputs.network == 'true'
