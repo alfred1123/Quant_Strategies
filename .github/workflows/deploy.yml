@@ -194,7 +194,7 @@ jobs:
               "git reset --hard origin/main",
               "echo \"── AFTER  ──\"",
               "git rev-parse --short HEAD",
-              "DOCKER_BUILDKIT=1 docker compose -f docker-compose.yml -f docker-compose.prod.yml build --pull",
+              "COMPOSE_PARALLEL_LIMIT=1 DOCKER_BUILDKIT=1 docker compose -f docker-compose.yml -f docker-compose.prod.yml build --pull",
               "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans",
               "docker image prune -f",
               "echo \"── RUNNING ──\"",
