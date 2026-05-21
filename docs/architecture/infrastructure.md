@@ -56,7 +56,9 @@ aws/
 ├── params/
 │   └── prod.json              ← parameter values for prod
 └── scripts/
-    └── init-ssm-params.sh     ← bootstrap SSM secrets (run once)
+    ├── bootstrap-ec2.sh     ← one-time EC2 setup
+    ├── init-ssm-params.sh   ← bootstrap SSM secrets (run once)
+    └── capacity_snapshot.sh ← Phase 0.2 host CPU/mem capture
 ```
 
 ---

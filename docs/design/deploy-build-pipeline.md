@@ -156,5 +156,4 @@ can recur.
 
 ## Decision
 
-Documenting here for now; not yet adopted as a numbered entry in
-[decisions.md](../decisions.md). Promote once the ECR pipeline lands.
+**Adopted (Phase 0.3, revised 2026-05-20):** ECR pull deploy is **in scope now** — see decision #35 and [phase-0.3-topology.md](phase-0.3-topology.md). Implementation checklist below is the execution path; cut over from build-on-EC2 before Phase 1 Trade work ships.

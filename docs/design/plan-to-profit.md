@@ -32,8 +32,8 @@ Work **one subphase at a time** — finish exit criteria before starting the nex
 | Subphase | Title | Status |
 |----------|-------|--------|
 | [0.1](#phase-01--strategy-health) | Strategy health | done |
-| [0.2](#phase-02--host-capacity) | Host capacity | — |
-| [0.3](#phase-03--deploy-topology-decision) | Deploy topology decision | — |
+| [0.2](#phase-02--host-capacity) | Host capacity | done |
+| [0.3](#phase-03--deploy-topology-decision) | Deploy topology decision | done |
 | [1.1](#phase-11--user-secrets) | User secrets | — |
 | [1.2](#phase-12--trade-schema--apply-api) | Trade schema + apply API | — |
 | [1.3](#phase-13--bybit-adapter-dry-run) | Bybit adapter (dry run) | — |
@@ -138,11 +138,13 @@ flowchart TB
 
 **Tasks**
 
-- [ ] Capture current EC2 CPU/mem with API + worker + Redis (and any manual Bybit process).
-- [ ] Estimate headroom for +1 Docker service (trade worker or reconcile cron).
-- [ ] List which processes must move off the box first if headroom is tight.
+- [x] Capture current EC2 CPU/mem with API + worker + Redis (and any manual Bybit process).
+- [x] Estimate headroom for +1 Docker service (trade worker or reconcile cron).
+- [x] List which processes must move off the box first if headroom is tight.
 
 **Exit criteria:** One-page capacity snapshot with “safe to add container Y/N” and rough CPU/mem budget.
+
+**Result (2026-05-20):** t4g.small (2 GiB) — **NO** for +1 trade worker without upgrade; **YES** for daily reconcile cron. Recommend **t4g.medium** or separate TRADE host before Phase 1.7. See [phase-0.2-capacity.md](phase-0.2-capacity.md); live metrics: `bash aws/scripts/capacity_snapshot.sh` on EC2.
 
 ---
 
@@ -155,11 +157,13 @@ flowchart TB
 
 **Tasks**
 
-- [ ] Decide timing: TRADE on same EC2 vs separate host vs ECR image.
-- [ ] Decide whether daily Sharpe job shares host with trade executor.
-- [ ] Log decision in [Decisions log](../decisions.md) (see [open decision #4](#8-open-decisions)).
+- [x] Decide timing: TRADE on same EC2 vs separate host vs ECR image.
+- [x] Decide whether daily Sharpe job shares host with trade executor.
+- [x] Log decision in [Decisions log](../decisions.md) (see [open decision #4](#8-open-decisions)).
 
 **Exit criteria:** Recorded decision — no need to implement ECR yet unless chosen “now.”
+
+**Result (2026-05-20):** **Same EC2** for Phase 1 TRADE + Phase 2 reconcile after **t4g.medium** upgrade. **ECR pull deploy adopted now** (before Phase 1 app work). Separate TRADE host only if needed in Phase 3.7. See [phase-0.3-topology.md](phase-0.3-topology.md) and decision #35.
 
 ---
 
@@ -844,8 +848,8 @@ Required before first live apply per deployment:
 | Topic | Notes |
 |-------|--------|
 | **EC2 + Docker** | Measure CPU/mem before adding trade container alongside API + worker + Redis |
-| **ECR** | Prefer containerized trade worker on **separate host** when CPU isolation needed |
-| **Priority** | Profit pipeline first; polish ECR migration when TRADE processing justifies split |
+| **ECR** | **Adopt now** (Phase 0.3): CI → ECR → EC2 pull. Separate TRADE host in 3.7 reuses same images |
+| **Priority** | ECR pipeline + t4g.medium upgrade, then Phase 1 profit pipeline |
 | **Existing stack** | See [Infrastructure](../architecture/infrastructure.md), [Dev vs Prod](../architecture/dev-vs-prod.md) |
 
 ---
@@ -889,7 +893,7 @@ Detailed tasks and exit criteria for each row are in [§2 Phased Roadmap](#2-pha
 | 1 | **Backtest side nav taxonomy** | See §4.1 options A/B/C |
 | 2 | **What to store per optimization** | Full equity curve vs summary stats only |
 | 3 | **Sharpe reconcile storage** | Daily snapshot table vs rolling window materialized view |
-| 4 | **ECR cutover for TRADE** | Now vs after Phase 1 smoke test |
+| 4 | **ECR cutover for TRADE** | **Resolved (0.3, revised):** **ECR now** — CI build/push, EC2 pull-only; TRADE service reuses `quant-app` image on same EC2. Separate host (3.7) pulls same ECR repos. See [phase-0.3-topology.md](phase-0.3-topology.md), [deploy-build-pipeline.md](deploy-build-pipeline.md). |
 | 5 | **Silent failure policy** | Heartbeat table, external uptime, exchange position reconcile |
 | 6 | **Exchange limit detection** | Post-MVP per exchange |
 
