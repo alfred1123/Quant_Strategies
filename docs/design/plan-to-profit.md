@@ -31,7 +31,7 @@ Work **one subphase at a time** — finish exit criteria before starting the nex
 
 | Subphase | Title | Status |
 |----------|-------|--------|
-| [0.1](#phase-01--strategy-health) | Strategy health | — |
+| [0.1](#phase-01--strategy-health) | Strategy health | done |
 | [0.2](#phase-02--host-capacity) | Host capacity | — |
 | [0.3](#phase-03--deploy-topology-decision) | Deploy topology decision | — |
 | [1.1](#phase-11--user-secrets) | User secrets | — |
@@ -115,13 +115,17 @@ flowchart TB
 | **Depends on** | — |
 | **Blocks** | 1.6, 1.7 (confidence in strategy id) |
 
+**Scope:** Research sign-off only — **not** production trade tracking. Use existing backtest tooling (`python -m quant.cli --walk-forward`); do **not** build rolling-Sharpe scripts against historical bars for go/no-go.
+
 **Tasks**
 
-- [ ] Run rolling-window Sharpe on Bollinger/price (not a single historical backtest).
-- [ ] Record baseline: window length, Sharpe, date range, and pass/fail threshold (e.g. still ≥ target after haircut).
-- [ ] Document degradation trend if any (week-over-week or month-over-month).
+- [x] Run walk-forward on the live candidate (e.g. `btcusdt.crypto`, Bollinger / momentum) via CLI or queued optimize + WF.
+- [x] Record OOS Sharpe, overfitting ratio, and chosen `window` / `signal` in a ticket or [decisions log](../decisions.md).
+- [x] Agree go / no-go / watch for promoting that `strategy_id` into the Trade picker.
 
-**Exit criteria:** Written note or ticket with “go / no-go / watch” for live Bybit Bollinger; threshold agreed.
+**Exit criteria:** Written note with walk-forward OOS metrics; live candidate `strategy_id` confirmed for Phase 1.6 / 1.7.
+
+**Result (2026-05-20):** **WATCH** — `bollinger_momentum_60_1.75` on `btcusdt.crypto`. Full Sharpe 1.19; OOS (30%) 0.42; WF OOS negative. Dry-run/paper OK; defer live apply. See [phase-0.1-signoff.md](phase-0.1-signoff.md) and decision #33.
 
 ---
 
@@ -350,6 +354,7 @@ flowchart TB
 
 - [ ] Trade page top-right: chart or summary of Sharpe / drift vs backtest.
 - [ ] Show last reconcile timestamp and stale warning if &gt; 36h old.
+- [ ] *(Nice-to-have)* Calendar-year live Sharpe table (Year | Sharpe | return) from reconcile snapshots — production tracking only, not backtest.
 
 **Exit criteria:** User opens Trade and sees at least 7 days of reconcile data (or explicit “insufficient data”).
 
@@ -849,7 +854,7 @@ Required before first live apply per deployment:
 
 | Subphase | Work item (summary) |
 |----------|---------------------|
-| **0.1** | Rolling Sharpe / degradation check for Bollinger strategy |
+| **0.1** | Walk-forward sign-off on live candidate (`quant.cli --walk-forward`) |
 | **0.2** | EC2 + Docker capacity snapshot |
 | **0.3** | ECR / separate-host decision → decisions log |
 | **1.1** | Per-user secrets schema + SP + API |
