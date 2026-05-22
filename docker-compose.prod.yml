@@ -1,19 +1,30 @@
-# Production override — API secrets via SSM, direct RDS access.
+# Production override — SSM secrets, prod flags, ECR image URIs.
 #
-# Usage on EC2 (HTTP-only, no domain):
+# Local / build-on-EC2 (until ECR step 3 cutover):
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# ECR pull deploy (step 3+) — set on EC2 before pull/up:
+#   export IMAGE_TAG=<git-sha>
+#   export APP_IMAGE=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com/quant-app:${IMAGE_TAG}
+#   export NGINX_IMAGE=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com/quant-nginx:${IMAGE_TAG}
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
 #
 # To add TLS later, layer docker-compose.tls.yml on top:
 #   export DOMAIN=yourdomain.com
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.tls.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.tls.yml up -d
 
 services:
   api:
+    image: ${APP_IMAGE:-quant-app:latest}
     environment:
       - APP_ENV=prod
       - USE_SSM=1
       - COOKIE_SECURE=0
   worker:
+    image: ${APP_IMAGE:-quant-app:latest}
     environment:
       - APP_ENV=prod
       - USE_SSM=1
+  nginx:
+    image: ${NGINX_IMAGE:-quant-nginx:latest}

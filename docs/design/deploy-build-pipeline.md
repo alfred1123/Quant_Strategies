@@ -148,8 +148,7 @@ can recur.
 
 ## ECR implementation checklist (file-by-file)
 
-**Status:** adopted (decision #35) — **not yet implemented** in repo.  
-**Related:** [phase-0.3-topology.md](phase-0.3-topology.md), [infrastructure.md](../architecture/infrastructure.md).
+**Status:** step **1 done** in AWS (2026-05-22). Steps **2–5** (compose, CI push, pull deploy) still pending.
 
 ### Deploy flow — before vs after
 
@@ -167,7 +166,7 @@ AFTER ECR:
 
 ### 1. New AWS infrastructure
 
-**Status:** implemented in repo (step 1) — deploy manually or via CI `cfn` job before steps 2–5.
+**Status:** **done** — deployed via CI/manual; verified 2026-05-22.
 
 | File | Change |
 |------|--------|
@@ -208,6 +207,8 @@ bash aws/deploy.sh ecr
 ---
 
 ### 2. Docker Compose
+
+**Status:** **done** (2026-05-22).
 
 | File | Change |
 |------|--------|
@@ -295,7 +296,7 @@ docker image prune -f
 | Step | Scope | Notes |
 |------|-------|-------|
 | **1** | CFN `00-ecr.yml` + EC2 ECR read on `Ec2Role` + `deploy.sh` | Deploy stack manually first |
-| **2** | Compose `image:` wiring + `docker-compose.prod.yml` env | Local dev unchanged (`build` fallback) |
+| **2** | Compose `image:` wiring + `docker-compose.prod.yml` env | **Done** |
 | **3** | GitHub workflow `build-and-push` + pull-only deploy | Cutover PR — verify one green deploy |
 | **4** | IAM `github-deploy-ecr-policy.json` + manual apply | Required before step 3 can push |
 | **5** | Doc touch-ups | infrastructure.md, README |

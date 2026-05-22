@@ -848,8 +848,8 @@ Required before first live apply per deployment:
 | Topic | Notes |
 |-------|--------|
 | **EC2 + Docker** | Measure CPU/mem before adding trade container alongside API + worker + Redis |
-| **ECR** | **Adopt now** (Phase 0.3): CI → ECR → EC2 pull. Separate TRADE host in 3.7 reuses same images |
-| **Priority** | ECR pipeline + t4g.medium upgrade, then Phase 1 profit pipeline |
+| **ECR step 1** | **Done** — `quant-ecr` stack, repos `quant-app` / `quant-nginx`, EC2 ECR read, CI IAM |
+| **ECR steps 2–5** | Step **2 done** (compose wiring); steps **3–5** pending (CI push + pull deploy) |
 | **Existing stack** | See [Infrastructure](../architecture/infrastructure.md), [Dev vs Prod](../architecture/dev-vs-prod.md) |
 
 ---
