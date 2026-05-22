@@ -80,6 +80,10 @@ Active changelogs have **no baseline includes** — prod data is not touched unt
 ```bash
 source .env
 ./scripts/liquibase-deploy.sh
+
+# Dry-run — no DDL applied
+./scripts/liquibase-verify.sh --offline   # XML only
+./scripts/liquibase-verify.sh             # status + update-sql preview (needs DB)
 ```
 
 Or run schemas individually:
@@ -105,9 +109,9 @@ Active changelogs are empty manifests — see XML comments in each `db/liquidbas
 | `SP_GET_ENUM` | `REFDATA` | Generic REFCURSOR select for any REFDATA table |
 | `SP_INS_STRATEGY` | `BT` | Soft-versioning insert (auto-VID + IS_CURRENT_IND flip) |
 | `SP_INS_QUEUE` | `BT` | **Unified queue state machine**: `IN_ACTION` = **`ENQUEUE`**, **`CLAIM_NEXT`**, **`TERMINAL`**, **`CANCEL`** — all **`BT.QUEUE`** transitions |
-| `SP_GET_QUEUE` | `BT` | Flexible queue reader (REFCURSOR); coordinator `queryQueue` |
+| `SP_GET_QUEUE` | `BT` | Flexible queue reader (REFCURSOR); FastAPI jobs list/detail |
 | `SP_GET_QUEUE_FOR_TERMINAL` | `BT` | Active rows + strategy metadata (REFCURSOR) |
-| `FN_GET_QUEUE_FOR_TERMINAL` | `BT` | **Function** — coordinator `claimNext` / `queryTerminal` (`RETURNS TABLE`) |
+| `FN_GET_QUEUE_FOR_TERMINAL` | `BT` | **Function** — UI terminal lookup (`RETURNS TABLE`); worker uses `SP_GET_QUEUE_LATEST` |
 | `SP_GET_QUEUE_LATEST` | `BT` | **Queue worker**: active row for one **`QUEUE_ID`** + frozen **`CONFIG_JSON`** (`QUEUE` ⋈ **`STRATEGY`** on **`STRATEGY_VID`**) |
 | `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`**; **`IN_RESULT_ID`** is caller-supplied UUID; OUT row is status triplet only (same shape as **`SP_INS_QUEUE`**) |
 | `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`) |

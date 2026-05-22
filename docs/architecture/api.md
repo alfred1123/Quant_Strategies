@@ -37,6 +37,17 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `POST` | `/api/v1/backtest/performance` | Run a single backtest at fixed params. Returns equity curve, metrics, and daily P&L. |
 | `POST` | `/api/v1/backtest/walk-forward` | Walk-forward overfitting test. Returns IS/OOS metrics, overfitting ratio, and full equity curve. |
 
+### Jobs (backtest queue)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/jobs` | Enqueue a backtest job (202 Accepted). |
+| `GET`  | `/api/v1/jobs` | List queue rows for the current user. |
+| `GET`  | `/api/v1/jobs/{queue_id}` | Job detail + strategy metadata. |
+| `POST` | `/api/v1/jobs/{queue_id}/cancel` | Cancel a queued or running job. |
+| `POST` | `/api/v1/jobs/{queue_id}/re-enqueue` | Re-enqueue from a terminal row. |
+| `GET`  | `/api/v1/jobs/{queue_id}/events` | SSE stream of job progress events. |
+
 ### REFDATA / Instruments
 
 | Method | Path | Description |
@@ -105,9 +116,9 @@ If Postgres or Redis is **unreachable at startup**, the backend fails fast — R
 ## Project Structure
 
 ```
-api/
+quant/api/
 ├── main.py              # App factory — CORS, lifespan, router registration
-├── config.py            # Settings, env loading (calls quant.shared.logging.setup_logging)
+├── deps.py              # FastAPI dependencies (DataCaches, auth)
 ├── auth/
 │   ├── router.py        # /api/v1/auth/* endpoints
 │   ├── service.py       # AuthService — password verify (Argon2), JWT
@@ -116,12 +127,17 @@ api/
 │   └── models.py        # Pydantic models (LoginRequest, etc.)
 ├── routers/
 │   ├── backtest.py      # /api/v1/backtest/* endpoints
+│   ├── jobs.py          # /api/v1/jobs/* endpoints
 │   ├── refdata.py       # /api/v1/refdata/* endpoints
 │   └── inst.py          # /api/v1/inst/* endpoints
 ├── schemas/
-│   └── backtest.py      # Pydantic request/response models
+│   ├── backtest.py      # Backtest request/response models (also in quant/schemas/)
+│   └── jobs.py          # Job queue models
 └── services/
-    └── backtest.py      # _build_config, run_optimize, stream_optimize, etc.
+    └── jobs.py          # Enqueue, list, cancel, SSE broker
+
+quant/shared/config.py   # Settings, env/SSM loading (not under api/)
+quant/strategy/backtest_service.py  # Backtest orchestration (called from routers)
 ```
 
 REFDATA, INST, and BT cache classes live under `quant/refdata/` and `quant/data/` (shared between the API and the worker via `quant/refdata/bundle.py::DataCaches`). All Postgres access goes through `quant/shared/db.py::DbGateway` — no other module in `quant/` or `quant/api/` imports `psycopg`.

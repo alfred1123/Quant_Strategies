@@ -7,14 +7,14 @@ argument-hint: 'Indicator name, e.g. MACD, VWAP, ATR'
 # Add Technical Indicator
 
 ## When to Use
-- Adding a new indicator to `src/ta.py`
+- Adding a new indicator to `quant/strategy/indicators.py`
 - Extending the backtest pipeline with a new signal source
 
 ## Procedure
 
 ### 1. Implement the indicator
 
-Add a method to `TechnicalAnalysis` in [ta.py](../../src/ta.py):
+Add a method to `TechnicalAnalysis` in [indicators.py](../../quant/strategy/indicators.py):
 
 ```python
 def get_<name>(self, period):

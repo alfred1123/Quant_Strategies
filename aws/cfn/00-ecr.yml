@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
   Quant Strategies — ECR repositories for production container images.
   Repos: quant-app (api, worker, future trade), quant-nginx (static SPA + proxy).
-  See docs/design/deploy-build-pipeline.md § ECR implementation checklist.
+  See docs/architecture/infrastructure.md (CI/CD) and docs/archive/deploy-build-pipeline.md.
 
 Parameters:
   Project:

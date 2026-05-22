@@ -4,9 +4,8 @@
 
 | Path | Role |
 |------|------|
-| `src/` | Pipeline: `data.py` → `strat.py` (indicators + strategies + signals) → `perf.py` → `param_opt.py`, orchestrated by `main.py` |
-| `quant/api/` | FastAPI backend (Phase 7+8) |
-| `frontend/` | React/TypeScript SPA (Phase 8) |
+| `quant/` | Pipeline + FastAPI: `data/`, `refdata/`, `strategy/`, `queue/`, `trade/`, `shared/`, `api/`, `cli.py` |
+| `frontend/` | React/TypeScript SPA |
 | `docs/` | MkDocs Material wiki — architecture, guides, design docs, decisions log |
 | `backup/deco/` | Decommissioned scripts (kept for reference) |
 | `tests/unit/` | Unit tests per module |
@@ -16,7 +15,7 @@
 ## Code Style
 
 - Python 3.12+, pandas/numpy idioms matching existing modules.
-- Imports in `src/` are **relative** to that package (e.g. `from data import Glassnode`).
+- Import from the `quant` package (e.g. `from quant.data.sources import ...`).
 - Run tests with `python -m pytest tests/ -v` from project root.
 
 ## Logging
@@ -24,7 +23,7 @@
 - Every module uses `import logging` and `logger = logging.getLogger(__name__)` at the top.
 - Logging format and level are configured **once** in `quant/shared/logging.py` (`setup_logging()`). Do **not** call `logging.basicConfig()` anywhere else.
 - **Entry points only** (`quant/cli.py`, `quant/shared/config.py` via `load_config()`) call `setup_logging()`.
-- Library modules (`data.py`, `ta.py`, `perf.py`, `strat.py`, `param_opt.py`) **never** call `basicConfig` or `setup_logging` — they only use `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`.
+- Library modules **never** call `basicConfig` or `setup_logging` — they only use `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`.
 - Do **not** use `print()` for status output — use the logger at the appropriate level.
 
 ## Build and Test
@@ -33,13 +32,13 @@
 ./setup.sh                        # Create venv, install deps
 source env/bin/activate
 python -m pytest tests/ -v        # Run all tests
-python -m quant.cli                # Run backtest
+python -m quant.cli               # Run backtest
 ```
 
 ## Conventions
 
 - Keep changes **focused** — extend existing functions/classes rather than duplicating logic.
-- **Testing**: After any change to `src/`, review and update the corresponding unit tests in `tests/unit/` and integration tests in `tests/integration/`. New functions or classes must have unit tests. Run `python -m pytest tests/ -v` and confirm all tests pass before considering the change complete.
+- **Testing**: After any change to `quant/`, review and update the corresponding unit tests in `tests/unit/` and integration tests in `tests/integration/`. New functions or classes must have unit tests. Run `python -m pytest tests/ -v` and confirm all tests pass before considering the change complete.
 - **Secrets**: API keys live in `.env` (gitignored) at the project root. Never commit credentials.
 - `env/` is gitignored — always recreate via `setup.sh` or `requirements.txt`.
 - New dependencies go in `requirements.txt`.

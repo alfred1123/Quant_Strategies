@@ -7,7 +7,7 @@ argument-hint: 'Data source name, e.g. Tiingo, Binance, EODHD'
 # Add Data Source
 
 ## When to Use
-- Adding a new pricing data provider to `src/data.py`
+- Adding a new pricing data provider to `quant/data/sources.py`
 - Integrating a free or paid API for equity, crypto, or ETF data
 - Replacing or supplementing an existing data source
 
@@ -15,7 +15,7 @@ argument-hint: 'Data source name, e.g. Tiingo, Binance, EODHD'
 
 ### 1. Implement the class
 
-Add a class to [data.py](../../src/data.py) following the existing pattern:
+Add a class to [sources.py](../../quant/data/sources.py) following the existing pattern:
 
 ```python
 class <SourceName>:

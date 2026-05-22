@@ -3,28 +3,27 @@ Backtest pipeline: fetch data, compute indicators, run strategy,
 measure performance, and optimize parameters via grid search.
 
 Usage:
-    python -m main [OPTIONS]
-    # or: cd src && python main.py [OPTIONS]
+    python -m quant.cli [OPTIONS]
 
 Examples:
     # Run with defaults (BTC-USD, Bollinger + Momentum, crypto 365)
-    python main.py
+    python -m quant.cli
 
     # Equity backtest with custom window/signal
-    python main.py --symbol AAPL --asset equity --window 50 --signal 1.5
+    python -m quant.cli --symbol AAPL --asset equity --window 50 --signal 1.5
 
     # Custom date range + grid search bounds
-    python main.py --symbol ETH-USD --start 2020-01-01 --end 2026-01-01 \
+    python -m quant.cli --symbol ETH-USD --start 2020-01-01 --end 2026-01-01 \
                    --win-min 10 --win-max 60 --win-step 10
 
     # Different indicator + strategy combination
-    python main.py --indicator sma --strategy reversion
+    python -m quant.cli --indicator sma --strategy reversion
 
     # Skip grid search (single backtest only)
-    python main.py --no-grid
+    python -m quant.cli --no-grid
 
     # Custom output directory
-    python main.py --outdir /tmp/results
+    python -m quant.cli --outdir /tmp/results
 
 Options:
     --symbol        Yahoo Finance ticker              (default: BTC-USD)

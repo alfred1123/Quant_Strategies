@@ -15,16 +15,16 @@ and deployed via the AWS CLI.
                                │  HTTP :80  (HTTPS :443 with TLS overlay)
                                ▼
                    ┌───────────────────────┐
-                   │   EC2  (t4g.small)    │
+                   │   EC2  (t4g.medium)   │
                    │                       │
                    │  ┌─────────────────┐  │
-                   │  │  nginx          │  │  Static files (frontend/dist/)
-                   │  │  :80 → :8000    │  │  TLS termination via tls overlay
+                   │  │  nginx          │  │  SPA (ECR quant-nginx)
+                   │  │  :80 → api:8000 │  │
                    │  └────────┬────────┘  │
                    │           │           │
                    │  ┌────────▼────────┐  │
-                   │  │  uvicorn        │  │  FastAPI on 127.0.0.1:8000
-                   │  │  (Docker)       │  │
+                   │  │  api + worker   │  │  FastAPI + queue worker (ECR quant-app)
+                   │  │  redis          │  │
                    │  └────────┬────────┘  │
                    │           │           │
                    └───────────┼───────────┘
@@ -257,7 +257,7 @@ Or remotely via SSM:
 
 ```bash
 aws ssm send-command \
-  --instance-ids i-096f85bf84852cce3 \
+  --instance-ids i-03a670ddc9169233a \
   --document-name AWS-RunShellScript \
   --parameters 'commands=["curl -fsSL https://raw.githubusercontent.com/alfred1123/Quant_Strategies/main/aws/scripts/bootstrap-ec2.sh | sudo -u ec2-user bash"]' \
   --profile alfcheun --region ap-southeast-1
@@ -277,7 +277,7 @@ gh workflow run deploy
 When the workload outgrows a single EC2 (e.g. independent queue worker
 scaling), add an ECS stack:
 
-1. Create `04-ecr.yml` for container image repositories
+1. Reuse existing ECR repos (`00-ecr.yml` — `quant-app`, `quant-nginx`)
 2. Create `05-ecs.yml` for ECS cluster, ALB, API service, worker service
 3. The same Docker images and SSM parameters work unchanged
-4. Remove the compute stack (`03-compute.yml`)
+4. Remove the compute stack (`03-compute.yml`) when ready

@@ -488,20 +488,17 @@ pass `window` and `signal` explicitly to `strategy_to_json(cfg, window=20, signa
 
 ## 11. AWS Infrastructure
 
-### Compute — EC2 t4g.small (Graviton ARM)
+### Compute — EC2 t4g.medium (Graviton ARM)
 
 | Spec | Value |
 |------|-------|
 | vCPU | 2 |
-| RAM | 2 GB |
-| Architecture | ARM64 (Graviton) — 20% cheaper than x86 |
-| Baseline CPU | 20% sustained, burstable to 100% |
-| On-Demand | ~$12/mo |
-| Reserved 1yr | ~$7/mo |
+| RAM | 4 GB |
+| Architecture | ARM64 (Graviton) |
+| On-Demand | ~$24/mo |
+| Reserved 1yr | ~$14/mo |
 
-**Why burstable**: FastAPI idle 99% of the time, daily signal cron runs for seconds, backtests are occasional bursts. CPU credits accumulate overnight. Upgrade to `t4g.medium` (4 GB, ~$24/mo) only if grid search exhausts burst credits regularly.
-
-**Why Graviton**: Entire stack is Python — no x86 dependency. ARM is cheaper and faster for Python workloads.
+**Current prod:** `t4g.medium` per decision #34 — headroom for api + worker + redis + future trade service. See [phase-0.2-capacity.md](../archive/phase-0/phase-0.2-capacity.md).
 
 ### Database — Aurora PostgreSQL 17.9 (Serverless v2)
 
@@ -526,19 +523,8 @@ pass `window` and `signal` explicitly to `strategy_to_json(cfg, window=20, signa
 
 ```
 ┌───────────────────────────────────────────────┐
-│  EC2 t4g.small                                │
-│                                               │
-│  ┌─────────────────┐   ┌──────────────────┐   │
-│  │  FastAPI         │   │  React/TS        │   │
-│  │  Trade API       │   │  Frontend        │   │
-│  │  :8000           │   │  :3000           │   │
-│  └────────┬─────────┘   └──────────────────┘   │
-│           │                                    │
-│  ┌────────┴─────────┐                          │
-│  │  APScheduler /   │                          │
-│  │  Cron             │                          │
-│  │  (daily signals) │                          │
-│  └────────┬─────────┘                          │
+│  EC2 t4g.medium (Docker Compose)               │
+│  nginx + api + worker + redis (+ trade later) │
 └───────────┼───────────────────────────────────┘
             │
             ▼
@@ -568,7 +554,7 @@ DB_URL=postgresql://user:pass@host/quant          # AWS
 
 | Resource | Cost |
 |----------|------|
-| EC2 t4g.small (reserved 1yr) | ~$7 |
+| EC2 t4g.medium (reserved 1yr) | ~$14 |
 | RDS Serverless v2 (mostly idle) | ~$5–15 |
 | EBS 20 GB gp3 | ~$1.60 |
 | **Total** | **~$15–25** |

@@ -73,7 +73,6 @@ nav:
       - Dev vs Prod Config: architecture/dev-vs-prod.md
   - Guides:
       - CLI Backtest: guides/cli-backtest.md
-      - Strategy Implementation Plan: guides/strategy-implementation-plan.md
       - New User Guide (Website): guides/new-user-website.md
       - Indicators & Strategies: guides/indicators-strategies.md
       - Paper Trading (Futu): guides/trading.md
@@ -85,12 +84,15 @@ nav:
       - Backtest Queue: design/backtest-queue.md
       - Jobs Table Detail UX: design/jobs-table-detail-ux.md
       - Trade API: design/trade-api.md
-      - TypeScript Migration: design/ts-migration.md
       - Backtest Speed: design/backtest-speed.md
       - Alternative Data Sources: design/alt-data-sources.md
       - Separate Underlying & Cache: design/separate-underlying.md
       - Login & Authentication: design/login.md
       - Frontend Code Audit: design/frontend-audit.md
-      - Deploy Build Pipeline: design/deploy-build-pipeline.md
       - Plan to Profit: design/plan-to-profit.md
+  - Archive:
+      - Overview: archive/README.md
+      - TypeScript Migration: archive/ts-migration.md
+      - Deploy Build Pipeline: archive/deploy-build-pipeline.md
+      - Phase 0 Signoffs: archive/phase-0/phase-0.1-signoff.md
   - Decisions: decisions.md

@@ -3,7 +3,7 @@ description: "Run a backtest with specified parameters: symbol, date range, indi
 agent: "agent"
 argument-hint: "Symbol, date range, indicator name, strategy name"
 ---
-Run a backtest using the pipeline in `src/`. 
+Run a backtest using the pipeline in `quant/`. 
 
 1. Identify the requested symbol, date range, indicator, and strategy from the user's input.
 2. Show what parameters will be used before running.

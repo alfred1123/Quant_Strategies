@@ -11,7 +11,7 @@
 | Question | Decision |
 |----------|----------|
 | **TRADE executor (Phase 1.7) — where?** | **Same EC2** (`quant-server`) after **t4g.medium** RAM upgrade |
-| **ECR / CI build pipeline — when?** | **Now** — adopt ECR pull deploy before Phase 1 app work lands (see [deploy-build-pipeline.md](deploy-build-pipeline.md)) |
+| **ECR / CI build pipeline — when?** | **Now** — adopt ECR pull deploy before Phase 1 app work lands (see [deploy-build-pipeline.md](../deploy-build-pipeline.md)) |
 | **Separate TRADE host — when?** | **Phase 3.7 only** if t4g.medium proves tight in production |
 | **Daily Sharpe reconcile (Phase 2.2) — where?** | **Same EC2** — cron / one-shot container on `quant-server` |
 | **Reconcile vs trade executor — same box?** | **Yes** on upgraded host; stagger reconcile off peak hours |
@@ -52,11 +52,11 @@ quant-server (EC2 t4g.medium, 4 GiB)
 
 Revisit **only if** post-upgrade live capture shows sustained memory &gt; 85% with trade + one backtest child, or ops wants hard isolation between research queue and live execution.
 
-Then: second small EC2 pulling the same ECR images — see §2 in [deploy-build-pipeline.md](deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file).
+Then: second small EC2 pulling the same ECR images — see §2 in [deploy-build-pipeline.md](../deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file).
 
 ### ECR deploy pipeline (adopted now)
 
-Prod deploy **does not build on EC2**. Full file-by-file checklist: [deploy-build-pipeline.md § ECR implementation checklist](deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file).
+Prod deploy **does not build on EC2**. Full file-by-file checklist: [deploy-build-pipeline.md § ECR implementation checklist](../deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file). **Live ops:** [infrastructure.md § CI/CD](../../architecture/infrastructure.md#cicd--github-actions).
 
 ---
 
@@ -70,7 +70,7 @@ Prod deploy **does not build on EC2**. Full file-by-file checklist: [deploy-buil
 
 **Rationale:** Direct ECR avoids coupling Phase 1 delivery to fragile on-host builds; cost/complexity is bounded (two repos, one workflow change).
 
-Resolves open decision **#4** in [plan-to-profit.md](plan-to-profit.md) §8.
+Resolves open decision **#4** in [plan-to-profit.md](../../design/plan-to-profit.md) §8.
 
 ---
 
@@ -118,7 +118,7 @@ flowchart LR
 ## 5. What we are explicitly not doing now
 
 - No second EC2 for TRADE in Phase 1.
-- No ECS migration (future note in [infrastructure.md](../architecture/infrastructure.md)).
+- No ECS migration (future note in [infrastructure.md](../../architecture/infrastructure.md)).
 - No moving API or queue worker off `quant-server` for Phase 1.
 - No `docker compose build` on production EC2 after ECR cutover.
 
@@ -128,7 +128,7 @@ flowchart LR
 
 | Step | When | Owner |
 |------|------|-------|
-| **ECR CI pipeline** (repos, IAM, workflow, compose `image:`) | **Steps 1–3 done** — ECR pull deploy live — [checklist](deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file) |
+| **ECR CI pipeline** (repos, IAM, workflow, compose `image:`) | **Done** — see [infrastructure.md § CI/CD](../../architecture/infrastructure.md#cicd--github-actions) or [checklist](../deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file) |
 | Upgrade `quant-server` to t4g.medium | **Done** |
 | Build Phase 1 trade compose service on same host | Phase 1.3–1.7 | App |
 | Add reconcile cron on same host | Phase 2.2 | App + ops |

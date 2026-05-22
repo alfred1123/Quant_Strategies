@@ -1,7 +1,10 @@
 # Design Doc: Streamlit → TypeScript Migration
 
+!!! warning "Archived"
+    Historical record only. Current frontend: [architecture/frontend.md](../architecture/frontend.md).
+
 !!! info "Status"
-    **Done.** The React/TypeScript SPA in `frontend/` has fully replaced the Streamlit UI. This page is kept as a historical record of the migration plan and the rationale for the chosen stack. For the current frontend layout see [Architecture → React Frontend](../architecture/frontend.md) and the [Frontend Code Audit](frontend-audit.md) for follow-up work.
+    **Done.** The React/TypeScript SPA in `frontend/` has fully replaced the Streamlit UI. This page is kept as a historical record of the migration plan and the rationale for the chosen stack. For the current frontend layout see [Architecture → React Frontend](../architecture/frontend.md) and the [Frontend Code Audit](../design/frontend-audit.md) for follow-up work.
 
 ## Overview
 

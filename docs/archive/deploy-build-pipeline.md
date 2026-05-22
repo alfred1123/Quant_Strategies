@@ -1,12 +1,16 @@
 # Deploy build pipeline — issue & fix plan
 
+!!! warning "Archived"
+    ECR deploy is **live**. Current ops: [infrastructure.md § CI/CD](../architecture/infrastructure.md#cicd--github-actions).
+
 ## TL;DR
 
-We currently build container images **on the production EC2 host** (arm64
-Graviton) inside the GitHub Actions → SSM deploy step. That couples our deploy
-to a long-standing npm bug around cross-platform optional native dependencies
-and forces fragile workarounds. The proper fix is to **build images in CI and
-pull them on EC2** (ECR-based pipeline).
+**Status (2026-05): ECR pull deploy is live.** CI builds arm64 images, pushes to ECR, and EC2 pulls only — no `docker compose build` on prod. The sections below document the original build-on-EC2 problem and the migration plan (now complete).
+
+Historically we built container images **on the production EC2 host** (arm64
+Graviton) inside the GitHub Actions → SSM deploy step. That coupled deploy
+to npm cross-platform bugs and forced fragile workarounds. The fix was to
+**build images in CI and pull them on EC2** (ECR-based pipeline).
 
 ## The main issue
 
@@ -148,16 +152,17 @@ can recur.
 
 ## ECR implementation checklist (file-by-file)
 
-**Status:** step **1 done** in AWS (2026-05-22). Steps **2–5** (compose, CI push, pull deploy) still pending.
+**Status:** **steps 1–5 done** (2026-05-22). Selective deploy (path-filter per image) added 2026-05. Optional doc touch-ups in §5 remain low priority.
 
 ### Deploy flow — before vs after
 
 ```
-TODAY:
-  push main → test → (npm build check) → SSM → git pull → docker compose BUILD on EC2 → up
+BEFORE (historical):
+  push main → test → SSM → git pull → docker compose BUILD on EC2 → up
 
-AFTER ECR:
-  push main → test → buildx arm64 → push ECR → SSM → git pull → docker login → PULL → up
+NOW (ECR + selective deploy):
+  push main → changes filter → test → buildx (app and/or nginx if changed) → push ECR
+           → SSM → git pull → selective pull/up on EC2 (digest skip when unchanged)
 ```
 
 **Rollback:** redeploy with a previous `IMAGE_TAG=<older-git-sha>`.
@@ -227,10 +232,10 @@ Future **Phase 1.7 `trade`** service reuses the **`quant-app`** ECR image with a
 
 **Status:** **done** (2026-05-22).
 
-| Today | After ECR |
-|-------|-----------|
-| `build` — npm sanity check on runner | **`build-and-push`** — builds and pushes prod images |
-| `deploy` — SSM runs `docker compose build` on EC2 | **`deploy`** — SSM runs `ecr login` → `pull` → `up` only |
+| Today | Current (ECR) |
+|-------|----------------|
+| `build` — npm sanity check on runner | **`changes`** + **`build-and-push`** — builds only changed images |
+| `deploy` — SSM runs `docker compose build` on EC2 | **`deploy`** — SSM selective `pull` + `up` (digest skip) |
 
 **New `build-and-push` job:**
 
@@ -319,4 +324,4 @@ docker image prune -f
 
 ## Decision
 
-**Adopted (Phase 0.3, revised 2026-05-20):** ECR pull deploy is **in scope now** — see decision #35 and [phase-0.3-topology.md](phase-0.3-topology.md). Implementation checklist below is the execution path; cut over from build-on-EC2 before Phase 1 Trade work ships.
+**Adopted (Phase 0.3, revised 2026-05-20):** ECR pull deploy is **in scope now** — see decision #35 and [phase-0.3-topology.md](phase-0/phase-0.3-topology.md). Implementation checklist below is the execution path; cut over from build-on-EC2 before Phase 1 Trade work ships.

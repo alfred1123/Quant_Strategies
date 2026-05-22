@@ -132,14 +132,13 @@ cd frontend && npm test
 For running backtests without the UI:
 
 ```bash
-cd src
-python main.py                          # Default: BTC-USD, Bollinger + momentum
-python main.py --no-grid                # Skip grid search
-python main.py --symbol AAPL --asset equity --window 50 --signal 1.5
-python main.py --walk-forward --split 0.7
+python -m quant.cli                          # Default: BTC-USD, Bollinger + momentum
+python -m quant.cli --no-grid                # Skip grid search
+python -m quant.cli --symbol AAPL --asset equity --window 50 --signal 1.5
+python -m quant.cli --walk-forward --split 0.7
 ```
 
-Run `python main.py --help` for all options. See [CLI Backtest guide](https://alfred1123.github.io/Quant_Strategies/guides/cli-backtest/) for full documentation.
+Run `python -m quant.cli --help` for all options. See [CLI Backtest guide](https://alfred1123.github.io/Quant_Strategies/guides/cli-backtest/) for full documentation.
 
 ---
 

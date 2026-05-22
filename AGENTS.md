@@ -7,7 +7,7 @@ This repository contains Python tooling for **backtesting**, **technical analysi
 | Path | Role |
 |------|------|
 | `quant/` | Backtesting pipeline + FastAPI backend — `shared/` (config, logging, db), `schemas/`, `data/`, `refdata/`, `strategy/`, `queue/`, `trade/`, `cli.py`, and `api/` (HTTP routers) |
-| `frontend/` | React/TypeScript SPA (Phase 8) — replaces Streamlit |
+| `frontend/` | React/TypeScript SPA (replaced Streamlit) |
 | `docs/` | MkDocs Material wiki — architecture, guides, design docs, decisions log. Serve locally with `mkdocs serve`. |
 | `backup/deco/` | Decommissioned scripts (Bybit live trading — kept for reference) |
 
@@ -25,7 +25,7 @@ Run backtest-style code via `python -m quant.cli` or import from the `quant` pac
 - Name columns: `<TABLE>_NM TEXT` (e.g. `STRATEGY_NM`)
 - Audit: every table gets `USER_ID TEXT`, `CREATED_AT TIMESTAMPTZ`. Add `UPDATED_AT TIMESTAMPTZ` **only** on genuinely mutable tables (e.g. REFDATA lookups). Do **not** add `UPDATED_AT` for `IS_CURRENT_IND` flips — soft-versioning inserts a new row instead of updating.
 
-### Testing: After any change to `src/`, review and update the corresponding unit tests in `tests/unit/` and integration tests in `tests/integration/`. New functions or classes must have unit tests. Run `python -m pytest tests/ -v` and confirm all tests pass before considering the change complete.
+### Testing: After any change to `quant/`, review and update the corresponding unit tests in `tests/unit/` and integration tests in `tests/integration/`. New functions or classes must have unit tests. Run `python -m pytest tests/ -v` and confirm all tests pass before considering the change complete.
 - **Secrets**: API keys and env live in `.env` (gitignored) at the project root. Never commit credentials or paste them into source files.
 - **README**: After any change that affects usage, setup, CLI options, directory structure, data sources, or dependencies, review and update `README.md` to keep it accurate.
 - **Wiki**: After any change that affects architecture, API endpoints, database schema, indicators, strategies, or design decisions, review and update the relevant page in `docs/` (MkDocs wiki). Run `mkdocs serve` to preview.
@@ -75,12 +75,12 @@ All UI dropdown, radio, and selectbox values must come from `REFDATA` tables in 
 | Conjunction | `REFDATA.CONJUNCTION` | `DISPLAY_NAME` | `NAME` |
 | Grid defaults | `REFDATA.INDICATOR` | — | `WIN_MIN`, `WIN_MAX`, `WIN_STEP`, `SIG_MIN`, `SIG_MAX`, `SIG_STEP` (same table) |
 
-The `INDICATOR_DEFAULTS` dict in `src/strat.py` is a **legacy fallback** — once the FastAPI backend is live, it will be replaced by `RefDataCache.get_indicator_defaults()`.
+The `INDICATOR_DEFAULTS` dict in `quant/strategy/signals.py` is a **legacy fallback** — grid defaults should come from `REFDATA.INDICATOR` via `RedisRefData.get_indicator_defaults()`.
 
 ### REFDATA Caching
 
-- `RefDataCache` lives in `src/data.py` (inherits `DbGateway` from `src/db.py`). Discovers REFDATA tables dynamically from `information_schema` at startup — no hardcoded table list.
-- Backend loads all REFDATA tables into an in-process `RefDataCache` (Python dict) at startup via `REFDATA.SP_GET_ENUM`. `get()` raises `ValueError` on empty tables.
+- **`RefDataPublisher`** (`quant/refdata/publisher.py`) loads REFDATA from Postgres via `REFDATA.SP_GET_ENUM` and writes JSON snapshots to Redis (`refdata:<table>` keys). Invoked at FastAPI startup and on `POST /api/v1/refdata/refresh`.
+- **`RedisRefData`** (`quant/refdata/reader.py`) is the read-only accessor for API handlers and the worker. Checks `refdata:version` on every `get()` and rebuilds its local snapshot when bumped.
 - No TTL — REFDATA changes are rare, admin-only. Refresh via `POST /api/v1/refdata/refresh`.
 - Frontend fetches REFDATA via `GET /api/v1/refdata/{table_name}` and caches client-side with TanStack Query (stale-while-revalidate).
 - DB connection: `localhost:5433` via AWS SSM port-forward.

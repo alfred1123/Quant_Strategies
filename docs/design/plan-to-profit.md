@@ -53,7 +53,7 @@ Work **one subphase at a time** — finish exit criteria before starting the nex
 | [3.4](#phase-34--backtest-side-nav) | Backtest side nav | — |
 | [3.5](#phase-35--compact-queue-table) | Compact queue table | — |
 | [3.6](#phase-36--job--strategy-detail-drawer) | Job / strategy detail drawer | — |
-| [3.7](#phase-37--trade-host--ecr-optional) | Trade host / ECR (optional) | — |
+| [3.7](#phase-37--separate-trade-host-optional) | Separate TRADE host (optional) | — |
 
 ```mermaid
 flowchart TB
@@ -125,7 +125,7 @@ flowchart TB
 
 **Exit criteria:** Written note with walk-forward OOS metrics; live candidate `strategy_id` confirmed for Phase 1.6 / 1.7.
 
-**Result (2026-05-20):** **WATCH** — `bollinger_momentum_60_1.75` on `btcusdt.crypto`. Full Sharpe 1.19; OOS (30%) 0.42; WF OOS negative. Dry-run/paper OK; defer live apply. See [phase-0.1-signoff.md](phase-0.1-signoff.md) and decision #33.
+**Result (2026-05-20):** **WATCH** — `bollinger_momentum_60_1.75` on `btcusdt.crypto`. Full Sharpe 1.19; OOS (30%) 0.42; WF OOS negative. Dry-run/paper OK; defer live apply. See [phase-0.1-signoff.md](../archive/phase-0/phase-0.1-signoff.md) and decision #33.
 
 ---
 
@@ -144,7 +144,7 @@ flowchart TB
 
 **Exit criteria:** One-page capacity snapshot with “safe to add container Y/N” and rough CPU/mem budget.
 
-**Result (2026-05-20):** t4g.small (2 GiB) — **NO** for +1 trade worker without upgrade; **YES** for daily reconcile cron. Recommend **t4g.medium** or separate TRADE host before Phase 1.7. See [phase-0.2-capacity.md](phase-0.2-capacity.md); live metrics: `bash aws/scripts/capacity_snapshot.sh` on EC2.
+**Result (2026-05-20):** t4g.small (2 GiB) — **NO** for +1 trade worker without upgrade; **YES** for daily reconcile cron. **Upgraded to t4g.medium** per decision #34. See [phase-0.2-capacity.md](../archive/phase-0/phase-0.2-capacity.md); live metrics: `bash aws/scripts/capacity_snapshot.sh` on EC2.
 
 ---
 
@@ -163,7 +163,7 @@ flowchart TB
 
 **Exit criteria:** Recorded decision — no need to implement ECR yet unless chosen “now.”
 
-**Result (2026-05-20):** **Same EC2** for Phase 1 TRADE + Phase 2 reconcile after **t4g.medium** upgrade. **ECR pull deploy adopted now** (before Phase 1 app work). Separate TRADE host only if needed in Phase 3.7. See [phase-0.3-topology.md](phase-0.3-topology.md) and decision #35.
+**Result (2026-05-20):** **Same EC2** for Phase 1 TRADE + Phase 2 reconcile after **t4g.medium** upgrade. **ECR pull deploy adopted now** (before Phase 1 app work). Separate TRADE host only if needed in Phase 3.7. See [phase-0.3-topology.md](../archive/phase-0/phase-0.3-topology.md) and decision #35.
 
 ---
 
@@ -501,21 +501,23 @@ flowchart TB
 
 ---
 
-#### Phase 3.7 — Trade host / ECR (optional)
+#### Phase 3.7 — Separate TRADE host (optional)
 
 | | |
 |---|---|
 | **Depends on** | 0.3, 1.7 stable |
 | **Blocks** | — |
 
+**Scope:** ECR for app/nginx is **already live** (decision #35). This subphase is only about a **second EC2** if metrics warrant isolation.
+
 **Tasks**
 
-- [ ] If 0.3 chose separate host: build/push TRADE image to ECR, deploy trade worker.
+- [ ] If metrics warrant: second EC2 pulling same ECR `quant-app` image with trade-only `command:`.
 - [ ] If same host: document why and set revisit trigger (CPU &gt; X%).
 
 **Exit criteria:** **M3 — Product** met when 3.1–3.6 done; 3.7 done only if topology decision requires it.
 
-Align with [Backtest Queue](backtest-queue.md), [Deploy Build Pipeline](deploy-build-pipeline.md).
+Align with [Backtest Queue](backtest-queue.md), [Infrastructure CI/CD](../architecture/infrastructure.md#cicd--github-actions).
 
 ---
 
@@ -849,7 +851,7 @@ Required before first live apply per deployment:
 |-------|--------|
 | **EC2 + Docker** | Measure CPU/mem before adding trade container alongside API + worker + Redis |
 | **ECR step 1** | **Done** — `quant-ecr` stack, repos `quant-app` / `quant-nginx`, EC2 ECR read, CI IAM |
-| **ECR steps 2–5** | Steps **2–3 done** (compose + CI push/pull deploy); docs/README cleanup optional |
+| **ECR pipeline** | **Done** — compose + CI push/pull + selective deploy; see [infrastructure.md](../architecture/infrastructure.md#cicd--github-actions) |
 | **Existing stack** | See [Infrastructure](../architecture/infrastructure.md), [Dev vs Prod](../architecture/dev-vs-prod.md) |
 
 ---
@@ -893,7 +895,7 @@ Detailed tasks and exit criteria for each row are in [§2 Phased Roadmap](#2-pha
 | 1 | **Backtest side nav taxonomy** | See §4.1 options A/B/C |
 | 2 | **What to store per optimization** | Full equity curve vs summary stats only |
 | 3 | **Sharpe reconcile storage** | Daily snapshot table vs rolling window materialized view |
-| 4 | **ECR cutover for TRADE** | **Resolved (0.3):** **ECR now** — see [deploy-build-pipeline.md § ECR implementation checklist](deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file). |
+| 4 | **ECR cutover for TRADE** | **Resolved (0.3):** **ECR now** — see [infrastructure.md § CI/CD](../architecture/infrastructure.md#cicd--github-actions). |
 | 5 | **Silent failure policy** | Heartbeat table, external uptime, exchange position reconcile |
 | 6 | **Exchange limit detection** | Post-MVP per exchange |
 
@@ -917,7 +919,7 @@ Notes mentioned alternative profit paths (e.g. horse racing, Poisson/Bernoulli m
 | [Database](../architecture/database.md) | `BT.*`, planned `TRADE.*` |
 | [Frontend](../architecture/frontend.md) | React SPA structure |
 | [Paper Trading guide](../guides/trading.md) | Existing Futu utility (pattern reference) |
-| [Deploy Build Pipeline](deploy-build-pipeline.md) | ECR file-by-file checklist (adopted, not yet implemented) |
+| [Deploy Build Pipeline](../archive/deploy-build-pipeline.md) | ECR history — **live ops:** [infrastructure.md](../architecture/infrastructure.md#cicd--github-actions) |
 
 ---
 

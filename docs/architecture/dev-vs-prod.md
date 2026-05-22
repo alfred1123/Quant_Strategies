@@ -89,7 +89,7 @@ Start the SSM tunnel (runs automatically via Cursor hook, or manually):
 
 ```bash
 aws ssm start-session \
-  --target i-096f85bf84852cce3 \
+  --target i-03a670ddc9169233a \
   --document-name AWS-StartPortForwardingSessionToRemoteHost \
   --parameters '{"host":["quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com"],"portNumber":["5432"],"localPortNumber":["5433"]}' \
   --profile alfcheun
@@ -251,7 +251,7 @@ aws ssm put-parameter --name /quant/dev/QUANTDB_HOST \
 After updating prod SSM params, restart the API container on EC2:
 
 ```bash
-aws ssm send-command --instance-ids i-096f85bf84852cce3 \
+aws ssm send-command --instance-ids i-03a670ddc9169233a \
   --document-name AWS-RunShellScript \
   --parameters 'commands=["cd /opt/quant && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d"]' \
   --region ap-southeast-1
@@ -279,13 +279,17 @@ aws ssm send-command --instance-ids i-096f85bf84852cce3 \
 ## Docker Compose layering
 
 ```bash
-# Dev (HTTP, SSM /quant/dev/ config, falls back to .env if offline)
+# Dev (HTTP, local build)
 docker compose up -d --build
 
-# Prod HTTP-only (SSM secrets, direct RDS, no TLS)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Prod — CI deploys via ECR pull (no --build on EC2). Manual equivalent:
+export IMAGE_TAG=<git-sha>
+export APP_IMAGE=<acct>.dkr.ecr.ap-southeast-1.amazonaws.com/quant-app:${IMAGE_TAG}
+export NGINX_IMAGE=<acct>.dkr.ecr.ap-southeast-1.amazonaws.com/quant-nginx:${IMAGE_TAG}
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
 
 # Prod with TLS (requires DOMAIN)
 export DOMAIN=yourdomain.com
-docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.tls.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.tls.yml up -d
 ```

@@ -13,7 +13,7 @@
 #     --parameters 'commands=["cd /opt/quant && bash aws/scripts/capacity_snapshot.sh"]' \
 #     --region ap-southeast-1
 #
-# Paste output into docs/design/phase-0.2-capacity.md §Live capture.
+# Paste output into docs/archive/phase-0/phase-0.2-capacity.md §Live capture.
 
 set -euo pipefail
 
