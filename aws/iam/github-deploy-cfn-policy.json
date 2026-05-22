@@ -141,6 +141,15 @@
       "Resource": "arn:aws:ssm:ap-southeast-1:539163478329:parameter/quant/*"
     },
     {
+      "Sid": "SsmReadAwsPublicAmiParams",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:GetParameters"
+      ],
+      "Resource": "arn:aws:ssm:ap-southeast-1::parameter/aws/service/ami-amazon-linux-latest/*"
+    },
+    {
       "Sid": "EcrManageQuantRepos",
       "Effect": "Allow",
       "Action": [

@@ -213,6 +213,8 @@ jobs:
             --timeout-seconds 900 \
             --parameters commands='[
               "set -euo pipefail",
+              "mkdir -p /opt/quant",
+              "if [ ! -d /opt/quant/.git ]; then git clone https://github.com/alfred1123/Quant_Strategies.git /opt/quant; fi",
               "cd /opt/quant",
               "git config --system --add safe.directory /opt/quant",
               "echo \"── BEFORE ──\"",
