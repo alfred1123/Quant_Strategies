@@ -178,15 +178,31 @@ AFTER ECR:
 
 **One-time ops (outside repo):**
 
-```bash
-# Deploy ECR stack
-bash aws/deploy.sh ecr
+The CFN policy JSON is ~5 KB — **too large for an inline user policy** (2048-byte
+limit). Use **customer-managed policies** and attach to `quant_deploy`:
 
-# Attach push policy to GitHub deploy IAM user
-aws iam put-user-policy --user-name quant_deploy \
-  --policy-name quant-deploy-ecr \
+```bash
+# Create or update managed policies (admin creds)
+aws iam create-policy --policy-name quant-deploy-cfn \
+  --policy-document file://aws/iam/github-deploy-cfn-policy.json \
+  --profile alfcheun --region ap-southeast-1
+# If policy already exists, create a new version instead:
+# aws iam create-policy-version --policy-arn arn:aws:iam::539163478329:policy/quant-deploy-cfn \
+#   --policy-document file://aws/iam/github-deploy-cfn-policy.json --set-as-default
+
+aws iam create-policy --policy-name quant-deploy-ecr \
   --policy-document file://aws/iam/github-deploy-ecr-policy.json \
   --profile alfcheun --region ap-southeast-1
+
+aws iam attach-user-policy --user-name quant_deploy \
+  --policy-arn arn:aws:iam::539163478329:policy/quant-deploy-cfn \
+  --profile alfcheun
+aws iam attach-user-policy --user-name quant_deploy \
+  --policy-arn arn:aws:iam::539163478329:policy/quant-deploy-ecr \
+  --profile alfcheun
+
+# Deploy ECR stack (CLI or re-run GitHub cfn job)
+bash aws/deploy.sh ecr
 ```
 
 ---

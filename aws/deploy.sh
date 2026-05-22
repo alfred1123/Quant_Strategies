@@ -79,7 +79,7 @@ matches = [p['ParameterValue'] for p in params if p['ParameterKey'] == '${key}']
 print(matches[0] if matches else '', end='')
 " 2>/dev/null || true)
       if [[ -n "$val" ]]; then
-        overrides+=("ParameterKey=${key},ParameterValue=${val}")
+        overrides+=("${key}=${val}")
       fi
     done
   fi
@@ -97,7 +97,7 @@ print(matches[0] if matches else '', end='')
     done
     if ! $has_pw; then
       read -rsp "  DB master password (or Ctrl-C to abort): " db_pw; echo
-      override_args+=("ParameterKey=MasterUserPassword,ParameterValue=${db_pw}")
+      override_args+=("MasterUserPassword=${db_pw}")
     fi
   fi
 
@@ -109,7 +109,7 @@ print(matches[0] if matches else '', end='')
       --query "Stacks[0].Outputs[?OutputKey=='RdsSecurityGroupId'].OutputValue" \
       --output text --region "$REGION" --no-cli-pager 2>/dev/null || true)
     if [[ -n "$rds_sg" ]]; then
-      override_args+=("ParameterKey=RdsSecurityGroupId,ParameterValue=${rds_sg}")
+      override_args+=("RdsSecurityGroupId=${rds_sg}")
     fi
   fi
 
@@ -120,7 +120,7 @@ print(matches[0] if matches else '', end='')
       --query "Stacks[0].Outputs[?OutputKey=='Ec2SecurityGroupId'].OutputValue" \
       --output text --region "$REGION" --no-cli-pager 2>/dev/null || true)
     if [[ -n "$ec2_sg" ]]; then
-      override_args+=("ParameterKey=Ec2SecurityGroupId,ParameterValue=${ec2_sg}")
+      override_args+=("Ec2SecurityGroupId=${ec2_sg}")
     fi
   fi
 
