@@ -38,7 +38,7 @@ from typing import Callable
 
 import redis
 
-from quant.api.config import get_redis_url, load_config
+from quant.shared.config import get_redis_url, load_config
 from quant.queue.repo import BtQueueRepo
 from quant.queue.wake import wait_for_wake
 from quant.refdata.reader import RedisRefData

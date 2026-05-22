@@ -1,6 +1,5 @@
 """Unit tests for api.auth.service — JWT secret resolution and AuthService basics."""
 
-from __future__ import annotations
 
 import os
 from unittest.mock import patch

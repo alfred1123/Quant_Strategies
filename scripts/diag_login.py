@@ -6,7 +6,6 @@ Usage:
     python scripts/diag_login.py testuser '<the password you type in the form>'
 """
 
-from __future__ import annotations
 
 import logging
 import os
@@ -14,7 +13,7 @@ import sys
 
 from quant.api.auth.repo import AuthRepo
 from quant.api.auth.service import AuthService
-from quant.api.config import _build_db_conninfo
+from quant.shared.config import _build_db_conninfo
 
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s %(name)s: %(message)s")
 

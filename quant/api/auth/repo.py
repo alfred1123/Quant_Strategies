@@ -1,6 +1,5 @@
 """Auth DB repository — wraps CORE_ADMIN.SP_GET_APP_USER_BY_USERNAME / SP_UPD_APP_USER_LAST_LOGIN."""
 
-from __future__ import annotations
 
 import logging
 from uuid import UUID

@@ -54,29 +54,10 @@ import pandas as pd
 import seaborn as sns
 
 from quant.data.sources import NasdaqDataLink, YahooFinance
+from quant.shared.logging import setup_logging
 from quant.strategy.optimizer import ParametersOptimization
 from quant.strategy.performance import Performance
 from quant.strategy.signals import SignalDirection, StrategyConfig
-
-LOG_FORMAT = '[%(asctime)s] [%(levelname)s] %(name)s: %(message)s'
-LOG_DATEFMT = '%Y-%m-%d %H:%M:%S'
-_LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'log')
-_LOG_FILE = os.path.join(_LOG_DIR, 'bt_app.log')
-
-
-def setup_logging(*, debug: bool = False) -> None:
-    os.makedirs(_LOG_DIR, exist_ok=True)
-    level = logging.DEBUG if debug else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format=LOG_FORMAT,
-        datefmt=LOG_DATEFMT,
-        handlers=[
-            logging.FileHandler(_LOG_FILE),
-            logging.StreamHandler(),
-        ],
-    )
-
 from quant.strategy.walk_forward import WalkForward
 
 logger = logging.getLogger(__name__)

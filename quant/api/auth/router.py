@@ -6,7 +6,6 @@ Cookie attributes:
   For HTTP-only prod deploys, set ``COOKIE_SECURE=0`` explicitly.
 """
 
-from __future__ import annotations
 
 import logging
 import os

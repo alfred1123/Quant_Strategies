@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 
 from quant.api.auth.dependencies import require_user
 from quant.api.auth.models import CurrentUser
-from quant.api.config import get_redis_url
+from quant.shared.config import get_redis_url
 from quant.api.deps import get_data_caches
 from quant.api.schemas.jobs import EnqueueRequest, EnqueueResponse, JobDetail, JobRow
 from quant.api.services.jobs import (

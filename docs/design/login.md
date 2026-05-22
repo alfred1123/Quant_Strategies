@@ -54,7 +54,7 @@ Before public hosting (Tier 1 in the deployment ladder), the app must require a 
 ## 4. Constraints & Observations
 
 - Backend is FastAPI (async, Pydantic v2). Frontend is React 19 + TanStack Query, served separately by Vite in dev and (in prod) by nginx.
-- `quant/api/config.py` already has SSM/.env loader — JWT signing key fits there.
+- `quant/shared/config.py` already has SSM/.env loader — JWT signing key fits there.
 - Audit columns (`USER_ID TEXT`) exist on every table per `AGENTS.md`. Today they receive `"alfcheun"`. We just need to plumb a real value.
 - All writes go through SPs (no direct DML). **Login itself reads a user table — `SELECT` is allowed directly per project conventions.** User provisioning runs as Liquibase changesets — that is the documented exception to the no-direct-DML rule.
 - HTTPS is mandatory for cookie-based auth. Tier 1 deployment already plans nginx + Let's Encrypt; this doc assumes that's in place.

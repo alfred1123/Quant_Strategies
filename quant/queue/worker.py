@@ -29,9 +29,9 @@ import sys
 import traceback
 import uuid
 
-from quant.api.config import load_config, get_redis_url
-from quant.api.schemas.backtest import OptimizeRequest
-from quant.api.services.backtest import run_optimize
+from quant.shared.config import load_config, get_redis_url
+from quant.schemas.backtest import OptimizeRequest
+from quant.strategy.backtest_service import run_optimize
 
 from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
@@ -140,7 +140,7 @@ class BacktestWorker:
 
 
 def main(argv: list[str]) -> int:
-    # Initialise logging (api.config.setup_logging) + load .env/SSM + DB conninfo.
+    # Initialise logging + load .env/SSM + DB conninfo via quant.shared.config.load_config().
     db_url = load_config()
 
     if len(argv) != 2:

@@ -22,7 +22,7 @@ environment after a deploy or onboard quickly.
 | DB access method | SSM port-forward tunnel | Direct VPC connection | Network topology |
 | Nginx config | `nginx.dev.conf` (HTTP only) | Same (HTTP) or `nginx.conf` (TLS via `docker-compose.tls.yml`) | `docker/nginx/` |
 | Swagger UI | enabled (`/docs`) | disabled | `quant/api/main.py` checks `APP_ENV` |
-| Logging | stdout, plus file (`log/bt_app.log`) when running locally **without** `USE_SSM=1` | stdout only | `quant/api/config.py` `setup_logging()` |
+| Logging | stdout, plus file (`log/bt_app.log`) when running locally **without** `USE_SSM=1` | stdout only | `quant/shared/logging.py` `setup_logging()` |
 
 ---
 
@@ -48,7 +48,7 @@ docker compose up                         docker compose -f docker-compose.yml
       │  (fallback if SSM unreachable:      JWT_SECRET, CORS_ORIGINS, etc.
       │   loads .env instead)                     │
       ▼                                           ▼
-  quant/api/config.py                            quant/api/config.py
+  quant/shared/config.py                            quant/shared/config.py
   _load_from_ssm("dev")                   _load_from_ssm("prod")
   _build_db_conninfo()                    _build_db_conninfo()
       │                                           │
@@ -195,7 +195,7 @@ one-off override).
 
 How it works: `appctl.sh` reads `DB_TARGET` and, when set to `local`, exports
 `USE_SSM=0` plus a `QUANTDB_CONNINFO` pointing at `127.0.0.1:5432` with
-`sslmode=disable` before launching uvicorn. `quant/api/config.py` honours
+`sslmode=disable` before launching uvicorn. `quant/shared/config.py` honours
 `QUANTDB_CONNINFO` over the individual `QUANTDB_*` vars, so .env defaults
 remain untouched.
 
@@ -268,7 +268,7 @@ aws ssm send-command --instance-ids i-096f85bf84852cce3 \
 | `docker-compose.yml` | Base services — `USE_SSM=1` default, SSM-first for all envs |
 | `docker-compose.prod.yml` | Prod behavioral flags only — `APP_ENV=prod`, `USE_SSM=1`, `COOKIE_SECURE=0` |
 | `docker-compose.tls.yml` | TLS layer — `COOKIE_SECURE=1`, `DOMAIN`, certbot |
-| `quant/api/config.py` | Config loader — tries SSM first, falls back to `.env` if unreachable |
+| `quant/shared/config.py` | Config loader — tries SSM first, falls back to `.env` if unreachable |
 | `quant/api/auth/router.py` | Cookie `Secure` flag — reads `COOKIE_SECURE` or falls back to `APP_ENV` |
 | `quant/api/main.py` | Swagger toggle, CORS — reads `APP_ENV`, `CORS_ORIGINS` |
 | `aws/scripts/init-ssm-params.sh` | Bootstraps SSM parameters (run once) |

@@ -107,7 +107,7 @@ If Postgres or Redis is **unreachable at startup**, the backend fails fast — R
 ```
 api/
 ├── main.py              # App factory — CORS, lifespan, router registration
-├── config.py            # Settings, env loading, setup_logging()
+├── config.py            # Settings, env loading (calls quant.shared.logging.setup_logging)
 ├── auth/
 │   ├── router.py        # /api/v1/auth/* endpoints
 │   ├── service.py       # AuthService — password verify (Argon2), JWT

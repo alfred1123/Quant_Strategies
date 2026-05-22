@@ -6,17 +6,33 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from quant.api.deps import get_data_caches
-from quant.api.schemas.backtest import (
-    OptimizeRequest, OptimizeResponse,
-    PerformanceRequest, PerformanceResponse,
-    WalkForwardRequest, WalkForwardResponse,
-)
-from quant.api.services import backtest as svc
 from quant.refdata.bundle import DataCaches
+from quant.schemas.backtest import (
+    OptimizeRequest,
+    OptimizeResponse,
+    PerformanceRequest,
+    PerformanceResponse,
+    WalkForwardRequest,
+    WalkForwardResponse,
+)
+from quant.strategy.backtest_service import (
+    BacktestError,
+    run_optimize,
+    run_performance,
+    run_walk_forward,
+    stream_optimize,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/backtest", tags=["backtest"])
+
+
+def _http_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, BacktestError):
+        return HTTPException(status_code=exc.status_code, detail=exc.detail)
+    return HTTPException(status_code=400, detail=str(exc))
+
 
 @router.post("/optimize", response_model=OptimizeResponse)
 def optimize(
@@ -24,7 +40,7 @@ def optimize(
     caches: DataCaches = Depends(get_data_caches),
 ):
     try:
-        return svc.run_optimize(
+        return run_optimize(
             req,
             caches.refdata,
             inst_cache=caches.instrument_cache,
@@ -32,7 +48,7 @@ def optimize(
         )
     except Exception as exc:
         logger.exception("Optimization failed")
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise _http_error(exc) from exc
 
 
 @router.post("/optimize/stream")
@@ -42,7 +58,7 @@ async def optimize_stream(
 ):
     """SSE endpoint streaming per-trial progress during optimization."""
     return StreamingResponse(
-        svc.stream_optimize(
+        stream_optimize(
             req,
             caches.refdata,
             inst_cache=caches.instrument_cache,
@@ -59,7 +75,7 @@ def performance(
     caches: DataCaches = Depends(get_data_caches),
 ):
     try:
-        return svc.run_performance(
+        return run_performance(
             req,
             caches.refdata,
             inst_cache=caches.instrument_cache,
@@ -67,7 +83,7 @@ def performance(
         )
     except Exception as exc:
         logger.exception("Performance calculation failed")
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise _http_error(exc) from exc
 
 
 @router.post("/walk-forward", response_model=WalkForwardResponse)
@@ -76,7 +92,7 @@ def walk_forward(
     caches: DataCaches = Depends(get_data_caches),
 ):
     try:
-        return svc.run_walk_forward(
+        return run_walk_forward(
             req,
             caches.refdata,
             inst_cache=caches.instrument_cache,
@@ -84,4 +100,4 @@ def walk_forward(
         )
     except Exception as exc:
         logger.exception("Walk-forward test failed")
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise _http_error(exc) from exc

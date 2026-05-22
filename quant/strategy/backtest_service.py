@@ -1,7 +1,7 @@
-"""Service layer that bridges FastAPI requests to src/ backtest modules.
+"""Backtest orchestration — fetch data, run optimize / performance / walk-forward.
 
-All heavy lifting is delegated to the existing pipeline modules.
-This layer handles DataFrame ↔ dict conversion and config construction.
+Shared by the FastAPI layer and the queue worker. Raises ``BacktestError``
+for client-facing validation and data issues (HTTP layer maps status codes).
 """
 
 import asyncio
@@ -13,22 +13,33 @@ import threading
 
 import numpy as np
 import pandas as pd
-from fastapi import HTTPException
 
 import quant.data.sources as _data_module
 from quant.data.backtest_cache import BacktestCache
-from quant.strategy.signals import SignalDirection, StrategyConfig, SubStrategy, resolve_signal_func
+from quant.schemas.backtest import (
+    EquityPoint,
+    OptimizeRequest,
+    OptimizeResponse,
+    PerformanceRequest,
+    PerformanceResponse,
+    WalkForwardRequest,
+    WalkForwardResponse,
+)
+from quant.strategy.optimizer import OPTUNA_MAX_TRIALS, ParametersOptimization
 from quant.strategy.performance import Performance
-from quant.strategy.optimizer import ParametersOptimization
+from quant.strategy.signals import StrategyConfig, SubStrategy, resolve_signal_func
 from quant.strategy.walk_forward import WalkForward
 
-from quant.api.schemas.backtest import (
-    OptimizeRequest, PerformanceRequest, WalkForwardRequest,
-    OptimizeResponse, PerformanceResponse, WalkForwardResponse,
-    EquityPoint,
-)
-
 logger = logging.getLogger(__name__)
+
+
+class BacktestError(Exception):
+    """Validation or data error surfaced to API callers and the queue worker."""
+
+    def __init__(self, detail: str, *, status_code: int = 400) -> None:
+        super().__init__(detail)
+        self.detail = detail
+        self.status_code = status_code
 
 # ── Data fetching ────────────────────────────────────────────────────────────
 
@@ -129,9 +140,9 @@ def _build_config(req, cache) -> StrategyConfig:
     signal_type_rows = cache.get("signal_type")
 
     if len(req.factors) >= 2 and not req.conjunction:
-        raise HTTPException(
+        raise BacktestError(
+            "`conjunction` is required when more than one factor is provided.",
             status_code=422,
-            detail="`conjunction` is required when more than one factor is provided.",
         )
 
     substrategies = [
@@ -202,7 +213,7 @@ def _build_data_dict(req, cache, inst_cache=None, bt_cache=None) -> dict[str, pd
         try:
             return _fetch_df(sym, req.start, req.end, ds, cache, inst_cache, bt_cache, refresh=refresh)
         except BacktestCache.CacheMissError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise BacktestError(str(exc)) from exc
 
     main_df = _fetch(req.symbol, req.data_source)
     data_dict = {req.symbol: main_df}
@@ -232,7 +243,7 @@ def _enforce_date_sync(data_dict: dict[str, pd.DataFrame], req_start: str, req_e
     bounds: dict[str, tuple[pd.Timestamp, pd.Timestamp]] = {}
     for sym, df in data_dict.items():
         if df.empty:
-            raise HTTPException(status_code=400, detail=f"No data returned for {sym!r}.")
+            raise BacktestError(f"No data returned for {sym!r}.")
         idx = df.index
         if idx.tz is None:
             idx = idx.tz_localize("UTC")
@@ -244,16 +255,13 @@ def _enforce_date_sync(data_dict: dict[str, pd.DataFrame], req_start: str, req_e
     if common_start > req_s or common_end < req_e:
         limiting_start = max(starts, key=starts.get)
         limiting_end = min(ends, key=ends.get)
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Date ranges across products+factors do not align with "
-                f"requested [{req_start}, {req_end}]. "
-                f"Common coverage = [{common_start.date()}, {common_end.date()}]. "
-                f"Latest start: {limiting_start!r} ({starts[limiting_start].date()}); "
-                f"earliest end: {limiting_end!r} ({ends[limiting_end].date()}). "
-                f"Tick 'Refresh dataset' to fetch matching ranges."
-            ),
+        raise BacktestError(
+            f"Date ranges across products+factors do not align with "
+            f"requested [{req_start}, {req_end}]. "
+            f"Common coverage = [{common_start.date()}, {common_end.date()}]. "
+            f"Latest start: {limiting_start!r} ({starts[limiting_start].date()}); "
+            f"earliest end: {limiting_end!r} ({ends[limiting_end].date()}). "
+            f"Tick 'Refresh dataset' to fetch matching ranges."
         )
 
 def _build_perf_response(data_dict, config, best, fee_bps) -> PerformanceResponse:
@@ -392,13 +400,6 @@ def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None, bt
 
 def _compute_total_trials(req: OptimizeRequest) -> int:
     """Pre-compute the number of trials that optuna will run."""
-    # NOTE [circular-import]: function-scoped import because moving this to
-    # the module top creates a cycle: api.services.backtest → src.param_opt
-    # → (transitively, via Performance) imports that re-touch api.services.
-    # Proper fix is to extract OPTUNA_MAX_TRIALS into a leaf module (e.g.
-    # src/constants.py) that both ends can import safely. Deferred — needs
-    # a small refactor + test sweep.
-    from quant.strategy.optimizer import OPTUNA_MAX_TRIALS
     total = math.prod(
         len(f.window_range.to_values(as_int=True)) * len(f.signal_range.to_values())
         for f in req.factors
@@ -500,13 +501,11 @@ def run_performance(req: PerformanceRequest, cache, inst_cache=None, bt_cache=No
     config = _build_config(req, cache)
 
     if len(req.factors) != len(req.windows) or len(req.factors) != len(req.signals):
-        raise HTTPException(
+        raise BacktestError(
+            f"factors / windows / signals length mismatch: "
+            f"{len(req.factors)} factors, {len(req.windows)} windows, "
+            f"{len(req.signals)} signals.",
             status_code=422,
-            detail=(
-                f"factors / windows / signals length mismatch: "
-                f"{len(req.factors)} factors, {len(req.windows)} windows, "
-                f"{len(req.signals)} signals."
-            ),
         )
 
     if len(req.factors) == 1:

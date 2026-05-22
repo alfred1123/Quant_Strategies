@@ -1,6 +1,5 @@
 """FastAPI dependencies — application-scoped services from ``app.state``."""
 
-from __future__ import annotations
 
 from fastapi import Request
 

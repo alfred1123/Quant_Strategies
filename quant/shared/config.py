@@ -5,47 +5,20 @@ Priority (highest → lowest):
     2. .env file                — local development (python-dotenv)
     3. Hardcoded defaults       — fallback so the app starts without any config
 
-Logging is also initialised here so that all subsequent imports see a
-correctly formatted logger.
+Logging is configured in ``quant.shared.logging`` and invoked from
+``load_config()`` so subsequent imports see a correctly formatted logger.
 
-Usage (call once at process startup, before any other imports):
-    from quant.api.config import load_config
+Usage (call once at process startup):
+    from quant.shared.config import load_config
     load_config()
 """
 
 import logging
 import os
-import sys
+
+from quant.shared.logging import setup_logging
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
-
-LOG_FORMAT = '[%(asctime)s] [%(levelname)s] %(name)s: %(message)s'
-LOG_DATEFMT = '%Y-%m-%d %H:%M:%S'
-_LOG_DIR = os.path.join(os.path.dirname(__file__), os.pardir, 'log')
-_LOG_FILE = os.path.join(_LOG_DIR, 'bt_app.log')
-
-
-def setup_logging(*, debug: bool = False) -> None:
-    level = logging.DEBUG if debug else logging.INFO
-    handlers: list[logging.Handler] = [logging.StreamHandler()]
-
-    # In containers (APP_ENV=prod or USE_SSM=1), log to stdout only.
-    # Locally, also write to a file for convenience.
-    if os.getenv("APP_ENV", "dev").lower() != "prod" and not os.getenv("USE_SSM"):
-        os.makedirs(_LOG_DIR, exist_ok=True)
-        handlers.append(logging.FileHandler(_LOG_FILE))
-
-    logging.basicConfig(
-        level=level,
-        format=LOG_FORMAT,
-        datefmt=LOG_DATEFMT,
-        handlers=handlers,
-    )
-
 
 # ---------------------------------------------------------------------------
 # SSM / env loading

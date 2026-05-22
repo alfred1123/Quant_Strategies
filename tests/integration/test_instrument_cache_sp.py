@@ -12,7 +12,6 @@ interpreted in the server's session timezone (HKT) but the seeded data was
 stored at UTC midnight.
 """
 
-from __future__ import annotations
 
 import os
 

@@ -15,7 +15,6 @@ Exit codes:
     2  password too short
     3  cancelled (Ctrl-C / EOF)
 """
-from __future__ import annotations
 
 import getpass
 import sys

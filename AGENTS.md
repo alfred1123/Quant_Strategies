@@ -6,7 +6,7 @@ This repository contains Python tooling for **backtesting**, **technical analysi
 
 | Path | Role |
 |------|------|
-| `quant/` | Backtesting pipeline + FastAPI backend — `data/`, `refdata/`, `strategy/`, `queue/`, `trade/`, `cli.py`, and `api/` (HTTP: `main.py`, `routers/`, `config.py`) |
+| `quant/` | Backtesting pipeline + FastAPI backend — `shared/` (config, logging, db), `schemas/`, `data/`, `refdata/`, `strategy/`, `queue/`, `trade/`, `cli.py`, and `api/` (HTTP routers) |
 | `frontend/` | React/TypeScript SPA (Phase 8) — replaces Streamlit |
 | `docs/` | MkDocs Material wiki — architecture, guides, design docs, decisions log. Serve locally with `mkdocs serve`. |
 | `backup/deco/` | Decommissioned scripts (Bybit live trading — kept for reference) |
@@ -33,8 +33,8 @@ Run backtest-style code via `python -m quant.cli` or import from the `quant` pac
 ## Logging
 
 - Every module uses `import logging` and `logger = logging.getLogger(__name__)` at the top.
-- Logging format and level are configured **once** in `quant/api/config.py` (`setup_logging()`). `quant/cli.py` has its own inline copy for standalone CLI use. Do **not** call `logging.basicConfig()` anywhere else.
-- **Entry points only** (`quant/cli.py`, `quant/api/config.py`) call `setup_logging()`.
+- Logging format and level are configured **once** in `quant/shared/logging.py` (`setup_logging()`). Do **not** call `logging.basicConfig()` anywhere else.
+- **Entry points only** (`quant/cli.py`, `quant/shared/config.py` via `load_config()`) call `setup_logging()`.
 - Library modules **never** call `setup_logging` — they only emit via `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`.
 - Do **not** use `print()` for status output — use the logger at the appropriate level.
 

@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from quant.api.config import load_config
+from quant.shared.config import load_config
 
 # load_config() initialises logging, loads .env or SSM, and returns the DB conninfo
 DB_CONNINFO = load_config()

@@ -10,7 +10,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from quant.api.config import get_redis_url
+from quant.shared.config import get_redis_url
 from quant.api.deps import get_data_caches
 from quant.refdata.bundle import DataCaches
 from quant.refdata.publisher import RefDataPublisher

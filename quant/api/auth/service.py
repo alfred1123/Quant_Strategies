@@ -3,7 +3,6 @@
 See docs/design/login.md §8.3, §10, §11.1.
 """
 
-from __future__ import annotations
 
 import logging
 import os
