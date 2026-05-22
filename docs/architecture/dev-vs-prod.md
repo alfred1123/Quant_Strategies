@@ -89,7 +89,7 @@ Start the SSM tunnel (runs automatically via Cursor hook, or manually):
 
 ```bash
 aws ssm start-session \
-  --target i-03a670ddc9169233a \
+  --target i-0eed954c1f7e028e8 \
   --document-name AWS-StartPortForwardingSessionToRemoteHost \
   --parameters '{"host":["quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com"],"portNumber":["5432"],"localPortNumber":["5433"]}' \
   --profile alfcheun
@@ -251,9 +251,9 @@ aws ssm put-parameter --name /quant/dev/QUANTDB_HOST \
 After updating prod SSM params, restart the API container on EC2:
 
 ```bash
-aws ssm send-command --instance-ids i-03a670ddc9169233a \
+aws ssm send-command --instance-ids i-0eed954c1f7e028e8 \
   --document-name AWS-RunShellScript \
-  --parameters 'commands=["cd /opt/quant && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d"]' \
+  --parameters file://aws/scripts/ssm-ec2-deploy.json \
   --region ap-southeast-1
 ```
 

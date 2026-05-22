@@ -3,7 +3,7 @@
 #
 # Run on the instance (SSM session or):
 #   aws ssm send-command --instance-ids <id> --document-name AWS-RunShellScript \
-#     --parameters 'commands=["bash /opt/quant/aws/scripts/ec2-docker-recover.sh"]'
+#     --parameters file://aws/scripts/ssm-ec2-recover.json
 set -euo pipefail
 
 log() { echo "[ec2-docker-recover] $*"; }

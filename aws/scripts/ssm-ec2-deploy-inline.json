@@ -1,0 +1,25 @@
+{
+  "commands": [
+    "set -euo pipefail",
+    "export HOME=/root",
+    "git config --global --add safe.directory /opt/quant",
+    "cd /opt/quant",
+    "git fetch --prune origin main",
+    "git reset --hard origin/main",
+    "git rev-parse --short HEAD",
+    "aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin 539163478329.dkr.ecr.ap-southeast-1.amazonaws.com",
+    "export APP_IMAGE=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com/quant-app:latest",
+    "export NGINX_IMAGE=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com/quant-nginx:latest",
+    "echo APP_IMAGE=$APP_IMAGE",
+    "echo NGINX_IMAGE=$NGINX_IMAGE",
+    "docker builder prune -af 2>/dev/null || true",
+    "docker image prune -af 2>/dev/null || true",
+    "docker compose -f docker-compose.yml -f docker-compose.prod.yml pull",
+    "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --remove-orphans",
+    "for i in 1 2 3 4 5 6 7 8 9 10 11 12; do curl -sf http://127.0.0.1:8000/health/ready && break || sleep 5; done",
+    "curl -sf http://127.0.0.1:8000/health/ready && echo API_READY || echo API_NOT_READY",
+    "curl -sf -o /dev/null -w 'nginx=%{http_code}\n' http://127.0.0.1:80 || echo nginx_fail",
+    "docker compose -f docker-compose.yml -f docker-compose.prod.yml ps",
+    "df -h /"
+  ]
+}

@@ -151,7 +151,7 @@ managed by CloudFormation:
 | `quant-network` | EC2 SG | `sg-0c48c9010eaf84372` | Web + SSH |
 | `quant-network` | RDS SG | `sg-0278c603461bbf8fa` | Postgres from EC2 only |
 | `quant-database` | Aurora cluster | `quantdb-cluster` | Imported; Serverless v2, 0.5–2.0 ACU |
-| `quant-compute` | EC2 | `i-03a670ddc9169233a` | `quant-server`, t4g.medium ARM |
+| `quant-compute` | EC2 | `i-0eed954c1f7e028e8` | `quant-server`, t4g.medium ARM, 30 GiB root |
 | `quant-compute` | IAM role | `quant-ec2-role` | SSM access |
 | `quant-compute` | EIP | `52.221.3.230` | Static public IP |
 | — | Key pair | `tradingServerKey` | SSH access (not managed by CFN) |
@@ -240,7 +240,7 @@ No SSH keys needed — deploy uses SSM Run Command (same IAM role the EC2 alread
 
 | Variable | Value |
 |----------|-------|
-| `EC2_INSTANCE_ID` | *(optional fallback)* | Prefer CFN `quant-compute` → `InstanceId` output (current: `i-03a670ddc9169233a`) |
+| `EC2_INSTANCE_ID` | *(optional fallback)* | Prefer CFN `quant-compute` → `InstanceId` output (current: `i-0eed954c1f7e028e8`) |
 
 **Environment**: Create a `production` environment (repo → Settings → Environments) for deploy approvals (optional).
 
@@ -257,7 +257,30 @@ Or remotely via SSM:
 
 ```bash
 aws ssm send-command \
-  --instance-ids i-03a670ddc9169233a \
+  --instance-ids i-0eed954c1f7e028e8 \
+  --document-name AWS-RunShellScript \
+  --parameters file://aws/scripts/ssm-ec2-deploy.json \
+  --region ap-southeast-1
+```
+
+Or for disk recovery:
+
+```bash
+aws ssm send-command \
+  --instance-ids i-0eed954c1f7e028e8 \
+  --document-name AWS-RunShellScript \
+  --parameters file://aws/scripts/ssm-ec2-recover.json \
+  --region ap-southeast-1
+```
+
+!!! warning "SSM `--parameters` escaping"
+    Do **not** pass long inline `commands=[...]` strings from a local shell — bash will expand `$VAR` and break JSON (`ParamValidation` / empty `CommandId`). Use `--parameters file://aws/scripts/ssm-ec2-deploy.json` (or `ssm-ec2-deploy-inline.json` before `ec2-deploy.sh` is on `main`). SSM runs without `$HOME`; scripts set `export HOME=/root` and `git config --global --add safe.directory /opt/quant`.
+
+One-time bootstrap (legacy curl):
+
+```bash
+aws ssm send-command \
+  --instance-ids i-0eed954c1f7e028e8 \
   --document-name AWS-RunShellScript \
   --parameters 'commands=["curl -fsSL https://raw.githubusercontent.com/alfred1123/Quant_Strategies/main/aws/scripts/bootstrap-ec2.sh | sudo -u ec2-user bash"]' \
   --profile alfcheun --region ap-southeast-1
@@ -279,13 +302,17 @@ Default AL2023 root volume is **8 GiB** — too small once Docker accumulates ol
 **Immediate recovery (SSM on EC2):**
 
 ```bash
-bash /opt/quant/aws/scripts/ec2-docker-recover.sh
-# Then re-run the GitHub deploy workflow, or manually:
-cd /opt/quant
-export APP_IMAGE=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com/quant-app:latest
-export NGINX_IMAGE=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com/quant-nginx:latest
-docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --remove-orphans
+aws ssm send-command \
+  --instance-ids i-0eed954c1f7e028e8 \
+  --document-name AWS-RunShellScript \
+  --parameters file://aws/scripts/ssm-ec2-recover.json \
+  --region ap-southeast-1
+# Then re-run the GitHub deploy workflow, or:
+aws ssm send-command \
+  --instance-ids i-0eed954c1f7e028e8 \
+  --document-name AWS-RunShellScript \
+  --parameters file://aws/scripts/ssm-ec2-deploy.json \
+  --region ap-southeast-1
 ```
 
 **Long-term:** CFN `03-compute.yml` sets **30 GiB gp3** root volume (`RootVolumeSize`). Update the live volume without replacing the instance:

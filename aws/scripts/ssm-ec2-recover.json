@@ -1,0 +1,5 @@
+{
+  "commands": [
+    "bash /opt/quant/aws/scripts/ec2-docker-recover.sh"
+  ]
+}

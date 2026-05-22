@@ -1,0 +1,12 @@
+{
+  "commands": [
+    "set -euo pipefail",
+    "export HOME=/root",
+    "git config --global --add safe.directory /opt/quant",
+    "if [ ! -d /opt/quant/.git ]; then git clone https://github.com/alfred1123/Quant_Strategies.git /opt/quant; fi",
+    "cd /opt/quant",
+    "git fetch --prune origin main",
+    "git reset --hard origin/main",
+    "bash aws/scripts/ec2-deploy.sh"
+  ]
+}
