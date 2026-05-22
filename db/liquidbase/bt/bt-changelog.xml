@@ -6,86 +6,18 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!--
-      Squashed BT baseline (historical 200-series changesets removed).
+      BT schema (bt.databasechangelog).
 
-      Existing databases already migrated with the old changelog must NOT run a
-      blind `update` after only deleting rows from `bt.databasechangelog` —
-      CREATE TABLE would fail. Options:
-        • Dev: DROP SCHEMA BT CASCADE; recreate schema (master changelog) then `update` here.
-        • Prod: verify live objects match these SQL files, then `liquibase changelogSync`
-          (or equivalent) so the new ids are marked EXECUTED without re-running DDL.
+      PRODUCTION SAFETY
+      - Baseline: releases/archive/baseline-1.0.0.xml (REFERENCE ONLY — never <include> on prod).
+      - Archive includes bt-000-precleanup (DROP PROCEDURE) and table rollbacks — unsafe on prod.
+      - App deploy does NOT run Liquibase. Manual: APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
 
-      Greenfield: `liquibase update` only.
+      NEW MIGRATION
+      1. Add SQL under tables/, procedures/, or functions/.
+      2. Create releases/X.Y.Z-name.xml — procedures need splitStatements="false".
+      3. Uncomment/add:
+           <include file="releases/X.Y.Z-name.xml" relativeToChangelogFile="true"/>
     -->
-
-    <!-- Idempotent: remove legacy names / overloads before (re)creating current procs. -->
-    <changeSet id="bt-000-precleanup" author="alfcheun" context="proc" runOnChange="true">
-        <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_queue(UUID, INTEGER, UUID, INTEGER, INTEGER, INTEGER, TEXT, TEXT, TEXT, TEXT, TEXT);</sql>
-        <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_result(UUID, UUID, INTEGER, TIMESTAMPTZ, DATE, DATE, TEXT, NUMERIC, JSONB, JSONB, TEXT, TEXT, TEXT, TEXT);</sql>
-        <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_strategy(UUID, TEXT, TEXT, TEXT, INTEGER, JSONB, TEXT, TEXT, TEXT, TEXT);</sql>
-        <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_result(UUID, INTEGER, TIMESTAMPTZ, DATE, DATE, TEXT, NUMERIC, JSONB, JSONB, TEXT);</sql>
-        <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_result(UUID, JSONB, TEXT, INTEGER, TEXT, TEXT, TEXT);</sql>
-        <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_result(UUID, JSONB, TEXT, TEXT, TEXT, TEXT, INTEGER);</sql>
-        <sql>DROP PROCEDURE IF EXISTS bt.sp_ins_result(UUID, JSONB, TEXT, INTEGER, TEXT, TEXT, TEXT);</sql>
-        <sql>DROP PROCEDURE IF EXISTS bt.sp_get_queued_priority(UUID, INTEGER, REFCURSOR, TEXT, TEXT, TEXT);</sql>
-        <sql>DROP PROCEDURE IF EXISTS bt.sp_get_queue_job(UUID, REFCURSOR, TEXT, TEXT, TEXT);</sql>
-        <sql>DROP FUNCTION IF EXISTS bt.fn_get_queue_for_terminal(TEXT, INTEGER, INTEGER);</sql>
-        <sql splitStatements="false"><![CDATA[
-DO $body$
-DECLARE
-    r RECORD;
-BEGIN
-    FOR r IN
-        SELECT pg_catalog.pg_get_function_identity_arguments(p.oid) AS args
-        FROM pg_catalog.pg_proc p
-        JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'bt'
-          AND p.proname = 'fn_get_queue'
-          AND p.prokind = 'f'
-    LOOP
-        EXECUTE format('DROP FUNCTION IF EXISTS bt.fn_get_queue(%s)', r.args);
-    END LOOP;
-END;
-$body$;
-        ]]></sql>
-        <rollback/>
-    </changeSet>
-
-    <changeSet id="bt-001-tables" author="alfcheun" context="bt" runOnChange="false">
-        <sqlFile path="tables/STRATEGY.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
-        <sqlFile path="tables/RESULT.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
-        <sqlFile path="tables/QUEUE.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
-        <sqlFile path="tables/API_REQUEST.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
-        <sqlFile path="tables/API_REQUEST_PAYLOAD.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <rollback>
-            <sql>DROP TABLE IF EXISTS BT.API_REQUEST_PAYLOAD;</sql>
-            <sql>DROP TABLE IF EXISTS BT.API_REQUEST;</sql>
-            <sql>DROP TABLE IF EXISTS BT.QUEUE;</sql>
-            <sql>DROP TABLE IF EXISTS BT.RESULT;</sql>
-            <sql>DROP TABLE IF EXISTS BT.STRATEGY;</sql>
-        </rollback>
-    </changeSet>
-
-    <changeSet id="bt-002-procedures" author="alfcheun" context="proc" runOnChange="true">
-        <sqlFile path="procedures/SP_INS_STRATEGY.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="true"/>
-        <sqlFile path="procedures/SP_INS_API_REQUEST.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <sqlFile path="procedures/SP_INS_QUEUE.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <sqlFile path="procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <sqlFile path="procedures/SP_GET_QUEUE.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <sqlFile path="procedures/SP_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <sqlFile path="procedures/SP_GET_QUEUED_COUNT.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <sqlFile path="procedures/SP_GET_STRATEGY.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <sqlFile path="procedures/SP_GET_QUEUE_LATEST.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <sqlFile path="procedures/SP_GET_API_REQUEST.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <sqlFile path="procedures/SP_GET_API_LIMIT_CHK.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <rollback/>
-    </changeSet>
-
-    <changeSet id="bt-003-fn-terminal" author="alfcheun" context="proc" runOnChange="true">
-        <sqlFile path="functions/FN_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true" splitStatements="false" stripComments="false"/>
-        <rollback>
-            <sql>DROP FUNCTION IF EXISTS bt.fn_get_queue_for_terminal(TEXT, INTEGER);</sql>
-        </rollback>
-    </changeSet>
 
 </databaseChangeLog>

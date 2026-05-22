@@ -211,7 +211,7 @@ The workflow uses `paths-ignore` for `docs/**`, `tests/**`, `*.md`, etc. — pus
 1. **Test job** — runs `pytest tests/unit/` on GitHub's runner
 2. **CFN job** — deploys infra stacks when `aws/cfn/**` or relevant `aws/params/**` keys change
 3. **Build-and-push job** — cross-builds `linux/arm64` images, pushes to ECR `quant-app` / `quant-nginx` (tags: git SHA + `latest`)
-4. **Deploy job** — SSM Run Command: `git pull`, `ecr login`, `docker compose pull`, `up -d` (no build on EC2)
+4. **Deploy job** — SSM Run Command: `git pull`, `ecr login`, `docker compose pull`, `up -d` (no build on EC2). **Liquibase is not run automatically** — apply DB migrations manually when ready (see [Database](database.md#deployment)).
 
 Rollback: re-run the workflow on an older commit (images tagged by SHA).
 

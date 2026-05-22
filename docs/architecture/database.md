@@ -62,22 +62,40 @@ Current operating model:
 
 ## Deployment
 
+### Automated (production)
+
+**App deploy does not run Liquibase.** GitHub Actions only updates Docker containers on EC2. Database schema changes are applied manually when you add a forward release file and run:
+
 ```bash
-# Source credentials
-source .env
-
-# Phase 0: create schemas + extensions
-cd db/liquidbase && liquibase --defaults-file=liquibase.properties update
-
-# Per-schema deployment (each has its own liquibase.properties)
-cd core_admin && source ../../../.env && liquibase --defaults-file=liquibase.properties update
-cd ../refdata  && source ../../../.env && liquibase --defaults-file=liquibase.properties update
-cd ../bt       && source ../../../.env && liquibase --defaults-file=liquibase.properties update
-cd ../trade    && source ../../../.env && liquibase --defaults-file=liquibase.properties update
-cd ../inst     && source ../../../.env && liquibase --defaults-file=liquibase.properties update
+# On EC2 (or locally with tunnel to prod)
+cd /opt/quant && APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
 ```
 
-`db/liquidbase/bt/bt-changelog.xml` is a **squashed** baseline (`bt-000` … `bt-003`). Existing databases that were tracked with the old 200-series changeset IDs must be re-baselined (dev: recreate `BT`; prod: `changelogSync` after verifying DDL) — see the comment at the top of that file.
+Active changelogs have **no baseline includes** — prod data is not touched until you explicitly add a new `releases/X.Y.Z-*.xml` and `<include>` it.
+
+**RDS CloudFormation** (`aws/cfn/02-database.yml`) deploys only when that template or relevant `aws/params/prod.json` keys change — not on every app push. Use workflow_dispatch `deploy_database=true` only when intentionally changing Aurora infrastructure.
+
+### Manual (local)
+
+```bash
+source .env
+./scripts/liquibase-deploy.sh
+```
+
+Or run schemas individually:
+
+```bash
+source .env
+cd db/liquidbase && liquibase --defaults-file=liquibase.properties update
+cd core_admin && liquibase --defaults-file=liquibase.properties update
+# ... refdata, bt, trade, inst — then core_admin again for GRANTS refresh
+```
+
+### Release-based changelogs
+
+Each schema root (`*-changelog.xml`) includes **forward-only** release files under `releases/`. **Baseline DDL is not included** — prod already has data and `DATABASECHANGELOG` tracks applied history.
+
+Active changelogs are empty manifests — see XML comments in each `db/liquidbase/*/*-changelog.xml`. Archive baselines live under `releases/archive/baseline-1.0.0.xml` (reference only, never included on prod).
 
 ## Stored Procedures
 
@@ -99,13 +117,14 @@ cd ../inst     && source ../../../.env && liquibase --defaults-file=liquibase.pr
 ```
 db/
 ├── liquidbase/                    # Liquibase changelogs
-│   ├── quantdb-changelog.xml     # Master — schema & extension creation
+│   ├── quantdb-changelog.xml     # Master manifest (comments only until new release)
+│   ├── releases/                 # TEMPLATE.xml + archive/ (baseline reference)
 │   ├── liquibase.properties      # Master properties
-│   ├── core_admin/               # CORE_ADMIN tables + procedures
-│   ├── refdata/                  # REFDATA tables + seed data
-│   ├── bt/                       # BT tables + procedures
-│   ├── trade/                    # TRADE tables
-│   └── inst/                     # INST tables (product master)
+│   ├── core_admin/               # *-changelog.xml + releases/archive/
+│   ├── refdata/                  # REFDATA + releases/
+│   ├── bt/                       # BT + releases/
+│   ├── trade/                    # TRADE + releases/
+│   └── inst/                     # INST + releases/
 ├── sql/                          # Standalone SQL scripts
 └── syncddl/                      # Extracted live DDL (gitignored, for diff)
 ```

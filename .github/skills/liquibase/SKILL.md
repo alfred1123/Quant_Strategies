@@ -94,32 +94,99 @@ driver=org.postgresql.Driver
 ## Running Liquibase
 
 ```bash
-# Always source .env first
+# Recommended — all schemas in order (local or prod)
 source .env
+./scripts/liquibase-deploy.sh
 
-# Phase 0 — schemas + extensions (from db/liquidbase/)
-cd db/liquidbase
-liquibase --defaults-file=liquibase.properties update
-
-# Per-schema deployment (from each schema directory)
-cd core_admin && source ../../../.env && liquibase --defaults-file=liquibase.properties update
-cd ../refdata  && source ../../../.env && liquibase --defaults-file=liquibase.properties update
-cd ../bt       && source ../../../.env && liquibase --defaults-file=liquibase.properties update
-cd ../trade    && source ../../../.env && liquibase --defaults-file=liquibase.properties update
-cd ../inst     && source ../../../.env && liquibase --defaults-file=liquibase.properties update
-
-# Schema-specific commands
-cd db/liquidbase/bt
-source ../../../.env
-liquibase --defaults-file=liquibase.properties status           # Pending changeSets
-liquibase --defaults-file=liquibase.properties history          # Applied changeSets
- # Roll back last (bt only)
-liquibase --defaults-file=liquibase.properties update-sql       # Dry-run
+# Prod on EC2 (SSM credentials)
+APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
 ```
 
-## PostgreSQL JDBC Driver
+Manual per-schema (same order as the script):
 
-Liquibase requires the PostgreSQL JDBC driver in its `lib/` directory. If missing:
+```bash
+source .env
+cd db/liquidbase && liquibase --defaults-file=liquibase.properties update
+cd core_admin && liquibase --defaults-file=liquibase.properties update
+cd ../refdata  && liquibase --defaults-file=liquibase.properties update
+cd ../bt       && liquibase --defaults-file=liquibase.properties update
+cd ../trade    && liquibase --defaults-file=liquibase.properties update
+cd ../inst     && liquibase --defaults-file=liquibase.properties update
+cd ../core_admin && liquibase --defaults-file=liquibase.properties update  # GRANTS refresh
+```
+
+Prod deploy runs `./scripts/liquibase-deploy.sh` **manually only** (not wired in GitHub Actions). Run on EC2 when a forward release is ready:
+
+```bash
+APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
+```
+
+## Verify without applying DDL
+
+These commands **do not run `update`** — safe to run against prod when you only want to check what would happen.
+
+| Command | Needs DB | Mutates DB? | Purpose |
+|---------|----------|-------------|---------|
+| `validate` | Yes (Liquibase 5) | No | Parse changelogs + compare checksums against `databasechangelog` |
+| `status` | Yes | No (SELECT only) | List pending changesets |
+| `update-sql` | Yes | **No** | Print SQL that `update` would execute |
+
+```bash
+# All schemas — offline XML/include checks (no Postgres)
+./scripts/liquibase-verify.sh --offline
+
+# All schemas — validate + status + update-sql preview (needs DB)
+source .env
+./scripts/liquibase-verify.sh
+
+# Local Postgres on :5432
+DB_TARGET=local ./scripts/liquibase-verify.sh
+```
+
+Manual per-schema dry run:
+
+```bash
+source .env
+cd db/liquidbase/bt
+liquibase --defaults-file=liquibase.properties status --verbose
+liquibase --defaults-file=liquibase.properties update-sql    # SQL to stdout
+liquibase --defaults-file=liquibase.properties validate
+```
+
+`update-sql` is the main safety check before a prod migrate: if output is empty (or only Liquibase headers), nothing pending will run.
+
+## Release-based changelogs
+
+Each schema root `*-changelog.xml` includes **new release files only** (forward migrations).
+
+```xml
+<!-- Example after you add a migration -->
+<include file="releases/1.1.0-my-feature.xml" relativeToChangelogFile="true"/>
+```
+
+- **`releases/archive/baseline-1.0.0.xml`** — squashed v1.0.0 DDL (reference only; see XML header — never `<include>` on prod)
+- **`releases/X.Y.Z-name.xml`** — forward migrations; copy from `releases/TEMPLATE.xml`
+- **Root manifest** — instructions in each `*-changelog.xml` comment block
+
+**Do NOT `<include>` other schemas' changelogs** in the master file — each schema is still deployed via its own `liquibase.properties`. Within-schema `<include>` for **forward-only** release files is required.
+
+## Java + JDBC prerequisites
+
+Liquibase is a **Java CLI** (requires **Java 11+**; Java 17 recommended). Every deploy runs `aws/scripts/install-liquibase.sh`, which:
+
+1. Verifies `java -version` (installs Corretto 17 on Amazon Linux if missing)
+2. Installs Liquibase to `/opt/liquibase` if absent
+3. Ensures the PostgreSQL JDBC JAR is in `lib/`
+4. Runs `liquibase --version` before returning
+
+```bash
+bash aws/scripts/install-liquibase.sh --check-only   # verify; exit 1 if broken
+bash aws/scripts/install-liquibase.sh              # install / repair (idempotent)
+```
+
+EC2 user-data installs Java 17 on **new** instances; older boxes get Java on first deploy via the script above.
+
+Manual JDBC install (only if not using the install script):
 
 ```bash
 sudo curl -L -o /opt/liquibase/lib/postgresql-42.7.5.jar \
@@ -130,18 +197,9 @@ sudo curl -L -o /opt/liquibase/lib/postgresql-42.7.5.jar \
 
 ### Master changelog — schemas and extensions ONLY
 
-The master `quantdb-changelog.xml` creates schemas and extensions. It does **NOT** include sub-changelogs — each schema is deployed independently.
+The master `quantdb-changelog.xml` includes `releases/baseline-1.0.0.xml` (schema + extension creation). It does **NOT** include other schemas' changelogs — each schema is deployed independently via its own `liquibase.properties`.
 
-```xml
-<changeSet id="000-schemas" author="alfcheun" context="schema" runOnChange="false">
-    <sql>
-        CREATE SCHEMA IF NOT EXISTS CORE_ADMIN;
-        CREATE SCHEMA IF NOT EXISTS BT;
-    </sql>
-</changeSet>
-```
-
-**Do NOT use `<include>`** in the master changelog. Sub-changelogs are deployed separately via per-schema `liquibase.properties`.
+**Do NOT `<include>` other schemas** in the master changelog. **Do** use `<include>` for release files within the same schema directory.
 
 ### Table changeSets
 

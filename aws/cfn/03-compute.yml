@@ -173,6 +173,9 @@ Resources:
           chown ec2-user:ec2-user /opt/quant
           git config --global --add safe.directory /opt/quant
 
+          # ── Java (Liquibase DB migrations — installed on first deploy) ──
+          dnf install -y java-17-amazon-corretto-headless
+
           echo "User-data complete" | tee /var/log/user-data-done.log
 
   Eip:

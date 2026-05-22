@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TEMPLATE — copy to <schema>/releases/X.Y.Z-short-name.xml
+  Then in <schema>-changelog.xml add:
+    <include file="releases/X.Y.Z-short-name.xml" relativeToChangelogFile="true"/>
+
+  Rules:
+  - Forward-only on prod (avoid DROP TABLE unless intentional).
+  - sqlFile paths from releases/ use ../tables/, ../procedures/, ../data/
+  - Procedures: splitStatements="false", runOnChange="true"
+  - Tables/seeds: splitStatements="true", runOnChange="false"
+-->
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="X.Y.Z-001-example" author="you" context="bt" runOnChange="false">
+        <comment>Describe this changeset</comment>
+        <sqlFile path="../tables/EXAMPLE.sql" relativeToChangelogFile="true"
+                 splitStatements="true" stripComments="true"/>
+        <rollback><sql>-- explicit rollback only when reviewed</sql></rollback>
+    </changeSet>
+
+</databaseChangeLog>

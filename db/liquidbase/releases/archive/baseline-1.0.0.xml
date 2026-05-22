@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+<!--
+  ARCHIVED BASELINE v1.0.0 — REFERENCE ONLY. NOT DEPLOYED.
+
+  Do NOT <include> this file from *-changelog.xml on production.
+  Prod DATABASECHANGELOG already records these changesets. Running update
+  against this archive can execute DROP PROCEDURE / DROP TABLE rollbacks.
+
+  Greenfield: restore from db/dumps/ or use liquibase changelogSync after
+  verifying DDL matches — do not blind-update prod.
+-->
+
+    <changeSet logicalFilePath="quantdb-changelog.xml" id="000-schemas" author="alfcheun" context="schema" runOnChange="false">
+        <comment>Create schemas and extensions</comment>
+        <sql>
+            CREATE SCHEMA IF NOT EXISTS CORE_ADMIN;
+            CREATE SCHEMA IF NOT EXISTS REFDATA;
+            CREATE SCHEMA IF NOT EXISTS BT;
+            CREATE SCHEMA IF NOT EXISTS TRADE;
+            CREATE SCHEMA IF NOT EXISTS INST;
+            CREATE EXTENSION IF NOT EXISTS pg_partman;
+        </sql>
+        <rollback>
+            <sql>
+                DROP SCHEMA IF EXISTS INST CASCADE;
+                DROP SCHEMA IF EXISTS TRADE CASCADE;
+                DROP SCHEMA IF EXISTS BT CASCADE;
+                DROP SCHEMA IF EXISTS REFDATA CASCADE;
+                DROP SCHEMA IF EXISTS CORE_ADMIN CASCADE;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

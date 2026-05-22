@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+<!--
+  ARCHIVED BASELINE v1.0.0 — REFERENCE ONLY. NOT DEPLOYED.
+
+  Do NOT <include> this file from *-changelog.xml on production.
+  Prod DATABASECHANGELOG already records these changesets. Running update
+  against this archive can execute DROP PROCEDURE / DROP TABLE rollbacks.
+
+  Greenfield: restore from db/dumps/ or use liquibase changelogSync after
+  verifying DDL matches — do not blind-update prod.
+-->
+
+    <changeSet logicalFilePath="inst-changelog.xml" id="400-inst-product" author="alfcheun" context="inst" runOnChange="false">
+        <sqlFile path="../tables/PRODUCT.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql>
+                DROP TABLE IF EXISTS INST.PRODUCT;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet logicalFilePath="inst-changelog.xml" id="401-inst-product-xref" author="alfcheun" context="inst" runOnChange="false">
+        <sqlFile path="../tables/PRODUCT_XREF.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql>
+                DROP TABLE IF EXISTS INST.PRODUCT_XREF;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet logicalFilePath="inst-changelog.xml" id="402-inst-product-grp" author="alfcheun" context="inst" runOnChange="false">
+        <sqlFile path="../tables/PRODUCT_GRP.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS INST.PRODUCT_GRP;</sql></rollback>
+    </changeSet>
+
+    <changeSet logicalFilePath="inst-changelog.xml" id="403-inst-product-grp-member" author="alfcheun" context="inst" runOnChange="false">
+        <sqlFile path="../tables/PRODUCT_GRP_MEMBER.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS INST.PRODUCT_GRP_MEMBER;</sql></rollback>
+    </changeSet>
+
+    <!-- ========== INST procedures ========== -->
+
+    <changeSet logicalFilePath="inst-changelog.xml" id="410-inst-proc-ins-product" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="../procedures/SP_INS_PRODUCT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS INST.SP_INS_PRODUCT;</sql></rollback>
+    </changeSet>
+
+    <changeSet logicalFilePath="inst-changelog.xml" id="411-inst-proc-ins-product-xref" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="../procedures/SP_INS_PRODUCT_XREF.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS INST.SP_INS_PRODUCT_XREF;</sql></rollback>
+    </changeSet>
+
+    <changeSet logicalFilePath="inst-changelog.xml" id="412-inst-proc-ins-product-grp" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="../procedures/SP_INS_PRODUCT_GRP.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS INST.SP_INS_PRODUCT_GRP;</sql></rollback>
+    </changeSet>
+
+    <changeSet logicalFilePath="inst-changelog.xml" id="413-inst-proc-ins-product-grp-member" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="../procedures/SP_INS_PRODUCT_GRP_MEMBER.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS INST.SP_INS_PRODUCT_GRP_MEMBER;</sql></rollback>
+    </changeSet>
+
+    <changeSet logicalFilePath="inst-changelog.xml" id="414-inst-proc-get-product" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="../procedures/SP_GET_PRODUCT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS INST.SP_GET_PRODUCT;</sql></rollback>
+    </changeSet>
+
+    <changeSet logicalFilePath="inst-changelog.xml" id="415-inst-proc-get-product-xref" author="alfcheun" context="proc" runOnChange="true">
+        <sqlFile path="../procedures/SP_GET_PRODUCT_XREF.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback><sql>DROP PROCEDURE IF EXISTS INST.SP_GET_PRODUCT_XREF;</sql></rollback>
+    </changeSet>
+
+</databaseChangeLog>
