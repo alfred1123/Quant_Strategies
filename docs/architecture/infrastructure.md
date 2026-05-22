@@ -201,17 +201,24 @@ prevents accidental deletion (disable it manually first if you really mean to).
 Push to `main` triggers an automated deploy pipeline (`.github/workflows/deploy.yml`):
 
 ```
-push to main → test + cfn (parallel) → build-and-push (arm64 → ECR) → deploy (SSM: pull + up on EC2)
+push to main → changes (path filter) → test + cfn (parallel)
+            → build-and-push (only changed images) → deploy (SSM: selective pull + up)
 ```
 
-The workflow uses `paths-ignore` for `docs/**`, `tests/**`, `*.md`, etc. — pushes touching only ignored paths do **not** trigger a deploy. The docs site has its own workflow (`.github/workflows/docs.yml`).
+The workflow uses `paths-ignore` for `docs/**`, `tests/**`, `db/**`, `scripts/**`, `*.md`, etc. — pushes touching only ignored paths do **not** trigger the workflow. The docs site has its own workflow (`.github/workflows/docs.yml`).
 
 ### How it works
 
-1. **Test job** — runs `pytest tests/unit/` on GitHub's runner
-2. **CFN job** — deploys infra stacks when `aws/cfn/**` or relevant `aws/params/**` keys change
-3. **Build-and-push job** — cross-builds `linux/arm64` images, pushes to ECR `quant-app` / `quant-nginx` (tags: git SHA + `latest`)
-4. **Deploy job** — SSM Run Command: `git pull`, `ecr login`, `docker compose pull`, `up -d` (no build on EC2). **Liquibase is not run automatically** — apply DB migrations manually when ready (see [Database](database.md#deployment)).
+1. **Changes job** — `dorny/paths-filter` detects which artifacts changed:
+   - **app** — `quant/**`, `Dockerfile`, `requirements.txt`
+   - **nginx** — `frontend/**`, `docker/nginx/**`
+   - **compose** — `docker-compose*.yml`
+2. **Test job** — runs `pytest tests/unit/` on GitHub's runner
+3. **CFN job** — deploys infra stacks when `aws/cfn/**` or relevant `aws/params/**` keys change
+4. **Build-and-push job** — skipped when neither app nor nginx changed; otherwise builds only the affected image(s) and pushes to ECR (tags: git SHA + `latest`)
+5. **Deploy job** — skipped when no app/nginx/compose changes; otherwise SSM Run Command: `git pull`, selective `docker compose pull` + `up -d` per changed service. Skips ECR pull when local image digest already matches. **Liquibase is not run automatically** — apply DB migrations manually when ready (see [Database](database.md#deployment)).
+
+**Manual full deploy:** Actions → deploy → Run workflow (rebuilds both images and deploys regardless of paths).
 
 Rollback: re-run the workflow on an older commit (images tagged by SHA).
 

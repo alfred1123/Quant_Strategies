@@ -7,6 +7,9 @@ on:
       - "docs/**"
       - "*.md"
       - "tests/**"
+      - "db/**"
+      - "scripts/**"
+      - "backup/**"
       - ".github/skills/**"
       - ".github/instructions/**"
       - ".cursor/**"
@@ -23,6 +26,62 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.flags.outputs.app }}
+      nginx: ${{ steps.flags.outputs.nginx }}
+      compose: ${{ steps.flags.outputs.compose }}
+      deploy: ${{ steps.flags.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          filters: |
+            app:
+              - 'quant/**'
+              - 'Dockerfile'
+              - 'requirements.txt'
+            nginx:
+              - 'frontend/**'
+              - 'docker/nginx/**'
+            compose:
+              - 'docker-compose.yml'
+              - 'docker-compose.prod.yml'
+              - 'docker-compose.tls.yml'
+
+      - name: Set deploy flags
+        id: flags
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+            echo "nginx=true" >> "$GITHUB_OUTPUT"
+            echo "compose=true" >> "$GITHUB_OUTPUT"
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch — rebuild all images and deploy"
+            exit 0
+          fi
+
+          app="${{ steps.filter.outputs.app }}"
+          nginx="${{ steps.filter.outputs.nginx }}"
+          compose="${{ steps.filter.outputs.compose }}"
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+          echo "nginx=$nginx" >> "$GITHUB_OUTPUT"
+          echo "compose=$compose" >> "$GITHUB_OUTPUT"
+
+          if [[ "$app" == "true" || "$nginx" == "true" || "$compose" == "true" ]]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Path filter: app=$app nginx=$nginx compose=$compose"
+
   test:
     name: test
     runs-on: ubuntu-latest
@@ -46,7 +105,11 @@ jobs:
 
   build-and-push:
     name: build and push images
-    needs: [test]
+    needs: [test, changes]
+    if: >-
+      needs.changes.outputs.app == 'true' ||
+      needs.changes.outputs.nginx == 'true' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -68,6 +131,7 @@ jobs:
       - uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push quant-app
+        if: needs.changes.outputs.app == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -77,10 +141,11 @@ jobs:
           tags: |
             ${{ env.ECR_REGISTRY }}/quant-app:${{ github.sha }}
             ${{ env.ECR_REGISTRY }}/quant-app:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=quant-app
+          cache-to: type=gha,mode=max,scope=quant-app
 
       - name: Build and push quant-nginx
+        if: needs.changes.outputs.nginx == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -90,8 +155,8 @@ jobs:
           tags: |
             ${{ env.ECR_REGISTRY }}/quant-nginx:${{ github.sha }}
             ${{ env.ECR_REGISTRY }}/quant-nginx:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=quant-nginx
+          cache-to: type=gha,mode=max,scope=quant-nginx
 
   cfn:
     name: deploy CloudFormation
@@ -205,13 +270,22 @@ jobs:
 
   deploy:
     name: deploy to EC2
-    needs: [test, build-and-push, cfn]
+    needs: [test, changes, build-and-push, cfn]
+    if: >-
+      always() &&
+      needs.test.result == 'success' &&
+      (needs.cfn.result == 'success' || needs.cfn.result == 'skipped') &&
+      (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped') &&
+      (needs.changes.outputs.deploy == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     environment: production
     env:
       AWS_REGION: ap-southeast-1
       ECR_REGISTRY: 539163478329.dkr.ecr.ap-southeast-1.amazonaws.com
       IMAGE_TAG: ${{ github.sha }}
+      DEPLOY_APP: ${{ needs.changes.outputs.app == 'true' || github.event_name == 'workflow_dispatch' }}
+      DEPLOY_NGINX: ${{ needs.changes.outputs.nginx == 'true' || github.event_name == 'workflow_dispatch' }}
+      DEPLOY_COMPOSE: ${{ needs.changes.outputs.compose == 'true' || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Deploy via SSM Run Command
         uses: aws-actions/configure-aws-credentials@v4
@@ -238,6 +312,7 @@ jobs:
             exit 1
           fi
           echo "Deploy target instance: $INSTANCE_ID"
+          echo "Flags: DEPLOY_APP=${{ env.DEPLOY_APP }} DEPLOY_NGINX=${{ env.DEPLOY_NGINX }} DEPLOY_COMPOSE=${{ env.DEPLOY_COMPOSE }}"
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
@@ -255,18 +330,49 @@ jobs:
               "git reset --hard origin/main",
               "echo \"── AFTER  ──\"",
               "git rev-parse --short HEAD",
-              "aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin 539163478329.dkr.ecr.ap-southeast-1.amazonaws.com",
-              "export IMAGE_TAG=${{ github.sha }}",
-              "export APP_IMAGE=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com/quant-app:${IMAGE_TAG}",
-              "export NGINX_IMAGE=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com/quant-nginx:${IMAGE_TAG}",
-              "echo \"── IMAGES ──\"",
-              "echo APP_IMAGE=$APP_IMAGE",
-              "echo NGINX_IMAGE=$NGINX_IMAGE",
-              "COMPOSE_PARALLEL_LIMIT=1 docker compose -f docker-compose.yml -f docker-compose.prod.yml pull",
-              "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans",
+              "DEPLOY_APP=${{ env.DEPLOY_APP }}",
+              "DEPLOY_NGINX=${{ env.DEPLOY_NGINX }}",
+              "DEPLOY_COMPOSE=${{ env.DEPLOY_COMPOSE }}",
+              "ECR_REGISTRY=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com",
+              "IMAGE_TAG=${{ github.sha }}",
+              "COMPOSE=\"docker compose -f docker-compose.yml -f docker-compose.prod.yml\"",
+              "ecr_digest() { aws ecr describe-images --repository-name \"$1\" --image-ids imageTag=\"$2\" --region ap-southeast-1 --query imageDetails[0].imageDigest --output text 2>/dev/null || true; }",
+              "local_digest() { docker image inspect --format=\"{{index .RepoDigests 0}}\" \"$1\" 2>/dev/null | sed \"s/.*@//\" || true; }",
+              "image_unchanged() { repo=\"$1\"; tag=\"$2\"; img=\"${ECR_REGISTRY}/${repo}:${tag}\"; remote=\"$(ecr_digest \"$repo\" \"$tag\")\"; local=\"$(local_digest \"$img\")\"; [ -n \"$remote\" ] && [ \"$remote\" != \"None\" ] && [ \"$remote\" = \"$local\" ]; }",
+              "aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin \"$ECR_REGISTRY\"",
+              "if [ -z \"${APP_IMAGE:-}\" ]; then export APP_IMAGE=\"${ECR_REGISTRY}/quant-app:latest\"; fi",
+              "if [ -z \"${NGINX_IMAGE:-}\" ]; then export NGINX_IMAGE=\"${ECR_REGISTRY}/quant-nginx:latest\"; fi",
+              "if [ \"$DEPLOY_APP\" = \"true\" ]; then",
+              "  export APP_IMAGE=\"${ECR_REGISTRY}/quant-app:${IMAGE_TAG}\"",
+              "  echo \"── APP ── $APP_IMAGE\"",
+              "  if image_unchanged quant-app \"$IMAGE_TAG\"; then",
+              "    echo \"App image digest unchanged — skip pull\"",
+              "  else",
+              "    COMPOSE_PARALLEL_LIMIT=1 $COMPOSE pull api worker",
+              "  fi",
+              "  $COMPOSE up -d api worker",
+              "else",
+              "  echo \"Skip app — no quant-app image changes in this push\"",
+              "fi",
+              "if [ \"$DEPLOY_NGINX\" = \"true\" ]; then",
+              "  export NGINX_IMAGE=\"${ECR_REGISTRY}/quant-nginx:${IMAGE_TAG}\"",
+              "  echo \"── NGINX ── $NGINX_IMAGE\"",
+              "  if image_unchanged quant-nginx \"$IMAGE_TAG\"; then",
+              "    echo \"Nginx image digest unchanged — skip pull\"",
+              "  else",
+              "    COMPOSE_PARALLEL_LIMIT=1 $COMPOSE pull nginx",
+              "  fi",
+              "  $COMPOSE up -d nginx",
+              "else",
+              "  echo \"Skip nginx — no quant-nginx image changes in this push\"",
+              "fi",
+              "if [ \"$DEPLOY_COMPOSE\" = \"true\" ]; then",
+              "  echo \"── COMPOSE ── apply updated compose files\"",
+              "  $COMPOSE up -d --remove-orphans",
+              "fi",
               "docker image prune -f",
               "echo \"── RUNNING ──\"",
-              "docker compose -f docker-compose.yml -f docker-compose.prod.yml ps"
+              "$COMPOSE ps"
             ]' \
             --query Command.CommandId \
             --output text)
