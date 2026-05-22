@@ -201,7 +201,7 @@ prevents accidental deletion (disable it manually first if you really mean to).
 Push to `main` triggers an automated deploy pipeline (`.github/workflows/deploy.yml`):
 
 ```
-push to main → test job + build job → deploy job (SSM Run Command) → EC2 pulls + rebuilds containers
+push to main → test + cfn (parallel) → build-and-push (arm64 → ECR) → deploy (SSM: pull + up on EC2)
 ```
 
 The workflow uses `paths-ignore` for `docs/**`, `tests/**`, `*.md`, etc. — pushes touching only ignored paths do **not** trigger a deploy. The docs site has its own workflow (`.github/workflows/docs.yml`).
@@ -209,14 +209,16 @@ The workflow uses `paths-ignore` for `docs/**`, `tests/**`, `*.md`, etc. — pus
 ### How it works
 
 1. **Test job** — runs `pytest tests/unit/` on GitHub's runner
-2. **Build job** — Node 22, runs `npm ci` + `npm run build` in `frontend/` (verifies the SPA builds before deploy)
-3. **Deploy job** — depends on both above; uses AWS credentials to send an SSM `RunShellScript` command to the EC2
-4. **On the EC2** — `git pull`, `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --remove-orphans`, prune old images
+2. **CFN job** — deploys infra stacks when `aws/cfn/**` or relevant `aws/params/**` keys change
+3. **Build-and-push job** — cross-builds `linux/arm64` images, pushes to ECR `quant-app` / `quant-nginx` (tags: git SHA + `latest`)
+4. **Deploy job** — SSM Run Command: `git pull`, `ecr login`, `docker compose pull`, `up -d` (no build on EC2)
+
+Rollback: re-run the workflow on an older commit (images tagged by SHA).
 
 No SSH keys needed — deploy uses SSM Run Command (same IAM role the EC2 already has).
 
-!!! note "Node version"
-    CI uses **Node 22**; local dev pins **Node 24** (`.nvmrc`). Both build cleanly today; align if you hit a Vite/rolldown native-binding issue locally.
+!!! note "Frontend build"
+    The SPA is built inside the **quant-nginx** Docker image in CI (arm64). No separate npm job on the runner.
 
 ### GitHub setup (one-time)
 

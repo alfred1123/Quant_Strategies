@@ -225,6 +225,8 @@ Future **Phase 1.7 `trade`** service reuses the **`quant-app`** ECR image with a
 
 ### 3. GitHub Actions — `.github/workflows/deploy.yml`
 
+**Status:** **done** (2026-05-22).
+
 | Today | After ECR |
 |-------|-----------|
 | `build` — npm sanity check on runner | **`build-and-push`** — builds and pushes prod images |
@@ -297,8 +299,8 @@ docker image prune -f
 |------|-------|-------|
 | **1** | CFN `00-ecr.yml` + EC2 ECR read on `Ec2Role` + `deploy.sh` | Deploy stack manually first |
 | **2** | Compose `image:` wiring + `docker-compose.prod.yml` env | **Done** |
-| **3** | GitHub workflow `build-and-push` + pull-only deploy | Cutover PR — verify one green deploy |
-| **4** | IAM `github-deploy-ecr-policy.json` + manual apply | Required before step 3 can push |
+| **3** | GitHub workflow `build-and-push` + pull-only deploy | **Done** |
+| **4** | IAM `github-deploy-ecr-policy.json` + manual apply | **Done** (managed policy on `quant_deploy`) |
 | **5** | Doc touch-ups | infrastructure.md, README |
 
 **Cutover:** single deploy to `main` replaces EC2 build with pull. Keep previous git SHA handy for rollback tag.

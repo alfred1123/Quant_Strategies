@@ -849,7 +849,7 @@ Required before first live apply per deployment:
 |-------|--------|
 | **EC2 + Docker** | Measure CPU/mem before adding trade container alongside API + worker + Redis |
 | **ECR step 1** | **Done** — `quant-ecr` stack, repos `quant-app` / `quant-nginx`, EC2 ECR read, CI IAM |
-| **ECR steps 2–5** | Step **2 done** (compose wiring); steps **3–5** pending (CI push + pull deploy) |
+| **ECR steps 2–5** | Steps **2–3 done** (compose + CI push/pull deploy); docs/README cleanup optional |
 | **Existing stack** | See [Infrastructure](../architecture/infrastructure.md), [Dev vs Prod](../architecture/dev-vs-prod.md) |
 
 ---

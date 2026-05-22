@@ -128,7 +128,7 @@ flowchart LR
 
 | Step | When | Owner |
 |------|------|-------|
-| **ECR CI pipeline** (repos, IAM, workflow, compose `image:`) | **Steps 1–2 done** — step 3 (CI push + pull deploy) next — [checklist](deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file) |
+| **ECR CI pipeline** (repos, IAM, workflow, compose `image:`) | **Steps 1–3 done** — ECR pull deploy live — [checklist](deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file) |
 | Upgrade `quant-server` to t4g.medium | **Done** |
 | Build Phase 1 trade compose service on same host | Phase 1.3–1.7 | App |
 | Add reconcile cron on same host | Phase 2.2 | App + ops |
