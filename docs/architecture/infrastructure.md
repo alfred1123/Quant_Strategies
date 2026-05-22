@@ -270,6 +270,35 @@ aws ssm send-command \
 gh workflow run deploy
 ```
 
+### Troubleshooting — disk full on deploy
+
+Default AL2023 root volume is **8 GiB** — too small once Docker accumulates old build layers from pre-ECR deploys.
+
+**Symptoms:** `no space left on device` during pull/extract; Compose warns `Some service image(s) must be built from source` and tries to **build on EC2** (never do this in prod).
+
+**Immediate recovery (SSM on EC2):**
+
+```bash
+bash /opt/quant/aws/scripts/ec2-docker-recover.sh
+# Then re-run the GitHub deploy workflow, or manually:
+cd /opt/quant
+export APP_IMAGE=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com/quant-app:latest
+export NGINX_IMAGE=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com/quant-nginx:latest
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --remove-orphans
+```
+
+**Long-term:** CFN `03-compute.yml` sets **30 GiB gp3** root volume (`RootVolumeSize`). Update the live volume without replacing the instance:
+
+```bash
+# Find volume id for the instance root device, then:
+aws ec2 modify-volume --volume-id vol-XXXXXXXX --size 30 --region ap-southeast-1
+# On the instance after volume shows "optimizing" → "completed":
+sudo growpart /dev/nvme0n1 1 && sudo xfs_growfs /
+```
+
+Deploy script uses `--no-build` on all `compose up` commands so prod never builds on EC2.
+
 ---
 
 ## Future: ECS migration

@@ -43,7 +43,14 @@ Parameters:
     Description: >-
       t2.micro = free-tier (x86, 1 GiB).
       t4g.small = Graviton ARM (2 GiB, ~$7/mo reserved). Recommended minimum.
-      t4g.medium = Graviton ARM (4 GiB, ~$14/mo). Good headroom for queue worker.
+      t4g.medium = Graviton ARM (4 GiB, ~$14/mo reserved). Prod default.
+
+  RootVolumeSize:
+    Type: Number
+    Default: 30
+    MinValue: 20
+    MaxValue: 100
+    Description: Root EBS gp3 size (GiB). Docker images need >= 20; prod uses 30.
 
   AmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
@@ -127,6 +134,12 @@ Resources:
       KeyName: !Ref KeyPairName
       SubnetId: !Ref SubnetId
       IamInstanceProfile: !Ref InstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: !Ref RootVolumeSize
+            VolumeType: gp3
+            DeleteOnTermination: true
       SecurityGroupIds: !If
         - HasRdsLink
         - - !Ref Ec2SecurityGroupId
