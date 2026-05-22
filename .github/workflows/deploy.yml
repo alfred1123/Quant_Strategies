@@ -112,9 +112,11 @@ jobs:
 
           if echo "$changed" | grep -q '^aws/params/prod.json'; then
             pdiff=$(git diff "$base" HEAD -- aws/params/prod.json)
-            echo "$pdiff" | grep -qE 'VpcId|SshCidr' && network=true
-            echo "$pdiff" | grep -qE 'EngineVersion|MinACU|MaxACU|MasterUsername|SubnetIds' && database=true
-            echo "$pdiff" | grep -qE 'InstanceType|AmiId|KeyPairName|"ParameterKey": "SubnetId"' && compute=true
+            # Only +/- lines — context lines in unified diff must not trigger stacks.
+            plines=$(echo "$pdiff" | grep -E '^[-+][^-+]' || true)
+            echo "$plines" | grep -qE 'VpcId|SshCidr' && network=true
+            echo "$plines" | grep -qE 'EngineVersion|MinACU|MaxACU|MasterUsername|SubnetIds' && database=true
+            echo "$plines" | grep -qE 'InstanceType|AmiId|KeyPairName|"ParameterKey": "SubnetId"' && compute=true
           fi
 
           if [[ "$force" == "true" ]]; then
@@ -141,6 +143,13 @@ jobs:
           AWS_REGION: ap-southeast-1
         run: bash aws/deploy.sh network
 
+      - name: Deploy compute stack
+        if: steps.changes.outputs.compute == 'true'
+        env:
+          APP_ENV: prod
+          AWS_REGION: ap-southeast-1
+        run: bash aws/deploy.sh compute
+
       - name: Deploy database stack
         if: steps.changes.outputs.database == 'true'
         env:
@@ -165,13 +174,6 @@ jobs:
           json.dump(arr, open(p, 'w'))
           "
           bash aws/deploy.sh database
-
-      - name: Deploy compute stack
-        if: steps.changes.outputs.compute == 'true'
-        env:
-          APP_ENV: prod
-          AWS_REGION: ap-southeast-1
-        run: bash aws/deploy.sh compute
 
   deploy:
     name: deploy to EC2
