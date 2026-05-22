@@ -155,6 +155,10 @@ Resources:
           # Docker Compose plugin (v2) + Buildx
           mkdir -p /usr/local/lib/docker/cli-plugins
           ARCH=$(uname -m)
+          case "$ARCH" in
+            aarch64) ARCH=arm64 ;;
+            x86_64) ARCH=amd64 ;;
+          esac
           curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-${!ARCH}" \
             -o /usr/local/lib/docker/cli-plugins/docker-compose
           chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
