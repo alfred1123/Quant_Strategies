@@ -151,7 +151,7 @@ managed by CloudFormation:
 | `quant-network` | EC2 SG | `sg-0c48c9010eaf84372` | Web + SSH |
 | `quant-network` | RDS SG | `sg-0278c603461bbf8fa` | Postgres from EC2 only |
 | `quant-database` | Aurora cluster | `quantdb-cluster` | Imported; Serverless v2, 0.5–2.0 ACU |
-| `quant-compute` | EC2 | `i-096f85bf84852cce3` | `quant-server`, t4g.medium ARM (upgrade from t4g.small) |
+| `quant-compute` | EC2 | `i-03a670ddc9169233a` | `quant-server`, t4g.medium ARM |
 | `quant-compute` | IAM role | `quant-ec2-role` | SSM access |
 | `quant-compute` | EIP | `52.221.3.230` | Static public IP |
 | — | Key pair | `tradingServerKey` | SSH access (not managed by CFN) |
@@ -231,7 +231,7 @@ No SSH keys needed — deploy uses SSM Run Command (same IAM role the EC2 alread
 
 | Variable | Value |
 |----------|-------|
-| `EC2_INSTANCE_ID` | `i-096f85bf84852cce3` |
+| `EC2_INSTANCE_ID` | *(optional fallback)* | Prefer CFN `quant-compute` → `InstanceId` output (current: `i-03a670ddc9169233a`) |
 
 **Environment**: Create a `production` environment (repo → Settings → Environments) for deploy approvals (optional).
 

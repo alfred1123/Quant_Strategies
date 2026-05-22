@@ -192,7 +192,20 @@ jobs:
         run: |
           set -euo pipefail
 
-          INSTANCE_ID="${{ vars.EC2_INSTANCE_ID }}"
+          # Resolve from CFN output so instance replacement does not require
+          # manually updating GitHub vars. vars.EC2_INSTANCE_ID is fallback only.
+          INSTANCE_ID=$(aws cloudformation describe-stacks \
+            --stack-name quant-compute \
+            --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" \
+            --output text)
+          if [[ -z "$INSTANCE_ID" || "$INSTANCE_ID" == "None" ]]; then
+            INSTANCE_ID="${{ vars.EC2_INSTANCE_ID }}"
+          fi
+          if [[ -z "$INSTANCE_ID" ]]; then
+            echo "::error::No EC2 instance id (quant-compute stack output or EC2_INSTANCE_ID var)"
+            exit 1
+          fi
+          echo "Deploy target instance: $INSTANCE_ID"
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \

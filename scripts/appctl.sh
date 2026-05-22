@@ -38,7 +38,7 @@ else
 fi
 
 # AWS SSM port-forward target (override via .env if needed).
-SSM_TARGET_INSTANCE="${SSM_TARGET_INSTANCE:-i-096f85bf84852cce3}"
+SSM_TARGET_INSTANCE="${SSM_TARGET_INSTANCE:-i-03a670ddc9169233a}"
 SSM_RDS_HOST="${SSM_RDS_HOST:-quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com}"
 SSM_REMOTE_PORT="${SSM_REMOTE_PORT:-5432}"
 SSM_AWS_PROFILE="${SSM_AWS_PROFILE:-alfcheun}"
