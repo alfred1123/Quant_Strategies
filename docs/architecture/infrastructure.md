@@ -173,7 +173,7 @@ All app secrets live under `/quant/<env>/` in SSM Parameter Store.
 | `FUTU_HOST` | String | `127.0.0.1` |
 | `FUTU_PORT` | String | `11111` |
 
-The app loads these at startup via `api/config.py` when `USE_SSM=1`.
+The app loads these at startup via `quant/api/config.py` when `USE_SSM=1`.
 
 **Note:** `JWT_SECRET` must be the same across all app instances sharing
 a database — otherwise JWTs minted by one instance cannot be verified

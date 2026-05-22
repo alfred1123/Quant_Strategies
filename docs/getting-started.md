@@ -43,7 +43,7 @@ cp .env.example .env   # then edit with your keys
 ```bash
 # Terminal 1 — FastAPI backend (defaults to port 8000)
 source env/bin/activate
-uvicorn api.main:app --reload
+uvicorn quant.api.main:app --reload
 
 # Terminal 2 — React frontend
 cd frontend && npm run dev

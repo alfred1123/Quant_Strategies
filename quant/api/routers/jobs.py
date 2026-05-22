@@ -1,7 +1,7 @@
 """HTTP boundary for the backtest job queue — Phase B v6.
 
 Replaces the TS coordinator's ``/api/v1/jobs/*`` endpoints. All routes
-behind ``require_user`` (registered in ``api/main.py``).
+behind ``require_user`` (registered in ``quant.api.main``).
 """
 
 import asyncio
@@ -13,12 +13,12 @@ import redis as redis_lib
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
-from api.auth.dependencies import require_user
-from api.auth.models import CurrentUser
-from api.config import get_redis_url
-from api.deps import get_data_caches
-from api.schemas.jobs import EnqueueRequest, EnqueueResponse, JobDetail, JobRow
-from api.services.jobs import (
+from quant.api.auth.dependencies import require_user
+from quant.api.auth.models import CurrentUser
+from quant.api.config import get_redis_url
+from quant.api.deps import get_data_caches
+from quant.api.schemas.jobs import EnqueueRequest, EnqueueResponse, JobDetail, JobRow
+from quant.api.services.jobs import (
     CancelNotAllowed,
     JobNotFound,
     JobsService,

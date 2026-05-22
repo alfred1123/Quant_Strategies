@@ -38,7 +38,7 @@ class DataCaches:
         """Load all INST products into memory.
 
         ``soft_fail=True`` (worker): log warning and continue with empty/partial INST.
-        ``soft_fail=False`` (API): log exception; same as historical ``api/main`` —
+        ``soft_fail=False`` (API): log exception; same as historical ``quant.api.main`` —
         server still boots with an unprepared ``InstrumentCache``.
         """
         try:

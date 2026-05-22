@@ -16,8 +16,8 @@ import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
-from api.auth.models import CurrentUser
-from api.auth.repo import AuthRepo
+from quant.api.auth.models import CurrentUser
+from quant.api.auth.repo import AuthRepo
 
 logger = logging.getLogger(__name__)
 

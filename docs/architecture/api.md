@@ -1,6 +1,6 @@
 # FastAPI Backend
 
-The `api/` directory contains the FastAPI application that serves the backtest pipeline as a REST API. All `/api/v1/*` routes (except auth and health) require an authenticated session.
+The `quant/api/` directory contains the FastAPI application that serves the backtest pipeline as a REST API. All `/api/v1/*` routes (except auth and health) require an authenticated session.
 
 !!! note "Queue endpoints — migration in progress"
     `/api/v1/jobs/*` (the backtest queue) is served by this FastAPI process — see decision #32 and [Queued Background Backtests](../design/backtest-queue.md). The Python `quant.queue.worker_loop` daemon (separate container) consumes jobs from `BT.QUEUE`; all HTTP terminates here.
@@ -9,7 +9,7 @@ The `api/` directory contains the FastAPI application that serves the backtest p
 
 ```bash
 source env/bin/activate
-uvicorn api.main:app --reload --port 8000
+uvicorn quant.api.main:app --reload --port 8000
 ```
 
 Interactive docs: `http://localhost:8000/docs`.
@@ -124,4 +124,4 @@ api/
     └── backtest.py      # _build_config, run_optimize, stream_optimize, etc.
 ```
 
-REFDATA, INST, and BT cache classes live under `quant/refdata/` and `quant/data/` (shared between the API and the worker via `quant/refdata/bundle.py::DataCaches`). All Postgres access goes through `quant/shared/db.py::DbGateway` — no other module in `quant/` or `api/` imports `psycopg`.
+REFDATA, INST, and BT cache classes live under `quant/refdata/` and `quant/data/` (shared between the API and the worker via `quant/refdata/bundle.py::DataCaches`). All Postgres access goes through `quant/shared/db.py::DbGateway` — no other module in `quant/` or `quant/api/` imports `psycopg`.

@@ -3,9 +3,9 @@
 **Status:** v6 — implemented. The TypeScript coordinator (`coordinator/`, Bun + Hono) was deleted; FastAPI now owns `/api/v1/jobs/*` and a long-lived `quant.queue.worker_loop` daemon supervises per-job worker subprocesses. The Postgres schema, `BT.SP_INS_QUEUE` / `BT.SP_GET_QUEUE_LATEST` contract, and the `BT.RESULT` write path are unchanged from v5 — only the runtime owner changed. See decision #32.
 
 **Date:** 2026-05-03 (v5) · 2026-05-16 (v6 cutover)
-**Scope (current):** `api/routers/jobs.py`, `api/services/jobs.py`, `api/schemas/jobs.py`, `quant/queue/worker.py`, `quant/queue/worker_loop.py`, `quant/queue/wake.py`, `frontend/src/features/queue/`, `db/liquidbase/bt/`.
+**Scope (current):** `quant/api/routers/jobs.py`, `quant/api/services/jobs.py`, `quant/api/schemas/jobs.py`, `quant/queue/worker.py`, `quant/queue/worker_loop.py`, `quant/queue/wake.py`, `frontend/src/features/queue/`, `db/liquidbase/bt/`.
 
-> **Reading guide.** Sections describing TypeScript / Bun / Hono / `coordinator/src/...` paths below are **historical (v5)** unless this banner says otherwise. The Python equivalents are: `coordinator/src/http/server.ts` → `api/routers/jobs.py`; `coordinator/src/queue/repo.ts` → `api/services/jobs.py`; `coordinator/src/queue/{manager,spawn}.ts` → `quant/queue/worker_loop.py`; `coordinator/src/refdata/cache.ts` → `quant/refdata/publisher.py`. §19 ("Why TypeScript") is retained as decision history — superseded by #32.
+> **Reading guide.** Sections describing TypeScript / Bun / Hono / `coordinator/src/...` paths below are **historical (v5)** unless this banner says otherwise. The Python equivalents are: `coordinator/src/http/server.ts` → `quant/api/routers/jobs.py`; `coordinator/src/queue/repo.ts` → `quant/api/services/jobs.py`; `coordinator/src/queue/{manager,spawn}.ts` → `quant/queue/worker_loop.py`; `coordinator/src/refdata/cache.ts` → `quant/refdata/publisher.py`. §19 ("Why TypeScript") is retained as decision history — superseded by #32.
 
 ---
 
@@ -14,7 +14,7 @@
 The four-phase migration completed 2026-05-16:
 
 - **Phase A** — `quant/queue/worker_loop.py` daemon with stale-job recovery + `tests/unit/test_worker_loop.py`.
-- **Phase B** — `api/routers/jobs.py` + `api/services/jobs.py` + `api/schemas/jobs.py` exposing all 5 endpoints under `Depends(require_user)`, with `tests/unit/test_jobs_router.py`.
+- **Phase B** — `quant/api/routers/jobs.py` + `quant/api/services/jobs.py` + `quant/api/schemas/jobs.py` exposing all 5 endpoints under `Depends(require_user)`, with `tests/unit/test_jobs_router.py`.
 - **Phase C** — Compose service `worker` (reuses the FastAPI image, command `python -m quant.queue.worker_loop`); `scripts/appctl.sh` brings Redis up before the backend and the worker after, so REFDATA is in Redis before the worker boots.
 - **Phase D** — `coordinator/` deleted; `.env.example`, `README.md`, `docs/architecture/dev-vs-prod.md` cleaned.
 
@@ -24,7 +24,7 @@ The four-phase migration completed 2026-05-16:
     Proposed jobs-table UX: hover preview **plus** right-hand detail drawer (shared payload, deep-link `?job=`). See [Jobs Table Detail UX](jobs-table-detail-ux.md).
 
 1. **`SP_CLAIM_NEXT` stored procedure** (atomic `SELECT … FOR UPDATE SKIP LOCKED` + `SP_INS_QUEUE RUNNING`). Required before running > 1 `worker_loop` replica safely. v6 ships single-replica.
-2. **Per-trial progress (`Slice D`)** — worker emits `{"event":"progress","trial":N,"total":M,...}` JSON to stdout *and* `PUBLISH bt:progress:{queue_id}` on Redis. SSE handler in `api/routers/jobs.py` swaps the 1s DB poll for a Redis subscription. Worker_loop is unaffected.
+2. **Per-trial progress (`Slice D`)** — worker emits `{"event":"progress","trial":N,"total":M,...}` JSON to stdout *and* `PUBLISH bt:progress:{queue_id}` on Redis. SSE handler in `quant/api/routers/jobs.py` swaps the 1s DB poll for a Redis subscription. Worker_loop is unaffected.
 3. **`pg_notify` from `SP_INS_QUEUE`** — replaces the Redis BLPOP wake when ready. Already noted in §6.
 
 ---
@@ -101,7 +101,7 @@ Implementation constraints:
 | Python worker entrypoint | `quant/queue/worker.py` | CPython | `python -m quant.queue.worker <queue_id>`. |
 | Python DB repo (used by worker self-writes) | `src/jobs.py` | CPython | Existing `BacktestJobRepo`. |
 | Frontend queue panel | `frontend/src/features/queue/` | Browser | TanStack Query + EventSource. |
-| FastAPI `/optimize`, `/refdata`, `/auth`, `/inst` | `api/` | CPython | **Unchanged.** |
+| FastAPI `/optimize`, `/refdata`, `/auth`, `/inst` | `quant/api/` | CPython | **Unchanged.** |
 
 The CLI (`quant/cli.py`) is **not** modified — it runs synchronously with no use for the queue.
 
@@ -820,21 +820,21 @@ This slice introduces the coordinator and proves the polyglot boundary. Once it 
 
 | Router | Endpoints | Has numeric compute? | Recommended action | Priority |
 |---|---|---|---|---|
-| `api/routers/refdata.py` | `GET /refdata/{table}`, `POST /refdata/refresh` | No — pure SQL reads + in-process dict | **Port to coordinator.** REFDATA cache becomes the single source of truth in TS. FastAPI version deleted. | 1 (easiest) |
-| `api/routers/inst.py` | `GET /inst/products`, `GET /inst/products/:id/xrefs`, `POST /inst/refresh` | No — pure SQL reads via `InstrumentCache` | **Port to coordinator.** Same shape as REFDATA. | 2 |
-| `api/auth/router.py` | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | No — bcrypt/argon2 verify + JWT sign | **Port to coordinator.** Use `argon2` (Node) and `jose` for JWT. Removes the need to share `JWT_SECRET` across runtimes. | 3 |
-| `api/routers/backtest.py — /performance` | `POST /backtest/performance` | **Yes** — runs `perf.py` (single backtest, returns equity curve + metrics) | **Move to a dedicated Python service** invoked by the coordinator over HTTP, **or** queue it through the existing job system as a "single-trial" job. Recommendation: queue route — reuses the worker. | 4 |
-| `api/routers/backtest.py — /walk-forward` | `POST /backtest/walk-forward` | **Yes** — runs `walk_forward.py` | Same as `/performance`: queue as a single-trial job. The frontend already accepts async job results. | 4 |
-| `api/routers/backtest.py — /optimize` + `/optimize/stream` | Synchronous + SSE | **Yes** — runs `param_opt.py` | **Retire** once the queue is fully wired. Every optimization becomes a queued job. The legacy sync path can stay as an admin-only fallback. | 5 |
-| `api/services/backtest.py` | Internal | **Yes** — orchestrates `data → strat → perf → param_opt` | **Stays in Python.** Becomes the worker entry point that `src/worker.py` calls into. Nothing to port. | n/a |
+| `quant/api/routers/refdata.py` | `GET /refdata/{table}`, `POST /refdata/refresh` | No — pure SQL reads + in-process dict | **Port to coordinator.** REFDATA cache becomes the single source of truth in TS. FastAPI version deleted. | 1 (easiest) |
+| `quant/api/routers/inst.py` | `GET /inst/products`, `GET /inst/products/:id/xrefs`, `POST /inst/refresh` | No — pure SQL reads via `InstrumentCache` | **Port to coordinator.** Same shape as REFDATA. | 2 |
+| `quant/api/auth/router.py` | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | No — bcrypt/argon2 verify + JWT sign | **Port to coordinator.** Use `argon2` (Node) and `jose` for JWT. Removes the need to share `JWT_SECRET` across runtimes. | 3 |
+| `quant/api/routers/backtest.py — /performance` | `POST /backtest/performance` | **Yes** — runs `perf.py` (single backtest, returns equity curve + metrics) | **Move to a dedicated Python service** invoked by the coordinator over HTTP, **or** queue it through the existing job system as a "single-trial" job. Recommendation: queue route — reuses the worker. | 4 |
+| `quant/api/routers/backtest.py — /walk-forward` | `POST /backtest/walk-forward` | **Yes** — runs `walk_forward.py` | Same as `/performance`: queue as a single-trial job. The frontend already accepts async job results. | 4 |
+| `quant/api/routers/backtest.py — /optimize` + `/optimize/stream` | Synchronous + SSE | **Yes** — runs `param_opt.py` | **Retire** once the queue is fully wired. Every optimization becomes a queued job. The legacy sync path can stay as an admin-only fallback. | 5 |
+| `quant/api/services/backtest.py` | Internal | **Yes** — orchestrates `data → strat → perf → param_opt` | **Stays in Python.** Becomes the worker entry point that `src/worker.py` calls into. Nothing to port. | n/a |
 | `src/data.py`, `strat.py`, `perf.py`, `param_opt.py`, `walk_forward.py` | Library modules | **Yes** | **Stay in Python forever.** Library ecosystem reasons (§19.3). | n/a |
 
 ### 20.2 Migration order — strangler-fig pattern
 
 Once the queue (Slices A–F) is stable:
 
-1. **Refdata port** — coordinator reads `REFDATA.SP_GET_ENUM` and serves `/api/v1/refdata/*`. Frontend repointed via Vite proxy. Delete `api/routers/refdata.py` + `api/services/refdata_cache.py` *(if separate)*. Sanity check: TanStack Query cache invalidation still works.
-2. **Inst port** — same pattern. Delete `api/routers/inst.py`.
+1. **Refdata port** — coordinator reads `REFDATA.SP_GET_ENUM` and serves `/api/v1/refdata/*`. Frontend repointed via Vite proxy. Delete `quant/api/routers/refdata.py` + `quant/api/services/refdata_cache.py` *(if separate)*. Sanity check: TanStack Query cache invalidation still works.
+2. **Inst port** — same pattern. Delete `quant/api/routers/inst.py`.
 3. **Auth port** — port `qs_token` issue/verify into TS. Frontend unaffected (still sets `HttpOnly` cookie). FastAPI loses its auth middleware. Coordinator becomes the only origin issuing the cookie.
 4. **`/performance` and `/walk-forward` queueing** — extend `BT.QUEUE` with a `JOB_KIND` column (`'OPTIMIZE' | 'PERFORMANCE' | 'WALK_FORWARD'`). Worker dispatches on kind. Frontend submits these as ordinary queue jobs.
 5. **Retire `/optimize` (sync) and `/optimize/stream`** — once all callers are queued. Phase out FastAPI.

@@ -8,7 +8,7 @@ Backtesting and trading framework for crypto and equity markets. Strategies are 
 
 | Component | Description |
 |-----------|-------------|
-| **Backtest Pipeline** | `quant/data/sources.py` → `quant/strategy/{indicators,signals}.py` → `performance.py` → `optimizer.py` → `walk_forward.py`, orchestrated by `quant.cli` (CLI) and `api/services/backtest.py` (web) |
+| **Backtest Pipeline** | `quant/data/sources.py` → `quant/strategy/{indicators,signals}.py` → `performance.py` → `optimizer.py` → `walk_forward.py`, orchestrated by `quant.cli` (CLI) and `quant/api/services/backtest.py` (web) |
 | **FastAPI Backend** | REST + SSE endpoints for optimization, performance, walk-forward, refdata, and instruments — cookie-based auth |
 | **React Frontend** | MUI-based SPA with configurable factor cards, live progress bar, interactive charts |
 | **PostgreSQL Database** | REFDATA (dropdowns), BT (backtest results), INST (products + xrefs), CORE_ADMIN (users), TRADE (planned) — managed via Liquibase |

@@ -8,5 +8,5 @@ from quant.refdata.bundle import DataCaches
 
 
 def get_data_caches(request: Request) -> DataCaches:
-    """REFDATA (Redis) + INST + BT caches — built in ``api.main`` lifespan."""
+    """REFDATA (Redis) + INST + BT caches — built in ``quant.api.main`` lifespan."""
     return request.app.state.data_caches

@@ -11,7 +11,7 @@ from typing import Any
 
 import redis
 
-from api.schemas.jobs import (
+from quant.api.schemas.jobs import (
     MAX_QUEUED_PER_USER,
     PRIORITY_MAP,
     EnqueueRequest,

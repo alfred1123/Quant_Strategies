@@ -29,9 +29,9 @@ import sys
 import traceback
 import uuid
 
-from api.config import load_config, get_redis_url
-from api.schemas.backtest import OptimizeRequest
-from api.services.backtest import run_optimize
+from quant.api.config import load_config, get_redis_url
+from quant.api.schemas.backtest import OptimizeRequest
+from quant.api.services.backtest import run_optimize
 
 from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches

@@ -6,13 +6,12 @@ This repository contains Python tooling for **backtesting**, **technical analysi
 
 | Path | Role |
 |------|------|
-| `src/` | Pipeline: `data.py` (sources), `strat.py` (indicators + strategies + signals), `perf.py`, `param_opt.py`, `util.py` (shared helpers), `main.py` (orchestration) |
-| `api/` | FastAPI backend — `main.py`, `deps.py` (e.g. `DataCaches`), `routers/`, `config.py`; imports `src/` directly |
+| `quant/` | Backtesting pipeline + FastAPI backend — `data/`, `refdata/`, `strategy/`, `queue/`, `trade/`, `cli.py`, and `api/` (HTTP: `main.py`, `routers/`, `config.py`) |
 | `frontend/` | React/TypeScript SPA (Phase 8) — replaces Streamlit |
 | `docs/` | MkDocs Material wiki — architecture, guides, design docs, decisions log. Serve locally with `mkdocs serve`. |
 | `backup/deco/` | Decommissioned scripts (Bybit live trading — kept for reference) |
 
-Run backtest-style code from `src/` (imports are relative to that package, e.g. `from data import ...` in `main.py`).
+Run backtest-style code via `python -m quant.cli` or import from the `quant` package (e.g. `from quant.data.sources import ...`).
 
 ## Conventions
 
@@ -34,8 +33,8 @@ Run backtest-style code from `src/` (imports are relative to that package, e.g. 
 ## Logging
 
 - Every module uses `import logging` and `logger = logging.getLogger(__name__)` at the top.
-- Logging format and level are configured **once** in `api/config.py` (`setup_logging()`). `quant/cli.py` has its own inline copy for standalone CLI use. Do **not** call `logging.basicConfig()` anywhere else.
-- **Entry points only** (`quant/cli.py`, `api/config.py`) call `setup_logging()`.
+- Logging format and level are configured **once** in `quant/api/config.py` (`setup_logging()`). `quant/cli.py` has its own inline copy for standalone CLI use. Do **not** call `logging.basicConfig()` anywhere else.
+- **Entry points only** (`quant/cli.py`, `quant/api/config.py`) call `setup_logging()`.
 - Library modules **never** call `setup_logging` — they only emit via `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`.
 - Do **not** use `print()` for status output — use the logger at the appropriate level.
 

@@ -8,8 +8,8 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from api.auth.models import LoginRequest
-from api.auth.service import AuthService, _resolve_jwt_secret
+from quant.api.auth.models import LoginRequest
+from quant.api.auth.service import AuthService, _resolve_jwt_secret
 
 
 class TestResolveJwtSecret:

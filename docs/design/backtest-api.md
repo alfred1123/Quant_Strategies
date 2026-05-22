@@ -5,7 +5,7 @@
 
 ## Overview
 
-The Backtest API is a **FastAPI** server (`api/`) that exposes the Python backtest pipeline (`quant/`) as HTTP endpoints. It lets a React/TypeScript frontend (or any HTTP client) run backtests, parameter optimizations, and walk-forward tests without touching Python directly.
+The Backtest API is a **FastAPI** server (`quant/api/`) that exposes the Python backtest pipeline (`quant/`) as HTTP endpoints. It lets a React/TypeScript frontend (or any HTTP client) run backtests, parameter optimizations, and walk-forward tests without touching Python directly.
 
 ```
 ┌──────────────┐       HTTP/JSON        ┌──────────────────────────────────────┐
@@ -39,7 +39,7 @@ The Backtest API is a **FastAPI** server (`api/`) that exposes the Python backte
 
 ## Startup Lifecycle
 
-1. **`uvicorn api.main:app --reload --port 8000`** launches the server.
+1. **`uvicorn quant.api.main:app --reload --port 8000`** launches the server.
 2. The `lifespan` context manager runs on startup:
    - Calls `setup_logging()` (once, as the entry point).
    - Creates a `RefDataCache` with the PostgreSQL connection string.
@@ -104,14 +104,14 @@ Frontend                    Router                  Service                 Pipe
 
 ## Three-Layer Architecture
 
-### 1. Routers (`api/routers/`)
+### 1. Routers (`quant/api/routers/`)
 
 Thin HTTP layer. Each endpoint:
 - Validates the Pydantic request model automatically.
 - Delegates to the corresponding service function.
 - Catches exceptions and returns appropriate HTTP errors.
 
-### 2. Services (`api/services/`)
+### 2. Services (`quant/api/services/`)
 
 Business logic bridge between HTTP and the pipeline:
 
@@ -258,7 +258,7 @@ localhost:5433  ──── SSM Port Forward ──── RDS PostgreSQL (quant
 # From project root
 source .env                    # Load DB credentials
 source env/bin/activate        # Activate Python venv
-uvicorn api.main:app --reload --port 8000
+uvicorn quant.api.main:app --reload --port 8000
 
 # Verify
 curl http://localhost:8000/health

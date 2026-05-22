@@ -8,9 +8,9 @@ from uuid import UUID
 import jwt
 from fastapi import Cookie, Depends, HTTPException, Request, status
 
-from api.auth.models import CurrentUser
-from api.auth.repo import AuthRepo
-from api.auth.service import AuthService
+from quant.api.auth.models import CurrentUser
+from quant.api.auth.repo import AuthRepo
+from quant.api.auth.service import AuthService
 
 logger = logging.getLogger(__name__)
 

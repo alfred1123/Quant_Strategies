@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from api.schemas.jobs import EnqueueResponse
+from quant.api.schemas.jobs import EnqueueResponse
 
 
 def _row(*, qid=None, status="QUEUED", status_id=1, vid=1, user="u1", priority=100, error=None):
@@ -36,10 +36,10 @@ def _row(*, qid=None, status="QUEUED", status_id=1, vid=1, user="u1", priority=1
 def client_and_svc():
     """TestClient + a MagicMock JobsService injected via dependency_overrides."""
     with patch("quant.shared.db.psycopg"):
-        from api.auth.dependencies import require_user
-        from api.auth.models import CurrentUser
-        from api.main import app
-        from api.routers.jobs import get_jobs_service
+        from quant.api.auth.dependencies import require_user
+        from quant.api.auth.models import CurrentUser
+        from quant.api.main import app
+        from quant.api.routers.jobs import get_jobs_service
 
         app.state.db_conninfo = "postgresql://stub"
         app.state.data_caches = MagicMock()
@@ -80,7 +80,7 @@ class TestEnqueue:
 
     def test_rate_limited_returns_429(self, client_and_svc):
         client, svc, _ = client_and_svc
-        from api.services.jobs import RateLimitError
+        from quant.api.services.jobs import RateLimitError
         svc.enqueue.side_effect = RateLimitError(30)
 
         resp = client.post(
@@ -138,7 +138,7 @@ class TestGet:
 
     def test_not_found(self, client_and_svc):
         client, svc, _ = client_and_svc
-        from api.services.jobs import JobNotFound
+        from quant.api.services.jobs import JobNotFound
         svc.get.side_effect = JobNotFound("missing")
 
         resp = client.get(f"/api/v1/jobs/{uuid.uuid4()}")
@@ -169,7 +169,7 @@ class TestCancel:
 
     def test_cancel_terminal_returns_409(self, client_and_svc):
         client, svc, _ = client_and_svc
-        from api.services.jobs import CancelNotAllowed
+        from quant.api.services.jobs import CancelNotAllowed
         svc.cancel.side_effect = CancelNotAllowed("already done")
 
         resp = client.post(f"/api/v1/jobs/{uuid.uuid4()}/cancel")
@@ -177,7 +177,7 @@ class TestCancel:
 
     def test_cancel_not_found_returns_404(self, client_and_svc):
         client, svc, _ = client_and_svc
-        from api.services.jobs import JobNotFound
+        from quant.api.services.jobs import JobNotFound
         svc.cancel.side_effect = JobNotFound("nope")
 
         resp = client.post(f"/api/v1/jobs/{uuid.uuid4()}/cancel")
@@ -202,7 +202,7 @@ class TestReenqueue:
 
     def test_not_found_returns_404(self, client_and_svc):
         client, svc, _ = client_and_svc
-        from api.services.jobs import JobNotFound
+        from quant.api.services.jobs import JobNotFound
         svc.reenqueue.side_effect = JobNotFound("nope")
 
         resp = client.post(f"/api/v1/jobs/{uuid.uuid4()}/reenqueue")
@@ -210,7 +210,7 @@ class TestReenqueue:
 
     def test_non_terminal_returns_409(self, client_and_svc):
         client, svc, _ = client_and_svc
-        from api.services.jobs import ReenqueueNotAllowed
+        from quant.api.services.jobs import ReenqueueNotAllowed
         svc.reenqueue.side_effect = ReenqueueNotAllowed("running")
 
         resp = client.post(f"/api/v1/jobs/{uuid.uuid4()}/reenqueue")
@@ -218,7 +218,7 @@ class TestReenqueue:
 
     def test_rate_limited_returns_429(self, client_and_svc):
         client, svc, _ = client_and_svc
-        from api.services.jobs import RateLimitError
+        from quant.api.services.jobs import RateLimitError
         svc.reenqueue.side_effect = RateLimitError(30)
 
         resp = client.post(f"/api/v1/jobs/{uuid.uuid4()}/reenqueue")
@@ -240,7 +240,7 @@ class TestEventsStream:
              "queue_status_id": 4, "error_text": None},
         ]
         # Speed up the test — patch the sleep to a no-op.
-        with patch("api.routers.jobs.asyncio.sleep") as mock_sleep:
+        with patch("quant.api.routers.jobs.asyncio.sleep") as mock_sleep:
             async def _noop(*_a, **_kw):
                 return None
             mock_sleep.side_effect = _noop
@@ -270,11 +270,11 @@ class TestAuthGating:
     def test_requires_login(self):
         """Without dependency_overrides the cookie is absent → 401."""
         with patch("quant.shared.db.psycopg"):
-            from api.main import app
+            from quant.api.main import app
             app.state.db_conninfo = "postgresql://stub"
             app.state.data_caches = MagicMock()
             # Ensure auth state present so require_user runs.
-            from api.auth.service import AuthService
+            from quant.api.auth.service import AuthService
             with patch.object(AuthService, "__init__", return_value=None):
                 app.state.auth_service = AuthService.__new__(AuthService)
             client = TestClient(app)

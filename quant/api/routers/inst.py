@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.deps import get_data_caches
+from quant.api.deps import get_data_caches
 from quant.refdata.bundle import DataCaches
 
 logger = logging.getLogger(__name__)

@@ -5,13 +5,13 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
-from api.deps import get_data_caches
-from api.schemas.backtest import (
+from quant.api.deps import get_data_caches
+from quant.api.schemas.backtest import (
     OptimizeRequest, OptimizeResponse,
     PerformanceRequest, PerformanceResponse,
     WalkForwardRequest, WalkForwardResponse,
 )
-from api.services import backtest as svc
+from quant.api.services import backtest as svc
 from quant.refdata.bundle import DataCaches
 
 logger = logging.getLogger(__name__)

@@ -2,7 +2,7 @@
 
 **Status:** Partially implemented (Glassnode + NasdaqDataLink classes exist in `quant/data/sources.py`; FMP/MarineTraffic/Aviationstack are still proposals).
 **Date:** 2026-04-15
-**Scope:** `quant/data/sources.py`, `api/`, REFDATA
+**Scope:** `quant/data/sources.py`, `quant/api/`, REFDATA
 
 ---
 

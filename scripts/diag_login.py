@@ -12,9 +12,9 @@ import logging
 import os
 import sys
 
-from api.auth.repo import AuthRepo
-from api.auth.service import AuthService
-from api.config import _build_db_conninfo
+from quant.api.auth.repo import AuthRepo
+from quant.api.auth.service import AuthService
+from quant.api.config import _build_db_conninfo
 
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s %(name)s: %(message)s")
 

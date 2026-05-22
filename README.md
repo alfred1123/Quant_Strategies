@@ -96,8 +96,7 @@ container at `/api/v1/jobs/*` — there is no separate coordinator port.
 
 ```
 Quant_Strategies/
-├── quant/                     # Backtesting pipeline (data, refdata, strategy, queue, cli)
-├── api/                       # FastAPI backend — backtest + auth endpoints
+├── quant/                     # Pipeline + FastAPI backend (api/, data/, refdata/, strategy/, queue/, cli)
 ├── frontend/                  # React + TypeScript SPA (MUI, TanStack Query, Plotly)
 ├── tests/                     # Unit, integration, and e2e tests
 ├── docs/                      # MkDocs Material wiki

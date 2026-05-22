@@ -139,7 +139,7 @@ For the common single-ticker case, the dict has one entry — no overhead.
 
 ### Phase 2 — API Backend
 
-#### 2a. `api/schemas/backtest.py` — add `symbol` per factor
+#### 2a. `quant/api/schemas/backtest.py` — add `symbol` per factor
 
 ```python
 class FactorConfig(BaseModel):
@@ -153,7 +153,7 @@ class FactorConfig(BaseModel):
 
 Request models keep `symbol: str` for now. `product_id` comes in DB phase.
 
-#### 2b. `api/services/backtest.py` — fetch unique symbols
+#### 2b. `quant/api/services/backtest.py` — fetch unique symbols
 
 ```python
 symbols = {req.symbol}
@@ -371,7 +371,7 @@ read_payload(...)                  refresh_payload(..., fetcher)
 
 ### Date sync across products + factors
 
-A backtest with N products/factors aligns DataFrames via `reindex` on the main product's index. If a factor is missing dates the main product has, the result silently corrupts. `_build_data_dict` in `api/services/backtest.py` therefore enforces an **intersection check** after fetching: the common `[max(starts), min(ends)]` across all tickers must cover the requested `[start, end]`, else 400 with the limiting ticker named.
+A backtest with N products/factors aligns DataFrames via `reindex` on the main product's index. If a factor is missing dates the main product has, the result silently corrupts. `_build_data_dict` in `quant/api/services/backtest.py` therefore enforces an **intersection check** after fetching: the common `[max(starts), min(ends)]` across all tickers must cover the requested `[start, end]`, else 400 with the limiting ticker named.
 
 ### Future work — minimise provider traffic without payload duplication
 
@@ -392,7 +392,7 @@ This is a meaningful chunk of work — partition migrations on a populated table
 
 ### FastAPI integration
 
-The FastAPI backend creates `BacktestCache` at startup (`api/main.py` lifespan). `_fetch_df` in `api/services/backtest.py` is the sole caller — it dispatches to `refresh_payload(...)` when the user ticks *Refresh dataset* and to `read_payload(...)` otherwise. Falls back to a direct provider call only when the DB is unavailable (e.g. unit tests).
+The FastAPI backend creates `BacktestCache` at startup (`quant/api/main.py` lifespan). `_fetch_df` in `quant/api/services/backtest.py` is the sole caller — it dispatches to `refresh_payload(...)` when the user ticks *Refresh dataset* and to `read_payload(...)` otherwise. Falls back to a direct provider call only when the DB is unavailable (e.g. unit tests).
 
 ### Partition maintenance
 

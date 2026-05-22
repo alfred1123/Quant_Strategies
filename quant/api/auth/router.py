@@ -15,15 +15,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from api.auth.dependencies import (
+from quant.api.auth.dependencies import (
     COOKIE_NAME,
     get_auth_repo,
     get_auth_service,
     require_user,
 )
-from api.auth.models import CurrentUser, LoginRequest, LoginResponse, MeResponse
-from api.auth.repo import AuthRepo
-from api.auth.service import AuthService
+from quant.api.auth.models import CurrentUser, LoginRequest, LoginResponse, MeResponse
+from quant.api.auth.repo import AuthRepo
+from quant.api.auth.service import AuthService
 
 logger = logging.getLogger(__name__)
 

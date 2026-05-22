@@ -8,7 +8,7 @@
 # What runs here:
 #   * redis  — REFDATA cache (FastAPI publishes on boot) + queue wake channel
 #              (BLPOP bt:queue:wake). Mapped to host :6379 so the host-side
-#              uvicorn (api/main.py) and worker container can both reach it.
+#              uvicorn (quant/api/main.py) and worker container can both reach it.
 #   * worker — Long-lived ``python -m quant.queue.worker_loop`` daemon. Uses
 #              host networking so it can reach both local Postgres
 #              (127.0.0.1:5432) and Redis (127.0.0.1:6379) without an extra

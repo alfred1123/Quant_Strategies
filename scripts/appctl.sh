@@ -181,7 +181,7 @@ export QUANTDB_USERNAME='$LOCAL_DB_USER' && \
 export QUANTDB_PASSWORD='$LOCAL_DB_PASSWORD' && \
 export QUANTDB_CONNINFO=\"host=$LOCAL_DB_HOST port=$DB_PORT dbname=$LOCAL_DB_NAME user=$LOCAL_DB_USER password=$LOCAL_DB_PASSWORD sslmode=disable\" && "
   fi
-  printf '%s' "cd '$ROOT_DIR' && source '$ROOT_DIR/env/bin/activate' && ${db_overrides}uvicorn api.main:app --reload --reload-dir '$ROOT_DIR/api' --reload-dir '$ROOT_DIR/quant' --host 0.0.0.0 --port 8000"
+  printf '%s' "cd '$ROOT_DIR' && source '$ROOT_DIR/env/bin/activate' && ${db_overrides}uvicorn quant.api.main:app --reload --reload-dir '$ROOT_DIR/quant' --host 0.0.0.0 --port 8000"
 }
 
 frontend_command() {

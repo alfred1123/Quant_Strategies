@@ -1,6 +1,6 @@
 import logging
 
-from api.config import setup_logging, LOG_FORMAT, LOG_DATEFMT
+from quant.api.config import setup_logging, LOG_FORMAT, LOG_DATEFMT
 
 
 class TestSetupLogging:

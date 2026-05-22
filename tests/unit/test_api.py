@@ -27,9 +27,9 @@ def client():
         ``CurrentUser`` so the JWT cookie path is bypassed.
     """
     with patch("quant.shared.db.psycopg"):
-        from api.main import app
-        from api.auth.dependencies import require_user
-        from api.auth.models import CurrentUser
+        from quant.api.main import app
+        from quant.api.auth.dependencies import require_user
+        from quant.api.auth.models import CurrentUser
 
         ref = MagicMock()
         inst = MagicMock()
@@ -82,7 +82,7 @@ class TestHealth:
 class TestDataEndpoint:
     # /backtest/data endpoint is disabled — tests skipped
     @pytest.mark.skip(reason="/backtest/data endpoint is disabled")
-    @patch("api.services.backtest.YahooFinance")
+    @patch("quant.api.services.backtest.YahooFinance")
     def test_data_returns_rows(self, mock_yf_cls, client):
         mock_yf = MagicMock()
         mock_yf_cls.return_value = mock_yf
@@ -113,8 +113,8 @@ class TestDataEndpoint:
 # ── /api/v1/backtest/optimize ───────────────────────────────────────
 
 class TestOptimizeEndpoint:
-    @patch("api.services.backtest.ParametersOptimization")
-    @patch("api.services.backtest._fetch_df")
+    @patch("quant.api.services.backtest.ParametersOptimization")
+    @patch("quant.api.services.backtest._fetch_df")
     def test_optimize_single(self, mock_fetch, mock_opt_cls, client):
         mock_fetch.return_value = pd.DataFrame({
             "price": np.linspace(100, 200, 100),
@@ -175,10 +175,10 @@ class TestOptimizeEndpoint:
 # ── /api/v1/backtest/optimize/stream (SSE) ──────────────────────────
 
 class TestOptimizeStreamEndpoint:
-    @patch("api.services.backtest._build_wf_response")
-    @patch("api.services.backtest._build_perf_response")
-    @patch("api.services.backtest.ParametersOptimization")
-    @patch("api.services.backtest._fetch_df")
+    @patch("quant.api.services.backtest._build_wf_response")
+    @patch("quant.api.services.backtest._build_perf_response")
+    @patch("quant.api.services.backtest.ParametersOptimization")
+    @patch("quant.api.services.backtest._fetch_df")
     def test_stream_emits_init_progress_and_result(self, mock_fetch, mock_opt_cls,
                                                     mock_perf_resp, mock_wf_resp, client):
         """SSE endpoint should emit init, progress events, and a final result."""
@@ -189,7 +189,7 @@ class TestOptimizeStreamEndpoint:
         }, index=pd.date_range("2024-01-01", periods=100, freq="D", name="datetime"))
         _df = pd.DataFrame({"window": [10, 20], "signal": [0.01, 0.02], "sharpe": [1.5, 1.8]})
         from quant.strategy.optimizer import OptimizeResult
-        from api.schemas.backtest import PerformanceResponse, WalkForwardResponse
+        from quant.api.schemas.backtest import PerformanceResponse, WalkForwardResponse
         mock_perf_resp.return_value = PerformanceResponse(
             strategy_metrics={"Sharpe Ratio": 1.8},
             buy_hold_metrics={"Sharpe Ratio": 0.5},
@@ -268,8 +268,8 @@ class TestOptimizeStreamEndpoint:
 # ── /api/v1/backtest/performance ────────────────────────────────────
 
 class TestPerformanceEndpoint:
-    @patch("api.services.backtest.Performance")
-    @patch("api.services.backtest._fetch_df")
+    @patch("quant.api.services.backtest.Performance")
+    @patch("quant.api.services.backtest._fetch_df")
     def test_performance_single(self, mock_fetch, mock_perf_cls, client):
         mock_fetch.return_value = pd.DataFrame({
             "price": np.linspace(100, 200, 100),
@@ -326,8 +326,8 @@ class TestPerformanceEndpoint:
 # ── /api/v1/backtest/walk-forward ───────────────────────────────────
 
 class TestWalkForwardEndpoint:
-    @patch("api.services.backtest.WalkForward")
-    @patch("api.services.backtest._fetch_df")
+    @patch("quant.api.services.backtest.WalkForward")
+    @patch("quant.api.services.backtest._fetch_df")
     def test_walk_forward_single(self, mock_fetch, mock_wf_cls, client):
         mock_fetch.return_value = pd.DataFrame({
             "price": np.linspace(100, 200, 100),
@@ -397,7 +397,7 @@ class TestRefDataEndpoint:
         assert resp.status_code == 404
 
     def test_post_refdata_refresh_ok(self, client):
-        with patch("api.routers.refdata.RefDataPublisher") as pub_cls:
+        with patch("quant.api.routers.refdata.RefDataPublisher") as pub_cls:
             pub_cls.return_value.publish_all.return_value = 5
             resp = client.post("/api/v1/refdata/refresh")
         assert resp.status_code == 200
@@ -405,7 +405,7 @@ class TestRefDataEndpoint:
         pub_cls.return_value.publish_all.assert_called_once()
 
     def test_post_refdata_refresh_failure_503(self, client):
-        with patch("api.routers.refdata.RefDataPublisher") as pub_cls:
+        with patch("quant.api.routers.refdata.RefDataPublisher") as pub_cls:
             pub_cls.return_value.publish_all.side_effect = RuntimeError("redis down")
             resp = client.post("/api/v1/refdata/refresh")
         assert resp.status_code == 503

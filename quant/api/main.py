@@ -2,7 +2,7 @@
 
 Run:
     cd <project_root>
-    uvicorn api.main:app --reload --port 8000
+    uvicorn quant.api.main:app --reload --port 8000
 """
 
 import logging
@@ -15,15 +15,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from api.config import load_config
+from quant.api.config import load_config
 
 # load_config() initialises logging, loads .env or SSM, and returns the DB conninfo
 DB_CONNINFO = load_config()
 
-from api.auth.dependencies import require_user  # noqa: E402
-from api.auth.router import limiter as auth_limiter, router as auth_router  # noqa: E402
-from api.auth.service import AuthService  # noqa: E402
-from api.routers import backtest, inst, jobs, refdata  # noqa: E402
+from quant.api.auth.dependencies import require_user  # noqa: E402
+from quant.api.auth.router import limiter as auth_limiter, router as auth_router  # noqa: E402
+from quant.api.auth.service import AuthService  # noqa: E402
+from quant.api.routers import backtest, inst, jobs, refdata  # noqa: E402
 from quant.refdata.bundle import DataCaches  # noqa: E402
 from quant.refdata.publisher import RefDataPublisher  # noqa: E402
 

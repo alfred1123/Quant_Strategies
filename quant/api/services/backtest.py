@@ -22,7 +22,7 @@ from quant.strategy.performance import Performance
 from quant.strategy.optimizer import ParametersOptimization
 from quant.strategy.walk_forward import WalkForward
 
-from api.schemas.backtest import (
+from quant.api.schemas.backtest import (
     OptimizeRequest, PerformanceRequest, WalkForwardRequest,
     OptimizeResponse, PerformanceResponse, WalkForwardResponse,
     EquityPoint,

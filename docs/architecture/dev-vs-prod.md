@@ -21,8 +21,8 @@ environment after a deploy or onboard quickly.
 | `JWT_SECRET` | shared dev secret from SSM | fixed value from SSM | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | DB access method | SSM port-forward tunnel | Direct VPC connection | Network topology |
 | Nginx config | `nginx.dev.conf` (HTTP only) | Same (HTTP) or `nginx.conf` (TLS via `docker-compose.tls.yml`) | `docker/nginx/` |
-| Swagger UI | enabled (`/docs`) | disabled | `api/main.py` checks `APP_ENV` |
-| Logging | stdout, plus file (`log/bt_app.log`) when running locally **without** `USE_SSM=1` | stdout only | `api/config.py` `setup_logging()` |
+| Swagger UI | enabled (`/docs`) | disabled | `quant/api/main.py` checks `APP_ENV` |
+| Logging | stdout, plus file (`log/bt_app.log`) when running locally **without** `USE_SSM=1` | stdout only | `quant/api/config.py` `setup_logging()` |
 
 ---
 
@@ -48,7 +48,7 @@ docker compose up                         docker compose -f docker-compose.yml
       │  (fallback if SSM unreachable:      JWT_SECRET, CORS_ORIGINS, etc.
       │   loads .env instead)                     │
       ▼                                           ▼
-  api/config.py                            api/config.py
+  quant/api/config.py                            quant/api/config.py
   _load_from_ssm("dev")                   _load_from_ssm("prod")
   _build_db_conninfo()                    _build_db_conninfo()
       │                                           │
@@ -104,7 +104,7 @@ pg_isready -h localhost -p 5433
 Run locally (no Docker needed for dev):
 
 ```bash
-uvicorn api.main:app --reload --port 8000
+uvicorn quant.api.main:app --reload --port 8000
 cd frontend && npm run dev
 ```
 
@@ -175,7 +175,7 @@ What runs where:
 
 | Component | Where | Port | Source of truth |
 |-----------|-------|------|-----------------|
-| FastAPI (uvicorn --reload) | host (native) | 8000 | `api/`, `quant/` |
+| FastAPI (uvicorn --reload) | host (native) | 8000 | `quant/api/`, `quant/` |
 | Vite dev server | host (native) | 5173 | `frontend/` |
 | PostgreSQL 17 | host (native, systemd) | 5432 | `pg_dump` of Aurora |
 | Redis 7 | docker | 6379 | `docker-compose.dev.yml` |
@@ -195,7 +195,7 @@ one-off override).
 
 How it works: `appctl.sh` reads `DB_TARGET` and, when set to `local`, exports
 `USE_SSM=0` plus a `QUANTDB_CONNINFO` pointing at `127.0.0.1:5432` with
-`sslmode=disable` before launching uvicorn. `api/config.py` honours
+`sslmode=disable` before launching uvicorn. `quant/api/config.py` honours
 `QUANTDB_CONNINFO` over the individual `QUANTDB_*` vars, so .env defaults
 remain untouched.
 
@@ -268,9 +268,9 @@ aws ssm send-command --instance-ids i-096f85bf84852cce3 \
 | `docker-compose.yml` | Base services — `USE_SSM=1` default, SSM-first for all envs |
 | `docker-compose.prod.yml` | Prod behavioral flags only — `APP_ENV=prod`, `USE_SSM=1`, `COOKIE_SECURE=0` |
 | `docker-compose.tls.yml` | TLS layer — `COOKIE_SECURE=1`, `DOMAIN`, certbot |
-| `api/config.py` | Config loader — tries SSM first, falls back to `.env` if unreachable |
-| `api/auth/router.py` | Cookie `Secure` flag — reads `COOKIE_SECURE` or falls back to `APP_ENV` |
-| `api/main.py` | Swagger toggle, CORS — reads `APP_ENV`, `CORS_ORIGINS` |
+| `quant/api/config.py` | Config loader — tries SSM first, falls back to `.env` if unreachable |
+| `quant/api/auth/router.py` | Cookie `Secure` flag — reads `COOKIE_SECURE` or falls back to `APP_ENV` |
+| `quant/api/main.py` | Swagger toggle, CORS — reads `APP_ENV`, `CORS_ORIGINS` |
 | `aws/scripts/init-ssm-params.sh` | Bootstraps SSM parameters (run once) |
 | `.cursor/hooks/ssm-port-forward-loop.sh` | Auto-starts SSM tunnel for dev |
 

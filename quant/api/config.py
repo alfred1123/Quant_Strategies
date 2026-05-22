@@ -9,7 +9,7 @@ Logging is also initialised here so that all subsequent imports see a
 correctly formatted logger.
 
 Usage (call once at process startup, before any other imports):
-    from api.config import load_config
+    from quant.api.config import load_config
     load_config()
 """
 

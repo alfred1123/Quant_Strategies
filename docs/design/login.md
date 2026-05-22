@@ -1,6 +1,6 @@
 # Login & Authentication — Design Doc (v1-minimal)
 
-Status: **Implemented (Phase 1)** — current behavior in `api/auth/`. Phases 2 & 3 below remain proposed.
+Status: **Implemented (Phase 1)** — current behavior in `quant/api/auth/`. Phases 2 & 3 below remain proposed.
 Owner: alfcheun
 Related: [decision #19 (no direct DML)](../decisions.md), [decision #27 (authentication)](../decisions.md), [trade-api.md](trade-api.md)
 
@@ -54,7 +54,7 @@ Before public hosting (Tier 1 in the deployment ladder), the app must require a 
 ## 4. Constraints & Observations
 
 - Backend is FastAPI (async, Pydantic v2). Frontend is React 19 + TanStack Query, served separately by Vite in dev and (in prod) by nginx.
-- `api/config.py` already has SSM/.env loader — JWT signing key fits there.
+- `quant/api/config.py` already has SSM/.env loader — JWT signing key fits there.
 - Audit columns (`USER_ID TEXT`) exist on every table per `AGENTS.md`. Today they receive `"alfcheun"`. We just need to plumb a real value.
 - All writes go through SPs (no direct DML). **Login itself reads a user table — `SELECT` is allowed directly per project conventions.** User provisioning runs as Liquibase changesets — that is the documented exception to the no-direct-DML rule.
 - HTTPS is mandatory for cookie-based auth. Tier 1 deployment already plans nginx + Let's Encrypt; this doc assumes that's in place.
@@ -85,7 +85,7 @@ Before public hosting (Tier 1 in the deployment ladder), the app must require a 
 ### 5.1 Trust model
 
 - **Single trust boundary**: nginx terminates TLS, forwards to uvicorn over loopback. No service-to-service auth needed inside the box.
-- **Cookie**: `qs_token`, `HttpOnly`, `Secure` (when `COOKIE_SECURE=1` or `APP_ENV=prod`), `SameSite=lax` in HTTP dev / `SameSite=strict` once `Secure=True`, `Path=/api`. Lifetime 7 days; refresh on activity. Implementation: `api/auth/router.py` `_set_cookie()`.
+- **Cookie**: `qs_token`, `HttpOnly`, `Secure` (when `COOKIE_SECURE=1` or `APP_ENV=prod`), `SameSite=lax` in HTTP dev / `SameSite=strict` once `Secure=True`, `Path=/api`. Lifetime 7 days; refresh on activity. Implementation: `quant/api/auth/router.py` `_set_cookie()`.
 - **Why dynamic `SameSite`**: pure HTTP dev needs `Lax` so the cookie survives navigation; HTTPS prod uses `Strict` so a malicious link cannot trigger an authenticated state-changing call to the trade API. Trade-off: a prod user clicking an external link to the app lands on `/login` even with a valid session and must navigate forward manually. Acceptable for an internal tool.
 - **CSRF**: not required while the SPA is same-origin and `SameSite=Strict` is enforced in prod. The deprecated `X-Requested-With: XMLHttpRequest` heuristic is **not** used. If the SPA ever moves to a different origin, switch to a double-submit CSRF token.
 
@@ -413,7 +413,7 @@ Neither layer locks the **account** (no DB state is mutated) — that requires t
 ### 11.1 Timing-attack hardening (concrete pattern)
 
 ```python
-# api/auth/service.py
+# quant/api/auth/service.py
 DUMMY_HASH = PasswordHasher().hash("not-a-real-password-xyz")
 
 def verify_credentials(username: str, password: str) -> AppUser | None:
@@ -436,7 +436,7 @@ Both branches do the same Argon2 work, so `/auth/login` has the same latency pro
 
 - [x] Passwords hashed with Argon2id (`argon2-cffi`), default `memory_cost=65536, time_cost=3, parallelism=4`.
 - [x] Password hashes generated **only** via `scripts/hash_password.py` running locally — never via online tools.
-- [x] Cookies `HttpOnly + Secure + SameSite=Strict + Path=/api` in prod; `Lax` (no `Secure`) in HTTP dev. See `api/auth/router.py` `_set_cookie()`.
+- [x] Cookies `HttpOnly + Secure + SameSite=Strict + Path=/api` in prod; `Lax` (no `Secure`) in HTTP dev. See `quant/api/auth/router.py` `_set_cookie()`.
 - [x] HTTPS enforced at nginx (HSTS header).
 - [x] Uvicorn binds to `127.0.0.1` only — never accept TLS-stripped traffic.
 - [x] JWT signed (HS256) with secret from SSM, never committed.
@@ -465,8 +465,8 @@ Both branches do the same Argon2 work, so `/auth/login` has the same latency pro
 5. **SSM**: change `/quant/prod/QUANTDB_USERNAME` from `postgres` → `quant_app` and rotate `/quant/prod/QUANTDB_PASSWORD` to `quant_app`'s password.
 6. **Seed admin user** via a Liquibase changeset that calls `SP_INS_APP_USER` (context `dev` only). Prod runs the `CALL` manually as `quant_admin` after generating a fresh hash with the helper script. **Prod password is never committed.**
 7. **Helper script** `scripts/hash_password.py` — reads password from stdin (no echo, via `getpass`), prints Argon2id PHC string. Doc warns against online hash generators.
-8. **Add `JWT_SECRET`** to `/quant/prod/JWT_SECRET` (SSM SecureString, 32 random bytes base64). EC2 instance role reads it at process start; not written to `.env` in prod. In dev mode, `JWT_SECRET` is auto-generated if absent (see `_resolve_jwt_secret` in `api/auth/service.py`).
-9. **Backend**: add `api/auth/` module (login router, JWT helpers, `require_user` dep, repo, service). Add `argon2-cffi`, `pyjwt[cryptography]`, `slowapi` to `requirements.txt`.
+8. **Add `JWT_SECRET`** to `/quant/prod/JWT_SECRET` (SSM SecureString, 32 random bytes base64). EC2 instance role reads it at process start; not written to `.env` in prod. In dev mode, `JWT_SECRET` is auto-generated if absent (see `_resolve_jwt_secret` in `quant/api/auth/service.py`).
+9. **Backend**: add `quant/api/auth/` module (login router, JWT helpers, `require_user` dep, repo, service). Add `argon2-cffi`, `pyjwt[cryptography]`, `slowapi` to `requirements.txt`.
 10. **Wire `Depends(require_user)`** into existing routers. Replace every `user_id="alfcheun"` with `user.username`. Remove the `="alfcheun"` default in `quant/shared/db.py` and `quant/data/` — parameter becomes required.
 11. **Frontend**: add `/login` route + `<App>` mount-time `me` check + axios 401 interceptor + user menu.
 12. **Tests**: unit tests for JWT encode/decode + Argon2 verify (incl. dummy-hash branch) + each admin SP; integration test for login → protected endpoint → logout flow.

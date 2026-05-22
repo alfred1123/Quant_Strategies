@@ -36,7 +36,7 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 
 | Module | Class / Function | Role |
 |--------|-----------------|------|
-| `quant/shared/db.py` | `DbGateway` | Sole owner of `psycopg` in `quant/` + `api/`. Strict-OOP base — `_call_get` / `_call_write` / `_query` / `health_check` / `close`. `__init__(conninfo, user_id, *, persistent=False)` opts into a long-lived held connection. |
+| `quant/shared/db.py` | `DbGateway` | Sole owner of `psycopg` in `quant/`. Strict-OOP base — `_call_get` / `_call_write` / `_query` / `health_check` / `close`. `__init__(conninfo, user_id, *, persistent=False)` opts into a long-lived held connection. |
 | `quant/refdata/reader.py` | `RedisRefData` | Read-only REFDATA accessor backed by Redis. Checks `refdata:version` on every `get()` and rebuilds its local snapshot lazily on bump. |
 | `quant/refdata/publisher.py` | `RefDataPublisher(DbGateway)` | The only Postgres → Redis writer for REFDATA. Discovers tables via `information_schema`, `CALL REFDATA.SP_GET_ENUM` per table, writes `refdata:<table>` + bumps `refdata:version`. Invoked from FastAPI lifespan and `POST /api/v1/refdata/refresh`. |
 | `quant/refdata/bundle.py` | `DataCaches` | Composes `RedisRefData` + `InstrumentCache` + `BacktestCache` so API and worker wire identically. |
