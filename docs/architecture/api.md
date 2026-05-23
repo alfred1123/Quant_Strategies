@@ -28,6 +28,18 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `POST` | `/api/v1/auth/logout` | Required | Clears the session cookie. |
 | `GET`  | `/api/v1/auth/me` | Required | Returns the current user (or 401). |
 
+### Credentials (Phase 1.1 — planned)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/credentials` | Required | List current user's exchange credentials (masked). |
+| `GET` | `/api/v1/credentials/{id}` | Required | One credential (masked). |
+| `POST` | `/api/v1/credentials` | Required | Save new broker API key pair (`app_id`, Fernet-encrypted in DB). |
+| `PUT` | `/api/v1/credentials/{id}` | Required | Rotate keys (soft-version). |
+| `DELETE` | `/api/v1/credentials/{id}` | Required | Revoke. |
+
+Same session cookie as auth; implementation reuses `require_user` and `DbGateway` — see [Login §6.4](../design/login.md#64-reuse-from-login--jwt-credential-api--phase-11).
+
 ### Backtest
 
 | Method | Path | Description |

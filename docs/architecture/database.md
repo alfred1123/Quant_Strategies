@@ -6,7 +6,7 @@ The project uses **PostgreSQL 17** with Liquibase for schema management. Each sc
 
 | Schema | Purpose |
 |--------|---------|
-| `CORE_ADMIN` | Logging infrastructure (`LOG_PROC_DETAIL` table, `CORE_INS_LOG_PROC` procedure) |
+| `CORE_ADMIN` | App users (`APP_USER`), proc audit log (`LOG_PROC_DETAIL`), exchange API credentials (`API_CREDENTIAL`) |
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, etc.) + `SP_GET_ENUM` procedure for cache loading |
 | `BT` | Backtest results (`STRATEGY`, `RESULT`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert procedures |
 | `TRADE` | Live trading tables (`DEPLOYMENT`, `LOG`, `TRANSACTION`) — procedures deferred |
@@ -59,6 +59,35 @@ Current operating model:
 | `PRODUCT_XREF` | **Yes** — `PRODUCT_XREF_VID` + `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` | Vendor symbols can change; current row is the open-ended transaction-time record |
 | `PRODUCT_GRP` | **No** — uses `UPDATED_AT` | Hierarchy versioning is impractical; rare admin-only edits |
 | `PRODUCT_GRP_MEMBER` | **No** — add/remove only | Junction table; `CREATED_AT` audit is sufficient |
+
+### CORE_ADMIN — exchange API credentials (Phase 1.1)
+
+`CORE_ADMIN.API_CREDENTIAL` stores **per-user exchange API keys** (encrypted at rest). Broker is identified by **`APP_ID`** (`REFDATA.APP`), not a free-text exchange column.
+
+| Column | Notes |
+|--------|--------|
+| `API_CREDENTIAL_ID` | `INTEGER` — assigned in `SP_INS_API_CREDENTIAL` (`MAX+1`), **not** `GENERATED AS IDENTITY` |
+| `API_CREDENTIAL_VID` | Soft-version; bump on key rotation |
+| `APP_USER_ID` | Owner |
+| `APP_ID` | Broker / venue app (e.g. Bybit row in `REFDATA.APP`) |
+| `LABEL` | User-facing account name |
+| `API_KEY_CIPHERTEXT` / `API_SECRET_CIPHERTEXT` | Fernet blobs — encrypt in Python before SP |
+| `IS_ACTIVE_IND` / `IS_CURRENT_IND` | Revoke / current version |
+| `CREATED_AT` | Per version row — **no `UPDATED_AT`** |
+
+PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, APP_ID)` allowed (multiple accounts on same broker).
+
+**No `TRADE.CONNECTION` table** — runtime broker sessions are ephemeral. Trade audit = `TRADE.LOG` / `TRADE.TRANSACTION`. `TRADE.DEPLOYMENT` (Phase 1.2) references `API_CREDENTIAL_ID` only.
+
+| Procedure | Purpose |
+|-----------|---------|
+| `SP_INS_API_CREDENTIAL` | New account (assign id) or rotate keys (new VID) |
+| `SP_GET_API_CREDENTIAL` | List/get for owner; returns ciphertext |
+| `SP_UPD_API_CREDENTIAL_REVOKE` | Soft-version revoke |
+
+See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11--user-secrets) and decision #36.
+
+**Application code:** `ApiCredentialRepo` extends `DbGateway` (same as `AuthRepo`); routes use `require_user`; Fernet key separate from `JWT_SECRET` — see [Login §6.4](../design/login.md#64-reuse-from-login--jwt-credential-api--phase-11).
 
 ## Deployment
 
@@ -115,6 +144,9 @@ Active changelogs are empty manifests — see XML comments in each `db/liquidbas
 | `SP_GET_QUEUE_LATEST` | `BT` | **Queue worker**: active row for one **`QUEUE_ID`** + frozen **`CONFIG_JSON`** (`QUEUE` ⋈ **`STRATEGY`** on **`STRATEGY_VID`**) |
 | `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`**; **`IN_RESULT_ID`** is caller-supplied UUID; OUT row is status triplet only (same shape as **`SP_INS_QUEUE`**) |
 | `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`) |
+| `SP_INS_API_CREDENTIAL` | `CORE_ADMIN` | New exchange credential or rotate keys (soft-version) |
+| `SP_GET_API_CREDENTIAL` | `CORE_ADMIN` | List/get credentials for `APP_USER_ID` (REFCURSOR) |
+| `SP_UPD_API_CREDENTIAL_REVOKE` | `CORE_ADMIN` | Soft-version revoke |
 
 ## Directory Layout
 

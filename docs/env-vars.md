@@ -68,6 +68,7 @@ These vars only apply to local dev (`./scripts/appctl.sh dev start`). Teammates 
 | Variable | Required? | Description |
 |---|---|---|
 | `JWT_SECRET` | **Required in prod** | Symmetric HS256 signing key (generate via `openssl rand -base64 32`). In dev (`APP_ENV != prod`) the API auto-generates a random secret each startup. In prod the API refuses to start without it. Rotate by changing the value and restarting. |
+| `EXCHANGE_SECRETS_KEY` | **Required in prod** (Phase 1.1+) | Fernet key for encrypting `CORE_ADMIN.API_CREDENTIAL` ciphertext (`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`). SSM: `/quant/prod/EXCHANGE_SECRETS_KEY`. Separate from `JWT_SECRET`. |
 | `COOKIE_SECURE` | Optional | `1` to force the `Secure` flag on the auth cookie. Default tracks `APP_ENV == prod`. |
 
 User accounts are admin-managed — there is no signup endpoint. See [Login & Authentication](design/login.md) for the provisioning flow.

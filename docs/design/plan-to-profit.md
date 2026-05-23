@@ -176,17 +176,75 @@ flowchart TB
 
 | | |
 |---|---|
-| **Depends on** | Auth (`CORE_ADMIN`) |
-| **Blocks** | 1.5, 1.7 |
+| **Depends on** | Auth (`CORE_ADMIN.APP_USER`) |
+| **Blocks** | 1.3, 1.5, 1.7 |
+
+**Scope:** Per-user **exchange API keys** in `CORE_ADMIN` only. No `TRADE.CONNECTION` table — runtime sessions to Bybit are ephemeral; the audit trail you care about is **`TRADE.LOG` / `TRADE.TRANSACTION`** (Phase 1.8), not “which connection was opened.”
 
 **Tasks**
 
-- [ ] DDL: per-user exchange credential storage (encrypt at rest; scoped by `USER_ID`).
-- [ ] Stored procedures: insert / rotate / revoke (no raw DML).
-- [ ] API: read masked config, write credentials (never return full secret in logs).
-- [ ] Security review: no secrets in `.env` for multi-user prod paths.
+- [ ] DDL: `CORE_ADMIN.API_CREDENTIAL` (soft-versioned; see below).
+- [ ] REFDATA: seed `bybit` row in `REFDATA.APP` (broker identified by `APP_ID`, not free-text exchange).
+- [ ] SPs: insert (new account / rotate keys) / get / revoke — **no raw DML** from Python.
+- [ ] App-layer Fernet encryption before `SP_INS_*`; key from SSM `EXCHANGE_SECRETS_KEY`.
+- [ ] API: `/api/v1/credentials` — masked read, write, rotate, revoke (never log or return full secrets).
+- [ ] Security review: multi-user prod does not store per-user exchange keys in `.env`.
 
-**Exit criteria:** Can save and load Bybit API key for a test user via API only (UI optional in this subphase).
+**Data model — `CORE_ADMIN.API_CREDENTIAL`**
+
+| Column | Notes |
+|--------|--------|
+| `API_CREDENTIAL_ID` | `INTEGER` — **not** `IDENTITY`; assigned in SP (`COALESCE(MAX(...), 0) + 1`) on **new account** |
+| `API_CREDENTIAL_VID` | Soft-version; bump on **key rotation** only |
+| `APP_USER_ID` | Owner (`UUID`, JWT `sub`) |
+| `APP_ID` | `REFDATA.APP` — e.g. Bybit broker row |
+| `LABEL` | User label (“Main”, “Subaccount”) |
+| `API_KEY_CIPHERTEXT` / `API_SECRET_CIPHERTEXT` | Fernet blobs (encrypt in app before SP) |
+| `IS_ACTIVE_IND` | `Y`/`N` — revoke |
+| `IS_CURRENT_IND` | `Y`/`N` — current version |
+| `CREATED_AT` | `TIMESTAMPTZ` — per row; **no `UPDATED_AT`** |
+
+PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. No unique on `(APP_USER_ID, APP_ID)` — **multiple accounts per exchange** via distinct `API_CREDENTIAL_ID` values (1, 2, 3, …).
+
+**Stored procedures**
+
+| Procedure | Behaviour |
+|-----------|-----------|
+| `SP_INS_API_CREDENTIAL` | **New account** (`IN_API_CREDENTIAL_ID` NULL): assign next `API_CREDENTIAL_ID`, `VID=1`. **Rotate** (id set): demote current row, `VID := MAX(VID)+1`, insert. |
+| `SP_GET_API_CREDENTIAL` | By `APP_USER_ID`; optional id; default `IS_CURRENT_IND='Y'` + `IS_ACTIVE_IND='Y'`. |
+| `SP_UPD_API_CREDENTIAL_REVOKE` | Soft-version revoke: new row, `IS_ACTIVE_IND='N'`, cleared ciphertext. |
+
+Optional `CORE_INS_LOG_PROC` on credential SPs only (security-sensitive writes).
+
+**API (1.1 — no UI)**
+
+| Method | Path |
+|--------|------|
+| `GET` | `/api/v1/credentials` |
+| `GET` | `/api/v1/credentials/{api_credential_id}` |
+| `POST` | `/api/v1/credentials` — body: `app_id`, `label`, `api_key`, `api_secret` |
+| `PUT` | `/api/v1/credentials/{api_credential_id}` — rotate keys |
+| `DELETE` | `/api/v1/credentials/{api_credential_id}` — revoke |
+
+Responses: `api_key_masked`, `app_id`, `label`, `api_credential_id` — never full secrets.
+
+**Application layer — reuse from auth**
+
+Reuse login/JWT **plumbing**, not login **crypto**. Full table: [Login design §6.4](login.md#64-reuse-from-login--jwt-credential-api--phase-11).
+
+| Reuse | Do not reuse |
+|-------|----------------|
+| `require_user`, `DbGateway` / `AuthRepo` pattern, SSM config, never log secrets, ownership scoping | JWT, Argon2, `SESSION_GEN`, decrypted-key cache |
+
+Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls `CORE_ADMIN.SP_*` only; router behind `require_user`.
+
+**Explicitly out of scope for 1.1**
+
+- `TRADE.CONNECTION` table or connection audit/history
+- `CONFIG_JSON` or trade-default columns (add on `TRADE.DEPLOYMENT` or credential when needed)
+- Bybit validation (1.3), Config UI (1.5)
+
+**Exit criteria:** Test user saves Bybit keys (`app_id` from REFDATA) via API; GET returns masked credential; rotate bumps `API_CREDENTIAL_VID`; revoke sets inactive; second account on same exchange gets a new `API_CREDENTIAL_ID`.
 
 ---
 
@@ -200,10 +258,11 @@ flowchart TB
 **Tasks**
 
 - [ ] DDL: `TRADE.DEPLOYMENT`, `TRADE.LOG` (per [Trade API](trade-api.md)).
-- [ ] SP: create deployment linked to `BT.STRATEGY` id.
+- [ ] `TRADE.DEPLOYMENT` includes **`API_CREDENTIAL_ID INTEGER`** (points at current credential row via GET with `IS_CURRENT_IND='Y'`) — not a separate connection entity.
+- [ ] SP: create deployment linked to `BT.STRATEGY` id + `API_CREDENTIAL_ID`.
 - [ ] API: `POST` apply / `GET` deployment status (skeleton OK without exchange call).
 
-**Exit criteria:** Deployment row persists with `strategy_id` FK; status endpoint returns stored state.
+**Exit criteria:** Deployment row persists with `strategy_id` and `api_credential_id`; status endpoint returns stored state.
 
 ---
 
@@ -250,11 +309,12 @@ flowchart TB
 
 **Tasks**
 
-- [ ] Config page: exchange label, API key/secret, trade defaults (size, paper/live flag).
-- [ ] Wire to secrets API from 1.1.
-- [ ] Top-left exchange selector (user-named default).
+- [ ] Config page: broker from **REFDATA.APP** dropdown (`app_id`), label, API key/secret → `/api/v1/credentials`.
+- [ ] Support **multiple accounts per broker** (list by `api_credential_id` + label).
+- [ ] Top-left **credential selector** (which saved account to use for apply) — not a separate “connection” entity.
+- [ ] Trade defaults (size, paper/live) deferred until columns exist on `TRADE.DEPLOYMENT` or credential.
 
-**Exit criteria:** User saves Bybit config in UI and reload sees persisted settings (secrets masked).
+**Exit criteria:** User saves Bybit credential in UI and reload sees masked keys; can pick among multiple accounts on the same broker.
 
 ---
 
@@ -574,7 +634,7 @@ No top-level Backtest \| Trade split yet; Trade may live at `/trade` beside exis
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │  (existing app header / backtest link)                                       │
 ├──────────┬───────────────────────────────────────────────────────────────────┤
-│ SIDE     │  Exchange: [ My Bybit ▾ ]                          (1.5)       │  ← top-left
+│ SIDE     │  Account:  [ #1 Main (Bybit) ▾ ]                   (1.5)       │  ← top-left
 │ 1.4      ├───────────────────────────────────────────────────────────────────┤
 │          │                                                                   │
 │ ● Config │   STRATEGY PICKER (1.6)                                           │
@@ -598,10 +658,12 @@ No top-level Backtest \| Trade split yet; Trade may live at `/trade` beside exis
 
 Config page (sidebar ● Config):
 ┌────────────────────────────────────────┐
-│ Exchange label    [ My Bybit      ]    │
-│ API key           [ •••••••••••• ]    │  (1.1 / 1.5)
+│ Broker (REFDATA)  [ Bybit ▾       ]    │  (1.5 — app_id)
+│ Account label     [ Main          ]    │
+│ API key           [ •••••••••••• ]    │  (1.1 / 1.5 → /credentials)
 │ API secret        [ •••••••••••• ]    │
-│ Default size      [ 0.01          ]    │
+│ Saved accounts    [ #1 Main ▾     ]    │  multiple per broker
+│ Default size      [ (later)      ]    │  → DEPLOYMENT columns
 │ Telegram chat id  [ (Phase 2.4)  ]    │
 │              [ Save ]                  │
 └────────────────────────────────────────┘
@@ -660,7 +722,7 @@ flowchart LR
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │  Quant Strategies          [ Backtest ]  [ Trade*]              user ▾       │
 ├──────────┬───────────────────────────────────────────────────────────────────┤
-│ SIDE     │  Exchange: [ My Bybit ▾ ]          LIVE SHARPE / RECONCILE (2.3)  │
+│ SIDE     │  Account:  [ #1 Main (Bybit) ▾ ]   LIVE SHARPE / RECONCILE (2.3)  │
 │          │                                     ┌─────────────────────────┐   │
 │ ● Config │                                     │ chart: live vs BT exp   │   │
 │ ○ Trade  │                                     │ last run: today 06:00   │   │
@@ -759,7 +821,7 @@ flowchart TB
 |------|--------------|-----------|
 | Top bar | App title · **Backtest** \| **Trade** · user menu | Same |
 | Left column | Side nav: Strategies, Jobs, Leaderboard, Settings | Side nav: **Config**, **Trade** |
-| Top of main | — | Exchange selector (left) |
+| Top of main | — | Credential / account selector (left) |
 | Top-right of main | Best strategy banner | Live Sharpe / reconcile chart |
 | Main center | Configure, run, charts | Picker, dry-run, apply |
 | Bottom / right | Compact queue (+ Enlarge) | Execution log (full width bottom) |
@@ -799,17 +861,17 @@ Recommendation: start with **B** — matches mental model (strategy artifact vs 
 
 | Zone | Content |
 |------|---------|
-| **Side nav** | **Config** (exchange, API keys, defaults) · **Trade** (apply strategy) |
-| **Top left** | Exchange selector (user-named label / default) |
+| **Side nav** | **Config** (broker + API credentials) · **Trade** (apply strategy) |
+| **Top left** | Credential selector (`api_credential_id` + label; broker via `APP_ID`) |
 | **Top right** | Live Sharpe / reconcile series (Phase 2) |
 | **Main** | Dry-run → Apply (uses BT strategy in backend) |
 | **Bottom right** | Execution / transaction history |
 
 **Flow:**
 
-1. User selects exchange (limits detection = later).
+1. User selects a saved **credential** (which broker account); limits detection = later.
 2. Optional **dry run** before live apply.
-3. Apply uses strategy from BT module ([Trade API](trade-api.md), `TRADE.DEPLOYMENT` / `TRADE.LOG` per [Decisions log](../decisions.md)).
+3. Apply uses BT strategy + `TRADE.DEPLOYMENT` (holds `API_CREDENTIAL_ID`); **audit = `TRADE.LOG` / transactions**, not connection history ([Decisions log](../decisions.md) #36).
 4. Errors → Telegram; refer strategy detail via Backtest/leaderboard when drill-down exists.
 
 **Bybit:** Reference implementation in `backup/deco/`; active experimentation in `quant/trade/`. Adapter pattern: `BybitAdapter` in [Trade API](trade-api.md).
@@ -818,16 +880,21 @@ Recommendation: start with **B** — matches mental model (strategy artifact vs 
 
 ## 5. Cross-cutting concerns
 
-### 5.1 User secrets (API keys & passwords)
+### 5.1 User secrets (exchange API keys)
 
 | Requirement | Direction |
 |-------------|-----------|
-| Per-user credentials | Not in `.env` for production multi-user |
-| Storage | Encrypt at rest in DB or secrets manager; never log |
-| Access | Scoped to `USER_ID`; procedures for insert/rotate/revoke |
-| UI | Trade → Config sidebar |
+| Per-user credentials | `CORE_ADMIN.API_CREDENTIAL`; not in `.env` for multi-user prod |
+| Broker identity | `APP_ID` → `REFDATA.APP` (seed `bybit`, etc.) — not free-text `EXCHANGE` |
+| Multiple accounts | Distinct `API_CREDENTIAL_ID` (SP-assigned integer) per saved key pair; same user + same `APP_ID` allowed |
+| Versioning | Soft-version (`API_CREDENTIAL_VID` + `IS_CURRENT_IND`); rotate keys = new VID; **no `UPDATED_AT`**; **no table IDENTITY** |
+| Encryption | Fernet in app before SP; `EXCHANGE_SECRETS_KEY` in SSM |
+| Writes | `CALL CORE_ADMIN.SP_*` only — no raw DML |
+| Audit | Credential SPs may use `CORE_INS_LOG_PROC`; **no connection entity or connection audit** — trade audit = `TRADE.LOG` / `TRANSACTION` |
+| UI | Trade → Config sidebar (1.5); API `/api/v1/credentials` (1.1) |
+| App patterns | Reuse `require_user`, `DbGateway`, secret bootstrap — **not** JWT/Argon2 ([login.md §6.4](login.md#64-reuse-from-login--jwt-credential-api--phase-11)) |
 
-Align with [Login design](login.md) (`CORE_ADMIN` users) and app-layer validation (no CHECK constraints in DB).
+Align with [Login design](login.md) (`CORE_ADMIN.APP_USER`) and [Database](../architecture/database.md). See decision #36.
 
 ### 5.2 Error handling & observability
 
@@ -863,7 +930,7 @@ Required before first live apply per deployment:
 | **0.1** | Walk-forward sign-off on live candidate (`quant.cli --walk-forward`) |
 | **0.2** | EC2 + Docker capacity snapshot |
 | **0.3** | ECR / separate-host decision → decisions log |
-| **1.1** | Per-user secrets schema + SP + API |
+| **1.1** | `CORE_ADMIN.API_CREDENTIAL` + SPs + `/api/v1/credentials` (Fernet, `APP_ID`, soft-version) |
 | **1.2** | `TRADE.DEPLOYMENT` / `TRADE.LOG` + apply endpoint |
 | **1.3** | Bybit adapter dry-run |
 | **1.4** | Trade tab shell + sidebar routes |

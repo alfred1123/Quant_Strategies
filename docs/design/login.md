@@ -121,7 +121,64 @@ JWT wins for our scale. Immediate revocation comes from the `SESSION_GEN` column
 
 ### 6.2 Existing tables
 
-No schema changes elsewhere. The hardcoded `"alfcheun"` becomes the actual logged-in `USERNAME` flowing into every existing `USER_ID` audit column.
+No schema changes elsewhere for Phase 1 auth. The hardcoded `"alfcheun"` became the actual logged-in `USERNAME` flowing into every existing `USER_ID` audit column.
+
+### 6.3 `CORE_ADMIN.API_CREDENTIAL` (Phase 1.1 — exchange keys)
+
+Separate from login passwords. Stores **broker API key + secret** per app user, soft-versioned, encrypted (Fernet) before insert.
+
+| Column | Notes |
+|--------|--------|
+| `API_CREDENTIAL_ID` | `INTEGER` — next id assigned in `SP_INS_API_CREDENTIAL`, not table `IDENTITY` |
+| `API_CREDENTIAL_VID` | Version; bump on key rotation |
+| `APP_USER_ID` | Owner — same identity as `APP_USER` / JWT `sub` |
+| `APP_ID` | Broker via `REFDATA.APP` |
+| `LABEL` | User label for multiple accounts on same broker |
+| Ciphertext columns | Never returned in full over HTTP — masked API only |
+
+No `USER_ID` audit column (same rule as `APP_USER`). No `UPDATED_AT` — new row per version. Full spec: [Plan to Profit §1.1](plan-to-profit.md#phase-11--user-secrets), decision #36.
+
+**Not stored here:** trade execution history (`TRADE.LOG` / `TRANSACTION`), deployment state (`TRADE.DEPLOYMENT`), or ephemeral broker “connections.”
+
+### 6.4 Reuse from login / JWT (credential API — Phase 1.1)
+
+Exchange API keys use the **same auth gate and repo patterns** as login, but **different crypto**. JWT proves *who is calling*; Fernet protects *broker secrets at rest*.
+
+**Reuse**
+
+| Pattern | Source | Credential use |
+|---------|--------|----------------|
+| Session gate | `require_user` (`quant/api/auth/dependencies.py`) | All `/api/v1/credentials/*` routes; scope SPs with `CurrentUser.app_user_id` |
+| DB access | `DbGateway` + `_call_get` / `_call_write` (`quant/shared/db.py`) | `ApiCredentialRepo` — `CALL CORE_ADMIN.SP_*` only, same as `AuthRepo` |
+| Per-request repo | `get_auth_repo(request)` pattern | `get_api_credential_repo(request)` from `app.state.db_conninfo` |
+| Secret bootstrap | `_resolve_jwt_secret()` in `AuthService` | Same prod fail-fast / dev ephemeral pattern for `EXCHANGE_SECRETS_KEY` (separate env var — **never** reuse `JWT_SECRET`) |
+| Startup singleton | `app.state.auth_service` in `lifespan` | `app.state.credential_crypto` (Fernet) — fail boot in prod if key missing |
+| Never log secrets | Login router logs username only | Credential routes log `app_user_id`, `api_credential_id`, `app_id` — never key/secret |
+| Active row check | `_app_user_row_is_active()` | Same `IS_ACTIVE_IND == 'Y'` check before internal decrypt (Bybit adapter) |
+| Ownership | Jobs API uses `str(user.app_user_id)` | Pass `APP_USER_ID` into every credential SP; return **404** for other users' ids (no leak) |
+| Request hygiene | `LoginRequest` strips password | Strip whitespace on `api_key` / `api_secret` in Pydantic |
+| Rate limit | `@limiter.limit("5/15minutes")` on login | Optional on `POST`/`PUT` credentials |
+| Config load | `load_config()` + SSM `/quant/{env}/` | Loads `EXCHANGE_SECRETS_KEY` alongside `JWT_SECRET` |
+
+**Do not reuse**
+
+| Login / JWT | Why |
+|-------------|-----|
+| JWT mint/decode / `qs_token` cookie | Credentials are stored data, not session tokens |
+| Argon2 / `PasswordHasher` | API keys must be **decrypted** for the broker — use **Fernet**, not one-way hash |
+| `SESSION_GEN` bump | Revoke/rotate via `IS_ACTIVE_IND` + soft `API_CREDENTIAL_VID`, not JWT invalidation |
+| 5 s user-resolution cache | Do **not** cache decrypted keys; masked list cache optional only |
+| Timing-attack dummy Argon2 verify | Login-only hardening; not applicable to credential save/load |
+
+**Suggested modules**
+
+```text
+quant/api/auth/              # session identity (unchanged)
+quant/shared/secrets_crypto.py   # Fernet + EXCHANGE_SECRETS_KEY resolution
+quant/api/credentials/       # repo, service, router, schemas
+```
+
+See [Plan to Profit §1.1](plan-to-profit.md#phase-11--user-secrets) and [env-vars.md](../env-vars.md) (`EXCHANGE_SECRETS_KEY`).
 
 ---
 
@@ -138,8 +195,11 @@ No schema changes elsewhere. The hardcoded `"alfcheun"` becomes the actual logge
 | `CORE_ADMIN.SP_UPD_APP_USER_PASSWORD` | Set new `PASSWORD_HASH` and bump `SESSION_GEN`. Inputs: `IN_USERNAME`, `IN_PASSWORD_HASH`, `IN_USER_ID`. | Admin |
 | `CORE_ADMIN.SP_UPD_APP_USER_ACTIVE` | Set `IS_ACTIVE_IND` and bump `SESSION_GEN`. Inputs: `IN_USERNAME`, `IN_IS_ACTIVE_IND` (`Y`/`N`), `IN_USER_ID`. | Admin |
 | `CORE_ADMIN.SP_UPD_APP_USER_BUMP_TOKEN` | Bump `SESSION_GEN` only — force logout-everywhere without changing password (lost laptop). Inputs: `IN_USERNAME`, `IN_USER_ID`. | Admin |
+| `CORE_ADMIN.SP_INS_API_CREDENTIAL` | New exchange credential or rotate keys (soft-version). | App (Phase 1.1) |
+| `CORE_ADMIN.SP_GET_API_CREDENTIAL` | List/get credentials for `APP_USER_ID`. | App |
+| `CORE_ADMIN.SP_UPD_API_CREDENTIAL_REVOKE` | Revoke credential (soft-version). | App |
 
-Seven procedures total. Naming follows the existing project convention (`SP_GET_*`, `SP_INS_*`, `SP_UPD_*`).
+Auth procedures above plus credential procedures (Phase 1.1). Naming follows the existing project convention (`SP_GET_*`, `SP_INS_*`, `SP_UPD_*`).
 
 ### 7.1 Admin runbook (SP-only operations)
 
