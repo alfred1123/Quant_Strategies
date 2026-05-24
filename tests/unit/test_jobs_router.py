@@ -1,4 +1,4 @@
-"""Tests for ``/api/v1/jobs/*`` — Phase B v6 router.
+"""Tests for ``/api/v1/backtest/jobs/*`` — Phase B v6 router.
 
 Auth is bypassed via ``app.dependency_overrides[require_user]`` and the
 ``JobsService`` is replaced with an in-memory fake to avoid touching DB
@@ -56,7 +56,7 @@ def client_and_svc():
             app.dependency_overrides.clear()
 
 
-# ── POST /api/v1/jobs ───────────────────────────────────────────────────
+# ── POST /api/v1/backtest/jobs ───────────────────────────────────────────────────
 
 
 class TestEnqueue:
@@ -66,7 +66,7 @@ class TestEnqueue:
         svc.enqueue.return_value = EnqueueResponse(queue_id=qid, queue_pos=3)
 
         body = {"strategy_nm": "test", "config_json": {"foo": 1}, "priority": "high"}
-        resp = client.post("/api/v1/jobs", json=body)
+        resp = client.post("/api/v1/backtest/jobs", json=body)
 
         assert resp.status_code == 202
         data = resp.json()
@@ -84,7 +84,7 @@ class TestEnqueue:
         svc.enqueue.side_effect = RateLimitError(30)
 
         resp = client.post(
-            "/api/v1/jobs",
+            "/api/v1/backtest/jobs",
             json={"strategy_nm": "test", "config_json": {}},
         )
         assert resp.status_code == 429
@@ -93,13 +93,13 @@ class TestEnqueue:
     def test_validation_error_returns_422(self, client_and_svc):
         client, _, _ = client_and_svc
         resp = client.post(
-            "/api/v1/jobs",
+            "/api/v1/backtest/jobs",
             json={"config_json": {}},  # missing strategy_nm
         )
         assert resp.status_code == 422
 
 
-# ── GET /api/v1/jobs ────────────────────────────────────────────────────
+# ── GET /api/v1/backtest/jobs ────────────────────────────────────────────────────
 
 
 class TestList:
@@ -107,7 +107,7 @@ class TestList:
         client, svc, user = client_and_svc
         svc.list_for_user.return_value = [_row(), _row(status="RUNNING", status_id=2)]
 
-        resp = client.get("/api/v1/jobs")
+        resp = client.get("/api/v1/backtest/jobs")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -118,12 +118,12 @@ class TestList:
         client, svc, _ = client_and_svc
         svc.list_for_user.return_value = []
 
-        resp = client.get("/api/v1/jobs")
+        resp = client.get("/api/v1/backtest/jobs")
         assert resp.status_code == 200
         assert resp.json() == []
 
 
-# ── GET /api/v1/jobs/{id} ───────────────────────────────────────────────
+# ── GET /api/v1/backtest/jobs/{id} ───────────────────────────────────────────────
 
 
 class TestGet:
@@ -132,7 +132,7 @@ class TestGet:
         qid = uuid.uuid4()
         svc.get.return_value = _row(qid=qid)
 
-        resp = client.get(f"/api/v1/jobs/{qid}")
+        resp = client.get(f"/api/v1/backtest/jobs/{qid}")
         assert resp.status_code == 200
         assert resp.json()["queue_id"] == str(qid)
 
@@ -141,11 +141,11 @@ class TestGet:
         from quant.api.services.jobs import JobNotFound
         svc.get.side_effect = JobNotFound("missing")
 
-        resp = client.get(f"/api/v1/jobs/{uuid.uuid4()}")
+        resp = client.get(f"/api/v1/backtest/jobs/{uuid.uuid4()}")
         assert resp.status_code == 404
 
 
-# ── POST /api/v1/jobs/{id}/cancel ───────────────────────────────────────
+# ── POST /api/v1/backtest/jobs/{id}/cancel ───────────────────────────────────────
 
 
 class TestCancel:
@@ -154,7 +154,7 @@ class TestCancel:
         qid = uuid.uuid4()
         svc.cancel.return_value = _row(qid=qid, status="CANCELLED", status_id=6, vid=2)
 
-        resp = client.post(f"/api/v1/jobs/{qid}/cancel")
+        resp = client.post(f"/api/v1/backtest/jobs/{qid}/cancel")
         assert resp.status_code == 200
         assert resp.json()["queue_status"] == "CANCELLED"
 
@@ -163,7 +163,7 @@ class TestCancel:
         qid = uuid.uuid4()
         svc.cancel.return_value = _row(qid=qid, status="CANCEL_REQUESTED", status_id=3, vid=2)
 
-        resp = client.post(f"/api/v1/jobs/{qid}/cancel")
+        resp = client.post(f"/api/v1/backtest/jobs/{qid}/cancel")
         assert resp.status_code == 200
         assert resp.json()["queue_status"] == "CANCEL_REQUESTED"
 
@@ -172,7 +172,7 @@ class TestCancel:
         from quant.api.services.jobs import CancelNotAllowed
         svc.cancel.side_effect = CancelNotAllowed("already done")
 
-        resp = client.post(f"/api/v1/jobs/{uuid.uuid4()}/cancel")
+        resp = client.post(f"/api/v1/backtest/jobs/{uuid.uuid4()}/cancel")
         assert resp.status_code == 409
 
     def test_cancel_not_found_returns_404(self, client_and_svc):
@@ -180,11 +180,11 @@ class TestCancel:
         from quant.api.services.jobs import JobNotFound
         svc.cancel.side_effect = JobNotFound("nope")
 
-        resp = client.post(f"/api/v1/jobs/{uuid.uuid4()}/cancel")
+        resp = client.post(f"/api/v1/backtest/jobs/{uuid.uuid4()}/cancel")
         assert resp.status_code == 404
 
 
-# ── POST /api/v1/jobs/{id}/reenqueue ────────────────────────────────────
+# ── POST /api/v1/backtest/jobs/{id}/reenqueue ────────────────────────────────────
 
 
 class TestReenqueue:
@@ -194,7 +194,7 @@ class TestReenqueue:
         new_qid = uuid.uuid4()
         svc.reenqueue.return_value = EnqueueResponse(queue_id=new_qid, queue_pos=2)
 
-        resp = client.post(f"/api/v1/jobs/{src_qid}/reenqueue")
+        resp = client.post(f"/api/v1/backtest/jobs/{src_qid}/reenqueue")
 
         assert resp.status_code == 202
         assert resp.json() == {"queue_id": str(new_qid), "queue_pos": 2}
@@ -205,7 +205,7 @@ class TestReenqueue:
         from quant.api.services.jobs import JobNotFound
         svc.reenqueue.side_effect = JobNotFound("nope")
 
-        resp = client.post(f"/api/v1/jobs/{uuid.uuid4()}/reenqueue")
+        resp = client.post(f"/api/v1/backtest/jobs/{uuid.uuid4()}/reenqueue")
         assert resp.status_code == 404
 
     def test_non_terminal_returns_409(self, client_and_svc):
@@ -213,7 +213,7 @@ class TestReenqueue:
         from quant.api.services.jobs import ReenqueueNotAllowed
         svc.reenqueue.side_effect = ReenqueueNotAllowed("running")
 
-        resp = client.post(f"/api/v1/jobs/{uuid.uuid4()}/reenqueue")
+        resp = client.post(f"/api/v1/backtest/jobs/{uuid.uuid4()}/reenqueue")
         assert resp.status_code == 409
 
     def test_rate_limited_returns_429(self, client_and_svc):
@@ -221,12 +221,12 @@ class TestReenqueue:
         from quant.api.services.jobs import RateLimitError
         svc.reenqueue.side_effect = RateLimitError(30)
 
-        resp = client.post(f"/api/v1/jobs/{uuid.uuid4()}/reenqueue")
+        resp = client.post(f"/api/v1/backtest/jobs/{uuid.uuid4()}/reenqueue")
         assert resp.status_code == 429
         assert "rate_limited" in resp.json()["detail"]
 
 
-# ── GET /api/v1/jobs/{id}/events (SSE) ──────────────────────────────────
+# ── GET /api/v1/backtest/jobs/{id}/events (SSE) ──────────────────────────────────
 
 
 class TestEventsStream:
@@ -244,7 +244,7 @@ class TestEventsStream:
             async def _noop(*_a, **_kw):
                 return None
             mock_sleep.side_effect = _noop
-            resp = client.get(f"/api/v1/jobs/{qid}/events")
+            resp = client.get(f"/api/v1/backtest/jobs/{qid}/events")
 
         assert resp.status_code == 200
         body = resp.text
@@ -257,7 +257,7 @@ class TestEventsStream:
         client, svc, _ = client_and_svc
         svc.snapshot_status.return_value = None
 
-        resp = client.get(f"/api/v1/jobs/{uuid.uuid4()}/events")
+        resp = client.get(f"/api/v1/backtest/jobs/{uuid.uuid4()}/events")
         assert resp.status_code == 200
         assert "event: error" in resp.text
         assert "not_found" in resp.text
@@ -278,5 +278,5 @@ class TestAuthGating:
             with patch.object(AuthService, "__init__", return_value=None):
                 app.state.auth_service = AuthService.__new__(AuthService)
             client = TestClient(app)
-            resp = client.get("/api/v1/jobs")
+            resp = client.get("/api/v1/backtest/jobs")
             assert resp.status_code == 401

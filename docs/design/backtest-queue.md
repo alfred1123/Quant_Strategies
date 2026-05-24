@@ -1,6 +1,6 @@
 # Design: Queued Background Backtests
 
-**Status:** v6 — implemented. The TypeScript coordinator (`coordinator/`, Bun + Hono) was deleted; FastAPI now owns `/api/v1/jobs/*` and a long-lived `quant.queue.worker_loop` daemon supervises per-job worker subprocesses. The Postgres schema, `BT.SP_INS_QUEUE` / `BT.SP_GET_QUEUE_LATEST` contract, and the `BT.RESULT` write path are unchanged from v5 — only the runtime owner changed. See decision #32.
+**Status:** v6 — implemented. The TypeScript coordinator (`coordinator/`, Bun + Hono) was deleted; FastAPI now owns `/api/v1/backtest/jobs/*` and a long-lived `quant.queue.worker_loop` daemon supervises per-job worker subprocesses. The Postgres schema, `BT.SP_INS_QUEUE` / `BT.SP_GET_QUEUE_LATEST` contract, and the `BT.RESULT` write path are unchanged from v5 — only the runtime owner changed. See decision #32.
 
 **Date:** 2026-05-03 (v5) · 2026-05-16 (v6 cutover)
 **Scope (current):** `quant/api/routers/jobs.py`, `quant/api/services/jobs.py`, `quant/api/schemas/jobs.py`, `quant/queue/worker.py`, `quant/queue/worker_loop.py`, `quant/queue/wake.py`, `frontend/src/features/queue/`, `db/liquidbase/bt/`.
@@ -71,7 +71,7 @@ Implementation constraints:
 3. Coordinator process owns: HTTP for `/jobs/*`, SSE fan-out, child-process supervision, `LISTEN/NOTIFY` consumption.
 4. Worker process owns: DB read of strategy config, optimization compute, `INSERT INTO BT.RESULT`, queue terminal transition via `BT.SP_INS_QUEUE`.
 5. Coordinator and worker communicate **only** through PostgreSQL + process spawn + stdout JSON lines + exit code. Neither imports the other.
-6. FastAPI is untouched in this slice — `/optimize`, `/refdata`, `/auth`, `/inst` all stay where they are. Only `/api/v1/jobs/*` is owned by the new coordinator.
+6. FastAPI is untouched in this slice — `/optimize`, `/refdata`, `/auth`, `/inst` all stay where they are. Only `/api/v1/backtest/jobs/*` is owned by the new coordinator.
 
 ---
 
@@ -91,7 +91,7 @@ Implementation constraints:
 | Component | Location | Runtime | Notes |
 |---|---|---|---|
 | Coordinator entrypoint | `coordinator/src/index.ts` | Bun (or Node 22 LTS) | Boots HTTP server, manager, LISTEN consumer. |
-| HTTP routes (`/api/v1/jobs/*`) | `coordinator/src/http/routes/` | Bun | Hono framework. |
+| HTTP routes (`/api/v1/backtest/jobs/*`) | `coordinator/src/http/routes/` | Bun | Hono framework. |
 | SSE fan-out | `coordinator/src/queue/sse.ts` | Bun | `Set<ReadableStreamDefaultController>`. |
 | Job manager (event loop, watchdog, claim) | `coordinator/src/queue/manager.ts` | Bun | Owns the wakeup loop. |
 | Process supervisor (spawn, parse stdout, signal) | `coordinator/src/queue/supervisor.ts` | Bun | `child_process.spawn`. |
@@ -115,7 +115,7 @@ The CLI (`quant/cli.py`) is **not** modified — it runs synchronously with no u
 
 ```mermaid
 flowchart LR
-    UI[React SPA] -->|/api/v1/jobs/*| Coord[coordinator<br/>Bun + Hono<br/>:3001]
+    UI[React SPA] -->|/api/v1/backtest/jobs/*| Coord[coordinator<br/>Bun + Hono<br/>:3001]
     UI -->|everything else| FA[FastAPI<br/>uvicorn :8000]
     Coord -->|SP_INS_QUEUE QUEUED<br/>SP_INS_QUEUE RUNNING| DB[(PostgreSQL<br/>BT.QUEUE)]
     Coord -->|spawn child process| Worker[python -m quant.queue.worker<br/>queue_id]
@@ -292,20 +292,20 @@ Used by `coordinator/src/queue/repo.ts — queryTerminal()` / `claimNext()` and 
 
 ## 8. Coordinator HTTP API
 
-All endpoints under `/api/v1/jobs/*` are served by the coordinator. Auth: validates the existing `qs_token` JWT cookie (HS256, secret from `JWT_SECRET` env shared with FastAPI) — no separate session table read needed.
+All endpoints under `/api/v1/backtest/jobs/*` are served by the coordinator. Auth: validates the existing `qs_token` JWT cookie (HS256, secret from `JWT_SECRET` env shared with FastAPI) — no separate session table read needed.
 
 ### 8.1 Endpoints
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/v1/jobs` | Enqueue. Returns `{ queue_id, queue_pos }`. **Rate limit:** caller may have at most 20 `QUEUED` jobs → `429`. |
-| `GET` | `/api/v1/jobs` | Active queue + recent history (last 50 terminal). `?status=RUNNING` etc. filter. |
-| `GET` | `/api/v1/jobs/:id` | Full history (all VIDs) of one job. |
-| `GET` | `/api/v1/jobs/:id/result` | Resolves `STRATEGY_VID` + `RESULT_ID` → returns same payload shape as today's FastAPI `POST /backtest/optimize` response. Existing analysis components reuse unchanged. |
-| `POST` | `/api/v1/jobs/:id/cancel` | Cancels QUEUED or RUNNING job. Idempotent. |
-| `POST` | `/api/v1/jobs/:id/reenqueue` | Re-submits a **FAILED** or **CANCELLED** job: same `(STRATEGY_ID, STRATEGY_VID, PRIORITY)`, fresh `QUEUE_ID` with `VID=1`. Returns `{ queue_id, queue_pos }` (HTTP 202). Returns 409 if the source job is not terminal-failed/cancelled, 429 if the per-user QUEUED cap is exceeded, 404 if the source job is not visible to the caller. No `PARENT_QUEUE_ID` link — join by `STRATEGY_ID` (see `IX_QUEUE_STRATEGY`). |
-| `DELETE` | `/api/v1/jobs/:id` | Hard delete a terminal job from history. `409` if not terminal. |
-| `GET` | `/api/v1/jobs/stream` | SSE stream of queue events. |
+| `POST` | `/api/v1/backtest/jobs` | Enqueue. Returns `{ queue_id, queue_pos }`. **Rate limit:** caller may have at most 20 `QUEUED` jobs → `429`. |
+| `GET` | `/api/v1/backtest/jobs` | Active queue + recent history (last 50 terminal). `?status=RUNNING` etc. filter. |
+| `GET` | `/api/v1/backtest/jobs/:id` | Full history (all VIDs) of one job. |
+| `GET` | `/api/v1/backtest/jobs/:id/result` | Resolves `STRATEGY_VID` + `RESULT_ID` → returns same payload shape as today's FastAPI `POST /backtest/optimize` response. Existing analysis components reuse unchanged. |
+| `POST` | `/api/v1/backtest/jobs/:id/cancel` | Cancels QUEUED or RUNNING job. Idempotent. |
+| `POST` | `/api/v1/backtest/jobs/:id/reenqueue` | Re-submits a **FAILED** or **CANCELLED** job: same `(STRATEGY_ID, STRATEGY_VID, PRIORITY)`, fresh `QUEUE_ID` with `VID=1`. Returns `{ queue_id, queue_pos }` (HTTP 202). Returns 409 if the source job is not terminal-failed/cancelled, 429 if the per-user QUEUED cap is exceeded, 404 if the source job is not visible to the caller. No `PARENT_QUEUE_ID` link — join by `STRATEGY_ID` (see `IX_QUEUE_STRATEGY`). |
+| `DELETE` | `/api/v1/backtest/jobs/:id` | Hard delete a terminal job from history. `409` if not terminal. |
+| `GET` | `/api/v1/backtest/jobs/stream` | SSE stream of queue events. |
 | `GET` | `/health` | Coordinator liveness — returns 200 if process up + DB reachable. |
 
 ### 8.2 Enqueue request (zod schema in `coordinator/src/types/queue.ts`)
@@ -593,8 +593,8 @@ Mobile: queue collapses into a bottom sheet or a tab.
 ### 11.5 Editable UI while jobs run
 
 - Editing the draft form never mutates submitted jobs.
-- "Add to Queue" calls `POST /api/v1/jobs` with priority `normal`.
-- "Run Now" calls `POST /api/v1/jobs` with priority `high` (jumps queue, does **not** preempt running job).
+- "Add to Queue" calls `POST /api/v1/backtest/jobs` with priority `normal`.
+- "Run Now" calls `POST /api/v1/backtest/jobs` with priority `high` (jumps queue, does **not** preempt running job).
 - Clicking a queue row sets `selectedJobId`; main panel shows that job's result.
 
 ### 11.6 SSE reconnection
@@ -606,7 +606,7 @@ Mobile: queue collapses into a bottom sheet or a tab.
 ```ts
 // frontend/vite.config.ts
 proxy: {
-  '/api/v1/jobs': 'http://localhost:3001',     // coordinator
+  '/api/v1/backtest/jobs': 'http://localhost:3001',     // coordinator
   '/api':         'http://localhost:8000',     // FastAPI (everything else)
 }
 ```
@@ -647,7 +647,7 @@ In production the same routing happens at nginx.
 1. Single worker (default) prevents CPU oversubscription. Set `MAX_WORKERS=N` later.
 2. Worker progress polls DB at most every `WORKER_PROGRESS_EVERY_T` seconds.
 3. SSE payloads ~500 B. No chart data on the stream.
-4. `GET /api/v1/jobs` returns active queue + 50 most-recent terminal jobs. Older history loaded on demand.
+4. `GET /api/v1/backtest/jobs` returns active queue + 50 most-recent terminal jobs. Older history loaded on demand.
 5. Coordinator process is ~30 MB resident (Bun) vs ~150 MB for the FastAPI process — easier to autoscale.
 6. `LISTEN/NOTIFY` (when added) is in-process to PostgreSQL — no extra hop.
 
@@ -655,7 +655,7 @@ In production the same routing happens at nginx.
 
 ## 15. Security
 
-1. All `/api/v1/jobs/*` endpoints validate the `qs_token` JWT cookie. Same secret as FastAPI (`JWT_SECRET` env).
+1. All `/api/v1/backtest/jobs/*` endpoints validate the `qs_token` JWT cookie. Same secret as FastAPI (`JWT_SECRET` env).
 2. `USER_ID` stamped on every queue row. Read endpoints filter by user (admins later).
 3. `CONFIG_JSON` is data — never `eval`'d. Worker reconstructs Pydantic model with strict validation.
 4. Rate limit: max 20 QUEUED per user.
@@ -677,12 +677,12 @@ Each slice is independently shippable.
 ### Slice B — Coordinator skeleton ✅ Done
 
 1. ~~`coordinator/` Bun project: `package.json`, `tsconfig.json`, `Dockerfile`, `bun:test` setup.~~
-2. ~~`db/client.ts` + `queue/repo.ts` — `queryQueue()`; Hono `GET /api/v1/jobs` returns real DB rows (paths differ slightly from the original `db/repo.ts` sketch).~~
+2. ~~`db/client.ts` + `queue/repo.ts` — `queryQueue()`; Hono `GET /api/v1/backtest/jobs` returns real DB rows (paths differ slightly from the original `db/repo.ts` sketch).~~
 3. ~~`http/server.ts` — Hono app, `/health`, `/health/ready`.~~
 4. ~~`docker-compose.yml` — `coordinator` service on port **3001** (`COORDINATOR_PORT` override supported).~~
 5. ~~Smoke test: `curl` **examples** (after `docker compose up coordinator` or `bun run start` in `coordinator/` with env set):~~
    - `curl -sS "http://localhost:3001/health"`
-   - `curl -sS "http://localhost:3001/api/v1/jobs"` — JSON with `rows` when DB is reachable and Liquibase BT objects exist.
+   - `curl -sS "http://localhost:3001/api/v1/backtest/jobs"` — JSON with `rows` when DB is reachable and Liquibase BT objects exist.
    - **Compose note:** set **`QUANTDB_URL`** and **`JWT_SECRET`** in `.env` (see `.env.example`). For Postgres on the host (SSM tunnel), use something like `host.docker.internal` / the host IP in `QUANTDB_URL`.
 
 ### Slice C — Submit + claim + spawn
@@ -692,7 +692,7 @@ Each slice is independently shippable.
 3. `manager.ts` — wakeup queue, event loop.
 4. `supervisor.ts` — `child_process.spawn`, exit detection.
 5. `src/worker.py` — minimal version (no progress, no cancel): read config → run optimize → write RESULT → `SP_INS_QUEUE COMPLETED`.
-6. **End-to-end milestone**: `POST /api/v1/jobs` → coordinator claims → spawns Python → DB shows COMPLETED. No frontend yet.
+6. **End-to-end milestone**: `POST /api/v1/backtest/jobs` → coordinator claims → spawns Python → DB shows COMPLETED. No frontend yet.
 
 ### Slice D — Worker progress + cancel + timeout
 
@@ -857,7 +857,7 @@ After step 5, the FastAPI deployment unit can be removed entirely. The coordinat
 | Component | Current | Long-term option |
 |---|---|---|
 | **Frontend build** (`frontend/vite.config.ts`) | Vite + Vitest | Already TS — no change. Once coordinator exists, consider a top-level `bun`/`pnpm` workspace so `coordinator/` and `frontend/` share `types/`. |
-| **Nginx routing** (`docker/nginx/nginx.conf`) | Routes `/api/*` → FastAPI | Add `location /api/v1/jobs/ { proxy_pass http://coordinator:3001; }` first. Expand as routers port. |
+| **Nginx routing** (`docker/nginx/nginx.conf`) | Routes `/api/*` → FastAPI | Add `location /api/v1/backtest/jobs/ { proxy_pass http://coordinator:3001; }` first. Expand as routers port. |
 | **Docker Compose** (`docker-compose.yml`) | `api`, `frontend`, `nginx` | Add `coordinator` service. After full migration, remove `api`. |
 | **CI / CD** (`.github/workflows/`) | Builds Python + frontend | Add coordinator build (Bun image) + tests (`bun test`). |
 | **Observability** | Logging only | Add OpenTelemetry early — Python and TS both export to the same collector. Critical once requests hop runtimes. |

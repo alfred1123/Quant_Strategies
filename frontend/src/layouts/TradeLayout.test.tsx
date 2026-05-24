@@ -54,6 +54,6 @@ describe('TradeLayout', () => {
     renderWithProviders(<TradeRoutes />, { initialEntries: ['/trade/config'] });
     expect(screen.getByRole('group', { name: 'Application mode' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Trade mode' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Backtest mode' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Backtest mode' })).toHaveAttribute('href', '/backtest');
   });
 });

@@ -1,6 +1,6 @@
 """HTTP boundary for the backtest job queue — Phase B v6.
 
-Replaces the TS coordinator's ``/api/v1/jobs/*`` endpoints. All routes
+Backtest queue HTTP — ``/api/v1/backtest/jobs/*``. All routes
 behind ``require_user`` (registered in ``quant.api.main``).
 """
 
@@ -30,7 +30,7 @@ from quant.refdata.bundle import DataCaches
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/jobs", tags=["jobs"])
+router = APIRouter(prefix="/backtest/jobs", tags=["backtest-jobs"])
 
 # SSE polling cadence — see docs/design/backtest-queue.md §0 Phase B.
 SSE_POLL_INTERVAL_S = 1.0

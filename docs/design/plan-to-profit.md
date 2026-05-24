@@ -896,6 +896,19 @@ Recommendation: start with **B** — matches mental model (strategy artifact vs 
 
 Align with [Login design](login.md) (`CORE_ADMIN.APP_USER`) and [Database](../architecture/database.md). See decision #36.
 
+### 5.2 API URL layout
+
+| Area | Prefix | Phase |
+|------|--------|-------|
+| Auth | `/api/v1/auth/*` | done |
+| Backtest (sync) | `/api/v1/backtest/*` | done |
+| Backtest queue | `/api/v1/backtest/jobs/*` | done |
+| REFDATA / INST | `/api/v1/refdata/*`, `/api/v1/inst/*` | done (shared) |
+| Credentials | `/api/v1/credentials/*` | 1.1 |
+| Trade execution | `/api/v1/trade/*` (deployments, dry-run, log) | 1.2+ |
+
+No backward-compat aliases — update all call sites when paths change (decision #37).
+
 ### 5.2 Error handling & observability
 
 | Signal | Channel |

@@ -1,4 +1,4 @@
-"""Pydantic schemas for ``/api/v1/jobs/*`` — Phase B v6.
+"""Pydantic schemas for ``/api/v1/backtest/jobs/*`` — Phase B v6.
 
 Mirrors ``coordinator/src/types/queue.ts`` so the frontend contract is
 preserved when the coordinator is deleted in Phase D.

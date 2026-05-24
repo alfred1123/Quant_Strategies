@@ -21,29 +21,29 @@ export interface EnqueueResponse {
 }
 
 async function listJobs(): Promise<JobRow[]> {
-  const { data } = await apiClient.get<JobRow[]>('/jobs');
+  const { data } = await apiClient.get<JobRow[]>('/backtest/jobs');
   return data;
 }
 
 async function cancelJob(queueId: string): Promise<JobRow> {
-  const { data } = await apiClient.post<JobRow>(`/jobs/${queueId}/cancel`);
+  const { data } = await apiClient.post<JobRow>(`/backtest/jobs/${queueId}/cancel`);
   return data;
 }
 
 async function reenqueueJob(queueId: string): Promise<EnqueueResponse> {
   const { data } = await apiClient.post<EnqueueResponse>(
-    `/jobs/${queueId}/reenqueue`,
+    `/backtest/jobs/${queueId}/reenqueue`,
   );
   return data;
 }
 
 async function enqueueJob(req: EnqueueRequest): Promise<EnqueueResponse> {
-  const { data } = await apiClient.post<EnqueueResponse>('/jobs', req);
+  const { data } = await apiClient.post<EnqueueResponse>('/backtest/jobs', req);
   return data;
 }
 
 async function getJob(queueId: string): Promise<JobDetail> {
-  const { data } = await apiClient.get<JobDetail>(`/jobs/${queueId}`);
+  const { data } = await apiClient.get<JobDetail>(`/backtest/jobs/${queueId}`);
   return data;
 }
 

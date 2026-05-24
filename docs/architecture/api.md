@@ -2,8 +2,20 @@
 
 The `quant/api/` directory contains the FastAPI application that serves the backtest pipeline as a REST API. All `/api/v1/*` routes (except auth and health) require an authenticated session.
 
-!!! note "Queue endpoints — migration in progress"
-    `/api/v1/jobs/*` (the backtest queue) is served by this FastAPI process — see decision #32 and [Queued Background Backtests](../design/backtest-queue.md). The Python `quant.queue.worker_loop` daemon (separate container) consumes jobs from `BT.QUEUE`; all HTTP terminates here.
+!!! note "Queue endpoints"
+    `/api/v1/backtest/jobs/*` (the backtest queue) is served by this FastAPI process — see decision #32 and [Queued Background Backtests](../design/backtest-queue.md). The Python `quant.queue.worker_loop` daemon (separate container) consumes jobs from `BT.QUEUE`; all HTTP terminates here.
+
+## API namespaces
+
+| Area | Path prefix | Notes |
+|------|-------------|--------|
+| **Auth** | `/api/v1/auth/*` | Session cookie |
+| **Backtest** | `/api/v1/backtest/*` | Sync optimize / performance / walk-forward |
+| **Backtest queue** | `/api/v1/backtest/jobs/*` | Async `BT.QUEUE` jobs |
+| **Shared config** | `/api/v1/refdata/*`, `/api/v1/inst/*` | Used by Backtest and Trade UIs |
+| **Trade (planned)** | `/api/v1/credentials/*`, `/api/v1/trade/*` | Credentials (1.1); deployments / apply / log (1.2+) |
+
+UI mode (`/backtest` vs `/trade`) does **not** change these URLs — each page calls the appropriate prefix.
 
 ## Starting the Server
 
@@ -28,18 +40,6 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `POST` | `/api/v1/auth/logout` | Required | Clears the session cookie. |
 | `GET`  | `/api/v1/auth/me` | Required | Returns the current user (or 401). |
 
-### Credentials (Phase 1.1 — planned)
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/api/v1/credentials` | Required | List current user's exchange credentials (masked). |
-| `GET` | `/api/v1/credentials/{id}` | Required | One credential (masked). |
-| `POST` | `/api/v1/credentials` | Required | Save new broker API key pair (`app_id`, Fernet-encrypted in DB). |
-| `PUT` | `/api/v1/credentials/{id}` | Required | Rotate keys (soft-version). |
-| `DELETE` | `/api/v1/credentials/{id}` | Required | Revoke. |
-
-Same session cookie as auth; implementation reuses `require_user` and `DbGateway` — see [Login §6.4](../design/login.md#64-reuse-from-login--jwt-credential-api--phase-11).
-
 ### Backtest
 
 | Method | Path | Description |
@@ -48,19 +48,28 @@ Same session cookie as auth; implementation reuses `require_user` and `DbGateway
 | `POST` | `/api/v1/backtest/optimize/stream` | SSE-streamed optimization — sends `init`, `progress`, `result`, and `error` events in real time. |
 | `POST` | `/api/v1/backtest/performance` | Run a single backtest at fixed params. Returns equity curve, metrics, and daily P&L. |
 | `POST` | `/api/v1/backtest/walk-forward` | Walk-forward overfitting test. Returns IS/OOS metrics, overfitting ratio, and full equity curve. |
+| `POST` | `/api/v1/backtest/jobs` | Enqueue a backtest job (202 Accepted). |
+| `GET`  | `/api/v1/backtest/jobs` | List queue rows for the current user. |
+| `GET`  | `/api/v1/backtest/jobs/{queue_id}` | Job detail + strategy metadata. |
+| `POST` | `/api/v1/backtest/jobs/{queue_id}/cancel` | Cancel a queued or running job. |
+| `POST` | `/api/v1/backtest/jobs/{queue_id}/reenqueue` | Re-enqueue from a terminal row. |
+| `GET`  | `/api/v1/backtest/jobs/{queue_id}/events` | SSE stream of job progress events. |
 
-### Jobs (backtest queue)
+### Trade (planned — Phase 1.1+)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/v1/jobs` | Enqueue a backtest job (202 Accepted). |
-| `GET`  | `/api/v1/jobs` | List queue rows for the current user. |
-| `GET`  | `/api/v1/jobs/{queue_id}` | Job detail + strategy metadata. |
-| `POST` | `/api/v1/jobs/{queue_id}/cancel` | Cancel a queued or running job. |
-| `POST` | `/api/v1/jobs/{queue_id}/re-enqueue` | Re-enqueue from a terminal row. |
-| `GET`  | `/api/v1/jobs/{queue_id}/events` | SSE stream of job progress events. |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/credentials` | Required | List current user's exchange credentials (masked). |
+| `GET` | `/api/v1/credentials/{id}` | Required | One credential (masked). |
+| `POST` | `/api/v1/credentials` | Required | Save new broker API key pair. |
+| `PUT` | `/api/v1/credentials/{id}` | Required | Rotate keys. |
+| `DELETE` | `/api/v1/credentials/{id}` | Required | Revoke. |
+| `POST` | `/api/v1/trade/deployments` | Required | Apply strategy (1.2 skeleton). |
+| `GET` | `/api/v1/trade/deployments/{id}` | Required | Deployment status (1.2). |
 
-### REFDATA / Instruments
+See [Plan to Profit §5.2](../design/plan-to-profit.md#52-api-url-layout).
+
+### REFDATA / Instruments (shared)
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -139,7 +148,7 @@ quant/api/
 │   └── models.py        # Pydantic models (LoginRequest, etc.)
 ├── routers/
 │   ├── backtest.py      # /api/v1/backtest/* endpoints
-│   ├── jobs.py          # /api/v1/jobs/* endpoints
+│   ├── jobs.py          # /api/v1/backtest/jobs/* endpoints
 │   ├── refdata.py       # /api/v1/refdata/* endpoints
 │   └── inst.py          # /api/v1/inst/* endpoints
 ├── schemas/

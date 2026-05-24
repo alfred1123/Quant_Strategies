@@ -1,4 +1,4 @@
-"""Service for ``/api/v1/jobs/*`` — Phase B v6.
+"""Service for ``/api/v1/backtest/jobs/*`` — Phase B v6.
 
 Replaces ``coordinator/src/services/jobs.ts``. All DB access is delegated
 to :class:`quant.queue.repo.BtQueueRepo`; this module is HTTP-agnostic
@@ -45,7 +45,7 @@ class ReenqueueNotAllowed(Exception):
 
 
 class JobsService:
-    """Business logic for /jobs — HTTP-agnostic."""
+    """Business logic for /backtest/jobs — HTTP-agnostic."""
 
     def __init__(
         self,

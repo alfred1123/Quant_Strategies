@@ -8,7 +8,7 @@ interface AppModeSwitchProps {
 }
 
 const SEGMENTS: { mode: AppMode; to: string; label: string }[] = [
-  { mode: 'backtest', to: '/', label: 'Backtest' },
+  { mode: 'backtest', to: '/backtest', label: 'Backtest' },
   { mode: 'trade', to: '/trade', label: 'Trade' },
 ];
 

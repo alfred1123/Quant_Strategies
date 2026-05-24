@@ -90,7 +90,7 @@ docker compose logs -f worker
 
 FastAPI publishes REFDATA into Redis on boot, so start the API container
 before (or alongside) the worker. The HTTP surface lives on the API
-container at `/api/v1/jobs/*` — there is no separate coordinator port.
+container at `/api/v1/backtest/jobs/*` — there is no separate coordinator port.
 
 ## Repository Layout
 

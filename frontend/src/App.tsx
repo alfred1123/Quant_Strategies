@@ -55,7 +55,7 @@ function GuestOnly({ children }: { children: React.ReactNode }) {
   if (me.isLoading) return <FullPageSpinner />;
 
   if (me.data) {
-    const from = (location.state as { from?: Location })?.from?.pathname ?? '/';
+    const from = (location.state as { from?: Location })?.from?.pathname ?? '/backtest';
     return <Navigate to={from} replace />;
   }
   return children;
@@ -76,8 +76,9 @@ export default function App() {
                 </GuestOnly>
               }
             />
+            <Route path="/" element={<Navigate to="/backtest" replace />} />
             <Route
-              path="/"
+              path="/backtest"
               element={
                 <RequireAuth>
                   <BacktestPage />
@@ -97,7 +98,7 @@ export default function App() {
               <Route path="apply" element={<TradeApplyPage />} />
             </Route>
             {/* Any unknown path → redirect to root (which checks auth) */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/backtest" replace />} />
           </Routes>
         </ErrorBoundary>
       </ThemeProvider>

@@ -67,7 +67,7 @@ Examples:
 
 Self-test (after prod start — from project root, .env loaded for compose):
   curl -sS "http://127.0.0.1:8000/health/ready"
-  curl -sS "http://127.0.0.1:8000/api/v1/jobs"  # requires login cookie
+  curl -sS "http://127.0.0.1:8000/api/v1/backtest/jobs"  # requires login cookie
 
 Notes:
   - dev mode runs FastAPI with --reload and Vite dev server (no Docker).

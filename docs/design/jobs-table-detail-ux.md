@@ -2,7 +2,7 @@
 
 **Status:** proposed (not yet implemented)  
 **Date:** 2026-05-16  
-**Related:** [Backtest Queue](backtest-queue.md) (`/api/v1/jobs/*`, `frontend/src/features/queue/`)
+**Related:** [Backtest Queue](backtest-queue.md) (`/api/v1/backtest/jobs/*`, `frontend/src/components/JobsTable.tsx`)
 
 Hover preview and row-detail drawer **serve different jobs**. The recommendation is to ship **both**, with clearly separated roles rather than choosing one.
 

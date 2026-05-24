@@ -14,7 +14,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const redirectTo = (location.state as { from?: Location })?.from?.pathname ?? '/';
+  const redirectTo = (location.state as { from?: Location })?.from?.pathname ?? '/backtest';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
