@@ -62,4 +62,15 @@ describe('App routing', () => {
     renderApp(<App />);
     expect(screen.getByTestId('backtest-page')).toBeInTheDocument();
   });
+
+  it('shows Trade Config stub at /trade/config when authenticated', () => {
+    vi.mocked(authModule.useMe).mockReturnValue({
+      data: { username: 'alice' },
+      isLoading: false,
+    } as unknown as ReturnType<typeof authModule.useMe>);
+
+    window.history.pushState({}, '', '/trade/config');
+    renderApp(<App />);
+    expect(screen.getByText(/Phase 1\.5/)).toBeInTheDocument();
+  });
 });

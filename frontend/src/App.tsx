@@ -2,6 +2,9 @@ import { Box, CircularProgress, ThemeProvider, createTheme, CssBaseline } from '
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import BacktestPage from './pages/BacktestPage';
 import LoginPage from './pages/LoginPage';
+import TradeLayout from './layouts/TradeLayout';
+import TradeConfigPage from './pages/trade/TradeConfigPage';
+import TradeApplyPage from './pages/trade/TradeApplyPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useMe } from './api/auth';
 
@@ -81,6 +84,18 @@ export default function App() {
                 </RequireAuth>
               }
             />
+            <Route
+              path="/trade"
+              element={
+                <RequireAuth>
+                  <TradeLayout />
+                </RequireAuth>
+              }
+            >
+              <Route index element={<Navigate to="config" replace />} />
+              <Route path="config" element={<TradeConfigPage />} />
+              <Route path="apply" element={<TradeApplyPage />} />
+            </Route>
             {/* Any unknown path → redirect to root (which checks auth) */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

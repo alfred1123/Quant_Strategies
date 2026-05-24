@@ -11,6 +11,7 @@ import MetricsCards from '../components/MetricsCards';
 import HeatmapChart from '../components/HeatmapChart';
 import EquityCurveChart from '../components/EquityCurveChart';
 import UserMenu from '../components/UserMenu';
+import AppModeSwitch from '../components/AppModeSwitch';
 import { runPerformance } from '../api/backtest';
 import { fetchJob, useEnqueueJob } from '../api/jobs';
 import { useMe } from '../api/auth';
@@ -201,10 +202,12 @@ export default function BacktestPage() {
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       {/* Topbar */}
       <AppBar position="static" elevation={0} sx={{ bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider' }}>
-        <Toolbar>
-          <Typography variant="h6" color="text.primary" sx={{ flexGrow: 1, fontWeight: 700 }}>
+        <Toolbar sx={{ gap: 2 }}>
+          <Typography variant="h6" color="text.primary" sx={{ fontWeight: 700, mr: 1 }}>
             Quant Strategies
           </Typography>
+          <AppModeSwitch mode="backtest" />
+          <Box sx={{ flexGrow: 1 }} />
           <Button variant="outlined" onClick={() => setDrawerOpen(true)}>
             ⚙ Configure
           </Button>
