@@ -106,6 +106,29 @@ cmd_restore() {
     -j 4 -v \
     "$dumpfile" 2>&1 | grep -v "^pg_restore: warning: errors ignored"
   info "Restore complete."
+  info "Local dump omits cluster roles — run: ./scripts/dbctl.sh bootstrap-roles"
+}
+
+cmd_bootstrap_roles() {
+  require_local_pg
+  if [[ -f "$ROOT_DIR/.env" ]]; then
+    set -a; source "$ROOT_DIR/.env"; set +a
+  fi
+  local app_pw="${QUANTDB_PASSWORD_APP:-LetsGetRich888App}"
+  info "Creating quant_app login role (matches Aurora / :5433) if missing..."
+  sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
+    CREATE ROLE quant_app LOGIN PASSWORD '${app_pw}';
+    RAISE NOTICE 'Created role quant_app';
+  ELSE
+    RAISE NOTICE 'Role quant_app already exists';
+  END IF;
+END \$\$;
+GRANT USAGE ON SCHEMA CORE_ADMIN, REFDATA, BT, INST, TRADE TO quant_app;
+SQL
+  info "Done. Re-run: DB_TARGET=local ./scripts/liquibase-deploy.sh"
 }
 
 cmd_reset() {
@@ -159,10 +182,11 @@ case "${1:-}" in
   dump)    cmd_dump ;;
   restore) cmd_restore "${2:-}" ;;
   reset)   cmd_reset ;;
+  bootstrap-roles) cmd_bootstrap_roles ;;
   status)  cmd_status ;;
   psql)    cmd_psql ;;
   *)
-    echo "Usage: $0 {dump|restore [file]|reset|status|psql}"
+    echo "Usage: $0 {dump|restore [file]|reset|bootstrap-roles|status|psql}"
     exit 1
     ;;
 esac

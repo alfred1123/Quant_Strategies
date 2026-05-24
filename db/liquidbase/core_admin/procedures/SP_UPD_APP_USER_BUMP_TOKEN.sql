@@ -6,7 +6,7 @@ CREATE OR REPLACE PROCEDURE CORE_ADMIN.SP_UPD_APP_USER_BUMP_TOKEN(
     OUT OUT_SQLERRMC     TEXT
 )
 LANGUAGE plpgsql
-SET plan_cache_mode = 'force_custom_plan'
+SET plan_cache_mode = 'force_generic_plan'
 AS $$
 DECLARE
     V_START_TS   TIMESTAMPTZ := CURRENT_TIMESTAMP;

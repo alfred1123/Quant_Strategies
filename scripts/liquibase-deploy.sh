@@ -2,7 +2,8 @@
 # Apply pending Liquibase migrations (prod deploy or local).
 #
 # Usage:
-#   ./scripts/liquibase-deploy.sh              # uses .env / LIQUIBASE_COMMAND_*
+#   ./scripts/liquibase-deploy.sh              # Aurora tunnel :5433 (DB_TARGET=prod)
+#   DB_TARGET=local ./scripts/liquibase-deploy.sh   # local Postgres :5432
 #   APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh   # EC2: load /quant/prod/* from SSM
 #
 # Order: master (schemas) → per-schema DDL/procs → core_admin grants refresh.
@@ -48,9 +49,20 @@ load_env() {
     )
   fi
 
-  : "${QUANTDB_HOST:?QUANTDB_HOST required}"
-  QUANTDB_PORT="${QUANTDB_PORT:-5432}"
-  export LIQUIBASE_COMMAND_URL="${LIQUIBASE_COMMAND_URL:-jdbc:postgresql://${QUANTDB_HOST}:${QUANTDB_PORT}/quantdb?sslmode=require}"
+  # Same target selection as liquibase-verify.sh / appctl.sh DB_TARGET
+  if [[ "${DB_TARGET:-prod}" == "local" ]]; then
+    export QUANTDB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
+    export QUANTDB_PORT="${LOCAL_DB_PORT:-5432}"
+    export QUANTDB_USERNAME="${LOCAL_DB_USER:-quant_admin}"
+    export QUANTDB_PASSWORD="${LOCAL_DB_PASSWORD:-LetsGetRich888}"
+    SSLMODE=disable
+  else
+    : "${QUANTDB_HOST:?QUANTDB_HOST required (or set DB_TARGET=local)}"
+    QUANTDB_PORT="${QUANTDB_PORT:-5433}"
+    SSLMODE=require
+  fi
+
+  export LIQUIBASE_COMMAND_URL="jdbc:postgresql://${QUANTDB_HOST}:${QUANTDB_PORT}/quantdb?sslmode=${SSLMODE}"
   export LIQUIBASE_COMMAND_USERNAME="${LIQUIBASE_COMMAND_USERNAME:-${QUANTDB_USERNAME:?QUANTDB_USERNAME required}}"
   export LIQUIBASE_COMMAND_PASSWORD="${LIQUIBASE_COMMAND_PASSWORD:-${QUANTDB_PASSWORD:?QUANTDB_PASSWORD required}}"
 }

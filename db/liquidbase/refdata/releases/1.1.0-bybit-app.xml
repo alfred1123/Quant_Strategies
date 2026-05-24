@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.1.0-001-refdata-app-bybit" author="alfcheun" context="refdata" runOnChange="false">
+        <comment>Phase 1.1 — REFDATA.APP broker row for Bybit</comment>
+        <sqlFile path="../data/APP_BYBIT.sql" relativeToChangelogFile="true"
+                 splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql>DELETE FROM REFDATA.APP WHERE NAME = 'bybit';</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
