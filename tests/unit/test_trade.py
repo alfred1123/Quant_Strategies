@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 import pandas as pd
 import pytest
 
-from quant.trade import FutuTrader, OrderResult
+from quant.trade.futu_trader import FutuTrader, OrderResult
 
 
 # ── Fixtures ────────────────────────────────────────────────────────
@@ -13,7 +13,7 @@ from quant.trade import FutuTrader, OrderResult
 @pytest.fixture
 def mock_env():
     """Provide required env vars and suppress load_dotenv."""
-    with patch("quant.trade.load_dotenv"), \
+    with patch("quant.trade.futu_trader.load_dotenv"), \
          patch.dict("os.environ", {
              "FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111",
          }):
@@ -23,7 +23,7 @@ def mock_env():
 @pytest.fixture
 def mock_ctx():
     """Mock the OpenSecTradeContext and connection check so no real connection is made."""
-    with patch("quant.trade.futu.OpenSecTradeContext") as MockCtx, \
+    with patch("quant.trade.futu_trader.futu.OpenSecTradeContext") as MockCtx, \
          patch.object(FutuTrader, "_check_connection"):
         instance = MagicMock()
         MockCtx.return_value = instance
@@ -60,13 +60,13 @@ class TestFutuTraderInit:
             FutuTrader(paper=True, market="INVALID")
 
     def test_init_raises_without_env(self):
-        with patch("quant.trade.load_dotenv"), \
+        with patch("quant.trade.futu_trader.load_dotenv"), \
              patch.dict("os.environ", {}, clear=True):
             with pytest.raises(ValueError, match="FUTU_HOST and FUTU_PORT"):
                 FutuTrader(paper=True)
 
     def test_init_raises_missing_port(self):
-        with patch("quant.trade.load_dotenv"), \
+        with patch("quant.trade.futu_trader.load_dotenv"), \
              patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1"}, clear=True):
             with pytest.raises(ValueError, match="FUTU_HOST and FUTU_PORT"):
                 FutuTrader(paper=True)
@@ -277,7 +277,7 @@ class TestOrderResult:
 
 class TestConnectionTimeout:
     def test_raises_connection_error_when_gateway_down(self, mock_env):
-        with patch("quant.trade.socket.socket") as mock_sock_cls:
+        with patch("quant.trade.futu_trader.socket.socket") as mock_sock_cls:
             import socket
             mock_sock = MagicMock()
             mock_sock.connect.side_effect = socket.timeout("timed out")
@@ -286,7 +286,7 @@ class TestConnectionTimeout:
                 FutuTrader(paper=True)
 
     def test_raises_connection_error_on_refused(self, mock_env):
-        with patch("quant.trade.socket.socket") as mock_sock_cls:
+        with patch("quant.trade.futu_trader.socket.socket") as mock_sock_cls:
             mock_sock = MagicMock()
             mock_sock.connect.side_effect = ConnectionRefusedError("refused")
             mock_sock_cls.return_value = mock_sock
@@ -294,8 +294,8 @@ class TestConnectionTimeout:
                 FutuTrader(paper=True)
 
     def test_custom_timeout_value(self, mock_env):
-        with patch("quant.trade.socket.socket") as mock_sock_cls, \
-             patch("quant.trade.futu.OpenSecTradeContext"):
+        with patch("quant.trade.futu_trader.socket.socket") as mock_sock_cls, \
+             patch("quant.trade.futu_trader.futu.OpenSecTradeContext"):
             mock_sock = MagicMock()
             mock_sock_cls.return_value = mock_sock
             t = FutuTrader(paper=True, timeout=10)
@@ -303,8 +303,8 @@ class TestConnectionTimeout:
             mock_sock.settimeout.assert_called_with(10)
 
     def test_default_timeout(self, mock_env):
-        with patch("quant.trade.socket.socket") as mock_sock_cls, \
-             patch("quant.trade.futu.OpenSecTradeContext"):
+        with patch("quant.trade.futu_trader.socket.socket") as mock_sock_cls, \
+             patch("quant.trade.futu_trader.futu.OpenSecTradeContext"):
             mock_sock = MagicMock()
             mock_sock_cls.return_value = mock_sock
             t = FutuTrader(paper=True)

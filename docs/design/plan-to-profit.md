@@ -896,7 +896,7 @@ Recommendation: start with **B** — matches mental model (strategy artifact vs 
 
 **Bybit:** Reference implementation in `backup/deco/`; active experimentation in `quant/trade/`. Adapter pattern: `BybitAdapter` in [Trade API](trade-api.md).
 
-**Futu:** Prototype in `quant/futu_trader.py`; target architecture in [Futu Trading — OOP Implementation](futu-trading.md) (`FutuAdapter`, `FutuTradeGateway`, `AdapterRegistry`).
+**Futu:** Prototype in `quant/trade/futu_trader.py`; target architecture in [Futu Trading — OOP Implementation](futu-trading.md) (`FutuAdapter`, `FutuTradeGateway`, `AdapterRegistry`).
 
 ---
 

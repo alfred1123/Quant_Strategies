@@ -1,7 +1,7 @@
 # Futu Trading — OOP Implementation Plan
 
 !!! info "Status"
-    **Design — not implemented.** A procedural prototype exists in `quant/futu_trader.py` (single class, ~275 lines). This document defines how to integrate Futu into the Plan-to-Profit trade pipeline using **strict OOP**, broker adapters, and the existing `TRADE.DEPLOYMENT` model.
+    **Design — not implemented.** A procedural prototype exists in `quant/trade/futu_trader.py` (single class). This document defines how to integrate Futu into the Plan-to-Profit trade pipeline using **strict OOP**, broker adapters, and the existing `TRADE.DEPLOYMENT` model.
 
 **References**
 
@@ -39,12 +39,12 @@
 
 | Artifact | Location | Notes |
 |----------|----------|--------|
-| `FutuTrader` | `quant/futu_trader.py` | Procedural wrapper around `OpenSecTradeContext`; `place_order`, `apply_signal`, queries |
+| `FutuTrader` | `quant/trade/futu_trader.py` | Procedural wrapper around `OpenSecTradeContext`; `place_order`, `apply_signal`, queries |
 | Quote data | `quant/data/sources.py::FutuOpenD` | `OpenQuoteContext` — **separate** from trade context (matches Futu docs) |
 | Deployments API | `quant/api/routers/deployments.py` | Persist strategy + `api_credential_id` + `app_id` |
 | Trade domain | `quant/trade/service.py`, `db_repo.py` | DB only — no broker calls yet |
 | Legacy scripts | `quant/trade/trade.py`, `source.py`, `repo.py` | Old Bybit/ccxt experiments — **do not extend**; delete or move to `backup/deco/` when Futu adapter lands |
-| Unit / E2E tests | `tests/unit/test_trade.py`, `tests/e2e/test_futu_trader_e2e.py` | Target `quant.trade` exports — needs realignment after package refactor |
+| Unit / E2E tests | `tests/unit/test_trade.py`, `tests/e2e/test_futu_trader_e2e.py` | Import via `quant.trade` (re-exported from `futu_trader`) |
 
 ### 2.2 Futu OpenD model (from official docs)
 
@@ -183,7 +183,7 @@ quant/trade/
         └── adapter.py       # FutuAdapter(TradeAdapter)
 ```
 
-**Migration:** Move logic from `quant/futu_trader.py` into `brokers/futu/*`, then delete `futu_trader.py` and update imports/tests. Keep a one-release shim only if needed — project convention is **no backward-compat shims**.
+**Migration:** Move logic from `quant/trade/futu_trader.py` into `brokers/futu/*`, then delete `futu_trader.py` and update imports/tests. Keep a one-release shim only if needed — project convention is **no backward-compat shims**.
 
 ### 3.4 Abstract interfaces
 
@@ -432,7 +432,7 @@ Work in order; each phase has testable exit criteria.
 | Create `adapters/`, `models/`, `brokers/futu/` per §3.3 | `pytest` imports succeed |
 | Move `OrderResult` to `models/order.py` | Unit tests updated |
 | Port `FutuTrader` logic → `FutuTradeGateway` + `FutuAdapter` | Existing `test_trade.py` green against new paths |
-| Delete `quant/futu_trader.py` | No stale imports |
+| Delete `quant/trade/futu_trader.py` after broker refactor | No stale imports |
 
 ### Phase B — Registry + mapper
 

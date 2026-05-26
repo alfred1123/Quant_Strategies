@@ -1,7 +1,7 @@
 # Paper Trading with Futu OpenD
 
 !!! note "Status"
-    Futu trading is a **Python utility** today (`quant/futu_trader.py`). It is **not wired to the React Trade UI** yet. For the full OOP integration plan (adapters, worker, deployments), see **[Futu Trading — OOP Implementation](../design/futu-trading.md)**.
+    Futu trading is a **Python utility** today (`quant/trade/futu_trader.py`). It is **not wired to the React Trade UI** yet. For the full OOP integration plan (adapters, worker, deployments), see **[Futu Trading — OOP Implementation](../design/futu-trading.md)**.
 
 ## Prerequisites
 
@@ -20,7 +20,7 @@ See also the [official Program Samples](https://openapi.futunn.com/futu-api-doc/
 
 ```python
 # Run from the project root
-from quant.futu_trader import FutuTrader
+from quant.trade import FutuTrader
 
 with FutuTrader(paper=True) as trader:
     result = trader.place_order("US.AAPL", 10, "BUY")

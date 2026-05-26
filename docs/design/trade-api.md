@@ -1,7 +1,7 @@
 # Design Doc: Strategy JSON → Trade API
 
 !!! info "Status"
-    **Partially implemented (Phase 1.2).** Deployment persistence and `GET`/`POST /api/v1/trade/deployments` are live. Credentials API, Bybit adapter, dry-run, and execution-log writes are still planned. A `FutuTrader` utility exists in `quant/futu_trader.py` (see [Paper Trading guide](../guides/trading.md)).
+    **Partially implemented (Phase 1.2).** Deployment persistence and `GET`/`POST /api/v1/trade/deployments` are live. Credentials API, Bybit adapter, dry-run, and execution-log writes are still planned. A `FutuTrader` utility exists in `quant/trade/futu_trader.py` (see [Paper Trading guide](../guides/trading.md)).
 
 ## Overview
 
