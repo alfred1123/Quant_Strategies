@@ -23,7 +23,7 @@ DB_CONNINFO = load_config()
 from quant.api.auth.dependencies import require_user  # noqa: E402
 from quant.api.auth.router import limiter as auth_limiter, router as auth_router  # noqa: E402
 from quant.api.auth.service import AuthService  # noqa: E402
-from quant.api.routers import backtest, inst, jobs, refdata  # noqa: E402
+from quant.api.routers import backtest, deployments, inst, jobs, refdata  # noqa: E402
 from quant.refdata.bundle import DataCaches  # noqa: E402
 from quant.refdata.publisher import RefDataPublisher  # noqa: E402
 
@@ -89,6 +89,7 @@ app.include_router(backtest.router, prefix="/api/v1", dependencies=[Depends(requ
 app.include_router(inst.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(jobs.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(refdata.router, prefix="/api/v1", dependencies=[Depends(require_user)])
+app.include_router(deployments.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 
 
 @app.get("/health")

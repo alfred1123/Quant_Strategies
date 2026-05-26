@@ -13,7 +13,8 @@ The `quant/api/` directory contains the FastAPI application that serves the back
 | **Backtest** | `/api/v1/backtest/*` | Sync optimize / performance / walk-forward |
 | **Backtest queue** | `/api/v1/backtest/jobs/*` | Async `BT.QUEUE` jobs |
 | **Shared config** | `/api/v1/refdata/*`, `/api/v1/inst/*` | Used by Backtest and Trade UIs |
-| **Trade (planned)** | `/api/v1/credentials/*`, `/api/v1/trade/*` | Credentials (1.1); deployments / apply / log (1.2+) |
+| **Trade — deployments** | `/api/v1/trade/deployments/*` | **Done** (Phase 1.2) |
+| **Trade — credentials** | `/api/v1/credentials/*` | Planned (Phase 1.1 API, 1.5 UI) |
 
 UI mode (`/backtest` vs `/trade`) does **not** change these URLs — each page calls the appropriate prefix.
 
@@ -55,7 +56,15 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `POST` | `/api/v1/backtest/jobs/{queue_id}/reenqueue` | Re-enqueue from a terminal row. |
 | `GET`  | `/api/v1/backtest/jobs/{queue_id}/events` | SSE stream of job progress events. |
 
-### Trade (planned — Phase 1.1+)
+### Trade (Phase 1.2 — deployments)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/trade/deployments` | Required | Create or re-apply a deployment. |
+| `GET` | `/api/v1/trade/deployments` | Required | List current deployments for the authenticated user. |
+| `GET` | `/api/v1/trade/deployments/{id}` | Required | One deployment (current version). |
+
+### Credentials (planned — Phase 1.1 API, 1.5 UI wiring)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -64,8 +73,6 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `POST` | `/api/v1/credentials` | Required | Save new broker API key pair. |
 | `PUT` | `/api/v1/credentials/{id}` | Required | Rotate keys. |
 | `DELETE` | `/api/v1/credentials/{id}` | Required | Revoke. |
-| `POST` | `/api/v1/trade/deployments` | Required | Apply strategy (1.2 skeleton). |
-| `GET` | `/api/v1/trade/deployments/{id}` | Required | Deployment status (1.2). |
 
 See [Plan to Profit §5.2](../design/plan-to-profit.md#52-api-url-layout).
 
@@ -148,6 +155,7 @@ quant/api/
 │   └── models.py        # Pydantic models (LoginRequest, etc.)
 ├── routers/
 │   ├── backtest.py      # /api/v1/backtest/* endpoints
+│   ├── deployments.py   # /api/v1/trade/deployments/* (Phase 1.2)
 │   ├── jobs.py          # /api/v1/backtest/jobs/* endpoints
 │   ├── refdata.py       # /api/v1/refdata/* endpoints
 │   └── inst.py          # /api/v1/inst/* endpoints
@@ -159,6 +167,7 @@ quant/api/
 
 quant/shared/config.py   # Settings, env/SSM loading (not under api/)
 quant/strategy/backtest_service.py  # Backtest orchestration (called from routers)
+quant/trade/service.py              # TradeService — deployments (Phase 1.2)
 ```
 
 REFDATA, INST, and BT cache classes live under `quant/refdata/` and `quant/data/` (shared between the API and the worker via `quant/refdata/bundle.py::DataCaches`). All Postgres access goes through `quant/shared/db.py::DbGateway` — no other module in `quant/` or `quant/api/` imports `psycopg`.

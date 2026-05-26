@@ -1,7 +1,7 @@
 # Design Doc: Strategy JSON → Trade API
 
 !!! info "Status"
-    **Proposed — not implemented.** A `FutuTrader` Python utility exists in `quant/trade.py` (see [Paper Trading guide](../guides/trading.md)). The full Strategy-JSON-to-Trade-API flow described here is the long-term direction; persistence, deployment endpoints, and the broker-adapter abstraction have not been built yet.
+    **Partially implemented (Phase 1.2).** Deployment persistence and `GET`/`POST /api/v1/trade/deployments` are live. Credentials API, Bybit adapter, dry-run, and execution-log writes are still planned. A `FutuTrader` utility exists in `quant/futu_trader.py` (see [Paper Trading guide](../guides/trading.md)).
 
 ## Overview
 
@@ -177,12 +177,19 @@ DELETE /api/v1/strategies/{id}           → Soft-delete (mark inactive)
 
 ### 2.2 Deployment (one-click deploy)
 
+**Implemented (Phase 1.2)** — mounted at `/api/v1/trade/deployments` (auth required):
+
 ```
-POST   /api/v1/deployments               → Deploy strategy (accepts DeploymentConfig JSON)
-GET    /api/v1/deployments               → List active deployments
-GET    /api/v1/deployments/{id}          → Deployment status + recent trades
-PATCH  /api/v1/deployments/{id}          → Update (e.g. toggle enabled, change qty)
-DELETE /api/v1/deployments/{id}          → Stop deployment
+POST   /api/v1/trade/deployments               → Create / re-apply deployment
+GET    /api/v1/trade/deployments               → List deployments for current user
+GET    /api/v1/trade/deployments/{id}          → One deployment (current version)
+```
+
+**Planned:**
+
+```
+PATCH  /api/v1/trade/deployments/{id}          → Update (e.g. toggle enabled, change qty)
+DELETE /api/v1/trade/deployments/{id}          → Stop deployment
 ```
 
 ### 2.3 Execution Log
@@ -302,7 +309,7 @@ class TradeAdapter:
 ```
 
 Current adapters:
-- `FutuAdapter` — wraps existing `FutuTrader` (HK/US equities)
+- `FutuAdapter` — wraps `FutuTradeGateway` (HK/US equities); see [Futu Trading — OOP Implementation](futu-trading.md)
 - `BybitAdapter` — future, resume from `backup/deco/bybit._trade.py` (crypto)
 
 ---
@@ -469,7 +476,7 @@ pass `window` and `signal` explicitly to `strategy_to_json(cfg, window=20, signa
 | 2 | `strategy_to_json()` + `backtest_results_to_json()` serializers in `strat.py` | Phase 1 (done) |
 | 3 | DB schema + migrations in `db/sql/` | Step 1 |
 | 4 | FastAPI Trade API service (separate `trade_api/` package) | Steps 1–3 |
-| 5 | `TradeAdapter` interface + `FutuAdapter` wrapping `FutuTrader` | Step 4 |
+| 5 | `TradeAdapter` interface + `FutuAdapter` | Step 4 — [Futu Trading design](futu-trading.md) |
 | 6 | Signal execution loop + scheduler | Steps 4–5 |
 | 7 | Risk checks module | Step 6 |
 | 8 | "Deploy" button in Streamlit/TS UI | Steps 2–7 |

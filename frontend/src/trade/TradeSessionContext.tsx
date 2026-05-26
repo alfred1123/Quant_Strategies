@@ -1,0 +1,131 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
+import type { AccountFilter, BrokerAccount, BrokerFilter, TradingMode } from '../types/credentials';
+import { ALL_ACCOUNTS, ALL_BROKERS } from '../types/credentials';
+import { useBrokerAccounts } from '../api/credentials';
+
+interface TradeSessionState {
+  brokerFilter: BrokerFilter;
+  accountFilter: AccountFilter;
+  tradingMode: TradingMode;
+  accounts: BrokerAccount[];
+  accountsLoading: boolean;
+  brokerOptions: { value: string; label: string }[];
+  accountOptions: { value: number; label: string; broker_name: string }[];
+  setBrokerFilter: (v: BrokerFilter) => void;
+  setAccountFilter: (v: AccountFilter) => void;
+  setTradingMode: (v: TradingMode) => void;
+  selectedAccount: BrokerAccount | null;
+}
+
+const TradeSessionContext = createContext<TradeSessionState | null>(null);
+
+export function TradeSessionProvider({ children }: { children: ReactNode }) {
+  const { data: accounts = [], isLoading: accountsLoading } = useBrokerAccounts();
+  const [brokerFilter, setBrokerFilterRaw] = useState<BrokerFilter>(ALL_BROKERS);
+  const [accountFilter, setAccountFilterRaw] = useState<AccountFilter>(ALL_ACCOUNTS);
+  const [tradingMode, setTradingMode] = useState<TradingMode>('paper');
+
+  const brokerOptions = useMemo(() => {
+    const names = [...new Set(accounts.map(a => a.broker_name))].sort();
+    return names.map(name => ({ value: name, label: name }));
+  }, [accounts]);
+
+  const accountOptions = useMemo(() => {
+    let list = accounts;
+    if (brokerFilter !== ALL_BROKERS) {
+      list = list.filter(a => a.broker_name === brokerFilter);
+    }
+    return list.map(a => ({
+      value: a.api_credential_id,
+      label: a.label,
+      broker_name: a.broker_name,
+    }));
+  }, [accounts, brokerFilter]);
+
+  const setBrokerFilter = useCallback(
+    (v: BrokerFilter) => {
+      setBrokerFilterRaw(v);
+      setAccountFilterRaw(ALL_ACCOUNTS);
+    },
+    [],
+  );
+
+  const setAccountFilter = useCallback((v: AccountFilter) => {
+    setAccountFilterRaw(v);
+  }, []);
+
+  const selectedAccount = useMemo(() => {
+    if (accountFilter === ALL_ACCOUNTS) return null;
+    return accounts.find(a => a.api_credential_id === accountFilter) ?? null;
+  }, [accounts, accountFilter]);
+
+  const value = useMemo(
+    (): TradeSessionState => ({
+      brokerFilter,
+      accountFilter,
+      tradingMode,
+      accounts,
+      accountsLoading,
+      brokerOptions,
+      accountOptions,
+      setBrokerFilter,
+      setAccountFilter,
+      setTradingMode,
+      selectedAccount,
+    }),
+    [
+      brokerFilter,
+      accountFilter,
+      tradingMode,
+      accounts,
+      accountsLoading,
+      brokerOptions,
+      accountOptions,
+      setBrokerFilter,
+      setAccountFilter,
+      selectedAccount,
+    ],
+  );
+
+  return (
+    <TradeSessionContext.Provider value={value}>{children}</TradeSessionContext.Provider>
+  );
+}
+
+export function useTradeSession(): TradeSessionState {
+  const ctx = useContext(TradeSessionContext);
+  if (!ctx) {
+    throw new Error('useTradeSession must be used within TradeSessionProvider');
+  }
+  return ctx;
+}
+
+/** Filter deployments / log rows by layout account + paper/live selection. */
+export function useTradeSessionFilters() {
+  const { accountFilter, tradingMode, brokerFilter, accounts } = useTradeSession();
+
+  const matchesSession = useCallback(
+    (row: { api_credential_id: number; is_paper_ind: 'Y' | 'N'; app_id?: number }) => {
+      if (accountFilter !== ALL_ACCOUNTS && row.api_credential_id !== accountFilter) {
+        return false;
+      }
+      if (brokerFilter !== ALL_BROKERS) {
+        const acct = accounts.find(a => a.api_credential_id === row.api_credential_id);
+        if (acct && acct.broker_name !== brokerFilter) return false;
+      }
+      const wantPaper = tradingMode === 'paper';
+      const rowPaper = row.is_paper_ind === 'Y';
+      return wantPaper === rowPaper;
+    },
+    [accountFilter, brokerFilter, tradingMode, accounts],
+  );
+
+  return { accountFilter, tradingMode, brokerFilter, matchesSession };
+}

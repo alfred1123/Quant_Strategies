@@ -35,10 +35,10 @@ Work **one subphase at a time** — finish exit criteria before starting the nex
 | [0.2](#phase-02--host-capacity) | Host capacity | done |
 | [0.3](#phase-03--deploy-topology-decision) | Deploy topology decision | done |
 | [1.1](#phase-11--user-secrets) | User secrets | — |
-| [1.2](#phase-12--trade-schema--apply-api) | Trade schema + apply API | — |
+| [1.2](#phase-12--trade-schema--apply-api) | Trade schema + apply API | done |
 | [1.3](#phase-13--bybit-adapter-dry-run) | Bybit adapter (dry run) | — |
-| [1.4](#phase-14--trade-ui-shell) | Trade UI shell | — |
-| [1.5](#phase-15--exchange-config-ui) | Exchange config UI | — |
+| [1.4](#phase-14--trade-ui-shell) | Trade UI shell | done |
+| [1.5](#phase-15--exchange-config-ui) | Exchange config UI | in progress |
 | [1.6](#phase-16--strategy-picker) | Strategy picker | — |
 | [1.7](#phase-17--live-apply) | Live apply | — |
 | [1.8](#phase-18--execution-log) | Execution log | — |
@@ -257,10 +257,10 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 
 **Tasks**
 
-- [ ] DDL: `TRADE.DEPLOYMENT`, `TRADE.EXECUTION_EVENT`, `TRADE.TRANSACTION` (per [Trade API](trade-api.md)). **No `TRADE.INTENT`** — signal computed in worker; see decision #38.
-- [ ] `TRADE.DEPLOYMENT` includes **`API_CREDENTIAL_ID INTEGER`** (points at current credential row via GET with `IS_CURRENT_IND='Y'`) — not a separate connection entity.
-- [ ] SP: create deployment linked to `BT.STRATEGY` id + `API_CREDENTIAL_ID`.
-- [ ] API: `POST` apply / `GET` deployment status (skeleton OK without exchange call).
+- [x] DDL: `TRADE.DEPLOYMENT`, `TRADE.EXECUTION_EVENT`, `TRADE.TRANSACTION` (per [Trade API](trade-api.md)). **No `TRADE.INTENT`** — signal computed in worker; see decision #38.
+- [x] `TRADE.DEPLOYMENT` includes **`API_CREDENTIAL_ID INTEGER`** (points at current credential row via GET with `IS_CURRENT_IND='Y'`) — not a separate connection entity.
+- [x] SP: create deployment linked to `BT.STRATEGY` id + `API_CREDENTIAL_ID`.
+- [x] API: `POST` apply / `GET` deployment status (skeleton OK without exchange call).
 
 **Exit criteria:** Deployment row persists with `strategy_id` and `api_credential_id`; status endpoint returns stored state.
 
@@ -292,11 +292,16 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 
 **Tasks**
 
-- [ ] Add **Trade** route (tab or path) with layout: sidebar + main + bottom-right panel placeholder.
-- [ ] Sidebar nav entries: **Config** | **Trade** (pages can be stubs).
-- [ ] Auth-gate same as Backtest.
+- [x] Add **Trade** route (`/trade/config`, `/trade/apply`) with layout: sidebar + main + bottom execution-log placeholder.
+- [x] Sidebar nav entries: **Config** | **Trade**.
+- [x] Auth-gate same as Backtest (`RequireAuth`).
+- [x] **Toolbar** (compact, not full-width): **Exchange** filter · **Account** filter · **Paper / Live** toggle — shared via `TradeSessionContext`.
+- [x] **Deployments table** on Trade page with Exchange + Account columns; rows filtered by toolbar selection.
+- [x] Wire `GET /api/v1/trade/deployments` via `useDeployments()` (TanStack Query).
 
-**Exit criteria:** Logged-in user navigates to Trade layout; sidebar switches between stub pages.
+**Exit criteria:** Logged-in user navigates to Trade layout; sidebar switches Config ↔ Trade; toolbar filters deployments; execution-log panel is a placeholder.
+
+**Result (2026-05-20):** `TradeLayout`, `TradeNavBar`, `TradeSessionContext`, `TradeConfigPage`, `TradeApplyPage` in `frontend/src/`. See [Frontend § Trade](../architecture/frontend.md#trade-ui-phase-14).
 
 ---
 
@@ -309,12 +314,18 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 
 **Tasks**
 
-- [ ] Config page: broker from **REFDATA.APP** dropdown (`app_id`), label, API key/secret → `/api/v1/credentials`.
-- [ ] Support **multiple accounts per broker** (list by `api_credential_id` + label).
-- [ ] Top-left **credential selector** (which saved account to use for apply) — not a separate “connection” entity.
-- [ ] Trade defaults (size, paper/live) deferred until columns exist on `TRADE.DEPLOYMENT` or credential.
+- [x] **Accounts table** on Config page: Exchange · Account · Mode (Paper/Live) · masked API key · Status — click row to set toolbar account filter (`BrokerAccountsTable`).
+- [x] **Multi-broker / multi-account** UX: toolbar **Exchange** + **Account** dropdowns filter deployments and highlight table rows (not one broker / one account).
+- [x] Compact **Add account** form (Exchange, label, paper toggle, API key/secret) — UI only, disabled until API exists.
+- [x] **Paper / Live** mode toggle in toolbar (filters deployments by `is_paper_ind`; apply buttons reflect mode).
+- [ ] Wire **REFDATA.APP** broker dropdown (`app_id`) on add form.
+- [ ] Wire `GET` / `POST` / `PUT` / `DELETE` → `/api/v1/credentials` (requires **1.1** backend).
+- [ ] Enable save, rotate, revoke actions in table.
+- [ ] Trade defaults (size, Telegram chat id) deferred until columns exist on `TRADE.DEPLOYMENT` or credential.
 
-**Exit criteria:** User saves Bybit credential in UI and reload sees masked keys; can pick among multiple accounts on the same broker.
+**Exit criteria:** User saves Bybit credential in UI and reload sees masked keys in the accounts table; can register **multiple accounts per broker** and filter Trade/deployments via toolbar.
+
+**In progress:** UI shell and `useBrokerAccounts()` stub (`[]` until 1.1 API). Types in `frontend/src/types/credentials.ts`.
 
 ---
 
@@ -628,46 +639,48 @@ Layouts below use a **12-column grid** mental model. Subphase tags show when eac
 
 #### Phase 1 MVP — Trade tab only (subphases 1.4 – 1.8)
 
-No top-level Backtest \| Trade split yet; Trade may live at `/trade` beside existing `/` backtest page.
+Routes: `/backtest` (default) and `/trade/config` | `/trade/apply`. App mode switch in header (Backtest \| Trade); full top nav tabs ship in **3.1**.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│  (existing app header / backtest link)                                       │
+│  Quant Strategies     [ Backtest ] [ Trade* ]                    user ▾     │
 ├──────────┬───────────────────────────────────────────────────────────────────┤
-│ SIDE     │  Account:  [ #1 Main (Bybit) ▾ ]                   (1.5)       │  ← top-left
+│ SIDE     │  Filter: [Exchange ▾] [Account ▾]  [ Paper | Live ]     (1.4)   │  ← compact toolbar
 │ 1.4      ├───────────────────────────────────────────────────────────────────┤
 │          │                                                                   │
-│ ● Config │   STRATEGY PICKER (1.6)                                           │
-│ ○ Trade  │   ┌─────────────────────────────────────────────────────────┐    │
-│          │   │ ○ bollinger_momentum_20_1.0    Sharpe 1.22              │    │
-│          │   │ ● rsi_reversion_14_30          Sharpe 0.98              │    │
-│          │   └─────────────────────────────────────────────────────────┘    │
-│          │                                                                   │
-│          │   [ Dry run ]    [ Apply live ]                    (1.7)        │
-│          │   ┌ dry-run report / errors ────────────────────────────────┐    │
-│          │   │ signals OK · size 0.01 BTC · mapped btc-usd.crypto      │    │
-│          │   └─────────────────────────────────────────────────────────┘    │
+│ ● Config │   (Config = accounts table + add form  OR  Trade = picker/apply)  │
+│ ○ Trade  │                                                                   │
+│          │   Trade page — DEPLOYMENTS TABLE (filtered by toolbar):           │
+│          │   ┌─────────┬─────────┬─────────┬──────────┬──────┬────────┬───┐ │
+│          │   │Exchange │ Account │ Product │ Strategy │ Mode │ Status │Qty│ │
+│          │   ├─────────┼─────────┼─────────┼──────────┼──────┼────────┼───┤ │
+│          │   │ Bybit   │ Main    │ btc…    │ boll…    │Paper │ ACTIVE │…  │ │
+│          │   └─────────┴─────────┴─────────┴──────────┴──────┴────────┴───┘ │
+│          │   [ Dry run ]  [ Apply paper/live ]  (1.7)                        │
 │          ├───────────────────────────────────────────────────────────────────┤
 │          │  EXECUTION LOG (1.8) — bottom panel                             │
 │          │  ┌────────┬──────────┬────────┬─────────┐                        │
 │          │  │ Time   │ Side     │ Qty    │ Status  │                        │
-│          │  ├────────┼──────────┼────────┼─────────┤                        │
-│          │  │ 10:01  │ BUY      │ 0.01   │ FILLED  │                        │
 │          │  └────────┴──────────┴────────┴─────────┘                        │
 └──────────┴───────────────────────────────────────────────────────────────────┘
 
-Config page (sidebar ● Config):
-┌────────────────────────────────────────┐
-│ Broker (REFDATA)  [ Bybit ▾       ]    │  (1.5 — app_id)
-│ Account label     [ Main          ]    │
-│ API key           [ •••••••••••• ]    │  (1.1 / 1.5 → /credentials)
-│ API secret        [ •••••••••••• ]    │
-│ Saved accounts    [ #1 Main ▾     ]    │  multiple per broker
-│ Default size      [ (later)      ]    │  → DEPLOYMENT columns
-│ Telegram chat id  [ (Phase 2.4)  ]    │
-│              [ Save ]                  │
-└────────────────────────────────────────┘
+Config page (sidebar ● Config) — multi-broker account registry (1.5):
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Exchange accounts                                                            │
+├──────────┬─────────┬──────┬────────────┬────────┬─────────┐                  │
+│ Exchange │ Account │ Mode │ API key    │ Status │ Actions │  ← click row     │
+├──────────┼─────────┼──────┼────────────┼────────┼─────────┤    sets toolbar│
+│ Bybit    │ Main    │ Paper│ ****1234   │ Active │ Revoke  │    account filter│
+│ Bybit    │ Sub     │ Live │ ****5678   │ Active │ Revoke  │                  │
+│ Futu     │ HK      │ Live │ ****9012   │ Active │ Revoke  │                  │
+└──────────┴─────────┴──────┴────────────┴────────┴─────────┘                  │
+│ Add account (compact row, ~160px fields — not full width):                   │
+│ [Exchange ▾] [Label] [Paper toggle]  [API key] [API secret]  [Save]          │
+│ → POST /api/v1/credentials when 1.1 + 1.5 wiring complete                    │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
+
+**Filter model:** Toolbar **Account** dropdown is a **filter** over the consolidated deployments (and accounts) table — “All exchanges” / “All accounts” show everything; narrowing Exchange then Account scopes Trade and Config row highlight. **Paper / Live** toggles which `is_paper_ind` rows appear.
 
 ---
 
@@ -718,20 +731,20 @@ flowchart LR
 
 #### Phase 3 target — Trade tab (1.x layout + 2.3 reconcile)
 
+Same compact toolbar as Phase 1 MVP; reconcile chart added top-right of main area.
+
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │  Quant Strategies          [ Backtest ]  [ Trade*]              user ▾       │
 ├──────────┬───────────────────────────────────────────────────────────────────┤
-│ SIDE     │  Account:  [ #1 Main (Bybit) ▾ ]   LIVE SHARPE / RECONCILE (2.3)  │
+│ SIDE     │  Filter: [Exchange ▾] [Account ▾] [Paper|Live]  RECONCILE (2.3)  │
 │          │                                     ┌─────────────────────────┐   │
 │ ● Config │                                     │ chart: live vs BT exp   │   │
 │ ○ Trade  │                                     │ last run: today 06:00   │   │
 │          ├────────────────────────────────────────┴─────────────────────────┤
-│          │  STRATEGY PICKER + [ Dry run ] [ Apply live ]                     │
-│          │  (same as Phase 1 MVP main)                                       │
+│          │  STRATEGY PICKER + deployments table + [ Dry run ] [ Apply ]      │
 │          ├───────────────────────────────────────────────────────────────────┤
-│          │  EXECUTION LOG                                                    │
-│          │  (transaction table — full width bottom)                          │
+│          │  EXECUTION LOG (transaction table — full width bottom)             │
 └──────────┴───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -776,8 +789,8 @@ Slides in from the right; Backtest page dims behind. Trade tab may deep-link her
 
 | Subphase | UI change |
 |----------|-----------|
-| **1.4** | Trade route + empty sidebar + panel placeholders |
-| **1.5** | Config form in sidebar |
+| **1.4** | Trade routes + sidebar + compact filter toolbar (Exchange / Account / Paper·Live) + deployments table + execution-log placeholder |
+| **1.5** | Config accounts table + compact add form; wire `/api/v1/credentials` |
 | **1.6** | Strategy picker in Trade main |
 | **1.7** | Dry-run report + Apply buttons |
 | **1.8** | Bottom execution log table |
@@ -821,9 +834,9 @@ flowchart TB
 |------|--------------|-----------|
 | Top bar | App title · **Backtest** \| **Trade** · user menu | Same |
 | Left column | Side nav: Strategies, Jobs, Leaderboard, Settings | Side nav: **Config**, **Trade** |
-| Top of main | — | Credential / account selector (left) |
-| Top-right of main | Best strategy banner | Live Sharpe / reconcile chart |
-| Main center | Configure, run, charts | Picker, dry-run, apply |
+| Below header | — | Compact toolbar: **Exchange** filter · **Account** filter · **Paper / Live** toggle |
+| Top-right of main | Best strategy banner | Live Sharpe / reconcile chart (Phase 2) |
+| Main center | Configure, run, charts | Config: **accounts table** + add form · Trade: picker, deployments table, dry-run, apply |
 | Bottom / right | Compact queue (+ Enlarge) | Execution log (full width bottom) |
 | Overlay | Enlarged jobs · detail drawer | Optional link to drawer |
 
@@ -861,20 +874,29 @@ Recommendation: start with **B** — matches mental model (strategy artifact vs 
 
 | Zone | Content |
 |------|---------|
-| **Side nav** | **Config** (broker + API credentials) · **Trade** (apply strategy) |
-| **Top left** | Credential selector (`api_credential_id` + label; broker via `APP_ID`) |
+| **Side nav** | **Config** (register broker accounts) · **Trade** (apply strategy) |
+| **Toolbar** | **Exchange** dropdown (~160px) · **Account** dropdown (~200px) · **Paper / Live** toggle — filters deployments and highlights Config table rows |
+| **Config main** | **Accounts table** (Exchange · Account · Mode · masked key · Status) + compact **Add account** form |
+| **Trade main** | Strategy picker (1.6) · deployments table (Exchange · Account · …) · Dry-run / Apply buttons |
 | **Top right** | Live Sharpe / reconcile series (Phase 2) |
-| **Main** | Dry-run → Apply (uses BT strategy in backend) |
-| **Bottom right** | Execution / transaction history |
+| **Bottom** | Execution / transaction history (Phase 1.8) |
+
+**Multi-broker model:**
+
+- Many rows in `CORE_ADMIN.API_CREDENTIAL` — distinct `API_CREDENTIAL_ID` per saved key pair; same user may have multiple accounts on the same `APP_ID` (exchange).
+- Toolbar **Account** filter scopes the deployments table (and Config row selection); “All accounts” shows every deployment matching Exchange + Paper/Live filters.
+- **Paper / Live** toggle filters by `is_paper_ind` on credentials and deployments — not a separate “connection” entity.
 
 **Flow:**
 
-1. User selects a saved **credential** (which broker account); limits detection = later.
-2. Optional **dry run** before live apply.
+1. User registers accounts on **Config** (table); selects filter via toolbar or by clicking a table row.
+2. On **Trade**, pick strategy (1.6) and optional **dry run** before live apply.
 3. Apply uses BT strategy + `TRADE.DEPLOYMENT` (holds `API_CREDENTIAL_ID`); **audit = `TRADE.EXECUTION_EVENT` + `TRADE.TRANSACTION`**, not connection history ([Decisions log](../decisions.md) #36).
 4. Errors → Telegram; refer strategy detail via Backtest/leaderboard when drill-down exists.
 
 **Bybit:** Reference implementation in `backup/deco/`; active experimentation in `quant/trade/`. Adapter pattern: `BybitAdapter` in [Trade API](trade-api.md).
+
+**Futu:** Prototype in `quant/futu_trader.py`; target architecture in [Futu Trading — OOP Implementation](futu-trading.md) (`FutuAdapter`, `FutuTradeGateway`, `AdapterRegistry`).
 
 ---
 
@@ -904,8 +926,9 @@ Align with [Login design](login.md) (`CORE_ADMIN.APP_USER`) and [Database](../ar
 | Backtest (sync) | `/api/v1/backtest/*` | done |
 | Backtest queue | `/api/v1/backtest/jobs/*` | done |
 | REFDATA / INST | `/api/v1/refdata/*`, `/api/v1/inst/*` | done (shared) |
-| Credentials | `/api/v1/credentials/*` | 1.1 |
-| Trade execution | `/api/v1/trade/*` (deployments, dry-run, log) | 1.2+ |
+| Credentials | `/api/v1/credentials/*` | 1.1 (API) · 1.5 (UI) |
+| Trade deployments | `/api/v1/trade/deployments/*` | **done** (1.2) |
+| Trade dry-run / log | `/api/v1/trade/*` (future) | 1.3+ |
 
 No backward-compat aliases — update all call sites when paths change (decision #37).
 
@@ -946,8 +969,8 @@ Required before first live apply per deployment:
 | **1.1** | `CORE_ADMIN.API_CREDENTIAL` + SPs + `/api/v1/credentials` (Fernet, `APP_ID`, soft-version) |
 | **1.2** | `TRADE.DEPLOYMENT` / `EXECUTION_EVENT` / `TRANSACTION` + apply endpoint (no `INTENT`) |
 | **1.3** | Bybit adapter dry-run |
-| **1.4** | Trade tab shell + sidebar routes |
-| **1.5** | Exchange config UI |
+| **1.4** | Trade tab shell + sidebar routes + multi-broker filter toolbar |
+| **1.5** | Exchange config UI (accounts table; API wiring pending 1.1) |
 | **1.6** | Strategy picker from BT (id/name) |
 | **1.7** | Live apply (dry-run → apply) |
 | **1.8** | Execution log UI + `TRADE.EXECUTION_EVENT` writes |
@@ -994,6 +1017,7 @@ Notes mentioned alternative profit paths (e.g. horse racing, Poisson/Bernoulli m
 | Doc | Relevance |
 |-----|-----------|
 | [Trade API](trade-api.md) | Strategy JSON, deployment, adapters, risk checks |
+| [Futu Trading (OOP)](futu-trading.md) | Futu adapter class design, OpenD, implementation phases |
 | [Backtest Queue](backtest-queue.md) | Queue states, worker, jobs API |
 | [Jobs Table Detail UX](jobs-table-detail-ux.md) | Drawer / `?job=` deep links |
 | [Database](../architecture/database.md) | `BT.*`, planned `TRADE.*` |

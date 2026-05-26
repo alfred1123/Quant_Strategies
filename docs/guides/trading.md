@@ -1,7 +1,7 @@
 # Paper Trading with Futu OpenD
 
 !!! note "Status"
-    The Futu paper-trading flow is currently a **Python-only utility** in `quant/trade.py`. It is **not exposed in the React SPA** at the moment. Use it from a Python shell, notebook, or script.
+    Futu trading is a **Python utility** today (`quant/futu_trader.py`). It is **not wired to the React Trade UI** yet. For the full OOP integration plan (adapters, worker, deployments), see **[Futu Trading — OOP Implementation](../design/futu-trading.md)**.
 
 ## Prerequisites
 
@@ -14,11 +14,13 @@
    FUTU_PORT=11111
    ```
 
+See also the [official Program Samples](https://openapi.futunn.com/futu-api-doc/en/quick/demo.html) (`OpenSecTradeContext`, `TrdEnv.SIMULATE`).
+
 ## From Python
 
 ```python
-# Run from the project root (the `quant` package is on the default PYTHONPATH there)
-from quant.trade import FutuTrader
+# Run from the project root
+from quant.futu_trader import FutuTrader
 
 with FutuTrader(paper=True) as trader:
     result = trader.place_order("US.AAPL", 10, "BUY")
@@ -40,14 +42,22 @@ Futu uses prefixed symbols:
 - HK equities: `HK.00700`
 - Crypto-like contracts vary by region — see Futu OpenD docs.
 
+Live deployments will map `internal_cusip` → Futu code via `INST.PRODUCT_XREF` (see [Futu Trading design](../design/futu-trading.md)).
+
 ## Tips
 
 !!! tip
-    Futu's paper trading environment simulates realistic fills during market hours. Outside trading hours, market orders will queue until the next session opens.
+    Futu's paper trading environment simulates realistic fills during market hours. Outside trading hours, market orders will queue until the next session opens. Community robots such as [futubot](https://github.com/quincylin1/futubot) often use **limit** orders in paper mode because market orders may not fill immediately.
 
 !!! warning
-    Live trading (`paper=False`) places real orders. Always confirm `paper=True` until you have explicitly tested the full pipeline end-to-end.
+    Live trading (`paper=False`) places real orders and requires `unlock(trade_password)`. Always confirm `paper=True` until you have explicitly tested the full pipeline end-to-end.
 
 ## Roadmap
 
-A trading panel may be added back to the React SPA in a future phase. Until then, this guide covers the supported entry point.
+| Phase | Deliverable |
+|-------|-------------|
+| A–B | `FutuAdapter` + `AdapterRegistry` under `quant/trade/brokers/futu/` |
+| C | Dry-run endpoint + `DeploymentExecutor` |
+| D–E | Config credentials, paper/live apply via Trade UI |
+
+Details: [Futu Trading — OOP Implementation](../design/futu-trading.md).
