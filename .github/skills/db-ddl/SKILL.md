@@ -40,7 +40,7 @@ db/liquidbase/
 │   └── API_REQUEST_PAYLOAD.sql
 ├── trade/tables/                  # TRADE schema DDL files
 │   ├── DEPLOYMENT.sql
-│   ├── LOG.sql
+│   ├── EXECUTION_EVENT.sql
 │   └── TRANSACTION.sql
 └── refdata/
     ├── tables/                    # REFDATA schema DDL files

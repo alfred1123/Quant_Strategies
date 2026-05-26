@@ -345,8 +345,10 @@ def execute_deployment(deployment, strategy):
         deployment.ticker, final_signal, deployment.qty
     )
 
-    # 6. Log
-    log_trade(deployment, strategy, final_signal, result)
+    # 6. Persist audit rows (no TRADE.INTENT — signal was in-memory for this tick)
+    log_execution_event(deployment, final_signal, result)  # TRADE.EXECUTION_EVENT
+    if result.filled:
+        log_transaction(deployment, result)                # TRADE.TRANSACTION
 ```
 
 ---
@@ -355,7 +357,7 @@ def execute_deployment(deployment, strategy):
 
 Database: **Quant**. Tables use `SCHEMA.TABLE` naming:
 - `BT.` — backtest artifacts and strategy definitions
-- `TRADE.` — live execution records
+- `TRADE.` — live execution records (`DEPLOYMENT`, `EXECUTION_EVENT`, `TRANSACTION` only — no `INTENT`; decision #38)
 - `REFDATA.` — reference/lookup data
 
 ```sql
@@ -402,18 +404,17 @@ CREATE TABLE TRADE.DEPLOYMENT (
     CREATED_AT       TIMESTAMPTZ
 );
 
-CREATE TABLE TRADE.LOG (
-    LOG_ID        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    DEPLOYMENT_ID UUID NOT NULL,
-    TIMESTAMP     TIMESTAMPTZ,
-    SIGNAL_VALUE  NUMERIC,
-    ACTION        TEXT,                   -- BUY, SELL, HOLD, REJECTED
-    QTY           INTEGER,
-    ORDER_ID      TEXT,
-    SUCCESS       CHAR(1),
-    MESSAGE       TEXT,
-    USER_ID       TEXT,
-    CREATED_AT    TIMESTAMPTZ
+CREATE TABLE TRADE.EXECUTION_EVENT (
+    EXECUTION_EVENT_ID  UUID PRIMARY KEY,
+    DEPLOYMENT_ID       UUID NOT NULL,
+    DEPLOYMENT_VID      INTEGER NOT NULL,
+    SIGNAL_VALUE        NUMERIC,
+    BUY_SELL_CD         TEXT NOT NULL,    -- BUY, SELL, HOLD, REJECTED
+    QUANTITY            NUMERIC,
+    VENDOR_ORDER_ID     TEXT,
+    IS_SUCCESS_IND      CHAR(1) NOT NULL,
+    USER_ID             TEXT NOT NULL,
+    CREATED_AT          TIMESTAMPTZ NOT NULL
 );
 
 -- ── REFDATA schema ──

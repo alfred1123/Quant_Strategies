@@ -9,7 +9,7 @@ The project uses **PostgreSQL 17** with Liquibase for schema management. Each sc
 | `CORE_ADMIN` | App users (`APP_USER`), proc audit log (`LOG_PROC_DETAIL`), exchange API credentials (`API_CREDENTIAL`) |
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, etc.) + `SP_GET_ENUM` procedure for cache loading |
 | `BT` | Backtest results (`STRATEGY`, `RESULT`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert procedures |
-| `TRADE` | Live trading tables (`DEPLOYMENT`, `LOG`, `TRANSACTION`) — procedures deferred |
+| `TRADE` | Live trading: `DEPLOYMENT`, `EXECUTION_EVENT`, `TRANSACTION` + SPs (no `INTENT` — decision #38) |
 | `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) — `REFDATA.TICKER_MAPPING` has been dropped |
 
 ## Conventions
@@ -77,7 +77,26 @@ Current operating model:
 
 PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, APP_ID)` allowed (multiple accounts on same broker).
 
-**No `TRADE.CONNECTION` table** — runtime broker sessions are ephemeral. Trade audit = `TRADE.LOG` / `TRADE.TRANSACTION`. `TRADE.DEPLOYMENT` (Phase 1.2) references `API_CREDENTIAL_ID` only.
+**No `TRADE.CONNECTION` table** — runtime broker sessions are ephemeral. Trade audit = `TRADE.EXECUTION_EVENT` + `TRADE.TRANSACTION`. `TRADE.DEPLOYMENT` (Phase 1.2) references `API_CREDENTIAL_ID` only. **No `TRADE.INTENT`** — current signal lives in the worker for one tick; see decision #38.
+
+### TRADE — live execution (Phase 1.2)
+
+| Table | Role |
+|-------|------|
+| `DEPLOYMENT` | Apply target: pinned strategy, credential, product, qty (soft-versioned via `DEPLOYMENT_VID` + `TRANSACT_FROM/TO`) |
+| `EXECUTION_EVENT` | Append-only submit / error diary |
+| `TRANSACTION` | Append-only broker-confirmed fills |
+
+**Not stored:** current signal / target position between ticks (`TRADE.INTENT` rejected — decision #38).
+
+| Procedure | Purpose |
+|-----------|---------|
+| `SP_INS_DEPLOYMENT` | Create or version deployment |
+| `SP_GET_DEPLOYMENT` | Read current or historical deployment (REFCURSOR) |
+| `SP_INS_EXECUTION_EVENT` | Append execution event |
+| `SP_INS_TRANSACTION` | Append fill row |
+
+Validation: Python `TradeRepo` before SP calls. See [Plan to Profit §1.2](../design/plan-to-profit.md#phase-12--trade-schema--apply-api).
 
 | Procedure | Purpose |
 |-----------|---------|
@@ -147,6 +166,10 @@ Active changelogs are empty manifests — see XML comments in each `db/liquidbas
 | `SP_INS_API_CREDENTIAL` | `CORE_ADMIN` | New exchange credential or rotate keys (soft-version) |
 | `SP_GET_API_CREDENTIAL` | `CORE_ADMIN` | List/get credentials for `APP_USER_ID` (REFCURSOR) |
 | `SP_UPD_API_CREDENTIAL_REVOKE` | `CORE_ADMIN` | Soft-version revoke |
+| `SP_INS_DEPLOYMENT` | `TRADE` | Create or version deployment |
+| `SP_GET_DEPLOYMENT` | `TRADE` | Read deployment rows (REFCURSOR) |
+| `SP_INS_EXECUTION_EVENT` | `TRADE` | Append execution event |
+| `SP_INS_TRANSACTION` | `TRADE` | Append fill row |
 
 ## Directory Layout
 

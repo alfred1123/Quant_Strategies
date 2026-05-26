@@ -179,7 +179,7 @@ flowchart TB
 | **Depends on** | Auth (`CORE_ADMIN.APP_USER`) |
 | **Blocks** | 1.3, 1.5, 1.7 |
 
-**Scope:** Per-user **exchange API keys** in `CORE_ADMIN` only. No `TRADE.CONNECTION` table — runtime sessions to Bybit are ephemeral; the audit trail you care about is **`TRADE.LOG` / `TRADE.TRANSACTION`** (Phase 1.8), not “which connection was opened.”
+**Scope:** Per-user **exchange API keys** in `CORE_ADMIN` only. No `TRADE.CONNECTION` table — runtime sessions to Bybit are ephemeral; the audit trail you care about is **`TRADE.EXECUTION_EVENT` / `TRADE.TRANSACTION`** (Phase 1.8), not “which connection was opened.”
 
 **Tasks**
 
@@ -257,7 +257,7 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 
 **Tasks**
 
-- [ ] DDL: `TRADE.DEPLOYMENT`, `TRADE.LOG` (per [Trade API](trade-api.md)).
+- [ ] DDL: `TRADE.DEPLOYMENT`, `TRADE.EXECUTION_EVENT`, `TRADE.TRANSACTION` (per [Trade API](trade-api.md)). **No `TRADE.INTENT`** — signal computed in worker; see decision #38.
 - [ ] `TRADE.DEPLOYMENT` includes **`API_CREDENTIAL_ID INTEGER`** (points at current credential row via GET with `IS_CURRENT_IND='Y'`) — not a separate connection entity.
 - [ ] SP: create deployment linked to `BT.STRATEGY` id + `API_CREDENTIAL_ID`.
 - [ ] API: `POST` apply / `GET` deployment status (skeleton OK without exchange call).
@@ -361,7 +361,7 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 
 **Tasks**
 
-- [ ] SP: append execution rows to `TRADE.LOG` on each order/fill event.
+- [ ] SP: append execution rows to `TRADE.EXECUTION_EVENT` on submit/error; fills to `TRADE.TRANSACTION`.
 - [ ] API: paginated transaction history per deployment.
 - [ ] UI: bottom-right panel lists recent executions with refresh.
 
@@ -383,7 +383,7 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 **Tasks**
 
 - [ ] Design table(s) for daily deployment snapshots (live Sharpe, cumulative return, vs backtest expectation).
-- [ ] Avoid full scan of `TRADE.LOG` / `BT.RESULT` each run — aggregate on write or nightly rollup.
+- [ ] Avoid full scan of `TRADE.EXECUTION_EVENT` / `BT.RESULT` each run — aggregate on write or nightly rollup.
 - [ ] SP: insert daily snapshot; SP/GET: series for chart.
 
 **Exit criteria:** Schema + procedures merged; manual insert of one test snapshot succeeds.
@@ -871,7 +871,7 @@ Recommendation: start with **B** — matches mental model (strategy artifact vs 
 
 1. User selects a saved **credential** (which broker account); limits detection = later.
 2. Optional **dry run** before live apply.
-3. Apply uses BT strategy + `TRADE.DEPLOYMENT` (holds `API_CREDENTIAL_ID`); **audit = `TRADE.LOG` / transactions**, not connection history ([Decisions log](../decisions.md) #36).
+3. Apply uses BT strategy + `TRADE.DEPLOYMENT` (holds `API_CREDENTIAL_ID`); **audit = `TRADE.EXECUTION_EVENT` + `TRADE.TRANSACTION`**, not connection history ([Decisions log](../decisions.md) #36).
 4. Errors → Telegram; refer strategy detail via Backtest/leaderboard when drill-down exists.
 
 **Bybit:** Reference implementation in `backup/deco/`; active experimentation in `quant/trade/`. Adapter pattern: `BybitAdapter` in [Trade API](trade-api.md).
@@ -890,7 +890,7 @@ Recommendation: start with **B** — matches mental model (strategy artifact vs 
 | Versioning | Soft-version (`API_CREDENTIAL_VID` + `IS_CURRENT_IND`); rotate keys = new VID; **no `UPDATED_AT`**; **no table IDENTITY** |
 | Encryption | Fernet in app before SP; `EXCHANGE_SECRETS_KEY` in SSM |
 | Writes | `CALL CORE_ADMIN.SP_*` only — no raw DML |
-| Audit | Credential SPs may use `CORE_INS_LOG_PROC`; **no connection entity or connection audit** — trade audit = `TRADE.LOG` / `TRANSACTION` |
+| Audit | Credential SPs may use `CORE_INS_LOG_PROC`; **no connection entity or connection audit** — trade audit = `TRADE.EXECUTION_EVENT` / `TRANSACTION` |
 | UI | Trade → Config sidebar (1.5); API `/api/v1/credentials` (1.1) |
 | App patterns | Reuse `require_user`, `DbGateway`, secret bootstrap — **not** JWT/Argon2 ([login.md §6.4](login.md#64-reuse-from-login--jwt-credential-api--phase-11)) |
 
@@ -944,13 +944,13 @@ Required before first live apply per deployment:
 | **0.2** | EC2 + Docker capacity snapshot |
 | **0.3** | ECR / separate-host decision → decisions log |
 | **1.1** | `CORE_ADMIN.API_CREDENTIAL` + SPs + `/api/v1/credentials` (Fernet, `APP_ID`, soft-version) |
-| **1.2** | `TRADE.DEPLOYMENT` / `TRADE.LOG` + apply endpoint |
+| **1.2** | `TRADE.DEPLOYMENT` / `EXECUTION_EVENT` / `TRANSACTION` + apply endpoint (no `INTENT`) |
 | **1.3** | Bybit adapter dry-run |
 | **1.4** | Trade tab shell + sidebar routes |
 | **1.5** | Exchange config UI |
 | **1.6** | Strategy picker from BT (id/name) |
 | **1.7** | Live apply (dry-run → apply) |
-| **1.8** | Execution log UI + `TRADE.LOG` writes |
+| **1.8** | Execution log UI + `TRADE.EXECUTION_EVENT` writes |
 | **2.1** | Reconcile snapshot schema + SP |
 | **2.2** | Daily Sharpe reconcile job |
 | **2.3** | Reconcile chart (Trade top-right) |

@@ -27,7 +27,7 @@ db/syncddl/
     tables/STRATEGY.sql, RESULT.sql, ...
     procedures/SP_INS_STRATEGY.sql, ...
   trade/
-    tables/DEPLOYMENT.sql, LOG.sql, TRANSACTION.sql
+    tables/DEPLOYMENT.sql, EXECUTION_EVENT.sql, TRANSACTION.sql
   core_admin/
     tables/LOG_PROC_DETAIL.sql
     procedures/CORE_INS_LOG_PROC.sql

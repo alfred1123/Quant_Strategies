@@ -138,7 +138,7 @@ Separate from login passwords. Stores **broker API key + secret** per app user, 
 
 No `USER_ID` audit column (same rule as `APP_USER`). No `UPDATED_AT` — new row per version. Full spec: [Plan to Profit §1.1](plan-to-profit.md#phase-11--user-secrets), decision #36.
 
-**Not stored here:** trade execution history (`TRADE.LOG` / `TRANSACTION`), deployment state (`TRADE.DEPLOYMENT`), or ephemeral broker “connections.”
+**Not stored here:** trade execution history (`TRADE.EXECUTION_EVENT` / `TRANSACTION`), deployment state (`TRADE.DEPLOYMENT`), or ephemeral broker “connections.”
 
 ### 6.4 Reuse from login / JWT (credential API — Phase 1.1)
 

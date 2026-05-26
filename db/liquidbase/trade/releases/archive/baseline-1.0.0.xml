@@ -21,9 +21,9 @@
         <rollback><sql>DROP TABLE IF EXISTS TRADE.DEPLOYMENT;</sql></rollback>
     </changeSet>
 
-    <changeSet logicalFilePath="trade-changelog.xml" id="301-trade-log" author="alfcheun" context="trade" runOnChange="false">
-        <sqlFile path="../tables/LOG.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
-        <rollback><sql>DROP TABLE IF EXISTS TRADE.LOG;</sql></rollback>
+    <changeSet logicalFilePath="trade-changelog.xml" id="301-trade-execution-event" author="alfcheun" context="trade" runOnChange="false">
+        <sqlFile path="../tables/EXECUTION_EVENT.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS TRADE.EXECUTION_EVENT;</sql></rollback>
     </changeSet>
 
     <changeSet logicalFilePath="trade-changelog.xml" id="302-trade-transaction" author="alfcheun" context="trade" runOnChange="false">
