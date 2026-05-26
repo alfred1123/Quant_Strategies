@@ -19,7 +19,4 @@
            <include file="releases/X.Y.Z-name.xml" relativeToChangelogFile="true"/>
     -->
 
-    <include file="releases/1.2.0-trade-tables.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.2.1-trade-procedures.xml" relativeToChangelogFile="true"/>
-
 </databaseChangeLog>

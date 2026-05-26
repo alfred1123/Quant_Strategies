@@ -31,11 +31,17 @@ ensure_prereqs() {
 }
 
 load_env() {
+  local _db_target_override="${DB_TARGET:-}"
+
   if [[ -f "${ROOT_DIR}/.env" ]]; then
     set -a
     # shellcheck disable=SC1091
     source "${ROOT_DIR}/.env"
     set +a
+  fi
+
+  if [[ -n "${_db_target_override}" ]]; then
+    export DB_TARGET="${_db_target_override}"
   fi
 
   if [[ "${USE_SSM:-}" == "1" ]]; then

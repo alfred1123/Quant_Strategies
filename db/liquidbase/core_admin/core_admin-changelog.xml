@@ -22,6 +22,4 @@
          (runOnChange=true) in a core_admin release file.
     -->
 
-    <include file="releases/1.1.0-api-credential.xml" relativeToChangelogFile="true"/>
-
 </databaseChangeLog>
