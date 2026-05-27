@@ -1,0 +1,21 @@
+{
+  "commands": [
+    "set -euo pipefail",
+    "export HOME=/root",
+    "export AWS_REGION=ap-southeast-1",
+    "git config --global --add safe.directory /opt/quant",
+    "cd /opt/quant",
+    "COMPOSE='docker compose -f docker-compose.yml -f docker-compose.prod.yml'",
+    "echo '── before ──'",
+    "$COMPOSE ps || true",
+    "if [ -f aws/scripts/ec2-deploy.sh ]; then",
+    "  bash aws/scripts/ec2-deploy.sh",
+    "else",
+    "  echo 'ec2-deploy.sh missing — compose restart only'",
+    "  $COMPOSE restart",
+    "  sleep 5",
+    "  curl -sf http://127.0.0.1:8000/health/ready && echo ' API ready' || echo ' API not ready'",
+    "  $COMPOSE ps",
+    "fi"
+  ]
+}
