@@ -1,0 +1,5 @@
+aws ssm start-session \
+--target i-026d3c6d323144663 \
+--document-name AWS-StartPortForwardingSessionToRemoteHost \
+--parameters '{"host":["quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com"],"portNumber":["5432"],"localPortNumber":["5433"]}' \
+--profile loki99-art
