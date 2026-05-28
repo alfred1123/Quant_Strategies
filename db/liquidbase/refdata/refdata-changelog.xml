@@ -22,5 +22,6 @@
     -->
 
     <include file="releases/1.2.0-app-is-exchange.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.2.1-app-binance.xml"    relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

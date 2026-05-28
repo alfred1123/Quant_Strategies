@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   CircularProgress,
@@ -16,12 +17,42 @@ import {
 import BrokerAccountsTable from '../../components/trade/BrokerAccountsTable';
 import { useTradeSession } from '../../trade/TradeSessionContext';
 import { useExchangeApps } from '../../api/refdata';
+import { useCreateCredential } from '../../api/credentials';
 
-/** Phase 1.4 / 1.5 — multi-broker account registry + compact add form. */
 export default function TradeConfigPage() {
   const { accounts, accountsLoading, accountFilter, setAccountFilter } = useTradeSession();
   const { data: exchangeApps = [], isLoading: appsLoading } = useExchangeApps();
-  const [selectedExchange, setSelectedExchange] = useState<string>('');
+  const createCredential = useCreateCredential();
+
+  const [appId, setAppId] = useState<number | ''>('');
+  const [label, setLabel] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [apiSecret, setApiSecret] = useState('');
+  const [isPaper, setIsPaper] = useState(true);
+
+  const canSubmit =
+    appId !== '' && label.trim().length > 0 && apiKey.trim().length > 0 && apiSecret.trim().length > 0;
+
+  const handleSave = () => {
+    if (!canSubmit) return;
+    createCredential.mutate(
+      {
+        app_id: appId as number,
+        label: `${label.trim()}${isPaper ? ' (paper)' : ''}`,
+        api_key: apiKey.trim(),
+        api_secret: apiSecret.trim(),
+      },
+      {
+        onSuccess: () => {
+          setAppId('');
+          setLabel('');
+          setApiKey('');
+          setApiSecret('');
+          setIsPaper(true);
+        },
+      },
+    );
+  };
 
   return (
     <Stack spacing={3}>
@@ -47,9 +78,17 @@ export default function TradeConfigPage() {
         <Typography variant="subtitle1" gutterBottom>
           Add account
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Saves to <code>/api/v1/credentials</code> (Phase 1.5).
-        </Typography>
+
+        {createCredential.isError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {(createCredential.error as Error)?.message || 'Failed to save account'}
+          </Alert>
+        )}
+        {createCredential.isSuccess && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            Account saved successfully.
+          </Alert>
+        )}
 
         <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', maxWidth: 720 }}>
           <FormControl size="small" sx={{ width: 160 }} disabled={appsLoading}>
@@ -57,8 +96,8 @@ export default function TradeConfigPage() {
             <Select
               labelId="add-broker"
               label="Exchange"
-              value={selectedExchange}
-              onChange={e => setSelectedExchange(e.target.value)}
+              value={appId}
+              onChange={e => setAppId(e.target.value as number)}
             >
               {appsLoading && (
                 <MenuItem value="" disabled>
@@ -66,7 +105,7 @@ export default function TradeConfigPage() {
                 </MenuItem>
               )}
               {exchangeApps.map(app => (
-                <MenuItem key={app.app_id} value={app.name}>
+                <MenuItem key={app.app_id} value={app.app_id}>
                   {app.display_name}
                 </MenuItem>
               ))}
@@ -79,11 +118,12 @@ export default function TradeConfigPage() {
             size="small"
             label="Account label"
             placeholder="Main"
-            disabled
+            value={label}
+            onChange={e => setLabel(e.target.value)}
             sx={{ width: 160 }}
           />
           <FormControlLabel
-            control={<Switch disabled defaultChecked />}
+            control={<Switch checked={isPaper} onChange={e => setIsPaper(e.target.checked)} />}
             label="Paper / testnet"
           />
         </Stack>
@@ -92,22 +132,27 @@ export default function TradeConfigPage() {
             size="small"
             label="API key"
             type="password"
-            placeholder="••••••••"
-            disabled
+            value={apiKey}
+            onChange={e => setApiKey(e.target.value)}
             sx={{ width: 220 }}
           />
           <TextField
             size="small"
             label="API secret"
             type="password"
-            placeholder="••••••••"
-            disabled
+            value={apiSecret}
+            onChange={e => setApiSecret(e.target.value)}
             sx={{ width: 220 }}
           />
         </Stack>
         <Box sx={{ mt: 2 }}>
-          <Button variant="contained" size="small" disabled>
-            Save account
+          <Button
+            variant="contained"
+            size="small"
+            disabled={!canSubmit || createCredential.isPending}
+            onClick={handleSave}
+          >
+            {createCredential.isPending ? 'Saving…' : 'Save account'}
           </Button>
         </Box>
       </Box>

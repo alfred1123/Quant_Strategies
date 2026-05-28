@@ -69,7 +69,7 @@ export default function TradeNavBar() {
           <MenuItem value={ALL_ACCOUNTS}>All accounts</MenuItem>
           {accountOptions.map(o => (
             <MenuItem key={o.value} value={o.value}>
-              {o.broker_name} · {o.label}
+              {o.brokerLabel} · {o.label}
             </MenuItem>
           ))}
         </Select>

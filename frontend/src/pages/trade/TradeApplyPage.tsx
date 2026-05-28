@@ -22,19 +22,20 @@ import { ALL_ACCOUNTS } from '../../types/credentials';
 function accountLabel(
   apiCredentialId: number,
   appId: number,
-  accounts: { api_credential_id: number; broker_name: string; label: string; app_id: number }[],
+  accounts: { api_credential_id: number; app_id: number; label: string }[],
+  appNameById: Map<number, string>,
 ): { exchange: string; account: string } {
   const acct = accounts.find(a => a.api_credential_id === apiCredentialId);
   if (acct) {
-    return { exchange: acct.broker_name, account: acct.label };
+    return { exchange: appNameById.get(acct.app_id) ?? `App ${acct.app_id}`, account: acct.label };
   }
-  return { exchange: `app ${appId}`, account: `#${apiCredentialId}` };
+  return { exchange: appNameById.get(appId) ?? `App ${appId}`, account: `#${apiCredentialId}` };
 }
 
 /** Phase 1.4 shell + 1.2 deployments filtered by exchange / account / paper-live. */
 export default function TradeApplyPage() {
   const { data: deployments, isLoading, isError, error } = useDeployments();
-  const { accounts, tradingMode, accountFilter, brokerFilter } = useTradeSession();
+  const { accounts, tradingMode, accountFilter, brokerFilter, appNameById } = useTradeSession();
   const { matchesSession, credentialsNotLoaded } = useTradeSessionFilters();
 
   const filtered = useMemo(
@@ -138,6 +139,7 @@ export default function TradeApplyPage() {
                     row.api_credential_id,
                     row.app_id,
                     accounts,
+                    appNameById,
                   );
                   return (
                     <TableRow key={`${row.deployment_id}-${row.deployment_vid}`}>

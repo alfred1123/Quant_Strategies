@@ -183,15 +183,15 @@ flowchart TB
 
 **Tasks**
 
-- [ ] DDL: `CORE_ADMIN.API_CREDENTIAL` (soft-versioned; see below).
-- [ ] REFDATA: seed `bybit` row in `REFDATA.APP` (broker identified by `APP_ID`, not free-text exchange).
-- [ ] SPs: insert (new account / rotate keys) / get / revoke — **no raw DML** from Python.
-- [ ] App-layer Fernet encryption before `SP_INS_*`; key from SSM `EXCHANGE_SECRETS_KEY`.
-- [ ] API: `/api/v1/credentials` — masked read, write, rotate, revoke (never log or return full secrets).
-- [ ] Security review: multi-user prod does not store per-user exchange keys in `.env`.
-- [ ] Security: prod boot **fail-fast** without `EXCHANGE_SECRETS_KEY` (mirror `JWT_SECRET` — never reuse it).
-- [ ] Security: API response schemas exclude ciphertext columns; unit test GET never returns `*_CIPHERTEXT`.
-- [ ] Security: rate-limit `POST`/`PUT` `/api/v1/credentials` (same pattern as login — see [login.md §11.2](login.md#112-rate-limiting-defense-in-depth)).
+- [x] DDL: `CORE_ADMIN.API_CREDENTIAL` (soft-versioned; see below).
+- [x] REFDATA: seed `bybit` row in `REFDATA.APP` (broker identified by `APP_ID`, not free-text exchange).
+- [x] SPs: insert (new account / rotate keys) / get / revoke — **no raw DML** from Python.
+- [x] App-layer Fernet encryption before `SP_INS_*`; key from SSM `EXCHANGE_SECRETS_KEY`.
+- [x] API: `/api/v1/credentials` — masked read, write, rotate, revoke (never log or return full secrets).
+- [x] Security review: multi-user prod does not store per-user exchange keys in `.env`.
+- [x] Security: prod boot **fail-fast** without `EXCHANGE_SECRETS_KEY` (mirror `JWT_SECRET` — never reuse it).
+- [x] Security: API response schemas exclude ciphertext columns; unit test GET never returns `*_CIPHERTEXT`.
+- [x] Security: rate-limit `POST`/`PUT` `/api/v1/credentials` (same pattern as login — see [login.md §11.2](login.md#112-rate-limiting-defense-in-depth)).
 
 **Data model — `CORE_ADMIN.API_CREDENTIAL`**
 

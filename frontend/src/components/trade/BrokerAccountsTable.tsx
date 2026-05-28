@@ -10,6 +10,8 @@ import {
   Typography,
 } from '@mui/material';
 import type { BrokerAccount } from '../../types/credentials';
+import { useApps } from '../../api/refdata';
+import { useMemo } from 'react';
 
 interface BrokerAccountsTableProps {
   accounts: BrokerAccount[];
@@ -27,6 +29,14 @@ export default function BrokerAccountsTable({
   onSelectAccount,
   showActions = false,
 }: BrokerAccountsTableProps) {
+  const { data: apps = [] } = useApps();
+
+  const appNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const a of apps) map.set(a.app_id, a.display_name);
+    return map;
+  }, [apps]);
+
   return (
     <TableContainer component={Paper} variant="outlined">
       <Table size="small">
@@ -34,7 +44,6 @@ export default function BrokerAccountsTable({
           <TableRow>
             <TableCell>Exchange</TableCell>
             <TableCell>Account</TableCell>
-            <TableCell>Mode</TableCell>
             <TableCell>API key</TableCell>
             <TableCell>Status</TableCell>
             {showActions && <TableCell align="right">Actions</TableCell>}
@@ -43,7 +52,7 @@ export default function BrokerAccountsTable({
         <TableBody>
           {!loading && accounts.length === 0 && (
             <TableRow>
-              <TableCell colSpan={showActions ? 6 : 5}>
+              <TableCell colSpan={showActions ? 5 : 4}>
                 <Typography variant="body2" color="text.secondary">
                   No broker accounts registered yet. Add one below (Phase 1.5).
                 </Typography>
@@ -66,19 +75,16 @@ export default function BrokerAccountsTable({
                 }
                 sx={onSelectAccount ? { cursor: 'pointer' } : undefined}
               >
-                <TableCell>{row.broker_name}</TableCell>
+                <TableCell>{appNameById.get(row.app_id) ?? `App ${row.app_id}`}</TableCell>
                 <TableCell>{row.label}</TableCell>
+                <TableCell>{row.api_key_masked}</TableCell>
                 <TableCell>
                   <Chip
                     size="small"
-                    label={row.is_paper_ind === 'Y' ? 'Paper' : 'Live'}
-                    color={row.is_paper_ind === 'Y' ? 'default' : 'warning'}
+                    label={row.is_active_ind === 'Y' ? 'Active' : 'Inactive'}
+                    color={row.is_active_ind === 'Y' ? 'success' : 'default'}
                     variant="outlined"
                   />
-                </TableCell>
-                <TableCell>{row.api_key_masked}</TableCell>
-                <TableCell>
-                  {row.is_active_ind === 'Y' ? 'Active' : 'Inactive'}
                 </TableCell>
                 {showActions && (
                   <TableCell align="right">

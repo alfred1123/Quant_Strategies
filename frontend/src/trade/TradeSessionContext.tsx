@@ -9,6 +9,7 @@ import {
 import type { AccountFilter, BrokerAccount, BrokerFilter, TradingMode } from '../types/credentials';
 import { ALL_ACCOUNTS, ALL_BROKERS } from '../types/credentials';
 import { useBrokerAccounts } from '../api/credentials';
+import { useApps } from '../api/refdata';
 
 interface TradeSessionState {
   brokerFilter: BrokerFilter;
@@ -17,37 +18,46 @@ interface TradeSessionState {
   accounts: BrokerAccount[];
   accountsLoading: boolean;
   brokerOptions: { value: string; label: string }[];
-  accountOptions: { value: number; label: string; broker_name: string }[];
+  accountOptions: { value: number; label: string; brokerLabel: string }[];
   setBrokerFilter: (v: BrokerFilter) => void;
   setAccountFilter: (v: AccountFilter) => void;
   setTradingMode: (v: TradingMode) => void;
   selectedAccount: BrokerAccount | null;
+  /** REFDATA display_name lookup by app_id */
+  appNameById: Map<number, string>;
 }
 
 const TradeSessionContext = createContext<TradeSessionState | null>(null);
 
 export function TradeSessionProvider({ children }: { children: ReactNode }) {
   const { data: accounts = [], isLoading: accountsLoading } = useBrokerAccounts();
+  const { data: apps = [] } = useApps();
   const [brokerFilter, setBrokerFilterRaw] = useState<BrokerFilter>(ALL_BROKERS);
   const [accountFilter, setAccountFilterRaw] = useState<AccountFilter>(ALL_ACCOUNTS);
   const [tradingMode, setTradingMode] = useState<TradingMode>('paper');
 
+  const appNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const a of apps) map.set(a.app_id, a.display_name);
+    return map;
+  }, [apps]);
+
   const brokerOptions = useMemo(() => {
-    const names = [...new Set(accounts.map(a => a.broker_name))].sort();
+    const names = [...new Set(accounts.map(a => appNameById.get(a.app_id) ?? `App ${a.app_id}`))].sort();
     return names.map(name => ({ value: name, label: name }));
-  }, [accounts]);
+  }, [accounts, appNameById]);
 
   const accountOptions = useMemo(() => {
     let list = accounts;
     if (brokerFilter !== ALL_BROKERS) {
-      list = list.filter(a => a.broker_name === brokerFilter);
+      list = list.filter(a => (appNameById.get(a.app_id) ?? `App ${a.app_id}`) === brokerFilter);
     }
     return list.map(a => ({
       value: a.api_credential_id,
       label: a.label,
-      broker_name: a.broker_name,
+      brokerLabel: appNameById.get(a.app_id) ?? `App ${a.app_id}`,
     }));
-  }, [accounts, brokerFilter]);
+  }, [accounts, brokerFilter, appNameById]);
 
   const setBrokerFilter = useCallback(
     (v: BrokerFilter) => {
@@ -79,6 +89,7 @@ export function TradeSessionProvider({ children }: { children: ReactNode }) {
       setAccountFilter,
       setTradingMode,
       selectedAccount,
+      appNameById,
     }),
     [
       brokerFilter,
@@ -91,6 +102,7 @@ export function TradeSessionProvider({ children }: { children: ReactNode }) {
       setBrokerFilter,
       setAccountFilter,
       selectedAccount,
+      appNameById,
     ],
   );
 
@@ -109,7 +121,7 @@ export function useTradeSession(): TradeSessionState {
 
 /** Filter deployments / log rows by layout account + paper/live selection. */
 export function useTradeSessionFilters() {
-  const { accountFilter, tradingMode, brokerFilter, accounts } = useTradeSession();
+  const { accountFilter, tradingMode, brokerFilter, accounts, appNameById } = useTradeSession();
 
   const accountsByCredId = useMemo(() => {
     const map = new Map<number, BrokerAccount>();
@@ -125,13 +137,14 @@ export function useTradeSessionFilters() {
       if (brokerFilter !== ALL_BROKERS) {
         const acct = accountsByCredId.get(row.api_credential_id);
         if (!acct) return false;
-        if (acct.broker_name !== brokerFilter) return false;
+        const brokerName = appNameById.get(acct.app_id) ?? `App ${acct.app_id}`;
+        if (brokerName !== brokerFilter) return false;
       }
       const wantPaper = tradingMode === 'paper';
       const rowPaper = row.is_paper_ind === 'Y';
       return wantPaper === rowPaper;
     },
-    [accountFilter, brokerFilter, tradingMode, accountsByCredId],
+    [accountFilter, brokerFilter, tradingMode, accountsByCredId, appNameById],
   );
 
   /** True when the credential lookup table is empty — filters may be inaccurate. */

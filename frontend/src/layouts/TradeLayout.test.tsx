@@ -31,6 +31,7 @@ vi.mock('../api/credentials', () => ({
 
 vi.mock('../api/refdata', () => ({
   useExchangeApps: vi.fn(),
+  useApps: vi.fn(),
 }));
 
 function TradeRoutes() {
@@ -61,11 +62,17 @@ describe('TradeLayout', () => {
       isLoading: false,
       isError: false,
     } as unknown as ReturnType<typeof credentialsModule.useBrokerAccounts>);
+    const appRows = [
+      { app_id: 1, name: 'yahoo', display_name: 'Yahoo Finance', class_name: 'Yahoo', is_exchange_ind: 'N' as const, description: null },
+      { app_id: 2, name: 'bybit', display_name: 'Bybit', class_name: 'Bybit', is_exchange_ind: 'Y' as const, description: null },
+      { app_id: 3, name: 'futu', display_name: 'Futu OpenD', class_name: 'FutuOpenD', is_exchange_ind: 'Y' as const, description: null },
+    ];
+    vi.mocked(refdataModule.useApps).mockReturnValue({
+      data: appRows,
+      isLoading: false,
+    } as unknown as ReturnType<typeof refdataModule.useApps>);
     vi.mocked(refdataModule.useExchangeApps).mockReturnValue({
-      data: [
-        { app_id: 2, name: 'bybit', display_name: 'Bybit', class_name: 'Bybit', is_exchange_ind: 'Y' as const, description: null },
-        { app_id: 3, name: 'futu', display_name: 'Futu OpenD', class_name: 'FutuOpenD', is_exchange_ind: 'Y' as const, description: null },
-      ],
+      data: appRows.filter(a => a.is_exchange_ind === 'Y'),
       isLoading: false,
     } as unknown as ReturnType<typeof refdataModule.useExchangeApps>);
   });
