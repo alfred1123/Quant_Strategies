@@ -48,3 +48,14 @@ export const useApps = () =>
     queryFn: () => fetchTable<AppRow>('app'),
     staleTime: Infinity,
   });
+
+/** Only apps that are brokers/exchanges (IS_EXCHANGE_IND = 'Y'). */
+export const useExchangeApps = () =>
+  useQuery({
+    queryKey: ['refdata', 'app', 'exchange'],
+    queryFn: async () => {
+      const all = await fetchTable<AppRow>('app');
+      return all.filter(a => a.is_exchange_ind === 'Y');
+    },
+    staleTime: Infinity,
+  });

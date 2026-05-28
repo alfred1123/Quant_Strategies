@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import {
   Box,
   Button,
+  CircularProgress,
   FormControl,
   FormControlLabel,
   InputLabel,
@@ -13,9 +15,13 @@ import {
 } from '@mui/material';
 import BrokerAccountsTable from '../../components/trade/BrokerAccountsTable';
 import { useTradeSession } from '../../trade/TradeSessionContext';
+import { useExchangeApps } from '../../api/refdata';
+
 /** Phase 1.4 / 1.5 — multi-broker account registry + compact add form. */
 export default function TradeConfigPage() {
   const { accounts, accountsLoading, accountFilter, setAccountFilter } = useTradeSession();
+  const { data: exchangeApps = [], isLoading: appsLoading } = useExchangeApps();
+  const [selectedExchange, setSelectedExchange] = useState<string>('');
 
   return (
     <Stack spacing={3}>
@@ -42,15 +48,31 @@ export default function TradeConfigPage() {
           Add account
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Saves to <code>/api/v1/credentials</code> in Phase 1.5.
+          Saves to <code>/api/v1/credentials</code> (Phase 1.5).
         </Typography>
 
         <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', maxWidth: 720 }}>
-          <FormControl size="small" sx={{ width: 160 }} disabled>
+          <FormControl size="small" sx={{ width: 160 }} disabled={appsLoading}>
             <InputLabel id="add-broker">Exchange</InputLabel>
-            <Select labelId="add-broker" label="Exchange" value="bybit">
-              <MenuItem value="bybit">Bybit</MenuItem>
-              <MenuItem value="futu">Futu</MenuItem>
+            <Select
+              labelId="add-broker"
+              label="Exchange"
+              value={selectedExchange}
+              onChange={e => setSelectedExchange(e.target.value)}
+            >
+              {appsLoading && (
+                <MenuItem value="" disabled>
+                  <CircularProgress size={16} sx={{ mr: 1 }} /> Loading…
+                </MenuItem>
+              )}
+              {exchangeApps.map(app => (
+                <MenuItem key={app.app_id} value={app.name}>
+                  {app.display_name}
+                </MenuItem>
+              ))}
+              {!appsLoading && exchangeApps.length === 0 && (
+                <MenuItem value="" disabled>No exchanges configured</MenuItem>
+              )}
             </Select>
           </FormControl>
           <TextField

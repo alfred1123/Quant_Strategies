@@ -35,7 +35,7 @@ function accountLabel(
 export default function TradeApplyPage() {
   const { data: deployments, isLoading, isError, error } = useDeployments();
   const { accounts, tradingMode, accountFilter, brokerFilter } = useTradeSession();
-  const { matchesSession } = useTradeSessionFilters();
+  const { matchesSession, credentialsNotLoaded } = useTradeSessionFilters();
 
   const filtered = useMemo(
     () => (deployments ?? []).filter(matchesSession),
@@ -92,6 +92,12 @@ export default function TradeApplyPage() {
             {filterHint}
           </Typography>
         </Stack>
+        {credentialsNotLoaded && brokerFilter !== 'all' && (
+          <Alert severity="warning" sx={{ mb: 1 }}>
+            No broker accounts loaded — exchange filter may hide valid deployments.
+            Register accounts in Config first.
+          </Alert>
+        )}
         {isLoading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
             <CircularProgress size={28} />

@@ -9,6 +9,7 @@ import { renderWithProviders } from '../test/wrapper';
 import * as authModule from '../api/auth';
 import * as tradeModule from '../api/trade';
 import * as credentialsModule from '../api/credentials';
+import * as refdataModule from '../api/refdata';
 
 vi.mock('../api/auth', () => ({
   ME_QUERY_KEY: ['auth', 'me'],
@@ -26,6 +27,10 @@ vi.mock('../api/trade', () => ({
 vi.mock('../api/credentials', () => ({
   CREDENTIALS_QUERY_KEY: ['credentials'],
   useBrokerAccounts: vi.fn(),
+}));
+
+vi.mock('../api/refdata', () => ({
+  useExchangeApps: vi.fn(),
 }));
 
 function TradeRoutes() {
@@ -56,6 +61,13 @@ describe('TradeLayout', () => {
       isLoading: false,
       isError: false,
     } as unknown as ReturnType<typeof credentialsModule.useBrokerAccounts>);
+    vi.mocked(refdataModule.useExchangeApps).mockReturnValue({
+      data: [
+        { app_id: 2, name: 'bybit', display_name: 'Bybit', class_name: 'Bybit', is_exchange_ind: 'Y' as const, description: null },
+        { app_id: 3, name: 'futu', display_name: 'Futu OpenD', class_name: 'FutuOpenD', is_exchange_ind: 'Y' as const, description: null },
+      ],
+      isLoading: false,
+    } as unknown as ReturnType<typeof refdataModule.useExchangeApps>);
   });
 
   it('shows accounts table on Config', () => {

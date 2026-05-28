@@ -5,7 +5,7 @@
 
 set -uo pipefail
 
-TARGET_INSTANCE="i-0eed954c1f7e028e8"
+TARGET_INSTANCE="i-026d3c6d323144663"
 RDS_HOST="quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com"
 REMOTE_PORT="5432"
 LOCAL_PORT="5433"

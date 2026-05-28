@@ -111,21 +111,31 @@ export function useTradeSession(): TradeSessionState {
 export function useTradeSessionFilters() {
   const { accountFilter, tradingMode, brokerFilter, accounts } = useTradeSession();
 
+  const accountsByCredId = useMemo(() => {
+    const map = new Map<number, BrokerAccount>();
+    for (const a of accounts) map.set(a.api_credential_id, a);
+    return map;
+  }, [accounts]);
+
   const matchesSession = useCallback(
     (row: { api_credential_id: number; is_paper_ind: 'Y' | 'N'; app_id?: number }) => {
       if (accountFilter !== ALL_ACCOUNTS && row.api_credential_id !== accountFilter) {
         return false;
       }
       if (brokerFilter !== ALL_BROKERS) {
-        const acct = accounts.find(a => a.api_credential_id === row.api_credential_id);
-        if (acct && acct.broker_name !== brokerFilter) return false;
+        const acct = accountsByCredId.get(row.api_credential_id);
+        if (!acct) return false;
+        if (acct.broker_name !== brokerFilter) return false;
       }
       const wantPaper = tradingMode === 'paper';
       const rowPaper = row.is_paper_ind === 'Y';
       return wantPaper === rowPaper;
     },
-    [accountFilter, brokerFilter, tradingMode, accounts],
+    [accountFilter, brokerFilter, tradingMode, accountsByCredId],
   );
 
-  return { accountFilter, tradingMode, brokerFilter, matchesSession };
+  /** True when the credential lookup table is empty — filters may be inaccurate. */
+  const credentialsNotLoaded = accounts.length === 0;
+
+  return { accountFilter, tradingMode, brokerFilter, matchesSession, credentialsNotLoaded };
 }
