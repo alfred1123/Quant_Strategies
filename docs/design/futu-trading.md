@@ -343,9 +343,9 @@ Futu differs from Bybit: authentication is **OpenD session + trade password**, n
 | `API_SECRET_CIPHERTEXT` | Fernet-encrypted **trade password** (live unlock) |
 | `IS_PAPER_IND` | `Y` = always `TrdEnv.SIMULATE` |
 
-OpenD host/port remain **infrastructure** (`.env` / SSM on trade worker host), not per-user credential rows — unless you run OpenD per user (unlikely).
+OpenD host/port remain **infrastructure** (`.env` / SSM on trade worker host), not per-user credential rows — unless you run multiple OpenD instances (§11–§12).
 
-**Decision to log:** extend Phase 1.1 credential schema doc vs add `CONFIG_JSON` on credential for broker-specific fields (`acc_id`, `security_firm`). Record in [decisions.md](../decisions.md) when chosen.
+**Decision to log:** extend Phase 1.1 credential schema doc vs add `CONFIG_JSON` on credential for broker-specific fields (`gateway_id`, `acc_id`, `security_firm`). Record in [decisions.md](../decisions.md) when chosen.
 
 ---
 
@@ -493,7 +493,343 @@ Prod: OpenD runs on trade worker EC2; API container talks to OpenD via host netw
 
 ---
 
-## 10. Comparison: futubot vs this design
+## 10. OpenD security on EC2
+
+Futu OpenD requires a **login password** in its config (often `FutuOpenD.xml`). That is an OpenD limitation — you cannot eliminate it — but you **can** keep the blast radius small by treating OpenD as **host infrastructure**, not as a public API.
+
+### 10.1 Two secrets — do not conflate
+
+| Secret | Purpose | Who consumes it | Where it lives |
+|--------|---------|-----------------|----------------|
+| **OpenD login password** | OpenD process logs into Futu on startup | OpenD daemon on EC2 | SSM → file on host at deploy (see §10.4) |
+| **Trade unlock password** | Live orders only (`unlock_trade`) | `FutuAdapter` at apply time | `CORE_ADMIN.API_CREDENTIAL` (Fernet) — see §4 |
+
+Paper trading (`TrdEnv.SIMULATE`) does **not** need the trade unlock password. The React Trade UI and `/api/v1/credentials` never return full secrets — only masked fields.
+
+### 10.2 Network topology (prod)
+
+OpenD listens on **`127.0.0.1:11111` only**. Port **11111 is never opened** in the EC2 security group (only 22 / 80 / 443 today — see `aws/cfn/01-network.yml`).
+
+```mermaid
+flowchart TB
+  subgraph internet["Internet"]
+    User["Browser / API clients"]
+  end
+
+  subgraph ec2["quant-server EC2"]
+    subgraph public["Public-facing"]
+      Nginx["nginx :443"]
+    end
+
+    subgraph docker["Docker Compose"]
+      API["api"]
+      Worker["worker"]
+      Trade["trade worker (future)"]
+    end
+
+    subgraph host["Host — not in ECR image"]
+      OpenD["Futu OpenD\n127.0.0.1:11111"]
+      PwdFile["/etc/futu/login.pwd\nchmod 600"]
+    end
+
+    User -->|"HTTPS only"| Nginx
+    Nginx --> API
+    API --> Worker
+    Trade -->|"TCP loopback"| OpenD
+    Worker -.->|"quotes optional"| OpenD
+    OpenD --> PwdFile
+  end
+
+  subgraph futu["Futu"]
+    FutuCloud["Futu servers"]
+  end
+
+  OpenD --> FutuCloud
+
+  style OpenD fill:#fef3c7
+  style PwdFile fill:#fee2e2
+```
+
+**Rule:** If traffic is not from `127.0.0.1` on the same box, it must not reach OpenD.
+
+### 10.3 Secret flow at deploy and runtime
+
+```mermaid
+sequenceDiagram
+  participant SSM as SSM Parameter Store
+  participant EC2 as EC2 host / user-data
+  participant OpenD as Futu OpenD
+  participant App as trade worker / FutuAdapter
+  participant DB as PostgreSQL
+  participant Futu as Futu cloud
+
+  Note over SSM,OpenD: Boot / deploy (infrastructure)
+  SSM->>EC2: FUTU_OPEND_LOGIN_PWD (SecureString)
+  EC2->>EC2: write /etc/futu/login.pwd (600)
+  EC2->>OpenD: start with pwd file or generated XML
+  OpenD->>Futu: login session
+
+  Note over App,DB: Live apply tick (per user, Phase 1.7)
+  App->>DB: SP_GET_API_CREDENTIAL (Fernet blob)
+  App->>App: decrypt trade password (EXCHANGE_SECRETS_KEY)
+  App->>OpenD: unlock_trade(password) — memory only
+  App->>OpenD: place_order (TrdEnv.REAL)
+  OpenD->>Futu: order
+```
+
+**Never:** commit `FutuOpenD.xml` with passwords, bake secrets into Docker images, or put login/trade passwords in Liquibase.
+
+### 10.4 Host bootstrap (recommended)
+
+| Step | Action |
+|------|--------|
+| 1 | Store OpenD login password in SSM: `/quant/prod/FUTU_OPEND_LOGIN_PWD` (SecureString) |
+| 2 | On EC2 boot or deploy script, fetch SSM and write `/etc/futu/login.pwd` with `chmod 600`, owner `root` |
+| 3 | Start OpenD bound to `127.0.0.1` — prefer **`--login-pwd-file`** ([futu-opend-rs](https://futuapi.com/en/tutorials/cheatsheet/)) or Docker secrets over inline XML plaintext when possible |
+| 4 | App containers use existing SSM params `FUTU_HOST=127.0.0.1`, `FUTU_PORT=11111` (already in [infrastructure.md](../architecture/infrastructure.md)) |
+| 5 | Per-user trade password via Phase 1.1 credentials API → Fernet → `SP_INS_API_CREDENTIAL` |
+
+Optional headless path: [timontr/docker-futuopend](https://github.com/timontr/docker-futuopend) or `futu-opend-rs` with `--login-pwd-file` mounted read-only — still **no** public port 11111.
+
+### 10.5 Dev access without exposing prod
+
+Use **SSM port forward** (same pattern as Aurora `:5433`), not a security-group rule on 11111:
+
+```bash
+aws ssm start-session --target i-<instance-id> \
+  --document-name AWS-StartPortForwardingSession \
+  --parameters '{"portNumber":["11111"],"localPortNumber":["11111"]}'
+```
+
+Then locally: `FUTU_HOST=127.0.0.1` `FUTU_PORT=11111` — tunnels to prod OpenD on loopback.
+
+### 10.6 Security checklist
+
+| ✓ | Control |
+|---|---------|
+| ☐ | OpenD binds `127.0.0.1` only — not `0.0.0.0` |
+| ☐ | EC2 SG has **no** ingress on port 11111 |
+| ☐ | Login password in SSM SecureString — not in git / `.env` on prod / ECR |
+| ☐ | `/etc/futu/*` mode `600`, root-owned |
+| ☐ | Trade password in DB (Fernet) — passed to `unlock_trade()` only, never logged |
+| ☐ | Paper deployments skip unlock (`IS_PAPER_IND='Y'`) |
+| ☐ | EC2 admin via SSM Session Manager — restrict SSH CIDR in prod |
+| ☐ | EBS encryption enabled on instance volume (default on modern AMIs) |
+
+### 10.7 What we explicitly avoid
+
+- Publishing OpenD on the EC2 public IP or EIP
+- Storing OpenD login password in `CORE_ADMIN.API_CREDENTIAL` (wrong lifecycle — it's infra, not per-user)
+- Running OpenD inside the same container image as the FastAPI app (secrets in image layers)
+- Using `FUTU_HOST=0.0.0.0` or opening 11111 “just for testing” on prod
+
+---
+
+## 11. Multi-user & multiple Futu logins
+
+OpenD is **not** like Bybit REST: one OpenD process holds **one Futu brokerage login**. Port `11111` is the TCP endpoint for **that** login — not one port per app user.
+
+### 11.1 Clients vs logins
+
+| Question | Answer |
+|----------|--------|
+| Can many API/worker clients connect to the same `:11111`? | **Yes** — normal; OpenD accepts multiple SDK connections. |
+| Can two different **Futu logins** share one `:11111`? | **No** — need separate OpenD processes (different ports or Docker service names). |
+| Can two app users share one OpenD if they use the **same** Futu login? | **Yes** — v1 default; isolate by `APP_USER_ID` in Postgres. |
+| Can one login have multiple **sub-accounts** (`acc_id`)? | **Yes** — one OpenD; route via `CONFIG_JSON` on credential (see §4). |
+
+### 11.2 Scenarios
+
+```mermaid
+flowchart TB
+  subgraph s1["Scenario A — v1 default"]
+    U1["User A"] --> App1["api / trade worker"]
+    U2["User B"] --> App1
+    App1 --> OD1["OpenD :11111\none Futu login"]
+  end
+
+  subgraph s2["Scenario B — sub-accounts"]
+    C1["credential HK\nacc_id=1"] --> OD2["OpenD :11111"]
+    C2["credential US\nacc_id=2"] --> OD2
+  end
+
+  subgraph s3["Scenario C — multiple logins"]
+    C3["credential Alice\ngateway_id=alice"] --> ODA["OpenD Alice\n:11111"]
+    C4["credential Bob\ngateway_id=bob"] --> ODB["OpenD Bob\n:11112"]
+  end
+```
+
+| Scenario | OpenD count | Port model |
+|----------|-------------|------------|
+| A — same Futu login, multiple app users | 1 | Single `127.0.0.1:11111` (§10) |
+| B — same login, multiple sub-accounts | 1 | Same port; `acc_id` on orders |
+| C — different Futu logins | 1 per login | `:11111`, `:11112`, … or Docker DNS (§12) |
+
+### 11.3 Routing when login ≠ global `FUTU_PORT`
+
+Today `FUTU_HOST` / `FUTU_PORT` are **global** (one login). For scenario C, store gateway info on the credential (or a registry table):
+
+| Field | Example | Purpose |
+|-------|---------|---------|
+| `CONFIG_JSON` | `{"gateway_id": "bob", "acc_id": "…"}` | Pick OpenD instance + sub-account |
+| `API_SECRET_CIPHERTEXT` | Fernet blob | **Trade unlock** password (live only) |
+
+`FutuAdapter` resolves `gateway_id` → `(host, port)` before opening `OpenSecTradeContext`. OpenD **login** passwords remain infra (SSM per gateway — §10.4, §12.3).
+
+**Do not build** a custom TCP proxy on `:11111` to multiplex logins — Futu uses a proprietary SDK protocol; a home-grown router is high effort with no official support.
+
+---
+
+## 12. Dedicated gateway EC2, Docker & consolidation
+
+When scenario C is required (2+ unrelated Futu logins), prefer a **dedicated gateway host** over many host ports on `quant-server`.
+
+### 12.1 Why Docker helps
+
+On the **host**, only one process may bind `:11111`. Inside **Docker**, each container has its own network namespace — every OpenD container can listen on **internal** `:11111`:
+
+```yaml
+# docker-compose on futu-gateway EC2 (conceptual)
+services:
+  opend-alice:
+    image: ghcr.io/futuleaf/futu-opend-rs:...
+    networks: [opend-net]
+    expose: ["11111"]
+    secrets: [alice_login_pwd]
+
+  opend-bob:
+    image: ghcr.io/futuleaf/futu-opend-rs:...
+    networks: [opend-net]
+    expose: ["11111"]          # same port number — no conflict inside Docker
+    secrets: [bob_login_pwd]
+```
+
+Clients on `opend-net` connect to `opend-alice:11111` vs `opend-bob:11111` — **Docker DNS**, not one shared hostname.
+
+Host publish (only if a process outside the compose network must connect):
+
+```yaml
+ports:
+  - "11111:11111"   # alice
+  - "11112:11111"   # bob — host port differs; container still 11111
+```
+
+Prefer **`futu-opend-rs`** or [timontr/docker-futuopend](https://github.com/timontr/docker-futuopend) with `--login-pwd-file` — not XML baked into images.
+
+### 12.2 Recommended topology — co-locate trade worker
+
+**Better than** opening `11111–11199` from `quant-server` → gateway: run the **`trade` worker on the gateway EC2** in the same compose network as OpenD.
+
+```mermaid
+flowchart TB
+  subgraph app_ec2["quant-server EC2"]
+    API["api / nginx"]
+    BW["backtest worker"]
+  end
+
+  subgraph gw_ec2["futu-gateway EC2 — private subnet, no public IP"]
+    subgraph compose["Docker Compose"]
+      TW["trade worker"]
+      A["opend-alice:11111"]
+      B["opend-bob:11111"]
+    end
+  end
+
+  DB["PostgreSQL / Aurora"]
+  Futu["Futu cloud"]
+
+  API --> DB
+  BW --> DB
+  TW --> DB
+  TW -->|"Docker DNS"| A
+  TW -->|"Docker DNS"| B
+  A --> Futu
+  B --> Futu
+```
+
+- Worker claims deployment ticks from Postgres (same pattern as `quant.queue.worker_loop`).
+- Connects via **`opend-{gateway_id}:11111`** — always port 11111 inside Docker.
+- API never talks to OpenD directly; no cross-VPC OpenD port range.
+
+**Security group:** only gateway EC2 needs ingress from app SG on **Postgres path** (via Aurora SG); OpenD ports stay **inside** gateway EC2 (not exposed to VPC unless you deliberately publish host ports).
+
+### 12.3 Gateway registry (consolidation layer)
+
+Consolidate **routing metadata** in one place — not one physical TCP port for all logins.
+
+| `gateway_id` | `host` | `port` or `docker_service` | SSM login pwd |
+|--------------|--------|----------------------------|---------------|
+| `alice` | `10.0.1.50` | `11111` or `opend-alice:11111` | `/quant/prod/futu-gw/alice/login` |
+| `bob` | `10.0.1.50` | `11112` or `opend-bob:11111` | `/quant/prod/futu-gw/bob/login` |
+
+Storage options (pick one when implementing scenario C):
+
+- **`REFDATA.OPEND_GATEWAY`** table (admin-managed), or
+- **`CONFIG_JSON`** on `CORE_ADMIN.API_CREDENTIAL` for small scale, or
+- SSM JSON blob for ≤3 gateways (dev only).
+
+App code: `registry.resolve(gateway_id)` → connection params; developers think in **`gateway_id`**, not raw ports.
+
+### 12.4 Deployment patterns compared
+
+| Pattern | When | Pros | Cons |
+|---------|------|------|------|
+| **One OpenD on `quant-server`** (§10) | v1 / M1, single login | Simplest | One Futu login only |
+| **Gateway EC2 + Docker + co-located trade worker** (§12.2) | 2–5 trusted logins | Docker DNS; isolation from app box | Ops: N containers, N SSM secrets |
+| **One EC2 per Futu login** | Untrusted tenants | Strong blast-radius isolation | Cost; Phase 3.7 × N |
+| **TCP proxy on :11111** | — | — | **Avoid** — no official multiplexer |
+
+---
+
+## 13. Broker strategy & when to scale Futu
+
+North star in [Plan to Profit](plan-to-profit.md): **Bybit live** with per-user REST keys. Futu OpenD is a **local gateway** — a poor fit for self-serve multi-tenant SaaS compared to Bybit.
+
+### 13.1 Recommended broker split (M1)
+
+| Broker | Role | Multi-user model |
+|--------|------|------------------|
+| **Bybit** | Primary live candidate | `API_CREDENTIAL` per user (Phase 1.1) — normal SaaS |
+| **Futu** | HK/US paper + house account | **One login**, one OpenD (§10) until product requires more |
+
+**Do not** build multi-OpenD infrastructure before Phase 1.7 works for a **single** Futu login and Bybit credentials API is live.
+
+### 13.2 Decision tree
+
+```mermaid
+flowchart TD
+  Q["Need multiple unrelated Futu logins in prod?"]
+  Q -->|No| V1["One OpenD on quant-server §10\nShip Bybit multi-user"]
+  Q -->|Yes, ≤5 trusted| GW["Gateway EC2 + Docker §12\ntrade worker co-located\ngateway registry"]
+  Q -->|Yes, many untrusted| BY["Prefer Bybit per user\nOR one EC2 per Futu login"]
+```
+
+### 13.3 Phased path
+
+| Phase | Futu infra | Product |
+|-------|------------|---------|
+| **Now (v1)** | Single OpenD `127.0.0.1:11111`; Phase A–C adapter | Futu = admin/house account; paper first |
+| **Parallel** | — | Phase 1.1 credentials + Bybit dry-run (real multi-user) |
+| **Login #2 required** | Gateway EC2 + compose + `gateway_id` registry | Futu credential UI admin-gated |
+| **Many tenants** | Per-tenant EC2 or **no Futu per tenant** | Bybit for SaaS; Futu optional add-on |
+
+### 13.4 Explicitly defer or avoid
+
+| Idea | Why |
+|------|-----|
+| Tunnel each user's home OpenD to EC2 | Fragile; not prod |
+| GUI OpenD + VNC on EC2 | Ops burden |
+| Share one Futu login across unrelated users | Audit / legal / execution risk |
+| Multi-login Futu platform before Bybit live | Wrong M1 priority |
+| Custom `:11111` TCP consolidator | Reimplements OpenD routing |
+
+### 13.5 UI implication
+
+Until gateway registry exists, Trade → Config should treat **Futu as “connected brokerage (admin)”** — not imply every user gets their own Futu login. Per-user multi-broker UX (toolbar filters) still applies for **deployments and labels** under shared or Bybit credentials.
+
+---
+
+## 14. Comparison: futubot vs this design
 
 | futubot | Quant Strategies |
 |---------|------------------|
@@ -506,21 +842,22 @@ Prod: OpenD runs on trade worker EC2; API container talks to OpenD via host netw
 
 ---
 
-## 11. Open Decisions
+## 15. Open Decisions
 
 | # | Question | Options |
 |---|----------|---------|
-| 1 | Futu credential shape in `API_CREDENTIAL` | Trade password only vs `CONFIG_JSON` with `acc_id` |
-| 2 | OpenD on EC2 | Desktop GUI vs Docker OpenD vs SSH tunnel from dev |
-| 3 | Paper order type default | Limit-at-last vs market-with-fallback |
-| 4 | Short selling | `apply_signal(-1)` — US/HK margin rules; may restrict to long-only v1 |
-| 5 | Legacy `quant/trade/trade.py` | Delete vs move to `backup/deco/` |
+| 1 | Futu credential shape in `API_CREDENTIAL` | Trade password + `CONFIG_JSON` with `gateway_id`, `acc_id` — see §11.3 |
+| 2 | OpenD on EC2 | **v1 decided:** same EC2, loopback only, SSM login pwd — §10. **Multi-login:** gateway EC2 + Docker + co-located trade worker — §12. Open item: C++ GUI vs `futu-opend-rs` |
+| 3 | Multi-tenant Futu | **Deferred:** Bybit for SaaS multi-user; Futu house account v1 — §13 |
+| 4 | Paper order type default | Limit-at-last vs market-with-fallback |
+| 5 | Short selling | `apply_signal(-1)` — US/HK margin rules; may restrict to long-only v1 |
+| 6 | Legacy `quant/trade/trade.py` | Delete vs move to `backup/deco/` |
 
 Record resolutions in [decisions.md](../decisions.md).
 
 ---
 
-## 12. Related Docs
+## 16. Related Docs
 
 | Doc | Relevance |
 |-----|-----------|
@@ -532,7 +869,7 @@ Record resolutions in [decisions.md](../decisions.md).
 
 ---
 
-## 13. Success Criteria
+## 17. Success Criteria
 
 **Futu trade is “enabled” when:**
 
