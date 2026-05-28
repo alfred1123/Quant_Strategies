@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 
 from quant.trade import FutuTrader, OrderResult
 
+
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 
 _has_futu = bool(os.getenv("FUTU_HOST")) and bool(os.getenv("FUTU_PORT"))

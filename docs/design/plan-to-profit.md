@@ -189,6 +189,9 @@ flowchart TB
 - [ ] App-layer Fernet encryption before `SP_INS_*`; key from SSM `EXCHANGE_SECRETS_KEY`.
 - [ ] API: `/api/v1/credentials` — masked read, write, rotate, revoke (never log or return full secrets).
 - [ ] Security review: multi-user prod does not store per-user exchange keys in `.env`.
+- [ ] Security: prod boot **fail-fast** without `EXCHANGE_SECRETS_KEY` (mirror `JWT_SECRET` — never reuse it).
+- [ ] Security: API response schemas exclude ciphertext columns; unit test GET never returns `*_CIPHERTEXT`.
+- [ ] Security: rate-limit `POST`/`PUT` `/api/v1/credentials` (same pattern as login — see [login.md §11.2](login.md#112-rate-limiting-defense-in-depth)).
 
 **Data model — `CORE_ADMIN.API_CREDENTIAL`**
 
@@ -244,7 +247,7 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 - `CONFIG_JSON` or trade-default columns (add on `TRADE.DEPLOYMENT` or credential when needed)
 - Bybit validation (1.3), Config UI (1.5)
 
-**Exit criteria:** Test user saves Bybit keys (`app_id` from REFDATA) via API; GET returns masked credential; rotate bumps `API_CREDENTIAL_VID`; revoke sets inactive; second account on same exchange gets a new `API_CREDENTIAL_ID`.
+**Exit criteria:** Test user saves Bybit keys (`app_id` from REFDATA) via API; GET returns masked credential; rotate bumps `API_CREDENTIAL_VID`; revoke sets inactive; second account on same exchange gets a new `API_CREDENTIAL_ID`. **Security:** prod refuses to start without `EXCHANGE_SECRETS_KEY`; GET/POST responses never include `*_CIPHERTEXT`; cross-user credential id returns **404** (not 403); `POST`/`PUT` credentials are rate-limited.
 
 ---
 
@@ -358,8 +361,12 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 - [ ] UI: Dry-run button → show report; Apply button → confirm live.
 - [ ] Backend: apply uses BT strategy config + deployment record + Bybit live path.
 - [ ] Error responses surfaced in UI (Telegram deferred to 2.4).
+- [ ] Security: server enforces `is_paper_ind` — UI Paper/Live toggle is **not** an auth boundary (see [§5.5](#55-auth--security-guardrails)).
+- [ ] Security: live apply requires prior dry-run + explicit confirm payload; reject `is_paper_ind='N'` without both.
+- [ ] Security: deployment create validates strategy **ownership** (`BT.STRATEGY` user matches `CurrentUser`).
+- [ ] Security: `PATCH` deployment kill switch (`is_enabled_ind`) before first live apply (see [Trade API §4](trade-api.md#4-risk--safety)).
 
-**Exit criteria:** **M1 — Pipeline** met: one real (or testnet) live apply completes end-to-end for Bollinger strategy.
+**Exit criteria:** **M1 — Pipeline** met: one real (or testnet) live apply completes end-to-end for Bollinger strategy. **Security:** backend rejects live apply without dry-run + confirm; paper/live cannot be bypassed via raw API; caller cannot deploy another user's strategy; deployment can be disabled via PATCH without DB access.
 
 ---
 
@@ -932,7 +939,7 @@ Align with [Login design](login.md) (`CORE_ADMIN.APP_USER`) and [Database](../ar
 
 No backward-compat aliases — update all call sites when paths change (decision #37).
 
-### 5.2 Error handling & observability
+### 5.3 Error handling & observability
 
 | Signal | Channel |
 |--------|---------|
@@ -940,11 +947,57 @@ No backward-compat aliases — update all call sites when paths change (decision
 | Healthy steady state | No Telegram noise |
 | Process / host health | Heartbeat or external monitor — TBD |
 
-### 5.3 Dry run
+### 5.4 Dry run
 
 Required before first live apply per deployment:
 
 - Validate credentials, symbol mapping (`INST.PRODUCT_XREF`), position sizing, and signal path without placing orders (or exchange paper mode if available).
+
+### 5.5 Auth & security guardrails
+
+Cross-cutting rules from the [login](login.md) / trade security review (2026-05-28). Phase-specific exit criteria in [§1.1](#phase-11--user-secrets) and [§1.7](#phase-17--live-apply).
+
+#### Reuse login plumbing — not login crypto
+
+| Reuse | Do not reuse |
+|-------|----------------|
+| `require_user`, `DbGateway` / repo + `CALL SP_*`, SSM secret bootstrap, never log secrets, ownership scoping (`APP_USER_ID`), Pydantic input strip, **404** for cross-user resource ids | JWT/Argon2/`SESSION_GEN`, decrypted-key cache, timing-attack dummy verify |
+
+Full table: [login.md §6.4](login.md#64-reuse-from-login--jwt-credential-api--phase-11).
+
+#### Authorization model (v1)
+
+| Topic | v1 behaviour | When to revisit |
+|-------|--------------|-----------------|
+| RBAC | **None** — any logged-in user can save credentials, create deployments, and (1.7) live apply | Second user who is not fully trusted |
+| Strategy visibility | `BT.STRATEGY` / results are **globally readable** to any logged-in user (`USER_ID` audit-only today) | login.md Phase 2 multi-user isolation |
+| Strategy deploy | Must validate strategy **ownership** before 1.7 — `_strategy_exists` alone is insufficient |
+| Paper vs live | **`is_paper_ind` on server** — client toolbar filter is UX only |
+
+#### Secrets at rest and in transit
+
+| Risk | Mitigation |
+|------|------------|
+| `SP_GET_API_CREDENTIAL` returns ciphertext | Service layer strips before JSON; response schema has no `*_CIPHERTEXT` fields; unit test |
+| Missing Fernet bootstrap | `EXCHANGE_SECRETS_KEY` from SSM; prod **fail-fast** at boot (mirror `_resolve_jwt_secret`); **never** reuse `JWT_SECRET` |
+| Worker decrypt path | Decrypt only at adapter boundary; short-lived; never log; no parallel env-key path once 1.1 is live |
+| Legacy `.env` exchange keys | Multi-user prod uses `CORE_ADMIN.API_CREDENTIAL` only — not shared `.env` keys (house account exception must be explicit) |
+| Futu unlock password | Not covered by key+secret model — decide before Futu live: extra column, credential type, or infra-only unlock |
+
+#### API hardening
+
+| Control | Where |
+|---------|--------|
+| Rate limit credential writes | `POST`/`PUT` `/api/v1/credentials` — at least login-tier limits |
+| CSRF | `SameSite=Strict` + HTTPS same-origin SPA is sufficient for v1; cross-origin frontend needs CSRF tokens ([login.md §16 Q5](login.md#16-open-questions)) |
+| Kill switch | `PATCH` deployment `is_enabled_ind` — required before 1.7 ([Trade API §4](trade-api.md#4-risk--safety)) |
+| Live apply step-up | Align with [Trade API §4.1](trade-api.md#41-confirmation-flow-for-live-trading): dry-run first, explicit confirm; Futu may need trade-unlock password |
+
+#### Frontend reuse (login page)
+
+| Reuse | Do not reuse |
+|-------|----------------|
+| `RequireAuth`, `useMe()`, controlled form + error display, `type="password"` for key/secret fields | Persisting API keys in `localStorage`; mixing credential calls into `/auth/login` module |
 
 ---
 

@@ -291,6 +291,8 @@ User clicks "Deploy" in UI
 
 These checks run **before every order** in the Trade API. They are non-negotiable.
 
+**Security / auth:** Server-side enforcement only — the Trade UI Paper/Live toggle and session filter are not authorization boundaries. Live apply requires prior dry-run and explicit confirm (§4.1). Strategy ownership, credential masking, and kill-switch requirements are in [plan-to-profit §5.5](plan-to-profit.md#55-auth--security-guardrails) and Phase [1.7 exit criteria](plan-to-profit.md#phase-17--live-apply).
+
 | Check | Description | Default |
 |-------|-------------|---------|
 | **Kill switch** | `deployment.enabled` must be `true` | — |
