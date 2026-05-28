@@ -21,7 +21,4 @@
       4. After deploy, refresh Redis REFDATA: POST /api/v1/refdata/refresh
     -->
 
-    <include file="releases/1.2.0-app-is-exchange.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.2.1-app-binance.xml"    relativeToChangelogFile="true"/>
-
 </databaseChangeLog>

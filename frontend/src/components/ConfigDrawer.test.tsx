@@ -25,7 +25,7 @@ const assetTypes: AssetTypeRow[] = [
 const conjunctions: ConjunctionRow[] = [{ name: 'AND', display_name: 'AND' }];
 const dataColumns: DataColumnRow[] = [{ column_name: 'price', display_name: 'Price' }];
 const apps: AppRow[] = [
-  { app_id: 1, name: 'yahoo', display_name: 'Yahoo Finance', class_name: 'YahooFinance', description: null },
+  { app_id: 1, name: 'yahoo', display_name: 'Yahoo Finance', class_name: 'YahooFinance', is_exchange_ind: 'N', description: null },
 ];
 const products: ProductRow[] = [
   { product_id: 10, product_vid: 1, internal_cusip: '00434.hkex', display_nm: 'Boyaa Interactive', asset_type_id: 2, exchange: 'HKEX', ccy: 'HKD', description: null },
