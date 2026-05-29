@@ -27,6 +27,9 @@ vi.mock('../api/trade', () => ({
 vi.mock('../api/credentials', () => ({
   CREDENTIALS_QUERY_KEY: ['credentials'],
   useBrokerAccounts: vi.fn(),
+  useCreateCredential: () => ({ mutate: vi.fn(), isPending: false, isError: false, isSuccess: false }),
+  useRevokeCredential: () => ({ mutate: vi.fn(), isPending: false }),
+  useRotateCredential: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock('../api/refdata', () => ({
