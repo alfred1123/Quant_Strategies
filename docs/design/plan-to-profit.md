@@ -34,11 +34,11 @@ Work **one subphase at a time** — finish exit criteria before starting the nex
 | [0.1](#phase-01--strategy-health) | Strategy health | done |
 | [0.2](#phase-02--host-capacity) | Host capacity | done |
 | [0.3](#phase-03--deploy-topology-decision) | Deploy topology decision | done |
-| [1.1](#phase-11--user-secrets) | User secrets | — |
+| [1.1](#phase-11--user-secrets) | User secrets | done |
 | [1.2](#phase-12--trade-schema--apply-api) | Trade schema + apply API | done |
 | [1.3](#phase-13--bybit-adapter-dry-run) | Bybit adapter (dry run) | — |
 | [1.4](#phase-14--trade-ui-shell) | Trade UI shell | done |
-| [1.5](#phase-15--exchange-config-ui) | Exchange config UI | in progress |
+| [1.5](#phase-15--exchange-config-ui) | Exchange config UI | done |
 | [1.6](#phase-16--strategy-picker) | Strategy picker | — |
 | [1.7](#phase-17--live-apply) | Live apply | — |
 | [1.8](#phase-18--execution-log) | Execution log | — |
@@ -319,16 +319,16 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 
 - [x] **Accounts table** on Config page: Exchange · Account · Mode (Paper/Live) · masked API key · Status — click row to set toolbar account filter (`BrokerAccountsTable`).
 - [x] **Multi-broker / multi-account** UX: toolbar **Exchange** + **Account** dropdowns filter deployments and highlight table rows (not one broker / one account).
-- [x] Compact **Add account** form (Exchange, label, paper toggle, API key/secret) — UI only, disabled until API exists.
+- [x] Compact **Add account** form (Exchange, label, paper toggle, API key/secret).
 - [x] **Paper / Live** mode toggle in toolbar (filters deployments by `is_paper_ind`; apply buttons reflect mode).
-- [ ] Wire **REFDATA.APP** broker dropdown (`app_id`) on add form.
-- [ ] Wire `GET` / `POST` / `PUT` / `DELETE` → `/api/v1/credentials` (requires **1.1** backend).
-- [ ] Enable save, rotate, revoke actions in table.
+- [x] Wire **REFDATA.APP** broker dropdown (`app_id`) on add form.
+- [x] Wire `GET` / `POST` / `PUT` / `DELETE` → `/api/v1/credentials`.
+- [x] Enable save, rotate, revoke actions in table.
 - [ ] Trade defaults (size, Telegram chat id) deferred until columns exist on `TRADE.DEPLOYMENT` or credential.
 
 **Exit criteria:** User saves Bybit credential in UI and reload sees masked keys in the accounts table; can register **multiple accounts per broker** and filter Trade/deployments via toolbar.
 
-**In progress:** UI shell and `useBrokerAccounts()` stub (`[]` until 1.1 API). Types in `frontend/src/types/credentials.ts`.
+**Result (2026-05-28):** `TradeConfigPage` + `BrokerAccountsTable` wired to `/api/v1/credentials`; REFDATA exchange dropdown; rotate/revoke dialogs. See [Frontend § Trade](../architecture/frontend.md#trade-ui-phase-14).
 
 ---
 
@@ -339,13 +339,27 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 | **Depends on** | 1.2, 1.4, 0.1 (recommended) |
 | **Blocks** | 1.7 |
 
+**Scope:** Pick an **existing** `BT.STRATEGY` row for deployment — not build a new backtest config. Do **not** reuse Backtest `ConfigDrawer` / `FactorCard` (those edit REFDATA signal types for optimize requests). See [Trade API §2.1](trade-api.md#21-strategy-catalog--phase-16).
+
 **Tasks**
 
-- [ ] API: list user’s backtested strategies (id + name + minimal stats).
-- [ ] Trade page: selectable list/table; no JSON drill-down required.
-- [ ] Selecting row sets active `strategy_id` for apply.
+- [ ] DDL: `BT.SP_LIST_STRATEGY` (or equivalent) — list current strategies (`IS_CURRENT_IND='Y'`) with optional latest-result stats; reads only.
+- [ ] API module: `quant/api/strategies/` — `GET /api/v1/strategies` (id, vid, name, minimal stats); behind `require_user`. Full CRUD deferred — create/update stays on backtest queue path (`BT.SP_INS_STRATEGY` via jobs).
+- [ ] Frontend: `frontend/src/api/strategies.ts` + `StrategyPicker` on Trade Apply — selectable list/table; no JSON drill-down.
+- [ ] Selecting row sets active `{ strategy_id, strategy_vid }` for apply / deployment payload.
+- [ ] **1.7 prep:** list response includes `user_id`; deployment create validates strategy ownership (see [§5.5](#55-auth--security-guardrails)).
 
-**Exit criteria:** User picks a strategy by name/id in UI; selection passed to apply payload.
+**Architecture (decided)**
+
+| Layer | Choice | Rationale |
+|-------|--------|-----------|
+| **Backend** | New `quant/api/strategies/` reading `BT.STRATEGY` | Cross-cutting catalog; matches [trade-api.md §2.1](trade-api.md#21-strategy-catalog--phase-16). Not `quant/strategy/` (execution math) or `quant/trade/` (deployments only). |
+| **Frontend** | New `StrategyPicker` + `useStrategies()` | Trade-specific UX. Extract to `components/strategy/` only when Backtest also needs the same picker (e.g. “Deploy this”). |
+| **Do not** | Reuse Backtest config UI or move `quant/strategy/` to shared | Wrong domain — signal-type builder ≠ persisted strategy catalog. |
+
+**Exit criteria:** User picks a strategy by name/id in UI; selection passed to apply payload as `strategy_id` + `strategy_vid`.
+
+**Known gap (v1):** `BT.STRATEGY` rows are globally readable to any logged-in user today; ownership enforcement lands in **1.7** deployment create. See [login.md](login.md) and [§5.5](#55-auth--security-guardrails).
 
 ---
 
@@ -1023,8 +1037,8 @@ Full table: [login.md §6.4](login.md#64-reuse-from-login--jwt-credential-api--p
 | **1.2** | `TRADE.DEPLOYMENT` / `EXECUTION_EVENT` / `TRANSACTION` + apply endpoint (no `INTENT`) |
 | **1.3** | Bybit adapter dry-run |
 | **1.4** | Trade tab shell + sidebar routes + multi-broker filter toolbar |
-| **1.5** | Exchange config UI (accounts table; API wiring pending 1.1) |
-| **1.6** | Strategy picker from BT (id/name) |
+| **1.5** | Exchange config UI — accounts table + credentials API wiring |
+| **1.6** | Strategy picker — `GET /api/v1/strategies` + `StrategyPicker` (reads `BT.STRATEGY`; not Backtest config UI) |
 | **1.7** | Live apply (dry-run → apply) |
 | **1.8** | Execution log UI + `TRADE.EXECUTION_EVENT` writes |
 | **2.1** | Reconcile snapshot schema + SP |

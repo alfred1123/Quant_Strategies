@@ -172,18 +172,38 @@ performance before and after going live.
 The trade API runs inside the existing FastAPI service (`quant/api/`).
 Endpoints use JWT auth (`require_user`); the user's `app_user_id` scopes all data.
 
-### 2.1 Strategy Management — planned
+### 2.1 Strategy catalog — Phase 1.6
 
-!!! note ""
-    Not yet implemented. Strategy definitions are currently managed via `BT.STRATEGY` + `BT.SP_INS_STRATEGY`. These endpoints will provide HTTP access when needed.
+!!! note "Architecture"
+    **Phase 1.6 scope is read-only catalog**, not full strategy CRUD. Persisted strategies are created today via the backtest queue (`POST /api/v1/backtest/jobs` → `BT.SP_INS_STRATEGY`). The Trade picker lists existing `BT.STRATEGY` rows for deployment.
+
+    | Do | Don't |
+    |----|-------|
+    | New `quant/api/strategies/` module + `GET /api/v1/strategies` | Put list logic in `quant/strategy/backtest_service.py` (execution only) |
+    | New `StrategyPicker` + `useStrategies()` on Trade Apply | Reuse Backtest `ConfigDrawer` / `FactorCard` (REFDATA signal-type builder) |
+    | Read `BT.STRATEGY` via SP (e.g. `BT.SP_LIST_STRATEGY`) | Nest under `/api/v1/trade/` — strategies are a BT artifact used by queue and trade |
+
+**Phase 1.6 — implement now:**
 
 ```
-POST   /api/v1/strategies                → Create strategy (accepts StrategyConfig JSON)
-GET    /api/v1/strategies                → List all strategies
-GET    /api/v1/strategies/{id}           → Get strategy details + latest backtest results
+GET    /api/v1/strategies                → List current strategies (IS_CURRENT_IND='Y')
+                                           id, vid, name, optional stats (Sharpe, symbol)
+GET    /api/v1/strategies/{id}           → One strategy + optional latest result     — optional 1.6
+```
+
+Response fields (list): `strategy_id`, `strategy_vid`, `strategy_nm`, `user_id`, optional `sharpe` / `internal_cusip` from latest `BT.RESULT` join.
+
+**Deferred (full CRUD — not 1.6):**
+
+```
+POST   /api/v1/strategies                → Create strategy (StrategyConfig JSON)
 PUT    /api/v1/strategies/{id}           → Update strategy (bumps version)
-DELETE /api/v1/strategies/{id}           → Soft-delete (mark inactive)
+DELETE /api/v1/strategies/{id}           → Soft-delete
 ```
+
+Create/update remain on the jobs/backtest path until a dedicated editor is needed.
+
+**Ownership:** v1 list may return all strategies (globally readable). Phase **1.7** deployment create must verify `BT.STRATEGY.USER_ID` matches caller — see [plan-to-profit §5.5](plan-to-profit.md#55-auth--security-guardrails).
 
 ### 2.2 Deployment (one-click deploy)
 
@@ -202,17 +222,19 @@ PATCH  /api/v1/trade/deployments/{id}          → Update (toggle enabled, qty) 
 DELETE /api/v1/trade/deployments/{id}          → Stop deployment                 — planned
 ```
 
-### 2.3 Credentials — planned (Phase 1.1)
+### 2.3 Credentials — implemented (Phase 1.1)
 
-!!! note ""
-    Not yet implemented. Frontend stub returns `[]`. Backend stored procedures for `CORE_ADMIN.API_CREDENTIAL` exist; HTTP layer does not.
+**Implemented** — `quant/api/credentials/`, mounted at `/api/v1/credentials`:
 
 ```
-GET    /api/v1/credentials                     → List user's broker accounts     — planned
-POST   /api/v1/credentials                     → Save new API key/secret         — planned
-PUT    /api/v1/credentials/{id}                → Update credential               — planned
-DELETE /api/v1/credentials/{id}                → Revoke credential               — planned
+GET    /api/v1/credentials                     → List user's broker accounts (masked)     ✅ live
+GET    /api/v1/credentials/{id}                → One credential (masked)                  ✅ live
+POST   /api/v1/credentials                     → Save new API key/secret (Fernet at rest)   ✅ live
+PUT    /api/v1/credentials/{id}                → Rotate keys (soft-version bump)          ✅ live
+DELETE /api/v1/credentials/{id}                → Revoke credential                        ✅ live
 ```
+
+See [plan-to-profit §1.1](plan-to-profit.md#phase-11--user-secrets) and [login.md §6.4](login.md#64-reuse-from-login--jwt-credential-api--phase-11).
 
 ### 2.4 Execution Log — planned (Phase 1.8)
 

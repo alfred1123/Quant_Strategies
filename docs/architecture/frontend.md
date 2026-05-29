@@ -55,7 +55,7 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 | Route | Page | Purpose |
 |-------|------|---------|
 | `/trade/config` | `TradeConfigPage` | Register broker accounts — table + compact add form |
-| `/trade/apply` | `TradeApplyPage` | Strategy picker stub, deployments table, dry-run / apply buttons |
+| `/trade/apply` | `TradeApplyPage` | Strategy picker, deployments table, dry-run / apply buttons |
 
 **Layout:** `TradeLayout` — permanent sidebar (Config \| Trade), **filter toolbar** (`TradeNavBar`), main content (`<Outlet />`), bottom execution-log placeholder.
 
@@ -63,7 +63,7 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 
 - `brokerFilter` / `accountFilter` — toolbar Exchange and Account dropdowns (`ALL_BROKERS` / `ALL_ACCOUNTS` = no filter)
 - `tradingMode` — `'paper' | 'live'` toggle
-- `accounts` — from `useBrokerAccounts()` (stub `[]` until Phase 1.5 wires `/api/v1/credentials`)
+- `accounts` — from `useBrokerAccounts()` → `GET /api/v1/credentials`
 - `matchesSession()` — filters deployment rows by toolbar selection
 
 **Components:**
@@ -71,9 +71,22 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 | Component | Role |
 |-----------|------|
 | `TradeNavBar` | Compact Exchange (~160px) + Account (~200px) selects; Paper / Live `ToggleButtonGroup` |
-| `BrokerAccountsTable` | Exchange · Account · Mode · masked key · Status; row click sets account filter |
-| `TradeConfigPage` | Accounts table + disabled add-account form (Phase 1.5) |
-| `TradeApplyPage` | Deployments table (Exchange / Account columns) filtered by toolbar; `useDeployments()` |
+| `BrokerAccountsTable` | Exchange · Account · masked key · Status; rotate/revoke; row click sets account filter |
+| `TradeConfigPage` | Accounts table + add-account form wired to credentials API |
+| `StrategyPicker` | **Phase 1.6** — selectable list of `BT.STRATEGY` rows via `GET /api/v1/strategies` |
+| `TradeApplyPage` | `StrategyPicker` + deployments table filtered by toolbar; `useDeployments()` |
+
+**Strategy picker (1.6) — not Backtest config UI**
+
+The Backtest **Strategy** dropdown in `FactorCard` is a REFDATA `signal_type` (momentum, etc.) used to *build* an optimize request. The Trade picker selects a **persisted** `BT.STRATEGY` row (`strategy_id`, `strategy_vid`, `strategy_nm`) for deployment. Do not reuse `ConfigDrawer` / `FactorCard`.
+
+| Backtest | Trade picker |
+|----------|--------------|
+| `FactorCard` → REFDATA signal type | `StrategyPicker` → `BT.STRATEGY` catalog |
+| Creates config for new job | Selects existing strategy for apply |
+| `POST /api/v1/backtest/jobs` | `GET /api/v1/strategies` |
+
+See [plan-to-profit §1.6](../design/plan-to-profit.md#phase-16--strategy-picker) and [trade-api §2.1](../design/trade-api.md#21-strategy-catalog--phase-16).
 
 Dropdowns use MUI `size="small"` and fixed widths — not full-width form fields.
 
@@ -87,7 +100,8 @@ frontend/src/
 │
 ├── types/                # TypeScript interfaces (no logic)
 │   ├── backtest.ts       # BacktestConfig, FactorConfig, API request/response types
-│   ├── credentials.ts  # BrokerAccount, TradingMode, filter constants (Phase 1.5)
+│   ├── credentials.ts    # BrokerAccount, TradingMode, filter constants
+│   ├── strategies.ts     # StrategyRow — Phase 1.6 catalog item
 │   ├── refdata.ts        # IndicatorRow, AssetTypeRow, ProductRow, etc.
 │   └── trade.ts          # DeploymentRow, create-deployment request (Phase 1.2)
 │
@@ -98,7 +112,8 @@ frontend/src/
 │   ├── backtest.ts       # runOptimizeStream() (SSE), runPerformance(), runWalkForward()
 │   ├── auth.ts           # useMe(), login(), logout()
 │   ├── trade.ts          # useDeployments(), useCreateDeployment() (Phase 1.2)
-│   └── credentials.ts    # useBrokerAccounts() — stub until Phase 1.5
+│   ├── credentials.ts    # useBrokerAccounts(), useCreateCredential(), …
+│   └── strategies.ts     # useStrategies() — Phase 1.6
 │
 ├── trade/
 │   └── TradeSessionContext.tsx  # Shared broker/account/mode filters (Phase 1.4)
@@ -133,7 +148,8 @@ frontend/src/
 │   ├── ErrorBoundary.tsx # React error boundary
 │   └── trade/
 │       ├── TradeNavBar.tsx         # Exchange / Account filters + Paper / Live toggle
-│       └── BrokerAccountsTable.tsx # Multi-broker accounts table (Config page)
+│       ├── BrokerAccountsTable.tsx # Multi-broker accounts table (Config page)
+│       └── StrategyPicker.tsx      # Phase 1.6 — selectable BT.STRATEGY list (Trade Apply)
 │
 ├── layouts/
 │   └── TradeLayout.tsx   # Trade shell — sidebar, toolbar, outlet, execution log
@@ -143,7 +159,7 @@ frontend/src/
     ├── LoginPage.tsx     # Login form
     └── trade/
         ├── TradeConfigPage.tsx  # Exchange accounts table + add form
-        └── TradeApplyPage.tsx   # Deployments table, strategy picker stub
+        └── TradeApplyPage.tsx   # Deployments table + StrategyPicker
 ```
 
 ## Reading Guide — Where to Start
