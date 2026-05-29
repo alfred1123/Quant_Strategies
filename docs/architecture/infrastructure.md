@@ -4,6 +4,8 @@ Infrastructure as Code for the Quant Strategies deployment.
 All resources are defined as CloudFormation templates under `aws/cfn/`
 and deployed via the AWS CLI.
 
+See [System Overview](overview.md) for runtime topology and [Dev vs Prod](dev-vs-prod.md) for environment differences.
+
 ---
 
 ## Architecture
@@ -37,7 +39,7 @@ and deployed via the AWS CLI.
                    └───────────────────────┘
 ```
 
-SSM Parameter Store supplies secrets (`JWT_SECRET`, DB credentials) at app startup.
+SSM Parameter Store supplies secrets (`JWT_SECRET`, `EXCHANGE_SECRETS_KEY`, DB credentials) at app startup.
 
 The base `docker-compose.yml` exposes nginx on **:80** (HTTP, using `nginx.dev.conf`). Adding `docker-compose.tls.yml` on top swaps in `nginx.conf` and adds **:443** (HTTPS with Let's Encrypt).
 
@@ -96,6 +98,11 @@ Stacks must be deployed in order due to cross-stack references.
 ```bash
 # Set up SSM parameters (prompts for DB password and JWT secret)
 bash aws/scripts/init-ssm-params.sh
+
+# Prod only — add Fernet key for exchange credentials (required for API boot)
+aws ssm put-parameter --name /quant/prod/EXCHANGE_SECRETS_KEY \
+  --value "$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" \
+  --type SecureString --region ap-southeast-1
 ```
 
 ### Deploy all stacks
@@ -169,6 +176,7 @@ All app secrets live under `/quant/<env>/` in SSM Parameter Store.
 | `QUANTDB_USERNAME` | SecureString | DB admin user |
 | `QUANTDB_PASSWORD` | SecureString | DB admin password |
 | `JWT_SECRET` | SecureString | `openssl rand -base64 32` |
+| `EXCHANGE_SECRETS_KEY` | SecureString | Fernet key for `CORE_ADMIN.API_CREDENTIAL` — **required in prod** (`CredentialCrypto` fail-fast at API boot) |
 | `CORS_ORIGINS` | String | `https://yourdomain.com` |
 | `FUTU_HOST` | String | `127.0.0.1` |
 | `FUTU_PORT` | String | `11111` |
@@ -177,7 +185,8 @@ The app loads these at startup via `quant/shared/config.py` when `USE_SSM=1`.
 
 **Note:** `JWT_SECRET` must be the same across all app instances sharing
 a database — otherwise JWTs minted by one instance cannot be verified
-by another.
+by another. `EXCHANGE_SECRETS_KEY` must also be stable — rotating it
+invalidates all stored credential ciphertext until users re-save keys.
 
 ---
 

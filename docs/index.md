@@ -9,9 +9,9 @@ Backtesting and trading framework for crypto and equity markets. Strategies are 
 | Component | Description |
 |-----------|-------------|
 | **Backtest Pipeline** | `quant/data/sources.py` → `quant/strategy/{indicators,signals}.py` → `performance.py` → `optimizer.py` → `walk_forward.py`, orchestrated by `quant.cli` (CLI) and `quant/api/services/backtest.py` (web) |
-| **FastAPI Backend** | REST + SSE endpoints for optimization, performance, walk-forward, refdata, and instruments — cookie-based auth |
-| **React Frontend** | MUI-based SPA with configurable factor cards, live progress bar, interactive charts |
-| **PostgreSQL Database** | REFDATA (dropdowns), BT (backtest results), INST (products + xrefs), CORE_ADMIN (users), TRADE (planned) — managed via Liquibase |
+| **FastAPI Backend** | REST + SSE for backtest; trade deployments + credentials; REFDATA/instruments — cookie-based auth |
+| **React Frontend** | MUI SPA — backtest config/results + Trade UI (accounts, deployments) |
+| **PostgreSQL Database** | REFDATA, BT, INST, CORE_ADMIN (users + credentials), TRADE — Liquibase-managed |
 | **CLI** | `argparse` interface for scripted single-symbol backtests and grid searches |
 
 ## Key Features
@@ -20,7 +20,7 @@ Backtesting and trading framework for crypto and equity markets. Strategies are 
 - **SSE-streamed optimization** — real-time progress bar with trial count and best Sharpe
 - **Data Column selector** — backtest on Price or Volume per factor
 - **Walk-forward test** — in-sample / out-of-sample overfitting detection
-- **Paper trading** — connect to Futu OpenD for HK/US equity order execution (Python utility today)
+- **Exchange credentials** — save, rotate, and revoke broker API keys (Bybit, Binance, Futu) via Trade Config UI
 - **REFDATA-driven UI** — all dropdowns sourced from PostgreSQL, zero hardcoded lists
 - **Authenticated** — JWT cookie session; user accounts managed by admin
 
@@ -29,7 +29,8 @@ Backtesting and trading framework for crypto and equity markets. Strategies are 
 - [Getting Started](getting-started.md) — setup in 3 commands
 - [New User Guide (Website)](guides/new-user-website.md) — run your first backtest in the SPA
 - [CLI Backtest](guides/cli-backtest.md) — all flags and examples
-- [Pipeline Architecture](architecture/pipeline.md) — data flow diagram
-- [API Reference](architecture/api.md) — endpoints and schemas
+- [System Overview](architecture/overview.md) — full stack diagram, schemas, phase status
+- [Pipeline Architecture](architecture/pipeline.md) — backtest + worker data flow
+- [API Reference](architecture/api.md) — endpoints and project structure
 - [Frontend Code Audit](design/frontend-audit.md) — known frontend issues + remediation directions
 - [Decisions Log](decisions.md) — all agreed design decisions

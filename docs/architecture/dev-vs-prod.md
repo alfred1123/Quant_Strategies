@@ -4,6 +4,8 @@ This page lists every configuration value that differs between local
 development and the production EC2, so developers can restore their
 environment after a deploy or onboard quickly.
 
+See [System Overview](overview.md) for runtime topologies.
+
 ---
 
 ## Quick reference
@@ -11,7 +13,7 @@ environment after a deploy or onboard quickly.
 | Setting | Dev (laptop) | Prod (EC2) | Where it lives |
 |---------|-------------|------------|----------------|
 | `QUANTDB_HOST` | `localhost` | `quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com` | SSM `/quant/dev/` / SSM `/quant/prod/` |
-| `QUANTDB_PORT` | `5433` | `5432` | SSM `/quant/dev/` / SSM `/quant/prod/` |
+| `QUANTDB_PORT` | `5433` (tunnel) or `5432` (`DB_TARGET=local`) | `5432` | SSM / `.env` |
 | `QUANTDB_USERNAME` | shared DB user | same | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | `QUANTDB_PASSWORD` | shared DB password | same | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | `APP_ENV` | `dev` (default) | `prod` | `docker-compose.prod.yml` |
@@ -19,6 +21,7 @@ environment after a deploy or onboard quickly.
 | `COOKIE_SECURE` | unset (defaults to `APP_ENV == prod`) | `0` (HTTP) / `1` (HTTPS) | `docker-compose.prod.yml` / `docker-compose.tls.yml` |
 | `CORS_ORIGINS` | SSM `/quant/dev/` or `.env` (no in-code default) | SSM `/quant/prod/` (public site URL(s)) | SSM / `.env` |
 | `JWT_SECRET` | shared dev secret from SSM | fixed value from SSM | SSM `/quant/dev/` / SSM `/quant/prod/` |
+| `EXCHANGE_SECRETS_KEY` | dev SSM or auto-generated ephemeral | **required** — Fernet for credentials | SSM `/quant/prod/EXCHANGE_SECRETS_KEY` |
 | DB access method | SSM port-forward tunnel | Direct VPC connection | Network topology |
 | Nginx config | `nginx.dev.conf` (HTTP only) | Same (HTTP) or `nginx.conf` (TLS via `docker-compose.tls.yml`) | `docker/nginx/` |
 | Swagger UI | enabled (`/docs`) | disabled | `quant/api/main.py` checks `APP_ENV` |
@@ -45,8 +48,9 @@ docker compose up                         docker compose -f docker-compose.yml
     QUANTDB_PORT (5433)                   loads ALL config:
     JWT_SECRET, CORS_ORIGINS, etc.          QUANTDB_HOST (RDS endpoint)
       │                                     QUANTDB_PORT (5432)
-      │  (fallback if SSM unreachable:      JWT_SECRET, CORS_ORIGINS, etc.
-      │   loads .env instead)                     │
+      │  (fallback if SSM unreachable:      JWT_SECRET, CORS_ORIGINS,
+      │   loads .env instead)               EXCHANGE_SECRETS_KEY (required)
+      │                                           │
       ▼                                           ▼
   quant/shared/config.py                            quant/shared/config.py
   _load_from_ssm("dev")                   _load_from_ssm("prod")
@@ -142,6 +146,7 @@ sudo usermod -aG docker "$USER"     # log out/in, or use `sg docker -c ...`
 ./scripts/dbctl.sh reset
 
 # 4. Dump prod (uses the SSM tunnel) and restore into local
+#    For prod tunnel dumps, ensure PGSSLMODE=require (dbctl sets this).
 ./scripts/dbctl.sh dump
 ./scripts/dbctl.sh restore        # picks the newest dump in db/dumps/
 ```
@@ -214,6 +219,7 @@ Both dev and prod config live in AWS SSM Parameter Store under `/quant/<env>/`.
 | `QUANTDB_USERNAME` | SecureString | `quant_admin` |
 | `QUANTDB_PASSWORD` | SecureString | *(stored securely)* |
 | `JWT_SECRET` | SecureString | *(shared dev secret)* |
+| `EXCHANGE_SECRETS_KEY` | SecureString | *(optional — dev auto-generates ephemeral if absent)* |
 | `CORS_ORIGINS` | String | `http://localhost:5173` |
 | `FUTU_HOST` | String | `127.0.0.1` |
 | `FUTU_PORT` | String | `11111` |
@@ -227,6 +233,7 @@ Both dev and prod config live in AWS SSM Parameter Store under `/quant/<env>/`.
 | `QUANTDB_USERNAME` | SecureString | `quant_admin` |
 | `QUANTDB_PASSWORD` | SecureString | *(stored securely)* |
 | `JWT_SECRET` | SecureString | *(stored securely)* |
+| `EXCHANGE_SECRETS_KEY` | SecureString | *(required — API refuses to boot without it)* |
 | `CORS_ORIGINS` | String | `http://localhost:5173,http://52.221.3.230` |
 | `FUTU_HOST` | String | `127.0.0.1` |
 | `FUTU_PORT` | String | `11111` |

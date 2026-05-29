@@ -2,6 +2,8 @@
 
 A single-page React + TypeScript application that replaces the Streamlit dashboard as the primary UI.
 
+See [System Overview](overview.md) for product surfaces and [Trade UI](#trade-ui-phase-14) below for the live-trading shell.
+
 !!! note "See also"
     The [Frontend Code Audit](../design/frontend-audit.md) lists known design issues and remediation directions.
 
@@ -46,7 +48,7 @@ Open `http://localhost:5173`. The Vite dev server proxies `/api` requests to the
 - **CSV download** of full grid search results
 - **Authentication** — cookie-based login; 401 interceptor auto-redirects to `/login`
 - **Client-side routing** — `/login` (guest-only), `/backtest`, `/trade/config`, `/trade/apply` (auth-required) via `react-router-dom`
-- **Trade UI (Phase 1.4+)** — multi-broker layout with compact Exchange / Account filters, Paper / Live toggle, accounts table on Config, deployments table on Trade (see [Trade UI](#trade-ui-phase-14) below)
+- **Trade UI (Phase 1.4+)** — multi-broker layout with compact Exchange / Account filters, Paper / Live toggle, accounts table on Config (credentials CRUD), deployments table on Trade (see [Trade UI](#trade-ui-phase-14) below)
 
 ## Trade UI (Phase 1.4+)
 
@@ -71,10 +73,10 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 | Component | Role |
 |-----------|------|
 | `TradeNavBar` | Compact Exchange (~160px) + Account (~200px) selects; Paper / Live `ToggleButtonGroup` |
-| `BrokerAccountsTable` | Exchange · Account · masked key · Status; rotate/revoke; row click sets account filter |
-| `TradeConfigPage` | Accounts table + add-account form wired to credentials API |
-| `StrategyPicker` | **Phase 1.6** — selectable list of `BT.STRATEGY` rows via `GET /api/v1/strategies` |
-| `TradeApplyPage` | `StrategyPicker` + deployments table filtered by toolbar; `useDeployments()` |
+| `BrokerAccountsTable` | Exchange · Account · masked key · Status; **Rotate** / **Revoke** dialogs; row click sets account filter |
+| `TradeConfigPage` | Accounts table + add-account form wired to credentials API (create) |
+| `StrategyPicker` | **Phase 1.6 (planned)** — selectable list of `BT.STRATEGY` rows via `GET /api/v1/strategies` |
+| `TradeApplyPage` | Deployments table filtered by toolbar; `StrategyPicker` placeholder until 1.6; `useDeployments()` |
 
 **Strategy picker (1.6) — not Backtest config UI**
 
@@ -101,9 +103,9 @@ frontend/src/
 ├── types/                # TypeScript interfaces (no logic)
 │   ├── backtest.ts       # BacktestConfig, FactorConfig, API request/response types
 │   ├── credentials.ts    # BrokerAccount, TradingMode, filter constants
-│   ├── strategies.ts     # StrategyRow — Phase 1.6 catalog item
-│   ├── refdata.ts        # IndicatorRow, AssetTypeRow, ProductRow, etc.
+│   ├── refdata.ts        # IndicatorRow, AssetTypeRow, ProductRow, AppRow, etc.
 │   └── trade.ts          # DeploymentRow, create-deployment request (Phase 1.2)
+│   # strategies.ts       # StrategyRow — Phase 1.6 (not yet in repo)
 │
 ├── api/                  # HTTP + data-fetching layer
 │   ├── client.ts         # Axios instance (baseURL, credentials, 401 interceptor)
@@ -112,8 +114,8 @@ frontend/src/
 │   ├── backtest.ts       # runOptimizeStream() (SSE), runPerformance(), runWalkForward()
 │   ├── auth.ts           # useMe(), login(), logout()
 │   ├── trade.ts          # useDeployments(), useCreateDeployment() (Phase 1.2)
-│   ├── credentials.ts    # useBrokerAccounts(), useCreateCredential(), …
-│   └── strategies.ts     # useStrategies() — Phase 1.6
+│   └── credentials.ts    # useBrokerAccounts(), useCreateCredential(), useRotateCredential(), useRevokeCredential()
+│   # strategies.ts       # useStrategies() — Phase 1.6 (not yet in repo)
 │
 ├── trade/
 │   └── TradeSessionContext.tsx  # Shared broker/account/mode filters (Phase 1.4)
@@ -148,8 +150,8 @@ frontend/src/
 │   ├── ErrorBoundary.tsx # React error boundary
 │   └── trade/
 │       ├── TradeNavBar.tsx         # Exchange / Account filters + Paper / Live toggle
-│       ├── BrokerAccountsTable.tsx # Multi-broker accounts table (Config page)
-│       └── StrategyPicker.tsx      # Phase 1.6 — selectable BT.STRATEGY list (Trade Apply)
+│       └── BrokerAccountsTable.tsx # Multi-broker accounts table (Config page)
+│   # StrategyPicker.tsx            # Phase 1.6 (not yet in repo)
 │
 ├── layouts/
 │   └── TradeLayout.tsx   # Trade shell — sidebar, toolbar, outlet, execution log
@@ -246,7 +248,7 @@ All dropdowns are populated from the backend `GET /api/v1/refdata/{table_name}` 
 | Asset Type | `useAssetTypes()` | `REFDATA.ASSET_TYPE` |
 | Conjunction | `useConjunctions()` | `REFDATA.CONJUNCTION` |
 | Data Column | `useDataColumns()` | `REFDATA.DATA_COLUMN` |
-| App (data source) | `useApps()` | `REFDATA.APP` |
+| App (data source / exchange) | `useApps()` | `REFDATA.APP` (`IS_EXCHANGE_IND` filters broker dropdown on Trade Config) |
 
 ## Build for Production
 

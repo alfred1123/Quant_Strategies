@@ -65,6 +65,7 @@ nav:
       - Quick Start: getting-started.md
       - Environment Variables: env-vars.md
   - Architecture:
+      - System Overview: architecture/overview.md
       - Pipeline: architecture/pipeline.md
       - FastAPI Backend: architecture/api.md
       - React Frontend: architecture/frontend.md
