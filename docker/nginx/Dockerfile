@@ -12,7 +12,9 @@ FROM node:22-slim AS frontend-build
 
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# Dependency install only — npm audit runs in CI (tests.yml), not here, so prod
+# image builds stay fast and auditable separately from the runtime artifact.
+RUN npm ci --no-fund
 COPY frontend/ .
 RUN npm run build
 

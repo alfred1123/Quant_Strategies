@@ -103,9 +103,37 @@ jobs:
       - name: Run unit tests
         run: python -m pytest tests/unit/ -v
 
+  frontend:
+    name: frontend (build + audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 22 (matches docker/nginx/Dockerfile)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Type-check and build
+        run: npm run build
+
+      - name: Run unit tests
+        run: npm test
+
   build-and-push:
     name: build and push images
-    needs: [test, changes]
+    needs: [test, frontend, changes]
     if: >-
       needs.changes.outputs.app == 'true' ||
       needs.changes.outputs.nginx == 'true' ||
