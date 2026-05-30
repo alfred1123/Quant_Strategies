@@ -101,7 +101,7 @@ function ServiceStatusPanel({ services }: { services: ServiceStatus[] }) {
   return (
     <Box sx={{ mb: 2 }}>
       {/* Row of status chips */}
-      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
+      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', mb: 1 }}>
         {services.map((service) => (
           <ServiceStatusChip key={service.name} service={service} />
         ))}
