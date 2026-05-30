@@ -80,6 +80,7 @@ latest_dump() {
 cmd_dump() {
   require_tunnel
   load_rds_password
+  export PGSSLMODE=require
   mkdir -p "$DUMP_DIR"
   local outfile="$DUMP_DIR/quantdb_$(date +%Y%m%d_%H%M%S).dump"
   info "Dumping Aurora quantdb → $outfile"

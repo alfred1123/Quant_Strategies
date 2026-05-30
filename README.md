@@ -36,7 +36,7 @@ echo 'DB_TARGET=local' >> .env
 ./scripts/appctl.sh dev start    # also brings up Redis + queue worker via docker-compose.dev.yml
 ```
 
-See [docs/architecture/dev-vs-prod.md](docs/architecture/dev-vs-prod.md#optional-point-dev-at-a-local-postgres) for details.
+See [docs/architecture/dev-vs-prod.md](docs/architecture/dev-vs-prod.md#optional-point-dev-at-a-local-postgres) for details. Full dump/restore guide: [docs/guides/database-dump-restore.md](docs/guides/database-dump-restore.md).
 
 **Production:** The app is deployed at `http://52.221.3.230/` via GitHub Actions CI/CD.
 

@@ -146,10 +146,11 @@ sudo usermod -aG docker "$USER"     # log out/in, or use `sg docker -c ...`
 ./scripts/dbctl.sh reset
 
 # 4. Dump prod (uses the SSM tunnel) and restore into local
-#    For prod tunnel dumps, ensure PGSSLMODE=require (dbctl sets this).
 ./scripts/dbctl.sh dump
 ./scripts/dbctl.sh restore        # picks the newest dump in db/dumps/
 ```
+
+See [Database dump & restore](../guides/database-dump-restore.md) for full steps, troubleshooting, and security notes.
 
 ### Daily usage
 

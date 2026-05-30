@@ -80,6 +80,7 @@ nav:
       - Adding Indicators: guides/adding-indicators.md
       - Adding Strategies: guides/adding-strategies.md
       - Running Tests: guides/testing.md
+      - Database Dump & Restore: guides/database-dump-restore.md
   - Design Docs:
       - Backtest API: design/backtest-api.md
       - Backtest Queue: design/backtest-queue.md

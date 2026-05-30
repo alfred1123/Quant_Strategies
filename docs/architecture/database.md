@@ -156,6 +156,8 @@ cd core_admin && liquibase --defaults-file=liquibase.properties update
 # ... refdata, bt, trade, inst — then core_admin again for GRANTS refresh
 ```
 
+**Developer copy of prod data:** see [Database dump & restore](../guides/database-dump-restore.md) (`./scripts/dbctl.sh`).
+
 ### Release-based changelogs
 
 Each schema root (`*-changelog.xml`) includes **forward-only** release files under `releases/`. **Baseline DDL is not included** — prod already has data and `DATABASECHANGELOG` tracks applied history.
