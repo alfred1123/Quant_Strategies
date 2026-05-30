@@ -90,6 +90,7 @@ nav:
       - Alternative Data Sources: design/alt-data-sources.md
       - Separate Underlying & Cache: design/separate-underlying.md
       - Login & Authentication: design/login.md
+      - User Isolation: design/user-isolation.md
       - Frontend Code Audit: design/frontend-audit.md
       - Plan to Profit: design/plan-to-profit.md
   - Archive:

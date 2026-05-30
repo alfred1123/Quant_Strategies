@@ -203,7 +203,7 @@ DELETE /api/v1/strategies/{id}           → Soft-delete
 
 Create/update remain on the jobs/backtest path until a dedicated editor is needed.
 
-**Ownership:** v1 list may return all strategies (globally readable). Phase **1.7** deployment create must verify `BT.STRATEGY.USER_ID` matches caller — see [plan-to-profit §5.5](plan-to-profit.md#55-auth--security-guardrails).
+**Ownership:** v1 list may return all strategies (globally readable). Phase **1.7** deployment create must verify `BT.STRATEGY.USER_ID` matches caller — see [User isolation](user-isolation.md) and [plan-to-profit §5.5](plan-to-profit.md#55-auth--security-guardrails).
 
 ### 2.2 Deployment (one-click deploy)
 

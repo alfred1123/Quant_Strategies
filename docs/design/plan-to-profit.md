@@ -981,6 +981,8 @@ Full table: [login.md §6.4](login.md#64-reuse-from-login--jwt-credential-api--p
 
 #### Authorization model (v1)
 
+Full matrix, phased backlog, and Futu/Bybit split: **[User isolation requirements](user-isolation.md)**.
+
 | Topic | v1 behaviour | When to revisit |
 |-------|--------------|-----------------|
 | RBAC | **None** — any logged-in user can save credentials, create deployments, and (1.7) live apply | Second user who is not fully trusted |

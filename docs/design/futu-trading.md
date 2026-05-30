@@ -783,7 +783,7 @@ App code: `registry.resolve(gateway_id)` → connection params; developers think
 
 ## 13. Broker strategy & when to scale Futu
 
-North star in [Plan to Profit](plan-to-profit.md): **Bybit live** with per-user REST keys. Futu OpenD is a **local gateway** — a poor fit for self-serve multi-tenant SaaS compared to Bybit.
+North star in [Plan to Profit](plan-to-profit.md): **Bybit live** with per-user REST keys. Futu OpenD is a **local gateway** — a poor fit for self-serve multi-tenant SaaS compared to Bybit. DB-level owner separation: [User isolation](user-isolation.md#futu-vs-bybit).
 
 ### 13.1 Recommended broker split (M1)
 

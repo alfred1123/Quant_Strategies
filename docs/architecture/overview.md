@@ -184,3 +184,4 @@ Liquibase is **manual** on deploy — not run by CI. See [Database § Deployment
 - [Trade API](../design/trade-api.md) — deployment and strategy endpoint specs
 - [Backtest Queue](../design/backtest-queue.md) — worker and `BT.QUEUE` state machine
 - [Plan to Profit](../design/plan-to-profit.md) — phased roadmap to live trading
+- [User isolation](../design/user-isolation.md) — `APP_USER_ID` vs `USER_ID`, enforcement matrix, Phase 1.7 requirements

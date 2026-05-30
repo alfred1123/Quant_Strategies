@@ -543,6 +543,9 @@ Both branches do the same Argon2 work, so `/auth/login` has the same latency pro
 - All authenticated users have full access (no row filtering).
 
 ### Phase 2 — Multi-user isolation
+
+See **[User isolation requirements](user-isolation.md)** for the full matrix, Phase 1.7 deploy checks, and implementation backlog.
+
 - Add `USER_ID` filter to BT/INST read queries.
 - Per-user `BT.RESULT` lists in the SPA.
 - Add `ROLE` column; admin user can see everyone's runs.
