@@ -23,7 +23,9 @@ DB_CONNINFO = load_config()
 from quant.api.auth.dependencies import require_user  # noqa: E402
 from quant.api.auth.router import limiter as auth_limiter, router as auth_router  # noqa: E402
 from quant.api.auth.service import AuthService  # noqa: E402
-from quant.api.routers import backtest, inst, jobs, refdata  # noqa: E402
+from quant.api.credentials.router import limiter as credentials_limiter, router as credentials_router  # noqa: E402
+from quant.api.credentials.service import CredentialService  # noqa: E402
+from quant.api.routers import backtest, deployments, inst, jobs, refdata  # noqa: E402
 from quant.refdata.bundle import DataCaches  # noqa: E402
 from quant.refdata.publisher import RefDataPublisher  # noqa: E402
 
@@ -40,9 +42,13 @@ async def lifespan(app: FastAPI):
     endpoints will 503 but the server still boots so ``/health`` remains
     useful for diagnosis.
     """
-    # Build the AuthService first so a missing JWT_SECRET fails the boot.
+    # Build singletons — missing secrets fail the boot in prod.
     app.state.auth_service = AuthService()
     app.state.db_conninfo = DB_CONNINFO
+
+    from quant.shared.secrets_crypto import CredentialCrypto
+    app.state.credential_crypto = CredentialCrypto()
+    app.state.credential_service = CredentialService(app.state.credential_crypto)
 
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
     try:
@@ -74,6 +80,7 @@ app = FastAPI(
 # slowapi: per-route rate limits (e.g. /auth/login). The limiter instance is
 # shared with api.auth.router so its @limiter.limit decorators take effect.
 app.state.limiter = auth_limiter
+app.state.credentials_limiter = credentials_limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
@@ -89,6 +96,8 @@ app.include_router(backtest.router, prefix="/api/v1", dependencies=[Depends(requ
 app.include_router(inst.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(jobs.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(refdata.router, prefix="/api/v1", dependencies=[Depends(require_user)])
+app.include_router(deployments.router, prefix="/api/v1", dependencies=[Depends(require_user)])
+app.include_router(credentials_router, prefix="/api/v1", dependencies=[Depends(require_user)])
 
 
 @app.get("/health")

@@ -23,11 +23,18 @@ ensure_prereqs() {
 }
 
 load_env() {
+  # Preserve DB_TARGET when caller set it before sourcing .env (e.g. DB_TARGET=prod ./scripts/…)
+  local _db_target_override="${DB_TARGET:-}"
+
   if [[ -f "${ROOT_DIR}/.env" ]]; then
     set -a
     # shellcheck disable=SC1091
     source "${ROOT_DIR}/.env"
     set +a
+  fi
+
+  if [[ -n "${_db_target_override}" ]]; then
+    export DB_TARGET="${_db_target_override}"
   fi
 
   if [[ "${USE_SSM:-}" == "1" ]]; then

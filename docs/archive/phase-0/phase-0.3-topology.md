@@ -86,7 +86,7 @@ Resolves open decision **#4** in [plan-to-profit.md](../../design/plan-to-profit
 | RAM | ~50–150 MiB while running (Phase 0.2: **YES** even on t4g.small) |
 | Schedule | Off-peak UTC (e.g. 00:30) — avoid overlap with heavy queue jobs if possible |
 
-Reconcile reads `TRADE.LOG` / deployment snapshots — co-locating with Postgres access path (SSM + same VPC as Aurora) keeps networking simple. No separate reconcile host unless the whole app moves to ECS later.
+Reconcile reads `TRADE.EXECUTION_EVENT` / deployment snapshots — co-locating with Postgres access path (SSM + same VPC as Aurora) keeps networking simple. No separate reconcile host unless the whole app moves to ECS later.
 
 **Trade executor + reconcile on same box:** acceptable on **t4g.medium** — reconcile is ephemeral; trade idle footprint is modest vs backtest worker spikes.
 

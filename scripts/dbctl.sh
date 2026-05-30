@@ -46,10 +46,11 @@ error() { echo "[dbctl] ERROR: $*" >&2; exit 1; }
 require_tunnel() {
   python3 -c "
 import socket, sys
-s = socket.socket(); s.settimeout(2)
+s = socket.socket(); s.settimeout(10)
 try:
-    s.connect(('127.0.0.1', 5433)); s.close(); sys.exit(0)
-except: sys.exit(1)
+    s.connect(('127.0.0.1', 5433)); s.close()
+except Exception:
+    sys.exit(1)
 " || error "SSM tunnel is not running on :5433. Start it with: ./scripts/appctl.sh dev tunnel start"
 }
 

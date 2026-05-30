@@ -65,6 +65,7 @@ nav:
       - Quick Start: getting-started.md
       - Environment Variables: env-vars.md
   - Architecture:
+      - System Overview: architecture/overview.md
       - Pipeline: architecture/pipeline.md
       - FastAPI Backend: architecture/api.md
       - React Frontend: architecture/frontend.md
@@ -84,6 +85,7 @@ nav:
       - Backtest Queue: design/backtest-queue.md
       - Jobs Table Detail UX: design/jobs-table-detail-ux.md
       - Trade API: design/trade-api.md
+      - Futu Trading (OOP): design/futu-trading.md
       - Backtest Speed: design/backtest-speed.md
       - Alternative Data Sources: design/alt-data-sources.md
       - Separate Underlying & Cache: design/separate-underlying.md

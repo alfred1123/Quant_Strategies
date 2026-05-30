@@ -1,7 +1,10 @@
 # Design Doc: Strategy JSON → Trade API
 
 !!! info "Status"
-    **Proposed — not implemented.** A `FutuTrader` Python utility exists in `quant/trade.py` (see [Paper Trading guide](../guides/trading.md)). The full Strategy-JSON-to-Trade-API flow described here is the long-term direction; persistence, deployment endpoints, and the broker-adapter abstraction have not been built yet.
+    **Partially implemented (Phase 1.2).** Deployment persistence and `GET`/`POST /api/v1/trade/deployments` are live. Credentials API, broker adapters, dry-run, and execution-log writes are still planned. A `FutuTrader` utility exists in `quant/trade/futu_trader.py` (see [Paper Trading guide](../guides/trading.md)).
+
+!!! warning "Schema accuracy"
+    §7 (DB Schema) is the **reference** for table DDL. The JSON examples in §1.2 and the pseudocode in §6 are **aspirational** — they show the target design, not what is implemented today. Always cross-check against the Liquibase DDL in `db/liquidbase/trade/tables/`.
 
 ## Overview
 
@@ -86,41 +89,45 @@ Each substrategy:
 
 ### 1.2 DeploymentConfig (trading target)
 
+**Implemented** — `CreateDeploymentRequest` in `quant/schemas/deployments.py`.
+DDL: `db/liquidbase/trade/tables/DEPLOYMENT.sql` (soft-versioned).
+
 ```json
 {
-  "deployment_id": "auto-generated-uuid",
+  "deployment_id": "auto-generated-uuid (optional, server generates if omitted)",
   "strategy_id": "links-to-strategy-config",
-  "portfolio": "DEFAULT",
-  "user": "alfcheun",
-  "broker": "FUTU",
-  "ticker": "US.WEAT",
+  "strategy_vid": 1,
+  "api_credential_id": 42,
+  "app_id": 2,
+  "internal_cusip": "BTC-USD",
   "qty": 100,
   "paper": true,
-  "market": "US",
-  "schedule": "daily_close",
   "enabled": true,
-  "risk_limits": {
-    "max_position_usd": 10000,
-    "max_daily_trades": 10,
-    "stop_loss_pct": 5.0
-  }
+  "deployment_status": "CREATED"
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `deployment_id` | string (UUID) | Unique deployment instance |
-| `strategy_id` | string | FK → StrategyConfig |
-| `portfolio` | string | Portfolio grouping label |
-| `user` | string | Owner |
-| `broker` | string | `"FUTU"`, `"BYBIT"`, etc. — selects trade adapter |
-| `ticker` | string | Broker-specific symbol |
-| `qty` | int | Position size per signal |
-| `paper` | bool | Paper vs live trading |
-| `market` | string | Market code (US, HK, etc.) |
-| `schedule` | string | When to evaluate: `"daily_close"`, `"hourly"`, `"manual"` |
-| `enabled` | bool | Kill switch |
-| `risk_limits` | object | Safety guardrails (see §4) |
+| `deployment_id` | UUID (optional) | Unique deployment instance; auto-generated if omitted |
+| `strategy_id` | UUID | FK → `BT.STRATEGY` |
+| `strategy_vid` | int | Pinned strategy version |
+| `api_credential_id` | int | FK → `CORE_ADMIN.API_CREDENTIAL` — links exchange account |
+| `app_id` | int | FK → `REFDATA.APP` — broker identity (e.g. 2=bybit, 3=futu) |
+| `internal_cusip` | string | Platform-internal product ID; mapped to vendor symbol via `INST.PRODUCT_XREF` |
+| `qty` | numeric | Position size per signal |
+| `paper` | bool | Paper / testnet (`IS_PAPER_IND` = Y/N) |
+| `enabled` | bool | Kill switch (`IS_ENABLED_IND` = Y/N) |
+| `deployment_status` | string | `CREATED`, `ACTIVE`, `PAUSED`, `STOPPED` |
+
+**Not yet implemented** (planned extensions to `TRADE.DEPLOYMENT`):
+
+| Field | Purpose |
+|-------|---------|
+| `schedule` | When to evaluate: `daily_close`, `hourly`, `manual` |
+| `risk_limits_json` | Safety guardrails (see §4) — `max_position_usd`, `max_daily_trades`, `stop_loss_pct` |
+| `portfolio` | Portfolio grouping label |
+| `market` | Market code (US, HK) — currently inferred from `internal_cusip` |
 
 ### 1.3 BacktestResults (stored alongside strategy)
 
@@ -162,41 +169,88 @@ performance before and after going live.
 
 ## 2. Trade API Endpoints
 
-The algo trade system runs as a **separate service** (FastAPI) that the backtest
-UI calls via HTTP. This decouples backtest from execution.
+The trade API runs inside the existing FastAPI service (`quant/api/`).
+Endpoints use JWT auth (`require_user`); the user's `app_user_id` scopes all data.
 
-### 2.1 Strategy Management
+### 2.1 Strategy catalog — Phase 1.6
+
+!!! note "Architecture"
+    **Phase 1.6 scope is read-only catalog**, not full strategy CRUD. Persisted strategies are created today via the backtest queue (`POST /api/v1/backtest/jobs` → `BT.SP_INS_STRATEGY`). The Trade picker lists existing `BT.STRATEGY` rows for deployment.
+
+    | Do | Don't |
+    |----|-------|
+    | New `quant/api/strategies/` module + `GET /api/v1/strategies` | Put list logic in `quant/strategy/backtest_service.py` (execution only) |
+    | New `StrategyPicker` + `useStrategies()` on Trade Apply | Reuse Backtest `ConfigDrawer` / `FactorCard` (REFDATA signal-type builder) |
+    | Read `BT.STRATEGY` via SP (e.g. `BT.SP_LIST_STRATEGY`) | Nest under `/api/v1/trade/` — strategies are a BT artifact used by queue and trade |
+
+**Phase 1.6 — implement now:**
 
 ```
-POST   /api/v1/strategies                → Create strategy (accepts StrategyConfig JSON)
-GET    /api/v1/strategies                → List all strategies
-GET    /api/v1/strategies/{id}           → Get strategy details + latest backtest results
+GET    /api/v1/strategies                → List current strategies (IS_CURRENT_IND='Y')
+                                           id, vid, name, optional stats (Sharpe, symbol)
+GET    /api/v1/strategies/{id}           → One strategy + optional latest result     — optional 1.6
+```
+
+Response fields (list): `strategy_id`, `strategy_vid`, `strategy_nm`, `user_id`, optional `sharpe` / `internal_cusip` from latest `BT.RESULT` join.
+
+**Deferred (full CRUD — not 1.6):**
+
+```
+POST   /api/v1/strategies                → Create strategy (StrategyConfig JSON)
 PUT    /api/v1/strategies/{id}           → Update strategy (bumps version)
-DELETE /api/v1/strategies/{id}           → Soft-delete (mark inactive)
+DELETE /api/v1/strategies/{id}           → Soft-delete
 ```
+
+Create/update remain on the jobs/backtest path until a dedicated editor is needed.
+
+**Ownership:** v1 list may return all strategies (globally readable). Phase **1.7** deployment create must verify `BT.STRATEGY.USER_ID` matches caller — see [plan-to-profit §5.5](plan-to-profit.md#55-auth--security-guardrails).
 
 ### 2.2 Deployment (one-click deploy)
 
-```
-POST   /api/v1/deployments               → Deploy strategy (accepts DeploymentConfig JSON)
-GET    /api/v1/deployments               → List active deployments
-GET    /api/v1/deployments/{id}          → Deployment status + recent trades
-PATCH  /api/v1/deployments/{id}          → Update (e.g. toggle enabled, change qty)
-DELETE /api/v1/deployments/{id}          → Stop deployment
-```
-
-### 2.3 Execution Log
+**Implemented (Phase 1.2)** — `quant/api/routers/deployments.py`, mounted at `/api/v1/trade/deployments`:
 
 ```
-GET    /api/v1/deployments/{id}/trades   → Trade history for a deployment
-GET    /api/v1/deployments/{id}/signals  → Signal log (what indicator computed)
+POST   /api/v1/trade/deployments               → Create / re-apply deployment    ✅ live
+GET    /api/v1/trade/deployments               → List deployments for user       ✅ live
+GET    /api/v1/trade/deployments/{id}          → One deployment (current ver.)   ✅ live
 ```
 
-### 2.4 Backtest Results
+**Planned:**
 
 ```
-POST   /api/v1/strategies/{id}/results   → Store backtest results
-GET    /api/v1/strategies/{id}/results   → Get all historical backtest results
+PATCH  /api/v1/trade/deployments/{id}          → Update (toggle enabled, qty)    — planned
+DELETE /api/v1/trade/deployments/{id}          → Stop deployment                 — planned
+```
+
+### 2.3 Credentials — implemented (Phase 1.1)
+
+**Implemented** — `quant/api/credentials/`, mounted at `/api/v1/credentials`:
+
+```
+GET    /api/v1/credentials                     → List user's broker accounts (masked)     ✅ live
+GET    /api/v1/credentials/{id}                → One credential (masked)                  ✅ live
+POST   /api/v1/credentials                     → Save new API key/secret (Fernet at rest)   ✅ live
+PUT    /api/v1/credentials/{id}                → Rotate keys (soft-version bump)          ✅ live
+DELETE /api/v1/credentials/{id}                → Revoke credential                        ✅ live
+```
+
+See [plan-to-profit §1.1](plan-to-profit.md#phase-11--user-secrets) and [login.md §6.4](login.md#64-reuse-from-login--jwt-credential-api--phase-11).
+
+### 2.4 Execution Log — planned (Phase 1.8)
+
+!!! note ""
+    Not yet implemented. DB tables (`TRADE.EXECUTION_EVENT`, `TRADE.TRANSACTION`) and SPs exist; HTTP layer does not.
+
+```
+GET    /api/v1/trade/deployments/{id}/events   → Execution events for deployment — planned
+GET    /api/v1/trade/deployments/{id}/trades   → Filled transactions             — planned
+```
+
+### 2.5 Backtest Results — planned
+
+```
+POST   /api/v1/strategies/{id}/results         → Store backtest results          — planned
+GET    /api/v1/strategies/{id}/results         → Historical backtest results     — planned
 ```
 
 ---
@@ -259,6 +313,8 @@ User clicks "Deploy" in UI
 
 These checks run **before every order** in the Trade API. They are non-negotiable.
 
+**Security / auth:** Server-side enforcement only — the Trade UI Paper/Live toggle and session filter are not authorization boundaries. Live apply requires prior dry-run and explicit confirm (§4.1). Strategy ownership, credential masking, and kill-switch requirements are in [plan-to-profit §5.5](plan-to-profit.md#55-auth--security-guardrails) and Phase [1.7 exit criteria](plan-to-profit.md#phase-17--live-apply).
+
 | Check | Description | Default |
 |-------|-------------|---------|
 | **Kill switch** | `deployment.enabled` must be `true` | — |
@@ -284,26 +340,58 @@ paper=false → Require explicit user confirmation + trade password
 ## 5. Trade Adapter Interface
 
 Abstract the broker so new exchanges can be added without changing signal logic.
+The canonical interface is defined in [Futu Trading §3.4](futu-trading.md#34-abstract-interfaces) and will live in `quant/trade/adapters/base.py`.
 
 ```python
-class TradeAdapter:
-    """Interface all broker adapters must implement."""
+class BrokerSession(ABC):
+    """Lifecycle: connect → (optional unlock) → use → disconnect."""
 
+    @abstractmethod
     def connect(self) -> None: ...
+    @abstractmethod
     def disconnect(self) -> None: ...
-    def place_order(self, symbol: str, qty: int, side: str,
-                    *, order_type: str = "MARKET",
-                    price: float | None = None) -> OrderResult: ...
-    def get_positions(self) -> pd.DataFrame | None: ...
-    def get_orders(self) -> pd.DataFrame | None: ...
-    def get_account_info(self) -> pd.DataFrame | None: ...
-    def apply_signal(self, symbol: str, signal_value: float,
-                     qty: int) -> OrderResult | None: ...
+    @abstractmethod
+    def health(self) -> BrokerSessionState: ...
+
+    def __enter__(self) -> "BrokerSession":
+        self.connect()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.disconnect()
+
+
+class TradeAdapter(BrokerSession):
+    """Broker-agnostic trading surface for the execution loop."""
+
+    @abstractmethod
+    def unlock_live_trading(self, trade_password: str) -> None:
+        """Required for REAL env; no-op or skip for paper."""
+    @abstractmethod
+    def place_order(self, req: OrderRequest) -> OrderResult: ...
+    @abstractmethod
+    def cancel_order(self, vendor_order_id: str) -> OrderResult: ...
+    @abstractmethod
+    def get_open_orders(self, symbol: str | None = None) -> list[dict]: ...
+    @abstractmethod
+    def get_position_qty(self, symbol: str) -> int: ...
+    @abstractmethod
+    def apply_signal(self, symbol: str, signal: float, qty: int) -> OrderResult | None:
+        """Translate {-1,0,1} signal to orders; None if no action."""
 ```
 
-Current adapters:
-- `FutuAdapter` — wraps existing `FutuTrader` (HK/US equities)
-- `BybitAdapter` — future, resume from `backup/deco/bybit._trade.py` (crypto)
+`TradeAdapter` extends `BrokerSession` so the worker can use `with adapter:` uniformly.
+Value objects `OrderRequest`, `OrderResult`, `BrokerSessionState` live in `quant/trade/models/`.
+
+**Adapter registry:** `AdapterRegistry.get(app_id)` resolves `REFDATA.APP` → adapter class (see [Futu Trading §3.1](futu-trading.md#31-principles)).
+
+Planned adapters:
+
+| Adapter | Gateway | Asset class | Reference |
+|---------|---------|-------------|-----------|
+| `FutuAdapter` | `FutuTradeGateway` (OpenD) | HK/US equities | [futu-trading.md](futu-trading.md) |
+| `BybitAdapter` | `CcxtTradeGateway` (ccxt) | Crypto perpetuals | `backup/deco/bybit._trade.py` |
+| `BinanceAdapter` | `CcxtTradeGateway` (ccxt) | Crypto spot/perps | — |
 
 ---
 
@@ -345,8 +433,10 @@ def execute_deployment(deployment, strategy):
         deployment.ticker, final_signal, deployment.qty
     )
 
-    # 6. Log
-    log_trade(deployment, strategy, final_signal, result)
+    # 6. Persist audit rows (no TRADE.INTENT — signal was in-memory for this tick)
+    log_execution_event(deployment, final_signal, result)  # TRADE.EXECUTION_EVENT
+    if result.filled:
+        log_transaction(deployment, result)                # TRADE.TRANSACTION
 ```
 
 ---
@@ -355,27 +445,28 @@ def execute_deployment(deployment, strategy):
 
 Database: **Quant**. Tables use `SCHEMA.TABLE` naming:
 - `BT.` — backtest artifacts and strategy definitions
-- `TRADE.` — live execution records
+- `TRADE.` — live execution records (`DEPLOYMENT`, `EXECUTION_EVENT`, `TRANSACTION` only — no `INTENT`; decision #38)
+- `CORE_ADMIN.` — user accounts, API credentials
+- `INST.` — instrument reference (product cross-reference)
 - `REFDATA.` — reference/lookup data
 
+!!! tip "Source of truth"
+    DDL lives in `db/liquidbase/`. The SQL below mirrors those files. Always run `diff` against the Liquibase source when in doubt (see AGENTS.md §Checking Schema Discrepancies).
+
 ```sql
--- ── BT schema ──
+-- ── BT schema (soft-versioned) ──
 
 CREATE TABLE BT.STRATEGY (
-    STRATEGY_ID    UUID PRIMARY KEY,
-    NAME           TEXT NOT NULL,
-    VERSION        INTEGER,
-    TICKER         TEXT NOT NULL,          -- data-source symbol (e.g. "BTC-USD")
-    CONJUNCTION    TEXT,
-    TRADING_PERIOD INTEGER NOT NULL,
-    CONFIG_JSON    JSONB NOT NULL,         -- full StrategyConfig JSON
-    USER_ID        TEXT,
-    CREATED_AT     TIMESTAMPTZ,
-    UPDATED_AT     TIMESTAMPTZ,
-    IS_CURRENT_IND CHAR(1)
+    STRATEGY_ID    UUID NOT NULL,
+    STRATEGY_VID   INTEGER NOT NULL,
+    STRATEGY_NM    TEXT,
+    CONFIG_JSON    JSONB NOT NULL,         -- full OptimizeRequest payload
+    IS_CURRENT_IND CHAR(1) NOT NULL,
+    USER_ID        TEXT NOT NULL,
+    CREATED_AT     TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (STRATEGY_ID, STRATEGY_VID)
 );
 
--- Current BT.RESULT (see Liquibase db/liquidbase/bt/tables/RESULT.sql)
 CREATE TABLE BT.RESULT (
     RESULT_ID    UUID PRIMARY KEY,        -- client-generated (queue worker)
     QUEUE_ID     UUID NOT NULL,
@@ -384,41 +475,63 @@ CREATE TABLE BT.RESULT (
     CREATED_AT   TIMESTAMPTZ NOT NULL
 );
 
--- ── TRADE schema ──
+-- ── TRADE schema (soft-versioned deployment, append-only event/txn) ──
 
 CREATE TABLE TRADE.DEPLOYMENT (
-    DEPLOYMENT_ID    UUID PRIMARY KEY,
-    STRATEGY_ID      UUID NOT NULL,
-    PORTFOLIO        TEXT,
-    USER_ID          TEXT NOT NULL,
-    BROKER           TEXT NOT NULL,
-    TICKER           TEXT NOT NULL,
-    QTY              INTEGER NOT NULL,
-    PAPER            CHAR(1),
-    MARKET           TEXT,
-    SCHEDULE         TEXT,
-    ENABLED          CHAR(1),
-    RISK_LIMITS_JSON JSONB,
-    CREATED_AT       TIMESTAMPTZ
+    DEPLOYMENT_ID       UUID NOT NULL,
+    DEPLOYMENT_VID      INTEGER NOT NULL,         -- bumps on config change
+    APP_USER_ID         UUID NOT NULL,            -- owner
+    STRATEGY_ID         UUID NOT NULL,            -- FK → BT.STRATEGY
+    STRATEGY_VID        INTEGER NOT NULL,         -- pinned strategy version
+    API_CREDENTIAL_ID   INTEGER NOT NULL,         -- FK → CORE_ADMIN.API_CREDENTIAL
+    APP_ID              INTEGER NOT NULL,         -- FK → REFDATA.APP (broker)
+    INTERNAL_CUSIP      TEXT NOT NULL,            -- platform product ID
+    QTY                 NUMERIC NOT NULL,
+    IS_PAPER_IND        CHAR(1) NOT NULL,         -- Y = paper / testnet
+    IS_ENABLED_IND      CHAR(1) NOT NULL,         -- kill switch
+    DEPLOYMENT_STATUS   TEXT NOT NULL,             -- CREATED / ACTIVE / PAUSED / STOPPED
+    TRANSACT_FROM_TS    TIMESTAMPTZ NOT NULL,
+    TRANSACT_TO_TS      TIMESTAMPTZ NOT NULL,     -- 9999-12-31 = current
+    USER_ID             TEXT NOT NULL,
+    CREATED_AT          TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (DEPLOYMENT_ID, DEPLOYMENT_VID)
 );
 
-CREATE TABLE TRADE.LOG (
-    LOG_ID        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    DEPLOYMENT_ID UUID NOT NULL,
-    TIMESTAMP     TIMESTAMPTZ,
-    SIGNAL_VALUE  NUMERIC,
-    ACTION        TEXT,                   -- BUY, SELL, HOLD, REJECTED
-    QTY           INTEGER,
-    ORDER_ID      TEXT,
-    SUCCESS       CHAR(1),
-    MESSAGE       TEXT,
-    USER_ID       TEXT,
-    CREATED_AT    TIMESTAMPTZ
+CREATE TABLE TRADE.EXECUTION_EVENT (
+    EXECUTION_EVENT_ID  UUID NOT NULL PRIMARY KEY,
+    DEPLOYMENT_ID       UUID NOT NULL,
+    DEPLOYMENT_VID      INTEGER NOT NULL,
+    SIGNAL_VALUE        NUMERIC,
+    BUY_SELL_CD         TEXT NOT NULL,             -- BUY, SELL, HOLD, REJECTED
+    QUANTITY            NUMERIC,
+    VENDOR_ORDER_ID     TEXT,
+    IS_SUCCESS_IND      CHAR(1) NOT NULL,
+    USER_ID             TEXT NOT NULL,
+    CREATED_AT          TIMESTAMPTZ NOT NULL
 );
 
--- ── REFDATA schema ──
+CREATE TABLE TRADE.TRANSACTION (
+    TRANSACTION_ID      UUID NOT NULL PRIMARY KEY,
+    DEPLOYMENT_ID       UUID NOT NULL,
+    APP_ID              INTEGER NOT NULL,
+    ORDER_STATE_ID      INTEGER,
+    TRANS_STATE_ID      INTEGER,
+    INTERNAL_CUSIP      TEXT NOT NULL,
+    VENDOR_SYMBOL       TEXT,
+    BUY_SELL_CD         TEXT NOT NULL,
+    TRANS_CCY_CD        TEXT NOT NULL,
+    QUANTITY            NUMERIC,
+    PRICE               NUMERIC,
+    NOTIONAL_AMT        NUMERIC,
+    FEE_AMT             NUMERIC,
+    VENDOR_ORDER_ID     TEXT,
+    USER_ID             TEXT NOT NULL,
+    CREATED_AT          TIMESTAMPTZ NOT NULL
+);
 
--- TICKER_MAPPING has been dropped. Vendor-symbol mapping now lives in INST.PRODUCT_XREF.
+-- ── REFDATA / INST ──
+
+-- Vendor-symbol mapping lives in INST.PRODUCT_XREF.
 -- See docs/architecture/database.md for the INST schema design.
 ```
 
@@ -462,27 +575,28 @@ pass `window` and `signal` explicitly to `strategy_to_json(cfg, window=20, signa
 
 ## 9. Implementation Order
 
-| Step | What | Depends on |
-|------|------|------------|
-| 1 | Define JSON schema (this doc) | — |
-| 2 | `strategy_to_json()` + `backtest_results_to_json()` serializers in `strat.py` | Phase 1 (done) |
-| 3 | DB schema + migrations in `db/sql/` | Step 1 |
-| 4 | FastAPI Trade API service (separate `trade_api/` package) | Steps 1–3 |
-| 5 | `TradeAdapter` interface + `FutuAdapter` wrapping `FutuTrader` | Step 4 |
-| 6 | Signal execution loop + scheduler | Steps 4–5 |
-| 7 | Risk checks module | Step 6 |
-| 8 | "Deploy" button in Streamlit/TS UI | Steps 2–7 |
-| 9 | Execution log + monitoring dashboard | Step 6 |
+| Step | What | Status | Depends on |
+|------|------|--------|------------|
+| 1 | Define JSON schema (this doc) | done | — |
+| 2 | `strategy_to_json()` + `backtest_results_to_json()` serializers | done | Step 1 |
+| 3 | DB schema + Liquibase migrations (`db/liquidbase/trade/`) | done | Step 1 |
+| 4 | FastAPI Trade API (`quant/api/routers/deployments.py`) | done (GET/POST) | Steps 1–3 |
+| 5 | Credentials API (`/api/v1/credentials`) — Phase 1.1 | — | Step 3 |
+| 6 | `TradeAdapter` interface + `FutuAdapter` + `AdapterRegistry` | — | Step 4 — [futu-trading.md](futu-trading.md) |
+| 7 | Signal execution loop + scheduler (`DeploymentExecutor`) | — | Steps 5–6 |
+| 8 | Risk checks module (`RiskRules`) | — | Step 7 |
+| 9 | Deploy / Apply in React Trade UI | — (shell exists) | Steps 5–8 |
+| 10 | Execution log + monitoring dashboard (Phase 1.8) | — | Step 7 |
 
 ---
 
 ## 10. Open Questions
 
 1. **Scheduler**: Use APScheduler (Python) or system cron? APScheduler keeps state in-process; cron is simpler but stateless.
-2. **Multi-ticker**: Should one deployment handle multiple tickers, or one deployment per ticker?
+2. ~~**Multi-ticker**: Should one deployment handle multiple tickers, or one deployment per ticker?~~ **Resolved:** one deployment = one ticker (`INTERNAL_CUSIP`).
 3. **Position sizing**: Current design is fixed `qty`. Future: fractional/proportional sizing based on portfolio value.
 4. **Rebalance frequency**: `daily_close` is straightforward. Intraday signals need streaming data — significantly more complex.
-5. **Auth**: Trade API needs authentication. JWT tokens? API keys? Tied to `user` field.
+5. ~~**Auth**: Trade API needs authentication. JWT tokens? API keys? Tied to `user` field.~~ **Resolved:** JWT via `require_user` + `CurrentUser.app_user_id`. All deployment rows scoped to `APP_USER_ID`.
 
 ---
 

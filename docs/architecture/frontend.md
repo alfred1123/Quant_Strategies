@@ -2,6 +2,8 @@
 
 A single-page React + TypeScript application that replaces the Streamlit dashboard as the primary UI.
 
+See [System Overview](overview.md) for product surfaces and [Trade UI](#trade-ui-phase-14) below for the live-trading shell.
+
 !!! note "See also"
     The [Frontend Code Audit](../design/frontend-audit.md) lists known design issues and remediation directions.
 
@@ -45,7 +47,50 @@ Open `http://localhost:5173`. The Vite dev server proxies `/api` requests to the
 - **Walk-forward analysis** — in-sample vs out-of-sample comparison with overfitting ratio
 - **CSV download** of full grid search results
 - **Authentication** — cookie-based login; 401 interceptor auto-redirects to `/login`
-- **Client-side routing** — `/login` (guest-only) and `/` (auth-required) as separate URLs via `react-router-dom`
+- **Client-side routing** — `/login` (guest-only), `/backtest`, `/trade/config`, `/trade/apply` (auth-required) via `react-router-dom`
+- **Trade UI (Phase 1.4+)** — multi-broker layout with compact Exchange / Account filters, Paper / Live toggle, accounts table on Config (credentials CRUD), deployments table on Trade (see [Trade UI](#trade-ui-phase-14) below)
+
+## Trade UI (Phase 1.4+)
+
+Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Backtest vs Trade mode.
+
+| Route | Page | Purpose |
+|-------|------|---------|
+| `/trade/config` | `TradeConfigPage` | Register broker accounts — table + compact add form |
+| `/trade/apply` | `TradeApplyPage` | Strategy picker, deployments table, dry-run / apply buttons |
+
+**Layout:** `TradeLayout` — permanent sidebar (Config \| Trade), **filter toolbar** (`TradeNavBar`), main content (`<Outlet />`), bottom execution-log placeholder.
+
+**Session state:** `TradeSessionProvider` (`trade/TradeSessionContext.tsx`) holds:
+
+- `brokerFilter` / `accountFilter` — toolbar Exchange and Account dropdowns (`ALL_BROKERS` / `ALL_ACCOUNTS` = no filter)
+- `tradingMode` — `'paper' | 'live'` toggle
+- `accounts` — from `useBrokerAccounts()` → `GET /api/v1/credentials`
+- `matchesSession()` — filters deployment rows by toolbar selection
+
+**Components:**
+
+| Component | Role |
+|-----------|------|
+| `TradeNavBar` | Compact Exchange (~160px) + Account (~200px) selects; Paper / Live `ToggleButtonGroup` |
+| `BrokerAccountsTable` | Exchange · Account · masked key · Status; **Rotate** / **Revoke** dialogs; row click sets account filter |
+| `TradeConfigPage` | Accounts table + add-account form wired to credentials API (create) |
+| `StrategyPicker` | **Phase 1.6 (planned)** — selectable list of `BT.STRATEGY` rows via `GET /api/v1/strategies` |
+| `TradeApplyPage` | Deployments table filtered by toolbar; `StrategyPicker` placeholder until 1.6; `useDeployments()` |
+
+**Strategy picker (1.6) — not Backtest config UI**
+
+The Backtest **Strategy** dropdown in `FactorCard` is a REFDATA `signal_type` (momentum, etc.) used to *build* an optimize request. The Trade picker selects a **persisted** `BT.STRATEGY` row (`strategy_id`, `strategy_vid`, `strategy_nm`) for deployment. Do not reuse `ConfigDrawer` / `FactorCard`.
+
+| Backtest | Trade picker |
+|----------|--------------|
+| `FactorCard` → REFDATA signal type | `StrategyPicker` → `BT.STRATEGY` catalog |
+| Creates config for new job | Selects existing strategy for apply |
+| `POST /api/v1/backtest/jobs` | `GET /api/v1/strategies` |
+
+See [plan-to-profit §1.6](../design/plan-to-profit.md#phase-16--strategy-picker) and [trade-api §2.1](../design/trade-api.md#21-strategy-catalog--phase-16).
+
+Dropdowns use MUI `size="small"` and fixed widths — not full-width form fields.
 
 ## Project Structure
 
@@ -57,14 +102,23 @@ frontend/src/
 │
 ├── types/                # TypeScript interfaces (no logic)
 │   ├── backtest.ts       # BacktestConfig, FactorConfig, API request/response types
-│   └── refdata.ts        # IndicatorRow, AssetTypeRow, ProductRow, etc.
+│   ├── credentials.ts    # BrokerAccount, TradingMode, filter constants
+│   ├── refdata.ts        # IndicatorRow, AssetTypeRow, ProductRow, AppRow, etc.
+│   └── trade.ts          # DeploymentRow, create-deployment request (Phase 1.2)
+│   # strategies.ts       # StrategyRow — Phase 1.6 (not yet in repo)
 │
 ├── api/                  # HTTP + data-fetching layer
 │   ├── client.ts         # Axios instance (baseURL, credentials, 401 interceptor)
 │   ├── refdata.ts        # React Query hooks: useIndicators(), useAssetTypes(), etc.
 │   ├── inst.ts           # useProducts() hook
 │   ├── backtest.ts       # runOptimizeStream() (SSE), runPerformance(), runWalkForward()
-│   └── auth.ts           # useMe(), login(), logout()
+│   ├── auth.ts           # useMe(), login(), logout()
+│   ├── trade.ts          # useDeployments(), useCreateDeployment() (Phase 1.2)
+│   └── credentials.ts    # useBrokerAccounts(), useCreateCredential(), useRotateCredential(), useRevokeCredential()
+│   # strategies.ts       # useStrategies() — Phase 1.6 (not yet in repo)
+│
+├── trade/
+│   └── TradeSessionContext.tsx  # Shared broker/account/mode filters (Phase 1.4)
 │
 ├── lib/                  # Shared singletons
 │   ├── queryClient.ts    # TanStack Query client (shared so interceptors can mutate cache)
@@ -92,11 +146,22 @@ frontend/src/
 │   ├── HeatmapChart.tsx  # Plotly Sharpe heatmap (window × signal)
 │   ├── EquityCurveChart.tsx  # Plotly equity + drawdown chart
 │   ├── UserMenu.tsx      # User avatar + logout
-│   └── ErrorBoundary.tsx # React error boundary
+│   ├── AppModeSwitch.tsx # Backtest | Trade header toggle
+│   ├── ErrorBoundary.tsx # React error boundary
+│   └── trade/
+│       ├── TradeNavBar.tsx         # Exchange / Account filters + Paper / Live toggle
+│       └── BrokerAccountsTable.tsx # Multi-broker accounts table (Config page)
+│   # StrategyPicker.tsx            # Phase 1.6 (not yet in repo)
+│
+├── layouts/
+│   └── TradeLayout.tsx   # Trade shell — sidebar, toolbar, outlet, execution log
 │
 └── pages/
     ├── BacktestPage.tsx  # Main page — orchestrates config, optimization, results
-    └── LoginPage.tsx     # Login form
+    ├── LoginPage.tsx     # Login form
+    └── trade/
+        ├── TradeConfigPage.tsx  # Exchange accounts table + add form
+        └── TradeApplyPage.tsx   # Deployments table + StrategyPicker
 ```
 
 ## Reading Guide — Where to Start
@@ -137,7 +202,7 @@ Once you know these shapes, every function signature and component prop makes se
 ### Layer 5: Pages (`pages/`) — orchestration
 
 - **`BacktestPage.tsx`** — The main page. Owns all state (`useState` for config, results, progress, errors). Wires `ConfigDrawer` → `buildOptimizeRequest()` → `runOptimizeStream()` → results components. This is the file to read to understand the full data flow. Reads `currentUser` from `useMe()` hook directly.
-- **`App.tsx`** — Sets up `BrowserRouter`, MUI dark theme, and `ErrorBoundary`. Defines two route wrappers: `RequireAuth` (redirects to `/login` if not authenticated) and `GuestOnly` (redirects to `/` if already authenticated). Routes: `/login` → `LoginPage`, `/` → `BacktestPage`, `/*` → redirect to `/`.
+- **`App.tsx`** — Sets up `BrowserRouter`, MUI dark theme, and `ErrorBoundary`. Routes: `/login`, `/backtest`, `/trade/config`, `/trade/apply` (nested under `TradeLayout`). `RequireAuth` / `GuestOnly` wrappers gate auth.
 - **`LoginPage.tsx`** — Login form. On success, navigates to `/` (or the page that triggered the auth redirect via `location.state.from`).
 - **`main.tsx`** — Mounts `<App />` inside `<QueryClientProvider>` and `<StrictMode>`.
 
@@ -183,7 +248,7 @@ All dropdowns are populated from the backend `GET /api/v1/refdata/{table_name}` 
 | Asset Type | `useAssetTypes()` | `REFDATA.ASSET_TYPE` |
 | Conjunction | `useConjunctions()` | `REFDATA.CONJUNCTION` |
 | Data Column | `useDataColumns()` | `REFDATA.DATA_COLUMN` |
-| App (data source) | `useApps()` | `REFDATA.APP` |
+| App (data source / exchange) | `useApps()` | `REFDATA.APP` (`IS_EXCHANGE_IND` filters broker dropdown on Trade Config) |
 
 ## Build for Production
 

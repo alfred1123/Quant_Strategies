@@ -15,11 +15,15 @@ BACKEND_PORT=8000
 DEV_FRONTEND_PORT=5173
 
 # Load .env early so DB_TARGET / QUANTDB_* / SSM_* overrides apply in dev too.
+_db_target_override="${DB_TARGET:-}"
 if [[ -f "$ROOT_DIR/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
   source "$ROOT_DIR/.env"
   set +a
+fi
+if [[ -n "${_db_target_override}" ]]; then
+  DB_TARGET="${_db_target_override}"
 fi
 
 # DB_TARGET selects where dev's API connects:
@@ -38,7 +42,7 @@ else
 fi
 
 # AWS SSM port-forward target (override via .env if needed).
-SSM_TARGET_INSTANCE="${SSM_TARGET_INSTANCE:-i-03a670ddc9169233a}"
+SSM_TARGET_INSTANCE="${SSM_TARGET_INSTANCE:-i-026d3c6d323144663}"
 SSM_RDS_HOST="${SSM_RDS_HOST:-quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com}"
 SSM_REMOTE_PORT="${SSM_REMOTE_PORT:-5432}"
 SSM_AWS_PROFILE="${SSM_AWS_PROFILE:-alfcheun}"

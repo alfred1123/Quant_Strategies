@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.2.0-001-drop-legacy-trade-tables" author="alfcheun" context="trade" runOnChange="false">
+        <comment>Phase 1.2 — drop v1.0.0 sketch tables (LOG, old DEPLOYMENT/TRANSACTION)</comment>
+        <sql>
+            DROP TABLE IF EXISTS TRADE.LOG;
+            DROP TABLE IF EXISTS TRADE.TRANSACTION;
+            DROP TABLE IF EXISTS TRADE.DEPLOYMENT;
+        </sql>
+        <rollback>
+            <comment>Legacy sketch DDL — restore from archive/baseline-1.0.0.xml if needed</comment>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.2.0-002-trade-deployment" author="alfcheun" context="trade" runOnChange="false">
+        <comment>Phase 1.2 — TRADE.DEPLOYMENT (soft-versioned, TRANSACT_FROM/TO)</comment>
+        <sqlFile path="../tables/DEPLOYMENT.sql" relativeToChangelogFile="true"
+                 splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS TRADE.DEPLOYMENT;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="1.2.0-003-trade-execution-event" author="alfcheun" context="trade" runOnChange="false">
+        <comment>Phase 1.2 — TRADE.EXECUTION_EVENT (replaces LOG)</comment>
+        <sqlFile path="../tables/EXECUTION_EVENT.sql" relativeToChangelogFile="true"
+                 splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS TRADE.EXECUTION_EVENT;</sql></rollback>
+    </changeSet>
+
+    <changeSet id="1.2.0-004-trade-transaction" author="alfcheun" context="trade" runOnChange="false">
+        <comment>Phase 1.2 — TRADE.TRANSACTION (broker-confirmed fills)</comment>
+        <sqlFile path="../tables/TRANSACTION.sql" relativeToChangelogFile="true"
+                 splitStatements="true" stripComments="true"/>
+        <rollback><sql>DROP TABLE IF EXISTS TRADE.TRANSACTION;</sql></rollback>
+    </changeSet>
+
+</databaseChangeLog>

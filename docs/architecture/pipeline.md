@@ -1,6 +1,37 @@
 # Pipeline Architecture
 
-## Data Flow
+See also [System Overview](overview.md) for the full stack (API, worker, Redis, schemas).
+
+## System context
+
+```mermaid
+flowchart TB
+  subgraph HTTP["FastAPI (quant/api)"]
+    BT_R[backtest + jobs]
+    TR_R[deployments + credentials]
+    RD[refdata + inst]
+  end
+
+  subgraph Worker["quant.queue.worker_loop"]
+    CL[claim_next via SP_INS_QUEUE]
+    SP[subprocess: quant.queue.worker]
+  end
+
+  REDIS[(Redis)]
+  PG[(PostgreSQL)]
+
+  BT_R --> PG
+  TR_R --> PG
+  RD --> REDIS
+  RD --> PG
+  CL --> PG
+  SP --> PG
+  SP --> REDIS
+  BT_R -->|enqueue wake| REDIS
+  CL -->|BLPOP bt:queue:wake| REDIS
+```
+
+## Backtest data flow
 
 ```mermaid
 graph LR
@@ -50,8 +81,14 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/strategy/performance.py` | `Performance` | PnL engine — single or multi-factor, with transaction costs. |
 | `quant/strategy/optimizer.py` | `ParametersOptimization` | Grid search (Cartesian or Optuna TPE/Grid sampler). |
 | `quant/strategy/walk_forward.py` | `WalkForward` | IS/OOS split, optimize on IS, evaluate on OOS. |
-| `quant/trade.py` | `FutuTrader` | Paper/live order execution via Futu OpenD. |
+| `quant/trade/futu_trader.py` | `FutuTrader` | Paper/live order execution via Futu OpenD (CLI / legacy). |
+| `quant/trade/service.py` | `TradeService` | Deployment create/list — validates then calls `TradeRepo` SPs (Phase 1.2). |
+| `quant/trade/db_repo.py` | `TradeRepo` | `CALL TRADE.SP_INS/GET_DEPLOYMENT` via `DbGateway`. |
+| `quant/api/credentials/service.py` | `CredentialService` | Fernet encrypt/decrypt; masks keys in API responses (Phase 1.1). |
+| `quant/api/credentials/repo.py` | `ApiCredentialRepo` | `CALL CORE_ADMIN.SP_*_API_CREDENTIAL` via `DbGateway`. |
+| `quant/shared/secrets_crypto.py` | `CredentialCrypto` | Resolves `EXCHANGE_SECRETS_KEY` (prod fail-fast); Fernet wrapper. |
 | `quant/cli.py` | `main()` | CLI entry point (`python -m quant.cli`) — orchestrates the full pipeline for single-symbol scripted runs. |
+| `quant/queue/worker_loop.py` | `main()` | Long-lived daemon — orphan recovery, `claim_next`, spawn worker subprocesses, BLPOP wake channel. |
 | `quant/queue/worker.py` | `WorkerRepo`, `main()` | Per-job backtest worker (`python -m quant.queue.worker <queue_id>`) — reads frozen `CONFIG_JSON`, runs optimize, writes `BT.RESULT`, drives `BT.QUEUE` terminal transitions. |
 
 ## Multi-Factor Flow

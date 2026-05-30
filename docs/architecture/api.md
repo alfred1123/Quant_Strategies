@@ -1,6 +1,8 @@
 # FastAPI Backend
 
-The `quant/api/` directory contains the FastAPI application that serves the backtest pipeline as a REST API. All `/api/v1/*` routes (except auth and health) require an authenticated session.
+The `quant/api/` directory contains the FastAPI application for backtest, trade, and shared REFDATA endpoints. All `/api/v1/*` routes (except auth and health) require an authenticated session.
+
+See [System Overview](overview.md) for the full stack.
 
 !!! note "Queue endpoints"
     `/api/v1/backtest/jobs/*` (the backtest queue) is served by this FastAPI process — see decision #32 and [Queued Background Backtests](../design/backtest-queue.md). The Python `quant.queue.worker_loop` daemon (separate container) consumes jobs from `BT.QUEUE`; all HTTP terminates here.
@@ -13,7 +15,9 @@ The `quant/api/` directory contains the FastAPI application that serves the back
 | **Backtest** | `/api/v1/backtest/*` | Sync optimize / performance / walk-forward |
 | **Backtest queue** | `/api/v1/backtest/jobs/*` | Async `BT.QUEUE` jobs |
 | **Shared config** | `/api/v1/refdata/*`, `/api/v1/inst/*` | Used by Backtest and Trade UIs |
-| **Trade (planned)** | `/api/v1/credentials/*`, `/api/v1/trade/*` | Credentials (1.1); deployments / apply / log (1.2+) |
+| **Trade — deployments** | `/api/v1/trade/deployments/*` | **Done** (Phase 1.2) |
+| **Trade — credentials** | `/api/v1/credentials/*` | **Done** (Phase 1.1) |
+| **Trade — strategies** | `/api/v1/strategies` | Planned (Phase 1.6) |
 
 UI mode (`/backtest` vs `/trade`) does **not** change these URLs — each page calls the appropriate prefix.
 
@@ -55,19 +59,35 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `POST` | `/api/v1/backtest/jobs/{queue_id}/reenqueue` | Re-enqueue from a terminal row. |
 | `GET`  | `/api/v1/backtest/jobs/{queue_id}/events` | SSE stream of job progress events. |
 
-### Trade (planned — Phase 1.1+)
+### Trade (Phase 1.2 — deployments)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/trade/deployments` | Required | Create or re-apply a deployment. |
+| `GET` | `/api/v1/trade/deployments` | Required | List current deployments for the authenticated user. |
+| `GET` | `/api/v1/trade/deployments/{id}` | Required | One deployment (current version). |
+
+### Credentials (Phase 1.1 — implemented)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/api/v1/credentials` | Required | List current user's exchange credentials (masked). |
-| `GET` | `/api/v1/credentials/{id}` | Required | One credential (masked). |
-| `POST` | `/api/v1/credentials` | Required | Save new broker API key pair. |
-| `PUT` | `/api/v1/credentials/{id}` | Required | Rotate keys. |
-| `DELETE` | `/api/v1/credentials/{id}` | Required | Revoke. |
-| `POST` | `/api/v1/trade/deployments` | Required | Apply strategy (1.2 skeleton). |
-| `GET` | `/api/v1/trade/deployments/{id}` | Required | Deployment status (1.2). |
+| `GET` | `/api/v1/credentials/{id}` | Required | One credential (masked). **404** if not owned (never 403). |
+| `POST` | `/api/v1/credentials` | Required | Save new broker API key pair. Rate-limited 5/15min per IP. |
+| `PUT` | `/api/v1/credentials/{id}` | Required | Rotate keys (soft-version bump). Rate-limited 5/15min per IP. |
+| `DELETE` | `/api/v1/credentials/{id}` | Required | Revoke (soft-version; clears ciphertext). Returns 204. |
 
-See [Plan to Profit §5.2](../design/plan-to-profit.md#52-api-url-layout).
+Keys are Fernet-encrypted in Python (`quant/shared/secrets_crypto.py`) before `CALL CORE_ADMIN.SP_INS_API_CREDENTIAL`. Responses never include `*_CIPHERTEXT`. Broker is identified by `app_id` (`REFDATA.APP`).
+
+See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11--user-secrets) and [Login §6.4](../design/login.md#64-reuse-from-login--jwt-credential-api--phase-11).
+
+### Strategies (planned — Phase 1.6)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/strategies` | Required | List persisted `BT.STRATEGY` rows for the strategy picker (Trade Apply). |
+
+Not the same as REFDATA `signal_type` — see [trade-api §2.1](../design/trade-api.md#21-strategy-catalog--phase-16).
 
 ### REFDATA / Instruments (shared)
 
@@ -125,7 +145,7 @@ Backend implementation: `queue.Queue` + `threading.Thread` + `asyncio.to_thread`
 
 ## Caches: REFDATA, INST, BT
 
-At startup the FastAPI lifespan hook builds a `quant.refdata.bundle.DataCaches` bundle wired to Postgres + Redis:
+At startup the FastAPI lifespan hook also builds `CredentialCrypto` (Fernet key from `EXCHANGE_SECRETS_KEY` — prod fail-fast) and a `DataCaches` bundle wired to Postgres + Redis:
 
 - **`RefDataPublisher`** (`quant/refdata/publisher.py`) — first runs `publish_all()`, which discovers every `REFDATA.*` table via `information_schema`, calls `REFDATA.SP_GET_ENUM`, and writes JSON snapshots under `refdata:<table>` plus a bumped `refdata:version` key in Redis. The same call is exposed at `POST /api/v1/refdata/refresh` for ad-hoc reseeding.
 - **`RedisRefData`** (`quant/refdata/reader.py`) — read-only accessor used by request handlers and the worker. Checks `refdata:version` on every `get()` and rebuilds its local snapshot lazily on bump, so long-lived processes always see the current REFDATA without pub/sub.
@@ -146,8 +166,14 @@ quant/api/
 │   ├── dependencies.py  # require_user FastAPI dependency
 │   ├── repo.py          # AuthRepo — calls SP_GET_APP_USER_BY_*
 │   └── models.py        # Pydantic models (LoginRequest, etc.)
+├── credentials/         # Phase 1.1 — exchange API keys
+│   ├── router.py        # /api/v1/credentials/* (rate-limited POST/PUT)
+│   ├── service.py       # CredentialService — Fernet encrypt, mask responses
+│   ├── repo.py          # ApiCredentialRepo — SP_INS/GET/REVOKE
+│   └── schemas.py       # CreateCredentialRequest, CredentialResponse, …
 ├── routers/
 │   ├── backtest.py      # /api/v1/backtest/* endpoints
+│   ├── deployments.py   # /api/v1/trade/deployments/* (Phase 1.2)
 │   ├── jobs.py          # /api/v1/backtest/jobs/* endpoints
 │   ├── refdata.py       # /api/v1/refdata/* endpoints
 │   └── inst.py          # /api/v1/inst/* endpoints
@@ -157,8 +183,11 @@ quant/api/
 └── services/
     └── jobs.py          # Enqueue, list, cancel, SSE broker
 
-quant/shared/config.py   # Settings, env/SSM loading (not under api/)
+quant/shared/config.py              # Settings, env/SSM loading (not under api/)
+quant/shared/secrets_crypto.py      # CredentialCrypto — EXCHANGE_SECRETS_KEY + Fernet
 quant/strategy/backtest_service.py  # Backtest orchestration (called from routers)
+quant/trade/service.py              # TradeService — deployments (Phase 1.2)
+quant/trade/db_repo.py              # TradeRepo — SP_INS/GET_DEPLOYMENT
 ```
 
 REFDATA, INST, and BT cache classes live under `quant/refdata/` and `quant/data/` (shared between the API and the worker via `quant/refdata/bundle.py::DataCaches`). All Postgres access goes through `quant/shared/db.py::DbGateway` — no other module in `quant/` or `quant/api/` imports `psycopg`.

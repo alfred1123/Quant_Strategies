@@ -71,6 +71,6 @@ describe('App routing', () => {
 
     window.history.pushState({}, '', '/trade/config');
     renderApp(<App />);
-    expect(screen.getByText(/Phase 1\.5/)).toBeInTheDocument();
+    expect(screen.getByText(/Exchange accounts/)).toBeInTheDocument();
   });
 });

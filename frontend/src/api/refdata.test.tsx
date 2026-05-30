@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode } from 'react';
-import { useIndicators, useSignalTypes, useAssetTypes, useConjunctions, useDataColumns, useApps } from './refdata';
+import { useIndicators, useSignalTypes, useAssetTypes, useConjunctions, useDataColumns, useApps, useExchangeApps } from './refdata';
 import { apiClient } from './client';
 
 vi.mock('./client', () => ({
@@ -46,5 +46,22 @@ describe.each(hookTable)('%s', (_name, hook) => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(rows);
+  });
+});
+
+describe('useExchangeApps', () => {
+  it('filters to only IS_EXCHANGE_IND=Y rows', async () => {
+    const allApps = [
+      { app_id: 1, name: 'yahoo', display_name: 'Yahoo Finance', class_name: 'YahooFinance', is_exchange_ind: 'N', description: null },
+      { app_id: 2, name: 'bybit', display_name: 'Bybit', class_name: 'Bybit', is_exchange_ind: 'Y', description: null },
+      { app_id: 3, name: 'futu', display_name: 'Futu OpenD', class_name: 'FutuOpenD', is_exchange_ind: 'Y', description: null },
+    ];
+    mockedGet.mockResolvedValue({ data: allApps });
+
+    const { result } = renderHook(() => useExchangeApps(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toHaveLength(2);
+    expect(result.current.data?.map(a => a.name)).toEqual(['bybit', 'futu']);
   });
 });

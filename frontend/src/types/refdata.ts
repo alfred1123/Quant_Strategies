@@ -37,6 +37,7 @@ export interface AppRow {
   name: string;
   display_name: string;
   class_name: string;
+  is_exchange_ind: 'Y' | 'N';
   description: string | null;
 }
 

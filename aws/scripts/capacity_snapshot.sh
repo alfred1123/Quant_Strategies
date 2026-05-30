@@ -8,7 +8,7 @@
 #   cd /opt/quant && bash aws/scripts/capacity_snapshot.sh
 #
 # Remotely via SSM (replace instance id / profile / region):
-#   aws ssm send-command --instance-ids i-096f85bf84852cce3 \
+#   aws ssm send-command --instance-ids i-026d3c6d323144663 \
 #     --document-name AWS-RunShellScript \
 #     --parameters 'commands=["cd /opt/quant && bash aws/scripts/capacity_snapshot.sh"]' \
 #     --region ap-southeast-1

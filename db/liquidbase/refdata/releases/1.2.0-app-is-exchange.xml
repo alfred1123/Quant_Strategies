@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.2.0-001-app-add-is-exchange-ind" author="alfcheun" context="refdata" runOnChange="false">
+        <comment>Add IS_EXCHANGE_IND to REFDATA.APP — distinguishes brokers/exchanges from data providers</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE REFDATA.APP
+                ADD COLUMN IF NOT EXISTS IS_EXCHANGE_IND CHAR(1);
+
+            UPDATE REFDATA.APP SET IS_EXCHANGE_IND = 'Y' WHERE NAME = 'futu';
+            UPDATE REFDATA.APP SET IS_EXCHANGE_IND = 'Y' WHERE NAME = 'bybit';
+            UPDATE REFDATA.APP SET IS_EXCHANGE_IND = 'N' WHERE NAME = 'yahoo';
+            UPDATE REFDATA.APP SET IS_EXCHANGE_IND = 'N' WHERE NAME = 'glassnode';
+            UPDATE REFDATA.APP SET IS_EXCHANGE_IND = 'N' WHERE NAME = 'nasdaq_data_link';
+
+            ALTER TABLE REFDATA.APP
+                ALTER COLUMN IS_EXCHANGE_IND SET NOT NULL;
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE REFDATA.APP DROP COLUMN IF EXISTS IS_EXCHANGE_IND;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

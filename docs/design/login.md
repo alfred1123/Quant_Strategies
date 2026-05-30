@@ -138,7 +138,7 @@ Separate from login passwords. Stores **broker API key + secret** per app user, 
 
 No `USER_ID` audit column (same rule as `APP_USER`). No `UPDATED_AT` — new row per version. Full spec: [Plan to Profit §1.1](plan-to-profit.md#phase-11--user-secrets), decision #36.
 
-**Not stored here:** trade execution history (`TRADE.LOG` / `TRANSACTION`), deployment state (`TRADE.DEPLOYMENT`), or ephemeral broker “connections.”
+**Not stored here:** trade execution history (`TRADE.EXECUTION_EVENT` / `TRANSACTION`), deployment state (`TRADE.DEPLOYMENT`), or ephemeral broker “connections.”
 
 ### 6.4 Reuse from login / JWT (credential API — Phase 1.1)
 
@@ -157,7 +157,7 @@ Exchange API keys use the **same auth gate and repo patterns** as login, but **d
 | Active row check | `_app_user_row_is_active()` | Same `IS_ACTIVE_IND == 'Y'` check before internal decrypt (Bybit adapter) |
 | Ownership | Jobs API uses `str(user.app_user_id)` | Pass `APP_USER_ID` into every credential SP; return **404** for other users' ids (no leak) |
 | Request hygiene | `LoginRequest` strips password | Strip whitespace on `api_key` / `api_secret` in Pydantic |
-| Rate limit | `@limiter.limit("5/15minutes")` on login | Optional on `POST`/`PUT` credentials |
+| Rate limit | `@limiter.limit("5/15minutes")` on login | **Required** on `POST`/`PUT` credentials (Phase 1.1) |
 | Config load | `load_config()` + SSM `/quant/{env}/` | Loads `EXCHANGE_SECRETS_KEY` alongside `JWT_SECRET` |
 
 **Do not reuse**
@@ -178,7 +178,9 @@ quant/shared/secrets_crypto.py   # Fernet + EXCHANGE_SECRETS_KEY resolution
 quant/api/credentials/       # repo, service, router, schemas
 ```
 
-See [Plan to Profit §1.1](plan-to-profit.md#phase-11--user-secrets) and [env-vars.md](../env-vars.md) (`EXCHANGE_SECRETS_KEY`).
+See [Plan to Profit §1.1](plan-to-profit.md#phase-11--user-secrets), [§5.5 Auth & security guardrails](plan-to-profit.md#55-auth--security-guardrails), and [env-vars.md](../env-vars.md) (`EXCHANGE_SECRETS_KEY`).
+
+**Known gaps before Phase 1.7:** no RBAC in v1; strategy list is globally visible; deployment must add strategy-ownership check; paper/live is server-enforced — not the Trade UI toggle alone. See plan-to-profit §5.5.
 
 ---
 
@@ -572,7 +574,7 @@ These shape Phase 1 choices to avoid painful rewrites later:
 2. **Should `LAST_LOGIN_AT` update be fire-and-forget?** Yes — wrap in `BackgroundTasks` so login latency stays under 150 ms.
 3. **Where does the user menu live?** Header right side, next to existing controls.
 4. **Confirm uvicorn bind address.** The `appctl` script must launch with `--host 127.0.0.1`. Verify before going live.
-5. **CSRF tokens on `/trade/*` writes when those land?** With `SameSite=Strict` already in place, additional CSRF tokens on trade endpoints are belt-and-braces. Decide when designing the trade router.
+5. **CSRF tokens on `/trade/*` writes when those land?** With `SameSite=Strict` already in place, additional CSRF tokens on trade endpoints are belt-and-braces. **Resolved for v1 same-origin SPA:** Strict + HTTPS is sufficient; document cross-origin need in [plan-to-profit §5.5](plan-to-profit.md#55-auth--security-guardrails).
 
 ---
 

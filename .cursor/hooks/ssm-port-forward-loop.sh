@@ -5,11 +5,11 @@
 
 set -uo pipefail
 
-TARGET_INSTANCE="i-096f85bf84852cce3"
+TARGET_INSTANCE="i-026d3c6d323144663"
 RDS_HOST="quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com"
 REMOTE_PORT="5432"
 LOCAL_PORT="5433"
-AWS_PROFILE_NAME="loki99-art"
+AWS_PROFILE_NAME="alfcheun"
 
 PARAMS=$(printf '{"host":["%s"],"portNumber":["%s"],"localPortNumber":["%s"]}' \
   "$RDS_HOST" "$REMOTE_PORT" "$LOCAL_PORT")

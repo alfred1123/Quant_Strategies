@@ -2,14 +2,16 @@
 
 The project uses **PostgreSQL 17** with Liquibase for schema management. Each schema is deployed independently with its own `databasechangelog` tracking table.
 
+See [System Overview](overview.md) for schema relationships and [Dev vs Prod](dev-vs-prod.md) for connection topology.
+
 ## Schemas
 
 | Schema | Purpose |
 |--------|---------|
 | `CORE_ADMIN` | App users (`APP_USER`), proc audit log (`LOG_PROC_DETAIL`), exchange API credentials (`API_CREDENTIAL`) |
-| `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, etc.) + `SP_GET_ENUM` procedure for cache loading |
-| `BT` | Backtest results (`STRATEGY`, `RESULT`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert procedures |
-| `TRADE` | Live trading tables (`DEPLOYMENT`, `LOG`, `TRANSACTION`) — procedures deferred |
+| `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, …) + `SP_GET_ENUM` procedure for cache loading. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. |
+| `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert/get procedures |
+| `TRADE` | Live trading: `DEPLOYMENT`, `EXECUTION_EVENT`, `TRANSACTION` + SPs (no `INTENT` — decision #38) |
 | `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) — `REFDATA.TICKER_MAPPING` has been dropped |
 
 ## Conventions
@@ -77,7 +79,26 @@ Current operating model:
 
 PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, APP_ID)` allowed (multiple accounts on same broker).
 
-**No `TRADE.CONNECTION` table** — runtime broker sessions are ephemeral. Trade audit = `TRADE.LOG` / `TRADE.TRANSACTION`. `TRADE.DEPLOYMENT` (Phase 1.2) references `API_CREDENTIAL_ID` only.
+**No `TRADE.CONNECTION` table** — runtime broker sessions are ephemeral. Trade audit = `TRADE.EXECUTION_EVENT` + `TRADE.TRANSACTION`. `TRADE.DEPLOYMENT` (Phase 1.2) references `API_CREDENTIAL_ID` only. **No `TRADE.INTENT`** — current signal lives in the worker for one tick; see decision #38.
+
+### TRADE — live execution (Phase 1.2)
+
+| Table | Role |
+|-------|------|
+| `DEPLOYMENT` | Apply target: pinned strategy, credential, product, qty (soft-versioned via `DEPLOYMENT_VID` + `TRANSACT_FROM/TO`) |
+| `EXECUTION_EVENT` | Append-only submit / error diary |
+| `TRANSACTION` | Append-only broker-confirmed fills |
+
+**Not stored:** current signal / target position between ticks (`TRADE.INTENT` rejected — decision #38).
+
+| Procedure | Purpose |
+|-----------|---------|
+| `SP_INS_DEPLOYMENT` | Create or version deployment |
+| `SP_GET_DEPLOYMENT` | Read current or historical deployment (REFCURSOR) |
+| `SP_INS_EXECUTION_EVENT` | Append execution event |
+| `SP_INS_TRANSACTION` | Append fill row |
+
+Validation: Python `TradeRepo` before SP calls. See [Plan to Profit §1.2](../design/plan-to-profit.md#phase-12--trade-schema--apply-api).
 
 | Procedure | Purpose |
 |-----------|---------|
@@ -88,6 +109,17 @@ PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, 
 See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11--user-secrets) and decision #36.
 
 **Application code:** `ApiCredentialRepo` extends `DbGateway` (same as `AuthRepo`); routes use `require_user`; Fernet key separate from `JWT_SECRET` — see [Login §6.4](../design/login.md#64-reuse-from-login--jwt-credential-api--phase-11).
+
+**SP OUT parameter order:** All write procedures called via `DbGateway._call_write` must return the status triplet `(OUT_SQLSTATE, OUT_SQLMSG, OUT_SQLERRMC)` **first**, then any business OUT params. Credential SPs were corrected in release `1.1.1-credential-sp-out-order` (applied to prod; archived in `releases/`).
+
+### BT — strategy catalog (Phase 1.6 planned)
+
+| Procedure | Status | Purpose |
+|-----------|--------|---------|
+| `SP_GET_STRATEGY` | exists | Read one strategy by id (REFCURSOR) |
+| `SP_LIST_STRATEGY` | **planned** | List strategies for authenticated user — needed by `GET /api/v1/strategies` |
+
+Persisted strategies (`BT.STRATEGY`) are created when backtest jobs complete — distinct from REFDATA `SIGNAL_TYPE` (signal function names used during optimize).
 
 ## Deployment
 
@@ -130,6 +162,8 @@ Each schema root (`*-changelog.xml`) includes **forward-only** release files und
 
 Active changelogs are empty manifests — see XML comments in each `db/liquidbase/*/*-changelog.xml`. Archive baselines live under `releases/archive/baseline-1.0.0.xml` (reference only, never included on prod).
 
+**Release lifecycle:** After a forward release is applied to prod, its `<include>` is removed from the active changelog (release SQL files remain under `releases/` for history). Recent examples applied and archived: `core_admin` 1.1.0–1.1.1 (credentials SPs), `refdata` 1.2.0–1.2.1 (`IS_EXCHANGE_IND`, Binance seed).
+
 ## Stored Procedures
 
 | Procedure | Schema | Type |
@@ -144,9 +178,14 @@ Active changelogs are empty manifests — see XML comments in each `db/liquidbas
 | `SP_GET_QUEUE_LATEST` | `BT` | **Queue worker**: active row for one **`QUEUE_ID`** + frozen **`CONFIG_JSON`** (`QUEUE` ⋈ **`STRATEGY`** on **`STRATEGY_VID`**) |
 | `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`**; **`IN_RESULT_ID`** is caller-supplied UUID; OUT row is status triplet only (same shape as **`SP_INS_QUEUE`**) |
 | `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`) |
-| `SP_INS_API_CREDENTIAL` | `CORE_ADMIN` | New exchange credential or rotate keys (soft-version) |
+| `SP_INS_API_CREDENTIAL` | `CORE_ADMIN` | New exchange credential or rotate keys (soft-version); status triplet OUT first |
 | `SP_GET_API_CREDENTIAL` | `CORE_ADMIN` | List/get credentials for `APP_USER_ID` (REFCURSOR) |
-| `SP_UPD_API_CREDENTIAL_REVOKE` | `CORE_ADMIN` | Soft-version revoke |
+| `SP_UPD_API_CREDENTIAL_REVOKE` | `CORE_ADMIN` | Soft-version revoke; status triplet OUT first |
+| `SP_LIST_STRATEGY` | `BT` | **Planned (1.6)** — list strategies for strategy picker |
+| `SP_INS_DEPLOYMENT` | `TRADE` | Create or version deployment |
+| `SP_GET_DEPLOYMENT` | `TRADE` | Read deployment rows (REFCURSOR) |
+| `SP_INS_EXECUTION_EVENT` | `TRADE` | Append execution event |
+| `SP_INS_TRANSACTION` | `TRADE` | Append fill row |
 
 ## Directory Layout
 
