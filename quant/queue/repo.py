@@ -129,15 +129,19 @@ class BtQueueRepo(DbGateway):
         self,
         *,
         strategy_id: uuid.UUID | str,
-        strategy_vid: int,
+        strategy_vid: int | None,
         user_id: str,
     ) -> None:
-        """Wrap ``BT.SP_UPD_PROMOTE_STRATEGY`` — flip IS_BEST_IND to target VID."""
+        """Wrap ``BT.SP_UPD_PROMOTE_STRATEGY``.
+
+        ``strategy_vid=None`` → demote-only (no replacement promoted).
+        """
+        vid_param = int(strategy_vid) if strategy_vid is not None else None
         self._call_write(
             "CALL bt.sp_upd_promote_strategy("
             "%s::uuid, %s::integer, %s::text,"
             " NULL::text, NULL::text, NULL::text)",
-            (str(strategy_id), int(strategy_vid), user_id),
+            (str(strategy_id), vid_param, user_id),
         )
 
     # ── reads (direct SELECT — no SP covers these projections) ──────────
@@ -227,5 +231,31 @@ class BtQueueRepo(DbGateway):
             " ORDER BY CREATED_AT DESC"
             " LIMIT 1",
             (str(queue_id),),
+        )
+        return rows[0] if rows else None
+
+    def sp_get_strategy(
+        self,
+        *,
+        strategy_id: uuid.UUID | str,
+        strategy_vid: int | None = None,
+        is_best_ind: str | None = None,
+    ) -> dict | None:
+        """Wrap ``BT.SP_GET_STRATEGY``.
+
+        Three modes controlled by the caller:
+          - ``strategy_vid`` set → exact frozen VID.
+          - ``is_best_ind='Y'`` (vid None) → IS_BEST_IND='Y' row.
+          - both None → active row (TRANSACT_TO_TS = 9999-12-31).
+        """
+        rows = self._call_get(
+            "CALL bt.sp_get_strategy("
+            "%s::uuid, %s::integer, %s::char,"
+            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (
+                str(strategy_id),
+                _opt(int, strategy_vid),
+                is_best_ind,
+            ),
         )
         return rows[0] if rows else None

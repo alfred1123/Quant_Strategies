@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.3.0-001-create-promotion-metric" author="alfcheun" context="refdata">
+        <comment>REFDATA.PROMOTION_METRIC — metrics available for IS_BEST_IND auto-promote comparison</comment>
+        <sqlFile path="../tables/PROMOTION_METRIC.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.3.0-002-seed-promotion-metric" author="alfcheun" context="refdata">
+        <comment>Seed promotion metrics: HARD = threshold gate, SOFT = comparison. Priority controls eval order.</comment>
+        <sql splitStatements="true" stripComments="true">
+            INSERT INTO REFDATA.PROMOTION_METRIC (NAME, DISPLAY_NAME, METRIC_KEY, DIRECTION, REQUIREMENT_TYPE, PRIORITY, THRESHOLD, DESCRIPTION, USER_ID, UPDATED_AT)
+            VALUES
+                ('sharpe_gate',       'Sharpe > 0',        'Sharpe Ratio',      'higher_is_better', 'HARD',  0, 0,    'Must have positive Sharpe to be promoted',       'system', NOW() AT TIME ZONE 'UTC'),
+                ('max_dd_gate',       'Max DD <= 40%',     'Max Drawdown',      'lower_is_better',  'HARD', 10, 0.40, 'Drawdown must not exceed 40%',                   'system', NOW() AT TIME ZONE 'UTC'),
+                ('sharpe_compare',    'Sharpe Ratio',      'Sharpe Ratio',      'higher_is_better', 'SOFT',  0, NULL, 'Primary comparison metric',                      'system', NOW() AT TIME ZONE 'UTC'),
+                ('calmar_compare',    'Calmar Ratio',      'Calmar Ratio',      'higher_is_better', 'SOFT', 20, NULL, 'Secondary comparison metric',                    'system', NOW() AT TIME ZONE 'UTC'),
+                ('total_return',      'Total Return',      'Total Return',      'higher_is_better', 'SOFT', 40, NULL, 'Cumulative strategy return',                     'system', NOW() AT TIME ZONE 'UTC'),
+                ('annualized_return', 'Annualized Return', 'Annualized Return', 'higher_is_better', 'SOFT', 60, NULL, 'Compound annual growth rate',                    'system', NOW() AT TIME ZONE 'UTC'),
+                ('max_drawdown',      'Max Drawdown',      'Max Drawdown',      'lower_is_better',  'SOFT', 80, NULL, 'Worst peak-to-trough decline (lower wins)',       'system', NOW() AT TIME ZONE 'UTC');
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

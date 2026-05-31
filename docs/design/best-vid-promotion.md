@@ -81,65 +81,67 @@ Add `IS_BEST_IND` to all cursor SELECT lists so the cache and callers can see it
 - changeSet 003: `SP_PROMOTE_STRATEGY` (new)
 - changeSet 004: `SP_GET_STRATEGY` (add IS_BEST_IND to cursors)
 
-## 2. Promotion Metric Configuration
+## 2. Promotion Metric Configuration — REFDATA-driven
 
-### Where to store the promotion policy
+Promotion criteria are **not hardcoded** in Python. They are stored in `REFDATA.PROMOTION_METRIC` and loaded at runtime via `RedisRefData.get_promotion_metrics()`.
 
-Add an optional `promotion` block to `CONFIG_JSON` in the strategy:
+### REFDATA.PROMOTION_METRIC table
 
-```json
-{
-  "indicators": [...],
-  "promotion": {
-    "metric": "Sharpe Ratio",
-    "direction": "higher_is_better"
-  }
-}
-```
-
-- **Default** (when `promotion` key absent): `Sharpe Ratio`, `higher_is_better`
-- Supported metrics: `Sharpe Ratio`, `Calmar Ratio`, `Total Return`, `Max Drawdown` (lower is better), `Annualized Return`
-- These keys match `performance.strategy_metrics` in `PAYLOAD_JSON`
-
-### Add a REFDATA.PROMOTION_METRIC table
-
-Dropdown values for the UI:
-
-| DISPLAY_NAME | METRIC_KEY | DIRECTION |
+| Column | Type | Description |
 |---|---|---|
-| Sharpe Ratio | Sharpe Ratio | higher_is_better |
-| Calmar Ratio | Calmar Ratio | higher_is_better |
-| Total Return | Total Return | higher_is_better |
-| Max Drawdown | Max Drawdown | lower_is_better |
+| NAME | TEXT | Unique key (e.g. `sharpe_gate`) |
+| DISPLAY_NAME | TEXT | UI label |
+| METRIC_KEY | TEXT | Matches `performance.strategy_metrics` key in PAYLOAD_JSON |
+| DIRECTION | TEXT | `higher_is_better` or `lower_is_better` |
+| REQUIREMENT_TYPE | TEXT | `HARD` = threshold gate, `SOFT` = comparison metric |
+| PRIORITY | INTEGER | Evaluation order (1 = first) |
+| THRESHOLD | NUMERIC | Required value for HARD gates (NULL for SOFT) |
+
+### Evaluation logic (`quant/queue/promote.py`)
+
+1. **Phase 1 — Hard gates**: All HARD metrics must pass their threshold. Any failure → skip promote.
+2. **Phase 2 — Soft comparison**: Compared in priority order against the current best VID. First decisive win/loss decides. All ties → no promote (conservative).
+
+### Default seed data
+
+Priority follows the same convention as `BT.QUEUE`: **lower number = higher priority** (evaluated first).
+
+| NAME | TYPE | PRIORITY | THRESHOLD | METRIC_KEY | DIRECTION |
+|---|---|---|---|---|---|
+| sharpe_gate | HARD | 0 | 0 | Sharpe Ratio | higher_is_better |
+| max_dd_gate | HARD | 10 | 0.40 | Max Drawdown | lower_is_better |
+| sharpe_compare | SOFT | 0 | — | Sharpe Ratio | higher_is_better |
+| calmar_compare | SOFT | 20 | — | Calmar Ratio | higher_is_better |
+| total_return | SOFT | 40 | — | Total Return | higher_is_better |
+| annualized_return | SOFT | 60 | — | Annualized Return | higher_is_better |
+| max_drawdown | SOFT | 80 | — | Max Drawdown | lower_is_better |
 
 ## 3. Python — Auto-Promote in Worker
 
-### 3a. Promotion helper (`quant/queue/promote.py` — new)
+### 3a. Promotion helper (`quant/queue/promote.py`)
 
 ```python
 def should_promote(
-    new_result: dict,
-    best_result: dict | None,
-    metric: str = "Sharpe Ratio",
-    direction: str = "higher_is_better",
+    new_payload: dict,
+    best_payload: dict | None,
+    promotion_metrics: list[dict],  # REFDATA.PROMOTION_METRIC rows
 ) -> bool:
 ```
 
-- Extracts `performance.strategy_metrics[metric]` from both `PAYLOAD_JSON` blobs
-- `best_result is None` → always promote (no baseline to beat)
+- Receives metric config from REFDATA (no hardcoded sets)
+- Evaluates hard gates first, then soft comparisons in priority order
 - Handles NaN / missing gracefully (don't promote if new metric is NaN)
 
 ### 3b. Worker completion (`quant/queue/worker.py`)
 
 After writing `BT.RESULT` and before marking COMPLETED:
 
-1. Read promotion config from `CONFIG_JSON.promotion` (default Sharpe)
-2. Find current best VID for this `strategy_id` — the row with `IS_BEST_IND = 'Y'` (from `StrategyCatalogCache`)
+1. Load `promotion_metrics` from `RefData.get_promotion_metrics()`
+2. Find current best VID for this `strategy_id` via `SP_GET_STRATEGY(is_best_ind='Y')`
 3. If best VID has a `BT.RESULT` → fetch its `PAYLOAD_JSON`
-4. Call `should_promote()` comparing new vs best
-5. If promote → `CALL BT.SP_PROMOTE_STRATEGY(strategy_id, new_vid, user_id)`
-6. Refresh `StrategyCatalogCache`
-7. Log the decision either way
+4. Call `should_promote(payload, best_payload, promotion_metrics)`
+5. If promote → `CALL BT.SP_UPD_PROMOTE_STRATEGY(strategy_id, new_vid, user_id)`
+6. Log the decision either way
 
 ### 3c. `BtQueueRepo` wrapper
 
@@ -147,9 +149,6 @@ Add `sp_promote_strategy(strategy_id, strategy_vid, user_id)` to `quant/queue/re
 
 Add a lookup to fetch a RESULT by `(strategy_id, strategy_vid)` — joins QUEUE → RESULT.
 
-### 3d. `StrategyCatalogCache` updates (`quant/data/strategy_catalog.py`)
-
-Add `get_best_for_strategy(strategy_id) -> dict | None` — returns the row where `IS_BEST_IND = 'Y'` for a given `strategy_id`.
 
 ## 4. Manual Promote API
 

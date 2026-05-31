@@ -1,17 +1,18 @@
 -- Read BT.STRATEGY rows.
 --
--- IN_STRATEGY_ID  required — scope to one logical strategy.
--- IN_STRATEGY_VID optional — when supplied, returns that exact frozen
---                  version (worker path: read the snapshot enqueued in
---                  BT.QUEUE.STRATEGY_VID even after the strategy has
---                  been edited). When NULL, returns the active row
---                  (TRANSACT_TO_TS = 9999-12-31).
+-- IN_STRATEGY_ID   required — scope to one logical strategy.
+-- IN_STRATEGY_VID  optional — when supplied, returns that exact frozen
+--                   version. When NULL, behaviour depends on IN_IS_BEST_IND.
+-- IN_IS_BEST_IND   optional — when 'Y' (and VID is NULL), returns the
+--                   IS_BEST_IND='Y' row. When NULL (and VID is NULL),
+--                   returns the active row (TRANSACT_TO_TS = 9999-12-31).
 --
 -- Cursor columns: STRATEGY_ID, STRATEGY_VID, STRATEGY_NM, CONFIG_JSON,
 -- USER_ID, CREATED_AT, TRANSACT_FROM_TS, TRANSACT_TO_TS, IS_BEST_IND.
 CREATE OR REPLACE PROCEDURE BT.SP_GET_STRATEGY(
     IN  IN_STRATEGY_ID   UUID,
     IN  IN_STRATEGY_VID  INTEGER,
+    IN  IN_IS_BEST_IND   CHAR(1),
     OUT OUT_RESULT       REFCURSOR,
     OUT OUT_SQLSTATE     TEXT,
     OUT OUT_SQLMSG       TEXT,
@@ -30,8 +31,9 @@ BEGIN
     OUT_SQLMSG   := '0';
     OUT_SQLERRMC := 'Stored Procedure completed successfully';
 
-    V_OTHER_TEXT := 'IN_STRATEGY_ID='      || COALESCE(IN_STRATEGY_ID::TEXT, '')
-                 || ', IN_STRATEGY_VID='   || COALESCE(IN_STRATEGY_VID::TEXT, '');
+    V_OTHER_TEXT := 'IN_STRATEGY_ID='    || COALESCE(IN_STRATEGY_ID::TEXT, '')
+                 || ', IN_STRATEGY_VID=' || COALESCE(IN_STRATEGY_VID::TEXT, '')
+                 || ', IN_IS_BEST_IND='  || COALESCE(IN_IS_BEST_IND, '');
 
     -- Step 10: Validate required input.
     OUT_SQLMSG := '10';
@@ -41,11 +43,12 @@ BEGIN
         RETURN;
     END IF;
 
-    -- Step 20: Open cursor — by VID (frozen snapshot) or current.
+    -- Step 20: Open cursor.
     OUT_SQLMSG := '20';
     OUT_RESULT := 'sp_get_strategy_cursor';
 
     IF IN_STRATEGY_VID IS NOT NULL THEN
+        -- Mode 1: exact VID (frozen snapshot).
         OPEN OUT_RESULT FOR
             SELECT STRATEGY_ID,
                    STRATEGY_VID,
@@ -59,7 +62,23 @@ BEGIN
               FROM BT.STRATEGY
              WHERE STRATEGY_ID  = IN_STRATEGY_ID
                AND STRATEGY_VID = IN_STRATEGY_VID;
+    ELSIF IN_IS_BEST_IND = 'Y' THEN
+        -- Mode 2: best-performing VID.
+        OPEN OUT_RESULT FOR
+            SELECT STRATEGY_ID,
+                   STRATEGY_VID,
+                   STRATEGY_NM,
+                   CONFIG_JSON,
+                   USER_ID,
+                   CREATED_AT,
+                   TRANSACT_FROM_TS,
+                   TRANSACT_TO_TS,
+                   IS_BEST_IND
+              FROM BT.STRATEGY
+             WHERE STRATEGY_ID = IN_STRATEGY_ID
+               AND IS_BEST_IND = 'Y';
     ELSE
+        -- Mode 3: active/latest (TRANSACT_TO_TS = 9999-12-31).
         OPEN OUT_RESULT FOR
             SELECT STRATEGY_ID,
                    STRATEGY_VID,

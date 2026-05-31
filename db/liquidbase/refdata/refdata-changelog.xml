@@ -21,4 +21,6 @@
       4. After deploy, refresh Redis REFDATA: POST /api/v1/refdata/refresh
     -->
 
+    <include file="releases/1.3.0-promotion-metric.xml" relativeToChangelogFile="true"/>
+
 </databaseChangeLog>

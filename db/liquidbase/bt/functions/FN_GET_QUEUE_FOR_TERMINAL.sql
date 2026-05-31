@@ -8,6 +8,7 @@ RETURNS TABLE (
     STRATEGY_VID      INTEGER,
     STRATEGY_NM       TEXT,
     STRAT_CURRENT_IND CHAR(1),
+    IS_BEST_IND       CHAR(1),
     TRANSACT_FROM_TS  TIMESTAMPTZ,
     QUEUE_STATUS      TEXT,
     PRIORITY          INTEGER,
@@ -42,7 +43,8 @@ BEGIN
         '       q.STRATEGY_ID,'
         '       q.STRATEGY_VID,'
         '       s.STRATEGY_NM,'
-        '       s.IS_CURRENT_IND AS STRAT_CURRENT_IND,'
+        '       CASE WHEN s.TRANSACT_TO_TS = TIMESTAMPTZ ''9999-12-31 00:00:00+00'' THEN ''Y'' ELSE ''N'' END AS STRAT_CURRENT_IND,'
+        '       s.IS_BEST_IND,'
         '       q.TRANSACT_FROM_TS,'
         '       (SELECT NAME FROM REFDATA.QUEUE_STATUS WHERE QUEUE_STATUS_ID = q.QUEUE_STATUS_ID) AS QUEUE_STATUS,'
         '       q.PRIORITY,'

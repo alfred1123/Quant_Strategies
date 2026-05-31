@@ -115,6 +115,14 @@ class RedisRefData:
                 return int(r["app_metric_id"])
         return None
 
+    def get_promotion_metrics(self) -> list[dict]:
+        """Return PROMOTION_METRIC rows sorted by priority.
+
+        Each row has: metric_key, direction, requirement_type, priority, threshold.
+        """
+        rows = self.get("promotion_metric")
+        return sorted(rows, key=lambda r: int(r.get("priority", 999)))
+
     def resolve_queue_status_id(self, name: str) -> int:
         for r in self.get("queue_status"):
             if r["name"] == name:

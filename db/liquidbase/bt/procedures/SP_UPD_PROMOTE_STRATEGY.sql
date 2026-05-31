@@ -2,6 +2,10 @@
 --
 -- Enforces the exactly-one-best invariant: demotes the current best
 -- then promotes the target VID.  No-op if the target is already best.
+--
+-- When IN_STRATEGY_VID IS NULL → demote-only: sets IS_BEST_IND = 'N'
+-- on the current best without promoting a replacement (strategy has
+-- no qualified best after hard-gate failure).
 CREATE OR REPLACE PROCEDURE BT.SP_UPD_PROMOTE_STRATEGY(
     IN  IN_STRATEGY_ID   UUID,
     IN  IN_STRATEGY_VID  INTEGER,
@@ -29,9 +33,24 @@ BEGIN
 
     -- Step 10: Validate inputs.
     OUT_SQLMSG := '10';
-    IF IN_STRATEGY_ID IS NULL OR IN_STRATEGY_VID IS NULL THEN
+    IF IN_STRATEGY_ID IS NULL THEN
         OUT_SQLSTATE := '22023';
-        OUT_SQLERRMC := 'IN_STRATEGY_ID and IN_STRATEGY_VID are required';
+        OUT_SQLERRMC := 'IN_STRATEGY_ID is required';
+        RETURN;
+    END IF;
+
+    -- Step 15: Demote-only mode (IN_STRATEGY_VID IS NULL).
+    OUT_SQLMSG := '15';
+    IF IN_STRATEGY_VID IS NULL THEN
+        UPDATE BT.STRATEGY
+           SET IS_BEST_IND = 'N'
+         WHERE STRATEGY_ID = IN_STRATEGY_ID
+           AND IS_BEST_IND = 'Y';
+
+        OUT_SQLERRMC := 'Demoted current best — no replacement promoted';
+
+        OUT_SQLMSG := '16';
+        CALL CORE_ADMIN.CORE_INS_LOG_PROC('BT', 'SP_UPD_PROMOTE_STRATEGY', V_START_TS, NULL, V_OTHER_TEXT, IN_USER_ID, V_LOG_STATE, V_LOG_MSG);
         RETURN;
     END IF;
 
