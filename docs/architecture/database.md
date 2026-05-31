@@ -185,7 +185,7 @@ Active changelogs are empty manifests — see XML comments in each `db/liquidbas
 |-----------|--------|------|
 | `CORE_INS_LOG_PROC` | `CORE_ADMIN` | Central logging for all SPs |
 | `SP_GET_ENUM` | `REFDATA` | Generic REFCURSOR select for any REFDATA table |
-| `SP_INS_STRATEGY` | `BT` | Soft-versioning insert (auto-VID + IS_CURRENT_IND flip) |
+| `SP_INS_STRATEGY` | `BT` | Soft-versioning insert (auto-VID + `TRANSACT_TO_TS` close; sets `IS_BEST_IND` = `'Y'` for VID 1, `'N'` for VID 2+) |
 | `SP_INS_QUEUE` | `BT` | **Unified queue state machine**: `IN_ACTION` = **`ENQUEUE`**, **`CLAIM_NEXT`**, **`TERMINAL`**, **`CANCEL`** — all **`BT.QUEUE`** transitions |
 | `SP_GET_QUEUE` | `BT` | Flexible queue reader (REFCURSOR); FastAPI jobs list/detail |
 | `SP_GET_QUEUE_FOR_TERMINAL` | `BT` | Active rows + strategy metadata (REFCURSOR) |

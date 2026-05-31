@@ -92,6 +92,7 @@ nav:
       - Separate Underlying & Cache: design/separate-underlying.md
       - Login & Authentication: design/login.md
       - User Isolation: design/user-isolation.md
+      - Best-VID Promotion: design/best-vid-promotion.md
       - Frontend Code Audit: design/frontend-audit.md
       - Plan to Profit: design/plan-to-profit.md
   - Archive:

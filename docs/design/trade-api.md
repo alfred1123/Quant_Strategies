@@ -186,8 +186,8 @@ Endpoints use JWT auth (`require_user`); the user's `app_user_id` scopes all dat
 **Phase 1.6 — implement now:**
 
 ```
-GET    /api/v1/strategies                → List current strategies (IS_CURRENT_IND='Y')
-                                           id, vid, name, optional stats (Sharpe, symbol)
+GET    /api/v1/strategies                → List current strategies (TRANSACT_TO_TS='9999-12-31')
+                                           id, vid, name, is_best_ind, optional stats (Sharpe, symbol)
 GET    /api/v1/strategies/{id}           → One strategy + optional latest result     — optional 1.6
 ```
 
@@ -460,8 +460,10 @@ CREATE TABLE BT.STRATEGY (
     STRATEGY_ID    UUID NOT NULL,
     STRATEGY_VID   INTEGER NOT NULL,
     STRATEGY_NM    TEXT,
-    CONFIG_JSON    JSONB NOT NULL,         -- full OptimizeRequest payload
-    IS_CURRENT_IND CHAR(1) NOT NULL,
+    CONFIG_JSON    JSONB NOT NULL,
+    IS_BEST_IND    CHAR(1) NOT NULL,
+    TRANSACT_FROM_TS TIMESTAMPTZ NOT NULL,
+    TRANSACT_TO_TS   TIMESTAMPTZ NOT NULL,
     USER_ID        TEXT NOT NULL,
     CREATED_AT     TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (STRATEGY_ID, STRATEGY_VID)

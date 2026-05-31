@@ -196,7 +196,7 @@ Body: { "strategy_vid": 3 }
 ```
 
 - Validates user owns the strategy (via `get_for_user`)
-- Calls `SP_PROMOTE_STRATEGY`
+- Calls `SP_UPD_PROMOTE_STRATEGY`
 - Refreshes cache
 - Returns new active VID
 
