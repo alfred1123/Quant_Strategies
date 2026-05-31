@@ -187,11 +187,11 @@ class Performance:
         return max_drawdown
     
     def get_calmar_ratio(self):
-        max_dd = self.data['dd'].max()
+        max_dd = self.get_max_drawdown()
         if max_dd == 0 or np.isnan(max_dd):
             logger.debug("Calmar ratio undefined (zero or NaN max drawdown)")
             return np.nan
-        calmar_ratio = self.data.iloc[self._metric_window:]['pnl'].mean() / max_dd
+        calmar_ratio = self.get_annualized_return() / max_dd
         return calmar_ratio
     
     def get_buy_hold_total_return(self):
@@ -216,11 +216,11 @@ class Performance:
         return max_drawdown
     
     def get_buy_hold_calmar_ratio(self):
-        max_dd = self.data['buy_hold_dd'].max()
+        max_dd = self.get_buy_hold_max_drawdown()
         if max_dd == 0 or np.isnan(max_dd):
             logger.debug("Buy-hold Calmar ratio undefined (zero or NaN max drawdown)")
             return np.nan
-        calmar_ratio = self.data.iloc[self._metric_window:]['buy_hold'].mean() / max_dd
+        calmar_ratio = self.get_buy_hold_annualized_return() / max_dd
         return calmar_ratio
     
     def get_strategy_performance(self):
