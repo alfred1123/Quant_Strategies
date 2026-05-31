@@ -1,6 +1,6 @@
 # User isolation requirements
 
-**Status:** v1 — partial enforcement. Credentials, deployments, and job queue are scoped by owner; strategy **reads** are global; strategy **deploy** ownership is required before Phase 1.7 live apply.
+**Status:** v1 — partial enforcement. Credentials, deployments, and job queue are scoped by owner; strategies are a **shared pool** — any authenticated user can read and deploy any strategy.
 
 Related: [Login §14 Phase 2](login.md#14-phased-plan), [Plan to Profit §5.5](plan-to-profit.md#55-auth--security-guardrails), [Trade API §2.1](trade-api.md#21-strategy-catalog--phase-16), [Futu Trading §13](futu-trading.md#13-broker-strategy--when-to-scale-futu).
 
@@ -25,7 +25,7 @@ The FastAPI connection pool logs in as Postgres role `quant_app`. The human iden
 | `TRADE.DEPLOYMENT` audit column | `username` (TEXT) via `user.username` on create |
 | Sync backtest (`/optimize`) | Pool user / cache path — **not** per-human today |
 
-**Phase 1.7 ownership checks** must compare `BT.STRATEGY.USER_ID` against what jobs actually wrote (`str(caller.app_user_id)`), not username.
+~~**Phase 1.7 ownership checks** must compare `BT.STRATEGY.USER_ID` against what jobs actually wrote (`str(caller.app_user_id)`), not username.~~ **Removed** — strategies are a shared pool (decision #42). `USER_ID` on `BT.STRATEGY` is audit-only.
 
 ---
 
@@ -37,8 +37,8 @@ The FastAPI connection pool logs in as Postgres role `quant_app`. The human iden
 | **Credentials** | `CORE_ADMIN.API_CREDENTIAL.APP_USER_ID` | **Yes** | SP + API scoped; cross-user id → **404** | 1.1 |
 | **Deployments** | `TRADE.DEPLOYMENT.APP_USER_ID` | **Yes** | `SP_GET_DEPLOYMENT(IN_APP_USER_ID)`; credential must match owner | 1.2 |
 | **Job queue** | `BT.QUEUE.USER_ID` | **Yes** | List/cancel/SSE scoped; max 20 `QUEUED` per user | Done |
-| **Strategy picker (read)** | `BT.STRATEGY.USER_ID` | **No** | Any logged-in user sees all strategies | 1.6 or login Phase 2 |
-| **Strategy deploy (write)** | `BT.STRATEGY.USER_ID` vs caller | **No** | Reject deploying another user's strategy | **1.7 — required** |
+| **Strategy picker (read)** | `BT.STRATEGY.USER_ID` | **Yes** | Any logged-in user sees all strategies (shared pool) | 1.6 — Done |
+| **Strategy deploy (write)** | — | **N/A** | Any user can deploy any strategy with their own credentials (shared pool) | By design (decision #42) |
 | **Sync backtest** | — | **No** | No per-user result isolation on `/optimize` | login Phase 2 |
 | **`BT.RESULT`** | `USER_ID` audit only | **No** | Globally readable | login Phase 2 |
 | **REFDATA / INST** | — | N/A | Shared catalog | By design (v1) |
@@ -76,25 +76,21 @@ Implementation: `quant/api/routers/jobs.py`, `quant/api/services/jobs.py`.
 
 | Check | Rule |
 |-------|------|
-| **Strategy ownership** | `BT.STRATEGY.USER_ID` must match caller (`str(app_user_id)` as stored today) |
+| ~~**Strategy ownership**~~ | ~~`BT.STRATEGY.USER_ID` must match caller~~ — **Removed** (decision #42: shared strategy pool) |
 | **Credential ownership** | Already enforced |
 | **Deployment ownership** | Already enforced on get/list |
 | **Paper vs live** | `is_paper_ind` enforced **on server** — Trade UI toggle is UX only |
 | **Live apply step-up** | Dry-run first + explicit confirm ([Trade API §4.1](trade-api.md#41-confirmation-flow-for-live-trading)) |
 
-Without strategy ownership validation, user A could deploy user B's backtest config to user A's exchange keys — wrong strategy, wrong audit trail, capital at risk.
+Strategies are a shared pool — any authenticated user can deploy any strategy using their own exchange credentials. `USER_ID` on `BT.STRATEGY` is **audit-only** (who created the config). Capital safety comes from credential ownership (user can only trade with their own keys) and the paper-vs-live gate.
 
-**Exit criteria (1.7):** deployment create validates strategy ownership; see [plan-to-profit §1.7](plan-to-profit.md#phase-17--live-apply).
+**Exit criteria (1.7):** deployment create validates credential ownership (done) + paper/live gate; see [plan-to-profit §1.7](plan-to-profit.md#phase-17--live-apply).
 
 ---
 
-## Phase 1.6 — strategy picker (read path)
+## Phase 1.6 — strategy picker (read path) — Done
 
-Docs allow a **global** strategy list in early 1.6, but the API should expose `user_id` on each row so the UI can label "mine vs others".
-
-**Recommended:** `BT.SP_GET_STRATEGY` list mode (`IN_STRATEGY_ID` NULL, `IN_USER_ID` required) — same GET convention as `SP_GET_QUEUE`. Optional admin/unfiltered mode when `ROLE` exists (login Phase 2).
-
-See [Trade API §2.1](trade-api.md#21-strategy-catalog--phase-16).
+All strategies are visible to all authenticated users (shared pool). `SP_GET_STRATEGY` list mode is deployed. `IS_BEST_IND` marks the best-performing VID per strategy — see [Best-VID Promotion](best-vid-promotion.md).
 
 ---
 
@@ -134,9 +130,7 @@ flowchart TD
   B -->|No — REFDATA| C["Shared — no owner filter"]
   B -->|Yes| D{"Has APP_USER_ID column?"}
   D -->|Yes| E["Filter SP + API by caller APP_USER_ID"]
-  D -->|No — BT reads| F{"Deploy or trade?"}
-  F -->|Deploy 1.7| G["Require STRATEGY.USER_ID match"]
-  F -->|Read-only browse| H["Phase 2 filter or show all + label"]
+  D -->|No — BT strategies| F["Shared pool — any user can read + deploy\n(USER_ID is audit only)"]
   E --> I["Cross-user resource id → 404"]
 ```
 
@@ -146,10 +140,10 @@ flowchart TD
 
 | Priority | Task | Blocks |
 |----------|------|--------|
-| **P0** | Deployment create: verify `BT.STRATEGY.USER_ID == str(app_user_id)` | 1.7 live apply |
-| **P0** | Deployment create: verify credential + product belong to caller | 1.7 (credential partial) |
-| **P1** | `SP_GET_STRATEGY` list mode deployed; wire `GET /api/v1/strategies` | 1.6 privacy / UX |
-| **P1** | Normalize BT `USER_ID` — UUID string **or** username consistently | Ownership checks |
+| ~~**P0**~~ | ~~Deployment create: verify `BT.STRATEGY.USER_ID == str(app_user_id)`~~ | ~~1.7 live apply~~ — **Removed** (shared pool) |
+| **P0** | Deployment create: verify credential + product belong to caller | 1.7 (credential done) |
+| ~~**P1**~~ | ~~`SP_GET_STRATEGY` list mode deployed; wire `GET /api/v1/strategies`~~ | ~~1.6~~ — **Done** |
+| **P1** | Normalize TRADE `USER_ID` — UUID string **or** username consistently | Audit consistency |
 | **P2** | Filter `BT.RESULT`, sync backtest cache by owner | login Phase 2 |
 | **P2** | `ROLE` + admin bypass | Multi-tenant admin |
 | **P3** | Postgres RLS or `SET LOCAL app.user_id` GUC | Defense in depth — see [Login §6.3](login.md#63-optional-session-guc) |
