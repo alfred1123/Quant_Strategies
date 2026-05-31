@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ── DDL: add TRANSACT columns, backfill, drop IS_CURRENT_IND ─── -->
+
+    <changeSet id="1.4.0-001-add-transact-ts-cols" author="alfcheun" context="bt">
+        <comment>Add TRANSACT_FROM_TS and TRANSACT_TO_TS to BT.STRATEGY (nullable initially for backfill)</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE BT.STRATEGY ADD COLUMN TRANSACT_FROM_TS TIMESTAMPTZ;
+            ALTER TABLE BT.STRATEGY ADD COLUMN TRANSACT_TO_TS   TIMESTAMPTZ;
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.4.0-002-backfill-transact-ts" author="alfcheun" context="bt">
+        <comment>Backfill: TRANSACT_FROM_TS = CREATED_AT; active rows get 9999-12-31, closed rows get CREATED_AT</comment>
+        <sql splitStatements="true" stripComments="true">
+            UPDATE BT.STRATEGY
+               SET TRANSACT_FROM_TS = CREATED_AT,
+                   TRANSACT_TO_TS   = CASE
+                       WHEN IS_CURRENT_IND = 'Y' THEN TIMESTAMPTZ '9999-12-31 00:00:00+00'
+                       ELSE CREATED_AT
+                   END;
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.4.0-003-set-not-null-drop-current-ind" author="alfcheun" context="bt">
+        <comment>Make TRANSACT columns NOT NULL after backfill, then drop IS_CURRENT_IND</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE BT.STRATEGY ALTER COLUMN TRANSACT_FROM_TS SET NOT NULL;
+            ALTER TABLE BT.STRATEGY ALTER COLUMN TRANSACT_TO_TS   SET NOT NULL;
+            ALTER TABLE BT.STRATEGY DROP COLUMN IS_CURRENT_IND;
+        </sql>
+    </changeSet>
+
+    <!-- ── SP: SP_INS_STRATEGY ─────────────────────────────────────── -->
+
+    <changeSet id="1.4.0-004-sp-ins-strategy" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_INS_STRATEGY: close prior row via TRANSACT_TO_TS instead of IS_CURRENT_IND flip</comment>
+        <sqlFile path="../procedures/SP_INS_STRATEGY.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <!-- ── SP: SP_GET_STRATEGY ─────────────────────────────────────── -->
+
+    <changeSet id="1.4.0-005-sp-get-strategy" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_GET_STRATEGY: filter on TRANSACT_TO_TS = 9999-12-31 instead of IS_CURRENT_IND</comment>
+        <sqlFile path="../procedures/SP_GET_STRATEGY.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <!-- ── SP + FN: queue-for-terminal ─────────────────────────────── -->
+
+    <changeSet id="1.4.0-006-sp-get-queue-for-terminal" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_GET_QUEUE_FOR_TERMINAL: drop STRAT_CURRENT_IND column reference</comment>
+        <sqlFile path="../procedures/SP_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.4.0-007-fn-get-queue-for-terminal" author="alfcheun" context="bt" runOnChange="true">
+        <comment>FN_GET_QUEUE_FOR_TERMINAL: drop STRAT_CURRENT_IND from RETURNS TABLE and SELECT</comment>
+        <sqlFile path="../functions/FN_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+</databaseChangeLog>

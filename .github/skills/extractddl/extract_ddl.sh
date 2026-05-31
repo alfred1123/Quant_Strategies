@@ -40,7 +40,7 @@ PGCONN="host=${HOST} port=${PORT} dbname=${DB_NAME} user=${USER}"
 
 # Run a query and return plain text rows (no headers, no alignment)
 psql_q() {
-  TERM=dumb PAGER='' psql "${PGCONN}" -A -t -c "$1"
+  TERM=dumb PAGER='' psql "${PGCONN}" -A -t -F $'\t' -c "$1"
 }
 
 # ---------------------------------------------------------------------------

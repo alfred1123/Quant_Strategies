@@ -92,7 +92,7 @@ Without strategy ownership validation, user A could deploy user B's backtest con
 
 Docs allow a **global** strategy list in early 1.6, but the API should expose `user_id` on each row so the UI can label "mine vs others".
 
-**Recommended:** `BT.SP_LIST_STRATEGY(IN_APP_USER_ID)` with default filter = caller only. Optional admin/unfiltered mode when `ROLE` exists (login Phase 2).
+**Recommended:** `BT.SP_GET_STRATEGY` list mode (`IN_STRATEGY_ID` NULL, `IN_USER_ID` required) — same GET convention as `SP_GET_QUEUE`. Optional admin/unfiltered mode when `ROLE` exists (login Phase 2).
 
 See [Trade API §2.1](trade-api.md#21-strategy-catalog--phase-16).
 
@@ -148,7 +148,7 @@ flowchart TD
 |----------|------|--------|
 | **P0** | Deployment create: verify `BT.STRATEGY.USER_ID == str(app_user_id)` | 1.7 live apply |
 | **P0** | Deployment create: verify credential + product belong to caller | 1.7 (credential partial) |
-| **P1** | `SP_LIST_STRATEGY(IN_APP_USER_ID)` + filter strategy picker | 1.6 privacy / UX |
+| **P1** | `SP_GET_STRATEGY` list mode deployed; wire `GET /api/v1/strategies` | 1.6 privacy / UX |
 | **P1** | Normalize BT `USER_ID` — UUID string **or** username consistently | Ownership checks |
 | **P2** | Filter `BT.RESULT`, sync backtest cache by owner | login Phase 2 |
 | **P2** | `ROLE` + admin bypass | Multi-tenant admin |

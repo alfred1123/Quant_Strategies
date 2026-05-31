@@ -1,9 +1,9 @@
 -- Insert / version a backtest strategy definition.
 --
--- If IN_STRATEGY_ID is new ⇒ inserts STRATEGY_VID=1 with IS_CURRENT_IND='Y'.
--- If IN_STRATEGY_ID already exists ⇒ flips the prior current row to 'N' (no
--- UPDATED_AT bump per AGENTS.md soft-versioning rule) and inserts the next
--- VID as the new current row.
+-- If IN_STRATEGY_ID is new => inserts STRATEGY_VID=1 as active
+-- (TRANSACT_TO_TS = 9999-12-31).
+-- If IN_STRATEGY_ID already exists => closes the prior active row
+-- (TRANSACT_TO_TS = now) and inserts the next VID as the new active row.
 --
 -- Returns OUT_STRATEGY_VID so the caller can reference this exact version
 -- when enqueueing a job (SP_INS_QUEUE expects STRATEGY_ID + STRATEGY_VID).
@@ -42,31 +42,33 @@ BEGIN
       FROM BT.STRATEGY
      WHERE STRATEGY_ID = IN_STRATEGY_ID;
 
-    -- Step 20: Demote prior current row, if any. No UPDATED_AT bump.
+    -- Step 20: Close prior active row — set TRANSACT_TO_TS to now.
     OUT_SQLMSG := '20';
     UPDATE BT.STRATEGY
-       SET IS_CURRENT_IND = 'N'
+       SET TRANSACT_TO_TS = V_START_TS
      WHERE STRATEGY_ID    = IN_STRATEGY_ID
-       AND IS_CURRENT_IND = 'Y';
+       AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00';
 
-    -- Step 30: Insert new version as current.
+    -- Step 30: Insert new version as active (TRANSACT_TO_TS = 9999-12-31).
     OUT_SQLMSG := '30';
     INSERT INTO BT.STRATEGY (
         STRATEGY_ID,
         STRATEGY_VID,
         STRATEGY_NM,
         CONFIG_JSON,
-        IS_CURRENT_IND,
         USER_ID,
-        CREATED_AT
+        CREATED_AT,
+        TRANSACT_FROM_TS,
+        TRANSACT_TO_TS
     ) VALUES (
         IN_STRATEGY_ID,
         V_VID,
         IN_STRATEGY_NM,
         IN_CONFIG_JSON,
-        'Y',
         IN_USER_ID,
-        NOW() AT TIME ZONE 'UTC'
+        V_START_TS,
+        V_START_TS,
+        TIMESTAMPTZ '9999-12-31 00:00:00+00'
     );
 
     OUT_STRATEGY_VID := V_VID;

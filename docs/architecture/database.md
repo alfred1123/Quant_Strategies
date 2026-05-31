@@ -112,14 +112,13 @@ See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11--user-secrets) a
 
 **SP OUT parameter order:** All write procedures called via `DbGateway._call_write` must return the status triplet `(OUT_SQLSTATE, OUT_SQLMSG, OUT_SQLERRMC)` **first**, then any business OUT params. Credential SPs were corrected in release `1.1.1-credential-sp-out-order` (applied to prod; archived in `releases/`).
 
-### BT — strategy catalog (Phase 1.6 planned)
+### BT — strategy catalog (Phase 1.6)
 
 | Procedure | Status | Purpose |
 |-----------|--------|---------|
-| `SP_GET_STRATEGY` | exists | Read one strategy by id (REFCURSOR) |
-| `SP_LIST_STRATEGY` | **planned** | List strategies for authenticated user — needed by `GET /api/v1/strategies` |
+| `SP_GET_STRATEGY` | **extended** | **Get-one:** `IN_STRATEGY_ID` + optional `IN_STRATEGY_VID`; optional `IN_USER_ID` for ownership. **List:** `IN_STRATEGY_ID` NULL + **`IN_USER_ID` required** → current strategies for owner (`IS_CURRENT_IND='Y'`), `IN_LIMIT` default 50. |
 
-Persisted strategies (`BT.STRATEGY`) are created when backtest jobs complete — distinct from REFDATA `SIGNAL_TYPE` (signal function names used during optimize).
+Persisted strategies (`BT.STRATEGY`) are created when backtest jobs complete — distinct from REFDATA `SIGNAL_TYPE`. Jobs store owner as `USER_ID = str(app_user_id)` (UUID text).
 
 ## Deployment
 
@@ -183,7 +182,7 @@ Active changelogs are empty manifests — see XML comments in each `db/liquidbas
 | `SP_INS_API_CREDENTIAL` | `CORE_ADMIN` | New exchange credential or rotate keys (soft-version); status triplet OUT first |
 | `SP_GET_API_CREDENTIAL` | `CORE_ADMIN` | List/get credentials for `APP_USER_ID` (REFCURSOR) |
 | `SP_UPD_API_CREDENTIAL_REVOKE` | `CORE_ADMIN` | Soft-version revoke; status triplet OUT first |
-| `SP_LIST_STRATEGY` | `BT` | **Planned (1.6)** — list strategies for strategy picker |
+| `SP_GET_STRATEGY` | `BT` | Get-one by id/vid; **list by `IN_USER_ID`** when `IN_STRATEGY_ID` is NULL (Phase 1.6) |
 | `SP_INS_DEPLOYMENT` | `TRADE` | Create or version deployment |
 | `SP_GET_DEPLOYMENT` | `TRADE` | Read deployment rows (REFCURSOR) |
 | `SP_INS_EXECUTION_EVENT` | `TRADE` | Append execution event |

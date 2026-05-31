@@ -6,6 +6,10 @@
 #   ./scripts/liquibase-verify.sh --offline    # validate XML only (no database)
 #   DB_TARGET=local ./scripts/liquibase-verify.sh
 #
+# Ports (set in .env or env):
+#   DB_TARGET=local  → LOCAL_DB_HOST / LOCAL_DB_PORT  (default 127.0.0.1:5432)
+#   DB_TARGET=prod   → QUANTDB_HOST / PROD_DB_PORT    (default localhost:5433)
+#
 # Liquibase commands used (none of these run update):
 #   validate    — parse changelogs; compares checksums (Liquibase 5 needs DB)
 #   status      — SELECT databasechangelog; list pending changesets
@@ -32,6 +36,7 @@ ensure_prereqs() {
 
 load_env() {
   local _db_target_override="${DB_TARGET:-}"
+  local _lb_url_override="${LIQUIBASE_COMMAND_URL:-}"
 
   if [[ -f "${ROOT_DIR}/.env" ]]; then
     set -a
@@ -63,7 +68,6 @@ load_env() {
     )
   fi
 
-  # Honour DB_TARGET=local (same as appctl.sh)
   if [[ "${DB_TARGET:-prod}" == "local" ]]; then
     export QUANTDB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
     export QUANTDB_PORT="${LOCAL_DB_PORT:-5432}"
@@ -71,12 +75,16 @@ load_env() {
     export QUANTDB_PASSWORD="${LOCAL_DB_PASSWORD:-LetsGetRich888}"
     SSLMODE=disable
   else
-    : "${QUANTDB_HOST:?QUANTDB_HOST required (or set DB_TARGET=local)}"
-    QUANTDB_PORT="${QUANTDB_PORT:-5433}"
+    export QUANTDB_HOST="${QUANTDB_HOST:-localhost}"
+    export QUANTDB_PORT="${PROD_DB_PORT:-5433}"
     SSLMODE=require
   fi
 
-  export LIQUIBASE_COMMAND_URL="jdbc:postgresql://${QUANTDB_HOST}:${QUANTDB_PORT}/quantdb?sslmode=${SSLMODE}"
+  if [[ -n "${_lb_url_override}" ]]; then
+    export LIQUIBASE_COMMAND_URL="${_lb_url_override}"
+  else
+    export LIQUIBASE_COMMAND_URL="jdbc:postgresql://${QUANTDB_HOST}:${QUANTDB_PORT}/quantdb?sslmode=${SSLMODE}"
+  fi
   export LIQUIBASE_COMMAND_USERNAME="${LIQUIBASE_COMMAND_USERNAME:-${QUANTDB_USERNAME:?QUANTDB_USERNAME required}}"
   export LIQUIBASE_COMMAND_PASSWORD="${LIQUIBASE_COMMAND_PASSWORD:-${QUANTDB_PASSWORD:?QUANTDB_PASSWORD required}}"
 }

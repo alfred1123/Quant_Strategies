@@ -343,8 +343,8 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 
 **Tasks**
 
-- [ ] DDL: `BT.SP_LIST_STRATEGY` (or equivalent) — list current strategies (`IS_CURRENT_IND='Y'`) with optional latest-result stats; reads only.
-- [ ] API module: `quant/api/strategies/` — `GET /api/v1/strategies` (id, vid, name, minimal stats); behind `require_user`. Full CRUD deferred — create/update stays on backtest queue path (`BT.SP_INS_STRATEGY` via jobs).
+- [x] DDL: extend `BT.SP_GET_STRATEGY` — list mode when `IN_STRATEGY_ID` is NULL + **`IN_USER_ID` required** (same GET convention as `SP_GET_QUEUE` / `SP_GET_API_CREDENTIAL`). Release `1.3.0-sp-get-strategy-user-scope`.
+- [ ] API module: `quant/api/strategies/` — `GET /api/v1/strategies` calls list mode with `str(user.app_user_id)`; behind `require_user`. Full CRUD deferred — create/update stays on backtest queue path (`BT.SP_INS_STRATEGY` via jobs).
 - [ ] Frontend: `frontend/src/api/strategies.ts` + `StrategyPicker` on Trade Apply — selectable list/table; no JSON drill-down.
 - [ ] Selecting row sets active `{ strategy_id, strategy_vid }` for apply / deployment payload.
 - [ ] **1.7 prep:** list response includes `user_id`; deployment create validates strategy ownership (see [§5.5](#55-auth--security-guardrails)).
@@ -353,7 +353,7 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 
 | Layer | Choice | Rationale |
 |-------|--------|-----------|
-| **Backend** | New `quant/api/strategies/` reading `BT.STRATEGY` | Cross-cutting catalog; matches [trade-api.md §2.1](trade-api.md#21-strategy-catalog--phase-16). Not `quant/strategy/` (execution math) or `quant/trade/` (deployments only). |
+| **Backend** | New `quant/api/strategies/` calling **`BT.SP_GET_STRATEGY`** list mode (`IN_STRATEGY_ID` NULL, `IN_USER_ID`) | Cross-cutting catalog; matches GET SP convention ([database.md](../architecture/database.md)). Not `quant/strategy/` (execution math) or `quant/trade/` (deployments only). |
 | **Frontend** | New `StrategyPicker` + `useStrategies()` | Trade-specific UX. Extract to `components/strategy/` only when Backtest also needs the same picker (e.g. “Deploy this”). |
 | **Do not** | Reuse Backtest config UI or move `quant/strategy/` to shared | Wrong domain — signal-type builder ≠ persisted strategy catalog. |
 

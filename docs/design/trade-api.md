@@ -181,7 +181,7 @@ Endpoints use JWT auth (`require_user`); the user's `app_user_id` scopes all dat
     |----|-------|
     | New `quant/api/strategies/` module + `GET /api/v1/strategies` | Put list logic in `quant/strategy/backtest_service.py` (execution only) |
     | New `StrategyPicker` + `useStrategies()` on Trade Apply | Reuse Backtest `ConfigDrawer` / `FactorCard` (REFDATA signal-type builder) |
-    | Read `BT.STRATEGY` via SP (e.g. `BT.SP_LIST_STRATEGY`) | Nest under `/api/v1/trade/` — strategies are a BT artifact used by queue and trade |
+    | Read `BT.STRATEGY` via **`BT.SP_GET_STRATEGY`** (list: `IN_USER_ID`; get-one: `IN_STRATEGY_ID`) | Nest under `/api/v1/trade/` — strategies are a BT artifact used by queue and trade |
 
 **Phase 1.6 — implement now:**
 
