@@ -9,7 +9,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | Schema | Purpose |
 |--------|---------|
 | `CORE_ADMIN` | App users (`APP_USER`), proc audit log (`LOG_PROC_DETAIL`), exchange API credentials (`API_CREDENTIAL`) |
-| `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, …) + `SP_GET_ENUM` procedure for cache loading. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. |
+| `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `PROMOTION_METRIC`, …) + `SP_GET_ENUM` procedure for cache loading. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `REFDATA.PROMOTION_METRIC` stores auto-promote rules (HARD gates + SOFT comparison metrics). |
 | `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert/get procedures |
 | `TRADE` | Live trading: `DEPLOYMENT`, `EXECUTION_EVENT`, `TRANSACTION` + SPs (no `INTENT` — decision #38) |
 | `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) — `REFDATA.TICKER_MAPPING` has been dropped |
@@ -31,7 +31,9 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `<TABLE>_NM` | `STRATEGY_NM` | Name column |
 | `USER_ID` | — | Audit: who created |
 | `CREATED_AT` | — | Audit: when created (`TIMESTAMPTZ`) |
-| `IS_CURRENT_IND` | — | Soft-versioning flag (`CHAR(1)` Y/N) |
+| `IS_CURRENT_IND` | — | Soft-versioning flag (`CHAR(1)` Y/N) — **deprecated** in `BT.STRATEGY`, replaced by `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` |
+| `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` | — | Transaction-time window (`TIMESTAMPTZ`). Active row: `TRANSACT_TO_TS = '9999-12-31'` |
+| `IS_BEST_IND` | — | Best-performing version flag (`CHAR(1)` Y/N, no DEFAULT). Used on `BT.STRATEGY`. |
 
 ### INTERNAL_CUSIP Convention
 
@@ -112,13 +114,25 @@ See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11--user-secrets) a
 
 **SP OUT parameter order:** All write procedures called via `DbGateway._call_write` must return the status triplet `(OUT_SQLSTATE, OUT_SQLMSG, OUT_SQLERRMC)` **first**, then any business OUT params. Credential SPs were corrected in release `1.1.1-credential-sp-out-order` (applied to prod; archived in `releases/`).
 
-### BT — strategy catalog (Phase 1.6)
+### BT — strategy catalog (Phase 1.6 + 1.7)
+
+`BT.STRATEGY` uses **temporal versioning** (`TRANSACT_FROM_TS` / `TRANSACT_TO_TS`, active = `9999-12-31`) instead of `IS_CURRENT_IND` (dropped). **`IS_BEST_IND`** (`CHAR(1)`, no DEFAULT) marks the best-performing VID per `STRATEGY_ID` — at most one `'Y'` row per strategy. See [Best-VID Promotion](../design/best-vid-promotion.md).
 
 | Procedure | Status | Purpose |
 |-----------|--------|---------|
-| `SP_GET_STRATEGY` | **extended** | **Get-one:** `IN_STRATEGY_ID` + optional `IN_STRATEGY_VID`; optional `IN_USER_ID` for ownership. **List:** `IN_STRATEGY_ID` NULL + **`IN_USER_ID` required** → current strategies for owner (`IS_CURRENT_IND='Y'`), `IN_LIMIT` default 50. |
+| `SP_GET_STRATEGY` | **extended** | **Get-one:** `IN_STRATEGY_ID` + optional `IN_STRATEGY_VID`; optional `IN_USER_ID` for ownership; `IN_IS_BEST_IND='Y'` fetches best VID. **List:** `IN_STRATEGY_ID` NULL + **`IN_USER_ID` required** → current strategies for owner (`TRANSACT_TO_TS = 9999-12-31`), `IN_LIMIT` default 50. |
+| `SP_UPD_PROMOTE_STRATEGY` | **new** | Demote current best + promote target VID. `IN_STRATEGY_VID = NULL` = demote-only. |
 
 Persisted strategies (`BT.STRATEGY`) are created when backtest jobs complete — distinct from REFDATA `SIGNAL_TYPE`. Jobs store owner as `USER_ID = str(app_user_id)` (UUID text).
+
+### REFDATA — promotion metrics
+
+`REFDATA.PROMOTION_METRIC` stores configurable auto-promote rules. Two types:
+
+- **HARD** — threshold gates (e.g. Sharpe GT 0, Max DD LTE 40%). Must all pass to be eligible.
+- **SOFT** — comparison metrics evaluated in priority order against the current best VID.
+
+Loaded at runtime via `RedisRefData.get_promotion_metrics()`. See [Best-VID Promotion §2](../design/best-vid-promotion.md#2-promotion-metric-configuration--refdata-driven).
 
 ## Deployment
 
@@ -182,7 +196,8 @@ Active changelogs are empty manifests — see XML comments in each `db/liquidbas
 | `SP_INS_API_CREDENTIAL` | `CORE_ADMIN` | New exchange credential or rotate keys (soft-version); status triplet OUT first |
 | `SP_GET_API_CREDENTIAL` | `CORE_ADMIN` | List/get credentials for `APP_USER_ID` (REFCURSOR) |
 | `SP_UPD_API_CREDENTIAL_REVOKE` | `CORE_ADMIN` | Soft-version revoke; status triplet OUT first |
-| `SP_GET_STRATEGY` | `BT` | Get-one by id/vid; **list by `IN_USER_ID`** when `IN_STRATEGY_ID` is NULL (Phase 1.6) |
+| `SP_UPD_PROMOTE_STRATEGY` | `BT` | Flip `IS_BEST_IND`: demote current best + promote target VID. `IN_STRATEGY_VID = NULL` = demote-only (no replacement) |
+| `SP_GET_STRATEGY` | `BT` | Get-one by id/vid; **list by `IN_USER_ID`** when `IN_STRATEGY_ID` is NULL (Phase 1.6). `IN_IS_BEST_IND = 'Y'` fetches the best VID directly. |
 | `SP_INS_DEPLOYMENT` | `TRADE` | Create or version deployment |
 | `SP_GET_DEPLOYMENT` | `TRADE` | Read deployment rows (REFCURSOR) |
 | `SP_INS_EXECUTION_EVENT` | `TRADE` | Append execution event |

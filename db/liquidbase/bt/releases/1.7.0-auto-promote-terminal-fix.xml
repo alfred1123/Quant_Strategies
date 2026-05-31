@@ -21,6 +21,13 @@
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
+    <changeSet id="1.7.0-003a-drop-fn-get-queue-for-terminal" author="alfcheun" context="bt">
+        <comment>DROP existing function — return type changed (added IS_BEST_IND), Postgres requires DROP first</comment>
+        <sql splitStatements="false">
+            DROP FUNCTION IF EXISTS BT.FN_GET_QUEUE_FOR_TERMINAL(TEXT, INTEGER);
+        </sql>
+    </changeSet>
+
     <changeSet id="1.7.0-003-fn-get-queue-for-terminal" author="alfcheun" context="bt" runOnChange="true">
         <comment>FN_GET_QUEUE_FOR_TERMINAL: derive STRAT_CURRENT_IND from TRANSACT_TO_TS, add IS_BEST_IND</comment>
         <sqlFile path="../functions/FN_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true"
