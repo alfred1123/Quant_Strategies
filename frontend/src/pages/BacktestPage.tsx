@@ -113,6 +113,12 @@ export default function BacktestPage() {
     }
   };
 
+  const handleCloneEdit = (_strategyId: string, configJson: Record<string, unknown>, _strategyNm: string) => {
+    const cfg = configJson as unknown as Partial<BacktestConfig>;
+    setConfig({ ...DEFAULT_CONFIG, ...cfg });
+    setDrawerOpen(true);
+  };
+
   const handleViewJob = async (queueId: string) => {
     setError(null);
     try {
@@ -233,7 +239,7 @@ export default function BacktestPage() {
       />
 
       <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
-        {pageTab === 1 && <JobsTable onView={handleViewJob} />}
+        {pageTab === 1 && <JobsTable onView={handleViewJob} onCloneEdit={handleCloneEdit} />}
         {pageTab === 0 && (
           <>
         {/* Running state */}

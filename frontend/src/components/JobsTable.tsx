@@ -4,7 +4,7 @@ import {
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
-import { useCancelJob, useJobs, useReenqueueJob } from '../api/jobs';
+import { fetchJob, useCancelJob, useJobs, useReenqueueJob, usePromoteStrategy } from '../api/jobs';
 import type { JobRow, JobStatus } from '../types/jobs';
 
 const STATUS_COLOR: Record<
@@ -29,13 +29,17 @@ const FILTER_STATES: readonly (JobStatus | 'ALL')[] = [
 export interface JobsTableProps {
   /** Optional: invoked when the user clicks "View" on a COMPLETED row. */
   onView?: (queueId: string) => void;
+  /** Optional: invoked to open ConfigDrawer pre-filled with a job's config + strategy_id. */
+  onCloneEdit?: (strategyId: string, configJson: Record<string, unknown>, strategyNm: string) => void;
 }
 
-export default function JobsTable({ onView }: JobsTableProps = {}) {
+export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) {
   const jobs = useJobs();
   const cancel = useCancelJob();
   const reenqueue = useReenqueueJob();
+  const promote = usePromoteStrategy();
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'ALL'>('ALL');
+  const [cloneLoading, setCloneLoading] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     const all = jobs.data ?? [];
@@ -62,6 +66,19 @@ export default function JobsTable({ onView }: JobsTableProps = {}) {
         ),
       },
       { field: 'strategy_nm', headerName: 'Strategy', flex: 1, minWidth: 160 },
+      {
+        field: 'strategy_vid',
+        headerName: 'VID',
+        width: 100,
+        renderCell: (p: GridRenderCellParams<JobRow>) => (
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+            <Typography variant="body2">v{p.row.strategy_vid}</Typography>
+            {p.row.is_best_ind === 'Y' && (
+              <Chip size="small" label="Best" color="success" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
+            )}
+          </Stack>
+        ),
+      },
       {
         field: 'queue_status',
         headerName: 'Status',
@@ -104,7 +121,7 @@ export default function JobsTable({ onView }: JobsTableProps = {}) {
       {
         field: 'actions',
         headerName: '',
-        width: 220,
+        width: 340,
         sortable: false,
         filterable: false,
         renderCell: (p: GridRenderCellParams<JobRow>) => {
@@ -139,23 +156,57 @@ export default function JobsTable({ onView }: JobsTableProps = {}) {
               </Button>
             );
           }
-          if (p.row.queue_status === 'COMPLETED' && onView) {
+          if (p.row.queue_status === 'COMPLETED') {
+            const promPending = promote.isPending
+              && promote.variables?.strategyId === p.row.strategy_id;
+            const isCloning = cloneLoading === p.row.queue_id;
             return (
-              <Button
-                size="small"
-                color="primary"
-                variant="outlined"
-                onClick={() => onView(p.row.queue_id)}
-              >
-                View
-              </Button>
+              <Stack direction="row" spacing={0.5}>
+                {onView && (
+                  <Button size="small" color="primary" variant="outlined"
+                    onClick={() => onView(p.row.queue_id)}>
+                    View
+                  </Button>
+                )}
+                {onCloneEdit && (
+                  <Button size="small" color="secondary" variant="outlined"
+                    disabled={isCloning}
+                    onClick={async () => {
+                      setCloneLoading(p.row.queue_id);
+                      try {
+                        const detail = await fetchJob(p.row.queue_id);
+                        if (detail.config_json) {
+                          onCloneEdit(
+                            p.row.strategy_id,
+                            detail.config_json,
+                            p.row.strategy_nm ?? '',
+                          );
+                        }
+                      } finally {
+                        setCloneLoading(null);
+                      }
+                    }}>
+                    {isCloning ? '\u2026' : 'Clone'}
+                  </Button>
+                )}
+                {p.row.is_best_ind !== 'Y' && (
+                  <Button size="small" color="success" variant="outlined"
+                    disabled={promPending}
+                    onClick={() => promote.mutate({
+                      strategyId: p.row.strategy_id,
+                      strategyVid: p.row.strategy_vid,
+                    })}>
+                    {promPending ? '\u2026' : 'Promote'}
+                  </Button>
+                )}
+              </Stack>
             );
           }
           return null;
         },
       },
     ],
-    [cancel, reenqueue, onView],
+    [cancel, reenqueue, promote, onView, onCloneEdit, cloneLoading],
   );
 
   return (
@@ -184,6 +235,11 @@ export default function JobsTable({ onView }: JobsTableProps = {}) {
       {reenqueue.isError && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => reenqueue.reset()}>
           Re-run failed: {(reenqueue.error as Error)?.message ?? 'unknown error'}
+        </Alert>
+      )}
+      {promote.isError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => promote.reset()}>
+          Promote failed: {(promote.error as Error)?.message ?? 'unknown error'}
         </Alert>
       )}
 

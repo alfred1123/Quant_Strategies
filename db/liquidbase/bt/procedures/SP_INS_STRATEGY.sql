@@ -50,6 +50,7 @@ BEGIN
        AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00';
 
     -- Step 30: Insert new version as active (TRANSACT_TO_TS = 9999-12-31).
+    -- VID 1 is presumed best (no baseline); VID 2+ starts as not-best until promoted.
     OUT_SQLMSG := '30';
     INSERT INTO BT.STRATEGY (
         STRATEGY_ID,
@@ -59,7 +60,8 @@ BEGIN
         USER_ID,
         CREATED_AT,
         TRANSACT_FROM_TS,
-        TRANSACT_TO_TS
+        TRANSACT_TO_TS,
+        IS_BEST_IND
     ) VALUES (
         IN_STRATEGY_ID,
         V_VID,
@@ -68,7 +70,8 @@ BEGIN
         IN_USER_ID,
         V_START_TS,
         V_START_TS,
-        TIMESTAMPTZ '9999-12-31 00:00:00+00'
+        TIMESTAMPTZ '9999-12-31 00:00:00+00',
+        CASE WHEN V_VID = 1 THEN 'Y' ELSE 'N' END
     );
 
     OUT_STRATEGY_VID := V_VID;

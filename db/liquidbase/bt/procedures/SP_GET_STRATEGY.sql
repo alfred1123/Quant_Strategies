@@ -5,10 +5,10 @@
 --                  version (worker path: read the snapshot enqueued in
 --                  BT.QUEUE.STRATEGY_VID even after the strategy has
 --                  been edited). When NULL, returns the active row
---                  (IS_CURRENT_IND='Y').
+--                  (TRANSACT_TO_TS = 9999-12-31).
 --
--- Cursor columns mirror the table 1:1 (STRATEGY_ID, STRATEGY_VID,
--- STRATEGY_NM, CONFIG_JSON, IS_CURRENT_IND, USER_ID, CREATED_AT).
+-- Cursor columns: STRATEGY_ID, STRATEGY_VID, STRATEGY_NM, CONFIG_JSON,
+-- USER_ID, CREATED_AT, TRANSACT_FROM_TS, TRANSACT_TO_TS, IS_BEST_IND.
 CREATE OR REPLACE PROCEDURE BT.SP_GET_STRATEGY(
     IN  IN_STRATEGY_ID   UUID,
     IN  IN_STRATEGY_VID  INTEGER,
@@ -51,9 +51,11 @@ BEGIN
                    STRATEGY_VID,
                    STRATEGY_NM,
                    CONFIG_JSON,
-                   IS_CURRENT_IND,
                    USER_ID,
-                   CREATED_AT
+                   CREATED_AT,
+                   TRANSACT_FROM_TS,
+                   TRANSACT_TO_TS,
+                   IS_BEST_IND
               FROM BT.STRATEGY
              WHERE STRATEGY_ID  = IN_STRATEGY_ID
                AND STRATEGY_VID = IN_STRATEGY_VID;
@@ -63,12 +65,14 @@ BEGIN
                    STRATEGY_VID,
                    STRATEGY_NM,
                    CONFIG_JSON,
-                   IS_CURRENT_IND,
                    USER_ID,
-                   CREATED_AT
+                   CREATED_AT,
+                   TRANSACT_FROM_TS,
+                   TRANSACT_TO_TS,
+                   IS_BEST_IND
               FROM BT.STRATEGY
-             WHERE STRATEGY_ID    = IN_STRATEGY_ID
-               AND IS_CURRENT_IND = 'Y';
+             WHERE STRATEGY_ID  = IN_STRATEGY_ID
+               AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00';
     END IF;
 
     -- Step 30: Audit log.

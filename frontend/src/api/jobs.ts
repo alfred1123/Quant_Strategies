@@ -97,3 +97,27 @@ export function useEnqueueJob() {
 export function fetchJob(queueId: string): Promise<JobDetail> {
   return getJob(queueId);
 }
+
+// ── promote strategy ────────────────────────────────────────────────
+
+interface PromoteParams {
+  strategyId: string;
+  strategyVid: number;
+}
+
+async function promoteStrategy({ strategyId, strategyVid }: PromoteParams): Promise<void> {
+  await apiClient.post(`/backtest/jobs/strategies/${strategyId}/promote`, {
+    strategy_vid: strategyVid,
+  });
+}
+
+/** Promote a VID to IS_BEST_IND = 'Y' — invalidates the jobs list on success. */
+export function usePromoteStrategy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: promoteStrategy,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: JOBS_QUERY_KEY });
+    },
+  });
+}

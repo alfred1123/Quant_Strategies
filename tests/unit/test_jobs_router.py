@@ -16,13 +16,14 @@ from fastapi.testclient import TestClient
 from quant.api.schemas.jobs import EnqueueResponse
 
 
-def _row(*, qid=None, status="QUEUED", status_id=1, vid=1, user="u1", priority=100, error=None):
+def _row(*, qid=None, status="QUEUED", status_id=1, vid=1, user="u1", priority=100, error=None, is_best="N"):
     return {
         "queue_id": qid or uuid.uuid4(),
         "queue_vid": vid,
         "strategy_id": uuid.uuid4(),
         "strategy_vid": 1,
         "strategy_nm": "Strat A",
+        "is_best_ind": is_best,
         "queue_status_id": status_id,
         "queue_status": status,
         "priority": priority,
@@ -261,6 +262,46 @@ class TestEventsStream:
         assert resp.status_code == 200
         assert "event: error" in resp.text
         assert "not_found" in resp.text
+
+
+# ── POST /api/v1/backtest/jobs/strategies/{id}/promote ────────────────────────
+
+
+class TestPromote:
+    def test_happy_path(self, client_and_svc):
+        client, svc, user = client_and_svc
+        sid = uuid.uuid4()
+        svc.promote.return_value = None
+
+        resp = client.post(
+            f"/api/v1/backtest/jobs/strategies/{sid}/promote",
+            json={"strategy_vid": 3},
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["strategy_id"] == str(sid)
+        assert data["promoted_vid"] == 3
+        svc.promote.assert_called_once_with(str(user.app_user_id), sid, 3)
+
+    def test_not_found_returns_404(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        from quant.api.services.jobs import StrategyNotFound
+        svc.promote.side_effect = StrategyNotFound("missing")
+
+        resp = client.post(
+            f"/api/v1/backtest/jobs/strategies/{uuid.uuid4()}/promote",
+            json={"strategy_vid": 1},
+        )
+        assert resp.status_code == 404
+
+    def test_missing_vid_returns_422(self, client_and_svc):
+        client, _, _ = client_and_svc
+        resp = client.post(
+            f"/api/v1/backtest/jobs/strategies/{uuid.uuid4()}/promote",
+            json={},
+        )
+        assert resp.status_code == 422
 
 
 # ── auth gating (only checks the route is wired through require_user) ──

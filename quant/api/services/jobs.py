@@ -36,6 +36,10 @@ class JobNotFound(Exception):
     """Router maps to HTTP 404."""
 
 
+class StrategyNotFound(Exception):
+    """Router maps to HTTP 404 for promote endpoint."""
+
+
 class CancelNotAllowed(Exception):
     """Job is already in a terminal state — router maps to HTTP 409."""
 
@@ -70,9 +74,6 @@ class JobsService:
         if self._repo.count_queued_for_user(user_id, queued_id) >= MAX_QUEUED_PER_USER:
             raise RateLimitError(MAX_QUEUED_PER_USER)
 
-        # Persist a frozen BT.STRATEGY snapshot first — SP_INS_QUEUE refs
-        # the exact (strategy_id, strategy_vid) so worker payloads can't
-        # be mutated mid-flight.
         strategy_id = uuid.uuid4()
         strategy_vid = self._repo.sp_ins_strategy(
             strategy_id=strategy_id,
@@ -179,6 +180,32 @@ class JobsService:
 
         pos = self._repo.queued_position(new_queue_id, queued_id)
         return EnqueueResponse(queue_id=new_queue_id, queue_pos=pos)
+
+    # ── promote ─────────────────────────────────────────────────────────
+
+    def promote(self, user_id: str, strategy_id: uuid.UUID, strategy_vid: int) -> None:
+        """Promote a specific VID to IS_BEST_IND = 'Y'.
+
+        Verifies the user owns at least one queue row referencing this
+        ``strategy_id`` before allowing the promotion.
+        """
+        from quant.api.services.jobs import StrategyNotFound
+
+        ownership = self._repo._query(
+            "SELECT 1 FROM BT.QUEUE"
+            " WHERE STRATEGY_ID = %s::uuid"
+            "   AND USER_ID = %s"
+            " LIMIT 1",
+            (str(strategy_id), user_id),
+        )
+        if not ownership:
+            raise StrategyNotFound(str(strategy_id))
+
+        self._repo.sp_upd_promote_strategy(
+            strategy_id=strategy_id,
+            strategy_vid=strategy_vid,
+            user_id=user_id,
+        )
 
     # ── SSE polling ─────────────────────────────────────────────────────
 

@@ -17,13 +17,14 @@ from quant.api.auth.dependencies import require_user
 from quant.api.auth.models import CurrentUser
 from quant.shared.config import get_redis_url
 from quant.api.deps import get_data_caches
-from quant.api.schemas.jobs import EnqueueRequest, EnqueueResponse, JobDetail, JobRow
+from quant.api.schemas.jobs import EnqueueRequest, EnqueueResponse, JobDetail, JobRow, PromoteRequest
 from quant.api.services.jobs import (
     CancelNotAllowed,
     JobNotFound,
     JobsService,
     RateLimitError,
     ReenqueueNotAllowed,
+    StrategyNotFound,
 )
 from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
@@ -143,6 +144,27 @@ def reenqueue_job(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except RateLimitError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+
+
+# ── POST /strategies/{strategy_id}/promote ─────────────────────────────
+
+
+@router.post(
+    "/strategies/{strategy_id}/promote",
+    status_code=status.HTTP_200_OK,
+)
+def promote_strategy(
+    strategy_id: UUID,
+    req: PromoteRequest,
+    user: CurrentUser = Depends(require_user),
+    svc: JobsService = Depends(get_jobs_service),
+) -> dict:
+    """Promote a specific VID to IS_BEST_IND = 'Y'."""
+    try:
+        svc.promote(str(user.app_user_id), strategy_id, req.strategy_vid)
+    except StrategyNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return {"strategy_id": str(strategy_id), "promoted_vid": req.strategy_vid}
 
 
 # ── GET /jobs/{id}/events (SSE) ─────────────────────────────────────────

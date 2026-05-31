@@ -32,6 +32,12 @@ class EnqueueResponse(BaseModel):
     queue_pos: int
 
 
+class PromoteRequest(BaseModel):
+    """Promote a specific VID to IS_BEST_IND = 'Y'."""
+
+    strategy_vid: int
+
+
 class JobRow(BaseModel):
     """One active or terminal BT.QUEUE row, joined to status name + strategy name."""
 
@@ -40,6 +46,7 @@ class JobRow(BaseModel):
     strategy_id: UUID
     strategy_vid: int
     strategy_nm: str | None = None
+    is_best_ind: str | None = None
     queue_status_id: int
     queue_status: str
     priority: int

@@ -14,6 +14,7 @@ export interface JobRow {
   strategy_id: string;
   strategy_vid: number;
   strategy_nm: string | null;
+  is_best_ind: string | null;
   queue_status_id: number;
   queue_status: JobStatus;
   priority: number;

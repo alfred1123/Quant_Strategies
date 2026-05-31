@@ -113,8 +113,9 @@ class BtQueueRepo(DbGateway):
     ) -> int:
         """Wrap ``BT.SP_INS_STRATEGY`` — returns the assigned ``STRATEGY_VID``.
 
-        New ``STRATEGY_ID`` ⇒ VID=1; existing ID ⇒ prior current row flipped
-        to ``IS_CURRENT_IND='N'`` and new row inserted as next VID.
+        New ``STRATEGY_ID`` ⇒ VID=1 (``IS_BEST_IND='Y'``); existing ID ⇒
+        prior active row closed (``TRANSACT_TO_TS = now``) and new VID
+        inserted as active (``IS_BEST_IND='N'`` until promoted).
         """
         (new_vid,) = self._call_write(
             "CALL bt.sp_ins_strategy("
@@ -123,6 +124,21 @@ class BtQueueRepo(DbGateway):
             (str(strategy_id), strategy_nm, json.dumps(config_json), user_id),
         )
         return int(new_vid)
+
+    def sp_upd_promote_strategy(
+        self,
+        *,
+        strategy_id: uuid.UUID | str,
+        strategy_vid: int,
+        user_id: str,
+    ) -> None:
+        """Wrap ``BT.SP_UPD_PROMOTE_STRATEGY`` — flip IS_BEST_IND to target VID."""
+        self._call_write(
+            "CALL bt.sp_upd_promote_strategy("
+            "%s::uuid, %s::integer, %s::text,"
+            " NULL::text, NULL::text, NULL::text)",
+            (str(strategy_id), int(strategy_vid), user_id),
+        )
 
     # ── reads (direct SELECT — no SP covers these projections) ──────────
 
@@ -138,10 +154,10 @@ class BtQueueRepo(DbGateway):
         return int(rows[0]["n"]) if rows else 0
 
     def list_for_user(self, user_id: str, limit: int = 50) -> list[dict]:
-        """Active rows for one user with ``STRATEGY_NM`` join (not in SP_GET_QUEUE)."""
+        """Active rows for one user with ``STRATEGY_NM`` + ``IS_BEST_IND`` join."""
         return self._query(
             "SELECT q.QUEUE_ID, q.QUEUE_VID, q.STRATEGY_ID, q.STRATEGY_VID,"
-            "       s.STRATEGY_NM,"
+            "       s.STRATEGY_NM, s.IS_BEST_IND,"
             "       q.QUEUE_STATUS_ID,"
             "       (SELECT NAME FROM REFDATA.QUEUE_STATUS"
             "         WHERE QUEUE_STATUS_ID = q.QUEUE_STATUS_ID) AS QUEUE_STATUS,"
@@ -184,7 +200,7 @@ class BtQueueRepo(DbGateway):
         """
         sql = (
             "SELECT q.QUEUE_ID, q.QUEUE_VID, q.STRATEGY_ID, q.STRATEGY_VID,"
-            "       s.STRATEGY_NM, s.CONFIG_JSON,"
+            "       s.STRATEGY_NM, s.CONFIG_JSON, s.IS_BEST_IND,"
             "       q.QUEUE_STATUS_ID,"
             "       (SELECT NAME FROM REFDATA.QUEUE_STATUS"
             "         WHERE QUEUE_STATUS_ID = q.QUEUE_STATUS_ID) AS QUEUE_STATUS,"
