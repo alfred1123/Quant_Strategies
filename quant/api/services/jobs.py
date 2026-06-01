@@ -71,7 +71,7 @@ class JobsService:
     def enqueue(self, user_id: str, req: EnqueueRequest) -> EnqueueResponse:
         queued_id = self._status("QUEUED")
 
-        if self._repo.count_queued_for_user(user_id, queued_id) >= MAX_QUEUED_PER_USER:
+        if self._repo.sp_get_queued_count(user_id, queued_id) >= MAX_QUEUED_PER_USER:
             raise RateLimitError(MAX_QUEUED_PER_USER)
 
         strategy_id = uuid.uuid4()
@@ -107,7 +107,7 @@ class JobsService:
         row = self._repo.get_active(queue_id, user_id=user_id)
         if row is None:
             raise JobNotFound(str(queue_id))
-        result = self._repo.get_result(queue_id)
+        result = self._repo.sp_get_result(queue_id)
         if result is not None:
             row["result"] = result.get("payload_json")
         return row
@@ -164,7 +164,7 @@ class JobsService:
             )
 
         queued_id = self._status("QUEUED")
-        if self._repo.count_queued_for_user(user_id, queued_id) >= MAX_QUEUED_PER_USER:
+        if self._repo.sp_get_queued_count(user_id, queued_id) >= MAX_QUEUED_PER_USER:
             raise RateLimitError(MAX_QUEUED_PER_USER)
 
         new_queue_id = uuid.uuid4()
@@ -191,12 +191,8 @@ class JobsService:
         """
         from quant.api.services.jobs import StrategyNotFound
 
-        ownership = self._repo._query(
-            "SELECT 1 FROM BT.QUEUE"
-            " WHERE STRATEGY_ID = %s::uuid"
-            "   AND USER_ID = %s"
-            " LIMIT 1",
-            (str(strategy_id), user_id),
+        ownership = self._repo.sp_get_queue(
+            strategy_id=strategy_id, user_id=user_id, limit=1,
         )
         if not ownership:
             raise StrategyNotFound(str(strategy_id))

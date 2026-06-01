@@ -54,7 +54,7 @@ All other mutations use schema stored procedures (e.g. `BT.SP_INS_STRATEGY`, `BT
 - Python/FastAPI code normally calls procedures via `CALL <schema>.<procedure>(...)`.
 - Seed data (Liquibase `<sql>` changesets) is the only broad exception — direct `INSERT` within a changelog at deploy time.
 - If a required procedure does not exist yet, create it first (following the db-ddl skill conventions) before writing the calling code.
-- `SELECT` queries (reads) are fine directly — this rule applies to writes only.
+- **`SELECT` queries (reads)** must also go through stored procedures (`SP_GET_*`) or functions — no direct `SELECT` in Python application code. The only exception is `information_schema` catalog queries (e.g. REFDATA table discovery).
 
 ## Environment
 

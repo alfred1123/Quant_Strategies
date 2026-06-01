@@ -2,7 +2,6 @@ CREATE OR REPLACE PROCEDURE BT.SP_INS_RESULT(
     IN  IN_RESULT_ID       UUID,
     IN  IN_QUEUE_ID        UUID,
     IN  IN_PAYLOAD_JSON    JSONB,
-    IN  IN_USER_ID         TEXT,
     OUT OUT_SQLSTATE       TEXT,
     OUT OUT_SQLMSG         TEXT,
     OUT OUT_SQLERRMC       TEXT
@@ -15,6 +14,8 @@ DECLARE
     V_OTHER_TEXT TEXT;
     V_LOG_STATE  TEXT;
     V_LOG_MSG    TEXT;
+    V_USER_ID    TEXT;
+    V_METRICS    JSONB;
 BEGIN
     OUT_SQLSTATE := '00000';
     OUT_SQLMSG   := '0';
@@ -23,25 +24,44 @@ BEGIN
     V_OTHER_TEXT := 'IN_RESULT_ID=' || COALESCE(IN_RESULT_ID::TEXT, '')
                  || ', IN_QUEUE_ID=' || COALESCE(IN_QUEUE_ID::TEXT, '');
 
-    -- Step 10: Insert result row (RESULT_ID supplied by caller)
+    -- Derive USER_ID from the queue row for audit logging
+    OUT_SQLMSG := '05';
+    SELECT USER_ID INTO V_USER_ID
+      FROM BT.QUEUE
+     WHERE QUEUE_ID = IN_QUEUE_ID
+       AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
+     LIMIT 1;
+
+    -- Extract strategy_metrics from payload for fast querying
+    V_METRICS := IN_PAYLOAD_JSON -> 'performance' -> 'strategy_metrics';
+
+    -- Step 10: Insert result row with shredded metrics
     OUT_SQLMSG := '10';
     INSERT INTO BT.RESULT (
         RESULT_ID,
         QUEUE_ID,
         PAYLOAD_JSON,
-        USER_ID,
+        TOTAL_RETURN,
+        ANNUALIZED_RETURN,
+        SHARPE_RATIO,
+        MAX_DRAWDOWN,
+        CALMAR_RATIO,
         CREATED_AT
     ) VALUES (
         IN_RESULT_ID,
         IN_QUEUE_ID,
         IN_PAYLOAD_JSON,
-        IN_USER_ID,
+        (V_METRICS ->> 'Total Return')::NUMERIC,
+        (V_METRICS ->> 'Annualized Return')::NUMERIC,
+        (V_METRICS ->> 'Sharpe Ratio')::NUMERIC,
+        (V_METRICS ->> 'Max Drawdown')::NUMERIC,
+        (V_METRICS ->> 'Calmar Ratio')::NUMERIC,
         NOW() AT TIME ZONE 'UTC'
     );
 
     -- Step 20: Audit log
     OUT_SQLMSG := '20';
-    CALL CORE_ADMIN.CORE_INS_LOG_PROC('BT', 'SP_INS_RESULT', V_START_TS, NULL, V_OTHER_TEXT, IN_USER_ID, V_LOG_STATE, V_LOG_MSG);
+    CALL CORE_ADMIN.CORE_INS_LOG_PROC('BT', 'SP_INS_RESULT', V_START_TS, NULL, V_OTHER_TEXT, COALESCE(V_USER_ID, 'system'), V_LOG_STATE, V_LOG_MSG);
 
 EXCEPTION
     WHEN OTHERS THEN

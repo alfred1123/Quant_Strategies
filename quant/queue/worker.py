@@ -33,7 +33,7 @@ from quant.shared.config import load_config, get_redis_url
 from quant.schemas.backtest import OptimizeRequest
 from quant.strategy.backtest_service import run_optimize
 
-from quant.queue.promote import passes_hard_gates, should_promote
+from quant.queue.promote import evaluate_promotion
 from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
 from quant.shared.util import utc_now_iso
@@ -58,13 +58,13 @@ class WorkerRepo(BtQueueRepo):
     # ── writes ──────────────────────────────────────────────────────────
 
     def ins_result(
-        self, result_id: uuid.UUID, queue_id: uuid.UUID, payload: dict, user_id: str
+        self, result_id: uuid.UUID, queue_id: uuid.UUID, payload: dict
     ) -> None:
-        """SP_INS_RESULT — OUT row ``(SQLSTATE, SQLMSG, SQLERRMC)`` only (same as SP_INS_QUEUE)."""
+        """SP_INS_RESULT — shreds metrics from payload; OUT row ``(SQLSTATE, SQLMSG, SQLERRMC)``."""
         self._call_write(
             "CALL bt.sp_ins_result("
-            "%s::uuid, %s::uuid, %s::jsonb, %s::text, NULL::text, NULL::text, NULL::text)",
-            (str(result_id), str(queue_id), json.dumps(payload, default=str), user_id),
+            "%s::uuid, %s::uuid, %s::jsonb, NULL::text, NULL::text, NULL::text)",
+            (str(result_id), str(queue_id), json.dumps(payload, default=str)),
         )
 
 
@@ -125,53 +125,69 @@ class BacktestWorker:
 
         result_id = uuid.uuid4()
         payload = response.model_dump()
-        repo.ins_result(result_id, queue_id, payload, job["user_id"])
+        repo.ins_result(result_id, queue_id, payload)
 
         # Auto-promote / demote: compare against current best VID's result.
         try:
             promotion_metrics = refdata.get_promotion_metrics()
+            best_strat = repo.sp_get_strategy(
+                strategy_id=job["strategy_id"], is_best_ind="Y",
+            )
             is_current_best = (
-                best_strat := repo.sp_get_strategy(
-                    strategy_id=job["strategy_id"], is_best_ind="Y",
-                )
-            ) and best_strat["strategy_vid"] == job["strategy_vid"]
+                best_strat is not None
+                and best_strat["strategy_vid"] == job["strategy_vid"]
+            )
+            best_vid = best_strat["strategy_vid"] if best_strat else None
 
-            # If this VID is the current best and fails hard gates → demote.
-            if is_current_best and not passes_hard_gates(payload, promotion_metrics):
+            best_payload = None
+            if not is_current_best and best_strat:
+                best_queue = repo.sp_get_queue(
+                    strategy_id=job["strategy_id"], limit=1,
+                )
+                best_q = next(
+                    (r for r in best_queue if r["strategy_vid"] == best_strat["strategy_vid"]),
+                    None,
+                )
+                if best_q:
+                    best_result = repo.sp_get_result(best_q["queue_id"])
+                    best_payload = best_result["payload_json"] if best_result else None
+
+            decision = evaluate_promotion(
+                payload, best_payload, promotion_metrics,
+                is_current_best=is_current_best, best_vid=best_vid,
+            )
+
+            if decision.outcome == "DEMOTED":
                 repo.sp_upd_promote_strategy(
                     strategy_id=job["strategy_id"],
                     strategy_vid=None,
                     user_id=job["user_id"],
                 )
-                logger.info(
-                    "Demoted strategy_id=%s vid=%s — failed hard gates",
-                    job["strategy_id"], job["strategy_vid"],
+            elif decision.outcome == "PROMOTED":
+                repo.sp_upd_promote_strategy(
+                    strategy_id=job["strategy_id"],
+                    strategy_vid=job["strategy_vid"],
+                    user_id=job["user_id"],
                 )
-            elif not is_current_best:
-                best_payload = None
-                if best_strat:
-                    best_queue = repo.sp_get_queue(
-                        strategy_id=job["strategy_id"],
-                        limit=1,
-                    )
-                    best_q = next(
-                        (r for r in best_queue if r["strategy_vid"] == best_strat["strategy_vid"]),
-                        None,
-                    )
-                    if best_q:
-                        best_result = repo.get_result(best_q["queue_id"])
-                        best_payload = best_result["payload_json"] if best_result else None
 
-                if should_promote(payload, best_payload, promotion_metrics):
-                    repo.sp_upd_promote_strategy(
-                        strategy_id=job["strategy_id"],
-                        strategy_vid=job["strategy_vid"],
-                        user_id=job["user_id"],
-                    )
-                    logger.info(
-                        "Auto-promoted strategy_id=%s vid=%s",
-                        job["strategy_id"], job["strategy_vid"],
-                    )
+            repo.sp_ins_promotion(
+                promotion_id=uuid.uuid4(),
+                queue_id=queue_id,
+                strategy_id=job["strategy_id"],
+                strategy_vid=job["strategy_vid"],
+                outcome=decision.outcome,
+                user_id=job["user_id"],
+                compared_vid=decision.compared_vid,
+                gate_results=[
+                    {"name": g.name, "passed": g.passed,
+                     "value": g.value, "threshold": g.threshold}
+                    for g in decision.gate_results
+                ] if decision.gate_results else None,
+            )
+            logger.info(
+                "Promotion decision for strategy_id=%s vid=%s: %s",
+                job["strategy_id"], job["strategy_vid"], decision.outcome,
+            )
         except Exception:
             logger.warning("Auto-promote failed (non-fatal)", exc_info=True)
 

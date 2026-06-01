@@ -2,7 +2,7 @@
 
 import pytest
 
-from quant.queue.promote import passes_hard_gates, should_promote
+from quant.queue.promote import evaluate_promotion, passes_hard_gates, should_promote
 
 
 def _payload(sharpe: float = 1.0, calmar: float = 0.5, max_dd: float = -0.1, total_ret: float = 0.2):
@@ -103,3 +103,65 @@ class TestEdgeCases:
 
     def test_nan_metric_fails_hard_gate(self):
         assert should_promote(_payload(sharpe=float("nan")), None, _metrics()) is False
+
+
+class TestEvaluatePromotion:
+    """Tests for evaluate_promotion — structured outcome with gate detail."""
+
+    def test_promoted_no_baseline(self):
+        d = evaluate_promotion(_payload(), None, _metrics(), best_vid=None)
+        assert d.outcome == "PROMOTED"
+        assert d.compared_vid is None
+        assert all(g.passed for g in d.gate_results)
+
+    def test_rejected_fails_hard_gate(self):
+        d = evaluate_promotion(_payload(sharpe=-1.0), None, _metrics(), best_vid=2)
+        assert d.outcome == "REJECTED"
+        assert not all(g.passed for g in d.gate_results)
+
+    def test_promoted_beats_best(self):
+        d = evaluate_promotion(
+            _payload(sharpe=2.0), _payload(sharpe=1.0), _metrics(), best_vid=1,
+        )
+        assert d.outcome == "PROMOTED"
+        assert d.compared_vid == 1
+
+    def test_kept_loses_to_best(self):
+        d = evaluate_promotion(
+            _payload(sharpe=0.5), _payload(sharpe=1.0), _metrics(), best_vid=1,
+        )
+        assert d.outcome == "KEPT"
+        assert d.compared_vid == 1
+
+    def test_kept_all_tied(self):
+        p = _payload()
+        d = evaluate_promotion(p, p, _metrics(), best_vid=1)
+        assert d.outcome == "KEPT"
+
+    def test_demoted_current_best_fails(self):
+        d = evaluate_promotion(
+            _payload(sharpe=-1.0), None, _metrics(), is_current_best=True,
+        )
+        assert d.outcome == "DEMOTED"
+
+    def test_kept_current_best_passes(self):
+        d = evaluate_promotion(
+            _payload(), None, _metrics(), is_current_best=True,
+        )
+        assert d.outcome == "KEPT"
+
+    def test_gate_results_populated(self):
+        d = evaluate_promotion(_payload(), None, _metrics())
+        assert len(d.gate_results) == 2
+        sharpe_gate = next(g for g in d.gate_results if "Sharpe" in g.metric_key)
+        assert sharpe_gate.passed is True
+        assert sharpe_gate.threshold == 0
+
+    def test_falls_to_calmar(self):
+        d = evaluate_promotion(
+            _payload(sharpe=1.0, calmar=2.0),
+            _payload(sharpe=1.0, calmar=1.0),
+            _metrics(), best_vid=1,
+        )
+        assert d.outcome == "PROMOTED"
+        assert d.compared_vid == 1

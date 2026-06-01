@@ -10,17 +10,17 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 |--------|---------|
 | `CORE_ADMIN` | App users (`APP_USER`), proc audit log (`LOG_PROC_DETAIL`), exchange API credentials (`API_CREDENTIAL`) |
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `PROMOTION_METRIC`, …) + `SP_GET_ENUM` procedure for cache loading. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `REFDATA.PROMOTION_METRIC` stores auto-promote rules (HARD gates + SOFT comparison metrics). |
-| `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert/get procedures |
+| `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `PROMOTION`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert/get procedures |
 | `TRADE` | Live trading: `DEPLOYMENT`, `EXECUTION_EVENT`, `TRANSACTION` + SPs (no `INTENT` — decision #38) |
 | `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) — `REFDATA.TICKER_MAPPING` has been dropped |
 
 ## Conventions
 
-!!! danger "No Direct DML"
-    Writes from Python/FastAPI normally go through **`CALL schema.procedure(...)`** (including **`BT.SP_INS_RESULT`** for **`BT.RESULT`**). Exceptions: **`BT.QUEUE`** mutations use **`BT.SP_INS_QUEUE`** only (**`IN_ACTION`** discriminates enqueue / claim / terminal / cancel). Liquibase seed changesets may use **`INSERT`** once per deploy.
+!!! danger "No Direct SQL in Application Code"
+    **All** database access from Python/FastAPI goes through **`CALL schema.procedure(...)`** — both reads (`SP_GET_*`) and writes (`SP_INS_*`, `SP_UPD_*`). No raw `SELECT`, `INSERT`, `UPDATE`, or `DELETE` in Python code. Exceptions: **`BT.QUEUE`** mutations use **`BT.SP_INS_QUEUE`** only (**`IN_ACTION`** discriminates enqueue / claim / terminal / cancel). Liquibase seed changesets may use direct SQL. `information_schema` catalog queries (e.g. REFDATA table discovery) are permitted.
 
     - **REFDATA reads** — application code reads REFDATA via the Redis-backed `RedisRefData` reader (`quant/refdata/reader.py`). Postgres is hit only by the publisher (`quant/refdata/publisher.py`) at startup and on `POST /api/v1/refdata/refresh`, which runs `CALL REFDATA.SP_GET_ENUM(table_name, ...)` per table. Never query REFDATA tables directly from application code.
-    - If a required write procedure does not exist yet, create it first.
+    - If a required procedure does not exist yet, create it first.
 
 ### Column Naming
 
@@ -96,7 +96,8 @@ PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, 
 | Procedure | Purpose |
 |-----------|---------|
 | `SP_INS_DEPLOYMENT` | Create or version deployment |
-| `SP_GET_DEPLOYMENT` | Read current or historical deployment (REFCURSOR) |
+| `SP_GET_DEPLOYMENT` | Read current or historical deployment (owner-scoped, REFCURSOR) |
+| `SP_GET_DEPLOYMENT_CHECK` | Validation read by deployment_id — no owner filter (caller checks) |
 | `SP_INS_EXECUTION_EVENT` | Append execution event |
 | `SP_INS_TRANSACTION` | Append fill row |
 
@@ -106,6 +107,7 @@ Validation: Python `TradeRepo` before SP calls. See [Plan to Profit §1.2](../de
 |-----------|---------|
 | `SP_INS_API_CREDENTIAL` | New account (assign id) or rotate keys (new VID) |
 | `SP_GET_API_CREDENTIAL` | List/get for owner; returns ciphertext |
+| `SP_GET_CREDENTIAL_CHECK` | Validation read by credential_id — no owner filter (caller checks ownership + active status) |
 | `SP_UPD_API_CREDENTIAL_REVOKE` | Soft-version revoke |
 
 See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11--user-secrets) and decision #36.
@@ -191,15 +193,19 @@ Active changelogs are empty manifests — see XML comments in each `db/liquidbas
 | `SP_GET_QUEUE_FOR_TERMINAL` | `BT` | Active rows + strategy metadata (REFCURSOR) |
 | `FN_GET_QUEUE_FOR_TERMINAL` | `BT` | **Function** — UI terminal lookup (`RETURNS TABLE`); worker uses `SP_GET_QUEUE_LATEST` |
 | `SP_GET_QUEUE_LATEST` | `BT` | **Queue worker**: active row for one **`QUEUE_ID`** + frozen **`CONFIG_JSON`** (`QUEUE` ⋈ **`STRATEGY`** on **`STRATEGY_VID`**) |
-| `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`**; **`IN_RESULT_ID`** is caller-supplied UUID; OUT row is status triplet only (same shape as **`SP_INS_QUEUE`**) |
+| `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`** with shredded metrics (Sharpe, Calmar, Max DD, etc.) extracted from `PAYLOAD_JSON`; **`IN_RESULT_ID`** is caller-supplied UUID; `USER_ID` derived from `BT.QUEUE`; OUT row is status triplet only |
+| `SP_GET_RESULT` | `BT` | Fetch latest result row for a `QUEUE_ID` (REFCURSOR) |
 | `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`) |
 | `SP_INS_API_CREDENTIAL` | `CORE_ADMIN` | New exchange credential or rotate keys (soft-version); status triplet OUT first |
 | `SP_GET_API_CREDENTIAL` | `CORE_ADMIN` | List/get credentials for `APP_USER_ID` (REFCURSOR) |
+| `SP_GET_CREDENTIAL_CHECK` | `CORE_ADMIN` | Validation read by `API_CREDENTIAL_ID` — no owner filter; caller checks ownership + active status |
 | `SP_UPD_API_CREDENTIAL_REVOKE` | `CORE_ADMIN` | Soft-version revoke; status triplet OUT first |
 | `SP_UPD_PROMOTE_STRATEGY` | `BT` | Flip `IS_BEST_IND`: demote current best + promote target VID. `IN_STRATEGY_VID = NULL` = demote-only (no replacement) |
+| `SP_INS_PROMOTION` | `BT` | Persist auto-promote decision (outcome, gate results, decisive metric) — one row per completed backtest |
 | `SP_GET_STRATEGY` | `BT` | Get-one by id/vid; **list by `IN_USER_ID`** when `IN_STRATEGY_ID` is NULL (Phase 1.6). `IN_IS_BEST_IND = 'Y'` fetches the best VID directly. |
 | `SP_INS_DEPLOYMENT` | `TRADE` | Create or version deployment |
 | `SP_GET_DEPLOYMENT` | `TRADE` | Read deployment rows (REFCURSOR) |
+| `SP_GET_DEPLOYMENT_CHECK` | `TRADE` | Validation read by `DEPLOYMENT_ID` — no owner filter; caller checks ownership |
 | `SP_INS_EXECUTION_EVENT` | `TRADE` | Append execution event |
 | `SP_INS_TRANSACTION` | `TRADE` | Append fill row |
 

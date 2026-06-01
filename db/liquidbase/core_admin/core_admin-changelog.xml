@@ -22,4 +22,6 @@
          (runOnChange=true) in a core_admin release file.
     -->
 
+    <include file="releases/1.2.0-credential-check.xml" relativeToChangelogFile="true"/>
+
 </databaseChangeLog>

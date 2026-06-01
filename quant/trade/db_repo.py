@@ -12,8 +12,6 @@ from quant.trade.errors import TradeValidationError
 
 logger = logging.getLogger(__name__)
 
-ACTIVE_TS = "9999-12-31 00:00:00+00"
-
 
 def _require(value: Any, name: str) -> None:
     if value is None:
@@ -25,55 +23,43 @@ def _require(value: Any, name: str) -> None:
 class TradeRepo(DbGateway):
     """TRADE.DEPLOYMENT / EXECUTION_EVENT / TRANSACTION — validates then CALLs SPs."""
 
-    # ── validation reads (SELECT ok per AGENTS.md) ───────────────────────
+    # ── validation reads (via stored procedures) ──────────────────────
 
     def _fetch_credential(self, api_credential_id: int) -> dict | None:
-        rows = self._query(
-            """
-            SELECT app_user_id, app_id, is_active_ind, is_current_ind
-              FROM core_admin.api_credential
-             WHERE api_credential_id = %s
-               AND is_current_ind = 'Y'
-            """,
+        rows = self._call_get(
+            "CALL core_admin.sp_get_credential_check("
+            "%s::integer,"
+            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
             (api_credential_id,),
         )
         return rows[0] if rows else None
 
     def _strategy_exists(self, strategy_id: UUID, strategy_vid: int) -> bool:
-        rows = self._query(
-            """
-            SELECT 1
-              FROM bt.strategy
-             WHERE strategy_id = %s::uuid
-               AND strategy_vid = %s
-            """,
-            (str(strategy_id), strategy_vid),
+        rows = self._call_get(
+            "CALL bt.sp_get_strategy("
+            "%s::uuid, %s::integer, NULL::char,"
+            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (str(strategy_id), int(strategy_vid)),
         )
         return bool(rows)
 
     def _fetch_deployment_version(
         self, deployment_id: UUID, deployment_vid: int
     ) -> dict | None:
-        rows = self._query(
-            """
-            SELECT app_user_id, app_id
-              FROM trade.deployment
-             WHERE deployment_id = %s::uuid
-               AND deployment_vid = %s
-            """,
-            (str(deployment_id), deployment_vid),
+        rows = self._call_get(
+            "CALL trade.sp_get_deployment_check("
+            "%s::uuid, %s::integer,"
+            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (str(deployment_id), int(deployment_vid)),
         )
         return rows[0] if rows else None
 
     def _fetch_current_deployment(self, deployment_id: UUID) -> dict | None:
-        rows = self._query(
-            """
-            SELECT app_user_id, app_id, deployment_vid
-              FROM trade.deployment
-             WHERE deployment_id = %s::uuid
-               AND transact_to_ts = %s::timestamptz
-            """,
-            (str(deployment_id), ACTIVE_TS),
+        rows = self._call_get(
+            "CALL trade.sp_get_deployment_check("
+            "%s::uuid, NULL::integer,"
+            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (str(deployment_id),),
         )
         return rows[0] if rows else None
 

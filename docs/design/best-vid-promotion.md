@@ -1,6 +1,6 @@
 # Best-VID Promotion Model
 
-**Status:** Implemented (DB + Python + API + UI). Deployed to prod.
+**Status:** Implemented (DB + Python + API + UI + outcome persistence). Deployed to prod. Promotion tab UI planned.
 
 ## Problem
 
@@ -148,7 +148,7 @@ Priority follows the same convention as `BT.QUEUE`: **lower number = higher prio
 
 ### 3a. Promotion helper (`quant/queue/promote.py`)
 
-Two public functions:
+Three public functions:
 
 ```python
 def passes_hard_gates(payload: dict, promotion_metrics: list[dict]) -> bool:
@@ -160,11 +160,24 @@ def should_promote(
     promotion_metrics: list[dict],
 ) -> bool:
     """Full promotion check: hard gates then soft comparison."""
+
+def evaluate_promotion(
+    new_payload: dict,
+    best_payload: dict | None,
+    promotion_metrics: list[dict],
+    *,
+    is_current_best: bool = False,
+    best_vid: int | None = None,
+) -> PromotionDecision:
+    """Structured evaluation — returns outcome + gate results + decisive metric."""
 ```
 
 - Receives metric config from REFDATA (no hardcoded sets)
-- `passes_hard_gates` — checks all `HARD` metrics against their thresholds, respecting `direction`
-- `should_promote` — calls `passes_hard_gates` first, then evaluates `SOFT` metrics in priority order against the current best; first decisive win/loss decides; all ties = no promote (conservative)
+- `passes_hard_gates` / `should_promote` — original bool helpers (still used by tests)
+- `evaluate_promotion` — wraps both and returns a `PromotionDecision` dataclass:
+  - `outcome`: `PROMOTED` | `KEPT` | `DEMOTED` | `REJECTED`
+  - `gate_results`: list of `GateResult(name, metric_key, passed, value, threshold)`
+  - `compared_vid`, `decisive_metric`, `new_value`, `best_value` — the soft comparison that decided
 - Handles NaN / missing gracefully (don't promote if new metric is NaN)
 
 ### 3b. Worker completion (`quant/queue/worker.py`)
@@ -173,17 +186,16 @@ After writing `BT.RESULT` and before marking COMPLETED:
 
 1. Load `promotion_metrics` from `RefData.get_promotion_metrics()`
 2. Find current best VID for this `strategy_id` via `SP_GET_STRATEGY(is_best_ind='Y')`
-3. **Demotion check**: if the just-completed VID *is* the current best and fails `passes_hard_gates` → call `SP_UPD_PROMOTE_STRATEGY(strategy_id, vid=NULL)` to demote (no replacement)
-4. **Promotion check**: if the just-completed VID is *not* the current best:
-   a. If best VID has a `BT.RESULT` → fetch its `PAYLOAD_JSON`
-   b. Call `should_promote(payload, best_payload, promotion_metrics)`
-   c. If promote → `CALL BT.SP_UPD_PROMOTE_STRATEGY(strategy_id, new_vid, user_id)`
-5. Log the decision either way
+3. If not the current best, fetch the best VID's `BT.RESULT` payload for comparison
+4. Call `evaluate_promotion(payload, best_payload, promotion_metrics, ...)`
+5. Act on the outcome: `DEMOTED` → `SP_UPD_PROMOTE_STRATEGY(vid=NULL)`, `PROMOTED` → `SP_UPD_PROMOTE_STRATEGY(vid=new_vid)`
+6. **Persist** the decision via `SP_INS_PROMOTION` with gate results and decisive metric detail
 
 ### 3c. `BtQueueRepo` wrapper (`quant/queue/repo.py`)
 
 - `sp_upd_promote_strategy(strategy_id, strategy_vid, user_id)` — `strategy_vid=None` triggers demote-only mode
 - `sp_get_strategy(strategy_id, is_best_ind='Y')` — fetches the current best VID for comparison
+- `sp_ins_promotion(...)` — persists the structured promotion decision to `BT.PROMOTION`
 
 
 ## 4. Manual Promote API
@@ -246,14 +258,27 @@ Strategies are a **shared pool** — any authenticated user can read, browse, an
 - The Promotion tab shows all strategies across all users
 - The Trade tab filters to the caller's deployments (scoped by `APP_USER_ID`)
 
-## 7. Promotion Outcome Persistence
+## 7. Promotion Outcome Persistence — Implemented
 
-Planned (`BT.PROMOTION_OUTCOME` table + `SP_INS_PROMOTION_OUTCOME` procedure designed, not yet deployed):
+`BT.PROMOTION` — append-only log, no temporal versioning (each decision is immutable):
 
-- Store structured outcome per completed `QUEUE_ID`: `PROMOTED` / `KEPT` / `DEMOTED` / `REJECTED`
-- `GATE_RESULTS JSONB` — per-gate pass/fail detail
-- `COMPARED_VID`, `COMPARED_METRIC`, `NEW_VALUE`, `BEST_VALUE` — the decisive soft comparison
-- Powers the Promotion tab UI — without this data, the tab cannot show why a decision was made
+| Column | Type | Description |
+|---|---|---|
+| PROMOTION_ID | UUID PK | Client-generated UUID |
+| QUEUE_ID | UUID | The completed backtest |
+| STRATEGY_ID | UUID | Strategy being evaluated |
+| STRATEGY_VID | INTEGER | VID being evaluated |
+| OUTCOME | TEXT | `PROMOTED` / `KEPT` / `DEMOTED` / `REJECTED` |
+| COMPARED_VID | INTEGER | Best VID compared against (NULL if no baseline) |
+| GATE_RESULTS | JSONB | Point-in-time snapshot `[{name, passed, value, threshold}]` |
+| USER_ID | TEXT | Audit |
+| CREATED_AT | TIMESTAMPTZ | When decision was made |
+
+Metric values (Sharpe, Calmar, etc.) are **not duplicated** here — they live as shredded columns on `BT.RESULT` (`SHARPE_RATIO`, `MAX_DRAWDOWN`, `CALMAR_RATIO`, `TOTAL_RETURN`, `ANNUALIZED_RETURN`). The UI derives the decisive soft metric by joining both results (candidate via `QUEUE_ID`, best via `COMPARED_VID`'s queue) and walking `REFDATA.PROMOTION_METRIC` in priority order. `GATE_RESULTS` is a snapshot because REFDATA thresholds may change after the decision.
+
+- **SP:** `BT.SP_INS_PROMOTION` — simple insert + audit log
+- **Liquibase:** `bt/releases/1.8.0-promotion.xml`
+- **Worker:** persists one row per completed backtest, immediately after the promote/demote decision
 
 ## Resolved Questions
 

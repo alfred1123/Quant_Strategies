@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ── BT.PROMOTION table ─────────────────────────────────────── -->
+
+    <changeSet id="1.8.0-001-promotion-table" author="alfcheun" context="bt">
+        <comment>BT.PROMOTION — persists auto-promote decisions per completed backtest</comment>
+        <sqlFile path="../tables/PROMOTION.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <!-- ── SP_INS_PROMOTION ───────────────────────────────────────── -->
+
+    <changeSet id="1.8.0-002-sp-ins-promotion" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_INS_PROMOTION — insert one promotion decision row</comment>
+        <sqlFile path="../procedures/SP_INS_PROMOTION.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <!-- ── BT.RESULT: drop USER_ID, add shredded metric columns ─── -->
+
+    <changeSet id="1.8.0-003-result-add-metrics" author="alfcheun" context="bt">
+        <comment>Add shredded metric columns to BT.RESULT for fast promotion queries</comment>
+        <sql splitStatements="true">
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS TOTAL_RETURN NUMERIC;
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS ANNUALIZED_RETURN NUMERIC;
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS SHARPE_RATIO NUMERIC;
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS MAX_DRAWDOWN NUMERIC;
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS CALMAR_RATIO NUMERIC;
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.8.0-004-result-backfill-metrics" author="alfcheun" context="bt">
+        <comment>Backfill shredded metrics from PAYLOAD_JSON for existing rows</comment>
+        <sql splitStatements="false"><![CDATA[
+            UPDATE BT.RESULT
+               SET TOTAL_RETURN      = (PAYLOAD_JSON -> 'performance' -> 'strategy_metrics' ->> 'Total Return')::NUMERIC,
+                   ANNUALIZED_RETURN = (PAYLOAD_JSON -> 'performance' -> 'strategy_metrics' ->> 'Annualized Return')::NUMERIC,
+                   SHARPE_RATIO      = (PAYLOAD_JSON -> 'performance' -> 'strategy_metrics' ->> 'Sharpe Ratio')::NUMERIC,
+                   MAX_DRAWDOWN      = (PAYLOAD_JSON -> 'performance' -> 'strategy_metrics' ->> 'Max Drawdown')::NUMERIC,
+                   CALMAR_RATIO      = (PAYLOAD_JSON -> 'performance' -> 'strategy_metrics' ->> 'Calmar Ratio')::NUMERIC
+             WHERE TOTAL_RETURN IS NULL
+               AND PAYLOAD_JSON -> 'performance' -> 'strategy_metrics' IS NOT NULL;
+        ]]></sql>
+    </changeSet>
+
+    <changeSet id="1.8.0-005-result-drop-userid" author="alfcheun" context="bt">
+        <comment>Drop redundant USER_ID from BT.RESULT (derivable via QUEUE_ID)</comment>
+        <sql>ALTER TABLE BT.RESULT DROP COLUMN IF EXISTS USER_ID;</sql>
+    </changeSet>
+
+    <!-- ── SP_INS_RESULT: drop IN_USER_ID, extract metrics from payload -->
+
+    <changeSet id="1.8.0-006a-drop-sp-ins-result" author="alfcheun" context="bt">
+        <comment>DROP existing SP_INS_RESULT — signature changed (IN_USER_ID removed)</comment>
+        <sql splitStatements="false">
+            DROP PROCEDURE IF EXISTS BT.SP_INS_RESULT(UUID, UUID, JSONB, TEXT);
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.8.0-006-sp-ins-result" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_INS_RESULT — shred metrics from PAYLOAD_JSON, USER_ID derived from QUEUE</comment>
+        <sqlFile path="../procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <!-- ── SP_GET_RESULT ─────────────────────────────────────────── -->
+
+    <changeSet id="1.8.0-007-sp-get-result" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_GET_RESULT — fetch latest result row for a queue_id</comment>
+        <sqlFile path="../procedures/SP_GET_RESULT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+</databaseChangeLog>

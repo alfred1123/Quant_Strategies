@@ -38,14 +38,19 @@ BEGIN
           || '       q.QUEUE_VID,'
           || '       q.STRATEGY_ID,'
           || '       q.STRATEGY_VID,'
+          || '       s.STRATEGY_NM,'
+          || '       s.CONFIG_JSON,'
+          || '       s.IS_BEST_IND,'
           || '       q.TRANSACT_FROM_TS,'
           || '       q.QUEUE_STATUS_ID,'
-          || '       (SELECT NAME FROM REFDATA.QUEUE_STATUS WHERE QUEUE_STATUS_ID = rs.QUEUE_STATUS_ID) AS QUEUE_STATUS,'
+          || '       rs.NAME AS QUEUE_STATUS,'
           || '       q.PRIORITY,'
           || '       q.ERROR_TEXT,'
           || '       q.USER_ID'
           || '  FROM BT.QUEUE q'
           || '  JOIN REFDATA.QUEUE_STATUS rs ON q.QUEUE_STATUS_ID = rs.QUEUE_STATUS_ID'
+          || '  LEFT JOIN BT.STRATEGY s ON s.STRATEGY_ID = q.STRATEGY_ID'
+          || '                         AND s.STRATEGY_VID = q.STRATEGY_VID'
           || ' WHERE 1=1';
 
     -- When QUEUE_ID is supplied return all VIDs (full history for that job).

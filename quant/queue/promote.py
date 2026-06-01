@@ -6,10 +6,32 @@ Metric configuration (direction, thresholds, priority) comes from
 REFDATA.PROMOTION_METRIC via RedisRefData — nothing is hardcoded here.
 """
 
+from __future__ import annotations
+
 import logging
 import math
+from dataclasses import dataclass, field
+from typing import Literal
 
 logger = logging.getLogger(__name__)
+
+Outcome = Literal["PROMOTED", "KEPT", "DEMOTED", "REJECTED"]
+
+
+@dataclass
+class GateResult:
+    name: str
+    metric_key: str
+    passed: bool
+    value: float | None
+    threshold: float | None
+
+
+@dataclass
+class PromotionDecision:
+    outcome: Outcome
+    gate_results: list[GateResult] = field(default_factory=list)
+    compared_vid: int | None = None
 
 
 def _extract_metric(payload: dict, metric_key: str) -> float | None:
@@ -128,3 +150,86 @@ def should_promote(
 
     logger.info("All soft metrics tied — no promote (conservative)")
     return False
+
+
+def _collect_gate_results(
+    payload: dict, promotion_metrics: list[dict]
+) -> list[GateResult]:
+    results: list[GateResult] = []
+    for m in promotion_metrics:
+        if m.get("requirement_type") != "HARD":
+            continue
+        threshold = m.get("threshold")
+        if threshold is None:
+            continue
+        metric_key = m["metric_key"]
+        direction = m["direction"]
+        val = _extract_metric(payload, metric_key)
+        passed = _check_one_gate(payload, metric_key, direction, float(threshold))
+        results.append(GateResult(
+            name=m.get("name", metric_key),
+            metric_key=metric_key,
+            passed=passed,
+            value=val,
+            threshold=float(threshold),
+        ))
+    return results
+
+
+def evaluate_promotion(
+    new_payload: dict,
+    best_payload: dict | None,
+    promotion_metrics: list[dict],
+    *,
+    is_current_best: bool = False,
+    best_vid: int | None = None,
+) -> PromotionDecision:
+    """Full promotion evaluation returning a structured decision.
+
+    Wraps ``passes_hard_gates`` / ``should_promote`` and collects
+    gate results + the decisive soft metric for persistence.
+    """
+    gates = _collect_gate_results(new_payload, promotion_metrics)
+    hard_pass = all(g.passed for g in gates)
+
+    if is_current_best:
+        if hard_pass:
+            return PromotionDecision(outcome="KEPT", gate_results=gates)
+        return PromotionDecision(outcome="DEMOTED", gate_results=gates)
+
+    if not hard_pass:
+        return PromotionDecision(
+            outcome="REJECTED", gate_results=gates, compared_vid=best_vid,
+        )
+
+    if best_payload is None:
+        return PromotionDecision(
+            outcome="PROMOTED", gate_results=gates, compared_vid=best_vid,
+        )
+
+    for m in promotion_metrics:
+        if m.get("requirement_type") != "SOFT":
+            continue
+        metric_key = m["metric_key"]
+        direction = m["direction"]
+        new_val = _extract_metric(new_payload, metric_key)
+        best_val = _extract_metric(best_payload, metric_key)
+
+        if new_val is None:
+            continue
+        if best_val is None:
+            return PromotionDecision(
+                outcome="PROMOTED", gate_results=gates, compared_vid=best_vid,
+            )
+        if _wins_soft(new_val, best_val, direction):
+            return PromotionDecision(
+                outcome="PROMOTED", gate_results=gates, compared_vid=best_vid,
+            )
+        if _wins_soft(best_val, new_val, direction):
+            return PromotionDecision(
+                outcome="KEPT", gate_results=gates, compared_vid=best_vid,
+            )
+
+    return PromotionDecision(
+        outcome="KEPT", gate_results=gates, compared_vid=best_vid,
+    )
