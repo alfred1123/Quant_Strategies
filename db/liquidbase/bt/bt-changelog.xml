@@ -23,5 +23,6 @@
     <include file="releases/1.6.0-promote-strategy.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.7.0-auto-promote-terminal-fix.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.8.0-promotion.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.9.0-promotion-read.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

@@ -1,6 +1,6 @@
 # Best-VID Promotion Model
 
-**Status:** Implemented (DB + Python + API + UI + outcome persistence). Deployed to prod. Promotion tab UI planned.
+**Status:** Implemented (DB + Python + API + UI + outcome persistence + Promotion tab). Deployed to prod.
 
 ## Problem
 
@@ -236,16 +236,26 @@ The Promotion tab is the **strategy improvement loop** — users iterate there u
 - **Actions column**: "View" (load result), "Clone" (opens enqueue form pre-filled with config), "Promote" (calls `POST /strategies/{id}/promote`)
 - `EnqueueRequest` does **not** include `strategy_id` — clone always creates a new strategy (new `strategy_id`, VID 1)
 
-### 5b. Promotion tab (planned)
+### 5b. Promotion tab (implemented)
+
+Third tab in `BacktestPage` (`frontend/src/components/PromotionTab.tsx`), fed by
+`GET /api/v1/backtest/promotions` (polled every 10s). `BT.SP_GET_PROMOTION` is
+enriched with a `LEFT JOIN LATERAL` on `BT.RESULT` (candidate's shredded metrics)
+and `BT.STRATEGY` (live `IS_BEST_IND`), so the whole tab renders from one query
+with no N+1 round-trips.
 
 Content:
 
-- **Recommended strategy banner** — the overall best strategy across all `strategy_id`s (highest Sharpe with `IS_BEST_IND = 'Y'`)
-- **Strategy list** — grouped by `strategy_id`, showing all VIDs with their promotion outcome (PROMOTED / KEPT / DEMOTED / REJECTED)
-- **VID comparison panel** — select a VID to see hard gate results (pass/fail per gate with values) and soft metric comparison vs current best, with the decisive metric highlighted
-- **Promotion rules card** — read-only display of `REFDATA.PROMOTION_METRIC` config (what gates, thresholds, comparison order)
-- **"Re-backtest" button** — clone the best VID config back to the Backtest tab with tweaked params
-- **"Deploy" button** — send the best VID to Trade (Phase 1.7)
+- **Recommended strategy banner** — the overall best strategy across all `strategy_id`s (highest Sharpe among rows with `IS_BEST_IND = 'Y'`)
+- **Strategy list** — accordions grouped by `strategy_id`, showing all VIDs with their promotion outcome chip (PROMOTED / KEPT / DEMOTED / REJECTED, label from `REFDATA.PROMOTION_STATE`), Sharpe/Calmar, and a "Best" chip on the current best VID
+- **VID comparison panel** — click a VID to see hard gate results (pass/fail per gate with value + threshold from the `GATE_RESULTS` snapshot) and a soft-metric comparison vs the `COMPARED_VID` baseline; the first decisive soft metric (walked in `REFDATA.PROMOTION_METRIC` priority order) is highlighted
+- **Promotion rules card** — read-only display of `REFDATA.PROMOTION_METRIC` (hard gates with thresholds, then soft metrics in priority order)
+- **"Re-backtest" button** — fetches the decision's frozen `config_json` via its `QUEUE_ID`, prefills the Backtest drawer, and switches to the Backtest tab
+- **"Deploy" button** — navigates to the Trade tab (`/trade/apply`) carrying `strategyId` + `strategyVid` in router state, ready for the Phase 1.7 apply form
+
+The soft-comparison baseline reuses the decision row whose `strategy_vid` equals
+`compared_vid` within the same strategy group — each row already carries that VID's
+shredded metrics, so no extra fetch is needed.
 
 ### 5c. Design principle — progressive disclosure
 

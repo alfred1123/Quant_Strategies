@@ -25,7 +25,7 @@ from quant.api.auth.router import limiter as auth_limiter, router as auth_router
 from quant.api.auth.service import AuthService  # noqa: E402
 from quant.api.credentials.router import limiter as credentials_limiter, router as credentials_router  # noqa: E402
 from quant.api.credentials.service import CredentialService  # noqa: E402
-from quant.api.routers import backtest, deployments, inst, jobs, refdata  # noqa: E402
+from quant.api.routers import backtest, deployments, inst, jobs, promotion, refdata  # noqa: E402
 from quant.refdata.bundle import DataCaches  # noqa: E402
 from quant.refdata.publisher import RefDataPublisher  # noqa: E402
 
@@ -95,6 +95,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(backtest.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(inst.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(jobs.router, prefix="/api/v1", dependencies=[Depends(require_user)])
+app.include_router(promotion.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(refdata.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(deployments.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(credentials_router, prefix="/api/v1", dependencies=[Depends(require_user)])

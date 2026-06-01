@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import ConfigDrawer from '../components/ConfigDrawer';
 import JobsTable from '../components/JobsTable';
+import PromotionTab from '../components/PromotionTab';
 import Top10Table from '../components/Top10Table';
 import MetricsCards from '../components/MetricsCards';
 import HeatmapChart from '../components/HeatmapChart';
@@ -119,6 +120,25 @@ export default function BacktestPage() {
     setDrawerOpen(true);
   };
 
+  // Re-backtest from the Promotion tab: pull the decision's frozen config off
+  // its queue row, prefill the drawer, and hand the user back to Backtest.
+  const handleReBacktest = async (queueId: string) => {
+    setError(null);
+    try {
+      const detail = await fetchJob(queueId);
+      if (detail.config_json) {
+        const cfg = detail.config_json as unknown as Partial<BacktestConfig>;
+        setConfig({ ...DEFAULT_CONFIG, ...cfg });
+      }
+      setPageTab(0);
+      setDrawerOpen(true);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to load strategy config';
+      console.error('[BacktestPage] handleReBacktest error:', e);
+      setError(msg);
+    }
+  };
+
   const handleViewJob = async (queueId: string) => {
     setError(null);
     try {
@@ -226,6 +246,7 @@ export default function BacktestPage() {
         >
           <Tab label="Backtest" />
           <Tab label="Queue" />
+          <Tab label="Promotion" />
         </Tabs>
       </AppBar>
 
@@ -240,6 +261,7 @@ export default function BacktestPage() {
 
       <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
         {pageTab === 1 && <JobsTable onView={handleViewJob} onCloneEdit={handleCloneEdit} />}
+        {pageTab === 2 && <PromotionTab onReBacktest={handleReBacktest} />}
         {pageTab === 0 && (
           <>
         {/* Running state */}

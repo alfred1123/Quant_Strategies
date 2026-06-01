@@ -26,6 +26,23 @@ class PromotionRepo(DbGateway):
         super().__init__(conninfo)
         self._bt = bt
 
+    # ── reads ─────────────────────────────────────────────────────────
+
+    def sp_get_promotion(
+        self, strategy_id: uuid.UUID | str | None = None, *, limit: int = 200
+    ) -> list[dict]:
+        """Wrap ``BT.SP_GET_PROMOTION`` — decision log, newest first.
+
+        ``strategy_id=None`` returns the global log; pass one to scope to a
+        single strategy's history.
+        """
+        return self._call_get(
+            "CALL bt.sp_get_promotion("
+            "%s::uuid, %s::integer,"
+            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (str(strategy_id) if strategy_id else None, int(limit)),
+        )
+
     # ── writes (promotion-specific SPs) ───────────────────────────────
 
     def flip_best(

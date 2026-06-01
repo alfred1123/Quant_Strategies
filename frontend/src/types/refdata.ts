@@ -27,6 +27,25 @@ export interface ConjunctionRow {
   display_name: string;
 }
 
+export interface PromotionStateRow {
+  promotion_state_id: number;
+  name: string;
+  display_name: string | null;
+  description: string | null;
+}
+
+export interface PromotionMetricRow {
+  promotion_metric_id: number;
+  name: string;
+  display_name: string;
+  metric_key: string;
+  direction: 'higher_is_better' | 'lower_is_better';
+  requirement_type: 'HARD' | 'SOFT';
+  priority: number;
+  threshold: number | null;
+  description: string | null;
+}
+
 export interface DataColumnRow {
   column_name: string;
   display_name: string;
