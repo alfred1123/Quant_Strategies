@@ -58,11 +58,10 @@ class BtQueueRepo(DbGateway):
 
         Returns ``None`` if the queue row does not exist.
         """
-        rows = self._call_get(
+        return self._call_get_one(
             "CALL bt.sp_get_queue_latest(%s::uuid, NULL, NULL, NULL, NULL)",
             (str(queue_id),),
         )
-        return rows[0] if rows else None
 
     # ── writes ──────────────────────────────────────────────────────────
 
@@ -119,55 +118,6 @@ class BtQueueRepo(DbGateway):
         )
         return int(new_vid)
 
-    def sp_upd_promote_strategy(
-        self,
-        *,
-        strategy_id: uuid.UUID | str,
-        strategy_vid: int | None,
-        user_id: str,
-    ) -> None:
-        """Wrap ``BT.SP_UPD_PROMOTE_STRATEGY``.
-
-        ``strategy_vid=None`` → demote-only (no replacement promoted).
-        """
-        vid_param = int(strategy_vid) if strategy_vid is not None else None
-        self._call_write(
-            "CALL bt.sp_upd_promote_strategy("
-            "%s::uuid, %s::integer, %s::text,"
-            " NULL::text, NULL::text, NULL::text)",
-            (str(strategy_id), vid_param, user_id),
-        )
-
-    def sp_ins_promotion(
-        self,
-        *,
-        promotion_id: uuid.UUID,
-        queue_id: uuid.UUID | str,
-        strategy_id: uuid.UUID | str,
-        strategy_vid: int,
-        outcome: str,
-        user_id: str,
-        compared_vid: int | None = None,
-        gate_results: list[dict] | None = None,
-    ) -> None:
-        """Wrap ``BT.SP_INS_PROMOTION``."""
-        self._call_write(
-            "CALL bt.sp_ins_promotion("
-            "%s::uuid, %s::uuid, %s::uuid, %s::integer, %s::text,"
-            " %s::integer, %s::jsonb, %s::text,"
-            " NULL::text, NULL::text, NULL::text)",
-            (
-                str(promotion_id),
-                str(queue_id),
-                str(strategy_id),
-                int(strategy_vid),
-                outcome,
-                compared_vid,
-                json.dumps(gate_results) if gate_results else None,
-                user_id,
-            ),
-        )
-
     # ── reads (SP wrappers) ────────────────────────────────────────────
 
     def sp_get_queued_count(self, user_id: str, queued_status_id: int) -> int:
@@ -211,36 +161,24 @@ class BtQueueRepo(DbGateway):
 
     def sp_get_result(self, queue_id: uuid.UUID | str) -> dict | None:
         """Wrap ``BT.SP_GET_RESULT`` — latest result row for a queue id."""
-        rows = self._call_get(
+        return self._call_get_one(
             "CALL bt.sp_get_result("
             "%s::uuid,"
             " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
             (str(queue_id),),
         )
-        return rows[0] if rows else None
 
     def sp_get_strategy(
         self,
-        *,
         strategy_id: uuid.UUID | str,
         strategy_vid: int | None = None,
         is_best_ind: str | None = None,
-    ) -> dict | None:
-        """Wrap ``BT.SP_GET_STRATEGY``.
-
-        Three modes controlled by the caller:
-          - ``strategy_vid`` set → exact frozen VID.
-          - ``is_best_ind='Y'`` (vid None) → IS_BEST_IND='Y' row.
-          - both None → active row (TRANSACT_TO_TS = 9999-12-31).
-        """
-        rows = self._call_get(
+    ) -> list[dict]:
+        """Wrap ``BT.SP_GET_STRATEGY`` — flexible filter on VID and/or IS_BEST_IND."""
+        return self._call_get(
             "CALL bt.sp_get_strategy("
             "%s::uuid, %s::integer, %s::char,"
             " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
-            (
-                str(strategy_id),
-                _opt(int, strategy_vid),
-                is_best_ind,
-            ),
+            (str(strategy_id), _opt(int, strategy_vid), is_best_ind),
         )
-        return rows[0] if rows else None
+

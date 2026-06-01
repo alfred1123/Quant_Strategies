@@ -19,11 +19,10 @@ class AuthRepo(DbGateway):
         ``password_hash`` (str), ``is_active_ind`` (str, 'Y'/'N'),
         ``session_gen`` (int).
         """
-        rows = self._call_get(
+        return self._call_get_one(
             "CALL CORE_ADMIN.SP_GET_APP_USER_BY_USERNAME(%s, NULL, NULL, NULL, NULL)",
             (username,),
         )
-        return rows[0] if rows else None
 
     def get_user_by_id(self, app_user_id: UUID) -> dict | None:
         """Return the APP_USER row for ``app_user_id`` or None if not found.
@@ -31,11 +30,10 @@ class AuthRepo(DbGateway):
         Same dict shape as :meth:`get_user_by_username`. Used by the
         ``require_user`` dependency on cache miss (login.md §10).
         """
-        rows = self._call_get(
+        return self._call_get_one(
             "CALL CORE_ADMIN.SP_GET_APP_USER_BY_ID(%s, NULL, NULL, NULL, NULL)",
             (str(app_user_id),),
         )
-        return rows[0] if rows else None
 
     def update_last_login(self, app_user_id: UUID) -> None:
         """Stamp LAST_LOGIN_AT = NOW() for the given user."""

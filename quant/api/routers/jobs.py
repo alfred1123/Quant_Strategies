@@ -26,6 +26,7 @@ from quant.api.services.jobs import (
     ReenqueueNotAllowed,
     StrategyNotFound,
 )
+from quant.promotion.repo import PromotionRepo
 from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
 
@@ -42,11 +43,13 @@ def get_jobs_service(
     caches: DataCaches = Depends(get_data_caches),
 ) -> JobsService:
     """Build a per-request ``JobsService`` against app-wide DB + Redis."""
-    repo = BtQueueRepo(request.app.state.db_conninfo, user_id="system")
+    conninfo = request.app.state.db_conninfo
+    repo = BtQueueRepo(conninfo, user_id="system")
     return JobsService(
         repo=repo,
         refdata=caches.refdata,
         redis_client=_get_redis(request),
+        promotion_repo=PromotionRepo(conninfo, bt=repo),
     )
 
 

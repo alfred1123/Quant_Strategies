@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.4.0-001-create-promotion-state" author="alfcheun" context="refdata">
+        <comment>REFDATA.PROMOTION_STATE — valid outcomes for BT.PROMOTION decisions</comment>
+        <sqlFile path="../tables/PROMOTION_STATE.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.4.0-002-seed-promotion-state" author="alfcheun" context="refdata">
+        <comment>Seed promotion states</comment>
+        <sql splitStatements="true" stripComments="true">
+            INSERT INTO REFDATA.PROMOTION_STATE (NAME, DISPLAY_NAME, DESCRIPTION, USER_ID, UPDATED_AT)
+            VALUES
+                ('PROMOTED', 'Promoted',  'New VID passes hard gates and beats current best on soft metrics', 'system', NOW() AT TIME ZONE 'UTC'),
+                ('KEPT',     'Kept',      'Current best retains IS_BEST_IND (new VID did not beat it)',      'system', NOW() AT TIME ZONE 'UTC'),
+                ('DEMOTED',  'Demoted',   'Current best failed hard gates and lost IS_BEST_IND',             'system', NOW() AT TIME ZONE 'UTC'),
+                ('REJECTED', 'Rejected',  'Candidate failed hard gates (not the current best)',              'system', NOW() AT TIME ZONE 'UTC');
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

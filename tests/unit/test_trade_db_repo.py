@@ -6,13 +6,15 @@ from uuid import uuid4
 
 import pytest
 
+from quant.queue.repo import BtQueueRepo
 from quant.trade.db_repo import TradeRepo
 from quant.trade.errors import TradeValidationError
 
 
 @pytest.fixture
 def repo():
-    return TradeRepo("postgresql://test")
+    bt = BtQueueRepo("postgresql://test")
+    return TradeRepo("postgresql://test", bt=bt)
 
 
 def _deployment_kwargs(**overrides):

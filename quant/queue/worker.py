@@ -33,7 +33,7 @@ from quant.shared.config import load_config, get_redis_url
 from quant.schemas.backtest import OptimizeRequest
 from quant.strategy.backtest_service import run_optimize
 
-from quant.queue.promote import evaluate_promotion
+from quant.promotion.repo import PromotionRepo
 from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
 from quant.shared.util import utc_now_iso
@@ -95,7 +95,7 @@ class BacktestWorker:
 
         try:
             req = OptimizeRequest.model_validate(job["config_json"])
-        except Exception as exc:  # bad CONFIG_JSON shape — config error
+        except Exception as exc:
             raise ValueError(f"CONFIG_JSON failed OptimizeRequest validation: {exc}") from exc
 
         try:
@@ -121,73 +121,14 @@ class BacktestWorker:
                 "type": "terminal", "queue_id": str(queue_id),
                 "status": "FAILED", "ts": utc_now_iso(),
             })
-            return 0  # FAILED row written → clean exit per §10.1.
+            return 0
 
         result_id = uuid.uuid4()
         payload = response.model_dump()
         repo.ins_result(result_id, queue_id, payload)
 
-        # Auto-promote / demote: compare against current best VID's result.
         try:
-            promotion_metrics = refdata.get_promotion_metrics()
-            best_strat = repo.sp_get_strategy(
-                strategy_id=job["strategy_id"], is_best_ind="Y",
-            )
-            is_current_best = (
-                best_strat is not None
-                and best_strat["strategy_vid"] == job["strategy_vid"]
-            )
-            best_vid = best_strat["strategy_vid"] if best_strat else None
-
-            best_payload = None
-            if not is_current_best and best_strat:
-                best_queue = repo.sp_get_queue(
-                    strategy_id=job["strategy_id"], limit=1,
-                )
-                best_q = next(
-                    (r for r in best_queue if r["strategy_vid"] == best_strat["strategy_vid"]),
-                    None,
-                )
-                if best_q:
-                    best_result = repo.sp_get_result(best_q["queue_id"])
-                    best_payload = best_result["payload_json"] if best_result else None
-
-            decision = evaluate_promotion(
-                payload, best_payload, promotion_metrics,
-                is_current_best=is_current_best, best_vid=best_vid,
-            )
-
-            if decision.outcome == "DEMOTED":
-                repo.sp_upd_promote_strategy(
-                    strategy_id=job["strategy_id"],
-                    strategy_vid=None,
-                    user_id=job["user_id"],
-                )
-            elif decision.outcome == "PROMOTED":
-                repo.sp_upd_promote_strategy(
-                    strategy_id=job["strategy_id"],
-                    strategy_vid=job["strategy_vid"],
-                    user_id=job["user_id"],
-                )
-
-            repo.sp_ins_promotion(
-                promotion_id=uuid.uuid4(),
-                queue_id=queue_id,
-                strategy_id=job["strategy_id"],
-                strategy_vid=job["strategy_vid"],
-                outcome=decision.outcome,
-                user_id=job["user_id"],
-                compared_vid=decision.compared_vid,
-                gate_results=[
-                    {"name": g.name, "passed": g.passed,
-                     "value": g.value, "threshold": g.threshold}
-                    for g in decision.gate_results
-                ] if decision.gate_results else None,
-            )
-            logger.info(
-                "Promotion decision for strategy_id=%s vid=%s: %s",
-                job["strategy_id"], job["strategy_vid"], decision.outcome,
-            )
+            PromotionRepo(self._db_url, bt=repo).run(refdata, job, payload, queue_id)
         except Exception:
             logger.warning("Auto-promote failed (non-fatal)", exc_info=True)
 

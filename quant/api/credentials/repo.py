@@ -31,11 +31,10 @@ class ApiCredentialRepo(DbGateway):
 
     def get_credential(self, app_user_id: UUID, api_credential_id: int) -> dict | None:
         """One current + active credential or ``None`` (empty cursor = 404)."""
-        rows = self._call_get(
+        return self._call_get_one(
             "CALL CORE_ADMIN.SP_GET_API_CREDENTIAL(%s, %s, NULL, NULL, NULL, NULL)",
             (str(app_user_id), api_credential_id),
         )
-        return rows[0] if rows else None
 
     # ------------------------------------------------------------------
     # WRITE

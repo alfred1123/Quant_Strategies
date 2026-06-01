@@ -17,6 +17,7 @@ from quant.api.schemas.jobs import (
     EnqueueRequest,
     EnqueueResponse,
 )
+from quant.promotion.repo import PromotionRepo
 from quant.queue.repo import BtQueueRepo
 from quant.queue.wake import publish_wake
 from quant.refdata.reader import RedisRefData
@@ -56,10 +57,12 @@ class JobsService:
         repo: BtQueueRepo,
         refdata: RedisRefData,
         redis_client: redis.Redis,
+        promotion_repo: PromotionRepo | None = None,
     ) -> None:
         self._repo = repo
         self._refdata = refdata
         self._redis = redis_client
+        self._promo = promotion_repo
 
     # ── helpers ─────────────────────────────────────────────────────────
 
@@ -114,20 +117,20 @@ class JobsService:
 
     # ── cancel ──────────────────────────────────────────────────────────
 
+    _CANCEL_TARGET = {"QUEUED": "CANCELLED", "RUNNING": "CANCEL_REQUESTED"}
+
     def cancel(self, user_id: str, queue_id: uuid.UUID) -> dict:
         row = self._repo.get_active(queue_id, user_id=user_id)
         if row is None:
             raise JobNotFound(str(queue_id))
 
         status = row["queue_status"]
-        if status == "QUEUED":
-            target = self._status("CANCELLED")
-        elif status == "RUNNING":
-            target = self._status("CANCEL_REQUESTED")
-        else:
+        target_name = self._CANCEL_TARGET.get(status)
+        if target_name is None:
             raise CancelNotAllowed(
                 f"job {queue_id} is in terminal state {status!r}"
             )
+        target = self._status(target_name)
 
         self._repo.sp_ins_queue(
             queue_id=queue_id,
@@ -189,15 +192,15 @@ class JobsService:
         Verifies the user owns at least one queue row referencing this
         ``strategy_id`` before allowing the promotion.
         """
-        from quant.api.services.jobs import StrategyNotFound
-
         ownership = self._repo.sp_get_queue(
             strategy_id=strategy_id, user_id=user_id, limit=1,
         )
         if not ownership:
             raise StrategyNotFound(str(strategy_id))
 
-        self._repo.sp_upd_promote_strategy(
+        if self._promo is None:
+            raise RuntimeError("PromotionRepo not configured")
+        self._promo.flip_best(
             strategy_id=strategy_id,
             strategy_vid=strategy_vid,
             user_id=user_id,

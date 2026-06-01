@@ -19,6 +19,17 @@ Run backtest-style code via `python -m quant.cli` or import from the `quant` pac
 - Keep changes **focused**: extend existing functions/classes rather than duplicating logic.
 - Do **not** consider backward compatibility for any code change. Completely remove old dependencies, imports, shims, and re-export wrappers — update all call sites directly.
 
+### Code Quality — Avoid These Mistakes
+
+Recurring pitfalls to self-check before finishing a change:
+
+- **Don't add layers just to cut lines.** A new helper that only wraps an existing one (e.g. a SQL-string builder on top of `_call_get`/`_call_write`) adds indirection without value. Only abstract when it removes real duplication or clarifies intent. Reducing line count is not a goal.
+- **Deduplicate via composition, not copy-paste.** If two repos call the same stored procedure, the SP wrapper lives in ONE owning repo; others inject and call it. Never paste the same `CALL ...` string into multiple classes. (e.g. `bt.sp_get_strategy` lives only on `BtQueueRepo`; `PromotionRepo`/`TradeRepo` take a `BtQueueRepo`.)
+- **Name things by what they do or mean, not by category label.** Echoing a config enum value (`_check_hard`, `_compare_soft`) says nothing. Prefer names that carry domain meaning: HARD = requirements that **must pass**, SOFT = ranking **by priority**.
+- **Separate layers; don't mix them in one function.** Keep higher-level policy (HARD/SOFT semantics) distinct from lower-level mechanics (threshold check, value compare). Lower helpers stay policy-agnostic; higher functions compose them, then a single entry point merges the result.
+- **Put logic where it belongs.** Domain logic (e.g. promotion) goes in its own module/repo, not dumped into an orchestrator like the worker. Analyse ownership before placing code.
+- **After a rename, grep for stale references.** A dispatch map once pointed at a function name that no longer existed after a rename — a latent bug. Search all call sites and run the suite after any rename.
+
 ### Database Column Naming
 
 - Version columns: `<TABLE>_VID INTEGER` (e.g. `STRATEGY_VID`)
@@ -74,6 +85,7 @@ All UI dropdown, radio, and selectbox values must come from `REFDATA` tables in 
 | Data column | `REFDATA.DATA_COLUMN` | `DISPLAY_NAME` | `COLUMN_NAME` |
 | Conjunction | `REFDATA.CONJUNCTION` | `DISPLAY_NAME` | `NAME` |
 | Grid defaults | `REFDATA.INDICATOR` | — | `WIN_MIN`, `WIN_MAX`, `WIN_STEP`, `SIG_MIN`, `SIG_MAX`, `SIG_STEP` (same table) |
+| Promotion state | `REFDATA.PROMOTION_STATE` | `DISPLAY_NAME` | `NAME` |
 
 The `INDICATOR_DEFAULTS` dict in `quant/strategy/signals.py` is a **legacy fallback** — grid defaults should come from `REFDATA.INDICATOR` via `RedisRefData.get_indicator_defaults()`.
 

@@ -129,6 +129,19 @@ class RedisRefData:
                 return int(r["queue_status_id"])
         raise RuntimeError(f"REFDATA.QUEUE_STATUS missing NAME={name!r}")
 
+    def get_promotion_states(self) -> list[str]:
+        """Return the valid PROMOTION_STATE names from REFDATA."""
+        return [r["name"] for r in self.get("promotion_state")]
+
+    def validate_promotion_state(self, name: str) -> str:
+        """Validate a promotion state name against REFDATA. Returns the name or raises."""
+        valid = self.get_promotion_states()
+        if name not in valid:
+            raise RuntimeError(
+                f"REFDATA.PROMOTION_STATE missing NAME={name!r} (valid: {valid})"
+            )
+        return name
+
     # ── for tests / introspection ───────────────────────────────────────
 
     @property

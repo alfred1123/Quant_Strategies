@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from quant.api.auth.dependencies import require_user
 from quant.api.auth.models import CurrentUser
+from quant.queue.repo import BtQueueRepo
 from quant.schemas.deployments import CreateDeploymentRequest, DeploymentRow
 from quant.trade.db_repo import TradeRepo
 from quant.trade.errors import TradeValidationError
@@ -23,7 +24,9 @@ router = APIRouter(prefix="/trade", tags=["trade"])
 
 def get_trade_service(request: Request) -> TradeService:
     """Build a per-request ``TradeService`` against app-wide DB conninfo."""
-    repo = TradeRepo(request.app.state.db_conninfo, user_id="system")
+    conninfo = request.app.state.db_conninfo
+    bt = BtQueueRepo(conninfo, user_id="system")
+    repo = TradeRepo(conninfo, bt=bt, user_id="system")
     return TradeService(repo=repo)
 
 

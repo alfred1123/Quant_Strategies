@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from quant.queue.repo import BtQueueRepo
 from quant.shared.db import DbGateway
 from quant.trade.errors import TradeValidationError
 
@@ -20,48 +21,48 @@ def _require(value: Any, name: str) -> None:
         raise TradeValidationError(f"{name} is required")
 
 
+def _require_all(**fields: Any) -> None:
+    for name, val in fields.items():
+        _require(val, name)
+
+
 class TradeRepo(DbGateway):
     """TRADE.DEPLOYMENT / EXECUTION_EVENT / TRANSACTION — validates then CALLs SPs."""
+
+    def __init__(self, conninfo: str, bt: BtQueueRepo, **kwargs) -> None:
+        super().__init__(conninfo, **kwargs)
+        self._bt = bt
 
     # ── validation reads (via stored procedures) ──────────────────────
 
     def _fetch_credential(self, api_credential_id: int) -> dict | None:
-        rows = self._call_get(
+        return self._call_get_one(
             "CALL core_admin.sp_get_credential_check("
             "%s::integer,"
             " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
             (api_credential_id,),
         )
-        return rows[0] if rows else None
 
     def _strategy_exists(self, strategy_id: UUID, strategy_vid: int) -> bool:
-        rows = self._call_get(
-            "CALL bt.sp_get_strategy("
-            "%s::uuid, %s::integer, NULL::char,"
-            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
-            (str(strategy_id), int(strategy_vid)),
-        )
-        return bool(rows)
+        return bool(self._bt.sp_get_strategy(strategy_id, strategy_vid=strategy_vid))
 
     def _fetch_deployment_version(
         self, deployment_id: UUID, deployment_vid: int
     ) -> dict | None:
-        rows = self._call_get(
+        return self._call_get_one(
             "CALL trade.sp_get_deployment_check("
             "%s::uuid, %s::integer,"
             " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
             (str(deployment_id), int(deployment_vid)),
         )
-        return rows[0] if rows else None
 
     def _fetch_current_deployment(self, deployment_id: UUID) -> dict | None:
-        rows = self._call_get(
+        return self._call_get_one(
             "CALL trade.sp_get_deployment_check("
             "%s::uuid, NULL::integer,"
             " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
             (str(deployment_id),),
         )
-        return rows[0] if rows else None
 
     def validate_create_deployment(
         self,
@@ -80,18 +81,14 @@ class TradeRepo(DbGateway):
         user_id: str,
         confirm_live: bool = False,
     ) -> None:
-        _require(deployment_id, "deployment_id")
-        _require(app_user_id, "app_user_id")
-        _require(strategy_id, "strategy_id")
-        _require(strategy_vid, "strategy_vid")
-        _require(api_credential_id, "api_credential_id")
-        _require(app_id, "app_id")
-        _require(internal_cusip, "internal_cusip")
-        _require(qty, "qty")
-        _require(is_paper_ind, "is_paper_ind")
-        _require(is_enabled_ind, "is_enabled_ind")
-        _require(deployment_status, "deployment_status")
-        _require(user_id, "user_id")
+        _require_all(
+            deployment_id=deployment_id, app_user_id=app_user_id,
+            strategy_id=strategy_id, strategy_vid=strategy_vid,
+            api_credential_id=api_credential_id, app_id=app_id,
+            internal_cusip=internal_cusip, qty=qty,
+            is_paper_ind=is_paper_ind, is_enabled_ind=is_enabled_ind,
+            deployment_status=deployment_status, user_id=user_id,
+        )
 
         if is_paper_ind == "N" and not confirm_live:
             raise TradeValidationError(
@@ -137,14 +134,11 @@ class TradeRepo(DbGateway):
         user_id: str,
         execution_event_id: UUID | None = None,
     ) -> None:
-        _require(app_user_id, "app_user_id")
-        _require(deployment_id, "deployment_id")
-        _require(deployment_vid, "deployment_vid")
-        _require(buy_sell_cd, "buy_sell_cd")
-        _require(is_success_ind, "is_success_ind")
-        _require(user_id, "user_id")
-        if execution_event_id is not None:
-            _require(execution_event_id, "execution_event_id")
+        _require_all(
+            app_user_id=app_user_id, deployment_id=deployment_id,
+            deployment_vid=deployment_vid, buy_sell_cd=buy_sell_cd,
+            is_success_ind=is_success_ind, user_id=user_id,
+        )
 
         dep = self._fetch_deployment_version(deployment_id, deployment_vid)
         if dep is None:
@@ -166,15 +160,12 @@ class TradeRepo(DbGateway):
         user_id: str,
         transaction_id: UUID | None = None,
     ) -> None:
-        _require(app_user_id, "app_user_id")
-        _require(deployment_id, "deployment_id")
-        _require(app_id, "app_id")
-        _require(internal_cusip, "internal_cusip")
-        _require(buy_sell_cd, "buy_sell_cd")
-        _require(trans_ccy_cd, "trans_ccy_cd")
-        _require(user_id, "user_id")
-        if transaction_id is not None:
-            _require(transaction_id, "transaction_id")
+        _require_all(
+            app_user_id=app_user_id, deployment_id=deployment_id,
+            app_id=app_id, internal_cusip=internal_cusip,
+            buy_sell_cd=buy_sell_cd, trans_ccy_cd=trans_ccy_cd,
+            user_id=user_id,
+        )
 
         dep = self._fetch_current_deployment(deployment_id)
         if dep is None:

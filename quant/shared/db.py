@@ -96,6 +96,11 @@ class DbGateway:
         rows, _ = self._run(work)
         return rows
 
+    def _call_get_one(self, sql: str, params: tuple) -> dict | None:
+        """CALL a SP_GET proc returning at most one row → first row or ``None``."""
+        rows = self._call_get(sql, params)
+        return rows[0] if rows else None
+
     def _call_write(self, sql: str, params: tuple) -> tuple:
         """CALL a SP_INS/SP_UPD proc whose OUT row starts with the status triplet.
 
