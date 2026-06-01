@@ -40,6 +40,7 @@ class TradeService:
             is_enabled_ind="Y" if req.enabled else "N",
             deployment_status=req.deployment_status,
             user_id=user_id,
+            confirm_live=req.confirm_live,
         )
         return DeploymentRow.model_validate(row)
 

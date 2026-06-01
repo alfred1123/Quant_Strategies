@@ -78,6 +78,38 @@ class TestValidateCreateDeployment:
         assert exc.value.status_code == 403
 
 
+    @patch.object(TradeRepo, "_fetch_credential")
+    def test_live_without_confirm_rejected(self, mock_cred, repo):
+        uid = uuid4()
+        mock_cred.return_value = {
+            "app_user_id": uid,
+            "app_id": 10,
+            "is_active_ind": "Y",
+            "is_current_ind": "Y",
+        }
+        with pytest.raises(TradeValidationError, match="confirm_live") as exc:
+            repo.validate_create_deployment(
+                **_deployment_kwargs(app_user_id=uid, is_paper_ind="N")
+            )
+        assert exc.value.status_code == 400
+
+    @patch.object(TradeRepo, "_fetch_credential")
+    @patch.object(TradeRepo, "_strategy_exists", return_value=True)
+    @patch.object(TradeRepo, "_fetch_current_deployment", return_value=None)
+    def test_live_with_confirm_accepted(self, _dep, _strat, mock_cred, repo):
+        uid = uuid4()
+        mock_cred.return_value = {
+            "app_user_id": uid,
+            "app_id": 10,
+            "is_active_ind": "Y",
+            "is_current_ind": "Y",
+        }
+        repo.validate_create_deployment(
+            **_deployment_kwargs(app_user_id=uid, is_paper_ind="N"),
+            confirm_live=True,
+        )
+
+
 class TestValidateExecutionEvent:
     @patch.object(TradeRepo, "_fetch_deployment_version", return_value=None)
     def test_unknown_deployment(self, _fetch, repo):

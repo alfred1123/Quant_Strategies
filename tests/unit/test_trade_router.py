@@ -87,9 +87,9 @@ class TestCreateDeployment:
         assert data["deployment_id"] == str(row.deployment_id)
         assert data["is_paper_ind"] == "Y"
         svc.create_deployment.assert_called_once()
-        app_user_id, username, req = svc.create_deployment.call_args.args
+        app_user_id, user_id, req = svc.create_deployment.call_args.args
         assert app_user_id == user.app_user_id
-        assert username == user.username
+        assert user_id == str(user.app_user_id)
         assert req.paper is True
 
     def test_validation_error_returns_404(self, client_and_svc):
@@ -108,6 +108,20 @@ class TestCreateDeployment:
 
         resp = client.post("/api/v1/trade/deployments", json=_create_body())
         assert resp.status_code == 500
+
+    def test_live_without_confirm_returns_400(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        svc.create_deployment.side_effect = TradeValidationError(
+            "Live trading requires explicit confirmation — set confirm_live=true",
+            status_code=400,
+        )
+
+        resp = client.post(
+            "/api/v1/trade/deployments",
+            json=_create_body(paper=False),
+        )
+        assert resp.status_code == 400
+        assert "confirm_live" in resp.json()["detail"]
 
     def test_missing_strategy_id_returns_422(self, client_and_svc):
         client, _, _ = client_and_svc

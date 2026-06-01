@@ -51,6 +51,9 @@ export const useLogin = () =>
       return data;
     },
     onSuccess: data => {
+      // Flush stale per-user data from any previous session (e.g. expired
+      // cookie followed by a different user logging in on the same browser).
+      queryClient.clear();
       queryClient.setQueryData(ME_QUERY_KEY, data);
     },
   });

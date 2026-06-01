@@ -56,6 +56,7 @@ class TestCreateDeployment:
             internal_cusip="btc-usd.crypto",
             qty=Decimal("0.01"),
             paper=False,
+            confirm_live=True,
             enabled=True,
         )
         result = svc.create_deployment(app_user_id, "alice", req)
@@ -68,6 +69,7 @@ class TestCreateDeployment:
         assert kwargs["app_user_id"] == app_user_id
         assert kwargs["user_id"] == "alice"
         assert kwargs["is_paper_ind"] == "N"
+        assert kwargs["confirm_live"] is True
         assert kwargs["strategy_id"] == strategy_id
 
     def test_generates_deployment_id_when_omitted(self, svc):

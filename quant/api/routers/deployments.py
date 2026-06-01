@@ -50,7 +50,7 @@ def create_deployment(
     svc: TradeService = Depends(get_trade_service),
 ) -> DeploymentRow:
     try:
-        return svc.create_deployment(user.app_user_id, user.username, req)
+        return svc.create_deployment(user.app_user_id, str(user.app_user_id), req)
     except TradeValidationError as exc:
         raise _map_trade_error(exc) from exc
     except RuntimeError as exc:

@@ -21,6 +21,7 @@ class CreateDeploymentRequest(BaseModel):
     internal_cusip: str = Field(..., min_length=1, max_length=200)
     qty: Decimal = Field(..., gt=0)
     paper: bool = True
+    confirm_live: bool = False
     enabled: bool = True
     deployment_status: DeploymentStatus = "CREATED"
 

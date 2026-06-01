@@ -92,6 +92,7 @@ class TradeRepo(DbGateway):
         is_enabled_ind: str,
         deployment_status: str,
         user_id: str,
+        confirm_live: bool = False,
     ) -> None:
         _require(deployment_id, "deployment_id")
         _require(app_user_id, "app_user_id")
@@ -105,6 +106,12 @@ class TradeRepo(DbGateway):
         _require(is_enabled_ind, "is_enabled_ind")
         _require(deployment_status, "deployment_status")
         _require(user_id, "user_id")
+
+        if is_paper_ind == "N" and not confirm_live:
+            raise TradeValidationError(
+                "Live trading requires explicit confirmation — set confirm_live=true",
+                status_code=400,
+            )
 
         cred = self._fetch_credential(api_credential_id)
         if cred is None:
@@ -214,6 +221,7 @@ class TradeRepo(DbGateway):
         is_enabled_ind: str,
         deployment_status: str,
         user_id: str,
+        confirm_live: bool = False,
     ) -> dict:
         self.validate_create_deployment(
             deployment_id=deployment_id,
@@ -228,6 +236,7 @@ class TradeRepo(DbGateway):
             is_enabled_ind=is_enabled_ind,
             deployment_status=deployment_status,
             user_id=user_id,
+            confirm_live=confirm_live,
         )
         self._call_write(
             "CALL trade.sp_ins_deployment("

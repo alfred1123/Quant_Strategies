@@ -22,7 +22,7 @@ The FastAPI connection pool logs in as Postgres role `quant_app`. The human iden
 | Table / path | What is stored in `USER_ID` today |
 |--------------|-------------------------------------|
 | `BT.STRATEGY`, `BT.QUEUE` (jobs API) | `str(app_user_id)` — UUID as text |
-| `TRADE.DEPLOYMENT` audit column | `username` (TEXT) via `user.username` on create |
+| `TRADE.DEPLOYMENT` audit column | `str(app_user_id)` — UUID as text (normalized) |
 | Sync backtest (`/optimize`) | Pool user / cache path — **not** per-human today |
 
 ~~**Phase 1.7 ownership checks** must compare `BT.STRATEGY.USER_ID` against what jobs actually wrote (`str(caller.app_user_id)`), not username.~~ **Removed** — strategies are a shared pool (decision #42). `USER_ID` on `BT.STRATEGY` is audit-only.
@@ -60,6 +60,7 @@ Implementation: `quant/api/credentials/`, `CORE_ADMIN.SP_*_API_CREDENTIAL`.
 
 - `SP_GET_DEPLOYMENT` requires `IN_APP_USER_ID`.
 - `TradeRepo` rejects credentials and deployments that belong to another user before `CALL TRADE.SP_INS_DEPLOYMENT`.
+- **Paper-vs-live gate:** live deployments (`paper=false`) are rejected unless `confirm_live=true` is set in the request. Prevents accidental live trading via crafted API calls.
 
 Implementation: `quant/trade/db_repo.py`, `quant/api/routers/deployments.py`.
 
@@ -79,12 +80,12 @@ Implementation: `quant/api/routers/jobs.py`, `quant/api/services/jobs.py`.
 | ~~**Strategy ownership**~~ | ~~`BT.STRATEGY.USER_ID` must match caller~~ — **Removed** (decision #42: shared strategy pool) |
 | **Credential ownership** | Already enforced |
 | **Deployment ownership** | Already enforced on get/list |
-| **Paper vs live** | `is_paper_ind` enforced **on server** — Trade UI toggle is UX only |
+| **Paper vs live** | `is_paper_ind` enforced on server — `confirm_live=true` required for live deployments |
 | **Live apply step-up** | Dry-run first + explicit confirm ([Trade API §4.1](trade-api.md#41-confirmation-flow-for-live-trading)) |
 
 Strategies are a shared pool — any authenticated user can deploy any strategy using their own exchange credentials. `USER_ID` on `BT.STRATEGY` is **audit-only** (who created the config). Capital safety comes from credential ownership (user can only trade with their own keys) and the paper-vs-live gate.
 
-**Exit criteria (1.7):** deployment create validates credential ownership (done) + paper/live gate; see [plan-to-profit §1.7](plan-to-profit.md#phase-17--live-apply).
+**Exit criteria (1.7):** deployment create validates credential ownership (done) + paper/live gate (done — `confirm_live` required); see [plan-to-profit §1.7](plan-to-profit.md#phase-17--live-apply).
 
 ---
 
@@ -141,9 +142,11 @@ flowchart TD
 | Priority | Task | Blocks |
 |----------|------|--------|
 | ~~**P0**~~ | ~~Deployment create: verify `BT.STRATEGY.USER_ID == str(app_user_id)`~~ | ~~1.7 live apply~~ — **Removed** (shared pool) |
-| **P0** | Deployment create: verify credential + product belong to caller | 1.7 (credential done) |
+| ~~**P0**~~ | ~~Deployment create: verify credential + product belong to caller~~ | ~~1.7 (credential done)~~ — **Done** |
+| ~~**P0**~~ | ~~Paper-vs-live gate: `confirm_live=true` required for live deployments~~ | ~~1.7~~ — **Done** |
 | ~~**P1**~~ | ~~`SP_GET_STRATEGY` list mode deployed; wire `GET /api/v1/strategies`~~ | ~~1.6~~ — **Done** |
-| **P1** | Normalize TRADE `USER_ID` — UUID string **or** username consistently | Audit consistency |
+| ~~**P1**~~ | ~~Normalize TRADE `USER_ID` — UUID string **or** username consistently~~ | ~~Audit consistency~~ — **Done** (all paths use `str(app_user_id)`) |
+| **P1** | Frontend: clear TanStack Query cache on login (prevent stale cross-user data) | Done |
 | **P2** | Filter `BT.RESULT`, sync backtest cache by owner | login Phase 2 |
 | **P2** | `ROLE` + admin bypass | Multi-tenant admin |
 | **P3** | Postgres RLS or `SET LOCAL app.user_id` GUC | Defense in depth — see [Login §6.3](login.md#63-optional-session-guc) |

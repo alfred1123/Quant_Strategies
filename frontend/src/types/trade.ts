@@ -28,6 +28,7 @@ export interface CreateDeploymentRequest {
   internal_cusip: string;
   qty: string;
   paper?: boolean;
+  confirm_live?: boolean;
   enabled?: boolean;
   deployment_status?: DeploymentStatus;
 }

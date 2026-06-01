@@ -32,6 +32,19 @@ cd frontend && npm run dev
 
 Open `http://localhost:5173`. The Vite dev server proxies `/api` requests to the backend (default `http://localhost:8000`, overridable via `VITE_API_URL`).
 
+## Pipeline Tab Model
+
+The Backtest SPA uses a four-tab pipeline. Each tab represents a stage in the strategy lifecycle:
+
+| Tab | Route | Purpose |
+|-----|-------|---------|
+| **Backtest** | `/backtest` (tab 0) | Configure params, submit optimization job |
+| **Queue** | `/backtest` (tab 1) | Monitor job status, view results, clone, manual promote |
+| **Promotion** | `/backtest` (tab 2, planned) | Compare VIDs, see gate results, recommended picks, re-backtest to improve, deploy to Trade |
+| **Trade** | `/trade/*` | Config (exchange accounts), Apply (deploy strategy, execution log) |
+
+See [Best-VID Promotion §5](../design/best-vid-promotion.md#5-ui--pipeline-tab-model) for the Promotion tab design.
+
 ## Features
 
 - **Configure** button in the topbar opens a top drawer with all backtest settings
@@ -46,6 +59,7 @@ Open `http://localhost:5173`. The Vite dev server proxies `/api` requests to the
 - Analysis panel: side-by-side metrics cards + Sharpe heatmap + equity curve + drawdown chart
 - **Walk-forward analysis** — in-sample vs out-of-sample comparison with overfitting ratio
 - **CSV download** of full grid search results
+- **Queue tab** — jobs table with VID column (`v{N}` + "Best" chip), status filter chips, View/Clone/Promote actions
 - **Authentication** — cookie-based login; 401 interceptor auto-redirects to `/login`
 - **Client-side routing** — `/login` (guest-only), `/backtest`, `/trade/config`, `/trade/apply` (auth-required) via `react-router-dom`
 - **Trade UI (Phase 1.4+)** — multi-broker layout with compact Exchange / Account filters, Paper / Live toggle, accounts table on Config (credentials CRUD), deployments table on Trade (see [Trade UI](#trade-ui-phase-14) below)
@@ -78,17 +92,17 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 | `StrategyPicker` | **Phase 1.6 (planned)** — selectable list of `BT.STRATEGY` rows via `GET /api/v1/strategies` |
 | `TradeApplyPage` | Deployments table filtered by toolbar; `StrategyPicker` placeholder until 1.6; `useDeployments()` |
 
-**Strategy picker (1.6) — not Backtest config UI**
+**Strategy picker — not Backtest config UI**
 
-The Backtest **Strategy** dropdown in `FactorCard` is a REFDATA `signal_type` (momentum, etc.) used to *build* an optimize request. The Trade picker selects a **persisted** `BT.STRATEGY` row (`strategy_id`, `strategy_vid`, `strategy_nm`) for deployment. Do not reuse `ConfigDrawer` / `FactorCard`.
+The Backtest **Strategy** dropdown in `FactorCard` is a REFDATA `signal_type` (momentum, etc.) used to *build* an optimize request. The Trade/Promotion picker selects a **persisted** `BT.STRATEGY` row (`strategy_id`, `strategy_vid`, `strategy_nm`) for deployment or comparison. Do not reuse `ConfigDrawer` / `FactorCard`.
 
-| Backtest | Trade picker |
-|----------|--------------|
-| `FactorCard` → REFDATA signal type | `StrategyPicker` → `BT.STRATEGY` catalog |
-| Creates config for new job | Selects existing strategy for apply |
+| Backtest | Trade / Promotion picker |
+|----------|--------------------------|
+| `FactorCard` → REFDATA signal type | `StrategyPicker` → `BT.STRATEGY` catalog (shared pool) |
+| Creates config for new job | Selects existing strategy for deploy or comparison |
 | `POST /api/v1/backtest/jobs` | `GET /api/v1/strategies` |
 
-See [plan-to-profit §1.6](../design/plan-to-profit.md#phase-16--strategy-picker) and [trade-api §2.1](../design/trade-api.md#21-strategy-catalog--phase-16).
+Strategies are a **shared pool** — any authenticated user can browse and deploy any strategy using their own credentials (decision #42). See [Best-VID Promotion §6](../design/best-vid-promotion.md#6-shared-strategy-pool).
 
 Dropdowns use MUI `size="small"` and fixed widths — not full-width form fields.
 
@@ -103,9 +117,9 @@ frontend/src/
 ├── types/                # TypeScript interfaces (no logic)
 │   ├── backtest.ts       # BacktestConfig, FactorConfig, API request/response types
 │   ├── credentials.ts    # BrokerAccount, TradingMode, filter constants
+│   ├── jobs.ts           # JobRow, JobDetail, JobStatus — queue table types
 │   ├── refdata.ts        # IndicatorRow, AssetTypeRow, ProductRow, AppRow, etc.
 │   └── trade.ts          # DeploymentRow, create-deployment request (Phase 1.2)
-│   # strategies.ts       # StrategyRow — Phase 1.6 (not yet in repo)
 │
 ├── api/                  # HTTP + data-fetching layer
 │   ├── client.ts         # Axios instance (baseURL, credentials, 401 interceptor)
@@ -113,9 +127,9 @@ frontend/src/
 │   ├── inst.ts           # useProducts() hook
 │   ├── backtest.ts       # runOptimizeStream() (SSE), runPerformance(), runWalkForward()
 │   ├── auth.ts           # useMe(), login(), logout()
+│   ├── jobs.ts           # useJobs(), useEnqueueJob(), useCancelJob(), usePromoteStrategy(), fetchJob()
 │   ├── trade.ts          # useDeployments(), useCreateDeployment() (Phase 1.2)
 │   └── credentials.ts    # useBrokerAccounts(), useCreateCredential(), useRotateCredential(), useRevokeCredential()
-│   # strategies.ts       # useStrategies() — Phase 1.6 (not yet in repo)
 │
 ├── trade/
 │   └── TradeSessionContext.tsx  # Shared broker/account/mode filters (Phase 1.4)
@@ -145,6 +159,7 @@ frontend/src/
 │   ├── MetricsCards.tsx  # Strategy vs buy-hold metric cards
 │   ├── HeatmapChart.tsx  # Plotly Sharpe heatmap (window × signal)
 │   ├── EquityCurveChart.tsx  # Plotly equity + drawdown chart
+│   ├── JobsTable.tsx     # Queue tab — MUI DataGrid with VID/Best chip, status filters, actions
 │   ├── UserMenu.tsx      # User avatar + logout
 │   ├── AppModeSwitch.tsx # Backtest | Trade header toggle
 │   ├── ErrorBoundary.tsx # React error boundary

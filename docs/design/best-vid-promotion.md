@@ -200,28 +200,60 @@ Body: { "strategy_vid": 3 }
 - Refreshes cache
 - Returns new active VID
 
-## 5. UI Changes
+## 5. UI — Pipeline Tab Model
+
+The SPA uses a four-tab pipeline, where each tab represents a stage in the strategy lifecycle:
+
+```mermaid
+flowchart LR
+    A["Backtest\n(Create & Run)"] --> B["Queue\n(Monitor Jobs)"] --> C["Promotion\n(Compare & Improve)"] --> D["Trade\n(Deploy & Execute)"]
+```
+
+| Tab | User question | What they do |
+|-----|---------------|--------------|
+| **Backtest** | "What strategy should I test?" | Configure params, submit job |
+| **Queue** | "How are my jobs doing?" | Monitor status, view results, clone |
+| **Promotion** | "Which VID is best? How do I improve?" | Compare VIDs, see gate results, tweak metrics, re-backtest, deploy to Trade |
+| **Trade** | "What's live? How is it performing?" | See deployed strategies, execution events, P&L |
+
+The Promotion tab is the **strategy improvement loop** — users iterate there until satisfied, then deploy to Trade.
+
+### 5a. Queue tab (implemented)
 
 - **VID column** in `JobsTable`: displays `v{strategy_vid}` with a green "Best" chip when `is_best_ind === 'Y'`
-- **Actions column**: "Clone" (opens enqueue form pre-filled with config) + "Promote" (calls `POST /strategies/{id}/promote`)
+- **Actions column**: "View" (load result), "Clone" (opens enqueue form pre-filled with config), "Promote" (calls `POST /strategies/{id}/promote`)
 - `EnqueueRequest` does **not** include `strategy_id` — clone always creates a new strategy (new `strategy_id`, VID 1)
+
+### 5b. Promotion tab (planned)
+
+Content:
+
+- **Recommended strategy banner** — the overall best strategy across all `strategy_id`s (highest Sharpe with `IS_BEST_IND = 'Y'`)
+- **Strategy list** — grouped by `strategy_id`, showing all VIDs with their promotion outcome (PROMOTED / KEPT / DEMOTED / REJECTED)
+- **VID comparison panel** — select a VID to see hard gate results (pass/fail per gate with values) and soft metric comparison vs current best, with the decisive metric highlighted
+- **Promotion rules card** — read-only display of `REFDATA.PROMOTION_METRIC` config (what gates, thresholds, comparison order)
+- **"Re-backtest" button** — clone the best VID config back to the Backtest tab with tweaked params
+- **"Deploy" button** — send the best VID to Trade (Phase 1.7)
+
+### 5c. Design principle — progressive disclosure
+
+Each tab answers a different question at a different stage. Adding a tab is justified when the **mental model** changes, not just when there is more data. The Promotion tab is a genuinely different task (strategy improvement) from Queue (job monitoring).
 
 ## 6. Shared Strategy Pool
 
-Currently list mode requires `IN_USER_ID` and scopes to that user's rows. For the shared pool:
-- When `IN_USER_ID` is supplied → returns that user's active strategies (current behavior, for "my strategies")
-- Add a new mode or endpoint for "all active strategies" (shared pool browser)
+Strategies are a **shared pool** — any authenticated user can read, browse, and deploy any strategy (decision #42). `USER_ID` on `BT.STRATEGY` is audit-only. Capital safety comes from credential ownership.
 
-Separate concern — defer to a follow-up.
+- The Promotion tab shows all strategies across all users
+- The Trade tab filters to the caller's deployments (scoped by `APP_USER_ID`)
 
-## 7. Future — Promotion Outcome Persistence
+## 7. Promotion Outcome Persistence
 
 Planned (`BT.PROMOTION_OUTCOME` table + `SP_INS_PROMOTION_OUTCOME` procedure designed, not yet deployed):
 
 - Store structured outcome per completed `QUEUE_ID`: `PROMOTED` / `KEPT` / `DEMOTED` / `REJECTED`
 - `GATE_RESULTS JSONB` — per-gate pass/fail detail
 - `COMPARED_VID`, `COMPARED_METRIC`, `NEW_VALUE`, `BEST_VALUE` — the decisive soft comparison
-- Enables UI features: recommended strategy banners, VID comparison drawers, promotion rules card
+- Powers the Promotion tab UI — without this data, the tab cannot show why a decision was made
 
 ## Resolved Questions
 
