@@ -1,12 +1,16 @@
 import { Card, CardContent, Typography } from '@mui/material';
 import type { PerformanceResponse } from '../types/backtest';
+import { formatDecimal, formatPercent } from '../utils/format';
 
 const PERCENT_KEYS = new Set(['Total Return', 'Annualized Return', 'Max Drawdown']);
 
-function fmt(key: string, v: number | null | undefined): string {
-  if (v == null || !isFinite(v)) return '—';
-  if (PERCENT_KEYS.has(key)) return `${(v * 100).toFixed(1)}%`;
-  return v.toFixed(3);
+function fmt(key: string, v: unknown): string {
+  if (PERCENT_KEYS.has(key)) {
+    const s = formatPercent(v);
+    return s === 'N/A' ? '—' : s;
+  }
+  const s = formatDecimal(v, 3);
+  return s === 'N/A' ? '—' : s;
 }
 
 interface CardProps {

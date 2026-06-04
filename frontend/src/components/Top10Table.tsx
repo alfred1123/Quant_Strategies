@@ -2,6 +2,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
 import { Button, Chip } from '@mui/material';
 import type { Top10Row, OptimizeResponse } from '../types/backtest';
+import { toFiniteNumber } from '../utils/format';
 
 interface Props {
   result: OptimizeResponse;
@@ -10,9 +11,10 @@ interface Props {
   isLoadingPerf: boolean;
 }
 
-/** Format any cell value defensively — only numbers get toFixed; other types pass through. */
+/** Format any cell value defensively — coerces numeric strings before toFixed. */
 function formatNumeric(value: unknown, digits: number): string {
-  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '';
+  const n = toFiniteNumber(value);
+  return n == null ? '' : n.toFixed(digits);
 }
 
 export default function Top10Table({ result, selectedIndex, onSelect, isLoadingPerf }: Props) {

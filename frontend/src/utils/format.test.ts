@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { overfitColor, overfitLabel, formatMetric, rowLabel } from './format';
+import { overfitColor, overfitLabel, formatMetric, formatDecimal, formatPercent, toFiniteNumber, rowLabel } from './format';
 import type { BacktestConfig, Top10Row } from '../types/backtest';
 
 describe('overfitColor', () => {
@@ -57,6 +57,24 @@ describe('formatMetric', () => {
   it('coerces numeric strings from API/REFDATA', () => {
     expect(formatMetric('0.40')).toBe('0.4000');
     expect(formatMetric('1.23456789')).toBe('1.2346');
+  });
+  it('does not throw on numeric strings (Postgres Decimal JSON)', () => {
+    expect(() => formatMetric('0')).not.toThrow();
+    expect(formatMetric('0')).toBe('0.0000');
+  });
+});
+
+describe('formatPercent', () => {
+  it('formats ratio as percent', () => {
+    expect(formatPercent(0.123)).toBe('12.3%');
+    expect(formatPercent('0.5')).toBe('50.0%');
+  });
+});
+
+describe('toFiniteNumber', () => {
+  it('coerces numeric strings', () => {
+    expect(toFiniteNumber('1.5')).toBe(1.5);
+    expect(toFiniteNumber('')).toBeNull();
   });
 });
 

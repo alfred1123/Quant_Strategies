@@ -10,25 +10,43 @@ import { isSingleFactorRow, multiFactorParams } from './top10';
  */
 export const OVERFIT_THRESHOLDS = { LOW: 0.3, HIGH: 0.5 } as const;
 
-export function overfitColor(ratio: number | null): 'success' | 'warning' | 'error' | 'default' {
-  if (ratio == null || isNaN(ratio)) return 'default';
-  if (ratio < OVERFIT_THRESHOLDS.LOW) return 'success';
-  if (ratio < OVERFIT_THRESHOLDS.HIGH) return 'warning';
+export function overfitColor(ratio: unknown): 'success' | 'warning' | 'error' | 'default' {
+  const r = toFiniteNumber(ratio);
+  if (r == null) return 'default';
+  if (r < OVERFIT_THRESHOLDS.LOW) return 'success';
+  if (r < OVERFIT_THRESHOLDS.HIGH) return 'warning';
   return 'error';
 }
 
-export function overfitLabel(ratio: number | null): string {
-  if (ratio == null || isNaN(ratio)) return 'N/A';
-  if (ratio < OVERFIT_THRESHOLDS.LOW) return 'Low Risk';
-  if (ratio < OVERFIT_THRESHOLDS.HIGH) return 'Moderate';
+export function overfitLabel(ratio: unknown): string {
+  const r = toFiniteNumber(ratio);
+  if (r == null) return 'N/A';
+  if (r < OVERFIT_THRESHOLDS.LOW) return 'Low Risk';
+  if (r < OVERFIT_THRESHOLDS.HIGH) return 'Moderate';
   return 'High Risk';
 }
 
-export function formatMetric(v: number | string | null | undefined | unknown): string {
-  if (v == null || v === '') return 'N/A';
+/** Coerce API / REFDATA values (number, numeric string, Decimal-as-string) to a finite number. */
+export function toFiniteNumber(v: unknown): number | null {
+  if (v == null || v === '') return null;
   const n = typeof v === 'number' ? v : Number(v);
-  if (!Number.isFinite(n)) return 'N/A';
-  return n.toFixed(4);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function formatDecimal(v: unknown, digits = 4): string {
+  const n = toFiniteNumber(v);
+  if (n == null) return 'N/A';
+  return n.toFixed(digits);
+}
+
+export function formatMetric(v: unknown): string {
+  return formatDecimal(v, 4);
+}
+
+export function formatPercent(v: unknown, digits = 1): string {
+  const n = toFiniteNumber(v);
+  if (n == null) return 'N/A';
+  return `${(n * 100).toFixed(digits)}%`;
 }
 
 export function rowLabel(row: Top10Row, cfg: BacktestConfig): string {

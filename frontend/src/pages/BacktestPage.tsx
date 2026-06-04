@@ -21,7 +21,7 @@ import type {
   WalkForwardResponse, OptimizeProgress,
 } from '../types/backtest';
 import { effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest } from '../utils/requestBuilders';
-import { overfitColor, overfitLabel, formatMetric, rowLabel } from '../utils/format';
+import { overfitColor, overfitLabel, formatMetric, formatDecimal, formatPercent, rowLabel } from '../utils/format';
 import { firstValidationError } from '../utils/validate';
 
 const DEFAULT_CONFIG: BacktestConfig = {
@@ -274,7 +274,7 @@ export default function BacktestPage() {
             />
             <Typography sx={{ color: 'text.secondary' }}>
               {optProgress?.trial
-                ? `Trial ${optProgress.trial} / ${optProgress.total}${optProgress.best_sharpe != null ? ` · Best Sharpe: ${optProgress.best_sharpe.toFixed(4)}` : ''}`
+                ? `Trial ${optProgress.trial} / ${optProgress.total}${optProgress.best_sharpe != null ? ` · Best Sharpe: ${formatDecimal(optProgress.best_sharpe)}` : ''}`
                 : 'Running optimization…'}
             </Typography>
           </Box>
@@ -307,7 +307,7 @@ export default function BacktestPage() {
                 <Chip label={effectiveSymbol(config)} color="primary" size="small" />
                 <Chip label={`${config.start} → ${config.end}`} size="small" variant="outlined" />
                 <Chip label={`${optimizeResult.valid} / ${optimizeResult.total_trials} valid trials`} size="small" variant="outlined" />
-                <Chip label={`Best Sharpe: ${(optimizeResult.best?.sharpe ?? 0).toFixed(4)}`} color="success" size="small" />
+                <Chip label={`Best Sharpe: ${formatDecimal(optimizeResult.best?.sharpe ?? 0)}`} color="success" size="small" />
                 {config.factors.map((f, i) => (
                   <Chip key={i} label={`F${i + 1}: ${f.indicator} / ${f.strategy}`} size="small" variant="outlined" />
                 ))}
@@ -392,7 +392,7 @@ export default function BacktestPage() {
                                 size="small" variant="outlined"
                               />
                               <Chip
-                                label={`Overfitting: ${wfResult.overfitting_ratio != null ? (wfResult.overfitting_ratio * 100).toFixed(1) + '%' : 'N/A'} — ${overfitLabel(wfResult.overfitting_ratio)}`}
+                                label={`Overfitting: ${formatPercent(wfResult.overfitting_ratio)} — ${overfitLabel(wfResult.overfitting_ratio)}`}
                                 size="small"
                                 color={overfitColor(wfResult.overfitting_ratio)}
                               />

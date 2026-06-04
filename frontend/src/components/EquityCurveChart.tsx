@@ -1,9 +1,15 @@
 import Plot from '../lib/Plot';
 import type { EquityPoint } from '../types/backtest';
+import { toFiniteNumber } from '../utils/format';
 
 interface Props {
   curve: EquityPoint[];
   splitDate?: string;
+}
+
+function pct(v: unknown): number {
+  const n = toFiniteNumber(v);
+  return n == null ? 0 : +(n * 100).toFixed(2);
 }
 
 export default function EquityCurveChart({ curve, splitDate }: Props) {
@@ -28,7 +34,7 @@ export default function EquityCurveChart({ curve, splitDate }: Props) {
         data={[
           {
             x: dates,
-            y: curve.map(p => +(p.cumu * 100).toFixed(2)),
+            y: curve.map(p => pct(p.cumu)),
             name: 'Strategy',
             type: 'scatter',
             mode: 'lines',
@@ -36,7 +42,7 @@ export default function EquityCurveChart({ curve, splitDate }: Props) {
           },
           {
             x: dates,
-            y: curve.map(p => +(p.buy_hold_cumu * 100).toFixed(2)),
+            y: curve.map(p => pct(p.buy_hold_cumu)),
             name: 'Buy & Hold',
             type: 'scatter',
             mode: 'lines',
@@ -71,7 +77,7 @@ export default function EquityCurveChart({ curve, splitDate }: Props) {
         data={[
           {
             x: dates,
-            y: curve.map(p => +(p.dd * 100).toFixed(2)),
+            y: curve.map(p => pct(p.dd)),
             name: 'Strategy DD',
             type: 'scatter',
             mode: 'lines',
@@ -81,7 +87,7 @@ export default function EquityCurveChart({ curve, splitDate }: Props) {
           },
           {
             x: dates,
-            y: curve.map(p => +(p.buy_hold_dd * 100).toFixed(2)),
+            y: curve.map(p => pct(p.buy_hold_dd)),
             name: 'B&H DD',
             type: 'scatter',
             mode: 'lines',
