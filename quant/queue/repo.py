@@ -121,14 +121,34 @@ class BtQueueRepo(DbGateway):
     # ── reads (SP wrappers) ────────────────────────────────────────────
 
     def sp_get_queued_count(self, user_id: str, queued_status_id: int) -> int:
-        """Wrap ``BT.SP_GET_QUEUED_COUNT`` — active QUEUED count for per-user cap."""
-        row = self._call_write(
+        """Wrap ``BT.SP_GET_QUEUED_COUNT`` — active QUEUED count for per-user cap.
+
+        OUT row shape is ``(OUT_COUNT, SQLSTATE, SQLMSG, SQLERRMC)`` — count
+        precedes the status triplet, so this cannot use ``_call_write``.
+        """
+        sql = (
             "CALL bt.sp_get_queued_count("
             "%s::text, %s::integer,"
-            " NULL::integer, NULL::text, NULL::text, NULL::text)",
-            (user_id, int(queued_status_id)),
+            " NULL::integer, NULL::text, NULL::text, NULL::text)"
         )
-        return int(row[0]) if row and row[0] is not None else 0
+        params = (user_id, int(queued_status_id))
+
+        def work(cur) -> int:
+            cur.execute(sql, params)
+            row = cur.fetchone()
+            if row is None or len(row) < 4:
+                raise RuntimeError("SP_GET_QUEUED_COUNT returned invalid OUT row")
+            count, sqlstate, _, sqlerrmc = row[0], row[1], row[2], row[3]
+            if sqlstate != "00000":
+                raise RuntimeError(
+                    f"Proc failed (SQLSTATE {sqlstate}): {sqlerrmc}",
+                )
+            return int(count) if count is not None else 0
+
+        result, held = self._run(work)
+        if held is not None:
+            held.commit()
+        return result
 
     def list_for_user(self, user_id: str, limit: int = 50) -> list[dict]:
         """Active rows for one user via ``SP_GET_QUEUE`` (includes STRATEGY join)."""
