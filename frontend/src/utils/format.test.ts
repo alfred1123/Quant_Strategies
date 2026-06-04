@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { overfitColor, overfitLabel, formatMetric, formatDecimal, formatPercent, toFiniteNumber, rowLabel } from './format';
+import { overfitColor, overfitLabel, formatMetric, formatPercent, toFiniteNumber, rowLabel } from './format';
 import type { BacktestConfig, Top10Row } from '../types/backtest';
 
 describe('overfitColor', () => {

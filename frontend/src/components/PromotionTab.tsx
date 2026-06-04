@@ -7,8 +7,8 @@ import {
 } from '@mui/material';
 import { usePromotions } from '../api/promotion';
 import { usePromotionMetrics, usePromotionStates } from '../api/refdata';
-import { formatMetric } from '../utils/format';
-import { readPromotionMetric, toFiniteNumber } from '../utils/promotionMetric';
+import { formatMetric, toFiniteNumber } from '../utils/format';
+import { readPromotionMetric } from '../utils/promotionMetric';
 import type { PromotionRow } from '../types/promotion';
 import type { PromotionMetricRow } from '../types/refdata';
 
