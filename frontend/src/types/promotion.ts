@@ -3,8 +3,8 @@
 export interface GateResult {
   name: string;
   passed: boolean;
-  value: number | null;
-  threshold: number | null;
+  value: number | string | null;
+  threshold: number | string | null;
 }
 
 export interface PromotionRow {
@@ -17,11 +17,11 @@ export interface PromotionRow {
   outcome: string;
   compared_vid: number | null;
   gate_results: GateResult[] | null;
-  sharpe_ratio: number | null;
-  calmar_ratio: number | null;
-  max_drawdown: number | null;
-  total_return: number | null;
-  annualized_return: number | null;
+  sharpe_ratio: number | string | null;
+  calmar_ratio: number | string | null;
+  max_drawdown: number | string | null;
+  total_return: number | string | null;
+  annualized_return: number | string | null;
   user_id: string;
   created_at: string;
 }

@@ -8,6 +8,7 @@ import {
 import { usePromotions } from '../api/promotion';
 import { usePromotionMetrics, usePromotionStates } from '../api/refdata';
 import { formatMetric } from '../utils/format';
+import { readPromotionMetric, toFiniteNumber } from '../utils/promotionMetric';
 import type { PromotionRow } from '../types/promotion';
 import type { PromotionMetricRow } from '../types/refdata';
 
@@ -16,15 +17,6 @@ const OUTCOME_COLOR: Record<string, 'success' | 'default' | 'warning' | 'error'>
   KEPT: 'default',
   DEMOTED: 'warning',
   REJECTED: 'error',
-};
-
-// Maps REFDATA.PROMOTION_METRIC.metric_key → the shredded numeric column on PromotionRow.
-const METRIC_FIELD: Record<string, keyof PromotionRow> = {
-  'Sharpe Ratio': 'sharpe_ratio',
-  'Calmar Ratio': 'calmar_ratio',
-  'Max Drawdown': 'max_drawdown',
-  'Total Return': 'total_return',
-  'Annualized Return': 'annualized_return',
 };
 
 interface PromotionTabProps {
@@ -47,7 +39,8 @@ function compareMetric(
 export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
   const promotions = usePromotions();
   const { data: states = [] } = usePromotionStates();
-  const { data: metrics = [] } = usePromotionMetrics();
+  const promotionMetricsQuery = usePromotionMetrics();
+  const metrics = promotionMetricsQuery.data ?? [];
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -71,9 +64,11 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
 
   // Recommended: highest Sharpe among current-best (IS_BEST_IND='Y') rows.
   const recommended = useMemo(() => {
-    const best = rows.filter((r) => r.is_best_ind === 'Y' && r.sharpe_ratio != null);
+    const best = rows.filter((r) => r.is_best_ind === 'Y' && toFiniteNumber(r.sharpe_ratio) != null);
     if (best.length === 0) return null;
-    return best.reduce((a, b) => ((b.sharpe_ratio ?? -Infinity) > (a.sharpe_ratio ?? -Infinity) ? b : a));
+    return best.reduce((a, b) =>
+      (toFiniteNumber(b.sharpe_ratio) ?? -Infinity) > (toFiniteNumber(a.sharpe_ratio) ?? -Infinity) ? b : a,
+    );
   }, [rows]);
 
   const selected = useMemo(
@@ -127,23 +122,27 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
             onSelect={setSelectedId}
             outcomeLabel={outcomeLabel}
           />
-          <Stack spacing={3}>
-            <ComparisonPanel
-              row={selected}
-              rows={rows}
-              metrics={metrics}
-              outcomeLabel={outcomeLabel}
-              onReBacktest={onReBacktest}
-              onDeploy={(r) =>
-                navigate('/trade/apply', {
-                  state: { strategyId: r.strategy_id, strategyVid: r.strategy_vid },
-                })
-              }
-            />
-            <RulesCard metrics={metrics} />
-          </Stack>
+          <ComparisonPanel
+            row={selected}
+            rows={rows}
+            metrics={metrics}
+            outcomeLabel={outcomeLabel}
+            onReBacktest={onReBacktest}
+            onDeploy={(r) =>
+              navigate('/trade/apply', {
+                state: { strategyId: r.strategy_id, strategyVid: r.strategy_vid },
+              })
+            }
+          />
         </Box>
       )}
+
+      <PromotionRulesCard
+        metrics={metrics}
+        isLoading={promotionMetricsQuery.isLoading}
+        isError={promotionMetricsQuery.isError}
+        error={promotionMetricsQuery.error}
+      />
     </Stack>
   );
 }
@@ -167,7 +166,7 @@ function RecommendedBanner({ row }: { row: PromotionRow | null }) {
   );
 }
 
-function Metric({ label, value }: { label: string; value: number | null }) {
+function Metric({ label, value }: { label: string; value: unknown }) {
   return (
     <Box sx={{ textAlign: 'right', minWidth: 80 }}>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{label}</Typography>
@@ -285,9 +284,11 @@ function ComparisonPanel({
   let decisiveKey: string | null = null;
   if (bestRow) {
     for (const m of softMetrics) {
-      const field = METRIC_FIELD[m.metric_key];
-      if (!field) continue;
-      const cmp = compareMetric(row[field] as number | null, bestRow[field] as number | null, m.direction);
+      const cmp = compareMetric(
+        readPromotionMetric(row, m.metric_key),
+        readPromotionMetric(bestRow, m.metric_key),
+        m.direction,
+      );
       if (cmp !== 0) { decisiveKey = m.metric_key; break; }
     }
   }
@@ -351,10 +352,8 @@ function ComparisonPanel({
             </TableHead>
             <TableBody>
               {softMetrics.map((m) => {
-                const field = METRIC_FIELD[m.metric_key];
-                if (!field) return null;
-                const cand = row[field] as number | null;
-                const best = bestRow[field] as number | null;
+                const cand = readPromotionMetric(row, m.metric_key);
+                const best = readPromotionMetric(bestRow, m.metric_key);
                 const cmp = compareMetric(cand, best, m.direction);
                 const isDecisive = m.metric_key === decisiveKey;
                 return (
@@ -398,41 +397,99 @@ function ComparisonPanel({
   );
 }
 
-function RulesCard({ metrics }: { metrics: PromotionMetricRow[] }) {
-  const hard = metrics.filter((m) => m.requirement_type === 'HARD').sort((a, b) => a.priority - b.priority);
-  const soft = metrics.filter((m) => m.requirement_type === 'SOFT').sort((a, b) => a.priority - b.priority);
+function PromotionRulesCard({
+  metrics,
+  isLoading,
+  isError,
+  error,
+}: {
+  metrics: PromotionMetricRow[];
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+}) {
+  const sorted = useMemo(
+    () => [...metrics].sort((a, b) => {
+      const typeOrder = a.requirement_type === b.requirement_type
+        ? 0
+        : a.requirement_type === 'HARD' ? -1 : 1;
+      return typeOrder !== 0 ? typeOrder : a.priority - b.priority;
+    }),
+    [metrics],
+  );
+
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
-      <Typography variant="subtitle2" gutterBottom>Promotion rules</Typography>
+      <Typography variant="subtitle2" gutterBottom>
+        Promotion rules (REFDATA.PROMOTION_METRIC)
+      </Typography>
       <Typography variant="caption" color="text.secondary">
-        Hard gates (must all pass), then soft metrics compared in priority order.
+        Lower priority number = evaluated first. HARD gates must all pass; SOFT metrics break ties in order.
       </Typography>
 
-      <Typography variant="caption" sx={{ display: 'block', mt: 1.5, fontWeight: 600 }}>Hard gates</Typography>
-      <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-        {hard.map((m) => (
-          <Stack key={m.promotion_metric_id} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <Chip size="small" label="HARD" color="error" variant="outlined" sx={{ height: 18, fontSize: '0.6rem' }} />
-            <Typography variant="body2">{m.display_name}</Typography>
-            <Typography variant="caption" color="text.secondary">
-              ({m.direction === 'lower_is_better' ? '≤' : '≥'} {formatMetric(m.threshold)})
-            </Typography>
-          </Stack>
-        ))}
-      </Stack>
-
-      <Typography variant="caption" sx={{ display: 'block', mt: 1.5, fontWeight: 600 }}>Soft metrics (priority order)</Typography>
-      <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-        {soft.map((m, i) => (
-          <Stack key={m.promotion_metric_id} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <Chip size="small" label={i + 1} variant="outlined" sx={{ height: 18, fontSize: '0.6rem' }} />
-            <Typography variant="body2">{m.display_name}</Typography>
-            <Typography variant="caption" color="text.secondary">
-              ({m.direction === 'lower_is_better' ? 'lower' : 'higher'} is better)
-            </Typography>
-          </Stack>
-        ))}
-      </Stack>
+      {isLoading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+          <CircularProgress size={24} />
+        </Box>
+      )}
+      {isError && (
+        <Alert severity="error" sx={{ mt: 1 }}>
+          Failed to load promotion rules: {(error as Error)?.message ?? 'unknown error'}
+        </Alert>
+      )}
+      {!isLoading && !isError && sorted.length === 0 && (
+        <Alert severity="warning" sx={{ mt: 1 }}>
+          No rows in REFDATA.PROMOTION_METRIC — refresh refdata or check the database seed.
+        </Alert>
+      )}
+      {!isLoading && !isError && sorted.length > 0 && (
+        <TableContainer sx={{ mt: 1.5 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell align="right">Priority</TableCell>
+                <TableCell>Type</TableCell>
+                <TableCell>Name</TableCell>
+                <TableCell>Display name</TableCell>
+                <TableCell>Metric key</TableCell>
+                <TableCell>Direction</TableCell>
+                <TableCell align="right">Threshold</TableCell>
+                <TableCell>Description</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {sorted.map((m) => (
+                <TableRow key={m.promotion_metric_id}>
+                  <TableCell align="right" sx={{ fontFamily: 'monospace' }}>{m.priority}</TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      label={m.requirement_type}
+                      color={m.requirement_type === 'HARD' ? 'error' : 'primary'}
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: '0.65rem' }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{m.name}</TableCell>
+                  <TableCell>{m.display_name}</TableCell>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{m.metric_key}</TableCell>
+                  <TableCell sx={{ fontSize: '0.8rem' }}>
+                    {m.direction === 'lower_is_better' ? 'Lower is better' : 'Higher is better'}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
+                    {m.threshold != null ? formatMetric(m.threshold) : '—'}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="caption" color="text.secondary">
+                      {m.description ?? '—'}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
     </Paper>
   );
 }

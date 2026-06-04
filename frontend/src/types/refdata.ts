@@ -42,7 +42,7 @@ export interface PromotionMetricRow {
   direction: 'higher_is_better' | 'lower_is_better';
   requirement_type: 'HARD' | 'SOFT';
   priority: number;
-  threshold: number | null;
+  threshold: number | string | null;
   description: string | null;
 }
 

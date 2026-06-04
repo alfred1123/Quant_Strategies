@@ -54,6 +54,10 @@ describe('formatMetric', () => {
     expect(formatMetric(1.23456789)).toBe('1.2346');
     expect(formatMetric(0)).toBe('0.0000');
   });
+  it('coerces numeric strings from API/REFDATA', () => {
+    expect(formatMetric('0.40')).toBe('0.4000');
+    expect(formatMetric('1.23456789')).toBe('1.2346');
+  });
 });
 
 describe('rowLabel', () => {

@@ -24,9 +24,11 @@ export function overfitLabel(ratio: number | null): string {
   return 'High Risk';
 }
 
-export function formatMetric(v: number | null | undefined): string {
-  if (v == null || isNaN(v)) return 'N/A';
-  return v.toFixed(4);
+export function formatMetric(v: number | string | null | undefined | unknown): string {
+  if (v == null || v === '') return 'N/A';
+  const n = typeof v === 'number' ? v : Number(v);
+  if (!Number.isFinite(n)) return 'N/A';
+  return n.toFixed(4);
 }
 
 export function rowLabel(row: Top10Row, cfg: BacktestConfig): string {

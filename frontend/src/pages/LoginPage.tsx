@@ -22,8 +22,8 @@ type ServiceStatus = {
 // =====================================================
 function useServiceHealth() {
   const [services, setServices] = useState<ServiceStatus[]>([
-    { name: 'Backend API', status: 'checking', url: 'http://localhost:8000/health' },
-    { name: 'Database', status: 'checking', url: 'http://localhost:8000/health/ready' },
+    { name: 'Backend API', status: 'checking', url: '/health' },
+    { name: 'Database', status: 'checking', url: '/health/ready' },
   ]);
 
   useEffect(() => {

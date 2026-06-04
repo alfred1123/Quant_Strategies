@@ -11,6 +11,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': process.env.VITE_API_URL ?? 'http://localhost:8000',
+      // Health probes (login page) — same-origin via Vite avoids WSL localhost split.
+      '/health': {
+        target: process.env.VITE_API_URL ?? 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
   test: {
