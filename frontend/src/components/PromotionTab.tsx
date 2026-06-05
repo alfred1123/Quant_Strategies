@@ -78,9 +78,11 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
 
   if (promotions.isLoading) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-          <CircularProgress />
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+        <Box sx={{ flex: 1, minWidth: 0, p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+            <CircularProgress />
+          </Box>
         </Box>
         <PromotionRulesFlyout
           metrics={metrics}
@@ -93,8 +95,9 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Stack spacing={3}>
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+      <Box sx={{ flex: 1, minWidth: 0, p: 3 }}>
+        <Stack spacing={3}>
         <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>Promotion</Typography>
           {promotions.isFetching && <CircularProgress size={16} />}
@@ -145,7 +148,8 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
             />
           </Box>
         )}
-      </Stack>
+        </Stack>
+      </Box>
 
       <PromotionRulesFlyout
         metrics={metrics}
@@ -407,6 +411,9 @@ function ComparisonPanel({
   );
 }
 
+const RULES_TAB_WIDTH = 40;
+const RULES_PANEL_WIDTH = { xs: 'min(100vw - 56px, 520px)', md: 'min(860px, 50vw)' };
+
 function PromotionRulesFlyout({
   metrics,
   isLoading,
@@ -435,19 +442,19 @@ function PromotionRulesFlyout({
   return (
     <Box
       sx={{
-        position: 'fixed',
-        right: 0,
-        top: '50%',
-        transform: 'translateY(-50%)',
-        zIndex: (theme) => theme.zIndex.drawer + 1,
         display: 'flex',
         flexDirection: 'row-reverse',
-        alignItems: 'stretch',
+        flexShrink: 0,
+        alignSelf: 'stretch',
+        position: 'sticky',
+        top: 0,
+        maxHeight: '100vh',
+        zIndex: 1,
       }}
       onMouseEnter={hoverCapable ? () => setOpen(true) : undefined}
       onMouseLeave={hoverCapable ? () => setOpen(false) : undefined}
     >
-      {/* Right-edge tab — always visible */}
+      {/* Right-edge tab — in layout flow, never overlaps main content */}
       <Box
         role="button"
         tabIndex={0}
@@ -462,8 +469,9 @@ function PromotionRulesFlyout({
         }}
         onClick={hoverCapable ? undefined : () => setOpen((v) => !v)}
         sx={{
-          width: 40,
+          width: RULES_TAB_WIDTH,
           minHeight: 120,
+          alignSelf: 'center',
           bgcolor: open ? 'primary.main' : 'background.paper',
           color: open ? 'primary.contrastText' : 'text.primary',
           border: 1,
@@ -476,7 +484,7 @@ function PromotionRulesFlyout({
           justifyContent: 'center',
           gap: 0.5,
           cursor: 'pointer',
-          boxShadow: 3,
+          boxShadow: 2,
           py: 2,
           transition: 'background-color 0.15s ease',
           userSelect: 'none',
@@ -501,20 +509,21 @@ function PromotionRulesFlyout({
         )}
       </Box>
 
-      {/* Flyout — opens on hover / click; closes on mouse leave */}
+      {/* Flyout panel — expands in layout, pushes main content left */}
       <Paper
-        elevation={8}
+        elevation={4}
         sx={{
-          width: open ? { xs: 'calc(100vw - 48px)', md: 'min(860px, 58vw)' } : 0,
+          width: open ? RULES_PANEL_WIDTH : 0,
           opacity: open ? 1 : 0,
           overflow: 'hidden',
           transition: 'width 0.22s ease, opacity 0.18s ease',
           borderRadius: '10px 0 0 10px',
           borderRight: 0,
-          maxHeight: '88vh',
+          maxHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',
           pointerEvents: open ? 'auto' : 'none',
+          flexShrink: 0,
         }}
       >
         <Box sx={{ p: 2, pb: 1, flexShrink: 0 }}>
