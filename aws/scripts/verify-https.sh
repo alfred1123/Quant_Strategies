@@ -60,6 +60,34 @@ curl_code() {
   curl -sS -o /dev/null -w '%{http_code}' --max-time "$1" "${@:2}"
 }
 
+# Cloudflare Origin Certificates are signed by Cloudflare Origin CA — trusted by
+# the Cloudflare edge in Full (strict), not by the public CA bundle curl uses.
+# Direct-to-origin checks skip chain verification (-k) but still require TLS + HTTP 200.
+check_origin_https() {
+  local origin_ip="$1"
+  local code cert_info
+
+  require_cmd openssl
+
+  cert_info="$(echo | openssl s_client \
+    -connect "${origin_ip}:443" \
+    -servername "$DOMAIN" \
+    2>/dev/null | openssl x509 -noout -issuer -subject 2>/dev/null || true)"
+  [[ -n "$cert_info" ]] || die "Origin ${origin_ip}:443 did not present a TLS certificate for ${DOMAIN}"
+
+  if ! grep -qi 'Cloudflare Origin' <<<"$cert_info"; then
+    die "Origin cert is not a Cloudflare Origin certificate:${cert_info}"
+  fi
+  log "Origin TLS cert: OK (Cloudflare Origin CA, SNI ${DOMAIN})"
+
+  code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 25 \
+    --resolve "${DOMAIN}:443:${origin_ip}" \
+    "https://${DOMAIN}/health")"
+  [[ "$code" == "200" ]] \
+    || die "Origin HTTPS https://${DOMAIN}/health via ${origin_ip}:443 returned HTTP ${code} (expected 200)"
+  log "Origin HTTPS: OK (HTTP 200)"
+}
+
 main() {
   require_cmd curl
   require_cmd aws
@@ -68,14 +96,11 @@ main() {
   log "Domain=$DOMAIN env=$APP_ENV skip_edge=$SKIP_EDGE"
   check_ssm_tls
 
-  local origin_ip
+  local origin_ip code
   origin_ip="$(resolve_origin_ip)"
   log "Origin IP=$origin_ip"
 
-  local code
-  code="$(curl_code 25 --resolve "${DOMAIN}:443:${origin_ip}" "https://${DOMAIN}/health")"
-  [[ "$code" == "200" ]] || die "Origin HTTPS https://${DOMAIN}/health via ${origin_ip}:443 returned HTTP ${code} (expected 200)"
-  log "Origin HTTPS: OK (HTTP 200)"
+  check_origin_https "$origin_ip"
 
   if [[ "$SKIP_EDGE" == "true" ]]; then
     log "Skipping Cloudflare edge checks (SKIP_EDGE=true)"
