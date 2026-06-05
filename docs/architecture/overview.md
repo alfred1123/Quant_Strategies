@@ -2,6 +2,10 @@
 
 Quant Strategies is a **backtest + trade** platform: researchers configure multi-factor strategies in a React SPA, run grid-search jobs via a Postgres-backed queue, and (Phase 1+) deploy pinned strategy versions to exchange accounts.
 
+For an honest comparison to professional quant firms, a phased implementation plan,
+and OOP target architecture, see [Comparison to Pro Quant Firms](comparison.md)
+and [OOP Strategy Framework](oop-framework.md).
+
 ---
 
 ## High-level architecture

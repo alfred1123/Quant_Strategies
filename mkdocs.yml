@@ -72,6 +72,8 @@ nav:
       - Database: architecture/database.md
       - Infrastructure: architecture/infrastructure.md
       - Dev vs Prod Config: architecture/dev-vs-prod.md
+      - Comparison to Pro Quant Firms: architecture/comparison.md
+      - OOP Strategy Framework: architecture/oop-framework.md
   - Guides:
       - CLI Backtest: guides/cli-backtest.md
       - New User Guide (Website): guides/new-user-website.md
