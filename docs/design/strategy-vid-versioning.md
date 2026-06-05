@@ -1,27 +1,58 @@
 # Strategy VID Versioning by Name
 
-How to make repeated submissions of the **same strategy** increment
-`STRATEGY_VID` instead of spawning a brand-new `STRATEGY_ID` at `VID=1` each
-time, add a uniqueness guarantee, and clean up the duplicated rows already in
-`BT.STRATEGY`.
+**Status:** Design — not yet implemented (DB + API + data cleanup pending).
+
+How to make repeated submissions of the **same strategy name** increment
+`STRATEGY_VID` (`v1`, `v2`, `v3`, …) under **one** `STRATEGY_ID`, add a
+uniqueness guarantee on `(USER_ID, STRATEGY_NM, STRATEGY_VID)`, and clean up
+duplicate rows already in `BT.STRATEGY`.
+
+## Summary
+
+| Today | Target |
+|-------|--------|
+| Every enqueue mints a new random `STRATEGY_ID` | Same `(USER_ID, STRATEGY_NM)` reuses one `STRATEGY_ID` |
+| Each submission is always `VID=1` | VID increments: `1, 2, 3, …` per name |
+| Promotion UI shows two cards, both `v1` / Best | One card with `v1`, `v2`, … in time order |
+| No uniqueness on name + VID | `UNIQUE (USER_ID, STRATEGY_NM, STRATEGY_VID)` |
+
+```mermaid
+flowchart LR
+  subgraph today [Today — broken]
+    E1[enqueue same name] --> N1[new STRATEGY_ID A]
+    E1 --> N2[new STRATEGY_ID B]
+    N1 --> V1A[VID 1 Best]
+    N2 --> V1B[VID 1 Best]
+  end
+  subgraph target [Target]
+    E2[enqueue same name] --> S[same STRATEGY_ID]
+    S --> V1[VID 1]
+    S --> V2[VID 2]
+    S --> V3[VID 3]
+  end
+```
 
 ## Symptom
 
-Submitting the same configuration twice produces **two separate strategy cards**,
-each showing `v1` / `Best`, instead of one card with `v1`, `v2`:
+Submitting the same configuration twice produces **two separate strategy blocks** in
+the Promotion tab, each showing `v1` / `Best`, instead of one block with
+`v1`, `v2`:
 
 ```
 btcusdt.crypto · get_bollinger_band/momentum    v1  Best   (19:03:32)
 btcusdt.crypto · get_bollinger_band/momentum    v1  Best   (19:03:46)
 ```
 
+Same root cause in the Jobs queue: two rows with the same `strategy_nm`, both
+at `v1`.
+
 ## Root cause
 
 Identity is keyed on a **random** `STRATEGY_ID`, not on the strategy name.
 
-- [`quant/api/services/jobs.py`](https://github.com/alfred1123/Quant_Strategies/blob/main/quant/api/services/jobs.py)
-  mints `strategy_id = uuid.uuid4()` on **every** `enqueue()`.
-- [`BT.SP_INS_STRATEGY`](https://github.com/alfred1123/Quant_Strategies/blob/main/db/liquidbase/bt/procedures/SP_INS_STRATEGY.sql)
+- [`quant/api/services/jobs.py`](../../quant/api/services/jobs.py) mints
+  `strategy_id = uuid.uuid4()` on **every** `enqueue()`.
+- [`BT.SP_INS_STRATEGY`](../../db/liquidbase/bt/procedures/SP_INS_STRATEGY.sql)
   computes the next VID as
   `SELECT COALESCE(MAX(STRATEGY_VID),0)+1 WHERE STRATEGY_ID = IN_STRATEGY_ID`.
 
@@ -31,21 +62,51 @@ version resolution.
 
 ## Target behaviour
 
-- Same logical strategy (same **owner + name**) → **one** `STRATEGY_ID`, with
-  `STRATEGY_VID` incrementing `1, 2, 3, …` on each resubmission.
-- A uniqueness guarantee so duplicate `(name, vid)` rows cannot be created again.
-- Existing duplicated rows collapsed into the correct version history.
+1. Same logical strategy (same **owner + name**) → **one** `STRATEGY_ID`, with
+   `STRATEGY_VID` incrementing `1, 2, 3, …` on each resubmission.
+2. A **unique key** so duplicate `(name, vid)` rows cannot be created again.
+3. Existing duplicated rows collapsed into the correct version history.
 
-!!! note "Scoping: per-user, not global"
+!!! note "Scoping: `(USER_ID, STRATEGY_NM, STRATEGY_VID)` — not global `(STRATEGY_NM, VID)`"
     Strategies are owned (`BT.STRATEGY.USER_ID`, see
     [User isolation](user-isolation.md)). Two different users may legitimately
-    pick the same `STRATEGY_NM`. A **global** `UNIQUE (STRATEGY_NM, VID)` would
-    block user B from ever using a name user A already used. Scope identity and
-    the unique key to **`(USER_ID, STRATEGY_NM, …)`**. The rest of this doc uses
-    that scoping; drop `USER_ID` from the constraint only if names are meant to
-    be globally unique.
+    pick the same `STRATEGY_NM`. A **global** `UNIQUE (STRATEGY_NM, STRATEGY_VID)`
+    would block user B from ever using a name user A already used.
 
-## How to do it
+    The constraint must be:
+
+    ```sql
+    UNIQUE (USER_ID, STRATEGY_NM, STRATEGY_VID)
+    ```
+
+    When people say "unique on strategy name and vid", include **`USER_ID`**
+    unless the product decision is that names are globally unique across all users.
+
+## Audit — find duplicates before cleanup
+
+Run against prod (via SSM port-forward) to see how much cleanup is needed:
+
+```sql
+-- Duplicate (USER_ID, STRATEGY_NM, STRATEGY_VID) — blocks the unique constraint
+SELECT USER_ID, STRATEGY_NM, STRATEGY_VID, COUNT(*) AS cnt
+  FROM BT.STRATEGY
+ GROUP BY 1, 2, 3
+HAVING COUNT(*) > 1
+ ORDER BY cnt DESC;
+
+-- Same name, many STRATEGY_IDs each at VID=1 — the Promotion-tab symptom
+SELECT USER_ID, STRATEGY_NM,
+       COUNT(DISTINCT STRATEGY_ID) AS distinct_ids,
+       COUNT(*)                    AS total_rows,
+       MAX(STRATEGY_VID)           AS max_vid
+  FROM BT.STRATEGY
+ GROUP BY 1, 2
+HAVING COUNT(DISTINCT STRATEGY_ID) > 1
+    OR MAX(STRATEGY_VID) = 1 AND COUNT(*) > 1
+ ORDER BY total_rows DESC;
+```
+
+## How to fix it (implementation)
 
 There are two ways to bind identity to the name. **Design A is recommended.**
 
@@ -83,10 +144,8 @@ The existing Steps 20–30 (close prior active row, insert new active row) stay 
 is but use `V_STRATEGY_ID`. Add an `OUT_STRATEGY_ID UUID` parameter so the caller
 learns the resolved id (it is no longer the value it passed in).
 
-**2. Python change** —
-[`quant/api/services/jobs.py`](https://github.com/alfred1123/Quant_Strategies/blob/main/quant/api/services/jobs.py)
-and the wrapper in
-[`quant/queue/repo.py`](https://github.com/alfred1123/Quant_Strategies/blob/main/quant/queue/repo.py):
+**2. Python change** — [`quant/api/services/jobs.py`](../../quant/api/services/jobs.py)
+and the wrapper in [`quant/queue/repo.py`](../../quant/queue/repo.py):
 stop minting `strategy_id` per call; pass `NULL` and read back the resolved
 `OUT_STRATEGY_ID` + `OUT_STRATEGY_VID`, then enqueue against that pair.
 
@@ -101,6 +160,11 @@ strategy_id, strategy_vid = self._repo.sp_ins_strategy(
 )
 ```
 
+**3. Re-backtest / clone paths** — any code path that enqueues a job with an
+existing `strategy_nm` must go through the same `SP_INS_STRATEGY` resolution
+(Promotion tab "Re-backtest", Jobs "Clone & edit"). Do not mint a new
+`STRATEGY_ID` there either.
+
 ### Design B — Deterministic `STRATEGY_ID` from the name (alternative)
 
 Keep the SP unchanged; make the **id deterministic** in Python so the existing
@@ -111,23 +175,27 @@ strategy_id = uuid.uuid5(STRATEGY_NS, f"{user_id}|{req.strategy_nm}")
 ```
 
 Simpler (no SP change) but couples the id to the name permanently — renaming a
-strategy creates a new lineage, and you cannot change the name of an existing
-lineage. Prefer Design A unless renames are guaranteed never to happen.
+strategy creates a new lineage. Prefer Design A unless renames are guaranteed
+never to happen.
 
-## Add the uniqueness guarantee
+## Add the unique constraint
 
-Once the insert path is fixed, enforce it at the schema level. New
-`db/liquidbase/bt/releases/*.xml` changeset:
+Once the insert path is fixed **and** existing duplicates are cleaned up, enforce
+at the schema level. New `db/liquidbase/bt/releases/*.xml` changeset:
 
 ```sql
 ALTER TABLE BT.STRATEGY
-    ADD CONSTRAINT UQ_STRATEGY_NM_VID
+    ADD CONSTRAINT UQ_STRATEGY_USER_NM_VID
     UNIQUE (USER_ID, STRATEGY_NM, STRATEGY_VID);
 ```
 
 !!! warning "Clean up data first"
-    This `ALTER` **fails** while duplicate `(USER_ID, STRATEGY_NM, VID)` rows
-    still exist. Run the cleanup below **before** adding the constraint.
+    This `ALTER` **fails** while duplicate `(USER_ID, STRATEGY_NM, STRATEGY_VID)`
+    rows still exist. Run the cleanup below **before** adding the constraint.
+
+The table keeps its existing composite PK `(STRATEGY_ID, STRATEGY_VID)` for
+temporal versioning and child-table joins. The new unique constraint is an
+**additional** guarantee on the human-facing identity `(owner, name, version)`.
 
 ## Clean up existing data
 
@@ -136,30 +204,46 @@ Today the same name maps to many `STRATEGY_ID`s, each at `VID=1`. Collapse each
 renumbered by `CREATED_AT`. Do this as a **one-off deploy-time Liquibase
 changeset** (the sanctioned place for direct DML — see `AGENTS.md`).
 
-Approach:
+### Steps
 
-1. **Pick a survivor id** per `(USER_ID, STRATEGY_NM)` — the earliest
-   `CREATED_AT` row's `STRATEGY_ID`.
-2. **Renumber** all rows in the group onto that survivor id, assigning
-   `STRATEGY_VID` by `ROW_NUMBER() OVER (PARTITION BY USER_ID, STRATEGY_NM
-   ORDER BY CREATED_AT)`.
-3. **Repoint children** that reference `(STRATEGY_ID, STRATEGY_VID)` —
-   `BT.QUEUE`, `BT.RESULT`, `BT.PROMOTION`, `TRADE.DEPLOYMENT` — to the new
-   `(survivor_id, new_vid)`. **Inventory every FK first**; a missed child
-   orphans rows.
-4. **Fix `TRANSACT_TO_TS`** so only the highest VID per group stays active
-   (`9999-12-31`); older VIDs get a closed timestamp.
-5. **Fix `IS_BEST_IND`** so exactly one row per group is `'Y'` (keep the
-   currently-best config, or default to the latest VID).
-6. **Add the unique constraint** (previous section) in the **same** changelog,
-   after the data fix, so the migration is atomic.
+1. **Back up** — see [Database Dump & Restore](../guides/database-dump-restore.md).
+2. **Pick a survivor id** per `(USER_ID, STRATEGY_NM)` — the `STRATEGY_ID` from
+   the earliest `CREATED_AT` row in the group.
+3. **Renumber** all rows in the group onto that survivor id, assigning
+   `STRATEGY_VID` via
+   `ROW_NUMBER() OVER (PARTITION BY USER_ID, STRATEGY_NM ORDER BY CREATED_AT)`.
+4. **Repoint child tables** that store `(STRATEGY_ID, STRATEGY_VID)`:
+
+   | Table | Repoint? | Notes |
+   |-------|----------|-------|
+   | `BT.QUEUE` | **Yes** | stores `STRATEGY_ID`, `STRATEGY_VID` |
+   | `BT.PROMOTION` | **Yes** | decision log keyed by strategy + vid |
+   | `TRADE.DEPLOYMENT` | **Yes** | deploy history |
+   | `BT.RESULT` | **No** | links via `QUEUE_ID` only — fixed when `BT.QUEUE` is updated |
+
+   Build a mapping `(old_strategy_id, old_vid) → (survivor_id, new_vid)` from
+   step 3 and apply it to each child table. **Inventory every reference first**;
+   a missed child orphans rows.
+
+5. **Fix `TRANSACT_TO_TS`** — only the highest VID per group stays active
+   (`9999-12-31`); older VIDs get `TRANSACT_TO_TS = next_version.CREATED_AT`.
+6. **Fix `IS_BEST_IND`** — exactly one row per `(USER_ID, STRATEGY_NM)` is
+   `'Y'` (keep the row that was best before migration, or the latest VID if
+   ambiguous).
+7. **Delete orphan `STRATEGY_ID`s** — after repointing, remove rows whose
+   `STRATEGY_ID` is no longer the survivor for any name group (if any remain).
+8. **Add the unique constraint** in the **same** changelog, after the data fix.
+
+### SQL sketch
 
 ```sql
--- Sketch (run inside a transaction; validate counts before/after).
+-- Step 3: renumber BT.STRATEGY (validate row counts in staging first!)
 WITH ranked AS (
     SELECT ctid,
            FIRST_VALUE(STRATEGY_ID) OVER w  AS survivor_id,
-           ROW_NUMBER()             OVER w  AS new_vid
+           ROW_NUMBER()             OVER w  AS new_vid,
+           STRATEGY_ID                          AS old_id,
+           STRATEGY_VID                         AS old_vid
       FROM BT.STRATEGY
     WINDOW w AS (PARTITION BY USER_ID, STRATEGY_NM ORDER BY CREATED_AT)
 )
@@ -168,159 +252,64 @@ UPDATE BT.STRATEGY s
        STRATEGY_VID = r.new_vid
   FROM ranked r
  WHERE s.ctid = r.ctid;
--- then: repoint BT.QUEUE / BT.RESULT / BT.PROMOTION / TRADE.DEPLOYMENT,
---       reset TRANSACT_TO_TS + IS_BEST_IND, then ADD CONSTRAINT.
+
+-- Step 4: repoint BT.QUEUE / BT.PROMOTION / TRADE.DEPLOYMENT using (old_id, old_vid) → (survivor_id, new_vid)
+-- Step 5–6: reset TRANSACT_TO_TS + IS_BEST_IND per group
+-- Step 8: ALTER TABLE ... ADD CONSTRAINT UQ_STRATEGY_USER_NM_VID ...
 ```
 
-!!! danger "Back up before migrating"
-    Take a dump first (see [Database Dump & Restore](../guides/database-dump-restore.md)).
+!!! danger "Validate in staging"
     Renumbering a PK that other tables reference is irreversible without a
-    restore. Validate row counts and FK integrity in a staging copy before prod.
+    restore. Run the audit queries before and after; compare row counts on every
+    child table.
 
 ## Rollout order
 
 1. **Back up** the database.
-2. Deploy the **cleanup + unique-constraint** changelog (data fixed, duplicates
-   gone, constraint live).
-3. Deploy the **`SP_INS_STRATEGY`** change (Design A) — new submissions now
-   increment VID.
+2. Deploy the **cleanup + unique-constraint** Liquibase changelog (data fixed,
+   constraint live).
+3. Deploy the **`SP_INS_STRATEGY`** change (Design A).
 4. Deploy the **Python** change so the API/worker read back the resolved
    `STRATEGY_ID` / `STRATEGY_VID`.
-5. Update unit + integration tests
-   ([`tests/unit/`](https://github.com/alfred1123/Quant_Strategies/tree/main/tests/unit),
-   [`tests/integration/`](https://github.com/alfred1123/Quant_Strategies/tree/main/tests/integration))
-   to assert a second submission of the same name returns `VID=2`.
-6. Verify in the UI: resubmitting the same strategy now shows `v1`, `v2` under
-   **one** card.
+5. Update unit + integration tests (`tests/unit/`, `tests/integration/`) to
+   assert a second submission of the same name returns `VID=2`.
+6. Verify in the UI: resubmitting the same strategy shows `v1`, `v2` under
+   **one** Promotion block.
+
+## UI follow-ups
+
+Once versioning works, the Promotion and Jobs views should reflect **name +
+owner**, not opaque UUIDs.
+
+### Promotion tab
+
+[`frontend/src/components/PromotionTab.tsx`](../../frontend/src/components/PromotionTab.tsx)
+
+- **Group by `(user_id, strategy_nm)`** in the block header (not raw
+  `strategy_id`) so two users with the same name stay distinct:
+
+  ```
+  btcusdt.crypto · get_bollinger_band/momentum · alice    5 decisions ▸
+  ```
+
+- **One block per logical strategy** — after the DB fix, all VIDs for a name
+  appear under a single accordion.
+- **Collapse blocks by default** when the list is long; pin the Recommended /
+  `IS_BEST_IND='Y'` row in the preview slice.
+- Optional **Mine / All** filter (Promotion is already global at the API layer).
+
+### Jobs table
+
+[`frontend/src/components/JobsTable.tsx`](../../frontend/src/components/JobsTable.tsx)
+
+- Lead with **Strategy** (`strategy_nm`) and **Owner** (`user_id`); drop visible
+  `Queue ID` (keep `queue_id` in row data for actions).
+- See [Jobs Table Detail UX](jobs-table-detail-ux.md) for the full column plan.
 
 ## Related
 
-- [`BT.STRATEGY` table](https://github.com/alfred1123/Quant_Strategies/blob/main/db/liquidbase/bt/tables/STRATEGY.sql)
-- [`BT.SP_INS_STRATEGY`](https://github.com/alfred1123/Quant_Strategies/blob/main/db/liquidbase/bt/procedures/SP_INS_STRATEGY.sql)
-- [Best-VID Promotion](best-vid-promotion.md) — `IS_BEST_IND` semantics
+- [`BT.STRATEGY` table](../../db/liquidbase/bt/tables/STRATEGY.sql)
+- [`BT.SP_INS_STRATEGY`](../../db/liquidbase/bt/procedures/SP_INS_STRATEGY.sql)
+- [Trade Deployment Rollout](trade-deployment-rollout.md) — **parallel track** (no queue changes; deploy pins explicit `(STRATEGY_ID, STRATEGY_VID)`)
+- [Best-VID Promotion](best-vid-promotion.md) — `IS_BEST_IND` semantics (orthogonal to VID increment)
 - [User isolation](user-isolation.md) — why scoping is per-`USER_ID`
-
----
-
-# UI: display strategies by name & owner
-
-Once a strategy's identity is the `(USER_ID, STRATEGY_NM)` pair (above), the
-Jobs and Promotion views should present strategies by **name + owner**, not by
-opaque UUIDs. Users do not care about `QUEUE_ID` / `STRATEGY_ID`.
-
-## Jobs table ("My Jobs")
-
-[`frontend/src/components/JobsTable.tsx`](https://github.com/alfred1123/Quant_Strategies/blob/main/frontend/src/components/JobsTable.tsx)
-
-- **Drop the `Queue ID` column.** Lead with **Strategy** (`strategy_nm`) and an
-  **Owner** column (`user_id`). Keep `VID` (with the `Best` chip), `Status`,
-  `Priority`, `Submitted`, `Error`.
-- `queue_id` is still needed internally for row actions (Cancel / Re-run / View /
-  Clone / Promote) and `getRowId` — keep it in the row **data**, just not as a
-  visible column.
-
-!!! note "Jobs is shared at the data layer — scoping is API-only"
-    The queue is **already shareable**: `BT.SP_GET_QUEUE`'s `IN_USER_ID` is an
-    **optional** filter (`IF IN_USER_ID IS NOT NULL THEN ... AND q.USER_ID =
-    ...`). Passing `NULL` returns **every user's** rows — no SP change needed.
-    The only thing scoping Jobs to one user today is the **API layer**:
-    [`quant/api/routers/jobs.py`](https://github.com/alfred1123/Quant_Strategies/blob/main/quant/api/routers/jobs.py)
-    calls `svc.list_for_user(user.app_user_id)`, and
-    [`BtQueueRepo.list_for_user`](https://github.com/alfred1123/Quant_Strategies/blob/main/quant/queue/repo.py)
-    always passes `user_id`.
-
-### Make Jobs shared (like Promotion)
-
-To show **all users'** jobs with a "Mine / All" toggle — the intended design:
-
-1. **Repo** — add a global list path, e.g.
-   `list_all(limit)` → `sp_get_queue(user_id=None, limit=...)`, or give
-   `list_for_user` an optional `user_id=None` meaning "all".
-2. **Service** —
-   [`JobsService.list_for_user`](https://github.com/alfred1123/Quant_Strategies/blob/main/quant/api/services/jobs.py)
-   gains a sibling that does not scope by user.
-3. **Router** — `GET /backtest/jobs` accepts `?scope=all|mine` (default per the
-   shared-strategy product decision); `mine` passes the caller's
-   `app_user_id`, `all` passes `NULL`. Keep **ownership enforcement** on
-   mutations (cancel / re-run) via `get_active(..., user_id=...)` — sharing is
-   read-only visibility, not write access.
-4. **Frontend** — `JobsTable` adds the **Mine / All** toggle and the **Owner**
-   column (same pattern as Promotion §3 below).
-
-!!! warning "Mutation guard stays user-scoped"
-    Making the **list** global must not make **actions** global. Cancel,
-    re-run, and clone already resolve rows through `get_active(queue_id,
-    user_id=...)`; keep that ownership check so a shared (visible) job cannot be
-    cancelled by a non-owner. Visible ≠ editable (see
-    [User isolation](user-isolation.md)).
-
-## Promotion view
-
-[`frontend/src/components/PromotionTab.tsx`](https://github.com/alfred1123/Quant_Strategies/blob/main/frontend/src/components/PromotionTab.tsx)
-
-The Promotion log is **global** today (`PromotionRepo.get_log(strategy_id=None)`
-returns every user's decisions), and the UI already groups decisions into
-collapsible blocks. Required changes:
-
-### 1. Group by `(user_id, strategy_nm)`, not `strategy_id`
-
-`StrategyList` currently groups by `strategy_id`. After the VID fix one
-`strategy_id` == one logical strategy, so grouping by `strategy_id` becomes
-correct — but key the **block header** off `strategy_nm` + `user_id` so the
-label is human-readable and two users with the same name stay distinct:
-
-```
-btcusdt.crypto · get_bollinger_band/momentum   ·  alice          5 decisions  ▸
-```
-
-Show the owner (`user_id`) in the block header next to the name.
-
-### 2. Collapse all blocks by default
-
-Change the `Accordion` from `defaultExpanded` to **collapsed by default** so a
-long shared list is scannable. Optionally auto-expand only the block containing
-the **Recommended** row.
-
-### 3. "Mine / All" filter
-
-Add a toggle (default **All**, per the product decision that strategies are
-shared) that filters groups to `user_id === me` using
-[`useMe()`](https://github.com/alfred1123/Quant_Strategies/blob/main/frontend/src/api/auth.ts).
-This is display-only; **editing** rights are a separate question (a shared
-strategy being *visible* to everyone does not imply everyone may edit it — see
-[User isolation](user-isolation.md)).
-
-### 4. Per-block VID preview + full history
-
-Each collapsed block previews a short VID list; expanding reveals the rest.
-
-**Recommendation:** preview the **latest 5 VIDs by `created_at` desc**, but
-**always pin the `IS_BEST_IND='Y'` row** even if it falls outside the latest 5
-(the current best is the most decision-relevant row and must never be hidden).
-If a block has ≤ 5 VIDs, show them all and omit the expander.
-
-```
-get_bollinger_band/momentum · alice                     ▸ (collapsed)
-  ── expand ──
-  VID   Outcome   Sharpe   Calmar   When
-  v7 ★  Kept      1.21     1.40     2026/06/04 19:03      ← Best, pinned
-  v6    Demoted   1.18     1.31     2026/06/03 …
-  v5    Kept      1.20     1.35     2026/06/02 …
-  v4    Kept      1.15     1.28     2026/06/01 …
-  v3    Kept      1.10     1.22     2026/05/30 …
-  [ Show all 7 versions ]                               ← expander
-```
-
-Implementation notes:
-- Sort each group's decisions `created_at` desc, take the first 5, then union
-  the pinned best row (dedupe by `promotion_id`), preserving VID-desc order.
-- The expander toggles between the preview slice and the full `decisions` array
-  (already available in the group) — no extra API call.
-- Keep row-click → `ComparisonPanel` behaviour unchanged.
-
-## Out of scope
-
-- **Edit permissions** for shared strategies (who may re-run / rename / cancel
-  another user's strategy) — separate decision. Both Jobs and Promotion sharing
-  here are **read-only visibility**; mutations stay owner-scoped via
-  `get_active(..., user_id=...)`.

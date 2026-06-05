@@ -339,6 +339,8 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 | **Depends on** | 1.2, 1.4, 0.1 (recommended) |
 | **Blocks** | 1.7 |
 
+**Track:** [Trade Deployment Rollout](trade-deployment-rollout.md) — queue-free path; no `BT.QUEUE` / `SP_INS_STRATEGY` changes.
+
 **Scope:** Pick an **existing** `BT.STRATEGY` row for deployment — not build a new backtest config. Do **not** reuse Backtest `ConfigDrawer` / `FactorCard` (those edit REFDATA signal types for optimize requests). See [Trade API §2.1](trade-api.md#21-strategy-catalog--phase-16).
 
 **Tasks**

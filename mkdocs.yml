@@ -94,6 +94,7 @@ nav:
       - Login & Authentication: design/login.md
       - User Isolation: design/user-isolation.md
       - Best-VID Promotion: design/best-vid-promotion.md
+      - Trade Deployment Rollout: design/trade-deployment-rollout.md
       - Strategy VID Versioning: design/strategy-vid-versioning.md
       - Frontend Code Audit: design/frontend-audit.md
       - Plan to Profit: design/plan-to-profit.md

@@ -6,6 +6,12 @@
 
 `SP_INS_STRATEGY` always makes the newest VID active (`TRANSACT_TO_TS = 9999-12-31`) and closes the previous one — even if the new VID performs worse. There is no way to distinguish "latest version" from "best version".
 
+!!! note "Same name, duplicate VID=1 rows"
+    A separate bug causes every enqueue to mint a **new** `STRATEGY_ID`, so the
+    same `STRATEGY_NM` never increments VID. That breaks the Promotion UI (two
+    cards both at `v1`). See [Strategy VID Versioning by Name](strategy-vid-versioning.md)
+    for the fix, data cleanup, and `UNIQUE (USER_ID, STRATEGY_NM, STRATEGY_VID)`.
+
 ## Design — `IS_BEST_IND` column
 
 Separate two concerns:
