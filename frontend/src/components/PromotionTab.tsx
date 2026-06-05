@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Chip,
@@ -76,74 +76,117 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
     [rows, selectedId],
   );
 
+  const rulesPanel = (
+    <PromotionRulesCard
+      metrics={metrics}
+      isLoading={promotionMetricsQuery.isLoading}
+      isError={promotionMetricsQuery.isError}
+      error={promotionMetricsQuery.error}
+    />
+  );
+
   if (promotions.isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-        <CircularProgress />
-      </Box>
+      <PromotionLayout rules={rulesPanel}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+          <CircularProgress />
+        </Box>
+      </PromotionLayout>
     );
   }
 
   return (
-    <Stack spacing={3}>
-      <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>Promotion</Typography>
-        {promotions.isFetching && <CircularProgress size={16} />}
-        <Box sx={{ flexGrow: 1 }} />
-        <Typography variant="caption" color="text.secondary">
-          Auto-refreshes every 10 seconds
-        </Typography>
+    <PromotionLayout rules={rulesPanel}>
+      <Stack spacing={3}>
+        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Promotion</Typography>
+          {promotions.isFetching && <CircularProgress size={16} />}
+          <Box sx={{ flexGrow: 1 }} />
+          <Typography variant="caption" color="text.secondary">
+            Auto-refreshes every 10 seconds
+          </Typography>
+        </Stack>
+
+        {promotions.isError && (
+          <Alert severity="error">
+            Failed to load promotions: {(promotions.error as Error)?.message ?? 'unknown error'}
+          </Alert>
+        )}
+
+        <RecommendedBanner row={recommended} />
+
+        {rows.length === 0 ? (
+          <Alert severity="info">
+            No promotion decisions yet. Run a backtest — the worker logs a decision when each job completes.
+          </Alert>
+        ) : (
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: '1.4fr 1fr' },
+              gap: 3,
+              alignItems: 'start',
+            }}
+          >
+            <StrategyList
+              groups={groups}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              outcomeLabel={outcomeLabel}
+            />
+            <ComparisonPanel
+              row={selected}
+              rows={rows}
+              metrics={metrics}
+              outcomeLabel={outcomeLabel}
+              onReBacktest={onReBacktest}
+              onDeploy={(r) =>
+                navigate('/trade/apply', {
+                  state: { strategyId: r.strategy_id, strategyVid: r.strategy_vid },
+                })
+              }
+            />
+          </Box>
+        )}
       </Stack>
+    </PromotionLayout>
+  );
+}
 
-      {promotions.isError && (
-        <Alert severity="error">
-          Failed to load promotions: {(promotions.error as Error)?.message ?? 'unknown error'}
-        </Alert>
-      )}
-
-      <RecommendedBanner row={recommended} />
-
-      {rows.length === 0 ? (
-        <Alert severity="info">
-          No promotion decisions yet. Run a backtest — the worker logs a decision when each job completes.
-        </Alert>
-      ) : (
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: '1.4fr 1fr' },
-            gap: 3,
-            alignItems: 'start',
-          }}
-        >
-          <StrategyList
-            groups={groups}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            outcomeLabel={outcomeLabel}
-          />
-          <ComparisonPanel
-            row={selected}
-            rows={rows}
-            metrics={metrics}
-            outcomeLabel={outcomeLabel}
-            onReBacktest={onReBacktest}
-            onDeploy={(r) =>
-              navigate('/trade/apply', {
-                state: { strategyId: r.strategy_id, strategyVid: r.strategy_vid },
-              })
-            }
-          />
+function PromotionLayout({
+  children,
+  rules,
+}: {
+  children: ReactNode;
+  rules: ReactNode;
+}) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+      <Box sx={{ flex: 1, minWidth: 0, p: 3 }}>
+        {children}
+        <Box sx={{ display: { xs: 'block', lg: 'none' }, mt: 3 }}>
+          {rules}
         </Box>
-      )}
-
-      <PromotionRulesCard
-        metrics={metrics}
-        isLoading={promotionMetricsQuery.isLoading}
-        isError={promotionMetricsQuery.isError}
-        error={promotionMetricsQuery.error}
-      />
-    </Stack>
+      </Box>
+      <Box
+        sx={{
+          display: { xs: 'none', lg: 'block' },
+          width: 380,
+          flexShrink: 0,
+          position: 'sticky',
+          top: 0,
+          alignSelf: 'flex-start',
+          maxHeight: '100vh',
+          overflowY: 'auto',
+          borderLeft: 1,
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+          p: 2,
+        }}
+      >
+        {rules}
+      </Box>
+    </Box>
   );
 }
 
@@ -419,12 +462,12 @@ function PromotionRulesCard({
   );
 
   return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
+    <Box>
       <Typography variant="subtitle2" gutterBottom>
-        Promotion rules (REFDATA.PROMOTION_METRIC)
+        Promotion rules
       </Typography>
-      <Typography variant="caption" color="text.secondary">
-        Lower priority number = evaluated first. HARD gates must all pass; SOFT metrics break ties in order.
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+        HARD gates must all pass; SOFT metrics break ties in priority order.
       </Typography>
 
       {isLoading && (
@@ -443,53 +486,45 @@ function PromotionRulesCard({
         </Alert>
       )}
       {!isLoading && !isError && sorted.length > 0 && (
-        <TableContainer sx={{ mt: 1.5 }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell align="right">Priority</TableCell>
-                <TableCell>Type</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>Display name</TableCell>
-                <TableCell>Metric key</TableCell>
-                <TableCell>Direction</TableCell>
-                <TableCell align="right">Threshold</TableCell>
-                <TableCell>Description</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sorted.map((m) => (
-                <TableRow key={m.promotion_metric_id}>
-                  <TableCell align="right" sx={{ fontFamily: 'monospace' }}>{m.priority}</TableCell>
-                  <TableCell>
-                    <Chip
-                      size="small"
-                      label={m.requirement_type}
-                      color={m.requirement_type === 'HARD' ? 'error' : 'primary'}
-                      variant="outlined"
-                      sx={{ height: 20, fontSize: '0.65rem' }}
-                    />
-                  </TableCell>
-                  <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{m.name}</TableCell>
-                  <TableCell>{m.display_name}</TableCell>
-                  <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{m.metric_key}</TableCell>
-                  <TableCell sx={{ fontSize: '0.8rem' }}>
-                    {m.direction === 'lower_is_better' ? 'Lower is better' : 'Higher is better'}
-                  </TableCell>
-                  <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
-                    {m.threshold != null ? formatMetric(m.threshold) : '—'}
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="caption" color="text.secondary">
-                      {m.description ?? '—'}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <Stack spacing={1}>
+          {sorted.map((m) => (
+            <Box
+              key={m.promotion_metric_id}
+              sx={{
+                p: 1.25,
+                borderRadius: 1,
+                border: 1,
+                borderColor: 'divider',
+              }}
+            >
+              <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mb: 0.5 }}>
+                <Chip
+                  size="small"
+                  label={m.requirement_type}
+                  color={m.requirement_type === 'HARD' ? 'error' : 'primary'}
+                  variant="outlined"
+                  sx={{ height: 20, fontSize: '0.65rem' }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                  #{m.priority}
+                </Typography>
+              </Stack>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {m.display_name}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                {m.direction === 'lower_is_better' ? 'Lower is better' : 'Higher is better'}
+                {m.threshold != null ? ` · threshold ${formatMetric(m.threshold)}` : ''}
+              </Typography>
+              {m.description && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                  {m.description}
+                </Typography>
+              )}
+            </Box>
+          ))}
+        </Stack>
       )}
-    </Paper>
+    </Box>
   );
 }

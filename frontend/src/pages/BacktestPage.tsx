@@ -259,7 +259,7 @@ export default function BacktestPage() {
         isRunning={enqueue.isPending}
       />
 
-      <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
+      <Box sx={{ maxWidth: pageTab === 2 ? 'none' : 1200, mx: pageTab === 2 ? 0 : 'auto', p: pageTab === 2 ? 0 : 3 }}>
         {pageTab === 1 && <JobsTable onView={handleViewJob} onCloneEdit={handleCloneEdit} />}
         {pageTab === 2 && <PromotionTab onReBacktest={handleReBacktest} />}
         {pageTab === 0 && (
