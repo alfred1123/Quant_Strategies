@@ -1,9 +1,9 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Chip,
   CircularProgress, Divider, Paper, Stack, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Typography,
+  TableContainer, TableHead, TableRow, Typography, useMediaQuery,
 } from '@mui/material';
 import { usePromotions } from '../api/promotion';
 import { usePromotionMetrics, usePromotionStates } from '../api/refdata';
@@ -76,27 +76,24 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
     [rows, selectedId],
   );
 
-  const rulesPanel = (
-    <PromotionRulesCard
-      metrics={metrics}
-      isLoading={promotionMetricsQuery.isLoading}
-      isError={promotionMetricsQuery.isError}
-      error={promotionMetricsQuery.error}
-    />
-  );
-
   if (promotions.isLoading) {
     return (
-      <PromotionLayout rules={rulesPanel}>
+      <Box sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
           <CircularProgress />
         </Box>
-      </PromotionLayout>
+        <PromotionRulesFlyout
+          metrics={metrics}
+          isLoading={promotionMetricsQuery.isLoading}
+          isError={promotionMetricsQuery.isError}
+          error={promotionMetricsQuery.error}
+        />
+      </Box>
     );
   }
 
   return (
-    <PromotionLayout rules={rulesPanel}>
+    <Box sx={{ p: 3 }}>
       <Stack spacing={3}>
         <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>Promotion</Typography>
@@ -149,43 +146,13 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
           </Box>
         )}
       </Stack>
-    </PromotionLayout>
-  );
-}
 
-function PromotionLayout({
-  children,
-  rules,
-}: {
-  children: ReactNode;
-  rules: ReactNode;
-}) {
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
-      <Box sx={{ flex: 1, minWidth: 0, p: 3 }}>
-        {children}
-        <Box sx={{ display: { xs: 'block', lg: 'none' }, mt: 3 }}>
-          {rules}
-        </Box>
-      </Box>
-      <Box
-        sx={{
-          display: { xs: 'none', lg: 'block' },
-          width: 380,
-          flexShrink: 0,
-          position: 'sticky',
-          top: 0,
-          alignSelf: 'flex-start',
-          maxHeight: '100vh',
-          overflowY: 'auto',
-          borderLeft: 1,
-          borderColor: 'divider',
-          bgcolor: 'background.paper',
-          p: 2,
-        }}
-      >
-        {rules}
-      </Box>
+      <PromotionRulesFlyout
+        metrics={metrics}
+        isLoading={promotionMetricsQuery.isLoading}
+        isError={promotionMetricsQuery.isError}
+        error={promotionMetricsQuery.error}
+      />
     </Box>
   );
 }
@@ -440,7 +407,7 @@ function ComparisonPanel({
   );
 }
 
-function PromotionRulesCard({
+function PromotionRulesFlyout({
   metrics,
   isLoading,
   isError,
@@ -451,6 +418,8 @@ function PromotionRulesCard({
   isError: boolean;
   error: unknown;
 }) {
+  const [open, setOpen] = useState(false);
+  const hoverCapable = useMediaQuery('(hover: hover) and (pointer: fine)');
   const sorted = useMemo(
     () => [...metrics].sort((a, b) => {
       const typeOrder = a.requirement_type === b.requirement_type
@@ -461,70 +430,174 @@ function PromotionRulesCard({
     [metrics],
   );
 
-  return (
-    <Box>
-      <Typography variant="subtitle2" gutterBottom>
-        Promotion rules
-      </Typography>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-        HARD gates must all pass; SOFT metrics break ties in priority order.
-      </Typography>
+  const hardCount = sorted.filter((m) => m.requirement_type === 'HARD').length;
 
-      {isLoading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-          <CircularProgress size={24} />
+  return (
+    <Box
+      sx={{
+        position: 'fixed',
+        right: 0,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        zIndex: (theme) => theme.zIndex.drawer + 1,
+        display: 'flex',
+        flexDirection: 'row-reverse',
+        alignItems: 'stretch',
+      }}
+      onMouseEnter={hoverCapable ? () => setOpen(true) : undefined}
+      onMouseLeave={hoverCapable ? () => setOpen(false) : undefined}
+    >
+      {/* Right-edge tab — always visible */}
+      <Box
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        aria-label="Promotion rules"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setOpen((v) => !v);
+          }
+          if (e.key === 'Escape') setOpen(false);
+        }}
+        onClick={hoverCapable ? undefined : () => setOpen((v) => !v)}
+        sx={{
+          width: 40,
+          minHeight: 120,
+          bgcolor: open ? 'primary.main' : 'background.paper',
+          color: open ? 'primary.contrastText' : 'text.primary',
+          border: 1,
+          borderRight: 0,
+          borderColor: open ? 'primary.main' : 'divider',
+          borderRadius: '10px 0 0 10px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 0.5,
+          cursor: 'pointer',
+          boxShadow: 3,
+          py: 2,
+          transition: 'background-color 0.15s ease',
+          userSelect: 'none',
+        }}
+      >
+        <Typography
+          sx={{
+            writingMode: 'vertical-rl',
+            transform: 'rotate(180deg)',
+            fontWeight: 700,
+            fontSize: '0.72rem',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Rules
+        </Typography>
+        {sorted.length > 0 && (
+          <Typography variant="caption" sx={{ fontSize: '0.65rem', opacity: 0.9 }}>
+            {sorted.length}
+          </Typography>
+        )}
+      </Box>
+
+      {/* Flyout — opens on hover / click; closes on mouse leave */}
+      <Paper
+        elevation={8}
+        sx={{
+          width: open ? { xs: 'calc(100vw - 48px)', md: 'min(860px, 58vw)' } : 0,
+          opacity: open ? 1 : 0,
+          overflow: 'hidden',
+          transition: 'width 0.22s ease, opacity 0.18s ease',
+          borderRadius: '10px 0 0 10px',
+          borderRight: 0,
+          maxHeight: '88vh',
+          display: 'flex',
+          flexDirection: 'column',
+          pointerEvents: open ? 'auto' : 'none',
+        }}
+      >
+        <Box sx={{ p: 2, pb: 1, flexShrink: 0 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Promotion rules
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            HARD gates must all pass ({hardCount}); SOFT metrics break ties in priority order.
+          </Typography>
         </Box>
-      )}
-      {isError && (
-        <Alert severity="error" sx={{ mt: 1 }}>
-          Failed to load promotion rules: {(error as Error)?.message ?? 'unknown error'}
-        </Alert>
-      )}
-      {!isLoading && !isError && sorted.length === 0 && (
-        <Alert severity="warning" sx={{ mt: 1 }}>
-          No rows in REFDATA.PROMOTION_METRIC — refresh refdata or check the database seed.
-        </Alert>
-      )}
-      {!isLoading && !isError && sorted.length > 0 && (
-        <Stack spacing={1}>
-          {sorted.map((m) => (
-            <Box
-              key={m.promotion_metric_id}
-              sx={{
-                p: 1.25,
-                borderRadius: 1,
-                border: 1,
-                borderColor: 'divider',
-              }}
-            >
-              <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mb: 0.5 }}>
-                <Chip
-                  size="small"
-                  label={m.requirement_type}
-                  color={m.requirement_type === 'HARD' ? 'error' : 'primary'}
-                  variant="outlined"
-                  sx={{ height: 20, fontSize: '0.65rem' }}
-                />
-                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                  #{m.priority}
-                </Typography>
-              </Stack>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {m.display_name}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                {m.direction === 'lower_is_better' ? 'Lower is better' : 'Higher is better'}
-                {m.threshold != null ? ` · threshold ${formatMetric(m.threshold)}` : ''}
-              </Typography>
-              {m.description && (
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                  {m.description}
-                </Typography>
-              )}
+
+        <Box sx={{ flex: 1, overflow: 'auto', px: 2, pb: 2 }}>
+          {isLoading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress size={28} />
             </Box>
-          ))}
-        </Stack>
-      )}
+          )}
+          {isError && (
+            <Alert severity="error">
+              Failed to load promotion rules: {(error as Error)?.message ?? 'unknown error'}
+            </Alert>
+          )}
+          {!isLoading && !isError && sorted.length === 0 && (
+            <Alert severity="warning">
+              No rows in REFDATA.PROMOTION_METRIC — refresh refdata or check the database seed.
+            </Alert>
+          )}
+          {!isLoading && !isError && sorted.length > 0 && (
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell align="right">Priority</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Display name</TableCell>
+                    <TableCell>Metric key</TableCell>
+                    <TableCell>Direction</TableCell>
+                    <TableCell align="right">Threshold</TableCell>
+                    <TableCell>Description</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sorted.map((m) => (
+                    <TableRow key={m.promotion_metric_id} hover>
+                      <TableCell align="right" sx={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                        {m.priority}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          label={m.requirement_type}
+                          color={m.requirement_type === 'HARD' ? 'error' : 'primary'}
+                          variant="outlined"
+                          sx={{ height: 22, fontSize: '0.7rem' }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                        {m.name}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{m.display_name}</TableCell>
+                      <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                        {m.metric_key}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        {m.direction === 'lower_is_better' ? 'Lower is better' : 'Higher is better'}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                        {m.threshold != null ? formatMetric(m.threshold) : '—'}
+                      </TableCell>
+                      <TableCell sx={{ minWidth: 200 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          {m.description ?? '—'}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Box>
+      </Paper>
     </Box>
   );
 }
