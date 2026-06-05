@@ -486,3 +486,12 @@ jobs:
 
           echo "Timed out after $MAX_ATTEMPTS polls — deploy may still be running on EC2"
           exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Verify HTTPS (Cloudflare)
+        if: vars.DOMAIN != ''
+        env:
+          DOMAIN: ${{ vars.DOMAIN }}
+          AWS_REGION: ap-southeast-1
+        run: bash aws/scripts/verify-https.sh
