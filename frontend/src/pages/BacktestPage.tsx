@@ -13,6 +13,7 @@ import HeatmapChart from '../components/HeatmapChart';
 import EquityCurveChart from '../components/EquityCurveChart';
 import UserMenu from '../components/UserMenu';
 import AppModeSwitch from '../components/AppModeSwitch';
+import { APP_NAME } from '../constants/brand';
 import { runPerformance } from '../api/backtest';
 import { fetchJob, useEnqueueJob } from '../api/jobs';
 import { useMe } from '../api/auth';
@@ -230,7 +231,7 @@ export default function BacktestPage() {
       <AppBar position="static" elevation={0} sx={{ bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider' }}>
         <Toolbar sx={{ gap: 2 }}>
           <Typography variant="h6" color="text.primary" sx={{ fontWeight: 700, mr: 1 }}>
-            Quant Strategies
+            {APP_NAME}
           </Typography>
           <AppModeSwitch mode="backtest" />
           <Box sx={{ flexGrow: 1 }} />

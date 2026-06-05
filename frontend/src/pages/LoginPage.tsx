@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLogin } from '../api/auth';
+import { APP_NAME } from '../constants/brand';
 
 // =====================================================
 // NEW: Service status type
@@ -175,7 +176,7 @@ export default function LoginPage() {
       <Card sx={{ width: '100%', maxWidth: 400 }} variant="outlined">
         <CardContent>
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-            Quant Strategies
+            {APP_NAME}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Sign in to continue

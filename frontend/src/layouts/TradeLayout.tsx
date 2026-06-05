@@ -12,6 +12,7 @@ import {
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import UserMenu from '../components/UserMenu';
 import AppModeSwitch from '../components/AppModeSwitch';
+import { APP_NAME } from '../constants/brand';
 import TradeNavBar from '../components/trade/TradeNavBar';
 import { useMe } from '../api/auth';
 import { TradeSessionProvider } from '../trade/TradeSessionContext';
@@ -38,7 +39,7 @@ export default function TradeLayout() {
         >
           <Toolbar sx={{ gap: 2 }}>
             <Typography variant="h6" color="text.primary" sx={{ fontWeight: 700, mr: 1 }}>
-              Quant Strategies
+              {APP_NAME}
             </Typography>
             <AppModeSwitch mode="trade" />
             <Box sx={{ flexGrow: 1 }} />

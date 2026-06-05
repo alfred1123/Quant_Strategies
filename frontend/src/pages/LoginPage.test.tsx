@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import LoginPage from './LoginPage';
+import { APP_NAME } from '../constants/brand';
 import { renderWithProviders } from '../test/wrapper';
 
 vi.mock('../api/auth', async () => {
@@ -20,7 +21,7 @@ beforeEach(() => vi.clearAllMocks());
 describe('LoginPage', () => {
   it('renders the sign-in form', () => {
     renderWithProviders(<LoginPage />);
-    expect(screen.getByText('Quant Strategies')).toBeInTheDocument();
+    expect(screen.getByText(APP_NAME)).toBeInTheDocument();
     expect(screen.getByText('Sign in to continue')).toBeInTheDocument();
     expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
