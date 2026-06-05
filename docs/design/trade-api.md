@@ -1,7 +1,7 @@
 # Design Doc: Strategy JSON → Trade API
 
 !!! info "Status"
-    **Partially implemented (Phase 1.2).** Deployment persistence and `GET`/`POST /api/v1/trade/deployments` are live. Credentials API, broker adapters, dry-run, and execution-log writes are still planned. A `FutuTrader` utility exists in `quant/trade/futu_trader.py` (see [Paper Trading guide](../guides/trading.md)).
+    **Partially implemented.** Live today: deployment persistence (`GET`/`POST /api/v1/trade/deployments`), credentials CRUD (`/api/v1/credentials`), Trade UI shell (1.4–1.5), Promotion tab with Deploy → Trade navigation. **Next:** strategy picker (1.6), dry-run + apply (1.7), execution log (1.8) — see [Trade Deployment Rollout](trade-deployment-rollout.md). A `FutuTrader` utility exists in `quant/trade/futu_trader.py` ([Paper Trading guide](../guides/trading.md)).
 
 !!! warning "Schema accuracy"
     §7 (DB Schema) is the **reference** for table DDL. The JSON examples in §1.2 and the pseudocode in §6 are **aspirational** — they show the target design, not what is implemented today. Always cross-check against the Liquibase DDL in `db/liquidbase/trade/tables/`.
@@ -181,7 +181,7 @@ Endpoints use JWT auth (`require_user`); the user's `app_user_id` scopes all dat
     |----|-------|
     | New `quant/api/strategies/` module + `GET /api/v1/strategies` | Put list logic in `quant/strategy/backtest_service.py` (execution only) |
     | New `StrategyPicker` + `useStrategies()` on Trade Apply | Reuse Backtest `ConfigDrawer` / `FactorCard` (REFDATA signal-type builder) |
-    | Read `BT.STRATEGY` via **`BT.SP_GET_STRATEGY`** (list: `IN_USER_ID`; get-one: `IN_STRATEGY_ID`) | Nest under `/api/v1/trade/` — strategies are a BT artifact used by queue and trade |
+    | Read `BT.STRATEGY` via **`BT.SP_LIST_STRATEGIES`** (new read-only SP — see [Trade Deployment Rollout](trade-deployment-rollout.md)) | Nest under `/api/v1/trade/` — strategies are a BT artifact used by queue and trade |
 
 **Phase 1.6 — implement now:**
 

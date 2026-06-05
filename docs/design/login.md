@@ -57,7 +57,7 @@ Before public hosting (Tier 1 in the deployment ladder), the app must require a 
 - `quant/shared/config.py` already has SSM/.env loader — JWT signing key fits there.
 - Audit columns (`USER_ID TEXT`) exist on every table per `AGENTS.md`. Today they receive `"alfcheun"`. We just need to plumb a real value.
 - All writes go through SPs (no direct DML). **Login itself reads a user table — `SELECT` is allowed directly per project conventions.** User provisioning runs as Liquibase changesets — that is the documented exception to the no-direct-DML rule.
-- HTTPS is mandatory for cookie-based auth. Tier 1 deployment already plans nginx + Let's Encrypt; this doc assumes that's in place.
+- HTTPS is mandatory for cookie-based auth. Production terminates TLS via a [Cloudflare Origin Certificate at nginx](../guides/https-cloudflare.md) (Let's Encrypt is the grey-cloud fallback); this doc assumes HTTPS is in place.
 - **Uvicorn must bind to `127.0.0.1` only** — never `0.0.0.0` — so cleartext credentials never travel outside the box without TLS.
 - **All table writes go through stored procedures.** The application DB role is granted `EXECUTE` on procedures and `SELECT` on tables — never `INSERT/UPDATE/DELETE` directly. This removes a class of compromise paths (SQL injection, leaked app credentials, future RBAC errors) and lets schema evolve without re-grant work.
 

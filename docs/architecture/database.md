@@ -122,8 +122,9 @@ See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11--user-secrets) a
 
 | Procedure | Status | Purpose |
 |-----------|--------|---------|
-| `SP_GET_STRATEGY` | **extended** | **Get-one:** `IN_STRATEGY_ID` + optional `IN_STRATEGY_VID`; optional `IN_USER_ID` for ownership; `IN_IS_BEST_IND='Y'` fetches best VID. **List:** `IN_STRATEGY_ID` NULL + **`IN_USER_ID` required** → current strategies for owner (`TRANSACT_TO_TS = 9999-12-31`), `IN_LIMIT` default 50. |
-| `SP_UPD_PROMOTE_STRATEGY` | **new** | Demote current best + promote target VID. `IN_STRATEGY_VID = NULL` = demote-only. |
+| `SP_GET_STRATEGY` | **live** | **Get-one only:** `IN_STRATEGY_ID` required; optional `IN_STRATEGY_VID`; `IN_IS_BEST_IND='Y'` fetches best VID; else active row (`TRANSACT_TO_TS = 9999-12-31`). |
+| `SP_LIST_STRATEGIES` | **planned (1.6)** | **List catalog** for Trade picker — new SP to avoid queue-era signature churn on `SP_GET_STRATEGY`. See [Trade Deployment Rollout](../design/trade-deployment-rollout.md). |
+| `SP_UPD_PROMOTE_STRATEGY` | **live** | Demote current best + promote target VID. `IN_STRATEGY_VID = NULL` = demote-only. |
 
 Persisted strategies (`BT.STRATEGY`) are created when backtest jobs complete — distinct from REFDATA `SIGNAL_TYPE`. Jobs store owner as `USER_ID = str(app_user_id)` (UUID text).
 

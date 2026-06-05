@@ -18,12 +18,12 @@ See [System Overview](overview.md) for runtime topologies.
 | `QUANTDB_PASSWORD` | shared DB password | same | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | `APP_ENV` | `dev` (default) | `prod` | `docker-compose.prod.yml` |
 | `USE_SSM` | `1` (default) | `1` | `docker-compose.yml` (default for both) |
-| `COOKIE_SECURE` | unset (defaults to `APP_ENV == prod`) | `0` (HTTP) / `1` (HTTPS) | `docker-compose.prod.yml` / `docker-compose.tls.yml` |
+| `COOKIE_SECURE` | unset (defaults to `APP_ENV == prod`) | `0` (HTTP) / `1` (HTTPS) | `docker-compose.prod.yml` / `docker-compose.cloudflare.yml` |
 | `CORS_ORIGINS` | SSM `/quant/dev/` or `.env` (no in-code default) | SSM `/quant/prod/` (public site URL(s)) | SSM / `.env` |
 | `JWT_SECRET` | shared dev secret from SSM | fixed value from SSM | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | `EXCHANGE_SECRETS_KEY` | dev SSM or auto-generated ephemeral | **required** — Fernet for credentials | SSM `/quant/prod/EXCHANGE_SECRETS_KEY` |
 | DB access method | SSM port-forward tunnel | Direct VPC connection | Network topology |
-| Nginx config | `nginx.dev.conf` (HTTP only) | Same (HTTP) or `nginx.conf` (TLS via `docker-compose.tls.yml`) | `docker/nginx/` |
+| Nginx config | `nginx.dev.conf` (HTTP only) | `nginx.cloudflare.conf` (Cloudflare Origin TLS via `docker-compose.cloudflare.yml`); `nginx.conf` for Let's Encrypt via `docker-compose.tls.yml` | `docker/nginx/` |
 | Swagger UI | enabled (`/docs`) | disabled | `quant/api/main.py` checks `APP_ENV` |
 | Logging | stdout, plus file (`log/bt_app.log`) when running locally **without** `USE_SSM=1` | stdout only | `quant/shared/logging.py` `setup_logging()` |
 

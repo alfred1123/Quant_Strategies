@@ -41,7 +41,10 @@ See [System Overview](overview.md) for runtime topology and [Dev vs Prod](dev-vs
 
 SSM Parameter Store supplies secrets (`JWT_SECRET`, `EXCHANGE_SECRETS_KEY`, DB credentials) at app startup.
 
-The base `docker-compose.yml` exposes nginx on **:80** (HTTP, using `nginx.dev.conf`). Adding `docker-compose.tls.yml` on top swaps in `nginx.conf` and adds **:443** (HTTPS with Let's Encrypt).
+The base `docker-compose.yml` exposes nginx on **:80** (HTTP, using `nginx.dev.conf`). For HTTPS there are two overlays:
+
+- **`docker-compose.cloudflare.yml`** — production default. Site sits behind Cloudflare (orange cloud) with a **Cloudflare Origin Certificate** terminating TLS at nginx (`nginx.cloudflare.conf`, `:443`). Wired automatically by the deploy pipeline when the `DOMAIN` GitHub variable and `/quant/prod/ORIGIN_TLS_CERT` + `ORIGIN_TLS_KEY` SSM params are present. See [HTTPS via Cloudflare](../guides/https-cloudflare.md).
+- **`docker-compose.tls.yml`** — alternative for a DNS-only (grey cloud) / no-CDN setup. Swaps in `nginx.conf` and adds **:443** with Let's Encrypt (certbot).
 
 ---
 
@@ -177,6 +180,9 @@ All app secrets live under `/quant/<env>/` in SSM Parameter Store.
 | `QUANTDB_PASSWORD` | SecureString | DB admin password |
 | `JWT_SECRET` | SecureString | `openssl rand -base64 32` |
 | `EXCHANGE_SECRETS_KEY` | SecureString | Fernet key for `CORE_ADMIN.API_CREDENTIAL` — **required in prod** (`CredentialCrypto` fail-fast at API boot) |
+| `ORIGIN_TLS_CERT` | SecureString | Cloudflare Origin Certificate (PEM) — written to `secrets/origin.pem` by the deploy job when `DOMAIN` is set |
+| `ORIGIN_TLS_KEY` | SecureString | Cloudflare Origin private key (PEM) — written to `secrets/origin-key.pem`; enables the `docker-compose.cloudflare.yml` overlay |
+| `CLOUDFLARE_API_TOKEN` | SecureString | Zone → DNS → Edit token for `aws/scripts/cloudflare-dns.sh` (DNS record management) |
 | `CORS_ORIGINS` | String | `https://yourdomain.com` |
 | `FUTU_HOST` | String | `127.0.0.1` |
 | `FUTU_PORT` | String | `11111` |
@@ -250,6 +256,7 @@ No SSH keys needed — deploy uses SSM Run Command (same IAM role the EC2 alread
 | Variable | Value |
 |----------|-------|
 | `EC2_INSTANCE_ID` | *(optional fallback)* | Prefer CFN `quant-compute` → `InstanceId` output (current: `i-026d3c6d323144663`) |
+| `DOMAIN` | Public domain (e.g. `algodaemon.com`). When set, the deploy job fetches `ORIGIN_TLS_CERT`/`ORIGIN_TLS_KEY` from SSM and merges `docker-compose.cloudflare.yml` for HTTPS. Unset → HTTP-only. |
 
 **Environment**: Create a `production` environment (repo → Settings → Environments) for deploy approvals (optional).
 
