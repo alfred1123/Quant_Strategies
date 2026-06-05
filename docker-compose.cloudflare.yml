@@ -1,0 +1,33 @@
+# Cloudflare TLS overlay — HTTPS at the origin via a Cloudflare Origin
+# Certificate (orange cloud, SSL/TLS mode = Full (strict)).
+#
+# Unlike docker-compose.tls.yml (Let's Encrypt + certbot), this overlay
+# mounts a long-lived Cloudflare Origin cert/key — no certbot, no ACME.
+#
+# The deploy pipeline fetches the cert/key from SSM
+# (/quant/prod/ORIGIN_TLS_CERT, /quant/prod/ORIGIN_TLS_KEY) and writes
+# them to ./secrets/ before bringing the stack up. Layer on top of
+# base + prod:
+#   export DOMAIN=algodaemon.com
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.cloudflare.yml up -d
+
+services:
+  api:
+    environment:
+      - COOKIE_SECURE=1
+
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:?Set DOMAIN for Cloudflare TLS}
+    volumes:
+      - ./docker/nginx/nginx.cloudflare.conf:/etc/nginx/templates/nginx.conf.template:ro
+      - ./secrets/origin.pem:/etc/nginx/ssl/origin.pem:ro
+      - ./secrets/origin-key.pem:/etc/nginx/ssl/origin-key.pem:ro
+    command: >
+      /bin/sh -c "
+        envsubst '$$DOMAIN' < /etc/nginx/templates/nginx.conf.template > /etc/nginx/nginx.conf &&
+        nginx -g 'daemon off;'
+      "

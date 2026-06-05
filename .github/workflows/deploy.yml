@@ -53,6 +53,7 @@ jobs:
               - 'docker-compose.yml'
               - 'docker-compose.prod.yml'
               - 'docker-compose.tls.yml'
+              - 'docker-compose.cloudflare.yml'
 
       - name: Set deploy flags
         id: flags
@@ -364,6 +365,23 @@ jobs:
               "ECR_REGISTRY=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com",
               "IMAGE_TAG=${{ github.sha }}",
               "COMPOSE=\"docker compose -f docker-compose.yml -f docker-compose.prod.yml\"",
+              "DOMAIN=\"${{ vars.DOMAIN }}\"",
+              "export DOMAIN",
+              "if [ -n \"$DOMAIN\" ]; then",
+              "  echo \"── TLS ── fetching Cloudflare origin cert for $DOMAIN\"",
+              "  mkdir -p /opt/quant/secrets",
+              "  if aws ssm get-parameter --name /quant/prod/ORIGIN_TLS_CERT --with-decryption --region ap-southeast-1 --query Parameter.Value --output text > /opt/quant/secrets/origin.pem 2>/dev/null && aws ssm get-parameter --name /quant/prod/ORIGIN_TLS_KEY --with-decryption --region ap-southeast-1 --query Parameter.Value --output text > /opt/quant/secrets/origin-key.pem 2>/dev/null && [ -s /opt/quant/secrets/origin.pem ] && [ -s /opt/quant/secrets/origin-key.pem ]; then",
+              "    chmod 600 /opt/quant/secrets/origin-key.pem",
+              "    chmod 644 /opt/quant/secrets/origin.pem",
+              "    COMPOSE=\"$COMPOSE -f docker-compose.cloudflare.yml\"",
+              "    echo \"TLS overlay enabled (Cloudflare origin cert)\"",
+              "  else",
+              "    echo \"::warning::DOMAIN set but origin cert/key missing in SSM — staying HTTP-only\"",
+              "    rm -f /opt/quant/secrets/origin.pem /opt/quant/secrets/origin-key.pem",
+              "  fi",
+              "else",
+              "  echo \"DOMAIN not set — HTTP-only deploy\"",
+              "fi",
               "ecr_digest() { aws ecr describe-images --repository-name \"$1\" --image-ids imageTag=\"$2\" --region ap-southeast-1 --query imageDetails[0].imageDigest --output text 2>/dev/null || true; }",
               "local_digest() { docker image inspect --format=\"{{index .RepoDigests 0}}\" \"$1\" 2>/dev/null | sed \"s/.*@//\" || true; }",
               "image_unchanged() { repo=\"$1\"; tag=\"$2\"; img=\"${ECR_REGISTRY}/${repo}:${tag}\"; remote=\"$(ecr_digest \"$repo\" \"$tag\")\"; local=\"$(local_digest \"$img\")\"; [ -n \"$remote\" ] && [ \"$remote\" != \"None\" ] && [ \"$remote\" = \"$local\" ]; }",
