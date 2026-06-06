@@ -16,10 +16,10 @@ import { runPerformance } from '../api/backtest';
 import { fetchJob, useEnqueueJob } from '../api/jobs';
 import { useMe } from '../api/auth';
 import type {
-  BacktestConfig, OptimizeResponse, PerformanceResponse, Top10Row,
+  BacktestConfig, OptimizeRequest, OptimizeResponse, PerformanceResponse, Top10Row,
   WalkForwardResponse, OptimizeProgress,
 } from '../types/backtest';
-import { effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest } from '../utils/requestBuilders';
+import { effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest, parseOptimizeRequest } from '../utils/requestBuilders';
 import { overfitColor, overfitLabel, formatMetric, rowLabel } from '../utils/format';
 import { firstValidationError } from '../utils/validate';
 
@@ -147,6 +147,14 @@ export default function BacktestPage() {
     }
   };
 
+  const handleCloneEdit = (configJson: OptimizeRequest, name: string) => {
+    const parsed = parseOptimizeRequest(configJson);
+    // Use the new name with " (copy)" suffix for clarity
+    setConfig({ ...DEFAULT_CONFIG, ...parsed });
+    setDrawerOpen(true);
+    setPageTab(0);
+  };
+
   const handleRun = async () => {
     const validationError = firstValidationError(config);
     if (validationError) {
@@ -233,7 +241,7 @@ export default function BacktestPage() {
       />
 
       <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
-        {pageTab === 1 && <JobsTable onView={handleViewJob} />}
+        {pageTab === 1 && <JobsTable onView={handleViewJob} onCloneEdit={handleCloneEdit} />}
         {pageTab === 0 && (
           <>
         {/* Running state */}

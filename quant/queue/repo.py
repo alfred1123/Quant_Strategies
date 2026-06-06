@@ -138,17 +138,25 @@ class BtQueueRepo(DbGateway):
         return int(rows[0]["n"]) if rows else 0
 
     def list_for_user(self, user_id: str, limit: int = 50) -> list[dict]:
-        """Active rows for one user with ``STRATEGY_NM`` join (not in SP_GET_QUEUE)."""
+        """Active rows for one user with ``STRATEGY_NM`` + ``CONFIG_JSON`` + result sharpe join."""
         return self._query(
             "SELECT q.QUEUE_ID, q.QUEUE_VID, q.STRATEGY_ID, q.STRATEGY_VID,"
-            "       s.STRATEGY_NM,"
+            "       s.STRATEGY_NM, s.CONFIG_JSON,"
             "       q.QUEUE_STATUS_ID,"
             "       (SELECT NAME FROM REFDATA.QUEUE_STATUS"
             "         WHERE QUEUE_STATUS_ID = q.QUEUE_STATUS_ID) AS QUEUE_STATUS,"
-            "       q.PRIORITY, q.USER_ID, q.TRANSACT_FROM_TS, q.ERROR_TEXT"
+            "       q.PRIORITY, q.USER_ID, q.TRANSACT_FROM_TS, q.ERROR_TEXT,"
+            "       r.BEST_SHARPE, r.TOTAL_TRIALS"
             "  FROM BT.QUEUE q"
             "  LEFT JOIN BT.STRATEGY s ON s.STRATEGY_ID = q.STRATEGY_ID"
             "                         AND s.STRATEGY_VID = q.STRATEGY_VID"
+            "  LEFT JOIN LATERAL ("
+            "    SELECT (PAYLOAD_JSON->'best'->>'sharpe')::NUMERIC AS BEST_SHARPE,"
+            "           (PAYLOAD_JSON->>'total_trials')::INTEGER AS TOTAL_TRIALS"
+            "      FROM BT.RESULT"
+            "     WHERE QUEUE_ID = q.QUEUE_ID"
+            "     ORDER BY CREATED_AT DESC LIMIT 1"
+            "  ) r ON TRUE"
             " WHERE q.TRANSACT_TO_TS = %s::timestamptz"
             "   AND q.USER_ID = %s"
             " ORDER BY q.PRIORITY ASC, q.TRANSACT_FROM_TS ASC"
@@ -213,3 +221,20 @@ class BtQueueRepo(DbGateway):
             (str(queue_id),),
         )
         return rows[0] if rows else None
+
+    def soft_delete(self, queue_id: uuid.UUID | str) -> None:
+        """Soft-delete a job by closing its active row (set TRANSACT_TO_TS = now()).
+
+        This hides the job from user queries without losing audit history.
+        """
+        def work(cur):
+            cur.execute(
+                "UPDATE BT.QUEUE SET TRANSACT_TO_TS = NOW()"
+                " WHERE QUEUE_ID = %s::uuid AND TRANSACT_TO_TS = %s::timestamptz",
+                (str(queue_id), ACTIVE_TS),
+            )
+            return cur.rowcount
+
+        count, held = self._run(work)
+        if held is not None:
+            held.commit()

@@ -44,9 +44,12 @@ def _load_from_ssm(env: str) -> None:
 
 def _load_from_dotenv() -> None:
     """Load .env from project root (no-op if file is absent)."""
+    from pathlib import Path
     from dotenv import load_dotenv
-    load_dotenv()
-    logger.debug("Loaded config from .env")
+    project_root = Path(__file__).resolve().parent.parent.parent
+    dotenv_path = project_root / ".env"
+    load_dotenv(dotenv_path)
+    logger.debug("Loaded config from %s", dotenv_path)
 
 
 def _ensure_connect_timeout(conninfo: str, *, seconds: int) -> str:

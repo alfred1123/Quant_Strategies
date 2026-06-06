@@ -33,19 +33,22 @@ class EnqueueResponse(BaseModel):
 
 
 class JobRow(BaseModel):
-    """One active or terminal BT.QUEUE row, joined to status name + strategy name."""
+    """One active or terminal BT.QUEUE row, joined to status name + strategy name + config."""
 
     queue_id: UUID
     queue_vid: int
     strategy_id: UUID
     strategy_vid: int
     strategy_nm: str | None = None
+    config_json: dict[str, Any] | None = None
     queue_status_id: int
     queue_status: str
     priority: int
     user_id: str
     transact_from_ts: datetime
     error_text: str | None = None
+    best_sharpe: float | None = None
+    total_trials: int | None = None
 
 
 class JobDetail(JobRow):

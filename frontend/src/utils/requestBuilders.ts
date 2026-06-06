@@ -6,6 +6,29 @@ export function effectiveSymbol(cfg: BacktestConfig): string {
 }
 
 /**
+ * Convert an OptimizeRequest (snake_case, from stored config_json) back to
+ * a BacktestConfig (camelCase, for form state). Used by "Use Config" to
+ * pre-fill the ConfigDrawer from a previous job.
+ */
+export function parseOptimizeRequest(req: OptimizeRequest): BacktestConfig {
+  return {
+    symbol: req.symbol,
+    vendorSymbol: '',
+    dataSource: req.data_source || '',
+    start: req.start,
+    end: req.end,
+    assetType: '',
+    tradingPeriod: req.trading_period,
+    feeBps: req.fee_bps,
+    refreshDataset: req.refresh_dataset ?? false,
+    conjunction: req.conjunction || 'AND',
+    factors: req.factors,
+    walkForward: req.walk_forward ?? false,
+    splitRatio: req.split_ratio ?? 0.5,
+  };
+}
+
+/**
  * Build an OptimizeRequest from form state.
  *
  * The backend always accepts the unified factor-list shape. A single

@@ -20,6 +20,7 @@ from quant.api.deps import get_data_caches
 from quant.api.schemas.jobs import EnqueueRequest, EnqueueResponse, JobDetail, JobRow
 from quant.api.services.jobs import (
     CancelNotAllowed,
+    DeleteNotAllowed,
     JobNotFound,
     JobsService,
     RateLimitError,
@@ -139,6 +140,28 @@ def reenqueue_job(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except RateLimitError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+
+
+# ── DELETE /jobs/{id} ────────────────────────────────────────────────────
+
+
+@router.delete("/{queue_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_job(
+    queue_id: UUID,
+    user: CurrentUser = Depends(require_user),
+    svc: JobsService = Depends(get_jobs_service),
+) -> None:
+    """Delete a job from the user's view.
+
+    Only terminal state jobs (COMPLETED, FAILED, CANCELLED) can be deleted.
+    Active jobs (QUEUED, RUNNING) must be cancelled first.
+    """
+    try:
+        svc.delete(str(user.app_user_id), queue_id)
+    except JobNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except DeleteNotAllowed as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 # ── GET /jobs/{id}/events (SSE) ─────────────────────────────────────────

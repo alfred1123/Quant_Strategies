@@ -14,12 +14,15 @@ export interface JobRow {
   strategy_id: string;
   strategy_vid: number;
   strategy_nm: string | null;
+  config_json: Record<string, unknown> | null;
   queue_status_id: number;
   queue_status: JobStatus;
   priority: number;
   user_id: string;
   transact_from_ts: string;
   error_text: string | null;
+  best_sharpe: number | null;
+  total_trials: number | null;
 }
 
 /** Single-job lookup — adds frozen config + completion payload. */

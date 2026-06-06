@@ -44,6 +44,10 @@ class ReenqueueNotAllowed(Exception):
     """Only FAILED / CANCELLED jobs may be re-enqueued — router maps to HTTP 409."""
 
 
+class DeleteNotAllowed(Exception):
+    """Only terminal state jobs (COMPLETED/FAILED/CANCELLED) may be deleted — router maps to HTTP 409."""
+
+
 class JobsService:
     """Business logic for /backtest/jobs — HTTP-agnostic."""
 
@@ -179,6 +183,28 @@ class JobsService:
 
         pos = self._repo.queued_position(new_queue_id, queued_id)
         return EnqueueResponse(queue_id=new_queue_id, queue_pos=pos)
+
+    # ── delete ───────────────────────────────────────────────────────────
+
+    def delete(self, user_id: str, queue_id: uuid.UUID) -> None:
+        """Soft-delete a job by closing its active row.
+
+        Only terminal states (COMPLETED, FAILED, CANCELLED) can be deleted.
+        QUEUED/RUNNING jobs must be cancelled first.
+        """
+        row = self._repo.get_active(queue_id, user_id=user_id)
+        if row is None:
+            raise JobNotFound(str(queue_id))
+
+        status = row["queue_status"]
+        terminal_states = {"COMPLETED", "FAILED", "CANCELLED"}
+        if status not in terminal_states:
+            raise DeleteNotAllowed(
+                f"job {queue_id} cannot be deleted from state {status!r} — cancel it first"
+            )
+
+        self._repo.soft_delete(queue_id)
+        logger.info("Deleted job %s (was %s)", queue_id, status)
 
     # ── SSE polling ─────────────────────────────────────────────────────
 

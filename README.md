@@ -26,6 +26,77 @@ cp .env.example .env       # then fill in QUANTDB_PASSWORD, etc.
 
 Open `http://localhost:5173`. Login, then configure and run backtests from the UI.
 
+---
+
+## Troubleshooting
+
+### Backend fails with "port 5432" instead of 5433
+
+**Symptom:** Backend log shows connection refused on port 5432, even though `.env` has port 5433.
+
+**Cause:** `QUANTDB_CONNINFO` in `.env` must be **quoted** because it contains spaces.
+
+**Fix:** Ensure your `.env` has quotes around the connection string:
+```bash
+# WRONG (spaces break the value when sourced by shell)
+QUANTDB_CONNINFO=host=localhost port=5433 dbname=quantdb user=quant_admin password=xxx sslmode=require
+
+# CORRECT
+QUANTDB_CONNINFO="host=localhost port=5433 dbname=quantdb user=quant_admin password=xxx sslmode=require"
+```
+
+### Backend fails with "Connection refused" on port 5433
+
+**Symptom:** Backend startup fails because DB is unreachable.
+
+**Cause:** The SSM tunnel isn't running or dropped (network timeout, AWS session expired, "broken pipe").
+
+**Fix:** Restart tunnel first, wait for DB, then start backend:
+```bash
+./scripts/appctl.sh dev kill
+./scripts/appctl.sh dev tunnel start   # Wait for "DB reachable on 127.0.0.1:5433"
+./scripts/appctl.sh dev start
+```
+
+### Dropdown options are empty (Indicator, Strategy, Asset Type)
+
+**Symptom:** UI loads but dropdown menus have no options.
+
+**Cause:** Redis is not running. REFDATA (dropdown values) is cached in Redis.
+
+**Fix:** Install and start Redis:
+```bash
+# Ubuntu/WSL
+sudo apt-get install -y redis-server
+sudo systemctl start redis-server
+
+# Or via Docker
+docker run -d --name redis -p 6379:6379 redis:alpine
+```
+Then restart the backend so it publishes REFDATA to Redis on startup.
+
+### Full restart procedure
+
+If things are broken, do a clean restart in this order:
+```bash
+# 1. Kill everything
+./scripts/appctl.sh dev kill
+./scripts/appctl.sh dev tunnel kill
+
+# 2. Start tunnel and wait for DB
+./scripts/appctl.sh dev tunnel start
+# Confirm: "DB reachable on 127.0.0.1:5433"
+
+# 3. Start backend + frontend
+./scripts/appctl.sh dev start
+
+# 4. Verify
+curl http://127.0.0.1:8000/health
+# Should return: {"status":"ok"}
+```
+
+---
+
 **Optional — work offline against a local Postgres** (no SSM tunnel, no shared DB):
 
 ```bash
@@ -139,6 +210,47 @@ python -m quant.cli --walk-forward --split 0.7
 ```
 
 Run `python -m quant.cli --help` for all options. See [CLI Backtest guide](https://alfred1123.github.io/Quant_Strategies/guides/cli-backtest/) for full documentation.
+
+---
+
+## Job Queue Features
+
+The **Queue** tab in the UI provides several features for managing and analyzing backtest jobs:
+
+### Job Detail Drawer
+
+**Click any Strategy name** in the Jobs table to open a detail drawer showing:
+
+- Full job metadata (status, priority, timestamps, queue ID)
+- **Strategy tab**: Readable summary of all config parameters (symbol, date range, factors, walk-forward settings)
+- **Raw JSON tab**: Copy-paste friendly JSON of the config
+- Action buttons: Copy JSON, Clone & Edit, Compare, Re-run
+
+### Clone & Edit
+
+Reuse a previous job's config without re-typing everything:
+
+1. Click a Strategy name → Detail drawer opens
+2. Click **"Clone & Edit"**
+3. Configure drawer opens with all settings pre-filled
+4. Tweak parameters and run
+
+### Compare Two Jobs
+
+Side-by-side comparison to understand why one job performed differently:
+
+1. Click a Strategy name → Detail drawer opens
+2. Click **"Compare"** button
+3. Yellow banner appears: *"Compare mode: Select Job B"*
+4. Click another Strategy name
+5. Comparison drawer opens showing:
+   - All parameters side-by-side
+   - **Differences highlighted** (different values shown in color)
+   - Basic settings, factors, walk-forward, and job metadata
+
+### Delete Jobs
+
+Click the trash icon (🗑️) on any terminal job (COMPLETED, FAILED, CANCELLED) to remove it from your view.
 
 ---
 

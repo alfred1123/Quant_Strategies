@@ -37,6 +37,10 @@ async function reenqueueJob(queueId: string): Promise<EnqueueResponse> {
   return data;
 }
 
+async function deleteJob(queueId: string): Promise<void> {
+  await apiClient.delete(`/backtest/jobs/${queueId}`);
+}
+
 async function enqueueJob(req: EnqueueRequest): Promise<EnqueueResponse> {
   const { data } = await apiClient.post<EnqueueResponse>('/backtest/jobs', req);
   return data;
@@ -76,6 +80,19 @@ export function useReenqueueJob() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: reenqueueJob,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: JOBS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Delete a terminal job (COMPLETED/FAILED/CANCELLED) from the user's view.
+ */
+export function useDeleteJob() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteJob,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: JOBS_QUERY_KEY });
     },
