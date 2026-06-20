@@ -10,6 +10,7 @@ import * as authModule from '../api/auth';
 import * as tradeModule from '../api/trade';
 import * as credentialsModule from '../api/credentials';
 import * as refdataModule from '../api/refdata';
+import * as strategiesModule from '../api/strategies';
 
 vi.mock('../api/auth', () => ({
   ME_QUERY_KEY: ['auth', 'me'],
@@ -35,6 +36,11 @@ vi.mock('../api/credentials', () => ({
 vi.mock('../api/refdata', () => ({
   useExchangeApps: vi.fn(),
   useApps: vi.fn(),
+}));
+
+vi.mock('../api/strategies', () => ({
+  STRATEGIES_QUERY_KEY: ['strategies'],
+  useStrategies: vi.fn(),
 }));
 
 function TradeRoutes() {
@@ -78,6 +84,12 @@ describe('TradeLayout', () => {
       data: appRows.filter(a => a.is_exchange_ind === 'Y'),
       isLoading: false,
     } as unknown as ReturnType<typeof refdataModule.useExchangeApps>);
+    vi.mocked(strategiesModule.useStrategies).mockReturnValue({
+      data: [],
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+    } as unknown as ReturnType<typeof strategiesModule.useStrategies>);
   });
 
   it('shows accounts table on Config', () => {
@@ -93,7 +105,7 @@ describe('TradeLayout', () => {
 
     const sidebar = screen.getByRole('navigation', { name: 'Trade sections' });
     await user.click(within(sidebar).getByRole('link', { name: 'Trade' }));
-    expect(screen.getByText(/Apply a strategy from the/)).toBeInTheDocument();
+    expect(screen.getByText('Your strategies')).toBeInTheDocument();
     expect(screen.getByText('Deployments')).toBeInTheDocument();
   });
 
