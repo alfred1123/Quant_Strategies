@@ -43,8 +43,24 @@ class TradeRepo(DbGateway):
             (api_credential_id,),
         )
 
-    def _strategy_exists(self, strategy_id: UUID, strategy_vid: int) -> bool:
-        return bool(self._bt.sp_get_strategy(strategy_id, strategy_vid=strategy_vid))
+    def _fetch_strategy(
+        self, strategy_id: UUID, strategy_vid: int
+    ) -> dict | None:
+        rows = self._bt.sp_get_strategy(strategy_id, strategy_vid=strategy_vid)
+        return rows[0] if rows else None
+
+    def _assert_strategy_owned(
+        self, strategy_id: UUID, strategy_vid: int, app_user_id: UUID
+    ) -> None:
+        row = self._fetch_strategy(strategy_id, strategy_vid)
+        if row is None:
+            raise TradeValidationError(
+                "strategy_id / strategy_vid not found", status_code=404
+            )
+        if str(row["user_id"]) != str(app_user_id):
+            raise TradeValidationError(
+                "strategy does not belong to user", status_code=403
+            )
 
     def _fetch_deployment_version(
         self, deployment_id: UUID, deployment_vid: int
@@ -112,10 +128,7 @@ class TradeRepo(DbGateway):
                 "app_id does not match API credential", status_code=400
             )
 
-        if not self._strategy_exists(strategy_id, strategy_vid):
-            raise TradeValidationError(
-                "strategy_id / strategy_vid not found", status_code=404
-            )
+        self._assert_strategy_owned(strategy_id, strategy_vid, app_user_id)
 
         current = self._fetch_current_deployment(deployment_id)
         if current is not None and str(current["app_user_id"]) != str(app_user_id):

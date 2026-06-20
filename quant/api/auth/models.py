@@ -37,7 +37,9 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     username: str
+    app_user_id: UUID
 
 
 class MeResponse(BaseModel):
     username: str
+    app_user_id: UUID

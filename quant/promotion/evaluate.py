@@ -117,6 +117,7 @@ def evaluate_promotion(
     *,
     is_current_best: bool = False,
     best_vid: int | None = None,
+    strategy_vid: int | None = None,
 ) -> PromotionDecision:
     """Merge HARD + SOFT into one decision."""
     if not promotion_metrics:
@@ -128,6 +129,13 @@ def evaluate_promotion(
     all_passed = all(g.passed for g in gates)
 
     if is_current_best:
+        # VID 1 is the default best — keep IS_BEST_IND='Y' even when hard gates fail.
+        if strategy_vid == 1:
+            return PromotionDecision(
+                outcome=KEPT,
+                gate_results=gates,
+                compared_vid=best_vid,
+            )
         return PromotionDecision(
             outcome=KEPT if all_passed else DEMOTED,
             gate_results=gates,

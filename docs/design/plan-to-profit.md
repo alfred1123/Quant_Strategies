@@ -39,7 +39,7 @@ Work **one subphase at a time** — finish exit criteria before starting the nex
 | [1.3](#phase-13--bybit-adapter-dry-run) | Bybit adapter (dry run) | — |
 | [1.4](#phase-14--trade-ui-shell) | Trade UI shell | done |
 | [1.5](#phase-15--exchange-config-ui) | Exchange config UI | done |
-| [1.6](#phase-16--strategy-picker) | Strategy picker | — |
+| [1.6](#phase-16--strategy-picker) | Strategy picker | done |
 | [1.7](#phase-17--live-apply) | Live apply | — |
 | [1.8](#phase-18--execution-log) | Execution log | — |
 | [2.1](#phase-21--reconcile-data-model) | Reconcile data model | — |
@@ -345,17 +345,17 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 
 **Tasks**
 
-- [ ] DDL: **`BT.SP_LIST_STRATEGIES`** — new read-only list SP (do **not** extend `SP_GET_STRATEGY` while queue work is in flight; release `1.3.0` list mode was superseded by later SP changes — see [database.md](../architecture/database.md#bt--strategy-catalog-phase-16--17)).
-- [ ] API module: `quant/api/strategies/` — `GET /api/v1/strategies` calls list SP; behind `require_user`. Full CRUD deferred — create/update stays on backtest queue path (`BT.SP_INS_STRATEGY` via jobs).
-- [ ] Frontend: `frontend/src/api/strategies.ts` + `StrategyPicker` on Trade Apply — selectable list/table; no JSON drill-down.
-- [ ] Selecting row sets active `{ strategy_id, strategy_vid }` for apply / deployment payload.
-- [ ] **1.7 prep:** list response includes `user_id`; deployment create validates strategy ownership (see [§5.5](#55-auth--security-guardrails)).
+- [x] DDL: **`BT.SP_GET_STRATEGY_LIST`** — read-only list SP (release `1.12.0`).
+- [x] API module: `quant/api/strategies/` — `GET /api/v1/strategies` calls list SP; behind `require_user`.
+- [x] Frontend: `frontend/src/api/strategies.ts` + `StrategyPicker` on Trade Apply.
+- [x] Selecting row sets active `{ strategy_id, strategy_vid }` for deploy payload.
+- [x] **1.7 prep:** deployment create validates strategy exists and is owned by caller via `SP_GET_STRATEGY`.
 
 **Architecture (decided)**
 
 | Layer | Choice | Rationale |
 |-------|--------|-----------|
-| **Backend** | New `quant/api/strategies/` calling **`BT.SP_LIST_STRATEGIES`** (read-only list) | Avoids `SP_GET_STRATEGY` signature churn during queue work; matches GET SP convention ([database.md](../architecture/database.md)). Not `quant/strategy/` (execution math) or `quant/trade/` (deployments only). |
+| **Backend** | New `quant/api/strategies/` calling **`BT.SP_GET_STRATEGY_LIST`** (read-only list) | Avoids `SP_GET_STRATEGY` signature churn during queue work; matches GET SP convention ([database.md](../architecture/database.md)). Not `quant/strategy/` (execution math) or `quant/trade/` (deployments only). |
 | **Frontend** | New `StrategyPicker` + `useStrategies()` | Trade-specific UX. Extract to `components/strategy/` only when Backtest also needs the same picker (e.g. “Deploy this”). |
 | **Do not** | Reuse Backtest config UI or move `quant/strategy/` to shared | Wrong domain — signal-type builder ≠ persisted strategy catalog. |
 

@@ -6,6 +6,7 @@ import {
   TableContainer, TableHead, TableRow, Typography, useMediaQuery,
 } from '@mui/material';
 import { usePromotions } from '../api/promotion';
+import { useMe } from '../api/auth';
 import { usePromotionMetrics, usePromotionStates } from '../api/refdata';
 import { formatMetric, toFiniteNumber } from '../utils/format';
 import { readPromotionMetric } from '../utils/promotionMetric';
@@ -40,6 +41,7 @@ function compareMetric(
 
 export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
   const promotions = usePromotions();
+  const { data: currentUser } = useMe();
   const { data: states = [] } = usePromotionStates();
   const promotionMetricsQuery = usePromotionMetrics();
   const metrics = promotionMetricsQuery.data ?? [];
@@ -144,6 +146,11 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
               metrics={metrics}
               outcomeLabel={outcomeLabel}
               onReBacktest={onReBacktest}
+              canDeploy={
+                selected != null
+                && currentUser != null
+                && selected.user_id === currentUser.app_user_id
+              }
               onDeploy={(r) =>
                 setDeploySelection({
                   strategyId: r.strategy_id,
@@ -162,7 +169,18 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
         open={deploySelection !== null}
         selection={deploySelection}
         onClose={() => setDeploySelection(null)}
-        onSuccess={() => navigate('/trade/apply')}
+        onSuccess={() =>
+          navigate('/trade/apply', {
+            state: deploySelection
+              ? {
+                  strategyId: deploySelection.strategyId,
+                  strategyVid: deploySelection.strategyVid,
+                  strategyNm: deploySelection.strategyNm,
+                  queueId: deploySelection.queueId,
+                }
+              : undefined,
+          })
+        }
       />
 
       <PromotionRulesFlyout
@@ -279,7 +297,7 @@ function StrategyList({
 }
 
 function ComparisonPanel({
-  row, rows, metrics, outcomeLabel, onReBacktest, onDeploy,
+  row, rows, metrics, outcomeLabel, onReBacktest, onDeploy, canDeploy,
 }: {
   row: PromotionRow | null;
   rows: PromotionRow[];
@@ -287,6 +305,7 @@ function ComparisonPanel({
   outcomeLabel: (name: string) => string;
   onReBacktest?: (queueId: string) => void;
   onDeploy: (row: PromotionRow) => void;
+  canDeploy: boolean;
 }) {
   if (!row) {
     return (
@@ -417,9 +436,11 @@ function ComparisonPanel({
             Re-backtest
           </Button>
         )}
-        <Button size="small" variant="outlined" color="primary" onClick={() => onDeploy(row)}>
-          Deploy
-        </Button>
+        {canDeploy && (
+          <Button size="small" variant="outlined" color="primary" onClick={() => onDeploy(row)}>
+            Deploy
+          </Button>
+        )}
       </Stack>
     </Paper>
   );

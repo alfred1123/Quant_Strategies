@@ -26,5 +26,8 @@
     <include file="releases/1.9.0-promotion-read.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.10.0-strategy-vid-versioning.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.11.0-sp-get-queue-strategy-join.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.12.0-strategy-list.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.13.0-result-strategy-keys.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.14.0-vid1-default-best.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

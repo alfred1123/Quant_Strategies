@@ -123,7 +123,7 @@ See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11--user-secrets) a
 | Procedure | Status | Purpose |
 |-----------|--------|---------|
 | `SP_GET_STRATEGY` | **live** | **Get-one only:** `IN_STRATEGY_ID` required; optional `IN_STRATEGY_VID`; `IN_IS_BEST_IND='Y'` fetches best VID; else active row (`TRANSACT_TO_TS = 9999-12-31`). |
-| `SP_LIST_STRATEGIES` | **planned (1.6)** | **List catalog** for Trade picker — new SP to avoid queue-era signature churn on `SP_GET_STRATEGY`. See [Trade Deployment Rollout](../design/trade-deployment-rollout.md). |
+| `SP_GET_STRATEGY_LIST` | **live (1.12.0+)** | **List catalog** for Trade picker — `IN_USER_ID` required; `IN_IS_BEST_IND='Y'` for best VID only, `NULL` for all VIDs. Joins shredded metrics from `BT.RESULT` on `(STRATEGY_ID, STRATEGY_VID)` (release `1.13.0`). |
 | `SP_UPD_PROMOTE_STRATEGY` | **live** | Demote current best + promote target VID. `IN_STRATEGY_VID = NULL` = demote-only. |
 
 Persisted strategies (`BT.STRATEGY`) are created when backtest jobs complete — distinct from REFDATA `SIGNAL_TYPE`. Jobs store owner as `USER_ID = str(app_user_id)` (UUID text).
@@ -194,7 +194,7 @@ Active changelogs are empty manifests — see XML comments in each `db/liquidbas
 | `SP_GET_QUEUE_FOR_TERMINAL` | `BT` | Active rows + strategy metadata (REFCURSOR) |
 | `FN_GET_QUEUE_FOR_TERMINAL` | `BT` | **Function** — UI terminal lookup (`RETURNS TABLE`); worker uses `SP_GET_QUEUE_LATEST` |
 | `SP_GET_QUEUE_LATEST` | `BT` | **Queue worker**: active row for one **`QUEUE_ID`** + frozen **`CONFIG_JSON`** (`QUEUE` ⋈ **`STRATEGY`** on **`STRATEGY_VID`**) |
-| `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`** with shredded metrics (Sharpe, Calmar, Max DD, etc.) extracted from `PAYLOAD_JSON`; **`IN_RESULT_ID`** is caller-supplied UUID; `USER_ID` derived from `BT.QUEUE`; OUT row is status triplet only |
+| `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`** with shredded metrics from `PAYLOAD_JSON` + denormalized `STRATEGY_ID`/`STRATEGY_VID` from `BT.QUEUE`; **`IN_RESULT_ID`** is caller-supplied UUID; OUT row is status triplet only |
 | `SP_GET_RESULT` | `BT` | Fetch latest result row for a `QUEUE_ID` (REFCURSOR) |
 | `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`) |
 | `SP_INS_API_CREDENTIAL` | `CORE_ADMIN` | New exchange credential or rotate keys (soft-version); status triplet OUT first |

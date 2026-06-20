@@ -199,40 +199,34 @@ worker is **1.8**.
 New module `quant/api/strategies/` (or extend trade router):
 
 ```
-GET /api/v1/strategies?scope=mine|all&limit=100
+GET /api/v1/strategies?versions=best|all&limit=100
 ```
 
-Returns rows the picker needs:
+Returns caller-owned rows the picker needs. Default `versions=best` — one row per logical strategy (`IS_BEST_IND='Y'`). Use `versions=all` to list every VID.
 
 ```json
 {
   "strategy_id": "uuid",
   "strategy_vid": 1,
   "strategy_nm": "btcusdt.crypto · get_bollinger_band/momentum",
-  "user_id": "alice",
   "is_best_ind": "Y",
-  "created_at": "2026-06-04T19:03:46Z"
+  "created_at": "2026-06-04T19:03:46Z",
+  "sharpe_ratio": 1.25,
+  "calmar_ratio": 0.8,
+  "max_drawdown": -0.12,
+  "total_return": 0.45,
+  "annualized_return": 0.22
 }
 ```
 
-**SP:** extend `BT.SP_GET_STRATEGY` with **list mode** (planned in release
-`1.3.0` but superseded — re-add without breaking existing 3 modes):
-
-| `IN_STRATEGY_ID` | `IN_USER_ID` | Behaviour |
-|------------------|--------------|-----------|
-| UUID | NULL | existing single-strategy modes |
-| **NULL** | TEXT (optional) | list all current rows (`TRANSACT_TO_TS = 9999-12-31`), filter by owner when set |
-
-Alternative: new `BT.SP_LIST_STRATEGIES` if changing `SP_GET_STRATEGY` signature
-is risky while queue work is active — **prefer a new SP** to avoid merge
-conflicts.
+**SP:** `BT.SP_GET_STRATEGY_LIST` (release `1.12.0`) — list catalog; metrics via `BT.RESULT (STRATEGY_ID, STRATEGY_VID)` (release `1.13.0`).
 
 ### Frontend
 
 | Piece | Detail |
 |-------|--------|
 | `frontend/src/api/strategies.ts` | TanStack Query hook |
-| `StrategyPicker` | Table: Name · VID · Best · Owner · Created; row select |
+| `StrategyPicker` | Table: Name · VID · Best · Sharpe · Created; **Best only / All versions** toggle (default best); row select |
 | `TradeApplyPage` | Replace placeholder; read `location.state` from Promotion Deploy |
 | Deployments table | Show `strategy_nm` (join or denormalize later) instead of UUID prefix |
 
@@ -380,7 +374,7 @@ GET /api/v1/trade/deployments/{id}/transactions?limit=50
 
 ## Suggested implementation order
 
-1. **`BT.SP_LIST_STRATEGIES`** (new SP, no queue touch) + `GET /api/v1/strategies`
+1. **`BT.SP_GET_STRATEGY_LIST`** (release `1.12.0`) + `GET /api/v1/strategies`
 2. **`StrategyPicker`** + Promotion pre-fill on `TradeApplyPage`
 3. **Apply form** (product, qty) + enable `POST /trade/deployments` from UI
 4. **`POST .../dry-run`** + Bybit adapter dry path

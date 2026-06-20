@@ -26,6 +26,8 @@ BEGIN
     OPEN OUT_RESULT FOR
         SELECT RESULT_ID,
                QUEUE_ID,
+               STRATEGY_ID,
+               STRATEGY_VID,
                PAYLOAD_JSON,
                TOTAL_RETURN,
                ANNUALIZED_RETURN,

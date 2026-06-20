@@ -36,6 +36,10 @@ def _deployment_kwargs(**overrides):
     return base
 
 
+def _owned_strategy(app_user_id):
+    return {"user_id": str(app_user_id)}
+
+
 class TestValidateCreateDeployment:
     def test_missing_deployment_id(self, repo):
         with pytest.raises(TradeValidationError, match="deployment_id"):
@@ -49,7 +53,7 @@ class TestValidateCreateDeployment:
         mock_cred.assert_called_once()
 
     @patch.object(TradeRepo, "_fetch_credential")
-    @patch.object(TradeRepo, "_strategy_exists", return_value=False)
+    @patch.object(TradeRepo, "_fetch_strategy", return_value=None)
     def test_unknown_strategy(self, _strat, mock_cred, repo):
         uid = uuid4()
         mock_cred.return_value = {
@@ -63,9 +67,8 @@ class TestValidateCreateDeployment:
         assert exc.value.status_code == 404
 
     @patch.object(TradeRepo, "_fetch_credential")
-    @patch.object(TradeRepo, "_strategy_exists", return_value=True)
-    @patch.object(TradeRepo, "_fetch_current_deployment")
-    def test_deployment_owner_mismatch(self, mock_current, _strat, mock_cred, repo):
+    @patch.object(TradeRepo, "_fetch_strategy")
+    def test_strategy_owner_mismatch(self, mock_strat, mock_cred, repo):
         owner = uuid4()
         other = uuid4()
         mock_cred.return_value = {
@@ -74,6 +77,24 @@ class TestValidateCreateDeployment:
             "is_active_ind": "Y",
             "is_current_ind": "Y",
         }
+        mock_strat.return_value = _owned_strategy(other)
+        with pytest.raises(TradeValidationError, match="does not belong to user") as exc:
+            repo.validate_create_deployment(**_deployment_kwargs(app_user_id=owner))
+        assert exc.value.status_code == 403
+
+    @patch.object(TradeRepo, "_fetch_credential")
+    @patch.object(TradeRepo, "_fetch_strategy")
+    @patch.object(TradeRepo, "_fetch_current_deployment")
+    def test_deployment_owner_mismatch(self, mock_current, mock_strat, mock_cred, repo):
+        owner = uuid4()
+        other = uuid4()
+        mock_cred.return_value = {
+            "app_user_id": owner,
+            "app_id": 10,
+            "is_active_ind": "Y",
+            "is_current_ind": "Y",
+        }
+        mock_strat.return_value = _owned_strategy(owner)
         mock_current.return_value = {"app_user_id": other}
         with pytest.raises(TradeValidationError, match="does not belong") as exc:
             repo.validate_create_deployment(**_deployment_kwargs(app_user_id=owner))
@@ -96,9 +117,9 @@ class TestValidateCreateDeployment:
         assert exc.value.status_code == 400
 
     @patch.object(TradeRepo, "_fetch_credential")
-    @patch.object(TradeRepo, "_strategy_exists", return_value=True)
+    @patch.object(TradeRepo, "_fetch_strategy")
     @patch.object(TradeRepo, "_fetch_current_deployment", return_value=None)
-    def test_live_with_confirm_accepted(self, _dep, _strat, mock_cred, repo):
+    def test_live_with_confirm_accepted(self, _dep, mock_strat, mock_cred, repo):
         uid = uuid4()
         mock_cred.return_value = {
             "app_user_id": uid,
@@ -106,6 +127,7 @@ class TestValidateCreateDeployment:
             "is_active_ind": "Y",
             "is_current_ind": "Y",
         }
+        mock_strat.return_value = _owned_strategy(uid)
         repo.validate_create_deployment(
             **_deployment_kwargs(app_user_id=uid, is_paper_ind="N"),
             confirm_live=True,

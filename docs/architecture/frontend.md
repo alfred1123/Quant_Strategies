@@ -89,8 +89,8 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 | `TradeNavBar` | Compact Exchange (~160px) + Account (~200px) selects; Paper / Live `ToggleButtonGroup` |
 | `BrokerAccountsTable` | Exchange · Account · masked key · Status; **Rotate** / **Revoke** dialogs; row click sets account filter |
 | `TradeConfigPage` | Accounts table + add-account form wired to credentials API (create) |
-| `StrategyPicker` | **Phase 1.6 (planned)** — selectable list of `BT.STRATEGY` rows via `GET /api/v1/strategies` |
-| `TradeApplyPage` | Deployments table filtered by toolbar; `StrategyPicker` placeholder until 1.6; `useDeployments()` |
+| `StrategyPicker` | Selectable caller-owned `BT.STRATEGY` catalog via `GET /api/v1/strategies` |
+| `TradeApplyPage` | Strategy picker + Deploy button + deployments table; `useDeployments()` |
 
 **Strategy picker — not Backtest config UI**
 
@@ -166,7 +166,7 @@ frontend/src/
 │   └── trade/
 │       ├── TradeNavBar.tsx         # Exchange / Account filters + Paper / Live toggle
 │       └── BrokerAccountsTable.tsx # Multi-broker accounts table (Config page)
-│   # StrategyPicker.tsx            # Phase 1.6 (not yet in repo)
+│   StrategyPicker.tsx              # BT.STRATEGY catalog table (Phase 1.6)
 │
 ├── layouts/
 │   └── TradeLayout.tsx   # Trade shell — sidebar, toolbar, outlet, execution log

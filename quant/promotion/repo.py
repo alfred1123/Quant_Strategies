@@ -145,7 +145,9 @@ class PromotionRepo(DbGateway):
 
         decision = evaluate_promotion(
             payload, best_payload, promotion_metrics,
-            is_current_best=is_current_best, best_vid=best_vid,
+            is_current_best=is_current_best,
+            best_vid=best_vid,
+            strategy_vid=job["strategy_vid"],
         )
         refdata.validate_promotion_state(decision.outcome)
 

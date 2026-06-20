@@ -1,6 +1,7 @@
 import {
   Alert,
   Box,
+  Button,
   CircularProgress,
   Paper,
   Stack,
@@ -12,10 +13,14 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useDeployments } from '../../api/trade';
 import { useTradeSession, useTradeSessionFilters } from '../../trade/TradeSessionContext';
 import { ALL_ACCOUNTS } from '../../types/credentials';
+import type { TradeApplyLocationState } from '../../types/strategies';
+import DeploymentDialog, { type DeploymentSelection } from '../../components/trade/DeploymentDialog';
+import StrategyPicker, { type StrategyPickerSelection } from '../../components/trade/StrategyPicker';
 
 function accountLabel(
   apiCredentialId: number,
@@ -31,15 +36,41 @@ function accountLabel(
 }
 
 /**
- * Trade deployments list, filtered by the session toolbar.
+ * Trade Apply — strategy picker (1.6) + deployments table.
  *
- * Strategies are applied via the Deploy popup on the Promotion tab
- * (``DeploymentDialog``); this page shows the resulting deployments.
+ * Pick a catalog row, then **Deploy** to open the deployment form. Promotion
+ * tab can pre-select via react-router location state.
  */
 export default function TradeApplyPage() {
+  const location = useLocation();
+  const routeState = (location.state ?? null) as TradeApplyLocationState | null;
+
   const { data: deployments, isLoading, isError, error } = useDeployments();
   const { accounts, tradingMode, accountFilter, brokerFilter, appNameById } = useTradeSession();
   const { matchesSession, credentialsNotLoaded } = useTradeSessionFilters();
+
+  const [pickerSelection, setPickerSelection] = useState<StrategyPickerSelection | null>(null);
+  const [deployOpen, setDeployOpen] = useState(false);
+
+  // Pre-select from Promotion → Trade navigation (optional location state).
+  useEffect(() => {
+    if (!routeState?.strategyId || routeState.strategyVid == null) return;
+    setPickerSelection({
+      strategyId: routeState.strategyId,
+      strategyVid: routeState.strategyVid,
+      strategyNm: routeState.strategyNm ?? null,
+    });
+  }, [routeState?.strategyId, routeState?.strategyVid, routeState?.strategyNm]);
+
+  const deploySelection: DeploymentSelection | null = useMemo(() => {
+    if (!pickerSelection) return null;
+    return {
+      strategyId: pickerSelection.strategyId,
+      strategyVid: pickerSelection.strategyVid,
+      strategyNm: pickerSelection.strategyNm,
+      queueId: routeState?.queueId,
+    };
+  }, [pickerSelection, routeState?.queueId]);
 
   const filtered = useMemo(
     () => (deployments ?? []).filter(matchesSession),
@@ -57,10 +88,25 @@ export default function TradeApplyPage() {
         Trade
       </Typography>
 
-      <Alert severity="info">
-        Apply a strategy from the <strong>Promotion</strong> tab — click <strong>Deploy</strong>{' '}
-        on a strategy to open the deployment form. New deployments appear below.
-      </Alert>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <StrategyPicker selected={pickerSelection} onSelect={setPickerSelection} />
+        <Stack direction="row" spacing={1.5} sx={{ mt: 2, alignItems: 'center' }}>
+          <Button
+            variant="contained"
+            disabled={!pickerSelection}
+            onClick={() => setDeployOpen(true)}
+          >
+            Deploy selected
+          </Button>
+          {pickerSelection && (
+            <Typography variant="body2" color="text.secondary">
+              {pickerSelection.strategyNm ?? pickerSelection.strategyId.slice(0, 8)}
+              {' · '}
+              v{pickerSelection.strategyVid}
+            </Typography>
+          )}
+        </Stack>
+      </Paper>
 
       <Box>
         <Stack
@@ -107,8 +153,8 @@ export default function TradeApplyPage() {
                   <TableRow>
                     <TableCell colSpan={7}>
                       <Typography variant="body2" color="text.secondary">
-                        No deployments match the current filter. Register accounts in Config,
-                        then Deploy a strategy from the Promotion tab.
+                        No deployments yet. Select a strategy above and click Deploy, or use
+                        Promotion → Deploy.
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -139,6 +185,13 @@ export default function TradeApplyPage() {
           </TableContainer>
         )}
       </Box>
+
+      <DeploymentDialog
+        open={deployOpen}
+        selection={deploySelection}
+        onClose={() => setDeployOpen(false)}
+        onSuccess={() => setDeployOpen(false)}
+      />
     </Stack>
   );
 }

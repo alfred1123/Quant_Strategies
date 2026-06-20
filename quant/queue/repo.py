@@ -203,3 +203,18 @@ class BtQueueRepo(DbGateway):
             (str(strategy_id), _opt(int, strategy_vid), is_best_ind),
         )
 
+    def sp_get_strategy_list(
+        self,
+        *,
+        user_id: str,
+        limit: int = 200,
+        is_best_ind: str | None = "Y",
+    ) -> list[dict]:
+        """Wrap ``BT.SP_GET_STRATEGY_LIST`` — caller-owned catalog for Trade picker."""
+        return self._call_get(
+            "CALL bt.sp_get_strategy_list("
+            "%s::text, %s::integer, %s::char,"
+            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (user_id, int(limit), is_best_ind),
+        )
+

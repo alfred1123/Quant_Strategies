@@ -10,12 +10,14 @@ LANGUAGE plpgsql
 SET plan_cache_mode = 'force_generic_plan'
 AS $$
 DECLARE
-    V_START_TS   TIMESTAMPTZ := CURRENT_TIMESTAMP;
-    V_OTHER_TEXT TEXT;
-    V_LOG_STATE  TEXT;
-    V_LOG_MSG    TEXT;
-    V_USER_ID    TEXT;
-    V_METRICS    JSONB;
+    V_START_TS     TIMESTAMPTZ := CURRENT_TIMESTAMP;
+    V_OTHER_TEXT   TEXT;
+    V_LOG_STATE    TEXT;
+    V_LOG_MSG      TEXT;
+    V_USER_ID      TEXT;
+    V_STRATEGY_ID  UUID;
+    V_STRATEGY_VID INTEGER;
+    V_METRICS      JSONB;
 BEGIN
     OUT_SQLSTATE := '00000';
     OUT_SQLMSG   := '0';
@@ -24,22 +26,29 @@ BEGIN
     V_OTHER_TEXT := 'IN_RESULT_ID=' || COALESCE(IN_RESULT_ID::TEXT, '')
                  || ', IN_QUEUE_ID=' || COALESCE(IN_QUEUE_ID::TEXT, '');
 
-    -- Derive USER_ID from the queue row for audit logging
+    -- Derive audit + strategy keys from the queue submission (latest VID row).
     OUT_SQLMSG := '05';
-    SELECT USER_ID INTO V_USER_ID
+    SELECT USER_ID, STRATEGY_ID, STRATEGY_VID
+      INTO V_USER_ID, V_STRATEGY_ID, V_STRATEGY_VID
       FROM BT.QUEUE
      WHERE QUEUE_ID = IN_QUEUE_ID
-       AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
+     ORDER BY QUEUE_VID DESC
      LIMIT 1;
 
-    -- Extract strategy_metrics from payload for fast querying
+    IF V_STRATEGY_ID IS NULL THEN
+        OUT_SQLSTATE := '22023';
+        OUT_SQLERRMC := 'QUEUE_ID not found or missing STRATEGY_ID';
+        RETURN;
+    END IF;
+
     V_METRICS := IN_PAYLOAD_JSON -> 'performance' -> 'strategy_metrics';
 
-    -- Step 10: Insert result row with shredded metrics
     OUT_SQLMSG := '10';
     INSERT INTO BT.RESULT (
         RESULT_ID,
         QUEUE_ID,
+        STRATEGY_ID,
+        STRATEGY_VID,
         PAYLOAD_JSON,
         TOTAL_RETURN,
         ANNUALIZED_RETURN,
@@ -50,6 +59,8 @@ BEGIN
     ) VALUES (
         IN_RESULT_ID,
         IN_QUEUE_ID,
+        V_STRATEGY_ID,
+        V_STRATEGY_VID,
         IN_PAYLOAD_JSON,
         (V_METRICS ->> 'Total Return')::NUMERIC,
         (V_METRICS ->> 'Annualized Return')::NUMERIC,
@@ -59,9 +70,11 @@ BEGIN
         NOW() AT TIME ZONE 'UTC'
     );
 
-    -- Step 20: Audit log
     OUT_SQLMSG := '20';
-    CALL CORE_ADMIN.CORE_INS_LOG_PROC('BT', 'SP_INS_RESULT', V_START_TS, NULL, V_OTHER_TEXT, COALESCE(V_USER_ID, 'system'), V_LOG_STATE, V_LOG_MSG);
+    CALL CORE_ADMIN.CORE_INS_LOG_PROC(
+        'BT', 'SP_INS_RESULT', V_START_TS, NULL, V_OTHER_TEXT,
+        COALESCE(V_USER_ID, 'system'), V_LOG_STATE, V_LOG_MSG
+    );
 
 EXCEPTION
     WHEN OTHERS THEN

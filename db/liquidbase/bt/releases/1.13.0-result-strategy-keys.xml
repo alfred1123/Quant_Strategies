@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.13.0-001-result-add-strategy-keys" author="alfcheun" context="bt">
+        <comment>Add STRATEGY_ID + STRATEGY_VID to BT.RESULT for direct strategy joins</comment>
+        <sql splitStatements="true">
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS STRATEGY_ID UUID;
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS STRATEGY_VID INTEGER;
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.13.0-002-result-backfill-strategy-keys" author="alfcheun" context="bt">
+        <comment>Backfill STRATEGY_ID/STRATEGY_VID from BT.QUEUE (latest VID per QUEUE_ID)</comment>
+        <sql splitStatements="false"><![CDATA[
+            UPDATE BT.RESULT R
+               SET STRATEGY_ID  = Q.STRATEGY_ID,
+                   STRATEGY_VID = Q.STRATEGY_VID
+              FROM (
+                       SELECT DISTINCT ON (QUEUE_ID)
+                              QUEUE_ID,
+                              STRATEGY_ID,
+                              STRATEGY_VID
+                         FROM BT.QUEUE
+                        WHERE STRATEGY_ID IS NOT NULL
+                        ORDER BY QUEUE_ID, QUEUE_VID DESC
+                   ) Q
+             WHERE Q.QUEUE_ID = R.QUEUE_ID
+               AND R.STRATEGY_ID IS NULL;
+        ]]></sql>
+    </changeSet>
+
+    <changeSet id="1.13.0-003-result-strategy-index" author="alfcheun" context="bt">
+        <comment>Index BT.RESULT by strategy for catalog and promotion lookups</comment>
+        <sql splitStatements="false">
+            CREATE INDEX IF NOT EXISTS IX_RESULT_STRATEGY
+                ON BT.RESULT (STRATEGY_ID, STRATEGY_VID, CREATED_AT DESC);
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.13.0-004-sp-ins-result" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_INS_RESULT — denormalize STRATEGY_ID/STRATEGY_VID from BT.QUEUE at insert</comment>
+        <sqlFile path="../procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.13.0-005-sp-get-result" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_GET_RESULT — include STRATEGY_ID/STRATEGY_VID in cursor</comment>
+        <sqlFile path="../procedures/SP_GET_RESULT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.13.0-006-sp-get-strategy-list" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_GET_STRATEGY_LIST — join shredded metrics from BT.RESULT by strategy keys</comment>
+        <sqlFile path="../procedures/SP_GET_STRATEGY_LIST.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.13.0-007-drop-sp-get-strategy-list-v2" author="alfcheun" context="bt">
+        <comment>Drop legacy 2-arg SP_GET_STRATEGY_LIST (superseded by IN_IS_BEST_IND variant)</comment>
+        <sql splitStatements="false">
+            DROP PROCEDURE IF EXISTS BT.SP_GET_STRATEGY_LIST(TEXT, INTEGER, REFCURSOR, TEXT, TEXT, TEXT);
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

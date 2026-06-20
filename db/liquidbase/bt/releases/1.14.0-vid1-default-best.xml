@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.14.0-001-restore-vid1-best" author="alfcheun" context="bt">
+        <comment>Restore IS_BEST_IND='Y' on VID 1 when a strategy has no current best</comment>
+        <sql splitStatements="false"><![CDATA[
+            UPDATE BT.STRATEGY s
+               SET IS_BEST_IND = 'Y'
+             WHERE s.STRATEGY_VID = 1
+               AND NOT EXISTS (
+                       SELECT 1
+                         FROM BT.STRATEGY x
+                        WHERE x.STRATEGY_ID = s.STRATEGY_ID
+                          AND x.IS_BEST_IND = 'Y'
+                   );
+        ]]></sql>
+    </changeSet>
+
+    <changeSet id="1.14.0-002-sp-upd-promote-strategy" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_UPD_PROMOTE_STRATEGY — demote-only falls back to VID 1 as default best</comment>
+        <sqlFile path="../procedures/SP_UPD_PROMOTE_STRATEGY.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,6 +1,6 @@
 # User isolation requirements
 
-**Status:** v1 — partial enforcement. Credentials, deployments, and job queue are scoped by owner; strategies are a **shared pool** — any authenticated user can read and deploy any strategy.
+**Status:** v1 — partial enforcement. Credentials, deployments, and job queue are scoped by owner. Backtest/promotion artifacts remain a **shared pool** (any user can browse others' strategies). **Trade deploy** is owner-only — users may only list and deploy their own `BT.STRATEGY` rows.
 
 Related: [Login §14 Phase 2](login.md#14-phased-plan), [Plan to Profit §5.5](plan-to-profit.md#55-auth--security-guardrails), [Trade API §2.1](trade-api.md#21-strategy-catalog--phase-16), [Futu Trading §13](futu-trading.md#13-broker-strategy--when-to-scale-futu).
 
@@ -25,7 +25,7 @@ The FastAPI connection pool logs in as Postgres role `quant_app`. The human iden
 | `TRADE.DEPLOYMENT` audit column | `str(app_user_id)` — UUID as text (normalized) |
 | Sync backtest (`/optimize`) | Pool user / cache path — **not** per-human today |
 
-~~**Phase 1.7 ownership checks** must compare `BT.STRATEGY.USER_ID` against what jobs actually wrote (`str(caller.app_user_id)`), not username.~~ **Removed** — strategies are a shared pool (decision #42). `USER_ID` on `BT.STRATEGY` is audit-only.
+~~**Phase 1.7 ownership checks** must compare `BT.STRATEGY.USER_ID` against what jobs actually wrote (`str(caller.app_user_id)`), not username.~~ **Restored for Trade deploy** — `SP_GET_STRATEGY_LIST` and deployment create validate `BT.STRATEGY.USER_ID == str(app_user_id)`. Promotion/backtest browsing remains shared.
 
 ---
 
@@ -37,8 +37,9 @@ The FastAPI connection pool logs in as Postgres role `quant_app`. The human iden
 | **Credentials** | `CORE_ADMIN.API_CREDENTIAL.APP_USER_ID` | **Yes** | SP + API scoped; cross-user id → **404** | 1.1 |
 | **Deployments** | `TRADE.DEPLOYMENT.APP_USER_ID` | **Yes** | `SP_GET_DEPLOYMENT(IN_APP_USER_ID)`; credential must match owner | 1.2 |
 | **Job queue** | `BT.QUEUE.USER_ID` | **Yes** | List/cancel/SSE scoped; max 20 `QUEUED` per user | Done |
-| **Strategy picker (read)** | `BT.STRATEGY.USER_ID` | **Yes** | Any logged-in user sees all strategies (shared pool) | 1.6 — Done |
-| **Strategy deploy (write)** | — | **N/A** | Any user can deploy any strategy with their own credentials (shared pool) | By design (decision #42) |
+| **Strategy picker (Trade read)** | `BT.STRATEGY.USER_ID` | **Yes** | `SP_GET_STRATEGY_LIST(IN_USER_ID)` — caller-owned rows only | 1.6 — Done |
+| **Strategy deploy (write)** | `BT.STRATEGY.USER_ID` | **Yes** | Create deployment validates strategy owner == caller | 1.6 — Done |
+| **Promotion / backtest (read)** | `BT.STRATEGY.USER_ID` | **No** | Shared pool — any logged-in user sees all strategies | By design |
 | **Sync backtest** | — | **No** | No per-user result isolation on `/optimize` | login Phase 2 |
 | **`BT.RESULT`** | `USER_ID` audit only | **No** | Globally readable | login Phase 2 |
 | **REFDATA / INST** | — | N/A | Shared catalog | By design (v1) |
@@ -91,7 +92,7 @@ Strategies are a shared pool — any authenticated user can deploy any strategy 
 
 ## Phase 1.6 — strategy picker (read path) — Done
 
-All strategies are visible to all authenticated users (shared pool). `SP_GET_STRATEGY` list mode is deployed. `IS_BEST_IND` marks the best-performing VID per strategy — see [Best-VID Promotion](best-vid-promotion.md).
+All strategies are visible to all authenticated users (shared pool). Catalog via **`BT.SP_GET_STRATEGY_LIST`** + `GET /api/v1/strategies`. `IS_BEST_IND` marks the best-performing VID per strategy — see [Best-VID Promotion](best-vid-promotion.md).
 
 ---
 
@@ -131,7 +132,7 @@ flowchart TD
   B -->|No — REFDATA| C["Shared — no owner filter"]
   B -->|Yes| D{"Has APP_USER_ID column?"}
   D -->|Yes| E["Filter SP + API by caller APP_USER_ID"]
-  D -->|No — BT strategies| F["Shared pool — any user can read + deploy\n(USER_ID is audit only)"]
+  D -->|No — BT promotion/backtest| F["Shared pool — any user can browse\n(Trade deploy is owner-only)"]
   E --> I["Cross-user resource id → 404"]
 ```
 
@@ -141,7 +142,7 @@ flowchart TD
 
 | Priority | Task | Blocks |
 |----------|------|--------|
-| ~~**P0**~~ | ~~Deployment create: verify `BT.STRATEGY.USER_ID == str(app_user_id)`~~ | ~~1.7 live apply~~ — **Removed** (shared pool) |
+| ~~**P0**~~ | ~~Deployment create: verify `BT.STRATEGY.USER_ID == str(app_user_id)`~~ | ~~1.7 live apply~~ — **Done** (1.6) |
 | ~~**P0**~~ | ~~Deployment create: verify credential + product belong to caller~~ | ~~1.7 (credential done)~~ — **Done** |
 | ~~**P0**~~ | ~~Paper-vs-live gate: `confirm_live=true` required for live deployments~~ | ~~1.7~~ — **Done** |
 | ~~**P1**~~ | ~~`SP_GET_STRATEGY` list mode deployed; wire `GET /api/v1/strategies`~~ | ~~1.6~~ — **Done** |

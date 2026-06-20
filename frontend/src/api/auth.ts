@@ -7,6 +7,7 @@ export const ME_QUERY_KEY = ['auth', 'me'] as const;
 
 export interface CurrentUser {
   username: string;
+  app_user_id: string;
 }
 
 export interface LoginRequest {

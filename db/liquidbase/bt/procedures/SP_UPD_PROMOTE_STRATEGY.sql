@@ -47,7 +47,19 @@ BEGIN
          WHERE STRATEGY_ID = IN_STRATEGY_ID
            AND IS_BEST_IND = 'Y';
 
-        OUT_SQLERRMC := 'Demoted current best — no replacement promoted';
+        -- Fallback: VID 1 is always the default best when none qualifies.
+        UPDATE BT.STRATEGY
+           SET IS_BEST_IND = 'Y'
+         WHERE STRATEGY_ID  = IN_STRATEGY_ID
+           AND STRATEGY_VID = 1
+           AND NOT EXISTS (
+                   SELECT 1
+                     FROM BT.STRATEGY
+                    WHERE STRATEGY_ID = IN_STRATEGY_ID
+                      AND IS_BEST_IND = 'Y'
+               );
+
+        OUT_SQLERRMC := 'Demoted current best — VID 1 restored as default best when needed';
 
         OUT_SQLMSG := '16';
         CALL CORE_ADMIN.CORE_INS_LOG_PROC('BT', 'SP_UPD_PROMOTE_STRATEGY', V_START_TS, NULL, V_OTHER_TEXT, IN_USER_ID, V_LOG_STATE, V_LOG_MSG);

@@ -181,7 +181,7 @@ Endpoints use JWT auth (`require_user`); the user's `app_user_id` scopes all dat
     |----|-------|
     | New `quant/api/strategies/` module + `GET /api/v1/strategies` | Put list logic in `quant/strategy/backtest_service.py` (execution only) |
     | New `StrategyPicker` + `useStrategies()` on Trade Apply | Reuse Backtest `ConfigDrawer` / `FactorCard` (REFDATA signal-type builder) |
-    | Read `BT.STRATEGY` via **`BT.SP_LIST_STRATEGIES`** (new read-only SP — see [Trade Deployment Rollout](trade-deployment-rollout.md)) | Nest under `/api/v1/trade/` — strategies are a BT artifact used by queue and trade |
+    | Read `BT.STRATEGY` via **`BT.SP_GET_STRATEGY_LIST`** (release `1.12.0`) | `GET /api/v1/strategies` — BT artifact shared by queue and trade |
 
 **Phase 1.6 — implement now:**
 
@@ -191,7 +191,7 @@ GET    /api/v1/strategies                → List current strategies (TRANSACT_T
 GET    /api/v1/strategies/{id}           → One strategy + optional latest result     — optional 1.6
 ```
 
-Response fields (list): `strategy_id`, `strategy_vid`, `strategy_nm`, `user_id`, optional `sharpe` / `internal_cusip` from latest `BT.RESULT` join.
+Response fields (list): `strategy_id`, `strategy_vid`, `strategy_nm`, `is_best_ind`, `created_at`, shredded metrics (`sharpe_ratio`, `calmar_ratio`, `max_drawdown`, `total_return`, `annualized_return`) from latest `BT.RESULT` on `(STRATEGY_ID, STRATEGY_VID)`. Caller-owned rows only.
 
 **Deferred (full CRUD — not 1.6):**
 

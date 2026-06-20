@@ -103,7 +103,7 @@ def login(
         logger.exception("Failed to stamp LAST_LOGIN_AT for user=%s", body.username)
 
     logger.info("Login OK for username=%s", body.username)
-    return LoginResponse(username=user["username"])
+    return LoginResponse(username=user["username"], app_user_id=user["app_user_id"])
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -123,4 +123,4 @@ def logout(
 @router.get("/me", response_model=MeResponse)
 def me(user: CurrentUser = Depends(require_user)) -> MeResponse:
     """Return the current authenticated user. Used by the SPA on page load."""
-    return MeResponse(username=user.username)
+    return MeResponse(username=user.username, app_user_id=user.app_user_id)

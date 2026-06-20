@@ -96,9 +96,13 @@ class TestPassesHardGates:
         assert passes_hard_gates(_payload(), []) is True
 
     def test_vid1_demotion_scenario(self):
-        """VID 1 starts as best but result fails hard gates — should demote."""
+        """VID 1 stays best even when the backtest fails hard gates."""
         bad_result = _payload(sharpe=-1.0, max_dd=0.60)
         assert passes_hard_gates(bad_result, _metrics()) is False
+        d = evaluate_promotion(
+            bad_result, None, _metrics(), is_current_best=True, strategy_vid=1,
+        )
+        assert d.outcome == KEPT
 
 
 class TestEdgeCases:
@@ -148,9 +152,18 @@ class TestEvaluatePromotion:
         d = evaluate_promotion(p, p, _metrics(), best_vid=1)
         assert d.outcome == KEPT
 
+    def test_vid1_current_best_fails_stays_kept(self):
+        """VID 1 stays best (IS_BEST_IND='Y') even when hard gates fail."""
+        d = evaluate_promotion(
+            _payload(sharpe=-1.0), None, _metrics(),
+            is_current_best=True, strategy_vid=1,
+        )
+        assert d.outcome == KEPT
+
     def test_demoted_current_best_fails(self):
         d = evaluate_promotion(
-            _payload(sharpe=-1.0), None, _metrics(), is_current_best=True,
+            _payload(sharpe=-1.0), None, _metrics(),
+            is_current_best=True, strategy_vid=2,
         )
         assert d.outcome == DEMOTED
 

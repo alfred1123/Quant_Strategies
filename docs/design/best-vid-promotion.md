@@ -28,8 +28,9 @@ flowchart TD
     subgraph promote [After Backtest]
         E["Worker completes backtest"] --> F{"passes_hard_gates?"}
         F -->|No| F2{"Is current best?"}
-        F2 -->|Yes| F3["DEMOTE\nSP_UPD_PROMOTE_STRATEGY\n(vid=NULL)"]
-        F2 -->|No| F4["REJECT\nLog decision"]
+        F2 -->|Yes, VID 1| F4["KEEP\nVID 1 stays default best"]
+        F2 -->|Yes, VID > 1| F3["DEMOTE\nrestore VID 1 as best"]
+        F2 -->|No| F4b["REJECT\nLog decision"]
         F -->|Yes| G{"Current best\nhas a RESULT?"}
         G -->|No| H["PROMOTE"]
         G -->|Yes| I{"should_promote?\n(soft comparison)"}
@@ -46,10 +47,10 @@ flowchart TD
 
 - `TRANSACT_TO_TS = 9999-12-31` = **latest version** (temporal, unchanged behavior)
 - `IS_BEST_IND = 'Y'` = **best-performing version** (exactly one per `STRATEGY_ID`)
-- VID 1 starts as `IS_BEST_IND = 'Y'` (no baseline) — **demoted** if its backtest fails hard gates
+- VID 1 starts as `IS_BEST_IND = 'Y'` and **remains** the default best even when its backtest fails hard gates
 - VID 2+ starts as `IS_BEST_IND = 'N'` — promoted only after beating the current best
 - Comparison only ever compares the new VID vs the one row with `IS_BEST_IND = 'Y'`
-- **Demotion**: if the current best fails hard gates, it is demoted (`IS_BEST_IND = 'N'`) with no replacement — the strategy has no best VID until one passes
+- **Demotion**: if a promoted VID (>1) fails hard gates while it is best, it is demoted and **VID 1 is restored** as the default best (`SP_UPD_PROMOTE_STRATEGY` demote-only fallback)
 
 ## 1. Database Changes
 
@@ -80,7 +81,7 @@ OUT status triplet
 
 Logic:
 1. Demote current best: `UPDATE BT.STRATEGY SET IS_BEST_IND = 'N' WHERE STRATEGY_ID = IN_STRATEGY_ID AND IS_BEST_IND = 'Y'`
-2. If `IN_STRATEGY_VID IS NULL` → **demote-only** (no replacement promoted), return immediately
+2. If `IN_STRATEGY_VID IS NULL` → **demote-only**, then restore **VID 1** as `IS_BEST_IND='Y'` when no best remains
 3. Promote target: `UPDATE BT.STRATEGY SET IS_BEST_IND = 'Y' WHERE STRATEGY_ID = IN_STRATEGY_ID AND STRATEGY_VID = IN_STRATEGY_VID`
 
 ### 1d. Update `SP_GET_STRATEGY`
