@@ -1,8 +1,6 @@
 import {
   Alert,
   Box,
-  Button,
-  Chip,
   CircularProgress,
   Paper,
   Stack,
@@ -32,7 +30,12 @@ function accountLabel(
   return { exchange: appNameById.get(appId) ?? `App ${appId}`, account: `#${apiCredentialId}` };
 }
 
-/** Phase 1.4 shell + 1.2 deployments filtered by exchange / account / paper-live. */
+/**
+ * Trade deployments list, filtered by the session toolbar.
+ *
+ * Strategies are applied via the Deploy popup on the Promotion tab
+ * (``DeploymentDialog``); this page shows the resulting deployments.
+ */
 export default function TradeApplyPage() {
   const { data: deployments, isLoading, isError, error } = useDeployments();
   const { accounts, tradingMode, accountFilter, brokerFilter, appNameById } = useTradeSession();
@@ -54,34 +57,10 @@ export default function TradeApplyPage() {
         Trade
       </Typography>
 
-      <Box>
-        <Typography variant="subtitle2" gutterBottom>
-          Strategy picker (Phase 1.6)
-        </Typography>
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="body2" color="text.disabled">
-            ○ bollinger_momentum_20_1.0
-          </Typography>
-          <Typography variant="body2" color="text.disabled">
-            ○ rsi_reversion_14_30
-          </Typography>
-        </Paper>
-      </Box>
-
-      <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
-        <Button variant="outlined" size="small" disabled>
-          Dry run
-        </Button>
-        <Button variant="contained" size="small" disabled>
-          Apply {tradingMode === 'paper' ? 'paper' : 'live'}
-        </Button>
-        <Chip
-          size="small"
-          label={tradingMode === 'paper' ? 'Paper mode' : 'Live mode'}
-          color={tradingMode === 'live' ? 'warning' : 'default'}
-          variant="outlined"
-        />
-      </Stack>
+      <Alert severity="info">
+        Apply a strategy from the <strong>Promotion</strong> tab — click <strong>Deploy</strong>{' '}
+        on a strategy to open the deployment form. New deployments appear below.
+      </Alert>
 
       <Box>
         <Stack
@@ -95,8 +74,8 @@ export default function TradeApplyPage() {
         </Stack>
         {credentialsNotLoaded && brokerFilter !== 'all' && (
           <Alert severity="warning" sx={{ mb: 1 }}>
-            No broker accounts loaded — exchange filter may hide valid deployments.
-            Register accounts in Config first.
+            No broker accounts loaded — exchange filter may hide valid deployments. Register
+            accounts in Config first.
           </Alert>
         )}
         {isLoading && (
@@ -128,8 +107,8 @@ export default function TradeApplyPage() {
                   <TableRow>
                     <TableCell colSpan={7}>
                       <Typography variant="body2" color="text.secondary">
-                        No deployments match the current filter. Register accounts in Config
-                        (Phase 1.5) or apply a strategy (Phase 1.7).
+                        No deployments match the current filter. Register accounts in Config,
+                        then Deploy a strategy from the Promotion tab.
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -149,9 +128,7 @@ export default function TradeApplyPage() {
                       <TableCell>
                         {row.strategy_id.slice(0, 8)}… v{row.strategy_vid}
                       </TableCell>
-                      <TableCell>
-                        {row.is_paper_ind === 'Y' ? 'Paper' : 'Live'}
-                      </TableCell>
+                      <TableCell>{row.is_paper_ind === 'Y' ? 'Paper' : 'Live'}</TableCell>
                       <TableCell>{row.deployment_status}</TableCell>
                       <TableCell align="right">{row.qty}</TableCell>
                     </TableRow>

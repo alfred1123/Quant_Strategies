@@ -959,7 +959,7 @@ No backward-compat aliases — update all call sites when paths change (decision
 
 | Signal | Channel |
 |--------|---------|
-| Trade / deployment errors | Telegram (user-supplied chat id) |
+| Trade / deployment errors | Telegram first (user-supplied chat id), Slack optional via notifier adapter |
 | Healthy steady state | No Telegram noise |
 | Process / host health | Heartbeat or external monitor — TBD |
 
@@ -1016,6 +1016,30 @@ Full matrix, phased backlog, and Futu/Bybit split: **[User isolation requirement
 | Reuse | Do not reuse |
 |-------|----------------|
 | `RequireAuth`, `useMe()`, controlled form + error display, `type="password"` for key/secret fields | Persisting API keys in `localStorage`; mixing credential calls into `/auth/login` module |
+
+### 5.6 Review outcomes (2026-06-20)
+
+This section records implementation viewpoints from the latest trade-readiness review and how the roadmap changes.
+
+| Topic | Viewpoint | Plan change |
+|-------|-----------|-------------|
+| Force INST input before trade | Deployment/apply must fail fast unless (`internal_cusip`, `app_id`) resolves in `INST.PRODUCT_XREF` and a vendor symbol exists. Do not let adapter infer symbols from free-text ticker. | Add mandatory preflight validation in 1.6/1.7 (`SP_GET_DEPLOYMENT_CHECK` + API guard) before dry-run/apply execution. |
+| Telegram / Slack system message | Keep one notifier path for now; avoid dual implementation in Phase 1. | Keep Telegram in 2.4 as the first target; implement a notifier interface so Slack can be added without rewiring trade logic. |
+| Strategy sharing vs cloning | Shared read-only catalog is fine, but live deployment should be user-owned to prevent implicit coupling to someone else's future best-VID changes. | Change 1.6/1.7 behavior: if selected strategy owner differs from caller, require clone to a new `strategy_id` owned by caller before deployment. Keep a "sync from source" action as optional UX. |
+| Strategy visibility in UI | If clone-per-user is required, duplicate rows can overwhelm the picker. | Add a grouped strategy view (`source_strategy_id` family) in 1.6 UI backlog; default list shows caller-owned rows first, shared templates second. |
+| Truncate BT tables for `strategy_vid` reset | Since trade is not live, bulk reset is the fastest path for one-time cleanup, but must be explicit and non-prod guarded. | Add a one-off runbook SQL for non-live environments only: `TRUNCATE BT.PROMOTION, BT.RESULT, BT.QUEUE, BT.STRATEGY;` with pre/post row-count checks. Do not use as routine ops after live starts. |
+| Dry-run value | Dry-run is still required: it validates credentials, product mapping, sizing, and payload shape before any live order path. Skipping now increases live-apply risk and support burden. | Keep 1.3 mandatory before 1.7. Allow a "fast path" only for paper mode if dry-run succeeded for the same deployment version recently. |
+| Bybit field coverage (`EXECUTION_EVENT` / `TRANSACTION`) | Most core fields are available at submit/fill time, but lifecycle/status details may arrive asynchronously. | In 1.8, write available fields immediately; leave nullable fields null; in 2.1/2.2 reconcile, backfill by `vendor_order_id` idempotently. |
+| Reconcile + re-execute when fields missing | Re-execute should be a controlled follow-up, not part of first release apply loop. | Keep as later-stage work under Phase 2 (reconcile first, optional remediation action second). |
+| AWS event scheduler effort | Moderate if using EventBridge + ECS/Fargate; low if starting with host-local scheduler. | For speed to value: start with EC2 cron/systemd timer in 2.2; move to EventBridge scheduler when trade worker isolation/scaling becomes necessary. |
+
+**Plan delta summary**
+
+- 1.6 now includes clone-on-select workflow (when owner differs).
+- 1.7 now hard-requires INST mapping preflight and dry-run gate.
+- 1.8 writes partial execution payloads; 2.x reconcile owns completion/backfill.
+- 2.4 starts with Telegram, but notifier abstraction is required so Slack can be plugged in later.
+- BT truncate is treated as a one-off pre-live reset runbook, not a standing data-management strategy.
 
 ---
 

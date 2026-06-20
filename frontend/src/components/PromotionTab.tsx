@@ -9,8 +9,10 @@ import { usePromotions } from '../api/promotion';
 import { usePromotionMetrics, usePromotionStates } from '../api/refdata';
 import { formatMetric, toFiniteNumber } from '../utils/format';
 import { readPromotionMetric } from '../utils/promotionMetric';
+import { strategyGroupKey } from '../utils/strategyIdentity';
 import type { PromotionRow } from '../types/promotion';
 import type { PromotionMetricRow } from '../types/refdata';
+import DeploymentDialog, { type DeploymentSelection } from './trade/DeploymentDialog';
 
 const OUTCOME_COLOR: Record<string, 'success' | 'default' | 'warning' | 'error'> = {
   PROMOTED: 'success',
@@ -43,6 +45,7 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
   const metrics = promotionMetricsQuery.data ?? [];
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [deploySelection, setDeploySelection] = useState<DeploymentSelection | null>(null);
 
   const rows = useMemo(() => promotions.data ?? [], [promotions.data]);
 
@@ -51,15 +54,16 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
     return (name: string) => m.get(name) ?? name;
   }, [states]);
 
-  // Group decisions by strategy_id (rows arrive newest-first).
+  // Group decisions by (user_id, strategy_nm) — one block per logical strategy.
   const groups = useMemo(() => {
-    const byId = new Map<string, PromotionRow[]>();
+    const byKey = new Map<string, PromotionRow[]>();
     for (const r of rows) {
-      const list = byId.get(r.strategy_id) ?? [];
+      const key = strategyGroupKey(r.user_id, r.strategy_nm, r.strategy_id);
+      const list = byKey.get(key) ?? [];
       list.push(r);
-      byId.set(r.strategy_id, list);
+      byKey.set(key, list);
     }
-    return Array.from(byId.entries());
+    return Array.from(byKey.entries());
   }, [rows]);
 
   // Recommended: highest Sharpe among current-best (IS_BEST_IND='Y') rows.
@@ -141,8 +145,11 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
               outcomeLabel={outcomeLabel}
               onReBacktest={onReBacktest}
               onDeploy={(r) =>
-                navigate('/trade/apply', {
-                  state: { strategyId: r.strategy_id, strategyVid: r.strategy_vid },
+                setDeploySelection({
+                  strategyId: r.strategy_id,
+                  strategyVid: r.strategy_vid,
+                  strategyNm: r.strategy_nm,
+                  queueId: r.queue_id,
                 })
               }
             />
@@ -150,6 +157,13 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
         )}
         </Stack>
       </Box>
+
+      <DeploymentDialog
+        open={deploySelection !== null}
+        selection={deploySelection}
+        onClose={() => setDeploySelection(null)}
+        onSuccess={() => navigate('/trade/apply')}
+      />
 
       <PromotionRulesFlyout
         metrics={metrics}
@@ -199,10 +213,10 @@ function StrategyList({
 }) {
   return (
     <Stack spacing={1}>
-      {groups.map(([strategyId, decisions]) => {
-        const nm = decisions[0]?.strategy_nm ?? strategyId.slice(0, 8);
+      {groups.map(([groupKey, decisions]) => {
+        const nm = decisions[0]?.strategy_nm ?? groupKey.split('\0')[1]?.slice(0, 8) ?? groupKey;
         return (
-          <Accordion key={strategyId} defaultExpanded variant="outlined" disableGutters>
+          <Accordion key={groupKey} defaultExpanded variant="outlined" disableGutters>
             <AccordionSummary expandIcon={<Box component="span" sx={{ fontSize: 18, lineHeight: 1 }}>▾</Box>}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{nm}</Typography>
               <Box sx={{ flexGrow: 1 }} />

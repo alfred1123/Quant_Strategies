@@ -93,7 +93,7 @@ describe('TradeLayout', () => {
 
     const sidebar = screen.getByRole('navigation', { name: 'Trade sections' });
     await user.click(within(sidebar).getByRole('link', { name: 'Trade' }));
-    expect(screen.getByText('Strategy picker (Phase 1.6)')).toBeInTheDocument();
+    expect(screen.getByText(/Apply a strategy from the/)).toBeInTheDocument();
     expect(screen.getByText('Deployments')).toBeInTheDocument();
   });
 
@@ -101,8 +101,9 @@ describe('TradeLayout', () => {
     const user = userEvent.setup();
     renderWithProviders(<TradeRoutes />, { initialEntries: ['/trade/apply'] });
 
-    await user.click(screen.getByRole('button', { name: 'Live trading' }));
-    expect(screen.getByText('Live mode')).toBeInTheDocument();
+    const liveBtn = screen.getByRole('button', { name: 'Live trading' });
+    await user.click(liveBtn);
+    expect(liveBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('shows mode switch with Trade active at /trade/config', () => {

@@ -77,7 +77,7 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `PUT` | `/api/v1/credentials/{id}` | Required | Rotate keys (soft-version bump). Rate-limited 5/15min per IP. |
 | `DELETE` | `/api/v1/credentials/{id}` | Required | Revoke (soft-version; clears ciphertext). Returns 204. |
 
-Keys are Fernet-encrypted in Python (`quant/shared/secrets_crypto.py`) before `CALL CORE_ADMIN.SP_INS_API_CREDENTIAL`. Responses never include `*_CIPHERTEXT`. Broker is identified by `app_id` (`REFDATA.APP`).
+Keys are Fernet-encrypted in Python (`quant/shared/secrets_crypto.py`) before `CALL CORE_ADMIN.SP_INS_API_CREDENTIAL`. Responses never include `*_CIPHERTEXT`. Broker is identified by `app_id` (`REFDATA.APP`). Full flow: [Credential Encryption](credentials.md).
 
 See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11--user-secrets) and [Login §6.4](../design/login.md#64-reuse-from-login--jwt-credential-api--phase-11).
 
@@ -90,6 +90,8 @@ See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11--user-secrets) a
 Not the same as REFDATA `signal_type` — see [trade-api §2.1](../design/trade-api.md#21-strategy-catalog--phase-16).
 
 ### REFDATA / Instruments (shared)
+
+How the cache is published and read: [REFDATA Cache](refdata-cache.md).
 
 | Method | Path | Description |
 |--------|------|-------------|

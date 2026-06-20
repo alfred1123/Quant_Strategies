@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppBar, Toolbar, Typography, Button, Box, Alert,
   Chip, Divider, CircularProgress, LinearProgress,
@@ -15,13 +15,14 @@ import UserMenu from '../components/UserMenu';
 import AppModeSwitch from '../components/AppModeSwitch';
 import { APP_NAME } from '../constants/brand';
 import { runPerformance } from '../api/backtest';
-import { fetchJob, useEnqueueJob } from '../api/jobs';
+import { fetchJob, useEnqueueJob, useJobCompletionEffects } from '../api/jobs';
 import { useMe } from '../api/auth';
 import type {
   BacktestConfig, OptimizeResponse, PerformanceResponse, Top10Row,
   WalkForwardResponse, OptimizeProgress,
 } from '../types/backtest';
 import { effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest } from '../utils/requestBuilders';
+import { buildStrategyNm } from '../utils/strategyIdentity';
 import { overfitColor, overfitLabel, formatMetric, formatDecimal, formatPercent, rowLabel } from '../utils/format';
 import { firstValidationError } from '../utils/validate';
 
@@ -80,6 +81,17 @@ export default function BacktestPage() {
   const optimizeAbort = useRef<AbortController | null>(null);
   const perfAbort = useRef<AbortController | null>(null);
   const perfReqId = useRef(0);
+  /** Queue id from the latest Run — auto-open Promotion when it completes. */
+  const watchCompletionQueueId = useRef<string | null>(null);
+
+  const handleJobCompleted = useCallback((queueId: string) => {
+    if (watchCompletionQueueId.current === queueId) {
+      watchCompletionQueueId.current = null;
+      setPageTab(2);
+    }
+  }, []);
+
+  useJobCompletionEffects(handleJobCompleted);
 
   useEffect(() => {
     // Cancel anything still running when the page unmounts.
@@ -189,14 +201,13 @@ export default function BacktestPage() {
     setDrawerOpen(false);
     try {
       const req = buildOptimizeRequest(config);
-      const strategyNm = `${effectiveSymbol(config)} · ${config.factors
-        .map((f) => `${f.indicator}/${f.strategy}`)
-        .join(config.factors.length > 1 ? ` ${config.conjunction} ` : '')}`;
-      await enqueue.mutateAsync({
+      const strategyNm = buildStrategyNm(config);
+      const result = await enqueue.mutateAsync({
         strategy_nm: strategyNm,
         config_json: req,
         priority: 'normal',
       });
+      watchCompletionQueueId.current = result.queue_id;
       // Hand off to the Queue tab — the worker will pick the job up and
       // the table will repaint via its 3s poll.
       setPageTab(1);

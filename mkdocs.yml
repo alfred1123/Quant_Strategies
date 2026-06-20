@@ -59,6 +59,11 @@ markdown_extensions:
   - toc:
       permalink: true
 
+# Mermaid is bundled locally so diagrams render fully offline (no CDN).
+extra_javascript:
+  - javascripts/mermaid.min.js
+  - javascripts/mermaid-init.js
+
 nav:
   - Home: index.md
   - Getting Started:
@@ -70,6 +75,8 @@ nav:
       - FastAPI Backend: architecture/api.md
       - React Frontend: architecture/frontend.md
       - Database: architecture/database.md
+      - Credential Encryption: architecture/credentials.md
+      - REFDATA Cache: architecture/refdata-cache.md
       - Infrastructure: architecture/infrastructure.md
       - Dev vs Prod Config: architecture/dev-vs-prod.md
       - Comparison to Pro Quant Firms: architecture/comparison.md
@@ -105,4 +112,6 @@ nav:
       - TypeScript Migration: archive/ts-migration.md
       - Deploy Build Pipeline: archive/deploy-build-pipeline.md
       - Phase 0 Signoffs: archive/phase-0/phase-0.1-signoff.md
+      - Phase 0.2 Capacity Snapshot: archive/phase-0/phase-0.2-capacity.md
+      - Phase 0.3 Deploy Topology: archive/phase-0/phase-0.3-topology.md
   - Decisions: decisions.md

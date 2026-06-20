@@ -216,31 +216,52 @@ prevents accidental deletion (disable it manually first if you really mean to).
 Push to `main` triggers an automated deploy pipeline (`.github/workflows/deploy.yml`):
 
 ```
-push to main → changes (path filter) → test + cfn (parallel)
-            → build-and-push (only changed images) → deploy (SSM: selective pull + up)
+push to main → changes (path filter) ─┐
+               test ──────────────────┤
+               frontend (build+audit) ─┤
+                                       ├─→ build-and-push (only changed images)
+               cfn (infra, parallel) ──┘             │
+                                                      ▼
+                                                   deploy (SSM: selective pull + up)
 ```
 
-The workflow uses `paths-ignore` for `docs/**`, `tests/**`, `db/**`, `scripts/**`, `*.md`, etc. — pushes touching only ignored paths do **not** trigger the workflow. The docs site has its own workflow (`.github/workflows/docs.yml`).
+`deploy` waits on `test`, `cfn`, and `build-and-push` (the last two may be skipped). `build-and-push` requires both `test` **and** `frontend` to pass.
+
+The workflow uses `paths-ignore` for `docs/**`, `*.md`, `tests/**`, `db/**`, `scripts/**`, `backup/**`, `.github/skills/**`, `.github/instructions/**`, `.cursor/**` — pushes touching only ignored paths do **not** trigger the workflow. The docs site has its own workflow (`.github/workflows/docs.yml`).
 
 ### How it works
 
 1. **Changes job** — `dorny/paths-filter` detects which artifacts changed:
    - **app** — `quant/**`, `Dockerfile`, `requirements.txt`
    - **nginx** — `frontend/**`, `docker/nginx/**`
-   - **compose** — `docker-compose*.yml`
-2. **Test job** — runs `pytest tests/unit/` on GitHub's runner
-3. **CFN job** — deploys infra stacks when `aws/cfn/**` or relevant `aws/params/**` keys change
-4. **Build-and-push job** — skipped when neither app nor nginx changed; otherwise builds only the affected image(s) and pushes to ECR (tags: git SHA + `latest`)
-5. **Deploy job** — skipped when no app/nginx/compose changes; otherwise SSM Run Command: `git pull`, selective `docker compose pull` + `up -d` per changed service. Skips ECR pull when local image digest already matches. **Liquibase is not run automatically** — apply DB migrations manually when ready (see [Database](database.md#deployment)).
+   - **compose** — `docker-compose.yml`, `docker-compose.prod.yml`, `docker-compose.tls.yml`, `docker-compose.cloudflare.yml`
+   - **deploy** — true when any of app / nginx / compose changed (gate for the deploy job)
+2. **Test job** — runs `pytest tests/unit/` on GitHub's runner (Python 3.12)
+3. **Frontend job** — `npm ci`, `npm audit --audit-level=high`, `npm run build` (type-check + Vite build), `npm test` on Node 22. Validates the SPA on the runner; a build/audit/test failure blocks `build-and-push`.
+4. **CFN job** — deploys infra stacks when the matching `aws/cfn/**` template or relevant `aws/params/prod.json` keys change (per-stack detection). The **database** stack only deploys when `02-database.yml` / DB params change and requires the `DB_MASTER_PASSWORD` secret (it is otherwise guarded by `DeletionPolicy=Retain`, `UpdateReplacePolicy=Snapshot`, `DeletionProtection=true`).
+5. **Build-and-push job** — skipped when neither app nor nginx changed; otherwise builds only the affected image(s) for `linux/arm64` (qemu/buildx) with GitHub Actions layer cache and pushes to ECR (tags: git SHA + `latest`).
+6. **Deploy job** — skipped when no app/nginx/compose changes; otherwise SSM Run Command runs the inline deploy script (see [Deployment logic](#deployment-logic) below). **Liquibase is not run automatically** — apply DB migrations manually when ready (see [Database](database.md#deployment)).
 
-**Manual full deploy:** Actions → deploy → Run workflow (rebuilds both images and deploys regardless of paths).
+**Manual full deploy:** Actions → deploy → Run workflow (`workflow_dispatch`). Rebuilds both images and deploys regardless of paths. The optional `deploy_database` input (default off) additionally deploys the RDS stack — leave unchecked unless you intend an Aurora change.
 
-Rollback: re-run the workflow on an older commit (images tagged by SHA).
+Rollback: re-run the workflow on an older commit (images tagged by SHA), or redeploy with a previous `IMAGE_TAG=<older-git-sha>`.
 
 No SSH keys needed — deploy uses SSM Run Command (same IAM role the EC2 already has).
 
-!!! note "Frontend build"
-    The SPA is built inside the **quant-nginx** Docker image in CI (arm64). No separate npm job on the runner.
+!!! note "Frontend build vs CI check"
+    The production SPA bundle ships **inside the quant-nginx Docker image** (built in CI for arm64). The separate `frontend` runner job is a fast **validation gate** (build + `npm audit` + unit tests) — it does not produce the deployed artifact.
+
+### Deployment logic
+
+The `deploy` job sends one `AWS-RunShellScript` SSM command to the EC2 and polls `ssm get-command-invocation` for up to ~10 min. The inline script (in `.github/workflows/deploy.yml`, `deploy` job) does, in order:
+
+1. **Resolve target** — `InstanceId` from the `quant-compute` CFN output (falls back to the `EC2_INSTANCE_ID` repo var).
+2. **Sync source** — clone `/opt/quant` if missing, else `git fetch --prune` + `git reset --hard origin/main` (compose/nginx config come from the repo).
+3. **TLS overlay** — when the `DOMAIN` repo var is set, fetch `ORIGIN_TLS_CERT` / `ORIGIN_TLS_KEY` from SSM into `secrets/`; if both land, append `-f docker-compose.cloudflare.yml`. Missing cert/key → stay HTTP-only with a warning.
+4. **Disk hygiene** — `docker builder prune -af` + `docker image prune -af` before pulling (the 8→30 GiB volume history made this necessary).
+5. **Digest-aware pull** — per service, compare the ECR image digest to the local one; **skip the pull when they match**. Tag resolution falls back from `${git_sha}` to `latest` if the SHA tag is missing.
+6. **Selective `up`** — only the changed services restart: `DEPLOY_APP` → `api`+`worker`, `DEPLOY_NGINX` → `nginx`, `DEPLOY_COMPOSE` → full `up -d --remove-orphans`. All `up` calls use `--no-build` so prod **never** builds on EC2.
+7. **Report** — `docker image prune -f`, then `docker compose ps`; the job tails the SSM `StandardOutputContent` and fails on `Failed`/`TimedOut`/`Cancelled`.
 
 ### GitHub setup (one-time)
 
@@ -248,8 +269,9 @@ No SSH keys needed — deploy uses SSM Run Command (same IAM role the EC2 alread
 
 | Secret | Value | How to get it |
 |--------|-------|---------------|
-| `AWS_ACCESS_KEY_ID` | IAM user access key | Create a deploy IAM user with `ssm:SendCommand` + `ssm:GetCommandInvocation` |
+| `AWS_ACCESS_KEY_ID` | IAM user access key | Deploy IAM user (`quant_deploy`) with SSM Run Command, CFN deploy, and ECR push policies attached |
 | `AWS_SECRET_ACCESS_KEY` | IAM user secret key | Same IAM user |
+| `DB_MASTER_PASSWORD` | Aurora master password | **Only** needed to deploy the `quant-database` stack (manual `workflow_dispatch` with `deploy_database` checked). Without it the `cfn` job fails fast instead of hanging on an interactive prompt. |
 
 **Variables** (repo → Settings → Secrets and variables → Actions → Variables):
 

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.10.0-001-strategy-vid-truncate" author="alfcheun" context="bt" runOnChange="false">
+        <comment>Pre-live: TRUNCATE BT strategy/queue/result/promotion (one-off)</comment>
+        <sqlFile path="../data/strategy_vid_truncate.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.10.0-002-drop-sp-ins-strategy-old-signature" author="alfcheun" context="bt" runOnChange="false">
+        <comment>Drop pre-1.10 SP_INS_STRATEGY before VID-by-name signature</comment>
+        <sql splitStatements="true" stripComments="true">
+            DROP PROCEDURE IF EXISTS BT.SP_INS_STRATEGY(UUID, TEXT, JSONB, TEXT, OUT TEXT, OUT TEXT, OUT TEXT, OUT INTEGER);
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.10.0-003-sp-ins-strategy-vid-by-name" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_INS_STRATEGY: resolve id from (USER_ID, STRATEGY_NM); OUT_STRATEGY_ID + OUT_STRATEGY_VID</comment>
+        <sqlFile path="../procedures/SP_INS_STRATEGY_VID_BY_NM.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.10.0-004-uq-strategy-user-nm-vid" author="alfcheun" context="bt" runOnChange="false">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM (
+                    SELECT 1 FROM BT.STRATEGY
+                     GROUP BY USER_ID, STRATEGY_NM, STRATEGY_VID
+                    HAVING COUNT(*) > 1
+                ) dup
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*)
+                  FROM pg_constraint
+                 WHERE conname = 'uq_strategy_user_nm_vid'
+                   AND conrelid = 'bt.strategy'::regclass
+            </sqlCheck>
+        </preConditions>
+        <comment>UNIQUE (USER_ID, STRATEGY_NM, STRATEGY_VID)</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE BT.STRATEGY
+                ADD CONSTRAINT UQ_STRATEGY_USER_NM_VID
+                UNIQUE (USER_ID, STRATEGY_NM, STRATEGY_VID);
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

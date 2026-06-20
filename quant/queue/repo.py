@@ -99,24 +99,25 @@ class BtQueueRepo(DbGateway):
     def sp_ins_strategy(
         self,
         *,
-        strategy_id: uuid.UUID | str,
         strategy_nm: str,
         config_json: dict[str, Any],
         user_id: str,
-    ) -> int:
-        """Wrap ``BT.SP_INS_STRATEGY`` — returns the assigned ``STRATEGY_VID``.
+        strategy_id: uuid.UUID | str | None = None,
+    ) -> tuple[uuid.UUID, int]:
+        """Wrap ``BT.SP_INS_STRATEGY`` — returns resolved ``(STRATEGY_ID, STRATEGY_VID)``.
 
-        New ``STRATEGY_ID`` ⇒ VID=1 (``IS_BEST_IND='Y'``); existing ID ⇒
-        prior active row closed (``TRANSACT_TO_TS = now``) and new VID
-        inserted as active (``IS_BEST_IND='N'`` until promoted).
+        When ``(user_id, strategy_nm)`` already exists the SP reuses that
+        ``STRATEGY_ID`` and bumps ``STRATEGY_VID``. Otherwise it allocates
+        ``strategy_id`` when provided, else ``gen_random_uuid()``.
         """
-        (new_vid,) = self._call_write(
+        sid = None if strategy_id is None else str(strategy_id)
+        (resolved_id, new_vid) = self._call_write(
             "CALL bt.sp_ins_strategy("
             "%s::uuid, %s::text, %s::jsonb, %s::text,"
-            " NULL::text, NULL::text, NULL::text, NULL::integer)",
-            (str(strategy_id), strategy_nm, json.dumps(config_json), user_id),
+            " NULL::text, NULL::text, NULL::text, NULL::uuid, NULL::integer)",
+            (sid, strategy_nm, json.dumps(config_json), user_id),
         )
-        return int(new_vid)
+        return uuid.UUID(str(resolved_id)), int(new_vid)
 
     # ── reads (SP wrappers) ────────────────────────────────────────────
 

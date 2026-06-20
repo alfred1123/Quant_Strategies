@@ -16,7 +16,7 @@ STRATEGY_VID)` from `BT.STRATEGY` and writes to the **`TRADE`** schema.
 | `TRADE.EXECUTION_EVENT` / `TRANSACTION` | **Yes** (1.8) | append-only logs |
 | `BT.SP_GET_STRATEGY` | **Read only** | list + exact VID lookup for picker |
 | `BT.QUEUE` | **No** | frozen — others changing enqueue |
-| `BT.SP_INS_STRATEGY` | **No** | VID-by-name fix deferred — see [Strategy VID Versioning](strategy-vid-versioning.md) |
+| `BT.SP_INS_STRATEGY` | **Yes** (1.10.0) | Resolves identity by `(USER_ID, STRATEGY_NM)` — see [Strategy VID Versioning](strategy-vid-versioning.md) |
 | `BT.PROMOTION` | **No** | UI already navigates to Trade with `{ strategy_id, strategy_vid }` |
 
 !!! note "Duplicate v1 rows are OK for now"
@@ -75,6 +75,90 @@ Validation on create (in `TradeRepo.validate_create_deployment`):
 - Strategy row exists: `BT.SP_GET_STRATEGY(strategy_id, strategy_vid)`
 - Credential exists and matches `app_id` / paper-live mode
 - Live apply requires `confirm_live=true` when `paper=false`
+
+## Implemented deployment logic (today)
+
+This section documents the **runtime code path** that is actually wired for
+`POST /api/v1/trade/deployments` — i.e. what executes when a user clicks
+**Apply**. Everything here is a synchronous DB write inside one HTTP request; no
+background worker is involved (see [Worker](#worker-minimal-for-m1)).
+
+### Layers
+
+| Layer | File | Responsibility |
+|-------|------|----------------|
+| HTTP router | [`quant/api/routers/deployments.py`](../../quant/api/routers/deployments.py) | Auth (`require_user`), request/response models, error → HTTP status mapping |
+| Service | [`quant/trade/service.py`](../../quant/trade/service.py) (`TradeService`) | HTTP-agnostic orchestration; generates `deployment_id` UUID client-side |
+| Repo | [`quant/trade/db_repo.py`](../../quant/trade/db_repo.py) (`TradeRepo`) | Validation reads + `CALL trade.sp_*`; extends `DbGateway` (the Postgres connection) |
+| Stored procedures | `db/liquidbase/trade/` | `trade.sp_ins_deployment`, `trade.sp_get_deployment(_check)` — the only writers of `TRADE.*` |
+
+`TradeRepo` is built **per request** in `get_trade_service()` — it reads the
+app-wide `request.app.state.db_conninfo`, constructs a `BtQueueRepo` (injected so
+the strategy-existence check reuses `BT.SP_GET_STRATEGY` from its owning repo,
+not a pasted `CALL`), then wraps both in `TradeService`.
+
+### Request flow — `POST /trade/deployments`
+
+```mermaid
+sequenceDiagram
+  participant UI as Trade Apply (SPA)
+  participant R as deployments.py router
+  participant S as TradeService
+  participant Repo as TradeRepo
+  participant PG as Postgres (TRADE schema)
+
+  UI->>R: POST /api/v1/trade/deployments (cookie JWT)
+  R->>R: require_user → CurrentUser.app_user_id
+  R->>S: create_deployment(app_user_id, user_id, req)
+  S->>S: deployment_id = req.deployment_id or uuid4()
+  S->>Repo: sp_ins_deployment(...)
+  Repo->>Repo: validate_create_deployment (reads via SPs)
+  Note over Repo,PG: credential active+owned+app_id match<br/>strategy_id/vid exists (BT.SP_GET_STRATEGY)<br/>live ⇒ confirm_live=true<br/>existing deployment_id owned by caller
+  Repo->>PG: CALL trade.sp_ins_deployment(...)
+  Repo->>PG: CALL trade.sp_get_deployment(...)  (read back)
+  PG-->>Repo: persisted row
+  Repo-->>S: dict
+  S-->>R: DeploymentRow (model_validate)
+  R-->>UI: 201 Created
+```
+
+Validation reads all go **through stored procedures** (no raw `SELECT`):
+`core_admin.sp_get_credential_check`, `trade.sp_get_deployment_check`, and
+`bt.sp_get_strategy`. On any failure `TradeRepo` raises `TradeValidationError`
+with a status code (400/403/404) that the router maps to the HTTP response.
+
+### Live endpoints
+
+| Method | Path | Handler | Notes |
+|--------|------|---------|-------|
+| `POST` | `/api/v1/trade/deployments` | `create_deployment` | Validates → `SP_INS_DEPLOYMENT` → reads back; `201` |
+| `GET` | `/api/v1/trade/deployments` | `list_deployments` | Current rows for the caller (`app_user_id` scoped) |
+| `GET` | `/api/v1/trade/deployments/{id}` | `get_deployment` | `404` via `DeploymentNotFound` |
+
+`EXECUTION_EVENT` / `TRANSACTION` writers (`sp_ins_execution_event`,
+`sp_ins_transaction`) exist on `TradeRepo` with the same validate-then-`CALL`
+shape, but the worker that calls them is **Phase 1.8** — not live yet.
+
+### Database connection (the "5432 database")
+
+`TRADE.DEPLOYMENT`, `TRADE.EXECUTION_EVENT`, and `TRADE.TRANSACTION` live in the
+**QuantDB Postgres** instance — the same database as `BT`, `INST`, `REFDATA`,
+and `CORE_ADMIN`. There is no separate trade DB.
+
+The connection string is built **once at FastAPI startup** by
+[`quant/shared/config.py`](../../quant/shared/config.py) `_build_db_conninfo()`
+from `QUANTDB_*` env vars and stored on `app.state.db_conninfo`
+([`quant/api/main.py`](../../quant/api/main.py)). Port depends on where the app runs:
+
+| Context | Host : Port | Source |
+|---------|-------------|--------|
+| **Local dev (native Postgres)** | `127.0.0.1:5432` | `docker-compose.dev.yml` (`QUANTDB_PORT=5432`, host networking) |
+| **Local tooling via SSM tunnel** | `localhost:5433` → Aurora `5432` | `.env` (`QUANTDB_PORT`), SSM port-forward task |
+| **Production (EC2)** | Aurora cluster endpoint `:5432` | SSM Parameter Store `/quant/prod/QUANTDB_*` |
+
+`_build_db_conninfo()` defaults to port **5433** (the SSM-tunnel convention) but
+the deployed app always supplies an explicit `QUANTDB_PORT`. Use `sslmode=require`
+for Aurora; local dev compose sets `QUANTDB_SSLMODE=disable`.
 
 ## Data model (Trade side)
 

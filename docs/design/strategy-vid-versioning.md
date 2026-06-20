@@ -1,6 +1,6 @@
 # Strategy VID Versioning by Name
 
-**Status:** Design — not yet implemented (DB + API + data cleanup pending).
+**Status:** Implemented (release `1.10.0` — SP + Python + frontend name builder + data merge).
 
 How to make repeated submissions of the **same strategy identity** increment
 `STRATEGY_VID` (`v1`, `v2`, `v3`, …) under **one** `STRATEGY_ID`, add a
@@ -501,47 +501,37 @@ temporal versioning and child-table joins. The new unique constraint is an
 
 ## Clean up existing data
 
-Today the same name maps to many `STRATEGY_ID`s, each at `VID=1`. Collapse each
-`(USER_ID, STRATEGY_NM)` group into a **single** `STRATEGY_ID` with VIDs
-renumbered by `CREATED_AT`. Do this as a **one-off deploy-time Liquibase
-changeset** (the sanctioned place for direct DML — see `AGENTS.md`).
+Trade is **not live** — use a **one-off TRUNCATE** (release `1.10.0-001`), not a
+merge/re-key. Wipes all backtest history and deployment rows so duplicate
+`(USER_ID, STRATEGY_NM, VID=1)` rows cannot block `UQ_STRATEGY_USER_NM_VID`.
+
+**Source:** [`db/liquidbase/bt/data/strategy_vid_truncate.sql`](../../db/liquidbase/bt/data/strategy_vid_truncate.sql)
+
+```sql
+TRUNCATE TABLE
+    BT.PROMOTION,
+    BT.RESULT,
+    BT.QUEUE,
+    BT.STRATEGY;
+```
+
+Does **not** truncate `TRADE.*` — trade deployment is a separate track.
 
 ### Steps
 
 1. **Back up** — see [Database Dump & Restore](../guides/database-dump-restore.md).
-2. **Pick a survivor id** per `(USER_ID, STRATEGY_NM)` — the `STRATEGY_ID` from
-   the earliest `CREATED_AT` row in the group.
-3. **Renumber** all rows in the group onto that survivor id, assigning
-   `STRATEGY_VID` via
-   `ROW_NUMBER() OVER (PARTITION BY USER_ID, STRATEGY_NM ORDER BY CREATED_AT)`.
-4. **Repoint child tables** that store `(STRATEGY_ID, STRATEGY_VID)`:
+2. Run Liquibase **`1.10.0-strategy-vid-versioning`** (truncate changeset runs first).
+3. Re-run backtests to repopulate `BT.STRATEGY` / queue / promotion under the new
+   name + VID rules.
 
-   | Table | Repoint? | Notes |
-   |-------|----------|-------|
-   | `BT.QUEUE` | **Yes** | stores `STRATEGY_ID`, `STRATEGY_VID` |
-   | `BT.PROMOTION` | **Yes** | stores `STRATEGY_ID`, `STRATEGY_VID`; see also `COMPARED_VID` below |
-   | `TRADE.DEPLOYMENT` | **Yes** | deploy history |
-   | `BT.RESULT` | **No** | links via `QUEUE_ID` only |
-   | `TRADE.EXECUTION_EVENT` | **No** | links via `DEPLOYMENT_ID` only |
-   | `TRADE.TRANSACTION` | **No** | links via `DEPLOYMENT_ID` only |
-   | `BT.STRATEGY.CONFIG_JSON` | **Optional** | embedded `strategy_id` string — see below |
-   | `BT.RESULT.PAYLOAD_JSON` | **Optional** | usually no top-level `strategy_id` — audit first |
-   | `CORE_ADMIN.LOG_PROC_DETAIL` | **No** | `OTHER_TEXT` may log old UUIDs — leave as audit history |
+!!! danger "Pre-live only"
+    Do **not** run this truncate after live trading or when deployment history must
+    be kept. Use the [merge appendix](#cleanup-sql-appendix--merge-post-live-only)
+    instead.
 
-   Build a mapping `(old_strategy_id, old_vid) → (survivor_id, new_vid)` from
-   step 3 and apply it to each child table. **Inventory every reference first**;
-   a missed child orphans rows.
+The unique constraint ships in the same release (`1.10.0-004`), after truncate + SP fix.
 
-5. **Fix `TRANSACT_TO_TS`** — only the highest VID per group stays active
-   (`9999-12-31`); older VIDs get `TRANSACT_TO_TS = next_version.CREATED_AT`.
-6. **Fix `IS_BEST_IND`** — exactly one row per `(USER_ID, STRATEGY_NM)` is
-   `'Y'` (keep the row that was best before migration, or the latest VID if
-   ambiguous).
-7. **No row deletes** — strategy rows are re-keyed onto the survivor id; discarded
-   UUIDs simply cease to exist as lookup keys.
-8. **Add the unique constraint** in the **same** changelog, after the data fix.
-
-## Table dependencies and migration impact
+## Table dependencies and migration impact (appendix — merge path)
 
 **Nothing is deleted.** Row counts for jobs, results, promotions, and deployments
 stay the same. The migration **re-keys** rows in affected `(USER_ID, STRATEGY_NM)`
@@ -820,7 +810,7 @@ global promotion list → still 2 rows.
 
 ---
 
-## Cleanup SQL (review before running)
+## Cleanup SQL (appendix — merge, post-live only)
 
 Run on **staging first**, with a backup. Replace `COMMIT` with `ROLLBACK` for a
 dry-run. Deploy as a one-off Liquibase `<sql>` changeset when approved.
@@ -1114,8 +1104,7 @@ ALTER TABLE BT.STRATEGY
     fix **first**, then the constraint — never the reverse.
 
 1. **Back up** the database.
-2. Run the **data cleanup** Liquibase changelog (collapse duplicates) — but do
-   **not** add the unique constraint yet.
+2. Run Liquibase **`1.10.0`** (truncate → SP → unique constraint) in one deploy.
 3. Deploy **`buildStrategyNm()`** (frontend + tests) — cross-product identity.
 4. Deploy the **`SP_INS_STRATEGY`** change (Design A, with the advisory lock).
 5. Deploy the **Python** change so the API/worker read back the resolved

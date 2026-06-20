@@ -1,6 +1,8 @@
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { JobDetail, JobRow } from '../types/jobs';
+import { PROMOTIONS_QUERY_KEY } from './promotion';
+import type { JobDetail, JobRow, JobStatus } from '../types/jobs';
 import type { OptimizeRequest } from '../types/backtest';
 
 export const JOBS_QUERY_KEY = ['jobs'] as const;
@@ -57,6 +59,33 @@ export function useJobs() {
   });
 }
 
+/**
+ * When a job transitions to COMPLETED, refresh the promotion log and optionally
+ * invoke ``onCompleted`` (e.g. switch to the Promotion tab).
+ *
+ * Mount on BacktestPage so it runs while the user watches the Queue tab.
+ */
+export function useJobCompletionEffects(onCompleted?: (queueId: string) => void) {
+  const jobs = useJobs();
+  const qc = useQueryClient();
+  const prevStatusRef = useRef<Map<string, JobStatus>>(new Map());
+
+  useEffect(() => {
+    const rows = jobs.data;
+    if (!rows) return;
+
+    for (const row of rows) {
+      const prev = prevStatusRef.current.get(row.queue_id);
+      const next = row.queue_status;
+      if (prev && prev !== 'COMPLETED' && next === 'COMPLETED') {
+        qc.invalidateQueries({ queryKey: PROMOTIONS_QUERY_KEY });
+        onCompleted?.(row.queue_id);
+      }
+      prevStatusRef.current.set(row.queue_id, next);
+    }
+  }, [jobs.data, onCompleted, qc]);
+}
+
 /** Cancel a job → invalidate the list so the next poll repaints. */
 export function useCancelJob() {
   const qc = useQueryClient();
@@ -96,6 +125,15 @@ export function useEnqueueJob() {
 /** Fetch one job's frozen config + completion payload (on-demand). */
 export function fetchJob(queueId: string): Promise<JobDetail> {
   return getJob(queueId);
+}
+
+/** Fetch one job's frozen config + payload reactively (skips when no id). */
+export function useJob(queueId?: string) {
+  return useQuery({
+    queryKey: [...JOBS_QUERY_KEY, queueId],
+    queryFn: () => getJob(queueId as string),
+    enabled: Boolean(queueId),
+  });
 }
 
 // ── promote strategy ────────────────────────────────────────────────

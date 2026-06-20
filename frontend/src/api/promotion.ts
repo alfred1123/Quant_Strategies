@@ -20,6 +20,9 @@ export function usePromotions(strategyId?: string) {
   return useQuery({
     queryKey: strategyId ? [...PROMOTIONS_QUERY_KEY, strategyId] : PROMOTIONS_QUERY_KEY,
     queryFn: () => listPromotions(strategyId),
+    // Global staleTime is Infinity — override so tab switches refetch after
+    // a backtest completes and invalidation may have been missed.
+    staleTime: POLL_INTERVAL_MS,
     refetchInterval: POLL_INTERVAL_MS,
     refetchIntervalInBackground: false,
   });

@@ -77,9 +77,7 @@ class JobsService:
         if self._repo.sp_get_queued_count(user_id, queued_id) >= MAX_QUEUED_PER_USER:
             raise RateLimitError(MAX_QUEUED_PER_USER)
 
-        strategy_id = uuid.uuid4()
-        strategy_vid = self._repo.sp_ins_strategy(
-            strategy_id=strategy_id,
+        strategy_id, strategy_vid = self._repo.sp_ins_strategy(
             strategy_nm=req.strategy_nm,
             config_json=req.config_json,
             user_id=user_id,

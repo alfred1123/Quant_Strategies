@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.11.0-001-sp-get-queue" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_GET_QUEUE — LEFT JOIN BT.STRATEGY for STRATEGY_NM, IS_BEST_IND, CONFIG_JSON</comment>
+        <sqlFile path="../procedures/SP_GET_QUEUE.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+</databaseChangeLog>
