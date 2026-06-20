@@ -26,7 +26,7 @@ Backtesting and trading framework for crypto and equity markets. Strategies are 
 
 ## Quick Links
 
-- [Getting Started](getting-started.md) — setup in 3 commands
+- [Getting Started](getting-started.md) — setup, appctl, dbctl, Liquibase, Docker
 - [New User Guide (Website)](guides/new-user-website.md) — run your first backtest in the SPA
 - [CLI Backtest](guides/cli-backtest.md) — all flags and examples
 - [System Overview](architecture/overview.md) — full stack diagram, schemas, phase status

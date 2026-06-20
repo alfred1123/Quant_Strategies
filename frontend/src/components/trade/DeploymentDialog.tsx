@@ -210,7 +210,7 @@ export default function DeploymentDialog({
               onChange={(e) => setQty(e.target.value)}
               error={qty.length > 0 && !qtyValid}
               helperText={qty.length > 0 && !qtyValid ? 'Must be greater than 0' : 'Order size per signal'}
-              inputProps={{ min: 0, step: 'any' }}
+              slotProps={{ htmlInput: { min: 0, step: 'any' } }}
               sx={{ width: { xs: '100%', sm: 160 } }}
             />
           </Stack>
