@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from quant.queue.repo import BtQueueRepo
+from quant.shared.db import ProcedureError
 
 
 @pytest.fixture
@@ -42,5 +43,8 @@ class TestSpGetQueuedCount:
             return fn(cur), None
 
         with patch.object(repo, "_run", side_effect=fake_run):
-            with pytest.raises(RuntimeError, match="SQLSTATE P0001"):
+            with pytest.raises(ProcedureError) as exc_info:
                 repo.sp_get_queued_count("alice", 1)
+            assert exc_info.value.sqlstate == "P0001"
+            assert exc_info.value.proc == "bt.sp_get_queued_count"
+            assert exc_info.value.message == "boom"

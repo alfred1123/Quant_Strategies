@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from quant.shared.db import DbGateway
+from quant.shared.db import DbGateway, ProcedureError
 
 
 class TestCallWrite:
@@ -40,8 +40,11 @@ class TestCallWrite:
         mock_cur.fetchone.return_value = ("23505", "msg", "detail")
 
         gw = DbGateway("postgresql://test")
-        with pytest.raises(RuntimeError, match="23505"):
-            gw._call_write("CALL x", ())
+        with pytest.raises(ProcedureError) as exc_info:
+            gw._call_write("CALL x(%s)", ())
+        assert exc_info.value.sqlstate == "23505"
+        assert exc_info.value.message == "detail"
+        assert exc_info.value.proc == "x"
         mock_conn.commit.assert_not_called()
 
     @patch("quant.shared.db.psycopg.connect")
