@@ -102,12 +102,19 @@ class TestCreateDeployment:
         assert resp.status_code == 404
         assert "API credential" in resp.json()["detail"]
 
-    def test_sp_failure_returns_500(self, client_and_svc):
+    def test_sp_failure_returns_502_with_detail(self, client_and_svc):
         client, svc, _ = client_and_svc
-        svc.create_deployment.side_effect = RuntimeError("Proc failed (SQLSTATE 23505)")
+        from quant.shared.db import ProcedureError
+
+        svc.create_deployment.side_effect = ProcedureError(
+            proc="trade.sp_ins_deployment",
+            sqlstate="23505",
+            message="duplicate deployment",
+        )
 
         resp = client.post("/api/v1/trade/deployments", json=_create_body())
-        assert resp.status_code == 500
+        assert resp.status_code == 409
+        assert resp.json()["detail"]["proc"] == "trade.sp_ins_deployment"
 
     def test_live_without_confirm_returns_400(self, client_and_svc):
         client, svc, _ = client_and_svc
@@ -145,12 +152,19 @@ class TestListDeployments:
         assert data[0]["deployment_id"] == str(rows[0].deployment_id)
         svc.list_deployments.assert_called_once_with(user.app_user_id)
 
-    def test_sp_failure_returns_500(self, client_and_svc):
+    def test_sp_failure_returns_502_with_detail(self, client_and_svc):
         client, svc, _ = client_and_svc
-        svc.list_deployments.side_effect = RuntimeError("Proc failed")
+        from quant.shared.db import ProcedureError
+
+        svc.list_deployments.side_effect = ProcedureError(
+            proc="trade.sp_get_deployment",
+            sqlstate="57000",
+            message="db down",
+        )
 
         resp = client.get("/api/v1/trade/deployments")
-        assert resp.status_code == 500
+        assert resp.status_code == 502
+        assert resp.json()["detail"]["proc"] == "trade.sp_get_deployment"
 
 
 class TestGetDeployment:
@@ -174,9 +188,16 @@ class TestGetDeployment:
         resp = client.get(f"/api/v1/trade/deployments/{dep_id}")
         assert resp.status_code == 404
 
-    def test_sp_failure_returns_500(self, client_and_svc):
+    def test_sp_failure_returns_502_with_detail(self, client_and_svc):
         client, svc, _ = client_and_svc
-        svc.get_deployment.side_effect = RuntimeError("Proc failed")
+        from quant.shared.db import ProcedureError
+
+        svc.get_deployment.side_effect = ProcedureError(
+            proc="trade.sp_get_deployment",
+            sqlstate="57000",
+            message="db down",
+        )
 
         resp = client.get(f"/api/v1/trade/deployments/{uuid.uuid4()}")
-        assert resp.status_code == 500
+        assert resp.status_code == 502
+        assert resp.json()["detail"]["proc"] == "trade.sp_get_deployment"

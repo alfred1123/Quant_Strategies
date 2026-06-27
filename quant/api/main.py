@@ -25,6 +25,7 @@ from quant.api.auth.router import limiter as auth_limiter, router as auth_router
 from quant.api.auth.service import AuthService  # noqa: E402
 from quant.api.credentials.router import limiter as credentials_limiter, router as credentials_router  # noqa: E402
 from quant.api.credentials.service import CredentialService  # noqa: E402
+from quant.api.exception_handlers import register as register_exception_handlers  # noqa: E402
 from quant.api.routers import backtest, deployments, inst, jobs, promotion, refdata, strategies  # noqa: E402
 from quant.refdata.bundle import DataCaches  # noqa: E402
 from quant.refdata.publisher import RefDataPublisher  # noqa: E402
@@ -82,6 +83,7 @@ app = FastAPI(
 app.state.limiter = auth_limiter
 app.state.credentials_limiter = credentials_limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+register_exception_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,

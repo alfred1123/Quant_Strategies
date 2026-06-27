@@ -3,6 +3,29 @@ import type { AxiosError } from 'axios';
 import { queryClient } from '../lib/queryClient';
 import { ME_QUERY_KEY } from './auth';
 
+function formatApiErrorDetail(detail: unknown): string {
+  if (typeof detail === 'string') {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d) => (typeof d === 'object' && d && 'msg' in d ? String(d.msg) : String(d)))
+      .join('; ');
+  }
+  if (typeof detail === 'object' && detail !== null && 'message' in detail) {
+    const d = detail as { message: string; proc?: string; sqlstate?: string };
+    const parts = [d.message];
+    if (d.proc) {
+      parts.push(`(${d.proc})`);
+    }
+    if (d.sqlstate) {
+      parts.push(`[${d.sqlstate}]`);
+    }
+    return parts.join(' ');
+  }
+  return 'Unknown error';
+}
+
 export const apiClient = axios.create({
   baseURL: '/api/v1',
   // Required so the browser sends/stores the HttpOnly `qs_token` cookie
@@ -31,12 +54,9 @@ export class ApiError extends Error {
 // current-user so the App-level route guard re-renders the login page.
 apiClient.interceptors.response.use(
   response => response,
-  (err: AxiosError<{ detail?: string | { msg: string }[] }>) => {
+  (err: AxiosError<{ detail?: unknown }>) => {
     const detail = err.response?.data?.detail;
-    const message =
-      Array.isArray(detail)
-        ? detail.map(d => d.msg).join('; ')
-        : (detail ?? err.message ?? 'Unknown error');
+    const message = formatApiErrorDetail(detail ?? err.message ?? 'Unknown error');
     const status = err.response?.status ?? null;
     console.error('[API]', err.config?.method?.toUpperCase(), err.config?.url, '→', message, err);
 

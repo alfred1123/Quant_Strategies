@@ -91,6 +91,25 @@ class TestEnqueue:
         assert resp.status_code == 429
         assert "rate_limited" in resp.json()["detail"]
 
+    def test_database_error_returns_structured_detail(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        from quant.shared.db import ProcedureError
+
+        svc.enqueue.side_effect = ProcedureError(
+            proc="bt.sp_ins_strategy",
+            sqlstate="23505",
+            message="duplicate key",
+        )
+        resp = client.post(
+            "/api/v1/backtest/jobs",
+            json={"strategy_nm": "test", "config_json": {"symbol": "x"}},
+        )
+        assert resp.status_code == 409
+        detail = resp.json()["detail"]
+        assert detail["proc"] == "bt.sp_ins_strategy"
+        assert detail["sqlstate"] == "23505"
+        assert "duplicate key" in detail["message"]
+
     def test_validation_error_returns_422(self, client_and_svc):
         client, _, _ = client_and_svc
         resp = client.post(

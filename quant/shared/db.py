@@ -11,10 +11,28 @@ as a tuple (often empty).
 """
 
 import logging
+import re
 
 import psycopg
 
 logger = logging.getLogger(__name__)
+
+_PROC_NAME_RE = re.compile(r"CALL\s+([\w.]+)\s*\(", re.IGNORECASE)
+
+
+def _proc_name_from_sql(sql: str) -> str:
+    match = _PROC_NAME_RE.search(sql)
+    return match.group(1) if match else "database"
+
+
+class ProcedureError(RuntimeError):
+    """Stored procedure returned a non-``00000`` SQLSTATE."""
+
+    def __init__(self, *, proc: str, sqlstate: str, message: str) -> None:
+        self.proc = proc
+        self.sqlstate = sqlstate
+        self.message = message
+        super().__init__(message)
 
 
 class DbGateway:
@@ -84,8 +102,15 @@ class DbGateway:
             cursor_name, sqlstate = status[0], status[1]
             if sqlstate != "00000":
                 cur.execute(f'CLOSE "{cursor_name}"')
-                logger.error("_call_get failed (SQLSTATE %s): %s — params=%s", sqlstate, status[3], params)
-                raise RuntimeError(f"Proc failed (SQLSTATE {sqlstate}): {status[3]}")
+                proc = _proc_name_from_sql(sql)
+                logger.error(
+                    "_call_get failed (SQLSTATE %s) proc=%s: %s — params=%s",
+                    sqlstate,
+                    proc,
+                    status[3],
+                    params,
+                )
+                raise ProcedureError(proc=proc, sqlstate=sqlstate, message=status[3])
             cur.execute(f'FETCH ALL FROM "{cursor_name}"')
             cols = [desc.name for desc in cur.description]
             rows = [dict(zip(cols, r)) for r in cur.fetchall()]
@@ -116,13 +141,15 @@ class DbGateway:
                 raise RuntimeError("Proc returned no row or invalid OUT shape")
             sqlstate, _sqlmsg, sqlerrmc = row[0], row[1], row[2]
             if sqlstate != "00000":
+                proc = _proc_name_from_sql(sql)
                 logger.error(
-                    "_call_write failed (SQLSTATE %s): %s — params=%s",
+                    "_call_write failed (SQLSTATE %s) proc=%s: %s — params=%s",
                     sqlstate,
+                    proc,
                     sqlerrmc,
                     params,
                 )
-                raise RuntimeError(f"Proc failed (SQLSTATE {sqlstate}): {sqlerrmc}")
+                raise ProcedureError(proc=proc, sqlstate=sqlstate, message=sqlerrmc)
             return row[3:]
 
         tail, held = self._run(work)

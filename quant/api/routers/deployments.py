@@ -14,7 +14,6 @@ from quant.api.auth.models import CurrentUser
 from quant.queue.repo import BtQueueRepo
 from quant.schemas.deployments import CreateDeploymentRequest, DeploymentRow
 from quant.trade.db_repo import TradeRepo
-from quant.trade.errors import TradeValidationError
 from quant.trade.service import DeploymentNotFound, TradeService
 
 logger = logging.getLogger(__name__)
@@ -30,18 +29,6 @@ def get_trade_service(request: Request) -> TradeService:
     return TradeService(repo=repo)
 
 
-def _map_trade_error(exc: TradeValidationError) -> HTTPException:
-    return HTTPException(status_code=exc.status_code, detail=str(exc))
-
-
-def _map_runtime_error(exc: RuntimeError) -> HTTPException:
-    logger.exception("trade deployment request failed")
-    return HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail=str(exc),
-    )
-
-
 @router.post(
     "/deployments",
     response_model=DeploymentRow,
@@ -52,12 +39,7 @@ def create_deployment(
     user: CurrentUser = Depends(require_user),
     svc: TradeService = Depends(get_trade_service),
 ) -> DeploymentRow:
-    try:
-        return svc.create_deployment(user.app_user_id, str(user.app_user_id), req)
-    except TradeValidationError as exc:
-        raise _map_trade_error(exc) from exc
-    except RuntimeError as exc:
-        raise _map_runtime_error(exc) from exc
+    return svc.create_deployment(user.app_user_id, str(user.app_user_id), req)
 
 
 @router.get("/deployments", response_model=list[DeploymentRow])
@@ -65,12 +47,7 @@ def list_deployments(
     user: CurrentUser = Depends(require_user),
     svc: TradeService = Depends(get_trade_service),
 ) -> list[DeploymentRow]:
-    try:
-        return svc.list_deployments(user.app_user_id)
-    except TradeValidationError as exc:
-        raise _map_trade_error(exc) from exc
-    except RuntimeError as exc:
-        raise _map_runtime_error(exc) from exc
+    return svc.list_deployments(user.app_user_id)
 
 
 @router.get("/deployments/{deployment_id}", response_model=DeploymentRow)
@@ -86,7 +63,3 @@ def get_deployment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
-    except TradeValidationError as exc:
-        raise _map_trade_error(exc) from exc
-    except RuntimeError as exc:
-        raise _map_runtime_error(exc) from exc

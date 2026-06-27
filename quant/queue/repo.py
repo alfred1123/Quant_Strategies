@@ -9,7 +9,7 @@ import json
 import uuid
 from typing import Any, TypeVar
 
-from quant.shared.db import DbGateway
+from quant.shared.db import DbGateway, ProcedureError
 
 T = TypeVar("T")
 
@@ -141,8 +141,10 @@ class BtQueueRepo(DbGateway):
                 raise RuntimeError("SP_GET_QUEUED_COUNT returned invalid OUT row")
             count, sqlstate, _, sqlerrmc = row[0], row[1], row[2], row[3]
             if sqlstate != "00000":
-                raise RuntimeError(
-                    f"Proc failed (SQLSTATE {sqlstate}): {sqlerrmc}",
+                raise ProcedureError(
+                    proc="bt.sp_get_queued_count",
+                    sqlstate=sqlstate,
+                    message=sqlerrmc,
                 )
             return int(count) if count is not None else 0
 
