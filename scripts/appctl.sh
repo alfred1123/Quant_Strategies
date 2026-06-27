@@ -195,6 +195,23 @@ frontend_command() {
   printf '%s' "cd '$ROOT_DIR/frontend' && npm run dev -- --host 0.0.0.0"
 }
 
+ensure_frontend_deps() {
+  # Vite 8 uses rolldown native bindings. npm often skips optional deps on WSL
+  # when node_modules was installed on another OS — vite exits immediately.
+  local binding_dir="$ROOT_DIR/frontend/node_modules/@rolldown/binding-linux-x64-gnu"
+  if [[ "$(uname -s)" == "Linux" && ! -d "$binding_dir" ]]; then
+    echo "Frontend rolldown binding missing — running npm install in frontend/ ..."
+    (cd "$ROOT_DIR/frontend" && npm install @rolldown/binding-linux-x64-gnu@1.0.3 --save-optional) \
+      2>&1 | sed 's/^/  /'
+  fi
+  if [[ "$(uname -s)" == "Linux" && ! -d "$binding_dir" ]]; then
+    echo "WARN: @rolldown/binding-linux-x64-gnu still missing — Vite will crash." >&2
+    echo "      Fix: cd frontend && rm -rf node_modules && npm install" >&2
+    return 1
+  fi
+  return 0
+}
+
 frontend_port() {
   printf '%s' "$DEV_FRONTEND_PORT"
 }
@@ -629,6 +646,9 @@ case "$ACTION" in
       dev_stack_start_redis
     fi
     start_service "backend" "$BACKEND_PID_FILE" "$BACKEND_LOG_FILE" "$(backend_command)" "$BACKEND_PORT"
+    if ! ensure_frontend_deps; then
+      echo "WARN: continuing frontend start anyway — check $FRONTEND_LOG_FILE if it exits" >&2
+    fi
     start_service "frontend" "$FRONTEND_PID_FILE" "$FRONTEND_LOG_FILE" "$(frontend_command)" "$(frontend_port)"
     if [[ "$DB_TARGET" == "local" ]]; then
       # Backend has published REFDATA → worker can resolve queue_status ids.
