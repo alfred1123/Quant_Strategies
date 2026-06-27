@@ -68,17 +68,16 @@ load_env() {
     export QUANTDB_PORT="${LOCAL_DB_PORT:-5432}"
     export QUANTDB_USERNAME="${LOCAL_DB_USER:-quant_admin}"
     export QUANTDB_PASSWORD="${LOCAL_DB_PASSWORD:-LetsGetRich888}"
-    SSLMODE=disable
+    export LIQUIBASE_COMMAND_URL="jdbc:postgresql://${QUANTDB_HOST}:${QUANTDB_PORT}/quantdb?sslmode=disable"
   else
     export QUANTDB_HOST="${QUANTDB_HOST:-localhost}"
-    export QUANTDB_PORT="${PROD_DB_PORT:-5433}"
-    SSLMODE=require
-  fi
-
-  if [[ -n "${_lb_url_override}" ]]; then
-    export LIQUIBASE_COMMAND_URL="${_lb_url_override}"
-  else
-    export LIQUIBASE_COMMAND_URL="jdbc:postgresql://${QUANTDB_HOST}:${QUANTDB_PORT}/quantdb?sslmode=${SSLMODE}"
+    # PROD_DB_PORT overrides (laptop SSM tunnel :5433). Else QUANTDB_PORT from SSM on EC2 (:5432).
+    export QUANTDB_PORT="${PROD_DB_PORT:-${QUANTDB_PORT:-5433}}"
+    if [[ -n "${_lb_url_override}" ]]; then
+      export LIQUIBASE_COMMAND_URL="${_lb_url_override}"
+    else
+      export LIQUIBASE_COMMAND_URL="jdbc:postgresql://${QUANTDB_HOST}:${QUANTDB_PORT}/quantdb?sslmode=require"
+    fi
   fi
   export LIQUIBASE_COMMAND_USERNAME="${LIQUIBASE_COMMAND_USERNAME:-${QUANTDB_USERNAME:?QUANTDB_USERNAME required}}"
   export LIQUIBASE_COMMAND_PASSWORD="${LIQUIBASE_COMMAND_PASSWORD:-${QUANTDB_PASSWORD:?QUANTDB_PASSWORD required}}"

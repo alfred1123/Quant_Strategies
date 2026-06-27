@@ -115,10 +115,26 @@ cd ../inst     && liquibase --defaults-file=liquibase.properties update
 cd ../core_admin && liquibase --defaults-file=liquibase.properties update  # GRANTS refresh
 ```
 
-Prod deploy runs `./scripts/liquibase-deploy.sh` **manually only** (not wired in GitHub Actions). Run on EC2 when a forward release is ready:
+Prod deploy on EC2 (recommended):
+
+```bash
+# GitHub Actions → database workflow (verify or deploy)
+# Or from a machine with AWS creds:
+bash aws/scripts/liquibase-ssm-run.sh verify main
+bash aws/scripts/liquibase-ssm-run.sh deploy main
+```
+
+Prod deploy from EC2 shell (SSM credentials):
 
 ```bash
 APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
+```
+
+Prod dry-run from laptop (SSM tunnel on :5433):
+
+```bash
+PROD_DB_PORT=5433 APP_ENV=prod USE_SSM=1 ./scripts/liquibase-verify.sh
+PROD_DB_PORT=5433 APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
 ```
 
 ## Verify without applying DDL

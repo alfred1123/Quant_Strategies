@@ -4,6 +4,8 @@
 -- client-generated UUID (worker) supplied to BT.SP_INS_RESULT — not DB identity.
 -- QUEUE_ID links to the originating submission; STRATEGY_ID + STRATEGY_VID
 -- are denormalized at insert time for direct strategy-scoped metric lookups.
+-- RESULT_VID + IS_CURRENT_IND soft-version within (STRATEGY_ID, STRATEGY_VID):
+-- re-backtesting the same strategy VID bumps RESULT_VID and flips prior rows.
 --
 -- Key metrics are shredded from PAYLOAD_JSON into dedicated columns for
 -- fast promotion comparison and catalog queries. The full payload
@@ -17,6 +19,8 @@ CREATE TABLE BT.RESULT (
     QUEUE_ID          UUID NOT NULL,
     STRATEGY_ID       UUID,
     STRATEGY_VID      INTEGER,
+    RESULT_VID        INTEGER NOT NULL,
+    IS_CURRENT_IND    CHAR(1) NOT NULL,
     PAYLOAD_JSON      JSONB NOT NULL,
     TOTAL_RETURN      NUMERIC,
     ANNUALIZED_RETURN NUMERIC,
@@ -28,3 +32,5 @@ CREATE TABLE BT.RESULT (
 
 CREATE INDEX IX_RESULT_QUEUE ON BT.RESULT (QUEUE_ID);
 CREATE INDEX IX_RESULT_STRATEGY ON BT.RESULT (STRATEGY_ID, STRATEGY_VID, CREATED_AT DESC);
+CREATE INDEX IX_RESULT_STRATEGY_CURRENT ON BT.RESULT (STRATEGY_ID, STRATEGY_VID)
+    WHERE IS_CURRENT_IND = 'Y';

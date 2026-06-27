@@ -81,8 +81,12 @@ DB_TARGET=local ./scripts/liquibase-verify.sh
 # Apply pending migrations
 DB_TARGET=local ./scripts/liquibase-deploy.sh
 
-# Prod (SSM tunnel must be up; truncates/migrations may wipe BT data — read release notes first)
-DB_TARGET=prod ./scripts/liquibase-deploy.sh
+# Prod schema (Aurora) — GitHub Actions → **database** workflow (verify or deploy)
+# Or: bash aws/scripts/liquibase-ssm-run.sh verify main
+
+# Prod from laptop (SSM tunnel on :5433 must be up)
+PROD_DB_PORT=5433 APP_ENV=prod USE_SSM=1 ./scripts/liquibase-verify.sh
+PROD_DB_PORT=5433 APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
 ```
 
 After a fresh local restore, always run deploy so procs/constraints match source:

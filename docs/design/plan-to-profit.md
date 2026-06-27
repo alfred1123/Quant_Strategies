@@ -345,7 +345,7 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 
 **Tasks**
 
-- [x] DDL: **`BT.SP_GET_STRATEGY_LIST`** — read-only list SP (release `1.12.0`).
+- [x] DDL: **`BT.SP_GET_STRATEGY_LIST`** — read-only list SP (release `1.12.0`; joins `BT.RESULT` on `STRATEGY_ID`/`STRATEGY_VID` from release `1.13.0`).
 - [x] API module: `quant/api/strategies/` — `GET /api/v1/strategies` calls list SP; behind `require_user`.
 - [x] Frontend: `frontend/src/api/strategies.ts` + `StrategyPicker` on Trade Apply.
 - [x] Selecting row sets active `{ strategy_id, strategy_vid }` for deploy payload.

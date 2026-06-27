@@ -53,12 +53,6 @@
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
-    <changeSet id="1.13.0-006-sp-get-strategy-list" author="alfcheun" context="bt" runOnChange="true">
-        <comment>SP_GET_STRATEGY_LIST — join shredded metrics from BT.RESULT by strategy keys</comment>
-        <sqlFile path="../procedures/SP_GET_STRATEGY_LIST.sql" relativeToChangelogFile="true"
-                 splitStatements="false" stripComments="true"/>
-    </changeSet>
-
     <changeSet id="1.13.0-007-drop-sp-get-strategy-list-v2" author="alfcheun" context="bt">
         <comment>Drop legacy 2-arg SP_GET_STRATEGY_LIST (superseded by IN_IS_BEST_IND variant)</comment>
         <sql splitStatements="false">

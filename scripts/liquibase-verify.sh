@@ -76,7 +76,7 @@ load_env() {
     SSLMODE=disable
   else
     export QUANTDB_HOST="${QUANTDB_HOST:-localhost}"
-    export QUANTDB_PORT="${PROD_DB_PORT:-5433}"
+    export QUANTDB_PORT="${PROD_DB_PORT:-${QUANTDB_PORT:-5433}}"
     SSLMODE=require
   fi
 

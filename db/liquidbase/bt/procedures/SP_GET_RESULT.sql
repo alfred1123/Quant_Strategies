@@ -28,6 +28,8 @@ BEGIN
                QUEUE_ID,
                STRATEGY_ID,
                STRATEGY_VID,
+               RESULT_VID,
+               IS_CURRENT_IND,
                PAYLOAD_JSON,
                TOTAL_RETURN,
                ANNUALIZED_RETURN,

@@ -4,9 +4,8 @@
 -- IN_LIMIT        optional — row cap (defaults to 200 when NULL).
 -- IN_IS_BEST_IND  optional — pass 'Y' for best VID per strategy only; NULL for all VIDs.
 --
--- Shredded metrics come from the latest BT.RESULT row for the same
--- (STRATEGY_ID, STRATEGY_VID). CONFIG_JSON is omitted to keep the catalog
--- payload small; load exact config via SP_GET_STRATEGY when applying.
+-- Shredded metrics from the current BT.RESULT row (IS_CURRENT_IND = 'Y')
+-- for the same (STRATEGY_ID, STRATEGY_VID).
 CREATE OR REPLACE PROCEDURE BT.SP_GET_STRATEGY_LIST(
     IN  IN_USER_ID       TEXT,
     IN  IN_LIMIT         INTEGER,
@@ -56,18 +55,10 @@ BEGIN
                R.TOTAL_RETURN,
                R.ANNUALIZED_RETURN
           FROM BT.STRATEGY S
-          LEFT JOIN LATERAL (
-                 SELECT RES.SHARPE_RATIO,
-                        RES.CALMAR_RATIO,
-                        RES.MAX_DRAWDOWN,
-                        RES.TOTAL_RETURN,
-                        RES.ANNUALIZED_RETURN
-                   FROM BT.RESULT RES
-                  WHERE RES.STRATEGY_ID  = S.STRATEGY_ID
-                    AND RES.STRATEGY_VID = S.STRATEGY_VID
-                  ORDER BY RES.CREATED_AT DESC
-                  LIMIT 1
-               ) R ON TRUE
+          LEFT JOIN BT.RESULT R
+            ON R.STRATEGY_ID     = S.STRATEGY_ID
+           AND R.STRATEGY_VID    = S.STRATEGY_VID
+           AND R.IS_CURRENT_IND  = 'Y'
          WHERE S.USER_ID = IN_USER_ID
            AND (IN_IS_BEST_IND IS DISTINCT FROM 'Y' OR S.IS_BEST_IND = 'Y')
          ORDER BY S.CREATED_AT DESC, S.STRATEGY_NM ASC, S.STRATEGY_VID DESC

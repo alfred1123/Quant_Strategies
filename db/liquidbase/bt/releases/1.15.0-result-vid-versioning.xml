@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.15.0-001-result-add-vid-current" author="alfcheun" context="bt">
+        <comment>Add RESULT_VID + IS_CURRENT_IND to BT.RESULT for soft-versioning per strategy VID</comment>
+        <sql splitStatements="true">
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS RESULT_VID INTEGER;
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS IS_CURRENT_IND CHAR(1);
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.15.0-002-result-backfill-vid-current" author="alfcheun" context="bt">
+        <comment>Backfill RESULT_VID/IS_CURRENT_IND — latest row per (STRATEGY_ID, STRATEGY_VID) is current</comment>
+        <sql splitStatements="false"><![CDATA[
+            WITH ranked AS (
+                SELECT RESULT_ID,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY STRATEGY_ID, STRATEGY_VID
+                           ORDER BY CREATED_AT ASC, RESULT_ID
+                       ) AS vid,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY STRATEGY_ID, STRATEGY_VID
+                           ORDER BY CREATED_AT DESC, RESULT_ID
+                       ) AS rev_rank
+                  FROM BT.RESULT
+                 WHERE STRATEGY_ID IS NOT NULL
+            )
+            UPDATE BT.RESULT R
+               SET RESULT_VID     = ranked.vid,
+                   IS_CURRENT_IND = CASE WHEN ranked.rev_rank = 1 THEN 'Y' ELSE 'N' END
+              FROM ranked
+             WHERE R.RESULT_ID = ranked.RESULT_ID;
+
+            UPDATE BT.RESULT
+               SET RESULT_VID = 1,
+                   IS_CURRENT_IND = 'Y'
+             WHERE RESULT_VID IS NULL;
+
+            ALTER TABLE BT.RESULT ALTER COLUMN RESULT_VID SET NOT NULL;
+            ALTER TABLE BT.RESULT ALTER COLUMN IS_CURRENT_IND SET NOT NULL;
+        ]]></sql>
+    </changeSet>
+
+    <changeSet id="1.15.0-003-result-strategy-current-index" author="alfcheun" context="bt">
+        <comment>Partial index for current-result lookup by strategy keys</comment>
+        <sql splitStatements="false">
+            CREATE INDEX IF NOT EXISTS IX_RESULT_STRATEGY_CURRENT
+                ON BT.RESULT (STRATEGY_ID, STRATEGY_VID)
+                WHERE IS_CURRENT_IND = 'Y';
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.15.0-004-sp-ins-result" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_INS_RESULT — bump RESULT_VID and flip IS_CURRENT_IND per strategy VID</comment>
+        <sqlFile path="../procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.15.0-005-sp-get-result" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_GET_RESULT — include RESULT_VID and IS_CURRENT_IND in cursor</comment>
+        <sqlFile path="../procedures/SP_GET_RESULT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.15.0-006-sp-get-strategy-list" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_GET_STRATEGY_LIST — join current BT.RESULT via IS_CURRENT_IND</comment>
+        <sqlFile path="../procedures/SP_GET_STRATEGY_LIST.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+</databaseChangeLog>

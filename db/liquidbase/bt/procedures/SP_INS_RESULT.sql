@@ -17,6 +17,7 @@ DECLARE
     V_USER_ID      TEXT;
     V_STRATEGY_ID  UUID;
     V_STRATEGY_VID INTEGER;
+    V_RESULT_VID   INTEGER;
     V_METRICS      JSONB;
 BEGIN
     OUT_SQLSTATE := '00000';
@@ -41,6 +42,20 @@ BEGIN
         RETURN;
     END IF;
 
+    OUT_SQLMSG := '08';
+    SELECT COALESCE(MAX(RESULT_VID), 0) + 1
+      INTO V_RESULT_VID
+      FROM BT.RESULT
+     WHERE STRATEGY_ID  = V_STRATEGY_ID
+       AND STRATEGY_VID = V_STRATEGY_VID;
+
+    OUT_SQLMSG := '09';
+    UPDATE BT.RESULT
+       SET IS_CURRENT_IND = 'N'
+     WHERE STRATEGY_ID  = V_STRATEGY_ID
+       AND STRATEGY_VID = V_STRATEGY_VID
+       AND IS_CURRENT_IND = 'Y';
+
     V_METRICS := IN_PAYLOAD_JSON -> 'performance' -> 'strategy_metrics';
 
     OUT_SQLMSG := '10';
@@ -49,6 +64,8 @@ BEGIN
         QUEUE_ID,
         STRATEGY_ID,
         STRATEGY_VID,
+        RESULT_VID,
+        IS_CURRENT_IND,
         PAYLOAD_JSON,
         TOTAL_RETURN,
         ANNUALIZED_RETURN,
@@ -61,6 +78,8 @@ BEGIN
         IN_QUEUE_ID,
         V_STRATEGY_ID,
         V_STRATEGY_VID,
+        V_RESULT_VID,
+        'Y',
         IN_PAYLOAD_JSON,
         (V_METRICS ->> 'Total Return')::NUMERIC,
         (V_METRICS ->> 'Annualized Return')::NUMERIC,
