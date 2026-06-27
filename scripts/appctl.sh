@@ -83,9 +83,12 @@ Notes:
   - 'dev tunnel' manages a single canonical AWS SSM port-forward to RDS so you
     only ever have one reconnect loop running (avoids races on port 5433).
     Not needed when DB_TARGET=local.
-  - When DB_TARGET=local, 'dev start' also brings up Redis + the queue worker
+  - When DB_TARGET=local, 'dev start' tries to start local Postgres if it is
+    down (systemctl / pg_ctlcluster), then brings up Redis + the queue worker
     via docker-compose.dev.yml so the backtest queue runs end-to-end.
     'dev stop|kill' tears it down. Requires docker + docker compose v2.
+  - When DB_TARGET=prod, 'dev start' auto-starts the SSM tunnel if :5433 is
+    down (same as 'dev tunnel start').
   - prod mode loads ./.env when present (set -a) so docker compose can substitute
     QUANTDB_URL, JWT_SECRET, REDIS_URL, etc. FastAPI and the worker both load
     secrets via SSM inside their containers when USE_SSM=1.
@@ -219,6 +222,92 @@ try:
 except Exception:
     sys.exit(1)
 PY
+}
+
+_start_systemd_postgresql() {
+  command -v systemctl >/dev/null 2>&1 || return 1
+  if systemctl is-active --quiet postgresql 2>/dev/null; then
+    return 0
+  fi
+  echo "Starting local Postgres (systemctl start postgresql) ..."
+  if systemctl start postgresql 2>/dev/null; then
+    return 0
+  fi
+  if sudo -n systemctl start postgresql 2>/dev/null; then
+    return 0
+  fi
+  sudo systemctl start postgresql
+}
+
+_start_pg_ctlcluster() {
+  command -v pg_ctlcluster >/dev/null 2>&1 || return 1
+  local line ver cluster
+  line="$(pg_lsclusters 2>/dev/null | awk 'NR==2 {print $1, $2, $4}')"
+  [[ -n "$line" ]] || return 1
+  read -r ver cluster _ <<<"$line"
+  [[ -n "$ver" && -n "$cluster" ]] || return 1
+  if [[ "$_" == "online" ]]; then
+    return 0
+  fi
+  echo "Starting local Postgres (pg_ctlcluster $ver $cluster start) ..."
+  if pg_ctlcluster "$ver" "$cluster" start 2>/dev/null; then
+    return 0
+  fi
+  if sudo -n pg_ctlcluster "$ver" "$cluster" start 2>/dev/null; then
+    return 0
+  fi
+  sudo pg_ctlcluster "$ver" "$cluster" start
+}
+
+ensure_local_postgres() {
+  # Best-effort boot of the OS Postgres service/cluster when DB_TARGET=local.
+  if db_reachable; then
+    return 0
+  fi
+  echo "Local Postgres on 127.0.0.1:$DB_PORT is not reachable — trying to start it ..."
+  _start_systemd_postgresql 2>/dev/null || _start_pg_ctlcluster 2>/dev/null || true
+  local i
+  for ((i = 1; i <= 15; i++)); do
+    if db_reachable; then
+      echo "Local Postgres ready on 127.0.0.1:$DB_PORT"
+      return 0
+    fi
+    if command -v pg_isready >/dev/null 2>&1; then
+      pg_isready -h "${LOCAL_DB_HOST:-127.0.0.1}" -p "$DB_PORT" -q 2>/dev/null && db_reachable && return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+ensure_prod_db_tunnel() {
+  # When DB_TARGET=prod, DB == SSM tunnel on :5433. Start tunnel if down.
+  if db_reachable; then
+    return 0
+  fi
+  local tunnel_pid
+  tunnel_pid="$(read_pid "$TUNNEL_PID_FILE")"
+  if ! pid_is_running "$tunnel_pid"; then
+    echo "DB tunnel on 127.0.0.1:$DB_PORT is down — starting SSM port-forward ..."
+    start_service "tunnel" "$TUNNEL_PID_FILE" "$TUNNEL_LOG_FILE" "$(tunnel_command)" "$DB_PORT"
+  fi
+  local i
+  for ((i = 1; i <= 15; i++)); do
+    if db_reachable; then
+      echo "DB reachable on 127.0.0.1:$DB_PORT via SSM tunnel"
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+ensure_db_ready() {
+  if [[ "$DB_TARGET" == "local" ]]; then
+    ensure_local_postgres
+  else
+    ensure_prod_db_tunnel
+  fi
 }
 
 pid_is_running() {
@@ -519,17 +608,19 @@ case "$ACTION" in
     exit 0
     ;;
   start)
-    # Pre-flight: API lifespan blocks on DB; refuse to start if it isn't reachable.
-    if ! db_reachable; then
+    # Pre-flight: API lifespan blocks on DB — try to start it, then refuse if still down.
+    if ! ensure_db_ready; then
       if [[ "$DB_TARGET" == "local" ]]; then
         echo "Local Postgres on 127.0.0.1:$DB_PORT is NOT reachable." >&2
-        echo "  - Start it:    sudo systemctl start postgresql" >&2
-        echo "  - Or restore:  ./scripts/dbctl.sh reset && ./scripts/dbctl.sh restore" >&2
-        echo "  - Or switch back to prod DB: unset DB_TARGET in .env (or set DB_TARGET=prod)" >&2
+        echo "  - Start manually: sudo systemctl start postgresql" >&2
+        echo "  - Or restore:     ./scripts/dbctl.sh reset && ./scripts/dbctl.sh restore" >&2
+        echo "  - Or use prod DB: set DB_TARGET=prod in .env and run ./scripts/appctl.sh dev tunnel start" >&2
       else
         echo "DB on 127.0.0.1:$DB_PORT is NOT reachable." >&2
-        echo "Start the SSM tunnel first:  ./scripts/appctl.sh dev tunnel start" >&2
-        echo "(Or use a local DB: set DB_TARGET=local in .env after running ./scripts/dbctl.sh restore)" >&2
+        echo "  - Check tunnel:   ./scripts/appctl.sh dev tunnel status" >&2
+        echo "  - Start tunnel:   ./scripts/appctl.sh dev tunnel start" >&2
+        echo "  - Tunnel log:     $TUNNEL_LOG_FILE" >&2
+        echo "(Or use local DB: set DB_TARGET=local in .env after ./scripts/dbctl.sh restore)" >&2
       fi
       exit 2
     fi
