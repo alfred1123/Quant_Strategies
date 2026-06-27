@@ -54,7 +54,14 @@ ensure_jdbc_driver() {
   if [[ -f "$jar" ]]; then
     return 0
   fi
-  [[ "$CHECK_ONLY" == true ]] && die "PostgreSQL JDBC driver missing: ${jar}"
+  # Liquibase tarball ships a postgresql*.jar — use it instead of duplicating drivers.
+  local bundled
+  bundled=$(find "${LIQUIBASE_HOME}/lib" -maxdepth 1 -name 'postgresql*.jar' -print -quit 2>/dev/null || true)
+  if [[ -n "$bundled" ]]; then
+    log "JDBC OK (bundled): $(basename "$bundled")"
+    return 0
+  fi
+  [[ "$CHECK_ONLY" == true ]] && die "PostgreSQL JDBC driver missing under ${LIQUIBASE_HOME}/lib"
   mkdir -p "${LIQUIBASE_HOME}/lib"
   log "Downloading PostgreSQL JDBC ${JDBC_VERSION}"
   curl -fsSL \
@@ -69,15 +76,11 @@ install_liquibase() {
   [[ "$CHECK_ONLY" == true ]] && die "Liquibase not installed at ${LIQUIBASE_HOME}/liquibase"
 
   log "Installing Liquibase ${LIQUIBASE_VERSION} -> ${LIQUIBASE_HOME}"
-  local tmp
-  tmp=$(mktemp -d)
-  trap 'rm -rf "$tmp"' RETURN
-
+  mkdir -p "${LIQUIBASE_HOME}"
+  # Stream extract — no mktemp/rm; nothing shared under /tmp to track or clean up.
   curl -fsSL \
     "https://github.com/liquibase/liquibase/releases/download/v${LIQUIBASE_VERSION}/liquibase-${LIQUIBASE_VERSION}.tar.gz" \
-    -o "${tmp}/liquibase.tgz"
-  mkdir -p "${LIQUIBASE_HOME}"
-  tar -xzf "${tmp}/liquibase.tgz" -C "${LIQUIBASE_HOME}"
+    | tar -xzf - -C "${LIQUIBASE_HOME}"
 
   chmod +x "${LIQUIBASE_HOME}/liquibase"
   ln -sf "${LIQUIBASE_HOME}/liquibase" /usr/local/bin/liquibase
