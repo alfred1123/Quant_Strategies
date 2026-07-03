@@ -92,6 +92,23 @@ class OptimizeResult:
         return plots or None
 
 
+def extract_best_params(best: dict) -> tuple:
+    """Extract ``(window, signal)`` from an optimize ``best`` row.
+
+    Single-factor dicts use ``window`` / ``signal`` keys.
+    Multi-factor dicts use ``window_0``, ``signal_0``, …
+    """
+    if "window" in best:
+        return int(best["window"]), float(best["signal"])
+    n = sum(1 for k in best if k.startswith("window_"))
+    if n == 0:
+        raise ValueError("best params missing window/signal keys")
+    return (
+        tuple(int(best[f"window_{i}"]) for i in range(n)),
+        tuple(float(best[f"signal_{i}"]) for i in range(n)),
+    )
+
+
 class ParametersOptimization:
 
     def __init__(self, data, config, *, fee_bps=None):

@@ -64,6 +64,18 @@ async def lifespan(app: FastAPI):
     caches = DataCaches(DB_CONNINFO, redis_url)
     caches.load_instruments(soft_fail=False)
     app.state.data_caches = caches
+
+    from quant.trade.registry import AdapterRegistry, build_default_registry
+
+    try:
+        app.state.adapter_registry = build_default_registry(caches.refdata)
+        logger.info("Adapter registry ready for ccxt brokers")
+    except Exception:
+        logger.exception(
+            "Failed to build adapter registry — ccxt dry-run will reject unknown app_id",
+        )
+        app.state.adapter_registry = AdapterRegistry()
+
     yield
 
 

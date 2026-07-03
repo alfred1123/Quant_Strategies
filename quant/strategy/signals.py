@@ -336,6 +336,52 @@ def strategy_to_json(config: StrategyConfig, window=None, signal=None) -> dict:
     }
 
 
+def config_from_json(doc: dict) -> StrategyConfig:
+    """Build a ``StrategyConfig`` from ``strategy_to_json`` output."""
+    internal = doc.get("internal_cusip") or doc.get("ticker")
+    if not internal:
+        raise ValueError("CONFIG_JSON missing internal_cusip")
+
+    subs_raw = doc.get("substrategies") or []
+    if not subs_raw:
+        raise ValueError("CONFIG_JSON has no substrategies")
+
+    subs = tuple(
+        SubStrategy(
+            indicator_name=s["indicator"],
+            signal_func_name=s["signal_func"],
+            window=int(s["window"]),
+            signal=float(s["signal"]),
+            data_column=s.get("data_column", "v"),
+            internal_cusip=s.get("internal_cusip"),
+        )
+        for s in subs_raw
+    )
+    first = subs[0]
+    signal_func = getattr(SignalDirection, first.signal_func_name)
+    return StrategyConfig(
+        internal_cusip=internal,
+        indicator_name=first.indicator_name,
+        signal_func=signal_func,
+        trading_period=int(doc.get("trading_period", 365)),
+        strategy_id=str(doc.get("strategy_id", "")),
+        name=doc.get("name", ""),
+        conjunction=doc.get("conjunction", "AND"),
+        substrategies=subs,
+    )
+
+
+def params_from_strategy_json(doc: dict) -> tuple:
+    """Return ``(window, signal)`` from serialized strategy JSON."""
+    subs = doc["substrategies"]
+    if len(subs) == 1:
+        return int(subs[0]["window"]), float(subs[0]["signal"])
+    return (
+        tuple(int(s["window"]) for s in subs),
+        tuple(float(s["signal"]) for s in subs),
+    )
+
+
 def backtest_results_to_json(strategy_id, perf, internal_cusip, start, end, fee_bps):
     """Serialize backtest Performance metrics to JSON."""
     return {

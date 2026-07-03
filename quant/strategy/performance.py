@@ -20,9 +20,38 @@ from quant.strategy.signals import StrategyConfig, combine_positions
 logger = logging.getLogger(__name__)
 
 
+def _live_lookback_days(max_window: int, trading_period: int) -> int:
+    """Calendar days of history to fetch so indicators are valid on the latest bar."""
+    return max(max_window * 3 + 60, min(trading_period, 400))
+
+
+def _live_date_range(window, trading_period: int) -> tuple[str, str]:
+    """ISO ``(start, end)`` for live position evaluation ending today."""
+    from datetime import date, timedelta
+
+    if isinstance(window, (tuple, list)):
+        max_window = max(int(w) for w in window)
+    else:
+        max_window = int(window)
+    days = _live_lookback_days(max_window, trading_period)
+    end = date.today()
+    start = end - timedelta(days=days)
+    return start.isoformat(), end.isoformat()
+
+
+def _latest_final_position(final_position: pd.Series) -> tuple[float, str]:
+    """Return ``(position, data_as_of)`` from a ``FinalPosition`` series."""
+    if not isinstance(final_position, pd.Series):
+        final_position = pd.Series(final_position)
+    series = final_position.dropna()
+    if series.empty:
+        raise ValueError("insufficient data to compute signal")
+    return float(series.iloc[-1]), str(series.index[-1])
+
+
 class Performance:
-    
-    
+
+
     DEFAULT_FEE_BPS = 5.0  # 5 bps (0.05%) transaction cost per unit of turnover
 
     def __init__(self, data, config, window=None, signal=None, *, fee_bps=None) -> None:
@@ -61,72 +90,113 @@ class Performance:
                      self.window, self.signal, config.trading_period,
                      self.fee_bps, self._is_multi)
 
-    def enrich_performance(self):
-        """Compute indicators, positions, and PnL columns.
-
-        Dispatches to single-factor or multi-factor path based on config.
-        Returns self for optional call chaining.
-        """
+    def _trade_enrich_positions(self):
+        """Compute indicators and ``FinalPosition`` only — no PnL / metrics columns."""
         if self._is_multi:
             self._enrich_multi_factor()
         else:
             self._enrich_single_factor()
+        return self
+
+    def enrich_performance(self):
+        """Compute indicators, positions, and PnL columns."""
+        self._trade_enrich_positions()
         self._compute_pnl_columns()
         return self
 
-    def _enrich_single_factor(self):
+    def _compute_latest_position(self) -> tuple[float, str]:
+        """Latest ``FinalPosition`` using the same math as backtest enrichment."""
+        if self._is_multi:
+            _, _, final_position, _ = self._compute_multi_factor_outputs()
+        else:
+            _, final_position, _ = self._compute_single_factor_outputs()
+        return _latest_final_position(final_position)
+
+    def _trade_latest_final_position(self) -> tuple[float, str]:
+        """Return ``(position, data_as_of)`` after :meth:`_trade_enrich_positions`."""
+        return _latest_final_position(self.data["FinalPosition"])
+
+    def _factor_series_for_sub(self, sub, main_index: pd.Index) -> pd.Series:
+        """Factor column for *sub*, aligned to *main_index*."""
+        sub_cusip = sub.internal_cusip or self.config.internal_cusip
+        sub_df = self.all_data[sub_cusip]
+        if sub_cusip != self.config.internal_cusip:
+            self._validate_factor_coverage(sub_df, sub_cusip)
+        return sub_df[sub.data_column].reindex(main_index)
+
+    def _indicator_and_position(
+        self,
+        sub,
+        factor_vals: pd.Series,
+        window: int,
+        signal: float,
+    ) -> tuple[pd.Series, pd.Series]:
+        sub_data = pd.DataFrame({"factor": factor_vals})
+        ta = TechnicalAnalysis(sub_data)
+        indicator_func = getattr(ta, sub.indicator_name)
+        indicator_vals = indicator_func(window).reindex(factor_vals.index)
+        pos = sub.resolve_signal_func()(indicator_vals, signal)
+        return indicator_vals, pos
+
+    def _compute_single_factor_outputs(self) -> tuple[pd.DataFrame, pd.Series, object]:
+        """Shared single-factor indicator → position math (backtest + trade)."""
         sub = self._subs[0]
         sub_cusip = sub.internal_cusip or self.config.internal_cusip
-        # Cross-product: indicator computed from a different product's DataFrame
+        data = self.data.copy()
         if sub_cusip != self.config.internal_cusip:
-            sub_df = self.all_data[sub_cusip]
-            self._validate_factor_coverage(sub_df, sub_cusip)
-            self.data['factor'] = sub_df[sub.data_column].reindex(self.data.index)
-        ta = TechnicalAnalysis(self.data)
-        self.data = ta.data
-        self.indicator_func = getattr(ta, self.config.indicator_name)
-        self.data['chg'] = self.data['price'].pct_change()
-        self.data['factor1'] = self.data['factor']
-        self.data['indicator1'] = self.indicator_func(self._windows[0])
-        self.data['position1'] = self.config.signal_func(
-            self.data['indicator1'], self._signals[0])
-        self.data['FinalPosition'] = self.data['position1']
+            data["factor"] = self._factor_series_for_sub(sub, data.index)
+        ta = TechnicalAnalysis(data)
+        data = ta.data
+        indicator_func = getattr(ta, self.config.indicator_name)
+        data["factor1"] = data["factor"]
+        data["indicator1"] = indicator_func(self._windows[0])
+        data["position1"] = self.config.signal_func(
+            data["indicator1"], self._signals[0],
+        )
+        return data, data["position1"], indicator_func
 
-    def _enrich_multi_factor(self):
+    def _compute_multi_factor_outputs(
+        self,
+    ) -> tuple[pd.DataFrame, list[tuple[pd.Series, pd.Series, pd.Series]], pd.Series, object]:
+        """Shared multi-factor indicator → position math (backtest + trade)."""
         ta_base = TechnicalAnalysis(self.data.copy())
-        self.data = ta_base.data
-        self.indicator_func = getattr(ta_base, self._subs[0].indicator_name)
-        self.data['chg'] = self.data['price'].pct_change()
-
+        data = ta_base.data
+        indicator_func = getattr(ta_base, self._subs[0].indicator_name)
+        main_index = data.index
         positions = []
+        factor_outputs: list[tuple[pd.Series, pd.Series, pd.Series]] = []
         for i, sub in enumerate(self._subs):
-            idx = i + 1
-            sub_cusip = sub.internal_cusip or self.config.internal_cusip
-            sub_df = self.all_data[sub_cusip]
-            if sub_cusip != self.config.internal_cusip:
-                self._validate_factor_coverage(sub_df, sub_cusip)
-            # Per-factor column: factorN from the sub's data_column on resolved DataFrame
-            factor_vals = sub_df[sub.data_column].reindex(self.data.index)
-            self.data[f'factor{idx}'] = factor_vals
-            # Build a TA instance on this factor's data
-            sub_data = pd.DataFrame({'factor': factor_vals})
-            ta = TechnicalAnalysis(sub_data)
-            indicator_func = getattr(ta, sub.indicator_name)
-            indicator_vals = indicator_func(self._windows[i])
-            # Reindex to match self.data — some indicators (e.g. RSI) drop rows
-            indicator_vals = indicator_vals.reindex(self.data.index)
-            signal_func = sub.resolve_signal_func()
-            pos = signal_func(indicator_vals, self._signals[i])
-
-            self.data[f'indicator{idx}'] = indicator_vals
-            self.data[f'position{idx}'] = pos
+            factor_vals = self._factor_series_for_sub(sub, main_index)
+            indicator_vals, pos = self._indicator_and_position(
+                sub, factor_vals, self._windows[i], self._signals[i],
+            )
+            factor_outputs.append((factor_vals, indicator_vals, pos))
             positions.append(pos)
 
-        indicator_strengths = [self.data[f'indicator{i+1}'].values
-                               for i in range(len(self._subs))]
-        combined = combine_positions(positions, self.config.conjunction,
-                                     strengths=indicator_strengths)
-        self.data['FinalPosition'] = combined
+        indicator_strengths = [indicator_vals.values for _, indicator_vals, _ in factor_outputs]
+        combined = combine_positions(
+            positions, self.config.conjunction, strengths=indicator_strengths,
+        )
+        final_position = pd.Series(combined, index=data.index)
+        return data, factor_outputs, final_position, indicator_func
+
+    def _enrich_single_factor(self):
+        data, final_position, indicator_func = self._compute_single_factor_outputs()
+        self.data = data
+        self.indicator_func = indicator_func
+        self.data["chg"] = self.data["price"].pct_change()
+        self.data["FinalPosition"] = final_position
+
+    def _enrich_multi_factor(self):
+        data, factor_outputs, final_position, indicator_func = self._compute_multi_factor_outputs()
+        self.data = data
+        self.indicator_func = indicator_func
+        self.data["chg"] = self.data["price"].pct_change()
+        for i, (factor_vals, indicator_vals, pos) in enumerate(factor_outputs, start=1):
+            self.data[f"factor{i}"] = factor_vals
+            self.data[f"indicator{i}"] = indicator_vals
+            self.data[f"position{i}"] = pos
+        self.data["FinalPosition"] = final_position
 
     def _validate_factor_coverage(self, factor_df, factor_cusip):
         """Raise if the factor has fewer trading days than the main product.
@@ -161,18 +231,18 @@ class Performance:
         self.data['buy_hold_cumu'] = self.data['buy_hold'].cumsum()
         self.data['buy_hold_dd'] = (self.data['buy_hold_cumu'].cummax()
                                     - self.data['buy_hold_cumu'])
-    
-        
-    # take account that nan leading zeros    
+
+
+    # take account that nan leading zeros
     def get_total_return(self):
         total_return = self.data['cumu'].iloc[-1]
         return total_return
-    
+
     # take account that nan leading zeros
     def get_annualized_return(self):
         annualized_return = self.data.iloc[self._metric_window:]['pnl'].mean() * self.trading_period
         return annualized_return
-        
+
     def get_sharpe_ratio(self):
         pnl = self.data.iloc[self._metric_window:]['pnl']
         std = pnl.std()
@@ -181,11 +251,11 @@ class Performance:
             return np.nan
         sharpe_ratio = pnl.mean() / std * np.sqrt(self.trading_period)
         return sharpe_ratio
-    
+
     def get_max_drawdown(self):
         max_drawdown = self.data['dd'].max()
         return max_drawdown
-    
+
     def get_calmar_ratio(self):
         max_dd = self.get_max_drawdown()
         if max_dd == 0 or np.isnan(max_dd):
@@ -193,15 +263,15 @@ class Performance:
             return np.nan
         calmar_ratio = self.get_annualized_return() / max_dd
         return calmar_ratio
-    
+
     def get_buy_hold_total_return(self):
         total_return = self.data['buy_hold_cumu'].iloc[-1]
         return total_return
-    
+
     def get_buy_hold_annualized_return(self):
         annualized_return = self.data.iloc[self._metric_window:]['buy_hold'].mean() * self.trading_period
         return annualized_return
-    
+
     def get_buy_hold_sharpe_ratio(self):
         bh = self.data.iloc[self._metric_window:]['buy_hold']
         std = bh.std()
@@ -210,11 +280,11 @@ class Performance:
             return np.nan
         sharpe_ratio = bh.mean() / std * np.sqrt(self.trading_period)
         return sharpe_ratio
-    
+
     def get_buy_hold_max_drawdown(self):
         max_drawdown = self.data['buy_hold_dd'].max()
         return max_drawdown
-    
+
     def get_buy_hold_calmar_ratio(self):
         max_dd = self.get_buy_hold_max_drawdown()
         if max_dd == 0 or np.isnan(max_dd):
@@ -222,7 +292,7 @@ class Performance:
             return np.nan
         calmar_ratio = self.get_buy_hold_annualized_return() / max_dd
         return calmar_ratio
-    
+
     def get_strategy_performance(self):
         strategy_performance = pd.Series([self.get_total_return(),
                                         self.get_annualized_return(),
@@ -231,7 +301,7 @@ class Performance:
                                         self.get_calmar_ratio()
         ], index=['Total Return', 'Annualized Return', 'Sharpe Ratio', 'Max Drawdown', 'Calmar Ratio'])
         return strategy_performance
-    
+
     def get_buy_hold_performance(self):
         buy_hold_performance = pd.Series([self.get_buy_hold_total_return(),
                                           self.get_buy_hold_annualized_return(),
@@ -240,12 +310,5 @@ class Performance:
                                           self.get_buy_hold_calmar_ratio()
         ], index=['Total Return', 'Annualized Return', 'Sharpe Ratio', 'Max Drawdown', 'Calmar Ratio'])
         return buy_hold_performance
-                                          
-                                        
-    
-    
 
-    
 
-    
-    

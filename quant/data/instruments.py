@@ -82,5 +82,15 @@ class InstrumentCache(DbGateway):
                 return x["vendor_symbol"]
         return None
 
+    def resolve_internal_cusip(self, internal_cusip: str, app_id: int) -> str | None:
+        """Resolve ``(internal_cusip, app_id)`` to a vendor symbol.
+
+        Returns ``None`` if the product is unknown or no xref exists.
+        """
+        product = self.get_product_by_cusip(internal_cusip)
+        if product is None:
+            return None
+        return self.resolve_vendor_symbol(product["product_id"], app_id)
+
     def refresh(self) -> None:
         self.load_all()

@@ -87,15 +87,9 @@ class PromotionRepo(DbGateway):
     # ── orchestration ────────────────────────────────────────────────
 
     def _fetch_best_payload(self, strategy_id, best_strat: dict) -> dict | None:
-        rows = self._bt.sp_get_queue(strategy_id=strategy_id, limit=1)
-        best_q = next(
-            (r for r in rows if r["strategy_vid"] == best_strat["strategy_vid"]),
-            None,
+        return self._bt.fetch_result_payload(
+            strategy_id, best_strat["strategy_vid"]
         )
-        if best_q is None:
-            return None
-        result = self._bt.sp_get_result(best_q["queue_id"])
-        return result["payload_json"] if result else None
 
     def _apply(
         self, decision: PromotionDecision, *, strategy_id, strategy_vid: int,

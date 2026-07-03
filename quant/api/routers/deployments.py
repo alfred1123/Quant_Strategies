@@ -11,9 +11,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from quant.api.auth.dependencies import require_user
 from quant.api.auth.models import CurrentUser
+from quant.api.credentials.repo import ApiCredentialRepo
+from quant.api.credentials.service import CredentialService
 from quant.queue.repo import BtQueueRepo
 from quant.schemas.deployments import CreateDeploymentRequest, DeploymentRow
+from quant.schemas.dry_run import DryRunReport, DryRunRequest
 from quant.trade.db_repo import TradeRepo
+from quant.trade.registry import AdapterRegistry
 from quant.trade.service import DeploymentNotFound, TradeService
 
 logger = logging.getLogger(__name__)
@@ -27,6 +31,40 @@ def get_trade_service(request: Request) -> TradeService:
     bt = BtQueueRepo(conninfo, user_id="system")
     repo = TradeRepo(conninfo, bt=bt, user_id="system")
     return TradeService(repo=repo)
+
+
+def get_bt_repo(request: Request) -> BtQueueRepo:
+    return BtQueueRepo(request.app.state.db_conninfo, user_id="system")
+
+
+def get_credential_repo(request: Request) -> ApiCredentialRepo:
+    return ApiCredentialRepo(request.app.state.db_conninfo, user_id="system")
+
+
+def get_adapter_registry(request: Request) -> AdapterRegistry:
+    return request.app.state.adapter_registry
+
+
+@router.post("/deployments/dry-run", response_model=DryRunReport)
+def dry_run_deployment(
+    req: DryRunRequest,
+    request: Request,
+    user: CurrentUser = Depends(require_user),
+    svc: TradeService = Depends(get_trade_service),
+    bt: BtQueueRepo = Depends(get_bt_repo),
+    credential_repo: ApiCredentialRepo = Depends(get_credential_repo),
+    adapter_registry: AdapterRegistry = Depends(get_adapter_registry),
+) -> DryRunReport:
+    credential_service: CredentialService = request.app.state.credential_service
+    return svc.dry_run(
+        user.app_user_id,
+        req,
+        bt=bt,
+        credential_service=credential_service,
+        credential_repo=credential_repo,
+        adapter_registry=adapter_registry,
+        data_caches=request.app.state.data_caches,
+    )
 
 
 @router.post(
