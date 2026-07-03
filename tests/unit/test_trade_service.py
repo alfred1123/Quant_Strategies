@@ -34,7 +34,14 @@ def _sp_row(**overrides):
 
 @pytest.fixture
 def svc():
-    return TradeService(repo=MagicMock())
+    return TradeService(
+        repo=MagicMock(),
+        bt=MagicMock(),
+        credential_service=MagicMock(),
+        credential_repo=MagicMock(),
+        adapter_registry=MagicMock(),
+        data_caches=MagicMock(),
+    )
 
 
 class TestCreateDeployment:

@@ -73,7 +73,7 @@ def run_dry_run(
         paper=req.paper,
         inst_cache=data_caches.instrument_cache,
     )
-    try:
+    with adapter:
         return _broker_report(
             adapter=adapter,
             req=req,
@@ -81,8 +81,6 @@ def run_dry_run(
             signal=position,
             data_as_of=data_as_of,
         )
-    finally:
-        adapter.disconnect()
 
 
 def _broker_report(
@@ -93,7 +91,7 @@ def _broker_report(
     signal: float,
     data_as_of: str,
 ) -> DryRunReport:
-    adapter.connect()
+    """Build dry-run report; caller must manage adapter lifecycle via context manager."""
     try:
         vendor_symbol = adapter.validate_for_dry_run(req.internal_cusip, req.app_id)
     except ValueError as exc:

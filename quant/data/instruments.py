@@ -23,6 +23,9 @@ class InstrumentCache(DbGateway):
         super().__init__(conninfo, persistent=True)
         self._products: list[dict] = []
         self._xrefs: list[dict] = []
+        self._by_cusip: dict[str, dict] = {}
+        self._by_product_id: dict[int, dict] = {}
+        self._xref_index: dict[tuple[int, int], str] = {}
 
     # ── load ─────────────────────────────────────────────────────────────
 
@@ -36,6 +39,12 @@ class InstrumentCache(DbGateway):
             "CALL INST.SP_GET_PRODUCT_XREF(%s, %s, %s, NULL, NULL, NULL, NULL)",
             (None, None, None),
         )
+        self._by_cusip = {p["internal_cusip"]: p for p in self._products}
+        self._by_product_id = {p["product_id"]: p for p in self._products}
+        self._xref_index = {
+            (x["product_id"], x["app_id"]): x["vendor_symbol"]
+            for x in self._xrefs
+        }
         logger.info(
             "InstrumentCache loaded %d products, %d xrefs",
             len(self._products), len(self._xrefs),
@@ -49,17 +58,11 @@ class InstrumentCache(DbGateway):
 
     def get_product_by_id(self, product_id: int) -> dict | None:
         """Lookup a single product by PRODUCT_ID."""
-        for p in self._products:
-            if p["product_id"] == product_id:
-                return p
-        return None
+        return self._by_product_id.get(product_id)
 
     def get_product_by_cusip(self, internal_cusip: str) -> dict | None:
         """Lookup a single product by INTERNAL_CUSIP."""
-        for p in self._products:
-            if p["internal_cusip"] == internal_cusip:
-                return p
-        return None
+        return self._by_cusip.get(internal_cusip)
 
     # ── xref lookups ─────────────────────────────────────────────────────
 
@@ -77,10 +80,7 @@ class InstrumentCache(DbGateway):
 
         Returns ``None`` if no mapping exists.
         """
-        for x in self._xrefs:
-            if x["product_id"] == product_id and x["app_id"] == app_id:
-                return x["vendor_symbol"]
-        return None
+        return self._xref_index.get((product_id, app_id))
 
     def resolve_internal_cusip(self, internal_cusip: str, app_id: int) -> str | None:
         """Resolve ``(internal_cusip, app_id)`` to a vendor symbol.

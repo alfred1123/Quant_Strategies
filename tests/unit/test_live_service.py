@@ -62,7 +62,7 @@ class TestConfigFromJson:
 
 
 class TestBuildDataDictForSignal:
-    @patch("quant.strategy.live_service._fetch_df")
+    @patch("quant.strategy.live_service.fetch_df")
     @patch("quant.strategy.backtest_service._enforce_date_sync")
     def test_does_not_use_backtest_date_sync(
         self, mock_sync, mock_fetch, strategy_json_doc, data_caches
@@ -87,7 +87,7 @@ class TestBuildDataDictForSignal:
 
 
 class TestComputeLatestPosition:
-    @patch("quant.strategy.live_service._fetch_df")
+    @patch("quant.strategy.live_service.fetch_df")
     def test_strategy_json_format(self, mock_fetch, strategy_json_doc, data_caches):
         mock_fetch.return_value = _sample_df()
 
@@ -100,7 +100,7 @@ class TestComputeLatestPosition:
         assert position in (-1.0, 0.0, 1.0)
         assert as_of
 
-    @patch("quant.strategy.live_service._fetch_df")
+    @patch("quant.strategy.live_service.fetch_df")
     def test_optimize_format_requires_result(self, mock_fetch, data_caches):
         config_json = {
             "symbol": "btc-usd.crypto",

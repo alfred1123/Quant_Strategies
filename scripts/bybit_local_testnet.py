@@ -358,9 +358,9 @@ def refresh_live_data(
     import json
 
     from quant.queue.repo import BtQueueRepo
-    from quant.strategy.backtest_service import _fetch_df
+    from quant.strategy.backtest_service import fetch_df
     from quant.strategy.live_service import _default_data_source, _resolve_config_and_params
-    from quant.strategy.performance import _live_date_range
+    from quant.strategy.performance import live_date_range
 
     bt = BtQueueRepo(conninfo, user_id="bybit_local_testnet")
     rows = bt.sp_get_strategy(strategy_id, strategy_vid)
@@ -380,7 +380,7 @@ def refresh_live_data(
     config, window, _signal, optimize_req = _resolve_config_and_params(
         config_json, result_payload, ref,
     )
-    start, end = _live_date_range(window, config.trading_period)
+    start, end = live_date_range(window, config.trading_period)
     default_ds = (
         optimize_req.data_source
         if optimize_req is not None
@@ -400,7 +400,7 @@ def refresh_live_data(
     print(f"[refresh] Fetching live lookback [{start}, {end}] from provider …")
     for cusip, ds_override in pairs:
         ds = ds_override or default_ds
-        df = _fetch_df(
+        df = fetch_df(
             cusip,
             start,
             end,

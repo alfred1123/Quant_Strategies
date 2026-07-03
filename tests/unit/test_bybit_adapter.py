@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from quant.trade.adapters.base import TradeAdapter
 from quant.trade.brokers.ccxt.adapter import CcxtTradeAdapter, create_ccxt_adapter
 from quant.trade.brokers.ccxt.config import (
     CCXT_PRESETS,
@@ -62,18 +63,35 @@ class TestExchangeWiring:
         exchange.enable_demo_trading.assert_not_called()
 
 
-class TestCcxtAdapterIntendedSide:
+class TestIntendedSide:
+    """TradeAdapter.intended_side — covers long, flat, and short positions."""
+
     def test_long_signal_flat_position(self):
-        assert CcxtTradeAdapter.intended_side(1.0, 0.0) == "BUY"
+        assert TradeAdapter.intended_side(1.0, 0.0) == "BUY"
 
-    def test_long_signal_existing_position(self):
-        assert CcxtTradeAdapter.intended_side(1.0, 0.01) == "HOLD"
+    def test_long_signal_existing_long(self):
+        assert TradeAdapter.intended_side(1.0, 0.01) == "HOLD"
 
-    def test_flat_signal_with_position(self):
-        assert CcxtTradeAdapter.intended_side(0.0, 0.01) == "SELL"
+    def test_long_signal_existing_short(self):
+        assert TradeAdapter.intended_side(1.0, -0.5) == "CLOSE_SHORT"
+
+    def test_flat_signal_with_long(self):
+        assert TradeAdapter.intended_side(0.0, 0.01) == "SELL"
 
     def test_flat_signal_no_position(self):
-        assert CcxtTradeAdapter.intended_side(0.0, 0.0) == "HOLD"
+        assert TradeAdapter.intended_side(0.0, 0.0) == "HOLD"
+
+    def test_flat_signal_with_short(self):
+        assert TradeAdapter.intended_side(0.0, -0.5) == "CLOSE_SHORT"
+
+    def test_sell_signal_with_long(self):
+        assert TradeAdapter.intended_side(-1.0, 1.0) == "SELL"
+
+    def test_sell_signal_flat(self):
+        assert TradeAdapter.intended_side(-1.0, 0.0) == "HOLD"
+
+    def test_sell_signal_already_short(self):
+        assert TradeAdapter.intended_side(-1.0, -0.5) == "HOLD"
 
 
 class TestCcxtTradeGateway:

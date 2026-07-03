@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-IntendedSide = Literal["BUY", "SELL", "HOLD"]
+IntendedSide = Literal["BUY", "SELL", "HOLD", "CLOSE_SHORT"]
 
 
 class DryRunRequest(BaseModel):

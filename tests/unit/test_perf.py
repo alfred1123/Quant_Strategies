@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, SignalDirection
-from quant.strategy.performance import Performance, _live_lookback_days
+from quant.strategy.performance import Performance, live_lookback_days
 
 
 _BOLLINGER_CONFIG = StrategyConfig("test", "get_bollinger_band",
@@ -78,7 +78,7 @@ class TestComputeLatestPositionParity:
         expected_sig, expected_as_of = enrich._trade_latest_final_position()
 
         trade = Performance(data, config, 5, 0.5)
-        sig, as_of = trade._compute_latest_position()
+        sig, as_of = trade.compute_latest_position()
         assert sig == expected_sig
         assert as_of == expected_as_of
 
@@ -91,7 +91,7 @@ class TestComputeLatestPositionParity:
         expected_sig, expected_as_of = enrich._trade_latest_final_position()
 
         trade = Performance(data, config)
-        sig, as_of = trade._compute_latest_position()
+        sig, as_of = trade.compute_latest_position()
         assert sig == expected_sig
         assert as_of == expected_as_of
 
@@ -109,7 +109,7 @@ class TestComputeLatestPositionParity:
         expected_sig, expected_as_of = enrich._trade_latest_final_position()
 
         trade = Performance(data, config, 20, 1.0)
-        sig, as_of = trade._compute_latest_position()
+        sig, as_of = trade.compute_latest_position()
         assert sig == expected_sig
         assert as_of == expected_as_of
 
@@ -128,14 +128,14 @@ class TestComputeLatestPositionParity:
         expected_sig, expected_as_of = enrich._trade_latest_final_position()
 
         trade = Performance(data, config)
-        sig, as_of = trade._compute_latest_position()
+        sig, as_of = trade.compute_latest_position()
         assert sig == expected_sig
         assert as_of == expected_as_of
 
 
 class TestLiveLookback:
     def test_scales_with_window(self):
-        assert _live_lookback_days(20, 365) == max(20 * 3 + 60, min(365, 400))
+        assert live_lookback_days(20, 365) == max(20 * 3 + 60, min(365, 400))
 
 
 class TestPerformanceInit:

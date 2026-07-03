@@ -2,7 +2,7 @@
 
 Unlike :mod:`quant.strategy.backtest_service`, this module derives a rolling
 lookback window and fetches fresh bars. Indicator math is
-:class:`quant.strategy.performance.Performance` ``._compute_latest_position()``.
+:class:`quant.strategy.performance.Performance` ``.compute_latest_position()``.
 """
 
 from __future__ import annotations
@@ -15,9 +15,9 @@ import pandas as pd
 from quant.data.backtest_cache import BacktestCache
 from quant.refdata.bundle import DataCaches
 from quant.schemas.backtest import OptimizeRequest
-from quant.strategy.backtest_service import BacktestError, _build_config, _fetch_df
+from quant.strategy.backtest_service import BacktestError, build_config, fetch_df
 from quant.strategy.optimizer import extract_best_params
-from quant.strategy.performance import Performance, _live_date_range
+from quant.strategy.performance import Performance, live_date_range
 from quant.strategy.signals import StrategyConfig, config_from_json, params_from_strategy_json
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ def _resolve_config_and_params(
 ) -> tuple[StrategyConfig, object, object, OptimizeRequest | None]:
     if "factors" in config_json:
         req = OptimizeRequest.model_validate(config_json)
-        config = _build_config(req, refdata_cache)
+        config = build_config(req, refdata_cache)
         if result_payload is None or not result_payload.get("best"):
             raise LiveEvaluationError(
                 "no optimization result found for strategy — run backtest first"
@@ -90,7 +90,7 @@ def build_data_dict_for_signal(
         if cusip in data_dict:
             continue
         try:
-            data_dict[cusip] = _fetch_df(
+            data_dict[cusip] = fetch_df(
                 cusip, start, end, ds_override or default_ds,
                 cache, inst_cache, bt_cache,
             )
@@ -127,7 +127,7 @@ def compute_latest_position(
     config, window, signal, optimize_req = _resolve_config_and_params(
         doc, result_payload, cache,
     )
-    start, end = _live_date_range(window, config.trading_period)
+    start, end = live_date_range(window, config.trading_period)
     data_dict = build_data_dict_for_signal(
         config,
         optimize_req,
@@ -140,7 +140,7 @@ def compute_latest_position(
     try:
         position, as_of = Performance(
             data_dict, config, window, signal,
-        )._compute_latest_position()
+        ).compute_latest_position()
     except ValueError as exc:
         raise LiveEvaluationError(str(exc)) from exc
 

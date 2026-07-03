@@ -54,3 +54,37 @@ class TradeAdapter(BrokerSession):
     @abstractmethod
     def validate_for_dry_run(self, internal_cusip: str, app_id: int) -> str:
         """Validate credentials + symbol mapping. Returns vendor symbol."""
+
+    @staticmethod
+    def intended_side(signal: float, position_qty: float) -> str:
+        """Map ``(signal, signed_position)`` to BUY / SELL / HOLD.
+
+        Handles long, flat, and short positions::
+
+            signal  position   →  action
+            ──────  ─────────  ─  ──────
+             +1      0 (flat)  →  BUY
+             +1     >0 (long)  →  HOLD          (already long)
+             +1     <0 (short) →  CLOSE_SHORT   (cover before buying)
+              0     >0 (long)  →  SELL           (flatten)
+              0      0 (flat)  →  HOLD
+              0     <0 (short) →  CLOSE_SHORT    (flatten)
+             -1     >0 (long)  →  SELL
+             -1      0 (flat)  →  HOLD           (no position to sell)
+             -1     <0 (short) →  HOLD           (already short)
+        """
+        sig = int(round(signal))
+        if sig > 0:
+            if position_qty < 0:
+                return "CLOSE_SHORT"
+            return "BUY" if position_qty == 0 else "HOLD"
+        if sig == 0:
+            if position_qty > 0:
+                return "SELL"
+            if position_qty < 0:
+                return "CLOSE_SHORT"
+            return "HOLD"
+        # sig < 0
+        if position_qty > 0:
+            return "SELL"
+        return "HOLD"

@@ -43,7 +43,7 @@ class BacktestError(Exception):
 
 # ── Data fetching ────────────────────────────────────────────────────────────
 
-def _fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_cache=None, bt_cache=None, refresh: bool = False) -> pd.DataFrame:
+def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_cache=None, bt_cache=None, refresh: bool = False) -> pd.DataFrame:
     """Fetch prices using the data source class registered in REFDATA.APP.
 
     If *symbol* is an internal_cusip registered in INST.PRODUCT, the vendor
@@ -122,7 +122,7 @@ def _fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_c
 # already constrained to valid values. getattr raises AttributeError if
 # an unknown name is sent directly to the API — no extra validation needed.
 
-def _build_config(req, cache) -> StrategyConfig:
+def build_config(req, cache) -> StrategyConfig:
     """Build a StrategyConfig from a unified factor-list request.
 
     A 1-element ``factors`` list collapses to ``Performance``'s
@@ -209,7 +209,7 @@ def _build_data_dict(req, cache, inst_cache=None, bt_cache=None) -> dict[str, pd
 
     def _fetch(sym: str, ds: str) -> pd.DataFrame:
         try:
-            return _fetch_df(sym, req.start, req.end, ds, cache, inst_cache, bt_cache, refresh=refresh)
+            return fetch_df(sym, req.start, req.end, ds, cache, inst_cache, bt_cache, refresh=refresh)
         except BacktestCache.CacheMissError as exc:
             raise BacktestError(str(exc)) from exc
 
@@ -372,7 +372,7 @@ def _build_wf_response(data_dict, config, window_list, signal_list,
 def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None, bt_cache=None) -> OptimizeResponse:
     data_dict = _build_data_dict(req, cache, inst_cache, bt_cache)
     callbacks = [callback] if callback else []
-    config = _build_config(req, cache)
+    config = build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
     opt = ParametersOptimization(data_dict, config, fee_bps=req.fee_bps)
     result = opt.run(window_list, signal_list, callbacks=callbacks)
@@ -438,7 +438,7 @@ async def stream_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache
     def _run():
         try:
             data_dict = _build_data_dict(req, cache, inst_cache, bt_cache)
-            config = _build_config(req, cache)
+            config = build_config(req, cache)
             window_list, signal_list = _build_param_ranges(req)
 
             def on_trial(study, trial):
@@ -510,7 +510,7 @@ async def stream_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache
 
 def run_performance(req: PerformanceRequest, cache, inst_cache=None, bt_cache=None) -> PerformanceResponse:
     data_dict = _build_data_dict(req, cache, inst_cache, bt_cache)
-    config = _build_config(req, cache)
+    config = build_config(req, cache)
 
     if len(req.factors) != len(req.windows) or len(req.factors) != len(req.signals):
         raise BacktestError(
@@ -532,7 +532,7 @@ def run_performance(req: PerformanceRequest, cache, inst_cache=None, bt_cache=No
 
 def run_walk_forward(req: WalkForwardRequest, cache, inst_cache=None, bt_cache=None) -> WalkForwardResponse:
     data_dict = _build_data_dict(req, cache, inst_cache, bt_cache)
-    config = _build_config(req, cache)
+    config = build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
 
     return _build_wf_response(
