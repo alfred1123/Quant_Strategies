@@ -54,26 +54,23 @@ BYBIT_VENDOR_SYMBOL = "BTCUSDT"
 
 # Mirror quant/trade/brokers/ccxt/adapter.py::CcxtTradeAdapter.intended_side — keep in sync.
 def _golden_intended_side(signal: float, position_qty: float) -> str:
-    sig = int(round(signal))
-    if sig > 0:
-        return "BUY" if position_qty == 0 else "HOLD"
-    if sig == 0:
-        return "SELL" if position_qty > 0 else "HOLD"
-    if position_qty > 0:
-        return "SELL"
-    return "HOLD"
+    from quant.trade.adapters.base import TradeAdapter
+    return TradeAdapter.intended_side(signal, position_qty)
 
 
 StepStatus = Literal["PASS", "FAIL", "SKIP", "WARN"]
 
-# Golden reference: CcxtTradeAdapter.intended_side (quant/trade/brokers/ccxt/adapter.py)
+# Golden reference: TradeAdapter.intended_side (quant/trade/adapters/base.py)
 INTENDED_SIDE_GOLDEN: list[tuple[float, float, str]] = [
     (1.0, 0.0, "BUY"),
     (1.0, 0.01, "HOLD"),
+    (1.0, -0.5, "CLOSE_SHORT"),
     (0.0, 0.0, "HOLD"),
     (0.0, 0.01, "SELL"),
-    (-1.0, 0.0, "HOLD"),
+    (0.0, -0.5, "CLOSE_SHORT"),
+    (-1.0, 0.0, "OPEN_SHORT"),
     (-1.0, 0.01, "SELL"),
+    (-1.0, -0.5, "HOLD"),
 ]
 
 

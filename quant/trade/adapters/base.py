@@ -57,7 +57,7 @@ class TradeAdapter(BrokerSession):
 
     @staticmethod
     def intended_side(signal: float, position_qty: float) -> str:
-        """Map ``(signal, signed_position)`` to BUY / SELL / HOLD.
+        """Map ``(signal, signed_position)`` to an action.
 
         Handles long, flat, and short positions::
 
@@ -70,7 +70,7 @@ class TradeAdapter(BrokerSession):
               0      0 (flat)  →  HOLD
               0     <0 (short) →  CLOSE_SHORT    (flatten)
              -1     >0 (long)  →  SELL
-             -1      0 (flat)  →  HOLD           (no position to sell)
+             -1      0 (flat)  →  OPEN_SHORT     (enter short)
              -1     <0 (short) →  HOLD           (already short)
         """
         sig = int(round(signal))
@@ -87,4 +87,6 @@ class TradeAdapter(BrokerSession):
         # sig < 0
         if position_qty > 0:
             return "SELL"
+        if position_qty == 0:
+            return "OPEN_SHORT"
         return "HOLD"

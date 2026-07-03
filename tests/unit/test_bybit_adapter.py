@@ -88,7 +88,7 @@ class TestIntendedSide:
         assert TradeAdapter.intended_side(-1.0, 1.0) == "SELL"
 
     def test_sell_signal_flat(self):
-        assert TradeAdapter.intended_side(-1.0, 0.0) == "HOLD"
+        assert TradeAdapter.intended_side(-1.0, 0.0) == "OPEN_SHORT"
 
     def test_sell_signal_already_short(self):
         assert TradeAdapter.intended_side(-1.0, -0.5) == "HOLD"
