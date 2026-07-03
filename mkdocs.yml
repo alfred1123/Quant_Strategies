@@ -104,6 +104,7 @@ nav:
       - User Isolation: design/user-isolation.md
       - Best-VID Promotion: design/best-vid-promotion.md
       - Trade Deployment Rollout: design/trade-deployment-rollout.md
+      - ccxt Trade & XREF Validation: design/ccxt-trade-and-xref-validation.md
       - Strategy VID Versioning: design/strategy-vid-versioning.md
       - Frontend Code Audit: design/frontend-audit.md
       - Plan to Profit: design/plan-to-profit.md

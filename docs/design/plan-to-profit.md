@@ -278,11 +278,36 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 
 **Tasks**
 
-- [ ] Implement `BybitAdapter` (or extend `quant/trade/`) with dry-run path.
-- [ ] Validate credentials, `INST.PRODUCT_XREF` symbol mapping, sizing — no live orders.
-- [ ] Return structured dry-run report (signals, intended side, errors).
+- [x] Implement ccxt broker stack (`quant/trade/brokers/ccxt/`, registry, `CcxtTradeAdapter`) with dry-run path — see [ccxt trade design](ccxt-trade-and-xref-validation.md).
+- [x] Validate credentials, `INST.PRODUCT_XREF` symbol mapping, sizing — no live orders.
+- [x] Return structured dry-run report (signals, intended side, errors) via `POST /api/v1/trade/deployments/dry-run`.
+- [ ] Trade UI dry-run button (deferred — use harness below until 1.6/1.7 UI wiring).
+- [ ] Live order path (`place_order` / `apply_signal`) — Phase 1.7.
 
-**Exit criteria:** Dry-run API succeeds for test user against Bybit testnet or read-only validation path.
+**Golden harness (run before any trade-layer change)**
+
+Local validation script — **source of truth** for Bybit testnet + dry-run behaviour:
+
+[`scripts/bybit_local_testnet.py`](../../scripts/bybit_local_testnet.py)
+
+| Command | Purpose |
+|---------|---------|
+| `--suite` | Full matrix: DB, Redis, xref, strategy payload, credential decrypt, diagnose, gateway, probe-intended, refresh-data, dry-run |
+| `--suite --json` | Same, machine-readable (CI / diff golden output) |
+| `--suite --with-api` | Also hits `POST /api/v1/trade/deployments/dry-run` (needs dev API + `LOCAL_LOGIN_PASSWORD`) |
+| `--check` | Prerequisites only (Fernet, DB credentials, env) |
+| `--diagnose` | Which Bybit env accepts the key (testnet / demo / mainnet) |
+| `--save` | Persist `BYBIT_TESTNET_*` keys to `CORE_ADMIN.API_CREDENTIAL` |
+| `--gateway` | ccxt connect + xref + position |
+| `--dry-run --refresh-data` | Full orchestration (Yahoo cache + signal + broker; no orders) |
+| `--intended-matrix` | Golden `signal × position → BUY/SELL/HOLD` (no network) |
+| `--probe-intended` | Live position + what signals -1/0/1 would do |
+
+**Prerequisites:** local Postgres (`DB_TARGET=local`), Redis (`./scripts/appctl.sh dev start`), `EXCHANGE_SECRETS_KEY`, `CCXT_ITEST_*` in `.env` (see `.env.example`), Bybit **testnet** keys ([testnet.bybit.com](https://testnet.bybit.com/)), strategy with `BT.RESULT` payload, `btcusdt.crypto → BTCUSDT` xref for `app_id=34`.
+
+**Automated mirror (CI / optional):** [`tests/integration/test_ccxt_dry_run.py`](../../tests/integration/test_ccxt_dry_run.py) — gateway + full dry-run; run after `--suite` passes. Not in default `pytest tests/` (`-m e2e` only).
+
+**Exit criteria:** `--suite` exits 0 for test user against Bybit testnet; dry-run API succeeds (`--api-dry-run` or `--suite --with-api` when dev API is up). **Security:** dry-run never calls `create_order`.
 
 ---
 
@@ -1063,7 +1088,7 @@ This section records implementation viewpoints from the latest trade-readiness r
 | **0.3** | ECR / separate-host decision → decisions log |
 | **1.1** | `CORE_ADMIN.API_CREDENTIAL` + SPs + `/api/v1/credentials` (Fernet, `APP_ID`, soft-version) |
 | **1.2** | `TRADE.DEPLOYMENT` / `EXECUTION_EVENT` / `TRANSACTION` + apply endpoint (no `INTENT`) |
-| **1.3** | Bybit adapter dry-run |
+| **1.3** | Bybit adapter dry-run — golden harness: `scripts/bybit_local_testnet.py --suite` |
 | **1.4** | Trade tab shell + sidebar routes + multi-broker filter toolbar |
 | **1.5** | Exchange config UI — accounts table + credentials API wiring |
 | **1.6** | Strategy picker — `GET /api/v1/strategies` + `StrategyPicker` (reads `BT.STRATEGY`; not Backtest config UI) |

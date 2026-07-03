@@ -69,11 +69,9 @@ def _fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_c
     # Resolve internal_cusip → vendor_symbol via instrument cache
     ticker = symbol
     if inst_cache is not None:
-        product = inst_cache.get_product_by_cusip(symbol)
-        if product is not None:
-            vs = inst_cache.resolve_vendor_symbol(product["product_id"], app["app_id"])
-            if vs:
-                ticker = vs
+        vs = inst_cache.resolve_internal_cusip(symbol, app["app_id"])
+        if vs:
+            ticker = vs
 
     cls = getattr(_data_module, app["class_name"])
     src = cls()
@@ -264,6 +262,21 @@ def _enforce_date_sync(data_dict: dict[str, pd.DataFrame], req_start: str, req_e
             f"Tick 'Refresh dataset' to fetch matching ranges."
         )
 
+
+def evaluate_performance(
+    data_dict: dict[str, pd.DataFrame],
+    config: StrategyConfig,
+    window,
+    signal,
+    *,
+    fee_bps: float | None = None,
+) -> Performance:
+    """Run full backtest enrichment (positions + PnL) at fixed params."""
+    perf = Performance(data_dict, config, window, signal, fee_bps=fee_bps)
+    perf.enrich_performance()
+    return perf
+
+
 def _build_perf_response(data_dict, config, best, fee_bps) -> PerformanceResponse:
     """Run Performance for the best params and return a PerformanceResponse.
 
@@ -285,8 +298,7 @@ def _build_perf_response(data_dict, config, best, fee_bps) -> PerformanceRespons
         window = w
         signal = s
 
-    perf = Performance(data_dict, config, window, signal, fee_bps=fee_bps)
-    perf.enrich_performance()
+    perf = evaluate_performance(data_dict, config, window, signal, fee_bps=fee_bps)
 
     strat_metrics = perf.get_strategy_performance().replace({np.nan: None}).to_dict()
     bh_metrics = perf.get_buy_hold_performance().replace({np.nan: None}).to_dict()

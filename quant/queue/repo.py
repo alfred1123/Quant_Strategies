@@ -191,6 +191,24 @@ class BtQueueRepo(DbGateway):
             (str(queue_id),),
         )
 
+    def fetch_result_payload(
+        self,
+        strategy_id: uuid.UUID | str,
+        strategy_vid: int,
+    ) -> dict | None:
+        """Load ``BT.RESULT.PAYLOAD_JSON`` for a strategy version, if any."""
+        rows = self.sp_get_queue(strategy_id=strategy_id, limit=200)
+        for row in rows:
+            if int(row["strategy_vid"]) != int(strategy_vid):
+                continue
+            result = self.sp_get_result(row["queue_id"])
+            if result and result.get("payload_json"):
+                payload = result["payload_json"]
+                if isinstance(payload, str):
+                    return json.loads(payload)
+                return payload
+        return None
+
     def sp_get_strategy(
         self,
         strategy_id: uuid.UUID | str,

@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, SignalDirection
-from quant.strategy.performance import Performance
+from quant.strategy.performance import Performance, _live_lookback_days
 
 
 _BOLLINGER_CONFIG = StrategyConfig("test", "get_bollinger_band",
@@ -17,6 +17,125 @@ def _make_performance(df, window=5, signal=0.5, config=None):
     perf = Performance({config.internal_cusip: df.copy()}, config, window, signal)
     perf.enrich_performance()
     return perf
+
+
+def _make_positions(df, window=5, signal=0.5, config=None):
+    if config is None:
+        config = _BOLLINGER_CONFIG
+    perf = Performance({config.internal_cusip: df.copy()}, config, window, signal)
+    perf._trade_enrich_positions()
+    return perf
+
+
+class TestTradeEnrichPositions:
+    def test_skips_pnl_columns(self, sample_ohlc_df):
+        perf = _make_positions(sample_ohlc_df)
+        assert "FinalPosition" in perf.data.columns
+        assert "cumu" not in perf.data.columns
+        assert "pnl" not in perf.data.columns
+
+    def test_trade_latest_final_position(self, sample_ohlc_df):
+        perf = _make_positions(sample_ohlc_df)
+        sig, as_of = perf._trade_latest_final_position()
+        assert sig in (-1.0, 0.0, 1.0)
+        assert as_of
+
+    def test_enrich_performance_still_adds_pnl(self, sample_ohlc_df):
+        perf = _make_performance(sample_ohlc_df)
+        assert "cumu" in perf.data.columns
+
+
+def _cross_product_data():
+    np.random.seed(42)
+    n = 300
+    idx = pd.date_range("2020-01-01", periods=n, freq="D", name="datetime")
+    btc = 100 + np.cumsum(np.random.randn(n) * 0.5)
+    eth = 50 + np.cumsum(np.random.randn(n) * 0.3)
+    return {
+        "btc-usd": pd.DataFrame({
+            "price": btc, "factor": btc, "v": btc,
+            "Close": btc,
+            "High": btc + np.abs(np.random.randn(n) * 0.3),
+            "Low": btc - np.abs(np.random.randn(n) * 0.3),
+        }, index=idx),
+        "eth-usd": pd.DataFrame({
+            "price": eth, "factor": eth, "v": eth,
+            "Close": eth,
+            "High": eth + np.abs(np.random.randn(n) * 0.3),
+            "Low": eth - np.abs(np.random.randn(n) * 0.3),
+        }, index=idx),
+    }
+
+
+class TestComputeLatestPositionParity:
+    """Live fast path must match full enrich on the last bar."""
+
+    def test_single_factor_matches_enrich(self, sample_ohlc_df):
+        config = _BOLLINGER_CONFIG
+        data = {config.internal_cusip: sample_ohlc_df.copy()}
+        enrich = Performance(data, config, 5, 0.5)
+        enrich._trade_enrich_positions()
+        expected_sig, expected_as_of = enrich._trade_latest_final_position()
+
+        trade = Performance(data, config, 5, 0.5)
+        sig, as_of = trade._compute_latest_position()
+        assert sig == expected_sig
+        assert as_of == expected_as_of
+
+    @pytest.mark.parametrize("conjunction", ["AND", "OR"])
+    def test_multi_factor_matches_enrich(self, multi_factor_df, conjunction):
+        config = _multi_factor_config(conjunction=conjunction)
+        data = {config.internal_cusip: multi_factor_df.copy()}
+        enrich = Performance(data, config)
+        enrich._trade_enrich_positions()
+        expected_sig, expected_as_of = enrich._trade_latest_final_position()
+
+        trade = Performance(data, config)
+        sig, as_of = trade._compute_latest_position()
+        assert sig == expected_sig
+        assert as_of == expected_as_of
+
+    def test_cross_product_single_factor_matches_enrich(self):
+        data = _cross_product_data()
+        sub = SubStrategy(
+            "get_sma", "momentum_band_signal", 20, 1.0, internal_cusip="eth-usd",
+        )
+        config = StrategyConfig(
+            "btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
+            substrategies=(sub,),
+        )
+        enrich = Performance(data, config, 20, 1.0)
+        enrich._trade_enrich_positions()
+        expected_sig, expected_as_of = enrich._trade_latest_final_position()
+
+        trade = Performance(data, config, 20, 1.0)
+        sig, as_of = trade._compute_latest_position()
+        assert sig == expected_sig
+        assert as_of == expected_as_of
+
+    def test_cross_product_multi_factor_matches_enrich(self):
+        data = _cross_product_data()
+        sub_btc = SubStrategy("get_sma", "momentum_band_signal", 20, 1.0)
+        sub_eth = SubStrategy(
+            "get_sma", "reversion_band_signal", 10, 0.5, internal_cusip="eth-usd",
+        )
+        config = StrategyConfig(
+            "btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
+            conjunction="AND", substrategies=(sub_btc, sub_eth),
+        )
+        enrich = Performance(data, config)
+        enrich._trade_enrich_positions()
+        expected_sig, expected_as_of = enrich._trade_latest_final_position()
+
+        trade = Performance(data, config)
+        sig, as_of = trade._compute_latest_position()
+        assert sig == expected_sig
+        assert as_of == expected_as_of
+
+
+class TestLiveLookback:
+    def test_scales_with_window(self):
+        assert _live_lookback_days(20, 365) == max(20 * 3 + 60, min(365, 400))
 
 
 class TestPerformanceInit:

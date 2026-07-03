@@ -13,6 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from quant.schemas.deployments import DeploymentRow
+from quant.schemas.dry_run import DryRunReport
 from quant.trade.errors import TradeValidationError
 from quant.trade.service import DeploymentNotFound
 
@@ -62,6 +63,8 @@ def client_and_svc():
 
         app.state.db_conninfo = "postgresql://stub"
         app.state.data_caches = MagicMock()
+        app.state.credential_service = MagicMock()
+        app.state.adapter_registry = MagicMock()
 
         svc = MagicMock()
         app.dependency_overrides[get_trade_service] = lambda: svc
@@ -201,3 +204,69 @@ class TestGetDeployment:
         resp = client.get(f"/api/v1/trade/deployments/{uuid.uuid4()}")
         assert resp.status_code == 502
         assert resp.json()["detail"]["proc"] == "trade.sp_get_deployment"
+
+
+class TestDryRunDeployment:
+    def _dry_run_body(self, **overrides):
+        base = {
+            "strategy_id": str(uuid.uuid4()),
+            "strategy_vid": 1,
+            "api_credential_id": 1,
+            "app_id": 34,
+            "internal_cusip": "btc-usd.crypto",
+            "qty": "0.01",
+            "paper": True,
+        }
+        base.update(overrides)
+        return base
+
+    def test_happy_path(self, client_and_svc):
+        client, svc, user = client_and_svc
+        sid = uuid.uuid4()
+        report = DryRunReport(
+            strategy_id=sid,
+            strategy_vid=1,
+            strategy_nm="btc strat",
+            internal_cusip="btc-usd.crypto",
+            vendor_symbol="BTCUSDT",
+            app_id=34,
+            paper=True,
+            qty=Decimal("0.01"),
+            signal=1.0,
+            intended_side="BUY",
+            position_qty=0.0,
+            data_as_of="2024-06-01",
+        )
+        svc.dry_run.return_value = report
+
+        resp = client.post(
+            "/api/v1/trade/deployments/dry-run",
+            json=self._dry_run_body(strategy_id=str(sid)),
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["vendor_symbol"] == "BTCUSDT"
+        assert data["intended_side"] == "BUY"
+        svc.dry_run.assert_called_once()
+        assert svc.dry_run.call_args.args[0] == user.app_user_id
+
+    def test_validation_error_returns_400(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        svc.dry_run.side_effect = TradeValidationError(
+            "no INST.PRODUCT_XREF for 'btc-usd.crypto' app_id=34"
+        )
+
+        resp = client.post(
+            "/api/v1/trade/deployments/dry-run",
+            json=self._dry_run_body(),
+        )
+        assert resp.status_code == 400
+        assert "PRODUCT_XREF" in resp.json()["detail"]
+
+    def test_missing_qty_returns_422(self, client_and_svc):
+        client, _, _ = client_and_svc
+        body = self._dry_run_body()
+        del body["qty"]
+        resp = client.post("/api/v1/trade/deployments/dry-run", json=body)
+        assert resp.status_code == 422

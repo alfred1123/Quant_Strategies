@@ -136,6 +136,51 @@ class TradeRepo(DbGateway):
                 "deployment_id does not belong to user", status_code=403
             )
 
+    def validate_dry_run(
+        self,
+        *,
+        app_user_id: UUID,
+        strategy_id: UUID,
+        strategy_vid: int,
+        api_credential_id: int,
+        app_id: int,
+        internal_cusip: str,
+        qty: Decimal | float,
+    ) -> dict:
+        """Preflight dry-run — credential + strategy ownership; returns strategy row."""
+        _require_all(
+            strategy_id=strategy_id,
+            strategy_vid=strategy_vid,
+            api_credential_id=api_credential_id,
+            app_id=app_id,
+            internal_cusip=internal_cusip,
+            qty=qty,
+        )
+
+        cred = self._fetch_credential(api_credential_id)
+        if cred is None:
+            raise TradeValidationError(
+                "API credential not found or not current", status_code=404
+            )
+        if cred["is_active_ind"] != "Y":
+            raise TradeValidationError("API credential is not active", status_code=400)
+        if str(cred["app_user_id"]) != str(app_user_id):
+            raise TradeValidationError(
+                "API credential does not belong to user", status_code=403
+            )
+        if cred["app_id"] != app_id:
+            raise TradeValidationError(
+                "app_id does not match API credential", status_code=400
+            )
+
+        self._assert_strategy_owned(strategy_id, strategy_vid, app_user_id)
+        row = self._fetch_strategy(strategy_id, strategy_vid)
+        if row is None:
+            raise TradeValidationError(
+                "strategy_id / strategy_vid not found", status_code=404
+            )
+        return row
+
     def validate_execution_event(
         self,
         *,

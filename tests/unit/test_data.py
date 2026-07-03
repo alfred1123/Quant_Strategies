@@ -620,6 +620,17 @@ class TestInstrumentCache:
         assert cache.resolve_vendor_symbol(2, 2) is None
         assert cache.resolve_vendor_symbol(999, 1) is None
 
+    def test_resolve_internal_cusip_found(self, cache):
+        assert cache.resolve_internal_cusip("btc-usd.crypto", 1) == "BTC-USD"
+        assert cache.resolve_internal_cusip("btc-usd.crypto", 2) == "BTC"
+        assert cache.resolve_internal_cusip("eth-usd.crypto", 1) == "ETH-USD"
+
+    def test_resolve_internal_cusip_unknown_product(self, cache):
+        assert cache.resolve_internal_cusip("nonexistent", 1) is None
+
+    def test_resolve_internal_cusip_missing_xref(self, cache):
+        assert cache.resolve_internal_cusip("eth-usd.crypto", 2) is None
+
     @patch("quant.shared.db.psycopg.connect", return_value=MagicMock())
     @patch("quant.shared.db.DbGateway._call_get")
     def test_load_all_calls_both_procs(self, mock_call_get, _mock_connect):

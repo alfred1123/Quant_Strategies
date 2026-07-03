@@ -28,7 +28,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from quant.strategy.optimizer import ParametersOptimization
+from quant.strategy.optimizer import ParametersOptimization, extract_best_params
 from quant.strategy.performance import Performance
 
 logger = logging.getLogger(__name__)
@@ -117,7 +117,7 @@ class WalkForward:
             is_data_dict, self.config, fee_bps=self.fee_bps,
         ).run(window_values, signal_values)
 
-        best_window, best_signal = self._extract_best(opt_result.best)
+        best_window, best_signal = extract_best_params(opt_result.best)
 
         logger.info("In-sample best: window=%s, signal=%s, Sharpe=%.4f",
                     best_window, best_signal, opt_result.best['sharpe'])
@@ -153,21 +153,6 @@ class WalkForward:
         )
         perf.enrich_performance()
         return perf.get_strategy_performance()
-
-    @staticmethod
-    def _extract_best(best: dict):
-        """Extract (best_window, best_signal) from an OptimizeResult.best dict.
-
-        Single-factor dicts have keys 'window'/'signal'.
-        Multi-factor dicts have keys 'window_0', 'signal_0', 'window_1', ...
-        """
-        if 'window' in best:
-            return int(best['window']), float(best['signal'])
-        n = sum(1 for k in best if k.startswith('window_'))
-        return (
-            tuple(int(best[f'window_{i}']) for i in range(n)),
-            tuple(float(best[f'signal_{i}']) for i in range(n)),
-        )
 
     def _run_single(self, window_tuple, signal_tuple):
         return self.run(window_tuple, signal_tuple)

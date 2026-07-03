@@ -43,8 +43,8 @@ flowchart LR
 | Item | Value |
 |------|-------|
 | Domain | `algodaemon.com` (registered on Cloudflare) |
-| EC2 instance | `i-026d3c6d323144663` |
-| Elastic IP (origin) | `52.221.3.230` |
+| EC2 instance | Resolve from `quant-compute` CFN output `InstanceId` ([Dev vs Prod](../architecture/dev-vs-prod.md#resolve-the-current-prod-ec2-instance-id)) |
+| Elastic IP (origin) | Resolve from `quant-compute` CFN output `PublicIp` (or `ORIGIN_IP` in `.env`) |
 | Region | `ap-southeast-1` |
 | Origin protocol today | HTTP only (`:80`) |
 | Secrets store | AWS SSM Parameter Store under `/quant/prod/*` |

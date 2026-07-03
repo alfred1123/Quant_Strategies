@@ -134,6 +134,46 @@ class TestValidateCreateDeployment:
         )
 
 
+class TestValidateDryRun:
+    def test_missing_strategy_vid(self, repo):
+        with pytest.raises(TradeValidationError, match="strategy_vid"):
+            repo.validate_dry_run(
+                app_user_id=uuid4(),
+                strategy_id=uuid4(),
+                strategy_vid=None,
+                api_credential_id=1,
+                app_id=10,
+                internal_cusip="btc-usd.crypto",
+                qty=Decimal("0.01"),
+            )
+
+    @patch.object(TradeRepo, "_fetch_credential")
+    @patch.object(TradeRepo, "_assert_strategy_owned")
+    @patch.object(TradeRepo, "_fetch_strategy")
+    def test_returns_strategy_row(self, mock_strat, mock_own, mock_cred, repo):
+        uid = uuid4()
+        sid = uuid4()
+        mock_cred.return_value = {
+            "is_active_ind": "Y",
+            "app_user_id": str(uid),
+            "app_id": 10,
+        }
+        mock_strat.return_value = {"strategy_nm": "s1", "config_json": {}}
+
+        row = repo.validate_dry_run(
+            app_user_id=uid,
+            strategy_id=sid,
+            strategy_vid=1,
+            api_credential_id=1,
+            app_id=10,
+            internal_cusip="btc-usd.crypto",
+            qty=Decimal("0.01"),
+        )
+
+        assert row["strategy_nm"] == "s1"
+        mock_own.assert_called_once_with(sid, 1, uid)
+
+
 class TestValidateExecutionEvent:
     @patch.object(TradeRepo, "_fetch_deployment_version", return_value=None)
     def test_unknown_deployment(self, _fetch, repo):

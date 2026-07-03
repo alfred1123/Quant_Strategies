@@ -22,7 +22,8 @@ See [System Overview](overview.md) for runtime topologies.
 | `CORS_ORIGINS` | SSM `/quant/dev/` or `.env` (no in-code default) | SSM `/quant/prod/` (public site URL(s)) | SSM / `.env` |
 | `JWT_SECRET` | shared dev secret from SSM | fixed value from SSM | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | `EXCHANGE_SECRETS_KEY` | dev SSM or auto-generated ephemeral | **required** — Fernet for credentials | SSM `/quant/prod/EXCHANGE_SECRETS_KEY` |
-| DB access method | SSM port-forward tunnel | Direct VPC connection | Network topology |
+| EC2 instance | **None** (laptop) | **One** `quant-compute` host (prod only) | CFN stack `quant-compute` → output `InstanceId` |
+| DB access method | SSM port-forward **via prod EC2** → Aurora | Direct VPC connection (same EC2) | Network topology |
 | Nginx config | `nginx.dev.conf` (HTTP only) | `nginx.cloudflare.conf` (Cloudflare Origin TLS via `docker-compose.cloudflare.yml`); `nginx.conf` for Let's Encrypt via `docker-compose.tls.yml` | `docker/nginx/` |
 | Swagger UI | enabled (`/docs`) | disabled | `quant/api/main.py` checks `APP_ENV` |
 | Logging | stdout, plus file (`log/bt_app.log`) when running locally **without** `USE_SSM=1` | stdout only | `quant/shared/logging.py` `setup_logging()` |
@@ -58,8 +59,33 @@ docker compose up                         docker compose -f docker-compose.yml
       │                                           │
       ▼                                           ▼
   connects to localhost:5433               connects to RDS:5432
-  (SSM tunnel to RDS)                     (direct VPC connection)
+  (SSM tunnel via prod EC2)               (direct VPC connection)
 ```
+
+!!! note "There is no dev EC2"
+    **Dev and prod share one compute host.** Laptops reach Aurora by SSM
+    port-forwarding through the **prod** EC2 instance (`quant-compute` stack).
+    There is no separate dev instance — do not hardcode an instance ID in docs
+    or scripts; resolve it from CloudFormation (see below) or use
+    `./scripts/appctl.sh dev tunnel start`, which reads `SSM_TARGET_INSTANCE`
+    from `.env` when set.
+
+### Resolve the current prod EC2 instance ID
+
+The instance ID **changes when the compute stack replaces EC2** (AMI upgrade,
+instance type change, etc.). CI and ops scripts resolve it at runtime:
+
+```bash
+aws cloudformation describe-stacks \
+  --stack-name quant-compute \
+  --region ap-southeast-1 \
+  --profile alfcheun \
+  --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" \
+  --output text
+```
+
+Optional fallback: set `SSM_TARGET_INSTANCE` in `.env` (dev tunnel) or
+`EC2_INSTANCE_ID` in GitHub Actions repo variables if CFN lookup fails.
 
 ---
 
@@ -89,20 +115,36 @@ export QUANTDB_PASSWORD=<your_password>
 JWT_SECRET=<any_value_or_leave_blank_for_auto>
 ```
 
-Start the SSM tunnel (runs automatically via Cursor hook, or manually):
+Start the SSM tunnel (preferred — resolves target from `SSM_TARGET_INSTANCE` in
+`.env`, or the default in `scripts/appctl.sh`):
 
 ```bash
-aws ssm start-session \
-  --target i-026d3c6d323144663 \
-  --document-name AWS-StartPortForwardingSessionToRemoteHost \
-  --parameters '{"host":["quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com"],"portNumber":["5432"],"localPortNumber":["5433"]}' \
-  --profile alfcheun
+./scripts/appctl.sh dev tunnel start
+./scripts/appctl.sh dev tunnel status   # confirms tunnel + DB on :5433
 ```
+
+The tunnel also starts automatically via the Cursor hook, or when you run
+`./scripts/appctl.sh dev start` with `DB_TARGET=prod` (default).
 
 Verify:
 
 ```bash
 pg_isready -h localhost -p 5433
+```
+
+Manual SSM (only if debugging — substitute `$INSTANCE_ID` from the CFN query
+above, not a copied literal):
+
+```bash
+INSTANCE_ID="$(aws cloudformation describe-stacks --stack-name quant-compute \
+  --region ap-southeast-1 --profile alfcheun \
+  --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)"
+
+aws ssm start-session \
+  --target "$INSTANCE_ID" \
+  --document-name AWS-StartPortForwardingSessionToRemoteHost \
+  --parameters '{"host":["quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com"],"portNumber":["5432"],"localPortNumber":["5433"]}' \
+  --profile alfcheun
 ```
 
 Run locally (no Docker needed for dev):
@@ -256,10 +298,16 @@ aws ssm put-parameter --name /quant/dev/QUANTDB_HOST \
   --value "new-value" --type String --overwrite --region ap-southeast-1
 ```
 
-After updating prod SSM params, restart the API container on EC2:
+After updating prod SSM params, restart the API container on the **prod EC2**
+(not your laptop). Prefer a normal deploy (push to `main` or `workflow_dispatch`
+on the deploy workflow). For a manual restart, resolve the instance ID first:
 
 ```bash
-aws ssm send-command --instance-ids i-026d3c6d323144663 \
+INSTANCE_ID="$(aws cloudformation describe-stacks --stack-name quant-compute \
+  --region ap-southeast-1 \
+  --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)"
+
+aws ssm send-command --instance-ids "$INSTANCE_ID" \
   --document-name AWS-RunShellScript \
   --parameters file://aws/scripts/ssm-ec2-deploy.json \
   --region ap-southeast-1
