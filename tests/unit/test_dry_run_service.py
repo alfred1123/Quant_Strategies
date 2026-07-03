@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 
 from quant.schemas.dry_run import DryRunRequest
+from quant.trade.adapters.base import TradeAdapter
 from quant.trade.dry_run import run_dry_run
 from quant.trade.errors import TradeValidationError
 
@@ -41,7 +42,9 @@ def deps():
     adapter = MagicMock()
     adapter.validate_for_dry_run.return_value = "BTCUSDT"
     adapter.get_position_qty.return_value = 0.0
-    adapter.intended_side.return_value = "BUY"
+    adapter.intended_side = TradeAdapter.intended_side
+    adapter.__enter__ = MagicMock(return_value=adapter)
+    adapter.__exit__ = MagicMock(return_value=False)
     adapter_registry.has_adapter.return_value = True
     adapter_registry.create.return_value = adapter
     data_caches = MagicMock()
@@ -75,8 +78,8 @@ class TestRunDryRun:
         assert report.signal == 1.0
         assert report.intended_side == "BUY"
         assert report.position_qty == 0.0
-        deps["adapter"].connect.assert_called_once()
-        deps["adapter"].disconnect.assert_called_once()
+        deps["adapter"].__enter__.assert_called_once()
+        deps["adapter"].__exit__.assert_called_once()
         deps["bt"].fetch_result_payload.assert_called_once()
 
     @patch("quant.trade.dry_run.compute_latest_position", return_value=(1.0, "2024-06-01"))
@@ -97,7 +100,7 @@ class TestRunDryRun:
                 data_caches=deps["data_caches"],
             )
 
-        deps["adapter"].disconnect.assert_called_once()
+        deps["adapter"].__exit__.assert_called_once()
 
     def test_unknown_broker_app_id(self, deps):
         deps["adapter_registry"].has_adapter.return_value = False

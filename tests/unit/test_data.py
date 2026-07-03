@@ -574,6 +574,12 @@ class TestInstrumentCache:
         c.user_id = "test"
         c._products = list(self.SAMPLE_PRODUCTS)
         c._xrefs = list(self.SAMPLE_XREFS)
+        c._by_cusip = {p["internal_cusip"]: p for p in c._products}
+        c._by_product_id = {p["product_id"]: p for p in c._products}
+        c._xref_index = {
+            (x["product_id"], x["app_id"]): x["vendor_symbol"]
+            for x in c._xrefs
+        }
         return c
 
     def test_get_products_returns_all(self, cache):

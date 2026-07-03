@@ -114,7 +114,7 @@ class TestDataEndpoint:
 
 class TestOptimizeEndpoint:
     @patch("quant.strategy.backtest_service.ParametersOptimization")
-    @patch("quant.strategy.backtest_service._fetch_df")
+    @patch("quant.strategy.backtest_service.fetch_df")
     def test_optimize_single(self, mock_fetch, mock_opt_cls, client):
         mock_fetch.return_value = pd.DataFrame({
             "price": np.linspace(100, 200, 100),
@@ -178,7 +178,7 @@ class TestOptimizeStreamEndpoint:
     @patch("quant.strategy.backtest_service._build_wf_response")
     @patch("quant.strategy.backtest_service._build_perf_response")
     @patch("quant.strategy.backtest_service.ParametersOptimization")
-    @patch("quant.strategy.backtest_service._fetch_df")
+    @patch("quant.strategy.backtest_service.fetch_df")
     def test_stream_emits_init_progress_and_result(self, mock_fetch, mock_opt_cls,
                                                     mock_perf_resp, mock_wf_resp, client):
         """SSE endpoint should emit init, progress events, and a final result."""
@@ -269,7 +269,7 @@ class TestOptimizeStreamEndpoint:
 
 class TestPerformanceEndpoint:
     @patch("quant.strategy.backtest_service.Performance")
-    @patch("quant.strategy.backtest_service._fetch_df")
+    @patch("quant.strategy.backtest_service.fetch_df")
     def test_performance_single(self, mock_fetch, mock_perf_cls, client):
         mock_fetch.return_value = pd.DataFrame({
             "price": np.linspace(100, 200, 100),
@@ -327,7 +327,7 @@ class TestPerformanceEndpoint:
 
 class TestWalkForwardEndpoint:
     @patch("quant.strategy.backtest_service.WalkForward")
-    @patch("quant.strategy.backtest_service._fetch_df")
+    @patch("quant.strategy.backtest_service.fetch_df")
     def test_walk_forward_single(self, mock_fetch, mock_wf_cls, client):
         mock_fetch.return_value = pd.DataFrame({
             "price": np.linspace(100, 200, 100),

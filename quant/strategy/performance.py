@@ -20,12 +20,12 @@ from quant.strategy.signals import StrategyConfig, combine_positions
 logger = logging.getLogger(__name__)
 
 
-def _live_lookback_days(max_window: int, trading_period: int) -> int:
+def live_lookback_days(max_window: int, trading_period: int) -> int:
     """Calendar days of history to fetch so indicators are valid on the latest bar."""
     return max(max_window * 3 + 60, min(trading_period, 400))
 
 
-def _live_date_range(window, trading_period: int) -> tuple[str, str]:
+def live_date_range(window, trading_period: int) -> tuple[str, str]:
     """ISO ``(start, end)`` for live position evaluation ending today."""
     from datetime import date, timedelta
 
@@ -33,7 +33,7 @@ def _live_date_range(window, trading_period: int) -> tuple[str, str]:
         max_window = max(int(w) for w in window)
     else:
         max_window = int(window)
-    days = _live_lookback_days(max_window, trading_period)
+    days = live_lookback_days(max_window, trading_period)
     end = date.today()
     start = end - timedelta(days=days)
     return start.isoformat(), end.isoformat()
@@ -104,7 +104,7 @@ class Performance:
         self._compute_pnl_columns()
         return self
 
-    def _compute_latest_position(self) -> tuple[float, str]:
+    def compute_latest_position(self) -> tuple[float, str]:
         """Latest ``FinalPosition`` using the same math as backtest enrichment."""
         if self._is_multi:
             _, _, final_position, _ = self._compute_multi_factor_outputs()

@@ -38,7 +38,11 @@ class CcxtTradeGateway:
 
     def connect(self) -> None:
         preset = self._config.preset
-        exchange_cls = getattr(ccxt, preset.exchange_id)
+        exchange_cls = getattr(ccxt, preset.exchange_id, None)
+        if exchange_cls is None:
+            raise BrokerConnectionError(
+                f"ccxt has no exchange class {preset.exchange_id!r}"
+            )
         params: dict = {
             "apiKey": self._config.api_key,
             "secret": self._config.api_secret,
@@ -104,6 +108,7 @@ class CcxtTradeGateway:
             return False
 
     def fetch_position_qty(self, vendor_symbol: str) -> float:
+        """Signed position size: positive for long, negative for short."""
         try:
             positions = self.exchange.fetch_positions([vendor_symbol])
         except ccxt.BaseError as exc:
@@ -112,9 +117,12 @@ class CcxtTradeGateway:
             if pos.get("symbol") == vendor_symbol:
                 contracts = pos.get("contracts")
                 if contracts is not None:
-                    return float(contracts)
-                info = pos.get("info") or {}
-                size = info.get("size")
-                if size is not None:
-                    return float(size)
+                    qty = float(contracts)
+                else:
+                    info = pos.get("info") or {}
+                    size = info.get("size")
+                    qty = float(size) if size is not None else 0.0
+                if pos.get("side") == "short":
+                    qty = -abs(qty)
+                return qty
         return 0.0

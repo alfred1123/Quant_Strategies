@@ -119,15 +119,3 @@ class CcxtTradeAdapter(TradeAdapter):
         self, symbol: str, signal: float, qty: float
     ) -> OrderResult | None:
         raise NotImplementedError("live order placement is Phase 1.7")
-
-    @staticmethod
-    def intended_side(signal: float, position_qty: float) -> str:
-        """Map signal + current position to the action dry-run would take."""
-        sig = int(round(signal))
-        if sig > 0:
-            return "BUY" if position_qty == 0 else "HOLD"
-        if sig == 0:
-            return "SELL" if position_qty > 0 else "HOLD"
-        if position_qty > 0:
-            return "SELL"
-        return "HOLD"

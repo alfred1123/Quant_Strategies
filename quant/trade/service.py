@@ -24,8 +24,21 @@ class DeploymentNotFound(Exception):
 class TradeService:
     """Deployment apply/status — HTTP-agnostic."""
 
-    def __init__(self, repo: TradeRepo) -> None:
+    def __init__(
+        self,
+        repo: TradeRepo,
+        bt: BtQueueRepo,
+        credential_service: CredentialService,
+        credential_repo: ApiCredentialRepo,
+        adapter_registry: AdapterRegistry,
+        data_caches: DataCaches,
+    ) -> None:
         self._repo = repo
+        self._bt = bt
+        self._credential_service = credential_service
+        self._credential_repo = credential_repo
+        self._adapter_registry = adapter_registry
+        self._data_caches = data_caches
 
     def create_deployment(
         self,
@@ -70,20 +83,14 @@ class TradeService:
         self,
         app_user_id: UUID,
         req: DryRunRequest,
-        *,
-        bt: BtQueueRepo,
-        credential_service: CredentialService,
-        credential_repo: ApiCredentialRepo,
-        adapter_registry: AdapterRegistry,
-        data_caches: DataCaches,
     ) -> DryRunReport:
         return run_dry_run(
             app_user_id=app_user_id,
             req=req,
             repo=self._repo,
-            bt=bt,
-            credential_service=credential_service,
-            credential_repo=credential_repo,
-            adapter_registry=adapter_registry,
-            data_caches=data_caches,
+            bt=self._bt,
+            credential_service=self._credential_service,
+            credential_repo=self._credential_repo,
+            adapter_registry=self._adapter_registry,
+            data_caches=self._data_caches,
         )
