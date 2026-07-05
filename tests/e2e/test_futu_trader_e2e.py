@@ -19,7 +19,7 @@ import pandas as pd
 import pytest
 from dotenv import load_dotenv
 
-from quant.trade import FutuTrader, OrderResult
+from quant.trade.futu_trader import FutuTrader, OrderResult
 
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))

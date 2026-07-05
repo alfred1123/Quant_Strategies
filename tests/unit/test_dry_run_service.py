@@ -9,7 +9,7 @@ import pytest
 from quant.schemas.dry_run import DryRunRequest
 from quant.trade.adapters.base import TradeAdapter
 from quant.trade.dry_run import run_dry_run
-from quant.trade.errors import TradeValidationError
+from quant.trade.errors import SymbolMappingError, TradeValidationError
 
 
 def _dry_run_request(**overrides):
@@ -84,7 +84,7 @@ class TestRunDryRun:
 
     @patch("quant.trade.dry_run.compute_latest_position", return_value=(1.0, "2024-06-01"))
     def test_disconnects_on_broker_error(self, _signal, deps):
-        deps["adapter"].validate_for_dry_run.side_effect = ValueError(
+        deps["adapter"].validate_for_dry_run.side_effect = SymbolMappingError(
             "vendor symbol 'X' not listed on Bybit"
         )
 

@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from quant.schemas.deployments import DeploymentRow
 from quant.schemas.dry_run import DryRunReport
 from quant.trade.errors import TradeValidationError
-from quant.trade.service import DeploymentNotFound
+from quant.trade.errors import DeploymentNotFound
 
 
 def _deployment_row(**overrides) -> DeploymentRow:

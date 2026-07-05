@@ -271,7 +271,7 @@ DDL xref seeds ship in **F** (or later), not before **B**/**F** verification.
 
 ## Out of scope (this design)
 
-- Live order placement (Phase 1.7)
+- Live order placement (Phase 1.7) — see [Live Order Execution](live-order-execution.md)
 - Futu adapter (separate [Futu Trading](futu-trading.md))
 - `INST.PRODUCT_XREF_PROPOSAL` table (future; see separate-underlying)
 - Automatic xref discovery from exchange feeds without approval

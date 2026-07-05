@@ -28,3 +28,7 @@ class BrokerConnectionError(TradeValidationError):
 
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=502)
+
+
+class DeploymentNotFound(Exception):
+    """Requested deployment does not exist for this user (maps to HTTP 404)."""

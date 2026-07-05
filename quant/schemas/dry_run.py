@@ -1,12 +1,11 @@
 """Pydantic schemas for deployment dry-run — Phase 1.3."""
 
 from decimal import Decimal
-from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-IntendedSide = Literal["BUY", "SELL", "HOLD", "CLOSE_SHORT"]
+from quant.trade.models.order import IntendedAction
 
 
 class DryRunRequest(BaseModel):
@@ -41,6 +40,6 @@ class DryRunReport(BaseModel):
     paper: bool
     qty: Decimal
     signal: float
-    intended_side: IntendedSide
+    intended_side: IntendedAction
     position_qty: float
     data_as_of: str

@@ -13,8 +13,18 @@ from quant.trade.brokers.ccxt.config import (
     _wire_paper_sandbox,
 )
 from quant.trade.brokers.ccxt.gateway import CcxtSessionConfig, CcxtTradeGateway
-from quant.trade.errors import BrokerConnectionError, SymbolMappingError
-from quant.trade.models.order import OrderRequest, OrderSide, OrderType
+from quant.trade.errors import (
+    BrokerConnectionError,
+    SymbolMappingError,
+    TradeValidationError,
+)
+from quant.trade.models.order import (
+    IntendedAction,
+    OrderRequest,
+    OrderResult,
+    OrderSide,
+    OrderType,
+)
 
 
 @pytest.fixture
@@ -88,10 +98,29 @@ class TestIntendedSide:
         assert TradeAdapter.intended_side(-1.0, 1.0) == "SELL"
 
     def test_sell_signal_flat(self):
-        assert TradeAdapter.intended_side(-1.0, 0.0) == "HOLD"
+        assert TradeAdapter.intended_side(-1.0, 0.0) == "OPEN_SHORT"
 
     def test_sell_signal_already_short(self):
         assert TradeAdapter.intended_side(-1.0, -0.5) == "HOLD"
+
+    def test_returns_intended_action_enum(self):
+        assert TradeAdapter.intended_side(1.0, 0.0) is IntendedAction.BUY
+
+    def test_float_dust_position_treated_as_flat(self):
+        assert TradeAdapter.intended_side(1.0, 1e-12) == "BUY"
+        assert TradeAdapter.intended_side(0.0, -1e-12) == "HOLD"
+        assert TradeAdapter.intended_side(-1.0, 1e-12) == "OPEN_SHORT"
+
+
+class TestSessionConfigRepr:
+    def test_secrets_hidden_from_repr(self):
+        cfg = CcxtSessionConfig(
+            api_key="AKIA-VISIBLE-KEY",
+            api_secret="super-secret-value",
+            preset=CCXT_PRESETS["bybit"],
+        )
+        assert "AKIA-VISIBLE-KEY" not in repr(cfg)
+        assert "super-secret-value" not in repr(cfg)
 
 
 class TestCcxtTradeGateway:
@@ -159,6 +188,63 @@ class TestCcxtTradeGateway:
         exchange.set_sandbox_mode.assert_called_once_with(True)
         mock_ccxt.binanceusdm.assert_called_once()
         exchange.fetch_balance.assert_called_once()
+
+    @patch("quant.trade.brokers.ccxt.gateway.ccxt")
+    def test_fetch_position_qty_matches_unified_symbol(self, mock_ccxt):
+        """fetch_positions returns ccxt unified symbol (BTC/USDT:USDT), not
+        the raw vendor_symbol (BTCUSDT) — must still match."""
+        exchange = MagicMock()
+        exchange.markets = {"BTCUSDT": {}}
+        exchange.has = {"fetchCurrencies": True}
+        exchange.market.return_value = {"symbol": "BTC/USDT:USDT"}
+        exchange.fetch_positions.return_value = [
+            {"symbol": "BTC/USDT:USDT", "contracts": 0.001, "side": "long", "info": {"symbol": "BTCUSDT"}}
+        ]
+        mock_ccxt.bybit.return_value = exchange
+
+        gw = CcxtTradeGateway(
+            CcxtSessionConfig(
+                api_key="k", api_secret="s", preset=CCXT_PRESETS["bybit"], paper=True,
+            )
+        )
+        gw.connect()
+        assert gw.fetch_position_qty("BTCUSDT") == 0.001
+
+    @patch("quant.trade.brokers.ccxt.gateway.ccxt")
+    def test_fetch_position_qty_short_is_negative(self, mock_ccxt):
+        exchange = MagicMock()
+        exchange.markets = {"BTCUSDT": {}}
+        exchange.has = {"fetchCurrencies": True}
+        exchange.market.return_value = {"symbol": "BTC/USDT:USDT"}
+        exchange.fetch_positions.return_value = [
+            {"symbol": "BTC/USDT:USDT", "contracts": 0.002, "side": "short", "info": {"symbol": "BTCUSDT"}}
+        ]
+        mock_ccxt.bybit.return_value = exchange
+
+        gw = CcxtTradeGateway(
+            CcxtSessionConfig(
+                api_key="k", api_secret="s", preset=CCXT_PRESETS["bybit"], paper=True,
+            )
+        )
+        gw.connect()
+        assert gw.fetch_position_qty("BTCUSDT") == -0.002
+
+    @patch("quant.trade.brokers.ccxt.gateway.ccxt")
+    def test_fetch_position_qty_no_position_returns_zero(self, mock_ccxt):
+        exchange = MagicMock()
+        exchange.markets = {"BTCUSDT": {}}
+        exchange.has = {"fetchCurrencies": True}
+        exchange.market.return_value = {"symbol": "BTC/USDT:USDT"}
+        exchange.fetch_positions.return_value = []
+        mock_ccxt.bybit.return_value = exchange
+
+        gw = CcxtTradeGateway(
+            CcxtSessionConfig(
+                api_key="k", api_secret="s", preset=CCXT_PRESETS["bybit"], paper=True,
+            )
+        )
+        gw.connect()
+        assert gw.fetch_position_qty("BTCUSDT") == 0.0
 
     @patch("quant.trade.brokers.ccxt.gateway.ccxt")
     def test_auth_failure_raises(self, mock_ccxt):
@@ -230,19 +316,137 @@ class TestCreateCcxtAdapter:
         with pytest.raises(SymbolMappingError, match="unknown product"):
             adapter.validate_for_dry_run("missing.crypto", 34)
 
-    def test_place_order_not_implemented(self, inst_cache):
-        adapter = create_ccxt_adapter(
+class TestPlaceOrder:
+    def _adapter(self, inst_cache):
+        return create_ccxt_adapter(
             preset=CCXT_PRESETS["bybit"],
             api_key="k",
             api_secret="s",
             paper=True,
             inst_cache=inst_cache,
         )
+
+    def test_place_order_buy_success(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(
+            adapter.gateway, "create_market_order",
+            return_value={"id": "abc123", "status": "closed"},
+        ) as mock_create:
+            req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
+            result = adapter.place_order(req)
+
+        mock_create.assert_called_once_with("BTCUSDT", "buy", 0.01)
+        assert result.success is True
+        assert result.vendor_order_id == "abc123"
+        assert result.raw_status == "closed"
+
+    def test_place_order_sell_maps_side(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(
+            adapter.gateway, "create_market_order", return_value={"id": "xyz"},
+        ) as mock_create:
+            adapter.place_order(OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.SELL))
+        mock_create.assert_called_once_with("BTCUSDT", "sell", 0.01)
+
+    def test_place_order_rejects_limit_orders(self, inst_cache):
+        adapter = self._adapter(inst_cache)
         req = OrderRequest(
             symbol="BTCUSDT",
             qty=0.01,
             side=OrderSide.BUY,
-            order_type=OrderType.MARKET,
+            order_type=OrderType.LIMIT,
+            limit_price=50_000.0,
         )
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(TradeValidationError, match="market only"):
             adapter.place_order(req)
+
+    def test_place_order_broker_error_returns_failed_result(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(
+            adapter.gateway, "create_market_order",
+            side_effect=BrokerConnectionError("insufficient funds"),
+        ):
+            req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
+            result = adapter.place_order(req)
+
+        assert result.success is False
+        assert result.vendor_order_id is None
+        assert "insufficient funds" in result.message
+
+    def test_cancel_order_success(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(
+            adapter.gateway, "cancel_order", return_value={"status": "canceled"},
+        ) as mock_cancel:
+            result = adapter.cancel_order("order-1", "BTCUSDT")
+        mock_cancel.assert_called_once_with("order-1", "BTCUSDT")
+        assert result.success is True
+        assert result.vendor_order_id == "order-1"
+
+    def test_get_open_orders_delegates_to_gateway(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(adapter.gateway, "fetch_open_orders", return_value=[{"id": "1"}]) as mock_fetch:
+            orders = adapter.get_open_orders("BTCUSDT")
+        mock_fetch.assert_called_once_with("BTCUSDT")
+        assert orders == [{"id": "1"}]
+
+
+class TestApplySignal:
+    def _adapter(self, inst_cache):
+        return create_ccxt_adapter(
+            preset=CCXT_PRESETS["bybit"],
+            api_key="k",
+            api_secret="s",
+            paper=True,
+            inst_cache=inst_cache,
+        )
+
+    def test_buy_signal_flat_position_opens_long(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(adapter, "get_position_qty", return_value=0.0), \
+             patch.object(adapter, "place_order") as mock_place:
+            mock_place.return_value = OrderResult(success=True, vendor_order_id="1", message="ok")
+            result = adapter.apply_signal("BTCUSDT", 1.0, 0.01)
+
+        req = mock_place.call_args[0][0]
+        assert req.side == OrderSide.BUY and req.qty == 0.01
+        assert result.success is True
+
+    def test_hold_signal_places_no_order(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(adapter, "get_position_qty", return_value=0.01), \
+             patch.object(adapter, "place_order") as mock_place:
+            result = adapter.apply_signal("BTCUSDT", 1.0, 0.01)
+
+        mock_place.assert_not_called()
+        assert result is None
+
+    def test_flat_signal_with_long_position_sells_full_qty(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(adapter, "get_position_qty", return_value=0.03), \
+             patch.object(adapter, "place_order") as mock_place:
+            mock_place.return_value = OrderResult(success=True, vendor_order_id="2", message="ok")
+            adapter.apply_signal("BTCUSDT", 0.0, 0.01)
+
+        req = mock_place.call_args[0][0]
+        assert req.side == OrderSide.SELL and req.qty == 0.03
+
+    def test_sell_signal_flat_opens_short(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(adapter, "get_position_qty", return_value=0.0), \
+             patch.object(adapter, "place_order") as mock_place:
+            mock_place.return_value = OrderResult(success=True, vendor_order_id="3", message="ok")
+            adapter.apply_signal("BTCUSDT", -1.0, 0.01)
+
+        req = mock_place.call_args[0][0]
+        assert req.side == OrderSide.SELL and req.qty == 0.01
+
+    def test_buy_signal_with_short_position_closes_short(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(adapter, "get_position_qty", return_value=-0.02), \
+             patch.object(adapter, "place_order") as mock_place:
+            mock_place.return_value = OrderResult(success=True, vendor_order_id="4", message="ok")
+            adapter.apply_signal("BTCUSDT", 1.0, 0.01)
+
+        req = mock_place.call_args[0][0]
+        assert req.side == OrderSide.BUY and req.qty == 0.02

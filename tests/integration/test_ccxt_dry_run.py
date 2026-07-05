@@ -330,6 +330,6 @@ class TestCcxtDeploymentDryRun:
         assert report.internal_cusip == params["internal_cusip"]
         assert report.vendor_symbol
         assert report.signal in (-1.0, 0.0, 1.0)
-        assert report.intended_side in ("BUY", "SELL", "HOLD", "CLOSE_SHORT")
+        assert report.intended_side in ("BUY", "SELL", "HOLD", "OPEN_SHORT", "CLOSE_SHORT")
         assert report.data_as_of
         assert isinstance(report.position_qty, float)

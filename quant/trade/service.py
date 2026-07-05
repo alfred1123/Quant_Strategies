@@ -12,13 +12,10 @@ from quant.schemas.deployments import CreateDeploymentRequest, DeploymentRow
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
 from quant.trade.db_repo import TradeRepo
 from quant.trade.dry_run import run_dry_run
+from quant.trade.errors import DeploymentNotFound
 from quant.trade.registry import AdapterRegistry
 
 logger = logging.getLogger(__name__)
-
-
-class DeploymentNotFound(Exception):
-    """HTTP layer maps to 404."""
 
 
 class TradeService:

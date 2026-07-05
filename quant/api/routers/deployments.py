@@ -16,7 +16,8 @@ from quant.queue.repo import BtQueueRepo
 from quant.schemas.deployments import CreateDeploymentRequest, DeploymentRow
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
 from quant.trade.db_repo import TradeRepo
-from quant.trade.service import DeploymentNotFound, TradeService
+from quant.trade.errors import DeploymentNotFound
+from quant.trade.service import TradeService
 
 logger = logging.getLogger(__name__)
 
