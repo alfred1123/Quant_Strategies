@@ -13,7 +13,7 @@ from quant.schemas.dry_run import DryRunReport, DryRunRequest
 from quant.strategy.live_service import LiveEvaluationError, compute_latest_position
 from quant.trade.adapters.base import TradeAdapter
 from quant.trade.db_repo import TradeRepo
-from quant.trade.errors import TradeValidationError
+from quant.trade.errors import AdapterNotFoundError, TradeValidationError
 from quant.trade.registry import AdapterRegistry
 
 logger = logging.getLogger(__name__)
@@ -42,8 +42,6 @@ def run_dry_run(
     )
 
     if not adapter_registry.has_adapter(req.app_id):
-        from quant.trade.errors import AdapterNotFoundError
-
         raise AdapterNotFoundError(
             f"no broker adapter registered for app_id={req.app_id}"
         )
@@ -92,11 +90,7 @@ def _broker_report(
     data_as_of: str,
 ) -> DryRunReport:
     """Build dry-run report; caller must manage adapter lifecycle via context manager."""
-    try:
-        vendor_symbol = adapter.validate_for_dry_run(req.internal_cusip, req.app_id)
-    except ValueError as exc:
-        raise TradeValidationError(str(exc)) from exc
-
+    vendor_symbol = adapter.validate_for_dry_run(req.internal_cusip, req.app_id)
     position_qty = adapter.get_position_qty(vendor_symbol)
     intended = adapter.intended_side(signal, position_qty)
 

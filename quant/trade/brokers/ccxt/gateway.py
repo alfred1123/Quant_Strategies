@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import ccxt
 
@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class CcxtSessionConfig:
-    api_key: str
-    api_secret: str
+    api_key: str = field(repr=False)
+    api_secret: str = field(repr=False)
     preset: CcxtExchangePreset
     paper: bool = True
     demo: bool = False
@@ -107,22 +107,62 @@ class CcxtTradeGateway:
         except ccxt.BadSymbol:
             return False
 
+    def create_market_order(self, vendor_symbol: str, side: str, qty: float) -> dict:
+        """Submit a market order. ``side`` is ``'buy'`` or ``'sell'`` (ccxt lowercase)."""
+        try:
+            return self.exchange.create_order(vendor_symbol, "market", side, qty)
+        except ccxt.InsufficientFunds as exc:
+            raise BrokerConnectionError(f"insufficient funds: {exc}") from exc
+        except ccxt.InvalidOrder as exc:
+            raise BrokerConnectionError(f"invalid order: {exc}") from exc
+        except ccxt.AuthenticationError as exc:
+            raise self._auth_error(exc, phase="create_order") from exc
+        except ccxt.BaseError as exc:
+            raise BrokerConnectionError(f"create_order failed: {exc}") from exc
+
+    def cancel_order(self, vendor_order_id: str, vendor_symbol: str | None = None) -> dict:
+        try:
+            return self.exchange.cancel_order(vendor_order_id, vendor_symbol)
+        except ccxt.AuthenticationError as exc:
+            raise self._auth_error(exc, phase="cancel_order") from exc
+        except ccxt.BaseError as exc:
+            raise BrokerConnectionError(f"cancel_order failed: {exc}") from exc
+
+    def fetch_open_orders(self, vendor_symbol: str | None = None) -> list[dict]:
+        try:
+            return self.exchange.fetch_open_orders(vendor_symbol)
+        except ccxt.AuthenticationError as exc:
+            raise self._auth_error(exc, phase="fetch_open_orders") from exc
+        except ccxt.BaseError as exc:
+            raise BrokerConnectionError(f"fetch_open_orders failed: {exc}") from exc
+
     def fetch_position_qty(self, vendor_symbol: str) -> float:
-        """Signed position size: positive for long, negative for short."""
+        """Signed position size: positive for long, negative for short.
+
+        ``fetch_positions`` returns ``symbol`` in ccxt's unified format (e.g.
+        ``BTC/USDT:USDT``) while ``vendor_symbol`` is the raw exchange symbol
+        (e.g. ``BTCUSDT``) from INST.PRODUCT_XREF — compare against both that
+        and the raw ``info.symbol`` ccxt preserves from the exchange response.
+        """
         try:
             positions = self.exchange.fetch_positions([vendor_symbol])
         except ccxt.BaseError as exc:
             raise BrokerConnectionError(f"fetch_positions failed: {exc}") from exc
+        try:
+            unified_symbol = self.exchange.market(vendor_symbol)["symbol"]
+        except ccxt.BadSymbol:
+            unified_symbol = vendor_symbol
         for pos in positions:
-            if pos.get("symbol") == vendor_symbol:
-                contracts = pos.get("contracts")
-                if contracts is not None:
-                    qty = float(contracts)
-                else:
-                    info = pos.get("info") or {}
-                    size = info.get("size")
-                    qty = float(size) if size is not None else 0.0
-                if pos.get("side") == "short":
-                    qty = -abs(qty)
-                return qty
+            info = pos.get("info") or {}
+            if vendor_symbol not in (pos.get("symbol"), unified_symbol, info.get("symbol")):
+                continue
+            contracts = pos.get("contracts")
+            if contracts is not None:
+                qty = float(contracts)
+            else:
+                size = info.get("size")
+                qty = float(size) if size is not None else 0.0
+            if pos.get("side") == "short":
+                qty = -abs(qty)
+            return qty
         return 0.0

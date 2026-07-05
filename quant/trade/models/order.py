@@ -1,7 +1,7 @@
 """Order value objects shared by broker adapters."""
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
 
 
 class OrderSide(str, Enum):
@@ -12,6 +12,20 @@ class OrderSide(str, Enum):
 class OrderType(str, Enum):
     MARKET = "MARKET"
     LIMIT = "LIMIT"
+
+
+class IntendedAction(StrEnum):
+    """Position-aware action from ``TradeAdapter.intended_side``.
+
+    Richer than :class:`OrderSide` — OPEN_SHORT/CLOSE_SHORT carry the position
+    context; execution collapses them back to a raw buy/sell order side.
+    """
+
+    BUY = "BUY"
+    SELL = "SELL"
+    HOLD = "HOLD"
+    OPEN_SHORT = "OPEN_SHORT"
+    CLOSE_SHORT = "CLOSE_SHORT"
 
 
 @dataclass(frozen=True)

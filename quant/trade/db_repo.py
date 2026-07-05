@@ -51,7 +51,8 @@ class TradeRepo(DbGateway):
 
     def _assert_strategy_owned(
         self, strategy_id: UUID, strategy_vid: int, app_user_id: UUID
-    ) -> None:
+    ) -> dict:
+        """Fetch the strategy row and enforce ownership; returns the row."""
         row = self._fetch_strategy(strategy_id, strategy_vid)
         if row is None:
             raise TradeValidationError(
@@ -61,6 +62,28 @@ class TradeRepo(DbGateway):
             raise TradeValidationError(
                 "strategy does not belong to user", status_code=403
             )
+        return row
+
+    def _assert_credential_usable(
+        self, api_credential_id: int, app_user_id: UUID, app_id: int
+    ) -> dict:
+        """Fetch the credential and enforce active/ownership/app; returns the row."""
+        cred = self._fetch_credential(api_credential_id)
+        if cred is None:
+            raise TradeValidationError(
+                "API credential not found or not current", status_code=404
+            )
+        if cred["is_active_ind"] != "Y":
+            raise TradeValidationError("API credential is not active", status_code=400)
+        if str(cred["app_user_id"]) != str(app_user_id):
+            raise TradeValidationError(
+                "API credential does not belong to user", status_code=403
+            )
+        if cred["app_id"] != app_id:
+            raise TradeValidationError(
+                "app_id does not match API credential", status_code=400
+            )
+        return cred
 
     def _fetch_deployment_version(
         self, deployment_id: UUID, deployment_vid: int
@@ -112,22 +135,7 @@ class TradeRepo(DbGateway):
                 status_code=400,
             )
 
-        cred = self._fetch_credential(api_credential_id)
-        if cred is None:
-            raise TradeValidationError(
-                "API credential not found or not current", status_code=404
-            )
-        if cred["is_active_ind"] != "Y":
-            raise TradeValidationError("API credential is not active", status_code=400)
-        if str(cred["app_user_id"]) != str(app_user_id):
-            raise TradeValidationError(
-                "API credential does not belong to user", status_code=403
-            )
-        if cred["app_id"] != app_id:
-            raise TradeValidationError(
-                "app_id does not match API credential", status_code=400
-            )
-
+        self._assert_credential_usable(api_credential_id, app_user_id, app_id)
         self._assert_strategy_owned(strategy_id, strategy_vid, app_user_id)
 
         current = self._fetch_current_deployment(deployment_id)
@@ -157,29 +165,8 @@ class TradeRepo(DbGateway):
             qty=qty,
         )
 
-        cred = self._fetch_credential(api_credential_id)
-        if cred is None:
-            raise TradeValidationError(
-                "API credential not found or not current", status_code=404
-            )
-        if cred["is_active_ind"] != "Y":
-            raise TradeValidationError("API credential is not active", status_code=400)
-        if str(cred["app_user_id"]) != str(app_user_id):
-            raise TradeValidationError(
-                "API credential does not belong to user", status_code=403
-            )
-        if cred["app_id"] != app_id:
-            raise TradeValidationError(
-                "app_id does not match API credential", status_code=400
-            )
-
-        self._assert_strategy_owned(strategy_id, strategy_vid, app_user_id)
-        row = self._fetch_strategy(strategy_id, strategy_vid)
-        if row is None:
-            raise TradeValidationError(
-                "strategy_id / strategy_vid not found", status_code=404
-            )
-        return row
+        self._assert_credential_usable(api_credential_id, app_user_id, app_id)
+        return self._assert_strategy_owned(strategy_id, strategy_vid, app_user_id)
 
     def validate_execution_event(
         self,
@@ -190,7 +177,6 @@ class TradeRepo(DbGateway):
         buy_sell_cd: str,
         is_success_ind: str,
         user_id: str,
-        execution_event_id: UUID | None = None,
     ) -> None:
         _require_all(
             app_user_id=app_user_id, deployment_id=deployment_id,
@@ -216,7 +202,6 @@ class TradeRepo(DbGateway):
         buy_sell_cd: str,
         trans_ccy_cd: str,
         user_id: str,
-        transaction_id: UUID | None = None,
     ) -> None:
         _require_all(
             app_user_id=app_user_id, deployment_id=deployment_id,
@@ -318,7 +303,6 @@ class TradeRepo(DbGateway):
         vendor_order_id: str | None = None,
     ) -> None:
         self.validate_execution_event(
-            execution_event_id=execution_event_id,
             app_user_id=app_user_id,
             deployment_id=deployment_id,
             deployment_vid=deployment_vid,
@@ -365,7 +349,6 @@ class TradeRepo(DbGateway):
         vendor_order_id: str | None = None,
     ) -> None:
         self.validate_transaction(
-            transaction_id=transaction_id,
             app_user_id=app_user_id,
             deployment_id=deployment_id,
             app_id=app_id,

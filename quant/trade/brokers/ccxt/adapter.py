@@ -8,8 +8,18 @@ from typing import TYPE_CHECKING
 from quant.trade.adapters.base import TradeAdapter
 from quant.trade.brokers.ccxt.config import CcxtExchangePreset
 from quant.trade.brokers.ccxt.gateway import CcxtSessionConfig, CcxtTradeGateway
-from quant.trade.errors import SymbolMappingError
-from quant.trade.models.order import OrderRequest, OrderResult
+from quant.trade.errors import (
+    BrokerConnectionError,
+    SymbolMappingError,
+    TradeValidationError,
+)
+from quant.trade.models.order import (
+    IntendedAction,
+    OrderRequest,
+    OrderResult,
+    OrderSide,
+    OrderType,
+)
 from quant.trade.models.session import BrokerSessionState
 
 if TYPE_CHECKING:
@@ -98,7 +108,7 @@ class CcxtTradeAdapter(TradeAdapter):
         vendor_symbol = self._require_vendor_symbol(internal_cusip, app_id)
         self._gateway.validate_credentials()
         if not self._gateway.market_exists(vendor_symbol):
-            raise ValueError(
+            raise SymbolMappingError(
                 f"vendor symbol {vendor_symbol!r} not listed on {self._exchange_label}"
             )
         return vendor_symbol
@@ -107,15 +117,56 @@ class CcxtTradeAdapter(TradeAdapter):
         return self._gateway.fetch_position_qty(symbol)
 
     def place_order(self, req: OrderRequest) -> OrderResult:
-        raise NotImplementedError("live order placement is Phase 1.7")
+        if req.order_type is not OrderType.MARKET:
+            raise TradeValidationError(
+                f"{req.order_type.value} orders not supported by the ccxt adapter — market only"
+            )
+        side = "buy" if req.side == OrderSide.BUY else "sell"
+        try:
+            raw = self._gateway.create_market_order(req.symbol, side, req.qty)
+        except BrokerConnectionError as exc:
+            return OrderResult(success=False, vendor_order_id=None, message=str(exc))
+        order_id = raw.get("id")
+        return OrderResult(
+            success=True,
+            vendor_order_id=str(order_id) if order_id is not None else None,
+            message="order submitted",
+            raw_status=raw.get("status"),
+        )
 
-    def cancel_order(self, vendor_order_id: str) -> OrderResult:
-        raise NotImplementedError("live order placement is Phase 1.7")
+    def cancel_order(self, vendor_order_id: str, vendor_symbol: str | None = None) -> OrderResult:
+        try:
+            raw = self._gateway.cancel_order(vendor_order_id, vendor_symbol)
+        except BrokerConnectionError as exc:
+            return OrderResult(success=False, vendor_order_id=vendor_order_id, message=str(exc))
+        return OrderResult(
+            success=True,
+            vendor_order_id=vendor_order_id,
+            message="order canceled",
+            raw_status=raw.get("status"),
+        )
 
     def get_open_orders(self, symbol: str | None = None) -> list[dict]:
-        raise NotImplementedError("live order placement is Phase 1.7")
+        return self._gateway.fetch_open_orders(symbol)
 
     def apply_signal(
         self, symbol: str, signal: float, qty: float
     ) -> OrderResult | None:
-        raise NotImplementedError("live order placement is Phase 1.7")
+        """Translate ``{-1,0,1}`` signal + live position to at most one order."""
+        position_qty = self.get_position_qty(symbol)
+        action = self.intended_side(signal, position_qty)
+        if action is IntendedAction.HOLD:
+            return None
+        if action is IntendedAction.BUY:
+            order_req = OrderRequest(symbol=symbol, qty=qty, side=OrderSide.BUY)
+        elif action is IntendedAction.OPEN_SHORT:
+            order_req = OrderRequest(symbol=symbol, qty=qty, side=OrderSide.SELL)
+        elif action is IntendedAction.SELL:
+            order_req = OrderRequest(symbol=symbol, qty=abs(position_qty), side=OrderSide.SELL)
+        elif action is IntendedAction.CLOSE_SHORT:
+            order_req = OrderRequest(symbol=symbol, qty=abs(position_qty), side=OrderSide.BUY)
+        else:  # pragma: no cover — exhaustive per IntendedAction
+            raise ValueError(f"unhandled intended_side action: {action!r}")
+        if order_req.qty <= 0:
+            return None
+        return self.place_order(order_req)

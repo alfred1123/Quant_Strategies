@@ -1,5 +1,34 @@
-"""Trade domain — DB repo, errors, and broker adapters."""
+"""Trade domain — broker-agnostic models, errors, adapters, and repos.
 
-from quant.trade.futu_trader import FutuTrader, OrderResult
+Broker-specific implementations live in submodules and are imported directly
+(e.g. ``quant.trade.futu_trader``, ``quant.trade.brokers.ccxt``) so the package
+import stays light — no broker SDKs are loaded here.
+"""
 
-__all__ = ["FutuTrader", "OrderResult"]
+from quant.trade.errors import (
+    AdapterNotFoundError,
+    BrokerConnectionError,
+    DeploymentNotFound,
+    SymbolMappingError,
+    TradeValidationError,
+)
+from quant.trade.models.order import (
+    IntendedAction,
+    OrderRequest,
+    OrderResult,
+    OrderSide,
+    OrderType,
+)
+
+__all__ = [
+    "AdapterNotFoundError",
+    "BrokerConnectionError",
+    "DeploymentNotFound",
+    "IntendedAction",
+    "OrderRequest",
+    "OrderResult",
+    "OrderSide",
+    "OrderType",
+    "SymbolMappingError",
+    "TradeValidationError",
+]

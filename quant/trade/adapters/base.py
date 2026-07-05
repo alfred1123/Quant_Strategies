@@ -2,8 +2,11 @@
 
 from abc import ABC, abstractmethod
 
-from quant.trade.models.order import OrderRequest, OrderResult
+from quant.trade.models.order import IntendedAction, OrderRequest, OrderResult
 from quant.trade.models.session import BrokerSessionState
+
+# Positions smaller than this are float noise, not real exposure — treat as flat.
+_FLAT_EPS = 1e-9
 
 
 class BrokerSession(ABC):
@@ -37,7 +40,10 @@ class TradeAdapter(BrokerSession):
     def place_order(self, req: OrderRequest) -> OrderResult: ...
 
     @abstractmethod
-    def cancel_order(self, vendor_order_id: str) -> OrderResult: ...
+    def cancel_order(
+        self, vendor_order_id: str, vendor_symbol: str | None = None
+    ) -> OrderResult:
+        """Cancel one order. Most ccxt exchanges require the symbol too."""
 
     @abstractmethod
     def get_open_orders(self, symbol: str | None = None) -> list[dict]: ...
@@ -56,7 +62,7 @@ class TradeAdapter(BrokerSession):
         """Validate credentials + symbol mapping. Returns vendor symbol."""
 
     @staticmethod
-    def intended_side(signal: float, position_qty: float) -> str:
+    def intended_side(signal: float, position_qty: float) -> IntendedAction:
         """Map ``(signal, signed_position)`` to an action.
 
         Handles long, flat, and short positions::
@@ -72,21 +78,26 @@ class TradeAdapter(BrokerSession):
              -1     >0 (long)  →  SELL
              -1      0 (flat)  →  OPEN_SHORT     (enter short)
              -1     <0 (short) →  HOLD           (already short)
+
+        Positions within ``_FLAT_EPS`` of zero are treated as flat so float
+        dust never triggers a flatten order the exchange would reject.
         """
         sig = int(round(signal))
+        if abs(position_qty) <= _FLAT_EPS:
+            position_qty = 0.0
         if sig > 0:
             if position_qty < 0:
-                return "CLOSE_SHORT"
-            return "BUY" if position_qty == 0 else "HOLD"
+                return IntendedAction.CLOSE_SHORT
+            return IntendedAction.BUY if position_qty == 0 else IntendedAction.HOLD
         if sig == 0:
             if position_qty > 0:
-                return "SELL"
+                return IntendedAction.SELL
             if position_qty < 0:
-                return "CLOSE_SHORT"
-            return "HOLD"
+                return IntendedAction.CLOSE_SHORT
+            return IntendedAction.HOLD
         # sig < 0
         if position_qty > 0:
-            return "SELL"
+            return IntendedAction.SELL
         if position_qty == 0:
-            return "OPEN_SHORT"
-        return "HOLD"
+            return IntendedAction.OPEN_SHORT
+        return IntendedAction.HOLD

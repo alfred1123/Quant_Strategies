@@ -36,7 +36,7 @@ Work **one subphase at a time** — finish exit criteria before starting the nex
 | [0.3](#phase-03--deploy-topology-decision) | Deploy topology decision | done |
 | [1.1](#phase-11--user-secrets) | User secrets | done |
 | [1.2](#phase-12--trade-schema--apply-api) | Trade schema + apply API | done |
-| [1.3](#phase-13--bybit-adapter-dry-run) | Bybit adapter (dry run) | — |
+| [1.3](#phase-13--bybit-adapter-dry-run) | Bybit adapter (dry run) | done |
 | [1.4](#phase-14--trade-ui-shell) | Trade UI shell | done |
 | [1.5](#phase-15--exchange-config-ui) | Exchange config UI | done |
 | [1.6](#phase-16--strategy-picker) | Strategy picker | done |
@@ -309,6 +309,8 @@ Local validation script — **source of truth** for Bybit testnet + dry-run beha
 
 **Exit criteria:** `--suite` exits 0 for test user against Bybit testnet; dry-run API succeeds (`--api-dry-run` or `--suite --with-api` when dev API is up). **Security:** dry-run never calls `create_order`.
 
+**Result (2026-07-05):** Automated mirror green end-to-end against Bybit paper testnet — `tests/integration/test_ccxt_dry_run.py -m e2e`: credential decrypt (`API_CREDENTIAL_ID=8`), `INST.PRODUCT_XREF` resolve (`btcusdt.crypto` → `BTCUSDT`, `app_id=34`), `validate_credentials()`, `market_exists()`, position qty fetch, and full `run_dry_run()` orchestration all pass (4 passed, 1 skipped). Unit suite (`test_dry_run_service.py`, `test_trade_router.py`, `test_bybit_adapter.py`, `test_trade_registry.py`, `test_trade_db_repo.py`, `test_trade.py`, `test_trade_service.py`): 87 passed.
+
 ---
 
 #### Phase 1.4 — Trade UI shell
@@ -397,6 +399,9 @@ Local validation script — **source of truth** for Bybit testnet + dry-run beha
 | **Depends on** | 1.2, 1.3, 1.5, 1.6 |
 | **Blocks** | 1.8, 2.x |
 
+See [Live Order Execution](live-order-execution.md) for the fill-confirmation, retry/cancel, and
+alerting design for the live order path itself.
+
 **Tasks**
 
 - [ ] UI: Dry-run button → show report; Apply button → confirm live.
@@ -408,6 +413,22 @@ Local validation script — **source of truth** for Bybit testnet + dry-run beha
 - [ ] Security: `PATCH` deployment kill switch (`is_enabled_ind`) before first live apply (see [Trade API §4](trade-api.md#4-risk--safety)).
 
 **Exit criteria:** **M1 — Pipeline** met: one real (or testnet) live apply completes end-to-end for Bollinger strategy. **Security:** backend rejects live apply without dry-run + confirm; paper/live cannot be bypassed via raw API; caller cannot deploy another user's strategy; deployment can be disabled via PATCH without DB access.
+
+**Result (2026-07-05):** Core order-placement mechanics (`CcxtTradeGateway.create_market_order`,
+`CcxtTradeAdapter.place_order`/`apply_signal`) implemented and validated end-to-end against Bybit
+testnet via the golden harness (`scripts/bybit_local_testnet.py --apply-signal {signal} --confirm`).
+All 6 lifecycle actions confirmed with real fills, human-verified against `testnet.bybit.com`:
+BUY (flat→long), HOLD (long, signal=+1), SELL (long→flat), HOLD (flat, signal=0), OPEN_SHORT
+(flat→short), CLOSE_SHORT (short→flat). Found and fixed a real bug along the way:
+`fetch_position_qty` compared ccxt's unified symbol against the raw vendor symbol and always
+returned `0.0` for any open position (masked until an open position existed to test against) — 3
+regression tests added. Two account-level blockers hit and resolved: Bybit API key needed
+explicit trade permission (was read-only), and a one-time derivatives risk-disclosure gate
+(`10024`) had to be accepted via Bybit's UI before API orders would go through. Unit suite green:
+`test_bybit_adapter.py` 34 passed, `test_trade*.py` 72 passed. Remaining for Phase 1.7: UI wiring,
+ownership/kill-switch security tasks above, and the poll-to-confirm + retry/alert robustness layer
+— see [Live Order Execution](live-order-execution.md) for that design (Slack alerting explicitly
+deferred pending further detail).
 
 ---
 

@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from quant.trade.adapters.base import TradeAdapter
 from quant.trade.brokers.ccxt.config import CCXT_PRESETS, CcxtExchangePreset
 from quant.trade.errors import AdapterNotFoundError
+
+if TYPE_CHECKING:
+    from quant.refdata.reader import RedisRefData
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +29,7 @@ class AdapterRegistry:
         logger.debug("registered adapter for app_id=%s", app_id)
 
     def register_by_name(
-        self, app_name: str, factory: AdapterFactory, *, refdata
+        self, app_name: str, factory: AdapterFactory, *, refdata: RedisRefData
     ) -> None:
         """Resolve ``app_name`` via REFDATA and register."""
         app_id = refdata.resolve_app_id(app_name)
@@ -53,7 +56,7 @@ def _factory_for(preset: CcxtExchangePreset) -> AdapterFactory:
     return factory
 
 
-def build_default_registry(refdata) -> AdapterRegistry:
+def build_default_registry(refdata: RedisRefData) -> AdapterRegistry:
     """Register built-in ccxt adapters. Called at API startup."""
     registry = AdapterRegistry()
     for app_name, preset in CCXT_PRESETS.items():

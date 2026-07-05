@@ -17,6 +17,9 @@ Individual steps (same code paths the suite calls):
   --api-dry-run        Same dry-run via POST /api/v1/trade/deployments/dry-run
   --intended-matrix    Golden table for signal × position → BUY/SELL/HOLD
   --probe-intended     Live position + intended_side for signals -1/0/1
+  --apply-signal S     Preview action for signal S against live position (BUY/SELL/
+                        HOLD/OPEN_SHORT/CLOSE_SHORT); add --confirm to place the order
+  --apply-signal S --confirm [--qty Q]   Actually place the market order on testnet
 
 Flags:
   --demo               Bybit Demo Trading (not testnet sandbox)
@@ -584,6 +587,93 @@ def probe_intended_with_live_position(paper: bool, *, bybit_demo: bool = False) 
     return {"vendor_symbol": vendor, "position_qty": position_qty, "outcomes": outcomes}
 
 
+def run_apply_signal(
+    paper: bool,
+    signal: float,
+    qty: float,
+    *,
+    bybit_demo: bool = False,
+    confirm: bool = False,
+) -> None:
+    """Preview (or, with --confirm, actually place) the order for one signal.
+
+    Prints live position before/after so each action (BUY/SELL/HOLD/
+    OPEN_SHORT/CLOSE_SHORT) can be verified against the Bybit testnet UI
+    one step at a time.
+    """
+    from quant.data.instruments import InstrumentCache
+    from quant.trade.brokers.ccxt.adapter import create_ccxt_adapter
+    from quant.trade.brokers.ccxt.config import CCXT_PRESETS
+
+    conninfo = _local_conninfo()
+    app_id = _env_int("CCXT_ITEST_APP_ID")
+    cusip = os.getenv("CCXT_ITEST_INTERNAL_CUSIP", "btcusdt.crypto")
+    api_key, api_secret = resolve_api_keys(conninfo)
+
+    inst_cache = InstrumentCache(conninfo)
+    inst_cache.load_all()
+    adapter = create_ccxt_adapter(
+        preset=CCXT_PRESETS["bybit"],
+        api_key=api_key,
+        api_secret=api_secret,
+        paper=paper and not bybit_demo,
+        inst_cache=inst_cache,
+        demo=bybit_demo,
+    )
+    try:
+        adapter.connect()
+        vendor = adapter.validate_for_dry_run(cusip, app_id)
+        position_before = adapter.get_position_qty(vendor)
+        action = adapter.intended_side(signal, position_before)
+        print(
+            f"[apply-signal] vendor_symbol={vendor} signal={signal} "
+            f"position_before={position_before} → action={action} qty={qty}"
+        )
+        if action == "HOLD":
+            print("[apply-signal] no order needed (HOLD)")
+            return
+        if not confirm:
+            print(
+                f"[apply-signal] DRY (no order sent) — pass --confirm to actually "
+                f"submit a {action} market order on Bybit testnet"
+            )
+            return
+        result = adapter.apply_signal(vendor, signal, qty)
+        if result is None:
+            print("[apply-signal] no order needed (qty resolved to 0)")
+            return
+        print(
+            f"[apply-signal] order result: success={result.success} "
+            f"vendor_order_id={result.vendor_order_id} status={result.raw_status} "
+            f"message={result.message}"
+        )
+        # Bybit's position endpoint briefly lags a market fill — poll instead of
+        # trusting a single immediate read.
+        position_after = _poll_position_change(adapter, vendor, position_before)
+        print(f"[apply-signal] position_after={position_after}")
+    finally:
+        adapter.disconnect()
+        inst_cache.close()
+
+
+def _poll_position_change(
+    adapter, vendor_symbol: str, position_before: float, *, attempts: int = 5, delay_s: float = 1.0
+) -> float:
+    """Re-fetch position until it differs from ``position_before`` or attempts run out.
+
+    Bybit's fetch_positions can briefly lag right after a market order fills.
+    """
+    import time
+
+    position = adapter.get_position_qty(vendor_symbol)
+    for _ in range(attempts - 1):
+        if position != position_before:
+            break
+        time.sleep(delay_s)
+        position = adapter.get_position_qty(vendor_symbol)
+    return position
+
+
 def _step_db_connect(conninfo: str) -> tuple[str, dict]:
     import psycopg
 
@@ -858,6 +948,27 @@ def main() -> None:
         action="store_true",
         help="Live Bybit position + intended_side for signals -1/0/1",
     )
+    parser.add_argument(
+        "--apply-signal",
+        type=float,
+        default=None,
+        metavar="SIGNAL",
+        help=(
+            "Test one action at a time (BUY/SELL/HOLD/OPEN_SHORT/CLOSE_SHORT) "
+            "against live position. SIGNAL in {-1,0,1}. Preview only unless --confirm."
+        ),
+    )
+    parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="With --apply-signal: actually submit the market order (else preview only)",
+    )
+    parser.add_argument(
+        "--qty",
+        type=float,
+        default=None,
+        help="Order qty override for --apply-signal (default: CCXT_ITEST_QTY)",
+    )
     parser.add_argument("--check", action="store_true", help="Print local setup status and exit")
     parser.add_argument(
         "--diagnose",
@@ -930,6 +1041,15 @@ def main() -> None:
         if args.ensure_xref:
             ensure_bybit_xref(conninfo)
         probe_intended_with_live_position(paper, bybit_demo=bybit_demo)
+        return
+
+    if args.apply_signal is not None:
+        if args.ensure_xref:
+            ensure_bybit_xref(conninfo)
+        qty = args.qty if args.qty is not None else float(os.getenv("CCXT_ITEST_QTY", "0.01"))
+        run_apply_signal(
+            paper, args.apply_signal, qty, bybit_demo=bybit_demo, confirm=args.confirm
+        )
         return
 
     if args.diagnose:

@@ -242,6 +242,10 @@ ready for the apply payload.
 
 **Depends on:** 1.6 (picker), 1.3 (Bybit dry-run adapter), 1.5 (credentials).
 
+**Live order placement mechanics** (fill confirmation, retry/cancel policy, alerting) are detailed
+separately in [Live Order Execution](live-order-execution.md) — this section covers the apply
+endpoint/UI flow only.
+
 ### Apply form fields
 
 | Field | Source |

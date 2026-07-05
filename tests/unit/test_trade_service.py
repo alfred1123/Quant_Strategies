@@ -8,7 +8,8 @@ from uuid import uuid4
 import pytest
 
 from quant.schemas.deployments import CreateDeploymentRequest
-from quant.trade.service import DeploymentNotFound, TradeService
+from quant.trade.errors import DeploymentNotFound
+from quant.trade.service import TradeService
 
 
 def _sp_row(**overrides):

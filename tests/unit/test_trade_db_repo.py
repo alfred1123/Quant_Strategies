@@ -148,9 +148,8 @@ class TestValidateDryRun:
             )
 
     @patch.object(TradeRepo, "_fetch_credential")
-    @patch.object(TradeRepo, "_assert_strategy_owned")
     @patch.object(TradeRepo, "_fetch_strategy")
-    def test_returns_strategy_row(self, mock_strat, mock_own, mock_cred, repo):
+    def test_returns_strategy_row(self, mock_strat, mock_cred, repo):
         uid = uuid4()
         sid = uuid4()
         mock_cred.return_value = {
@@ -158,7 +157,11 @@ class TestValidateDryRun:
             "app_user_id": str(uid),
             "app_id": 10,
         }
-        mock_strat.return_value = {"strategy_nm": "s1", "config_json": {}}
+        mock_strat.return_value = {
+            "user_id": str(uid),
+            "strategy_nm": "s1",
+            "config_json": {},
+        }
 
         row = repo.validate_dry_run(
             app_user_id=uid,
@@ -171,7 +174,7 @@ class TestValidateDryRun:
         )
 
         assert row["strategy_nm"] == "s1"
-        mock_own.assert_called_once_with(sid, 1, uid)
+        mock_strat.assert_called_once_with(sid, 1)
 
 
 class TestValidateExecutionEvent:
