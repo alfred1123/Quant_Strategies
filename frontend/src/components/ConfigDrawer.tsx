@@ -3,6 +3,9 @@ import {
   FormControl, InputLabel, Button, Divider, IconButton, CircularProgress,
   FormControlLabel, Checkbox, Slider, Alert,
 } from '@mui/material';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import {
   useIndicators, useSignalTypes, useAssetTypes, useConjunctions, useDataColumns, useApps,
 } from '../api/refdata';
@@ -97,7 +100,9 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
       onClose={onClose}
       slotProps={{ paper: { sx: { p: 3, maxHeight: '85vh', overflowY: 'auto', position: 'relative' } } }}
     >
-      <IconButton onClick={onClose} size="small" sx={{ position: 'absolute', top: 12, right: 12 }}>✕</IconButton>
+      <IconButton onClick={onClose} size="small" aria-label="Close" sx={{ position: 'absolute', top: 12, right: 12 }}>
+        <CloseRoundedIcon fontSize="small" />
+      </IconButton>
 
       {/* Header */}
       <Box sx={{ mb: 3 }}>
@@ -238,8 +243,8 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
           </Box>
         ))}
         {config.factors.length < 2 && (
-          <Button variant="outlined" size="small" onClick={addFactor} sx={{ alignSelf: 'flex-start' }}>
-            + Add Factor
+          <Button variant="outlined" size="small" startIcon={<AddRoundedIcon />} onClick={addFactor} sx={{ alignSelf: 'flex-start' }}>
+            Add Factor
           </Button>
         )}
       </Box>
@@ -264,7 +269,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
           size="large"
           onClick={onRun}
           disabled={isRunning || !isRunnable}
-          startIcon={isRunning ? <CircularProgress size={16} color="inherit" /> : undefined}
+          startIcon={isRunning ? <CircularProgress size={16} color="inherit" /> : <PlayArrowRoundedIcon />}
         >
           {isRunning ? 'Running…' : 'Run Optimization'}
         </Button>

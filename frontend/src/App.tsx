@@ -1,4 +1,4 @@
-import { Box, CircularProgress, ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { Box, CircularProgress, ThemeProvider, CssBaseline } from '@mui/material';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import BacktestPage from './pages/BacktestPage';
 import LoginPage from './pages/LoginPage';
@@ -7,20 +7,7 @@ import TradeConfigPage from './pages/trade/TradeConfigPage';
 import TradeApplyPage from './pages/trade/TradeApplyPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useMe } from './api/auth';
-
-const darkTheme = createTheme({
-  palette: {
-    mode: 'dark',
-    background: {
-      default: '#0d0f1a',
-      paper: '#131929',
-    },
-    primary: {
-      main: '#4d8ef0',
-    },
-    divider: '#1e2d45',
-  },
-});
+import { theme } from './theme';
 
 function FullPageSpinner() {
   return (
@@ -64,7 +51,7 @@ function GuestOnly({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <ThemeProvider theme={darkTheme}>
+      <ThemeProvider theme={theme}>
         <CssBaseline />
         <ErrorBoundary>
           <Routes>

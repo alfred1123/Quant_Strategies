@@ -12,6 +12,7 @@ import {
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import UserMenu from '../components/UserMenu';
 import AppModeSwitch from '../components/AppModeSwitch';
+import BrandMark from '../components/BrandMark';
 import { APP_NAME } from '../constants/brand';
 import TradeNavBar from '../components/trade/TradeNavBar';
 import { useMe } from '../api/auth';
@@ -38,6 +39,7 @@ export default function TradeLayout() {
           sx={{ bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider' }}
         >
           <Toolbar sx={{ gap: 2 }}>
+            <BrandMark />
             <Typography variant="h6" color="text.primary" sx={{ fontWeight: 700, mr: 1 }}>
               {APP_NAME}
             </Typography>

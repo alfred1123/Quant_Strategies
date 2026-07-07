@@ -24,7 +24,7 @@ describe('LoginPage', () => {
     expect(screen.getByText(APP_NAME)).toBeInTheDocument();
     expect(screen.getByText('Sign in to continue')).toBeInTheDocument();
     expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password/i)).toBeInTheDocument();
   });
 
   it('disables submit when fields are empty', () => {
@@ -36,7 +36,7 @@ describe('LoginPage', () => {
   it('enables submit when both fields have values', () => {
     renderWithProviders(<LoginPage />);
     fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'alice' } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123!' } });
+    fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: 'password123!' } });
     const btn = screen.getByRole('button', { name: /sign in/i });
     expect(btn).not.toBeDisabled();
   });

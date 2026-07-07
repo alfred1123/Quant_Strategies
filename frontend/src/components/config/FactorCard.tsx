@@ -1,6 +1,7 @@
 import {
   Box, FormControl, IconButton, InputLabel, MenuItem, Select, Stack, Typography,
 } from '@mui/material';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import ProductSelector from './ProductSelector';
 import RangeFields from './RangeFields';
 import type { FactorConfig, RangeParam } from '../../types/backtest';
@@ -58,7 +59,9 @@ export default function FactorCard({
           </Typography>
         </Typography>
         {total > 1 && (
-          <IconButton size="small" onClick={onRemove} title="Remove factor">✕</IconButton>
+          <IconButton size="small" onClick={onRemove} title="Remove factor" aria-label="Remove factor">
+            <CloseRoundedIcon fontSize="small" />
+          </IconButton>
         )}
       </Box>
 

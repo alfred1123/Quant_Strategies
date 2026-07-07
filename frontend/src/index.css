@@ -1,1 +1,16 @@
+/* Base polish — theme-level styling lives in src/theme.ts */
 
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(77, 142, 240, 0.35);
+}
+
+/* Numeric alignment for metrics and tables */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
