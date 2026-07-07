@@ -155,18 +155,19 @@ class CcxtTradeAdapter(TradeAdapter):
         """Translate ``{-1,0,1}`` signal + live position to at most one order."""
         position_qty = self.get_position_qty(symbol)
         action = self.intended_side(signal, position_qty)
-        if action is IntendedAction.HOLD:
-            return None
-        if action is IntendedAction.BUY:
-            order_req = OrderRequest(symbol=symbol, qty=qty, side=OrderSide.BUY)
-        elif action is IntendedAction.OPEN_SHORT:
-            order_req = OrderRequest(symbol=symbol, qty=qty, side=OrderSide.SELL)
-        elif action is IntendedAction.SELL:
-            order_req = OrderRequest(symbol=symbol, qty=abs(position_qty), side=OrderSide.SELL)
-        elif action is IntendedAction.CLOSE_SHORT:
-            order_req = OrderRequest(symbol=symbol, qty=abs(position_qty), side=OrderSide.BUY)
-        else:  # pragma: no cover — exhaustive per IntendedAction
-            raise ValueError(f"unhandled intended_side action: {action!r}")
+        match action:
+            case IntendedAction.HOLD:
+                return None
+            case IntendedAction.BUY:
+                order_req = OrderRequest(symbol=symbol, qty=qty, side=OrderSide.BUY)
+            case IntendedAction.OPEN_SHORT:
+                order_req = OrderRequest(symbol=symbol, qty=qty, side=OrderSide.SELL)
+            case IntendedAction.SELL:
+                order_req = OrderRequest(symbol=symbol, qty=abs(position_qty), side=OrderSide.SELL)
+            case IntendedAction.CLOSE_SHORT:
+                order_req = OrderRequest(symbol=symbol, qty=abs(position_qty), side=OrderSide.BUY)
+            case _:  # pragma: no cover — exhaustive per IntendedAction
+                raise ValueError(f"unhandled intended_side action: {action!r}")
         if order_req.qty <= 0:
             return None
         return self.place_order(order_req)

@@ -96,6 +96,89 @@ class StrategyConfig:
 # Signal combination
 # ---------------------------------------------------------------------------
 
+def _conviction(strengths: list) -> np.ndarray:
+    """Per-factor conviction from raw indicator strengths.
+
+    Percentile-ranks each factor's raw values, then measures distance from
+    the median (0.5) — the more extreme the reading, the higher the conviction.
+    """
+    raw = np.column_stack(strengths).astype(float)
+    pctile = np.full_like(raw, 0.5)
+    for j in range(raw.shape[1]):
+        col = raw[:, j]
+        valid_mask = ~np.isnan(col)
+        valid_count = valid_mask.sum()
+        if valid_count <= 1:
+            continue
+        sorted_vals = np.sort(col[valid_mask])
+        ranks = np.searchsorted(sorted_vals, col[valid_mask], side='right')
+        pctile[valid_mask, j] = ranks / valid_count
+    return np.abs(pctile - 0.5)
+
+
+def _strongest_sign(signs: np.ndarray, conviction: np.ndarray,
+                    rows: np.ndarray) -> np.ndarray:
+    """For each selected row, the sign of the most convicted non-flat factor."""
+    masked = np.where(signs[rows] != 0, conviction[rows], -np.inf)
+    winner = np.argmax(masked, axis=1)
+    idx = np.arange(rows.sum())
+    return signs[rows][idx, winner]
+
+
+def _combine_filter(stacked: np.ndarray, signs: np.ndarray,
+                    nan_mask: np.ndarray, strengths: list | None) -> np.ndarray:
+    """FILTER: first factor gates on/off; remaining factors give direction."""
+    gate = signs[:, 0] != 0  # True when gate is active
+
+    if signs.shape[1] == 2:
+        return np.where(gate, stacked[:, 1], 0.0)
+
+    sig_signs = signs[:, 1:]
+    all_pos = (sig_signs == 1).all(axis=1)
+    all_neg = (sig_signs == -1).all(axis=1)
+    direction = np.where(all_pos, 1.0, np.where(all_neg, -1.0, 0.0))
+
+    if strengths is not None:
+        has_signal = (sig_signs != 0).any(axis=1)
+        disagree = ~all_pos & ~all_neg & has_signal & ~nan_mask
+        if disagree.any():
+            direction[disagree] = _strongest_sign(
+                sig_signs, _conviction(strengths[1:]), disagree)
+
+    return np.where(gate, direction, 0.0)
+
+
+def _combine_and(signs: np.ndarray, nan_mask: np.ndarray,
+                 conviction: np.ndarray | None) -> np.ndarray:
+    """AND: position only when all factors agree; conviction breaks conflicts."""
+    all_positive = (signs == 1).all(axis=1)
+    all_negative = (signs == -1).all(axis=1)
+    combined = np.where(all_positive, 1.0, np.where(all_negative, -1.0, 0.0))
+
+    if conviction is not None:
+        has_signal = (signs != 0).any(axis=1)
+        disagree = ~all_positive & ~all_negative & has_signal & ~nan_mask
+        if disagree.any():
+            combined[disagree] = _strongest_sign(signs, conviction, disagree)
+    return combined
+
+
+def _combine_or(signs: np.ndarray, conviction: np.ndarray | None) -> np.ndarray:
+    """OR: position when any factor signals; conviction (or long) breaks conflicts."""
+    any_positive = (signs == 1).any(axis=1)
+    any_negative = (signs == -1).any(axis=1)
+    conflict = any_positive & any_negative
+
+    combined = np.where(any_positive & ~conflict, 1.0,
+                        np.where(any_negative & ~conflict, -1.0, 0.0))
+
+    if conviction is not None and conflict.any():
+        combined[conflict] = _strongest_sign(signs, conviction, conflict)
+    else:
+        combined[conflict] = 1.0
+    return combined
+
+
 def combine_positions(positions: list, conjunction: str = "AND",
                       strengths: list | None = None) -> np.ndarray:
     """Combine position arrays from multiple factors using AND/OR/FILTER logic.
@@ -129,92 +212,15 @@ def combine_positions(positions: list, conjunction: str = "AND",
     signs = np.sign(stacked)
 
     if conj == "FILTER":
-        gate = signs[:, 0] != 0  # True when gate is active
+        combined = _combine_filter(stacked, signs, nan_mask, strengths)
+    else:
+        conviction = _conviction(strengths) if strengths is not None else None
+        if conj == "AND":
+            combined = _combine_and(signs, nan_mask, conviction)
+        else:  # OR
+            combined = _combine_or(signs, conviction)
 
-        if signs.shape[1] == 2:
-            combined = np.where(gate, stacked[:, 1], 0.0)
-        else:
-            sig_signs = signs[:, 1:]
-            all_pos = (sig_signs == 1).all(axis=1)
-            all_neg = (sig_signs == -1).all(axis=1)
-            direction = np.where(all_pos, 1.0, np.where(all_neg, -1.0, 0.0))
-
-            if strengths is not None:
-                sig_strengths = strengths[1:]
-                sig_positions = positions[1:]
-                has_signal = (sig_signs != 0).any(axis=1)
-                disagree = ~all_pos & ~all_neg & has_signal & ~nan_mask
-                if disagree.any():
-                    raw = np.column_stack(sig_strengths).astype(float)
-                    n_rows, n_cols = raw.shape
-                    pctile = np.full_like(raw, 0.5)
-                    for j in range(n_cols):
-                        col = raw[:, j]
-                        valid_mask = ~np.isnan(col)
-                        valid_count = valid_mask.sum()
-                        if valid_count <= 1:
-                            continue
-                        sorted_vals = np.sort(col[valid_mask])
-                        ranks = np.searchsorted(sorted_vals, col[valid_mask], side='right')
-                        pctile[valid_mask, j] = ranks / valid_count
-                    conv = np.abs(pctile - 0.5)
-                    masked = np.where(sig_signs[disagree] != 0, conv[disagree], -np.inf)
-                    winner = np.argmax(masked, axis=1)
-                    rows = np.arange(disagree.sum())
-                    direction[disagree] = sig_signs[disagree][rows, winner]
-
-            combined = np.where(gate, direction, 0.0)
-
-        combined = combined.astype(float)
-        combined[nan_mask] = np.nan
-        return combined
-
-    # Build per-factor conviction from raw indicator strengths.
-    conviction = None
-    if strengths is not None:
-        raw = np.column_stack(strengths).astype(float)
-        n_rows, n_cols = raw.shape
-        pctile = np.full_like(raw, 0.5)
-        for j in range(n_cols):
-            col = raw[:, j]
-            valid_mask = ~np.isnan(col)
-            valid_count = valid_mask.sum()
-            if valid_count <= 1:
-                continue
-            sorted_vals = np.sort(col[valid_mask])
-            ranks = np.searchsorted(sorted_vals, col[valid_mask], side='right')
-            pctile[valid_mask, j] = ranks / valid_count
-        conviction = np.abs(pctile - 0.5)
-
-    if conj == "AND":
-        all_positive = (signs == 1).all(axis=1)
-        all_negative = (signs == -1).all(axis=1)
-        combined = np.where(all_positive, 1.0, np.where(all_negative, -1.0, 0.0))
-
-        if conviction is not None:
-            has_signal = (signs != 0).any(axis=1)
-            disagree = ~all_positive & ~all_negative & has_signal & ~nan_mask
-            if disagree.any():
-                masked = np.where(signs[disagree] != 0, conviction[disagree], -np.inf)
-                winner = np.argmax(masked, axis=1)
-                rows = np.arange(disagree.sum())
-                combined[disagree] = signs[disagree][rows, winner]
-    else:  # OR
-        any_positive = (signs == 1).any(axis=1)
-        any_negative = (signs == -1).any(axis=1)
-        conflict = any_positive & any_negative
-
-        combined = np.where(any_positive & ~conflict, 1.0,
-                            np.where(any_negative & ~conflict, -1.0, 0.0))
-
-        if conviction is not None and conflict.any():
-            masked = np.where(signs[conflict] != 0, conviction[conflict], -np.inf)
-            winner = np.argmax(masked, axis=1)
-            rows = np.arange(conflict.sum())
-            combined[conflict] = signs[conflict][rows, winner]
-        else:
-            combined[conflict] = 1.0
-
+    combined = combined.astype(float)
     combined[nan_mask] = np.nan
     return combined
 
