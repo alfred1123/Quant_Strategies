@@ -149,13 +149,10 @@ class FutuTrader:
             OrderResult with success status, order_id, and message.
         """
         futu_side = futu.TrdSide.BUY if side.upper() == "BUY" else futu.TrdSide.SELL
+        is_market = order_type.upper() == "MARKET"
+        futu_order_type = futu.OrderType.MARKET if is_market else futu.OrderType.NORMAL
 
-        if order_type.upper() == "MARKET":
-            futu_order_type = futu.OrderType.MARKET
-        else:
-            futu_order_type = futu.OrderType.NORMAL
-
-        if futu_order_type == futu.OrderType.NORMAL and price is None:
+        if not is_market and price is None:
             return OrderResult(False, None, "Limit price required for NORMAL orders")
 
         logger.info(
