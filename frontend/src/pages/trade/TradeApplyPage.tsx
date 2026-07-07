@@ -13,10 +13,10 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useDeployments } from '../../api/trade';
-import { useTradeSession, useTradeSessionFilters } from '../../trade/TradeSessionContext';
+import { useTradeSession, useTradeSessionFilters } from '../../trade/useTradeSession';
 import { ALL_ACCOUNTS } from '../../types/credentials';
 import type { TradeApplyLocationState } from '../../types/strategies';
 import DeploymentDialog, { type DeploymentSelection } from '../../components/trade/DeploymentDialog';
@@ -53,14 +53,22 @@ export default function TradeApplyPage() {
   const [deployOpen, setDeployOpen] = useState(false);
 
   // Pre-select from Promotion → Trade navigation (optional location state).
-  useEffect(() => {
-    if (!routeState?.strategyId || routeState.strategyVid == null) return;
+  // Render-phase adjustment keyed on the routed strategy — applies once per
+  // navigation without an effect (see React docs: "adjusting state when
+  // props change").
+  const routeKey =
+    routeState?.strategyId && routeState.strategyVid != null
+      ? `${routeState.strategyId}|${routeState.strategyVid}`
+      : null;
+  const [appliedRouteKey, setAppliedRouteKey] = useState<string | null>(null);
+  if (routeKey !== null && routeKey !== appliedRouteKey) {
+    setAppliedRouteKey(routeKey);
     setPickerSelection({
-      strategyId: routeState.strategyId,
-      strategyVid: routeState.strategyVid,
-      strategyNm: routeState.strategyNm ?? null,
+      strategyId: routeState!.strategyId!,
+      strategyVid: routeState!.strategyVid!,
+      strategyNm: routeState!.strategyNm ?? null,
     });
-  }, [routeState?.strategyId, routeState?.strategyVid, routeState?.strategyNm]);
+  }
 
   const deploySelection: DeploymentSelection | null = useMemo(() => {
     if (!pickerSelection) return null;

@@ -19,7 +19,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useCreateDeployment } from '../../api/trade';
 import { useJob } from '../../api/jobs';
 import { useBrokerAccounts } from '../../api/credentials';
@@ -41,58 +41,49 @@ export interface DeploymentSelection {
  * dependency) so it can launch from the Promotion tab. Live deployments
  * require an explicit confirmation — the backend rejects ``paper=false``
  * without ``confirm_live=true``.
+ *
+ * The content component mounts fresh on every open, so all form state
+ * starts from its initial values — no reset effects needed.
  */
-export default function DeploymentDialog({
-  open,
-  onClose,
-  selection,
-  onSuccess,
-}: {
+export default function DeploymentDialog(props: DeploymentDialogProps) {
+  if (!props.open) return null;
+  return <DeploymentDialogContent {...props} />;
+}
+
+interface DeploymentDialogProps {
   open: boolean;
   onClose: () => void;
   selection: DeploymentSelection | null;
   onSuccess?: () => void;
-}) {
+}
+
+function DeploymentDialogContent({
+  onClose,
+  selection,
+  onSuccess,
+}: DeploymentDialogProps) {
   const { data: accounts = [] } = useBrokerAccounts();
   const { data: apps = [] } = useApps();
   const create = useCreateDeployment();
-  const job = useJob(open ? selection?.queueId : undefined);
+  const job = useJob(selection?.queueId);
 
   const [credId, setCredId] = useState<number | ''>('');
-  const [cusip, setCusip] = useState('');
+  // null = untouched — falls back to the strategy's frozen config symbol.
+  const [cusipInput, setCusipInput] = useState<string | null>(null);
   const [qty, setQty] = useState('');
   const [mode, setMode] = useState<'paper' | 'live'>('paper');
   const [enabled, setEnabled] = useState(true);
   const [confirmLive, setConfirmLive] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const configSymbol = job.data?.config_json?.symbol;
+  const cusip = cusipInput ?? (typeof configSymbol === 'string' ? configSymbol : '');
+
   const appNameById = useMemo(() => {
     const m = new Map<number, string>();
     for (const a of apps) m.set(a.app_id, a.display_name);
     return m;
   }, [apps]);
-
-  // Reset every time the dialog opens for a (possibly new) selection.
-  useEffect(() => {
-    if (!open) return;
-    setCredId('');
-    setCusip('');
-    setQty('');
-    setMode('paper');
-    setEnabled(true);
-    setConfirmLive(false);
-    setFormError(null);
-    create.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, selection?.strategyId, selection?.strategyVid]);
-
-  // Pre-fill the trade product from the strategy's frozen config once loaded.
-  const configSymbol = job.data?.config_json?.symbol;
-  useEffect(() => {
-    if (open && typeof configSymbol === 'string' && configSymbol) {
-      setCusip((prev) => prev || configSymbol);
-    }
-  }, [open, configSymbol]);
 
   const selectedAccount = useMemo(
     () => accounts.find((a) => a.api_credential_id === credId) ?? null,
@@ -155,7 +146,7 @@ export default function DeploymentDialog({
 
   return (
     <Dialog
-      open={open}
+      open
       onClose={create.isPending ? undefined : onClose}
       maxWidth="sm"
       fullWidth
@@ -198,7 +189,7 @@ export default function DeploymentDialog({
               label="Product (internal cusip)"
               size="small"
               value={cusip}
-              onChange={(e) => setCusip(e.target.value)}
+              onChange={(e) => setCusipInput(e.target.value)}
               helperText={job.isLoading ? 'Loading strategy config…' : 'Trade product to execute'}
               sx={{ flex: 1 }}
             />

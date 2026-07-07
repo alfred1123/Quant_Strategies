@@ -15,7 +15,7 @@ import {
   Typography,
 } from '@mui/material';
 import BrokerAccountsTable from '../../components/trade/BrokerAccountsTable';
-import { useTradeSession } from '../../trade/TradeSessionContext';
+import { useTradeSession } from '../../trade/useTradeSession';
 import { useExchangeApps } from '../../api/refdata';
 import { useCreateCredential } from '../../api/credentials';
 

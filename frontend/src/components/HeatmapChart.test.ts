@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildHeatmapMatrix } from './HeatmapChart';
+import { buildHeatmapMatrix } from '../utils/heatmap';
 import type { Top10Row } from '../types/backtest';
 
 describe('buildHeatmapMatrix', () => {

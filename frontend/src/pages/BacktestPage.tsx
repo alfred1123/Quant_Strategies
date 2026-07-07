@@ -4,6 +4,9 @@ import {
   Chip, Divider, CircularProgress, LinearProgress,
   Tabs, Tab, Paper, Stack,
 } from '@mui/material';
+import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
+import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded';
+import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import ConfigDrawer from '../components/ConfigDrawer';
 import JobsTable from '../components/JobsTable';
 import PromotionTab from '../components/PromotionTab';
@@ -13,6 +16,7 @@ import HeatmapChart from '../components/HeatmapChart';
 import EquityCurveChart from '../components/EquityCurveChart';
 import UserMenu from '../components/UserMenu';
 import AppModeSwitch from '../components/AppModeSwitch';
+import BrandMark from '../components/BrandMark';
 import { APP_NAME } from '../constants/brand';
 import { runPerformance } from '../api/backtest';
 import { fetchJob, useEnqueueJob, useJobCompletionEffects } from '../api/jobs';
@@ -94,10 +98,13 @@ export default function BacktestPage() {
   useJobCompletionEffects(handleJobCompleted);
 
   useEffect(() => {
-    // Cancel anything still running when the page unmounts.
+    // Cancel anything still running when the page unmounts. Copy the ref
+    // containers (not .current) so the cleanup reads the latest controllers.
+    const optAbort = optimizeAbort;
+    const prfAbort = perfAbort;
     return () => {
-      optimizeAbort.current?.abort();
-      perfAbort.current?.abort();
+      optAbort.current?.abort();
+      prfAbort.current?.abort();
     };
   }, []);
 
@@ -127,7 +134,7 @@ export default function BacktestPage() {
     }
   };
 
-  const handleCloneEdit = (_strategyId: string, configJson: Record<string, unknown>, _strategyNm: string) => {
+  const handleCloneEdit = (_strategyId: string, configJson: Record<string, unknown>) => {
     const cfg = configJson as unknown as Partial<BacktestConfig>;
     setConfig({ ...DEFAULT_CONFIG, ...cfg });
     setDrawerOpen(true);
@@ -241,13 +248,14 @@ export default function BacktestPage() {
       {/* Topbar */}
       <AppBar position="static" elevation={0} sx={{ bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider' }}>
         <Toolbar sx={{ gap: 2 }}>
+          <BrandMark />
           <Typography variant="h6" color="text.primary" sx={{ fontWeight: 700, mr: 1 }}>
             {APP_NAME}
           </Typography>
           <AppModeSwitch mode="backtest" />
           <Box sx={{ flexGrow: 1 }} />
-          <Button variant="outlined" onClick={() => setDrawerOpen(true)}>
-            ⚙ Configure
+          <Button variant="outlined" startIcon={<TuneRoundedIcon />} onClick={() => setDrawerOpen(true)}>
+            Configure
           </Button>
           {currentUser && <UserMenu user={currentUser} />}
         </Toolbar>
@@ -300,12 +308,31 @@ export default function BacktestPage() {
         {/* Empty state */}
         {!isOptimizing && !optimizeResult && !error && (
           <Box sx={{ textAlign: 'center', py: 14 }}>
-            <Typography variant="h5" sx={{ color: 'text.secondary' }} gutterBottom>No results yet</Typography>
-            <Typography sx={{ color: 'text.secondary', mb: 3 }}>
-              Click Configure to set parameters and run an optimization.
+            <Box
+              aria-hidden
+              sx={{
+                width: 72,
+                height: 72,
+                mx: 'auto',
+                mb: 3,
+                display: 'grid',
+                placeItems: 'center',
+                borderRadius: '20px',
+                color: 'primary.light',
+                bgcolor: 'rgba(77, 142, 240, 0.08)',
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <InsightsRoundedIcon sx={{ fontSize: 36 }} />
+            </Box>
+            <Typography variant="h5" gutterBottom>No results yet</Typography>
+            <Typography sx={{ color: 'text.secondary', mb: 3, maxWidth: 420, mx: 'auto' }}>
+              Set up your indicators, signal thresholds and date range, then run an
+              optimization to see the best parameter combinations here.
             </Typography>
-            <Button variant="contained" size="large" onClick={() => setDrawerOpen(true)}>
-              ⚙ Configure &amp; Run
+            <Button variant="contained" size="large" startIcon={<TuneRoundedIcon />} onClick={() => setDrawerOpen(true)}>
+              Configure &amp; Run
             </Button>
           </Box>
         )}
@@ -327,7 +354,7 @@ export default function BacktestPage() {
                   <Chip label={config.conjunction} size="small" color="warning" variant="outlined" />
                 )}
                 <Box sx={{ flexGrow: 1 }} />
-                <Button size="small" variant="outlined" onClick={() => setDrawerOpen(true)}>⚙ Re-configure</Button>
+                <Button size="small" variant="outlined" startIcon={<TuneRoundedIcon />} onClick={() => setDrawerOpen(true)}>Re-configure</Button>
               </Stack>
             </Paper>
 
@@ -354,7 +381,7 @@ export default function BacktestPage() {
                   {isLoadingPerf && <CircularProgress size={16} />}
                   <Box sx={{ flexGrow: 1 }} />
                   {perfResult?.perf_csv && (
-                    <Button size="small" variant="outlined" onClick={downloadPerfCSV}>↓ Export CSV</Button>
+                    <Button size="small" variant="outlined" startIcon={<FileDownloadRoundedIcon />} onClick={downloadPerfCSV}>Export CSV</Button>
                   )}
                 </Stack>
 

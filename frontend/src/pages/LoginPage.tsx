@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   Alert, Box, Button, Card, CardContent, CircularProgress,
-  Stack, TextField, Typography, Chip,
+  IconButton, InputAdornment, Stack, TextField, Typography, Chip,
 } from '@mui/material';
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLogin } from '../api/auth';
+import BrandMark from '../components/BrandMark';
 import { APP_NAME } from '../constants/brand';
 
 // =====================================================
@@ -17,21 +20,26 @@ type ServiceStatus = {
   url: string;        // URL we're checking
 };
 
+/** Health endpoints probed by the login page — fixed list, module scope. */
+const SERVICE_ENDPOINTS = [
+  { name: 'Backend API', url: '/health' },
+  { name: 'Database', url: '/health/ready' },
+] as const;
+
 // =====================================================
 // NEW: Hook to check if services are running
 // This runs when the page loads and checks each service
 // =====================================================
 function useServiceHealth() {
-  const [services, setServices] = useState<ServiceStatus[]>([
-    { name: 'Backend API', status: 'checking', url: '/health' },
-    { name: 'Database', status: 'checking', url: '/health/ready' },
-  ]);
+  const [services, setServices] = useState<ServiceStatus[]>(
+    SERVICE_ENDPOINTS.map(s => ({ ...s, status: 'checking' })),
+  );
 
   useEffect(() => {
     // Check each service when component mounts
     const checkServices = async () => {
       const results = await Promise.all(
-        services.map(async (service) => {
+        SERVICE_ENDPOINTS.map(async (service) => {
           try {
             // Try to fetch the health endpoint
             const response = await fetch(service.url, {
@@ -56,7 +64,7 @@ function useServiceHealth() {
     // Re-check every 30 seconds
     const interval = setInterval(checkServices, 30000);
     return () => clearInterval(interval);
-  }, []); // Empty array = run once on mount
+  }, []); // Endpoints are a module constant — nothing to depend on
 
   return services;
 }
@@ -121,6 +129,7 @@ function ServiceStatusPanel({ services }: { services: ServiceStatus[] }) {
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const login = useLogin();
   const navigate = useNavigate();
@@ -167,18 +176,32 @@ export default function LoginPage() {
       sx={{
         minHeight: '100vh',
         bgcolor: 'background.default',
+        backgroundImage: `
+          radial-gradient(ellipse 60% 45% at 15% 0%, rgba(77, 142, 240, 0.14), transparent),
+          radial-gradient(ellipse 55% 40% at 90% 100%, rgba(52, 201, 142, 0.08), transparent)
+        `,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         p: 2,
       }}
     >
-      <Card sx={{ width: '100%', maxWidth: 400 }} variant="outlined">
-        <CardContent>
-          <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-            {APP_NAME}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+      <Card
+        variant="outlined"
+        sx={{
+          width: '100%',
+          maxWidth: 400,
+          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.45)',
+        }}
+      >
+        <CardContent sx={{ p: 4 }}>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 0.5 }}>
+            <BrandMark size={40} />
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              {APP_NAME}
+            </Typography>
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
             Sign in to continue
           </Typography>
 
@@ -202,13 +225,29 @@ export default function LoginPage() {
               />
               <TextField
                 label="Password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 autoComplete="current-password"
                 required
                 fullWidth
                 disabled={isPending || backendOffline}
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          onClick={() => setShowPassword(v => !v)}
+                          edge="end"
+                          size="small"
+                        >
+                          {showPassword ? <VisibilityOffRoundedIcon fontSize="small" /> : <VisibilityRoundedIcon fontSize="small" />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  },
+                }}
               />
               {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
               <Button

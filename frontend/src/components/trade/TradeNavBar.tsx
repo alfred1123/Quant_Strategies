@@ -8,7 +8,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { useTradeSession } from '../../trade/TradeSessionContext';
+import { useTradeSession } from '../../trade/useTradeSession';
 import { ALL_ACCOUNTS, ALL_BROKERS } from '../../types/credentials';
 
 const compactSelect = { minWidth: 0, width: 160 };

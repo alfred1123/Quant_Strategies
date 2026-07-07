@@ -64,7 +64,7 @@ flowchart LR
 ## Medium-priority issues — code smells
 
 - ✅ **`Top10Table` assumes all non-`sharpe` columns are numeric** — Cell formatter now narrows with `typeof value === 'number' && Number.isFinite(value)`; non-numeric values pass through as empty string instead of crashing `toFixed`.
-- ✅ **Heatmap is O(signals × windows × grid)** — `buildHeatmapMatrix` builds a single `Map` keyed by `${window}|${signal}` in one pass, then materializes the matrix in O(W × S). Extracted as a pure function with unit tests in `HeatmapChart.test.ts`.
+- ✅ **Heatmap is O(signals × windows × grid)** — `buildHeatmapMatrix` builds a single `Map` keyed by `${window}|${signal}` in one pass, then materializes the matrix in O(W × S). Extracted as a pure function in `utils/heatmap.ts` with unit tests in `HeatmapChart.test.ts`.
 - ✅ **Magic threshold drift** — `overfitColor` and `overfitLabel` now share a single `OVERFIT_THRESHOLDS = { LOW: 0.3, HIGH: 0.5 }` constant; tests in `format.test.ts` cover both bands.
 - ⏳ **`BacktestConfig` has both top-level `indicator/strategy/ranges` AND `factors[]`** — Not yet removed (would touch the public form contract; deferred to the "Backtest feature module" redesign in **Open follow-ups**).
 - ✅ **Misleading user copy `alert_internal_cusip`** — Replaced with "No product set on Factor N — will use the main trading product."

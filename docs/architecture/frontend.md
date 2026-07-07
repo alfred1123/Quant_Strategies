@@ -15,6 +15,7 @@ See [System Overview](overview.md) for product surfaces and [Trade UI](#trade-ui
 | Build Tool | Vite | 8 |
 | Language | TypeScript | 6 |
 | Component Library | MUI (Material UI) | 9 |
+| Icons | @mui/icons-material | 9 |
 | Data Fetching | TanStack React Query | 5 |
 | Routing | React Router | 7 |
 | HTTP Client | Axios | 1 |
@@ -22,6 +23,10 @@ See [System Overview](overview.md) for product surfaces and [Trade UI](#trade-ui
 | Tests | Vitest 4 + Testing Library + happy-dom | — |
 
 See `frontend/package.json` for exact pinned versions.
+
+## Theming
+
+All design tokens live in `src/theme.ts` — a single MUI dark theme (deep-navy surfaces, blue accent, Inter font stack loaded in `index.html`, softened corners, sentence-case buttons, styled scrollbars). Components must use theme tokens (`background.paper`, `divider`, `primary.main`) rather than hard-coded colors, and MUI icons (`@mui/icons-material`) rather than emoji glyphs. The shared `BrandMark` component renders the gradient app logo in the login card and both top bars.
 
 ## Starting the Dev Server
 
@@ -75,7 +80,7 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 
 **Layout:** `TradeLayout` — permanent sidebar (Config \| Trade), **filter toolbar** (`TradeNavBar`), main content (`<Outlet />`), bottom execution-log placeholder.
 
-**Session state:** `TradeSessionProvider` (`trade/TradeSessionContext.tsx`) holds:
+**Session state:** `TradeSessionProvider` (`trade/TradeSessionContext.tsx`; the `useTradeSession` / `useTradeSessionFilters` hooks live in `trade/useTradeSession.ts`) holds:
 
 - `brokerFilter` / `accountFilter` — toolbar Exchange and Account dropdowns (`ALL_BROKERS` / `ALL_ACCOUNTS` = no filter)
 - `tradingMode` — `'paper' | 'live'` toggle
@@ -111,8 +116,9 @@ Dropdowns use MUI `size="small"` and fixed widths — not full-width form fields
 ```
 frontend/src/
 ├── main.tsx              # React root — mounts <App />
-├── App.tsx               # BrowserRouter, theme, RequireAuth/GuestOnly route guards
-├── index.css             # Global styles
+├── App.tsx               # BrowserRouter, RequireAuth/GuestOnly route guards
+├── theme.ts              # MUI dark theme — single source of design tokens
+├── index.css             # Global styles (font smoothing, selection, tabular-nums)
 │
 ├── types/                # TypeScript interfaces (no logic)
 │   ├── backtest.ts       # BacktestConfig, FactorConfig, API request/response types
@@ -132,7 +138,8 @@ frontend/src/
 │   └── credentials.ts    # useBrokerAccounts(), useCreateCredential(), useRotateCredential(), useRevokeCredential()
 │
 ├── trade/
-│   └── TradeSessionContext.tsx  # Shared broker/account/mode filters (Phase 1.4)
+│   ├── TradeSessionContext.tsx  # TradeSessionProvider component (Phase 1.4)
+│   └── useTradeSession.ts       # Context + useTradeSession / useTradeSessionFilters hooks
 │
 ├── lib/                  # Shared singletons
 │   ├── queryClient.ts    # TanStack Query client (shared so interceptors can mutate cache)
@@ -141,6 +148,7 @@ frontend/src/
 ├── utils/
 │   ├── grid.ts            # countSteps() — calculates grid search trial count
 │   ├── format.ts          # overfitColor/Label, formatMetric, rowLabel
+│   ├── heatmap.ts         # buildHeatmapMatrix() — pure Sharpe-matrix builder
 │   ├── requestBuilders.ts # effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest
 │   ├── top10.ts           # isSingleFactorRow, readNumber, multiFactorParams (type-safe Top10Row accessors)
 │   └── validate.ts        # validateBacktestConfig, firstValidationError
@@ -162,6 +170,7 @@ frontend/src/
 │   ├── JobsTable.tsx     # Queue tab — MUI DataGrid with VID/Best chip, status filters, actions
 │   ├── UserMenu.tsx      # User avatar + logout
 │   ├── AppModeSwitch.tsx # Backtest | Trade header toggle
+│   ├── BrandMark.tsx     # Gradient app logo — login card + top bars
 │   ├── ErrorBoundary.tsx # React error boundary
 │   └── trade/
 │       ├── TradeNavBar.tsx         # Exchange / Account filters + Paper / Live toggle
@@ -217,7 +226,7 @@ Once you know these shapes, every function signature and component prop makes se
 ### Layer 5: Pages (`pages/`) — orchestration
 
 - **`BacktestPage.tsx`** — The main page. Owns all state (`useState` for config, results, progress, errors). Wires `ConfigDrawer` → `buildOptimizeRequest()` → `runOptimizeStream()` → results components. This is the file to read to understand the full data flow. Reads `currentUser` from `useMe()` hook directly.
-- **`App.tsx`** — Sets up `BrowserRouter`, MUI dark theme, and `ErrorBoundary`. Routes: `/login`, `/backtest`, `/trade/config`, `/trade/apply` (nested under `TradeLayout`). `RequireAuth` / `GuestOnly` wrappers gate auth.
+- **`App.tsx`** — Sets up `BrowserRouter`, the shared MUI dark theme (`theme.ts`), and `ErrorBoundary`. Routes: `/login`, `/backtest`, `/trade/config`, `/trade/apply` (nested under `TradeLayout`). `RequireAuth` / `GuestOnly` wrappers gate auth.
 - **`LoginPage.tsx`** — Login form. On success, navigates to `/` (or the page that triggered the auth redirect via `location.state.from`).
 - **`main.tsx`** — Mounts `<App />` inside `<QueryClientProvider>` and `<StrictMode>`.
 
