@@ -224,7 +224,73 @@ class TradeRepo(DbGateway):
                 "app_id does not match deployment", status_code=400
             )
 
+    # ── apply / update helpers ──────────────────────────────────────────
+
+    def get_deployment_for_apply(
+        self, deployment_id: UUID, app_user_id: UUID
+    ) -> dict:
+        """Fetch current deployment; enforce enabled + ownership."""
+        rows = self.sp_get_deployment(
+            app_user_id=app_user_id,
+            deployment_id=deployment_id,
+        )
+        if not rows:
+            raise TradeValidationError("deployment not found", status_code=404)
+        dep = rows[0]
+        if dep["is_enabled_ind"] != "Y":
+            raise TradeValidationError(
+                "deployment is disabled (kill switch)", status_code=400
+            )
+        return dep
+
     # ── writes ───────────────────────────────────────────────────────────
+
+    def write_deployment(
+        self,
+        *,
+        deployment_id: UUID,
+        app_user_id: UUID,
+        strategy_id: UUID,
+        strategy_vid: int,
+        api_credential_id: int,
+        app_id: int,
+        internal_cusip: str,
+        qty: Decimal | float,
+        is_paper_ind: str,
+        is_enabled_ind: str,
+        deployment_status: str,
+        user_id: str,
+    ) -> dict:
+        """Raw SP_INS_DEPLOYMENT call + read-back — used by create and update."""
+        self._call_write(
+            "CALL trade.sp_ins_deployment("
+            "%s::uuid, %s::uuid, %s::uuid, %s::integer, %s::integer, %s::integer,"
+            " %s::text, %s::numeric, %s::char(1), %s::char(1), %s::text, %s::text,"
+            " NULL::text, NULL::text, NULL::text)",
+            (
+                str(deployment_id),
+                str(app_user_id),
+                str(strategy_id),
+                int(strategy_vid),
+                int(api_credential_id),
+                int(app_id),
+                internal_cusip,
+                qty,
+                is_paper_ind,
+                is_enabled_ind,
+                deployment_status,
+                user_id,
+            ),
+        )
+        rows = self.sp_get_deployment(
+            app_user_id=app_user_id,
+            deployment_id=deployment_id,
+        )
+        if not rows:
+            raise RuntimeError(
+                f"SP_INS_DEPLOYMENT succeeded but SP_GET returned no row: {deployment_id}"
+            )
+        return rows[0]
 
     def sp_ins_deployment(
         self,
@@ -258,35 +324,20 @@ class TradeRepo(DbGateway):
             user_id=user_id,
             confirm_live=confirm_live,
         )
-        self._call_write(
-            "CALL trade.sp_ins_deployment("
-            "%s::uuid, %s::uuid, %s::uuid, %s::integer, %s::integer, %s::integer,"
-            " %s::text, %s::numeric, %s::char(1), %s::char(1), %s::text, %s::text,"
-            " NULL::text, NULL::text, NULL::text)",
-            (
-                str(deployment_id),
-                str(app_user_id),
-                str(strategy_id),
-                int(strategy_vid),
-                int(api_credential_id),
-                int(app_id),
-                internal_cusip,
-                qty,
-                is_paper_ind,
-                is_enabled_ind,
-                deployment_status,
-                user_id,
-            ),
-        )
-        rows = self.sp_get_deployment(
-            app_user_id=app_user_id,
+        return self.write_deployment(
             deployment_id=deployment_id,
+            app_user_id=app_user_id,
+            strategy_id=strategy_id,
+            strategy_vid=strategy_vid,
+            api_credential_id=api_credential_id,
+            app_id=app_id,
+            internal_cusip=internal_cusip,
+            qty=qty,
+            is_paper_ind=is_paper_ind,
+            is_enabled_ind=is_enabled_ind,
+            deployment_status=deployment_status,
+            user_id=user_id,
         )
-        if not rows:
-            raise RuntimeError(
-                f"deployment insert succeeded but SP_GET returned no row: {deployment_id}"
-            )
-        return rows[0]
 
     def sp_ins_execution_event(
         self,

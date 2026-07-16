@@ -2,13 +2,13 @@
 
 from datetime import datetime, timezone
 from decimal import Decimal
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
-from quant.schemas.deployments import CreateDeploymentRequest
-from quant.trade.errors import DeploymentNotFound
+from quant.schemas.deployments import CreateDeploymentRequest, UpdateDeploymentRequest
+from quant.trade.errors import DeploymentNotFound, TradeValidationError
 from quant.trade.service import TradeService
 
 
@@ -116,6 +116,94 @@ class TestGetDeployment:
         svc._repo.sp_get_deployment.return_value = []
         with pytest.raises(DeploymentNotFound):
             svc.get_deployment(uuid4(), uuid4())
+
+
+class TestUpdateDeployment:
+    def test_disable_deployment(self, svc):
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        current = _sp_row(deployment_id=dep_id, app_user_id=app_user_id)
+        svc._repo.sp_get_deployment.return_value = [current]
+        svc._repo.write_deployment.return_value = _sp_row(
+            deployment_id=dep_id, is_enabled_ind="N", deployment_vid=2
+        )
+
+        req = UpdateDeploymentRequest(enabled=False)
+        result = svc.update_deployment(app_user_id, dep_id, req)
+
+        assert result.is_enabled_ind == "N"
+        kwargs = svc._repo.write_deployment.call_args.kwargs
+        assert kwargs["is_enabled_ind"] == "N"
+        assert kwargs["strategy_id"] == current["strategy_id"]
+
+    def test_change_status(self, svc):
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        current = _sp_row(deployment_id=dep_id, app_user_id=app_user_id)
+        svc._repo.sp_get_deployment.return_value = [current]
+        svc._repo.write_deployment.return_value = _sp_row(
+            deployment_id=dep_id, deployment_status="PAUSED"
+        )
+
+        req = UpdateDeploymentRequest(deployment_status="PAUSED")
+        result = svc.update_deployment(app_user_id, dep_id, req)
+
+        assert result.deployment_status == "PAUSED"
+        kwargs = svc._repo.write_deployment.call_args.kwargs
+        assert kwargs["deployment_status"] == "PAUSED"
+        assert kwargs["is_enabled_ind"] == current["is_enabled_ind"]
+
+    def test_enable_true_maps_to_Y(self, svc):
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        current = _sp_row(deployment_id=dep_id, app_user_id=app_user_id)
+        svc._repo.sp_get_deployment.return_value = [current]
+        svc._repo.write_deployment.return_value = _sp_row(is_enabled_ind="Y")
+
+        svc.update_deployment(app_user_id, dep_id, UpdateDeploymentRequest(enabled=True))
+
+        kwargs = svc._repo.write_deployment.call_args.kwargs
+        assert kwargs["is_enabled_ind"] == "Y"
+
+
+class TestApplyDeployment:
+    @patch("quant.trade.service.run_live_apply")
+    def test_happy_path(self, mock_apply, svc):
+        from quant.schemas.apply import ApplyReport
+        from quant.trade.models.order import IntendedAction
+
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        dep_row = _sp_row(deployment_id=dep_id, app_user_id=app_user_id)
+        svc._repo.get_deployment_for_apply.return_value = dep_row
+
+        expected = ApplyReport(
+            deployment_id=dep_id,
+            deployment_vid=1,
+            action=IntendedAction.BUY,
+            vendor_symbol="BTCUSDT",
+            signal=1.0,
+            position_qty=0.0,
+            order_success=True,
+            vendor_order_id="order-1",
+            message="filled",
+        )
+        mock_apply.return_value = expected
+
+        result = svc.apply_deployment(app_user_id, dep_id)
+
+        assert result.action == IntendedAction.BUY
+        assert result.order_success is True
+        svc._repo.get_deployment_for_apply.assert_called_once_with(dep_id, app_user_id)
+        mock_apply.assert_called_once()
+
+    def test_disabled_deployment_raises(self, svc):
+        svc._repo.get_deployment_for_apply.side_effect = TradeValidationError(
+            "deployment is disabled (kill switch)", status_code=400
+        )
+
+        with pytest.raises(TradeValidationError, match="kill switch"):
+            svc.apply_deployment(uuid4(), uuid4())
 
 
 class TestListDeployments:

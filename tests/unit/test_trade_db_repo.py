@@ -177,6 +177,33 @@ class TestValidateDryRun:
         mock_strat.assert_called_once_with(sid, 1)
 
 
+class TestGetDeploymentForApply:
+    @patch.object(TradeRepo, "sp_get_deployment")
+    def test_returns_row_when_enabled(self, mock_get, repo):
+        uid = uuid4()
+        dep_id = uuid4()
+        mock_get.return_value = [{"deployment_id": dep_id, "is_enabled_ind": "Y"}]
+
+        result = repo.get_deployment_for_apply(dep_id, uid)
+
+        assert result["deployment_id"] == dep_id
+        mock_get.assert_called_once_with(app_user_id=uid, deployment_id=dep_id)
+
+    @patch.object(TradeRepo, "sp_get_deployment", return_value=[])
+    def test_not_found_raises_404(self, _get, repo):
+        with pytest.raises(TradeValidationError, match="not found") as exc:
+            repo.get_deployment_for_apply(uuid4(), uuid4())
+        assert exc.value.status_code == 404
+
+    @patch.object(TradeRepo, "sp_get_deployment")
+    def test_disabled_raises_400(self, mock_get, repo):
+        mock_get.return_value = [{"deployment_id": uuid4(), "is_enabled_ind": "N"}]
+
+        with pytest.raises(TradeValidationError, match="kill switch") as exc:
+            repo.get_deployment_for_apply(uuid4(), uuid4())
+        assert exc.value.status_code == 400
+
+
 class TestValidateExecutionEvent:
     @patch.object(TradeRepo, "_fetch_deployment_version", return_value=None)
     def test_unknown_deployment(self, _fetch, repo):

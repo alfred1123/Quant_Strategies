@@ -12,10 +12,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from quant.schemas.apply import ApplyReport
 from quant.schemas.deployments import DeploymentRow
 from quant.schemas.dry_run import DryRunReport
 from quant.trade.errors import TradeValidationError
 from quant.trade.errors import DeploymentNotFound
+from quant.trade.models.order import IntendedAction
 
 
 def _deployment_row(**overrides) -> DeploymentRow:
@@ -204,6 +206,110 @@ class TestGetDeployment:
         resp = client.get(f"/api/v1/trade/deployments/{uuid.uuid4()}")
         assert resp.status_code == 502
         assert resp.json()["detail"]["proc"] == "trade.sp_get_deployment"
+
+
+class TestUpdateDeployment:
+    def test_disable_deployment(self, client_and_svc):
+        client, svc, user = client_and_svc
+        dep_id = uuid.uuid4()
+        row = _deployment_row(deployment_id=dep_id, is_enabled_ind="N", deployment_vid=2)
+        svc.update_deployment.return_value = row
+
+        resp = client.patch(
+            f"/api/v1/trade/deployments/{dep_id}",
+            json={"enabled": False},
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["is_enabled_ind"] == "N"
+        assert data["deployment_vid"] == 2
+        svc.update_deployment.assert_called_once()
+
+    def test_not_found_returns_404(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        dep_id = uuid.uuid4()
+        svc.update_deployment.side_effect = TradeValidationError(
+            "deployment not found", status_code=404
+        )
+
+        resp = client.patch(
+            f"/api/v1/trade/deployments/{dep_id}",
+            json={"enabled": True},
+        )
+        assert resp.status_code == 404
+
+
+class TestApplyDeployment:
+    def test_happy_path(self, client_and_svc):
+        client, svc, user = client_and_svc
+        dep_id = uuid.uuid4()
+        report = ApplyReport(
+            deployment_id=dep_id,
+            deployment_vid=1,
+            action=IntendedAction.BUY,
+            vendor_symbol="BTCUSDT",
+            signal=1.0,
+            position_qty=0.0,
+            order_success=True,
+            vendor_order_id="order-1",
+            filled_qty=0.01,
+            avg_price=64000.0,
+            fee=0.256,
+            message="order filled",
+        )
+        svc.apply_deployment.return_value = report
+
+        resp = client.post(f"/api/v1/trade/deployments/{dep_id}/apply")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["action"] == "BUY"
+        assert data["order_success"] is True
+        assert data["filled_qty"] == 0.01
+        svc.apply_deployment.assert_called_once_with(user.app_user_id, dep_id)
+
+    def test_hold_returns_no_order(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        dep_id = uuid.uuid4()
+        report = ApplyReport(
+            deployment_id=dep_id,
+            deployment_vid=1,
+            action=IntendedAction.HOLD,
+            vendor_symbol="BTCUSDT",
+            signal=1.0,
+            position_qty=0.01,
+            message="no order needed (HOLD)",
+        )
+        svc.apply_deployment.return_value = report
+
+        resp = client.post(f"/api/v1/trade/deployments/{dep_id}/apply")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["action"] == "HOLD"
+        assert data["order_success"] is None
+
+    def test_disabled_deployment_returns_400(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        dep_id = uuid.uuid4()
+        svc.apply_deployment.side_effect = TradeValidationError(
+            "deployment is disabled (kill switch)", status_code=400
+        )
+
+        resp = client.post(f"/api/v1/trade/deployments/{dep_id}/apply")
+        assert resp.status_code == 400
+        assert "kill switch" in resp.json()["detail"]
+
+    def test_not_found_returns_404(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        dep_id = uuid.uuid4()
+        svc.apply_deployment.side_effect = TradeValidationError(
+            "deployment not found", status_code=404
+        )
+
+        resp = client.post(f"/api/v1/trade/deployments/{dep_id}/apply")
+        assert resp.status_code == 404
 
 
 class TestDryRunDeployment:
