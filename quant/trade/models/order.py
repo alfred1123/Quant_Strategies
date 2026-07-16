@@ -43,3 +43,8 @@ class OrderResult:
     vendor_order_id: str | None
     message: str
     raw_status: str | None = None
+    side: OrderSide | None = None
+    requested_qty: float | None = None
+    filled_qty: float | None = None
+    avg_price: float | None = None
+    fee: float | None = None

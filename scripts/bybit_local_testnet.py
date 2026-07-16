@@ -604,6 +604,7 @@ def run_apply_signal(
     from quant.data.instruments import InstrumentCache
     from quant.trade.brokers.ccxt.adapter import create_ccxt_adapter
     from quant.trade.brokers.ccxt.config import CCXT_PRESETS
+    from quant.trade.models.order import IntendedAction
 
     conninfo = _local_conninfo()
     app_id = _env_int("CCXT_ITEST_APP_ID")
@@ -629,7 +630,7 @@ def run_apply_signal(
             f"[apply-signal] vendor_symbol={vendor} signal={signal} "
             f"position_before={position_before} → action={action} qty={qty}"
         )
-        if action == "HOLD":
+        if action is IntendedAction.HOLD:
             print("[apply-signal] no order needed (HOLD)")
             return
         if not confirm:
@@ -647,8 +648,12 @@ def run_apply_signal(
             f"vendor_order_id={result.vendor_order_id} status={result.raw_status} "
             f"message={result.message}"
         )
-        # Bybit's position endpoint briefly lags a market fill — poll instead of
-        # trusting a single immediate read.
+        if result.success:
+            print(
+                f"[apply-signal] fill: side={result.side} "
+                f"requested_qty={result.requested_qty} filled_qty={result.filled_qty} "
+                f"avg_price={result.avg_price} fee={result.fee}"
+            )
         position_after = _poll_position_change(adapter, vendor, position_before)
         print(f"[apply-signal] position_after={position_after}")
     finally:
