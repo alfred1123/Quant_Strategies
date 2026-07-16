@@ -175,7 +175,7 @@ class TestApplyDeployment:
         app_user_id = uuid4()
         dep_id = uuid4()
         dep_row = _sp_row(deployment_id=dep_id, app_user_id=app_user_id)
-        svc._repo.get_deployment_for_apply.return_value = dep_row
+        svc._repo.sp_get_deployment.return_value = [dep_row]
 
         expected = ApplyReport(
             deployment_id=dep_id,
@@ -194,15 +194,21 @@ class TestApplyDeployment:
 
         assert result.action == IntendedAction.BUY
         assert result.order_success is True
-        svc._repo.get_deployment_for_apply.assert_called_once_with(dep_id, app_user_id)
+        svc._repo.sp_get_deployment.assert_called_once_with(
+            app_user_id=app_user_id, deployment_id=dep_id
+        )
         mock_apply.assert_called_once()
 
     def test_disabled_deployment_raises(self, svc):
-        svc._repo.get_deployment_for_apply.side_effect = TradeValidationError(
-            "deployment is disabled (kill switch)", status_code=400
-        )
+        svc._repo.sp_get_deployment.return_value = [_sp_row(is_enabled_ind="N")]
 
         with pytest.raises(TradeValidationError, match="kill switch"):
+            svc.apply_deployment(uuid4(), uuid4())
+
+    def test_not_found_raises(self, svc):
+        svc._repo.sp_get_deployment.return_value = []
+
+        with pytest.raises(DeploymentNotFound):
             svc.apply_deployment(uuid4(), uuid4())
 
 

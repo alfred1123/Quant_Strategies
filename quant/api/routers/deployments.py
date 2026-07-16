@@ -7,7 +7,7 @@ Routes under ``/api/v1/trade/deployments/*``. All routes behind
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 
 from quant.api.auth.dependencies import require_user
 from quant.api.auth.models import CurrentUser
@@ -21,7 +21,6 @@ from quant.schemas.deployments import (
 )
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
 from quant.trade.db_repo import TradeRepo
-from quant.trade.errors import DeploymentNotFound
 from quant.trade.service import TradeService
 
 logger = logging.getLogger(__name__)
@@ -80,13 +79,7 @@ def get_deployment(
     user: CurrentUser = Depends(require_user),
     svc: TradeService = Depends(get_trade_service),
 ) -> DeploymentRow:
-    try:
-        return svc.get_deployment(user.app_user_id, deployment_id)
-    except DeploymentNotFound as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
+    return svc.get_deployment(user.app_user_id, deployment_id)
 
 
 @router.patch("/deployments/{deployment_id}", response_model=DeploymentRow)

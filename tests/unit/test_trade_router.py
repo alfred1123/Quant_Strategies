@@ -229,9 +229,7 @@ class TestUpdateDeployment:
     def test_not_found_returns_404(self, client_and_svc):
         client, svc, _ = client_and_svc
         dep_id = uuid.uuid4()
-        svc.update_deployment.side_effect = TradeValidationError(
-            "deployment not found", status_code=404
-        )
+        svc.update_deployment.side_effect = DeploymentNotFound(str(dep_id))
 
         resp = client.patch(
             f"/api/v1/trade/deployments/{dep_id}",
@@ -304,9 +302,7 @@ class TestApplyDeployment:
     def test_not_found_returns_404(self, client_and_svc):
         client, svc, _ = client_and_svc
         dep_id = uuid.uuid4()
-        svc.apply_deployment.side_effect = TradeValidationError(
-            "deployment not found", status_code=404
-        )
+        svc.apply_deployment.side_effect = DeploymentNotFound(str(dep_id))
 
         resp = client.post(f"/api/v1/trade/deployments/{dep_id}/apply")
         assert resp.status_code == 404

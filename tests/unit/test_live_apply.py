@@ -97,7 +97,7 @@ class TestRunLiveApply:
         assert report.action == IntendedAction.HOLD
         assert report.order_success is None
         assert "HOLD" in report.message
-        adapter.apply_signal.assert_not_called()
+        adapter.execute_action.assert_not_called()
 
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_buy_success(self, mock_signal, deps):
@@ -111,7 +111,7 @@ class TestRunLiveApply:
         adapter.validate_for_dry_run.return_value = "BTCUSDT"
         adapter.get_position_qty.return_value = 0.0
         adapter.intended_side.return_value = IntendedAction.BUY
-        adapter.apply_signal.return_value = OrderResult(
+        adapter.execute_action.return_value = OrderResult(
             success=True, vendor_order_id="order-1", message="order filled",
             raw_status="closed", side=OrderSide.BUY, requested_qty=0.01,
             filled_qty=0.01, avg_price=64000.0, fee=0.256,
@@ -125,6 +125,12 @@ class TestRunLiveApply:
         assert report.vendor_order_id == "order-1"
         assert report.filled_qty == 0.01
         assert report.avg_price == 64000.0
+        # single position fetch — the decided action and its position reading
+        # are passed straight to execute_action, never re-derived
+        adapter.get_position_qty.assert_called_once_with("BTCUSDT")
+        adapter.execute_action.assert_called_once_with(
+            "BTCUSDT", IntendedAction.BUY, 0.01, 0.0
+        )
         deps["repo"].sp_ins_execution_event.assert_called_once()
         ee_kwargs = deps["repo"].sp_ins_execution_event.call_args.kwargs
         assert ee_kwargs["buy_sell_cd"] == "BUY"
@@ -142,7 +148,7 @@ class TestRunLiveApply:
         adapter.validate_for_dry_run.return_value = "BTCUSDT"
         adapter.get_position_qty.return_value = 0.0
         adapter.intended_side.return_value = IntendedAction.OPEN_SHORT
-        adapter.apply_signal.return_value = OrderResult(
+        adapter.execute_action.return_value = OrderResult(
             success=True, vendor_order_id="order-2", message="order filled",
             side=OrderSide.SELL, requested_qty=0.01,
             filled_qty=0.01, avg_price=63000.0, fee=0.252,
@@ -168,7 +174,7 @@ class TestRunLiveApply:
         adapter.validate_for_dry_run.return_value = "BTCUSDT"
         adapter.get_position_qty.return_value = 0.0
         adapter.intended_side.return_value = IntendedAction.BUY
-        adapter.apply_signal.return_value = OrderResult(
+        adapter.execute_action.return_value = OrderResult(
             success=False, vendor_order_id="order-3",
             message="insufficient funds",
             side=OrderSide.BUY, requested_qty=0.01,
@@ -183,8 +189,8 @@ class TestRunLiveApply:
         assert ee_kwargs["is_success_ind"] == "N"
 
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
-    def test_apply_signal_none_returns_no_order(self, mock_signal, deps):
-        """adapter.apply_signal returns None when qty resolves to 0."""
+    def test_execute_action_none_returns_no_order(self, mock_signal, deps):
+        """adapter.execute_action returns None when qty resolves to 0."""
         dep = _deployment()
         deps["adapter_registry"].has_adapter.return_value = True
         deps["credential_service"].decrypt_credential.return_value = ("k", "s")
@@ -195,7 +201,7 @@ class TestRunLiveApply:
         adapter.validate_for_dry_run.return_value = "BTCUSDT"
         adapter.get_position_qty.return_value = 0.0
         adapter.intended_side.return_value = IntendedAction.BUY
-        adapter.apply_signal.return_value = None
+        adapter.execute_action.return_value = None
         deps["adapter_registry"].create.return_value = adapter
 
         report = run_live_apply(app_user_id=dep.app_user_id, deployment=dep, **deps)
@@ -217,7 +223,7 @@ class TestRunLiveApply:
         adapter.validate_for_dry_run.return_value = "BTCUSDT"
         adapter.get_position_qty.return_value = 0.0
         adapter.intended_side.return_value = IntendedAction.BUY
-        adapter.apply_signal.return_value = OrderResult(
+        adapter.execute_action.return_value = OrderResult(
             success=True, vendor_order_id="order-4", message="filled",
             side=OrderSide.BUY, requested_qty=0.01, filled_qty=0.01,
         )

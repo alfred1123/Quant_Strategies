@@ -52,10 +52,28 @@ class TradeAdapter(BrokerSession):
     def get_position_qty(self, symbol: str) -> float: ...
 
     @abstractmethod
+    def execute_action(
+        self,
+        symbol: str,
+        action: IntendedAction,
+        qty: float,
+        position_qty: float,
+    ) -> OrderResult | None:
+        """Translate a precomputed action + signed position into at most one order.
+
+        ``position_qty`` must be the same reading used to derive ``action`` via
+        :meth:`intended_side` — callers that already fetched the position (e.g.
+        for audit purposes) pass it through here instead of triggering a second
+        broker read, so the executed order always matches the decided action.
+        """
+
     def apply_signal(
         self, symbol: str, signal: float, qty: float
     ) -> OrderResult | None:
-        """Translate {-1,0,1} signal to orders; None if no action."""
+        """Convenience: fetch position, decide action, execute — single call."""
+        position_qty = self.get_position_qty(symbol)
+        action = self.intended_side(signal, position_qty)
+        return self.execute_action(symbol, action, qty, position_qty)
 
     @abstractmethod
     def validate_for_dry_run(self, internal_cusip: str, app_id: int) -> str:

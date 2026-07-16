@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import ccxt
 
 from quant.trade.brokers.ccxt.config import CcxtExchangePreset, ConnectParams
-from quant.trade.errors import BrokerConnectionError
+from quant.trade.errors import BrokerConnectionError, OrderNotFoundError
 from quant.trade.models.session import BrokerSessionState
 
 logger = logging.getLogger(__name__)
@@ -144,7 +144,7 @@ class CcxtTradeGateway:
                 vendor_order_id, vendor_symbol, params=params or None
             )
         except ccxt.OrderNotFound as exc:
-            raise BrokerConnectionError(f"order not found: {exc}") from exc
+            raise OrderNotFoundError(f"order not found: {exc}") from exc
         except ccxt.AuthenticationError as exc:
             raise self._auth_error(exc, phase="fetch_order") from exc
         except ccxt.BaseError as exc:

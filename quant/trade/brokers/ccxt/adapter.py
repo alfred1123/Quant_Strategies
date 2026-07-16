@@ -157,12 +157,14 @@ class CcxtTradeAdapter(TradeAdapter):
     def get_open_orders(self, symbol: str | None = None) -> list[dict]:
         return self._gateway.fetch_open_orders(symbol)
 
-    def apply_signal(
-        self, symbol: str, signal: float, qty: float
+    def execute_action(
+        self,
+        symbol: str,
+        action: IntendedAction,
+        qty: float,
+        position_qty: float,
     ) -> OrderResult | None:
-        """Translate ``{-1,0,1}`` signal + live position to at most one order."""
-        position_qty = self.get_position_qty(symbol)
-        action = self.intended_side(signal, position_qty)
+        """Translate a precomputed action + position into at most one order."""
         match action:
             case IntendedAction.HOLD:
                 return None

@@ -2,17 +2,13 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from quant.trade.brokers.ccxt.confirm import (
-    _FillStatus,
     _extract_fee,
     _parse_terminal,
-    buy_sell_cd_for_action,
     confirm_market_order,
 )
-from quant.trade.errors import BrokerConnectionError
-from quant.trade.models.order import IntendedAction, OrderRequest, OrderSide
+from quant.trade.errors import BrokerConnectionError, OrderNotFoundError
+from quant.trade.models.order import OrderRequest, OrderSide
 
 
 class TestExtractFee:
@@ -130,7 +126,7 @@ class TestConfirmMarketOrder:
     def test_order_not_found_retries(self, mock_sleep):
         gw = MagicMock()
         gw.fetch_order.side_effect = [
-            BrokerConnectionError("order not found: xxx"),
+            OrderNotFoundError("order not found: xxx"),
             {"id": "abc", "status": "closed", "filled": 0.01, "average": 64000.0},
         ]
         req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
@@ -147,25 +143,3 @@ class TestConfirmMarketOrder:
 
         assert result.success is False
         assert "auth failed" in result.message
-
-
-class TestBuySellCdForAction:
-    @pytest.mark.parametrize("action,expected", [
-        (IntendedAction.BUY, "BUY"),
-        (IntendedAction.CLOSE_SHORT, "BUY"),
-        (IntendedAction.SELL, "SELL"),
-        (IntendedAction.OPEN_SHORT, "SELL"),
-        (IntendedAction.HOLD, None),
-    ])
-    def test_enum_values(self, action, expected):
-        assert buy_sell_cd_for_action(action) == expected
-
-    @pytest.mark.parametrize("action_str,expected", [
-        ("BUY", "BUY"),
-        ("SELL", "SELL"),
-        ("CLOSE_SHORT", "BUY"),
-        ("OPEN_SHORT", "SELL"),
-        ("HOLD", None),
-    ])
-    def test_string_values(self, action_str, expected):
-        assert buy_sell_cd_for_action(action_str) == expected

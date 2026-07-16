@@ -6,7 +6,8 @@ import time
 from dataclasses import dataclass
 
 from quant.trade.brokers.ccxt.gateway import CcxtTradeGateway
-from quant.trade.models.order import IntendedAction, OrderRequest, OrderResult, OrderSide
+from quant.trade.errors import BrokerConnectionError, OrderNotFoundError
+from quant.trade.models.order import OrderRequest, OrderResult
 
 _CONFIRM_DELAYS_S = (0.3, 0.6, 1.2, 2.4, 3.5)
 
@@ -81,10 +82,9 @@ def confirm_market_order(
         time.sleep(delay)
         try:
             order = gateway.fetch_order(vendor_order_id, req.symbol)
-        except Exception as exc:
-            msg = str(exc).lower()
-            if "order not found" in msg or "ordernotfound" in msg:
-                continue
+        except OrderNotFoundError:
+            continue
+        except BrokerConnectionError as exc:
             return OrderResult(
                 success=False,
                 vendor_order_id=vendor_order_id,
@@ -119,13 +119,3 @@ def confirm_market_order(
         side=req.side,
         requested_qty=req.qty,
     )
-
-
-def buy_sell_cd_for_action(action: IntendedAction | str) -> str | None:
-    """Map position-aware action to raw exchange side for audit rows."""
-    name = action.value if isinstance(action, IntendedAction) else action
-    if name in ("BUY", "CLOSE_SHORT"):
-        return OrderSide.BUY.value
-    if name in ("SELL", "OPEN_SHORT"):
-        return OrderSide.SELL.value
-    return None

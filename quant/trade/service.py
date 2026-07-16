@@ -17,7 +17,7 @@ from quant.schemas.deployments import (
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
 from quant.trade.db_repo import TradeRepo
 from quant.trade.dry_run import run_dry_run
-from quant.trade.errors import DeploymentNotFound
+from quant.trade.errors import DeploymentNotFound, TradeValidationError
 from quant.trade.live_apply import run_live_apply
 from quant.trade.registry import AdapterRegistry
 
@@ -112,8 +112,11 @@ class TradeService:
     def apply_deployment(
         self, app_user_id: UUID, deployment_id: UUID
     ) -> ApplyReport:
-        dep_row = self._repo.get_deployment_for_apply(deployment_id, app_user_id)
-        dep = DeploymentRow.model_validate(dep_row)
+        dep = self.get_deployment(app_user_id, deployment_id)
+        if dep.is_enabled_ind != "Y":
+            raise TradeValidationError(
+                "deployment is disabled (kill switch)", status_code=400
+            )
         return run_live_apply(
             app_user_id=app_user_id,
             deployment=dep,

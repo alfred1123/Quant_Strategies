@@ -17,7 +17,6 @@ from quant.refdata.bundle import DataCaches
 from quant.schemas.apply import ApplyReport
 from quant.schemas.deployments import DeploymentRow
 from quant.strategy.live_service import LiveEvaluationError, compute_latest_position
-from quant.trade.brokers.ccxt.confirm import buy_sell_cd_for_action
 from quant.trade.errors import AdapterNotFoundError, TradeValidationError
 from quant.trade.models.order import IntendedAction
 from quant.trade.db_repo import TradeRepo
@@ -102,8 +101,8 @@ def run_live_apply(
                 message="no order needed (HOLD)",
             )
 
-        result = adapter.apply_signal(
-            vendor_symbol, signal, float(deployment.qty)
+        result = adapter.execute_action(
+            vendor_symbol, action, float(deployment.qty), position_qty
         )
         if result is None:
             return ApplyReport(
@@ -117,23 +116,23 @@ def run_live_apply(
             )
 
         # ── audit ────────────────────────────────────────────────
-        buy_sell = buy_sell_cd_for_action(action)
-        if buy_sell is not None:
-            try:
-                repo.sp_ins_execution_event(
-                    execution_event_id=uuid.uuid4(),
-                    app_user_id=app_user_id,
-                    deployment_id=deployment.deployment_id,
-                    deployment_vid=deployment.deployment_vid,
-                    buy_sell_cd=buy_sell,
-                    is_success_ind="Y" if result.success else "N",
-                    user_id=user_id,
-                    signal_value=signal,
-                    quantity=result.filled_qty or float(deployment.qty),
-                    vendor_order_id=result.vendor_order_id,
-                )
-            except Exception:
-                logger.exception("audit write failed — order was already placed")
+        # action is never HOLD here (handled above), so order_side() is never None.
+        buy_sell = action.order_side().value
+        try:
+            repo.sp_ins_execution_event(
+                execution_event_id=uuid.uuid4(),
+                app_user_id=app_user_id,
+                deployment_id=deployment.deployment_id,
+                deployment_vid=deployment.deployment_vid,
+                buy_sell_cd=buy_sell,
+                is_success_ind="Y" if result.success else "N",
+                user_id=user_id,
+                signal_value=signal,
+                quantity=result.filled_qty or float(deployment.qty),
+                vendor_order_id=result.vendor_order_id,
+            )
+        except Exception:
+            logger.exception("audit write failed — order was already placed")
 
         return ApplyReport(
             deployment_id=deployment.deployment_id,

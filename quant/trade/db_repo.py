@@ -224,25 +224,6 @@ class TradeRepo(DbGateway):
                 "app_id does not match deployment", status_code=400
             )
 
-    # ── apply / update helpers ──────────────────────────────────────────
-
-    def get_deployment_for_apply(
-        self, deployment_id: UUID, app_user_id: UUID
-    ) -> dict:
-        """Fetch current deployment; enforce enabled + ownership."""
-        rows = self.sp_get_deployment(
-            app_user_id=app_user_id,
-            deployment_id=deployment_id,
-        )
-        if not rows:
-            raise TradeValidationError("deployment not found", status_code=404)
-        dep = rows[0]
-        if dep["is_enabled_ind"] != "Y":
-            raise TradeValidationError(
-                "deployment is disabled (kill switch)", status_code=400
-            )
-        return dep
-
     # ── writes ───────────────────────────────────────────────────────────
 
     def write_deployment(

@@ -27,6 +27,14 @@ class IntendedAction(StrEnum):
     OPEN_SHORT = "OPEN_SHORT"
     CLOSE_SHORT = "CLOSE_SHORT"
 
+    def order_side(self) -> "OrderSide | None":
+        """Raw exchange side this action executes as; ``None`` for HOLD."""
+        if self in (IntendedAction.BUY, IntendedAction.CLOSE_SHORT):
+            return OrderSide.BUY
+        if self in (IntendedAction.SELL, IntendedAction.OPEN_SHORT):
+            return OrderSide.SELL
+        return None
+
 
 @dataclass(frozen=True)
 class OrderRequest:
