@@ -1,5 +1,6 @@
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Checkbox,
@@ -20,10 +21,14 @@ import {
   Typography,
 } from '@mui/material';
 import { useMemo, useState } from 'react';
-import { useCreateDeployment } from '../../api/trade';
+import { useCreateDeployment, useDryRun } from '../../api/trade';
 import { useJob } from '../../api/jobs';
 import { useBrokerAccounts } from '../../api/credentials';
+import { useProductXrefs, useProducts } from '../../api/inst';
 import { useApps } from '../../api/refdata';
+import type { ProductRow } from '../../types/refdata';
+import DryRunReportDialog from './DryRunReportDialog';
+import type { DryRunReport } from '../../types/trade';
 
 /** Strategy + version handed in by the caller (Promotion tab Deploy). */
 export interface DeploymentSelection {
@@ -64,20 +69,24 @@ function DeploymentDialogContent({
 }: DeploymentDialogProps) {
   const { data: accounts = [] } = useBrokerAccounts();
   const { data: apps = [] } = useApps();
+  const { data: products = [] } = useProducts();
   const create = useCreateDeployment();
+  const dryRun = useDryRun();
   const job = useJob(selection?.queueId);
 
   const [credId, setCredId] = useState<number | ''>('');
-  // null = untouched — falls back to the strategy's frozen config symbol.
-  const [cusipInput, setCusipInput] = useState<string | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null);
+  const [cusipOverride, setCusipOverride] = useState<string | null>(null);
   const [qty, setQty] = useState('');
   const [mode, setMode] = useState<'paper' | 'live'>('paper');
   const [enabled, setEnabled] = useState(true);
   const [confirmLive, setConfirmLive] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [previewReport, setPreviewReport] = useState<DryRunReport | null>(null);
 
   const configSymbol = job.data?.config_json?.symbol;
-  const cusip = cusipInput ?? (typeof configSymbol === 'string' ? configSymbol : '');
+  const cusip = cusipOverride ?? selectedProduct?.internal_cusip
+    ?? (typeof configSymbol === 'string' ? configSymbol : '');
 
   const appNameById = useMemo(() => {
     const m = new Map<number, string>();
@@ -90,20 +99,43 @@ function DeploymentDialogContent({
     [accounts, credId],
   );
 
+  const { data: xrefs = [] } = useProductXrefs(selectedProduct?.product_id ?? null);
+  const vendorSymbol = useMemo(() => {
+    if (!selectedAccount) return '';
+    return xrefs.find((x) => x.app_id === selectedAccount.app_id)?.vendor_symbol ?? '';
+  }, [selectedAccount, xrefs]);
+
   const isLive = mode === 'live';
   const qtyNum = Number(qty);
   const qtyValid = Number.isFinite(qtyNum) && qtyNum > 0;
+  const canPreview = Boolean(selection) && Boolean(selectedAccount) && qtyValid && cusip.trim().length > 0;
   const canApply =
-    Boolean(selection) &&
-    Boolean(selectedAccount) &&
-    qtyValid &&
-    cusip.trim().length > 0 &&
+    canPreview &&
     (!isLive || confirmLive) &&
     !create.isPending;
 
   const strategyLabel = selection
     ? `${selection.strategyNm ?? selection.strategyId.slice(0, 8)} · v${selection.strategyVid}`
     : '';
+
+  const handlePreview = async () => {
+    setFormError(null);
+    if (!selection || !selectedAccount) return;
+    try {
+      const report = await dryRun.mutateAsync({
+        strategy_id: selection.strategyId,
+        strategy_vid: selection.strategyVid,
+        api_credential_id: selectedAccount.api_credential_id,
+        app_id: selectedAccount.app_id,
+        internal_cusip: cusip.trim(),
+        qty,
+        paper: !isLive,
+      });
+      setPreviewReport(report);
+    } catch (e: unknown) {
+      setFormError(e instanceof Error ? e.message : 'Dry-run preview failed');
+    }
+  };
 
   const handleApply = async () => {
     setFormError(null);
@@ -117,7 +149,7 @@ function DeploymentDialogContent({
       return;
     }
     if (!cusip.trim()) {
-      setFormError('Product (internal cusip) is required.');
+      setFormError('Product is required.');
       return;
     }
     if (isLive && !confirmLive) {
@@ -144,129 +176,199 @@ function DeploymentDialogContent({
     }
   };
 
+  const notionalHint = previewReport?.notional != null
+    ? `Est. notional ≈ ${previewReport.notional.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+    : canPreview
+      ? 'Use Preview dry-run to see estimated notional'
+      : 'Order size per signal';
+
   return (
-    <Dialog
-      open
-      onClose={create.isPending ? undefined : onClose}
-      maxWidth="sm"
-      fullWidth
-    >
-      <DialogTitle>Deploy strategy</DialogTitle>
-      <DialogContent dividers>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-            <Typography variant="body2" color="text.secondary">
-              Strategy
-            </Typography>
-            <Chip size="small" color="primary" variant="outlined" label={strategyLabel} />
-          </Stack>
+    <>
+      <Dialog
+        open
+        onClose={create.isPending ? undefined : onClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Deploy strategy</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+              <Typography variant="body2" color="text.secondary">
+                Strategy
+              </Typography>
+              <Chip size="small" color="primary" variant="outlined" label={strategyLabel} />
+            </Stack>
 
-          <FormControl size="small" fullWidth>
-            <InputLabel id="deploy-account-label">Account</InputLabel>
-            <Select
-              labelId="deploy-account-label"
-              label="Account"
-              value={credId === '' ? '' : String(credId)}
-              onChange={(e) =>
-                setCredId(e.target.value === '' ? '' : Number(e.target.value))
+            <FormControl size="small" fullWidth>
+              <InputLabel id="deploy-account-label">Account</InputLabel>
+              <Select
+                labelId="deploy-account-label"
+                label="Account"
+                value={credId === '' ? '' : String(credId)}
+                onChange={(e) =>
+                  setCredId(e.target.value === '' ? '' : Number(e.target.value))
+                }
+              >
+                {accounts.length === 0 && (
+                  <MenuItem value="" disabled>
+                    No accounts — register in Config first
+                  </MenuItem>
+                )}
+                {accounts.map((a) => (
+                  <MenuItem key={a.api_credential_id} value={String(a.api_credential_id)}>
+                    {(appNameById.get(a.app_id) ?? `App ${a.app_id}`)} — {a.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <Autocomplete<ProductRow, false, false, true>
+              size="small"
+              freeSolo
+              options={products}
+              value={selectedProduct}
+              inputValue={
+                selectedProduct
+                  ? `${selectedProduct.display_nm} (${selectedProduct.internal_cusip})`
+                  : cusipOverride ?? cusip
               }
-            >
-              {accounts.length === 0 && (
-                <MenuItem value="" disabled>
-                  No accounts — register in Config first
-                </MenuItem>
-              )}
-              {accounts.map((a) => (
-                <MenuItem key={a.api_credential_id} value={String(a.api_credential_id)}>
-                  {(appNameById.get(a.app_id) ?? `App ${a.app_id}`)} — {a.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
-              label="Product (internal cusip)"
-              size="small"
-              value={cusip}
-              onChange={(e) => setCusipInput(e.target.value)}
-              helperText={job.isLoading ? 'Loading strategy config…' : 'Trade product to execute'}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              label="Quantity"
-              size="small"
-              type="number"
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              error={qty.length > 0 && !qtyValid}
-              helperText={qty.length > 0 && !qtyValid ? 'Must be greater than 0' : 'Order size per signal'}
-              slotProps={{ htmlInput: { min: 0, step: 'any' } }}
-              sx={{ width: { xs: '100%', sm: 160 } }}
-            />
-          </Stack>
-
-          <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-            <ToggleButtonGroup
-              size="small"
-              exclusive
-              value={mode}
-              onChange={(_, v) => {
-                if (v) {
-                  setMode(v);
-                  setConfirmLive(false);
+              getOptionLabel={(opt) =>
+                typeof opt === 'string' ? opt : `${opt.display_nm} (${opt.internal_cusip})`
+              }
+              isOptionEqualToValue={(opt, val) => {
+                if (typeof opt === 'string' || typeof val === 'string') return opt === val;
+                return opt.internal_cusip === val.internal_cusip;
+              }}
+              onChange={(_, val) => {
+                setCusipOverride(null);
+                if (!val) {
+                  setSelectedProduct(null);
+                } else if (typeof val === 'string') {
+                  setSelectedProduct(null);
+                  setCusipOverride(val);
+                } else {
+                  setSelectedProduct(val);
                 }
               }}
-              aria-label="Trading mode"
-            >
-              <ToggleButton value="paper" aria-label="Paper trading">
-                Paper
-              </ToggleButton>
-              <ToggleButton value="live" aria-label="Live trading">
-                Live
-              </ToggleButton>
-            </ToggleButtonGroup>
-            <Box sx={{ flexGrow: 1 }} />
-            <FormControlLabel
-              control={<Checkbox checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
-              label="Enable immediately"
-            />
-          </Stack>
-
-          {isLive && (
-            <>
-              <Alert severity="warning">
-                Live mode places real orders on the selected account. Switch to Paper to test first.
-              </Alert>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    color="warning"
-                    checked={confirmLive}
-                    onChange={(e) => setConfirmLive(e.target.checked)}
-                  />
+              onInputChange={(_, val, reason) => {
+                if (reason === 'input') {
+                  setSelectedProduct(null);
+                  setCusipOverride(val);
                 }
-                label="I confirm this is a LIVE deployment"
-              />
-            </>
-          )}
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Product"
+                  helperText={
+                    job.isLoading
+                      ? 'Loading strategy config…'
+                      : vendorSymbol
+                        ? `Vendor symbol: ${vendorSymbol}`
+                        : selectedAccount && selectedProduct
+                          ? 'No xref for this exchange — check INST.PRODUCT_XREF'
+                          : 'Pick from catalog or type internal cusip'
+                  }
+                />
+              )}
+              renderOption={(props, opt) => (
+                <li {...props} key={opt.internal_cusip}>
+                  <Box>
+                    <Typography variant="body2">{opt.display_nm}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {opt.internal_cusip}
+                    </Typography>
+                  </Box>
+                </li>
+              )}
+            />
 
-          {formError && <Alert severity="error">{formError}</Alert>}
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={create.isPending}>
-          Cancel
-        </Button>
-        <Button
-          variant="contained"
-          color={isLive ? 'warning' : 'primary'}
-          onClick={handleApply}
-          disabled={!canApply}
-        >
-          {create.isPending ? 'Applying…' : `Apply ${isLive ? 'live' : 'paper'}`}
-        </Button>
-      </DialogActions>
-    </Dialog>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                label="Quantity"
+                size="small"
+                type="number"
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+                error={qty.length > 0 && !qtyValid}
+                helperText={notionalHint}
+                slotProps={{ htmlInput: { min: 0, step: 'any' } }}
+                sx={{ width: { xs: '100%', sm: '100%' } }}
+              />
+            </Stack>
+
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={mode}
+                onChange={(_, v) => {
+                  if (v) {
+                    setMode(v);
+                    setConfirmLive(false);
+                  }
+                }}
+                aria-label="Trading mode"
+              >
+                <ToggleButton value="paper" aria-label="Paper trading">
+                  Paper
+                </ToggleButton>
+                <ToggleButton value="live" aria-label="Live trading">
+                  Live
+                </ToggleButton>
+              </ToggleButtonGroup>
+              <Box sx={{ flexGrow: 1 }} />
+              <FormControlLabel
+                control={<Checkbox checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
+                label="Enable immediately"
+              />
+            </Stack>
+
+            {isLive && (
+              <>
+                <Alert severity="warning">
+                  Live mode places real orders on the selected account. Switch to Paper to test first.
+                </Alert>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      color="warning"
+                      checked={confirmLive}
+                      onChange={(e) => setConfirmLive(e.target.checked)}
+                    />
+                  }
+                  label="I confirm this is a LIVE deployment"
+                />
+              </>
+            )}
+
+            {formError && <Alert severity="error">{formError}</Alert>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose} disabled={create.isPending}>
+            Cancel
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={handlePreview}
+            disabled={!canPreview || dryRun.isPending}
+          >
+            {dryRun.isPending ? 'Previewing…' : 'Preview dry-run'}
+          </Button>
+          <Button
+            variant="contained"
+            color={isLive ? 'warning' : 'primary'}
+            onClick={handleApply}
+            disabled={!canApply}
+          >
+            {create.isPending ? 'Deploying…' : `Deploy ${isLive ? 'live' : 'paper'}`}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <DryRunReportDialog report={previewReport} onClose={() => setPreviewReport(null)} />
+    </>
   );
 }

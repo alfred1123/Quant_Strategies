@@ -166,6 +166,45 @@ class TestUpdateDeployment:
         assert kwargs["is_enabled_ind"] == "Y"
 
 
+class TestStopDeployment:
+    def test_stop_writes_stopped_and_disabled(self, svc):
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        current = _sp_row(deployment_id=dep_id, app_user_id=app_user_id)
+        svc._repo.sp_get_deployment.return_value = [current]
+        svc._repo.write_deployment.return_value = _sp_row(
+            deployment_id=dep_id, deployment_status="STOPPED",
+            is_enabled_ind="N", deployment_vid=2,
+        )
+
+        result = svc.stop_deployment(app_user_id, dep_id)
+
+        assert result.deployment_status == "STOPPED"
+        assert result.is_enabled_ind == "N"
+        kwargs = svc._repo.write_deployment.call_args.kwargs
+        assert kwargs["deployment_status"] == "STOPPED"
+        assert kwargs["is_enabled_ind"] == "N"
+
+    def test_stop_idempotent(self, svc):
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        current = _sp_row(
+            deployment_id=dep_id, app_user_id=app_user_id,
+            deployment_status="STOPPED", is_enabled_ind="N",
+        )
+        svc._repo.sp_get_deployment.return_value = [current]
+
+        result = svc.stop_deployment(app_user_id, dep_id)
+
+        assert result.deployment_status == "STOPPED"
+        svc._repo.write_deployment.assert_not_called()
+
+    def test_stop_not_found(self, svc):
+        svc._repo.sp_get_deployment.return_value = []
+        with pytest.raises(DeploymentNotFound):
+            svc.stop_deployment(uuid4(), uuid4())
+
+
 class TestApplyDeployment:
     @patch("quant.trade.service.run_live_apply")
     def test_happy_path(self, mock_apply, svc):

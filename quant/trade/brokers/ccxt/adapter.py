@@ -117,6 +117,13 @@ class CcxtTradeAdapter(TradeAdapter):
     def get_position_qty(self, symbol: str) -> float:
         return self._gateway.fetch_position_qty(symbol)
 
+    def get_last_price(self, symbol: str) -> float | None:
+        """Best-effort last traded price for notional estimates; None if unavailable."""
+        try:
+            return self._gateway.fetch_last_price(symbol)
+        except BrokerConnectionError:
+            return None
+
     def place_order(self, req: OrderRequest) -> OrderResult:
         if req.order_type is not OrderType.MARKET:
             raise TradeValidationError(

@@ -2,12 +2,18 @@
 
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-DeploymentStatus = Literal["CREATED", "ACTIVE", "PAUSED", "STOPPED"]
+
+class DeploymentStatus(StrEnum):
+    CREATED = "CREATED"
+    ACTIVE = "ACTIVE"
+    PAUSED = "PAUSED"
+    STOPPED = "STOPPED"
 
 
 class CreateDeploymentRequest(BaseModel):
@@ -23,7 +29,7 @@ class CreateDeploymentRequest(BaseModel):
     paper: bool = True
     confirm_live: bool = False
     enabled: bool = True
-    deployment_status: DeploymentStatus = "CREATED"
+    deployment_status: DeploymentStatus = DeploymentStatus.CREATED
 
     @field_validator("internal_cusip")
     @classmethod
@@ -55,6 +61,6 @@ class DeploymentRow(BaseModel):
     qty: Decimal
     is_paper_ind: Literal["Y", "N"]
     is_enabled_ind: Literal["Y", "N"]
-    deployment_status: str
+    deployment_status: DeploymentStatus
     user_id: str
     created_at: datetime

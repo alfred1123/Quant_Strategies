@@ -238,6 +238,32 @@ class TestUpdateDeployment:
         assert resp.status_code == 404
 
 
+class TestStopDeployment:
+    def test_happy_path(self, client_and_svc):
+        client, svc, user = client_and_svc
+        dep_id = uuid.uuid4()
+        row = _deployment_row(
+            deployment_id=dep_id, deployment_status="STOPPED", is_enabled_ind="N",
+        )
+        svc.stop_deployment.return_value = row
+
+        resp = client.post(f"/api/v1/trade/deployments/{dep_id}/stop")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["deployment_status"] == "STOPPED"
+        assert data["is_enabled_ind"] == "N"
+        svc.stop_deployment.assert_called_once_with(user.app_user_id, dep_id)
+
+    def test_not_found_returns_404(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        dep_id = uuid.uuid4()
+        svc.stop_deployment.side_effect = DeploymentNotFound(str(dep_id))
+
+        resp = client.post(f"/api/v1/trade/deployments/{dep_id}/stop")
+        assert resp.status_code == 404
+
+
 class TestApplyDeployment:
     def test_happy_path(self, client_and_svc):
         client, svc, user = client_and_svc
@@ -338,6 +364,7 @@ class TestDryRunDeployment:
             intended_side="BUY",
             position_qty=0.0,
             data_as_of="2024-06-01",
+            notional=600.0,
         )
         svc.dry_run.return_value = report
 
@@ -350,6 +377,7 @@ class TestDryRunDeployment:
         data = resp.json()
         assert data["vendor_symbol"] == "BTCUSDT"
         assert data["intended_side"] == "BUY"
+        assert data["notional"] == 600.0
         svc.dry_run.assert_called_once()
         assert svc.dry_run.call_args.args[0] == user.app_user_id
 

@@ -94,6 +94,9 @@ def _broker_report(
     position_qty = adapter.get_position_qty(vendor_symbol)
     intended = adapter.intended_side(signal, position_qty)
 
+    price = adapter.get_last_price(vendor_symbol)
+    notional = float(req.qty) * price if price is not None else None
+
     return DryRunReport(
         strategy_id=req.strategy_id,
         strategy_vid=req.strategy_vid,
@@ -107,4 +110,5 @@ def _broker_report(
         intended_side=intended,
         position_qty=position_qty,
         data_as_of=data_as_of,
+        notional=notional,
     )

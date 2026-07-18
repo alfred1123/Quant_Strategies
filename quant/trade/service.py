@@ -12,6 +12,7 @@ from quant.schemas.apply import ApplyReport
 from quant.schemas.deployments import (
     CreateDeploymentRequest,
     DeploymentRow,
+    DeploymentStatus,
     UpdateDeploymentRequest,
 )
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
@@ -107,6 +108,33 @@ class TradeService:
             deployment_status=req.deployment_status or current.deployment_status,
             user_id=str(app_user_id),
         )
+        return DeploymentRow.model_validate(row)
+
+    def stop_deployment(
+        self, app_user_id: UUID, deployment_id: UUID
+    ) -> DeploymentRow:
+        """Stop a deployment — disables it and sets status to STOPPED.
+
+        Idempotent: stopping an already-stopped deployment is a no-op.
+        """
+        current = self.get_deployment(app_user_id, deployment_id)
+        if current.deployment_status == DeploymentStatus.STOPPED:
+            return current
+        row = self._repo.write_deployment(
+            deployment_id=deployment_id,
+            app_user_id=app_user_id,
+            strategy_id=current.strategy_id,
+            strategy_vid=current.strategy_vid,
+            api_credential_id=current.api_credential_id,
+            app_id=current.app_id,
+            internal_cusip=current.internal_cusip,
+            qty=current.qty,
+            is_paper_ind=current.is_paper_ind,
+            is_enabled_ind="N",
+            deployment_status=DeploymentStatus.STOPPED,
+            user_id=str(app_user_id),
+        )
+        logger.info("Deployment %s stopped by user %s", deployment_id, app_user_id)
         return DeploymentRow.model_validate(row)
 
     def apply_deployment(
