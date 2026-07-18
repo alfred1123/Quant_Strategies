@@ -34,6 +34,13 @@ class CreateDeploymentRequest(BaseModel):
         return s
 
 
+class UpdateDeploymentRequest(BaseModel):
+    """PATCH body for toggling deployment state (kill switch)."""
+
+    enabled: bool | None = None
+    deployment_status: DeploymentStatus | None = None
+
+
 class DeploymentRow(BaseModel):
     """One TRADE.DEPLOYMENT row returned by SP_GET_DEPLOYMENT."""
 

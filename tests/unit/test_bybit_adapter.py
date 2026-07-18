@@ -112,6 +112,20 @@ class TestIntendedSide:
         assert TradeAdapter.intended_side(-1.0, 1e-12) == "OPEN_SHORT"
 
 
+class TestIntendedActionOrderSide:
+    """IntendedAction.order_side — collapses position-aware action to raw side."""
+
+    @pytest.mark.parametrize("action,expected", [
+        (IntendedAction.BUY, OrderSide.BUY),
+        (IntendedAction.CLOSE_SHORT, OrderSide.BUY),
+        (IntendedAction.SELL, OrderSide.SELL),
+        (IntendedAction.OPEN_SHORT, OrderSide.SELL),
+        (IntendedAction.HOLD, None),
+    ])
+    def test_mapping(self, action, expected):
+        assert action.order_side() == expected
+
+
 class TestSessionConfigRepr:
     def test_secrets_hidden_from_repr(self):
         cfg = CcxtSessionConfig(
@@ -326,22 +340,36 @@ class TestPlaceOrder:
             inst_cache=inst_cache,
         )
 
-    def test_place_order_buy_success(self, inst_cache):
+    @patch("quant.trade.brokers.ccxt.adapter.confirm_market_order")
+    def test_place_order_buy_success(self, mock_confirm, inst_cache):
         adapter = self._adapter(inst_cache)
+        mock_confirm.return_value = OrderResult(
+            success=True, vendor_order_id="abc123", message="order filled",
+            raw_status="closed", side=OrderSide.BUY, requested_qty=0.01,
+            filled_qty=0.01, avg_price=64000.0, fee=0.256,
+        )
         with patch.object(
             adapter.gateway, "create_market_order",
-            return_value={"id": "abc123", "status": "closed"},
+            return_value={"id": "abc123", "status": "open"},
         ) as mock_create:
             req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
             result = adapter.place_order(req)
 
         mock_create.assert_called_once_with("BTCUSDT", "buy", 0.01)
+        mock_confirm.assert_called_once_with(
+            adapter.gateway, req=req, vendor_order_id="abc123",
+        )
         assert result.success is True
         assert result.vendor_order_id == "abc123"
-        assert result.raw_status == "closed"
+        assert result.filled_qty == 0.01
 
-    def test_place_order_sell_maps_side(self, inst_cache):
+    @patch("quant.trade.brokers.ccxt.adapter.confirm_market_order")
+    def test_place_order_sell_maps_side(self, mock_confirm, inst_cache):
         adapter = self._adapter(inst_cache)
+        mock_confirm.return_value = OrderResult(
+            success=True, vendor_order_id="xyz", message="filled",
+            side=OrderSide.SELL, requested_qty=0.01,
+        )
         with patch.object(
             adapter.gateway, "create_market_order", return_value={"id": "xyz"},
         ) as mock_create:
@@ -371,7 +399,21 @@ class TestPlaceOrder:
 
         assert result.success is False
         assert result.vendor_order_id is None
+        assert result.side == OrderSide.BUY
+        assert result.requested_qty == 0.01
         assert "insufficient funds" in result.message
+
+    def test_place_order_no_order_id_returns_failed(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(
+            adapter.gateway, "create_market_order",
+            return_value={"id": None, "status": "unknown"},
+        ):
+            req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
+            result = adapter.place_order(req)
+
+        assert result.success is False
+        assert "no order id" in result.message
 
     def test_cancel_order_success(self, inst_cache):
         adapter = self._adapter(inst_cache)
@@ -450,3 +492,23 @@ class TestApplySignal:
 
         req = mock_place.call_args[0][0]
         assert req.side == OrderSide.BUY and req.qty == 0.02
+
+    def test_execute_action_uses_passed_position_without_refetch(self, inst_cache):
+        """The caller's position reading drives sizing — no second broker read."""
+        adapter = self._adapter(inst_cache)
+        with patch.object(adapter, "get_position_qty") as mock_pos, \
+             patch.object(adapter, "place_order") as mock_place:
+            mock_place.return_value = OrderResult(success=True, vendor_order_id="5", message="ok")
+            adapter.execute_action("BTCUSDT", IntendedAction.SELL, 0.01, 0.04)
+
+        mock_pos.assert_not_called()
+        req = mock_place.call_args[0][0]
+        assert req.side == OrderSide.SELL and req.qty == 0.04
+
+    def test_execute_action_zero_position_close_returns_none(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(adapter, "place_order") as mock_place:
+            result = adapter.execute_action("BTCUSDT", IntendedAction.SELL, 0.01, 0.0)
+
+        mock_place.assert_not_called()
+        assert result is None

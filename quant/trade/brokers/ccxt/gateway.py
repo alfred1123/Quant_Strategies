@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import ccxt
 
 from quant.trade.brokers.ccxt.config import CcxtExchangePreset, ConnectParams
-from quant.trade.errors import BrokerConnectionError
+from quant.trade.errors import BrokerConnectionError, OrderNotFoundError
 from quant.trade.models.session import BrokerSessionState
 
 logger = logging.getLogger(__name__)
@@ -135,6 +135,20 @@ class CcxtTradeGateway:
             raise self._auth_error(exc, phase="fetch_open_orders") from exc
         except ccxt.BaseError as exc:
             raise BrokerConnectionError(f"fetch_open_orders failed: {exc}") from exc
+
+    def fetch_order(self, vendor_order_id: str, vendor_symbol: str) -> dict:
+        """Read one order's status."""
+        params = dict(self._config.preset.fetch_order_params or {})
+        try:
+            return self.exchange.fetch_order(
+                vendor_order_id, vendor_symbol, params=params or None
+            )
+        except ccxt.OrderNotFound as exc:
+            raise OrderNotFoundError(f"order not found: {exc}") from exc
+        except ccxt.AuthenticationError as exc:
+            raise self._auth_error(exc, phase="fetch_order") from exc
+        except ccxt.BaseError as exc:
+            raise BrokerConnectionError(f"fetch_order failed: {exc}") from exc
 
     def fetch_position_qty(self, vendor_symbol: str) -> float:
         """Signed position size: positive for long, negative for short.

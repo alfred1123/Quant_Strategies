@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from quant.shared.db import ProcedureError
-from quant.trade.errors import TradeValidationError
+from quant.trade.errors import DeploymentNotFound, TradeValidationError
 
 
 def _procedure_status_code(sqlstate: str) -> int:
@@ -38,6 +38,17 @@ async def handle_trade_validation_error(
     )
 
 
+async def handle_deployment_not_found(
+    _request: Request,
+    exc: DeploymentNotFound,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={"detail": f"deployment not found: {exc}"},
+    )
+
+
 def register(app: FastAPI) -> None:
     app.add_exception_handler(ProcedureError, handle_procedure_error)
     app.add_exception_handler(TradeValidationError, handle_trade_validation_error)
+    app.add_exception_handler(DeploymentNotFound, handle_deployment_not_found)

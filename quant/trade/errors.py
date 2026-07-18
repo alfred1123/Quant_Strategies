@@ -30,5 +30,9 @@ class BrokerConnectionError(TradeValidationError):
         super().__init__(message, status_code=502)
 
 
+class OrderNotFoundError(BrokerConnectionError):
+    """Broker has no record of the order yet (may still be propagating)."""
+
+
 class DeploymentNotFound(Exception):
     """Requested deployment does not exist for this user (maps to HTTP 404)."""

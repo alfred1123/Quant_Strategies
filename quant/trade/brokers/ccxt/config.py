@@ -67,6 +67,7 @@ class CcxtExchangePreset:
     exchange_id: str
     exchange_label: str
     default_type: str | None = None
+    fetch_order_params: dict | None = field(default=None, compare=False, repr=False)
     wire: ExchangeWirer = field(default=_wire_paper_sandbox, compare=False, repr=False)
     auth_hint: AuthHintFn | None = field(default=None, compare=False, repr=False)
 
@@ -76,6 +77,7 @@ CCXT_PRESETS: dict[str, CcxtExchangePreset] = {
         exchange_id="bybit",
         exchange_label="Bybit",
         default_type="linear",
+        fetch_order_params={"acknowledged": True},
         wire=_wire_bybit,
         auth_hint=_bybit_auth_hint,
     ),

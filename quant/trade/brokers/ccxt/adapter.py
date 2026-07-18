@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from quant.trade.adapters.base import TradeAdapter
 from quant.trade.brokers.ccxt.config import CcxtExchangePreset
+from quant.trade.brokers.ccxt.confirm import confirm_market_order
 from quant.trade.brokers.ccxt.gateway import CcxtSessionConfig, CcxtTradeGateway
 from quant.trade.errors import (
     BrokerConnectionError,
@@ -125,13 +126,20 @@ class CcxtTradeAdapter(TradeAdapter):
         try:
             raw = self._gateway.create_market_order(req.symbol, side, req.qty)
         except BrokerConnectionError as exc:
-            return OrderResult(success=False, vendor_order_id=None, message=str(exc))
+            return OrderResult(
+                success=False, vendor_order_id=None, message=str(exc),
+                side=req.side, requested_qty=req.qty,
+            )
         order_id = raw.get("id")
-        return OrderResult(
-            success=True,
-            vendor_order_id=str(order_id) if order_id is not None else None,
-            message="order submitted",
-            raw_status=raw.get("status"),
+        if order_id is None:
+            return OrderResult(
+                success=False, vendor_order_id=None,
+                message="create_order returned no order id",
+                raw_status=raw.get("status"),
+                side=req.side, requested_qty=req.qty,
+            )
+        return confirm_market_order(
+            self._gateway, req=req, vendor_order_id=str(order_id),
         )
 
     def cancel_order(self, vendor_order_id: str, vendor_symbol: str | None = None) -> OrderResult:
@@ -149,12 +157,14 @@ class CcxtTradeAdapter(TradeAdapter):
     def get_open_orders(self, symbol: str | None = None) -> list[dict]:
         return self._gateway.fetch_open_orders(symbol)
 
-    def apply_signal(
-        self, symbol: str, signal: float, qty: float
+    def execute_action(
+        self,
+        symbol: str,
+        action: IntendedAction,
+        qty: float,
+        position_qty: float,
     ) -> OrderResult | None:
-        """Translate ``{-1,0,1}`` signal + live position to at most one order."""
-        position_qty = self.get_position_qty(symbol)
-        action = self.intended_side(signal, position_qty)
+        """Translate a precomputed action + position into at most one order."""
         match action:
             case IntendedAction.HOLD:
                 return None

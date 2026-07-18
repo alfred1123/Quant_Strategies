@@ -7,16 +7,20 @@ Routes under ``/api/v1/trade/deployments/*``. All routes behind
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 
 from quant.api.auth.dependencies import require_user
 from quant.api.auth.models import CurrentUser
 from quant.api.credentials.repo import ApiCredentialRepo
 from quant.queue.repo import BtQueueRepo
-from quant.schemas.deployments import CreateDeploymentRequest, DeploymentRow
+from quant.schemas.apply import ApplyReport
+from quant.schemas.deployments import (
+    CreateDeploymentRequest,
+    DeploymentRow,
+    UpdateDeploymentRequest,
+)
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
 from quant.trade.db_repo import TradeRepo
-from quant.trade.errors import DeploymentNotFound
 from quant.trade.service import TradeService
 
 logger = logging.getLogger(__name__)
@@ -75,10 +79,26 @@ def get_deployment(
     user: CurrentUser = Depends(require_user),
     svc: TradeService = Depends(get_trade_service),
 ) -> DeploymentRow:
-    try:
-        return svc.get_deployment(user.app_user_id, deployment_id)
-    except DeploymentNotFound as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
+    return svc.get_deployment(user.app_user_id, deployment_id)
+
+
+@router.patch("/deployments/{deployment_id}", response_model=DeploymentRow)
+def update_deployment(
+    deployment_id: UUID,
+    req: UpdateDeploymentRequest,
+    user: CurrentUser = Depends(require_user),
+    svc: TradeService = Depends(get_trade_service),
+) -> DeploymentRow:
+    return svc.update_deployment(user.app_user_id, deployment_id, req)
+
+
+@router.post(
+    "/deployments/{deployment_id}/apply",
+    response_model=ApplyReport,
+)
+def apply_deployment(
+    deployment_id: UUID,
+    user: CurrentUser = Depends(require_user),
+    svc: TradeService = Depends(get_trade_service),
+) -> ApplyReport:
+    return svc.apply_deployment(user.app_user_id, deployment_id)
