@@ -43,3 +43,4 @@ class DryRunReport(BaseModel):
     intended_side: IntendedAction
     position_qty: float
     data_as_of: str
+    notional: float | None = None

@@ -150,6 +150,20 @@ class CcxtTradeGateway:
         except ccxt.BaseError as exc:
             raise BrokerConnectionError(f"fetch_order failed: {exc}") from exc
 
+    def fetch_last_price(self, vendor_symbol: str) -> float | None:
+        """Best-effort mark/last price for notional estimates."""
+        try:
+            ticker = self.exchange.fetch_ticker(vendor_symbol)
+        except ccxt.AuthenticationError as exc:
+            raise self._auth_error(exc, phase="fetch_ticker") from exc
+        except ccxt.BaseError as exc:
+            raise BrokerConnectionError(f"fetch_ticker failed: {exc}") from exc
+        for key in ("last", "close", "bid", "ask"):
+            val = ticker.get(key)
+            if val is not None:
+                return float(val)
+        return None
+
     def fetch_position_qty(self, vendor_symbol: str) -> float:
         """Signed position size: positive for long, negative for short.
 

@@ -51,6 +51,10 @@ class TradeAdapter(BrokerSession):
     @abstractmethod
     def get_position_qty(self, symbol: str) -> float: ...
 
+    def get_last_price(self, symbol: str) -> float | None:
+        """Best-effort last traded price for notional estimates; ``None`` if unavailable."""
+        return None
+
     @abstractmethod
     def execute_action(
         self,

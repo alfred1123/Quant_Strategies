@@ -94,10 +94,19 @@ def build_data_dict_for_signal(
                 cusip, start, end, ds_override or default_ds,
                 cache, inst_cache, bt_cache,
             )
+        except BacktestCache.CacheMissError:
+            # Trade/dry-run must reach today's bar — refresh from the strategy's
+            # configured data provider when the BT cache is stale or short.
+            logger.info(
+                "Cache miss for %s [%s, %s] — refreshing from provider for live eval",
+                cusip, start, end,
+            )
+            data_dict[cusip] = fetch_df(
+                cusip, start, end, ds_override or default_ds,
+                cache, inst_cache, bt_cache, refresh=True,
+            )
         except BacktestError as exc:
             raise LiveEvaluationError(exc.detail) from exc
-        except BacktestCache.CacheMissError as exc:
-            raise LiveEvaluationError(str(exc)) from exc
 
     for sym, df in data_dict.items():
         if df.empty:

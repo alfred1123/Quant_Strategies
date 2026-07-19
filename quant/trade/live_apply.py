@@ -91,6 +91,11 @@ def run_live_apply(
         action = adapter.intended_side(signal, position_qty)
 
         if action is IntendedAction.HOLD:
+            _write_event(
+                repo, app_user_id=app_user_id, deployment=deployment,
+                buy_sell_cd=IntendedAction.HOLD.value, is_success="Y",
+                signal_value=signal, user_id=user_id,
+            )
             return ApplyReport(
                 deployment_id=deployment.deployment_id,
                 deployment_vid=deployment.deployment_vid,
@@ -105,6 +110,11 @@ def run_live_apply(
             vendor_symbol, action, float(deployment.qty), position_qty
         )
         if result is None:
+            _write_event(
+                repo, app_user_id=app_user_id, deployment=deployment,
+                buy_sell_cd=action.order_side().value,
+                is_success="Y", signal_value=signal, user_id=user_id,
+            )
             return ApplyReport(
                 deployment_id=deployment.deployment_id,
                 deployment_vid=deployment.deployment_vid,
@@ -116,23 +126,15 @@ def run_live_apply(
             )
 
         # ── audit ────────────────────────────────────────────────
-        # action is never HOLD here (handled above), so order_side() is never None.
         buy_sell = action.order_side().value
-        try:
-            repo.sp_ins_execution_event(
-                execution_event_id=uuid.uuid4(),
-                app_user_id=app_user_id,
-                deployment_id=deployment.deployment_id,
-                deployment_vid=deployment.deployment_vid,
-                buy_sell_cd=buy_sell,
-                is_success_ind="Y" if result.success else "N",
-                user_id=user_id,
-                signal_value=signal,
-                quantity=result.filled_qty or float(deployment.qty),
-                vendor_order_id=result.vendor_order_id,
-            )
-        except Exception:
-            logger.exception("audit write failed — order was already placed")
+        _write_event(
+            repo, app_user_id=app_user_id, deployment=deployment,
+            buy_sell_cd=buy_sell,
+            is_success="Y" if result.success else "N",
+            signal_value=signal, user_id=user_id,
+            quantity=result.filled_qty or float(deployment.qty),
+            vendor_order_id=result.vendor_order_id,
+        )
 
         return ApplyReport(
             deployment_id=deployment.deployment_id,
@@ -148,3 +150,33 @@ def run_live_apply(
             fee=result.fee,
             message=result.message,
         )
+
+
+def _write_event(
+    repo: TradeRepo,
+    *,
+    app_user_id: UUID,
+    deployment: DeploymentRow,
+    buy_sell_cd: str,
+    is_success: str,
+    signal_value: float,
+    user_id: str,
+    quantity: float | None = None,
+    vendor_order_id: str | None = None,
+) -> None:
+    """Best-effort audit write — never fails the apply cycle."""
+    try:
+        repo.sp_ins_execution_event(
+            execution_event_id=uuid.uuid4(),
+            app_user_id=app_user_id,
+            deployment_id=deployment.deployment_id,
+            deployment_vid=deployment.deployment_vid,
+            buy_sell_cd=buy_sell_cd,
+            is_success_ind=is_success,
+            user_id=user_id,
+            signal_value=signal_value,
+            quantity=quantity,
+            vendor_order_id=vendor_order_id,
+        )
+    except Exception:
+        logger.exception("audit write failed — apply cycle continues")

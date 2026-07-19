@@ -23,6 +23,10 @@ vi.mock('../api/trade', () => ({
   DEPLOYMENTS_QUERY_KEY: ['trade', 'deployments'],
   useDeployments: vi.fn(),
   useCreateDeployment: () => ({ mutate: vi.fn(), isPending: false }),
+  useDryRun: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useApplyDeployment: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateDeployment: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useStopDeployment: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock('../api/credentials', () => ({

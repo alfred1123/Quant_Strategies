@@ -98,6 +98,10 @@ class TestRunLiveApply:
         assert report.order_success is None
         assert "HOLD" in report.message
         adapter.execute_action.assert_not_called()
+        deps["repo"].sp_ins_execution_event.assert_called_once()
+        ee_kwargs = deps["repo"].sp_ins_execution_event.call_args.kwargs
+        assert ee_kwargs["buy_sell_cd"] == "HOLD"
+        assert ee_kwargs["is_success_ind"] == "Y"
 
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_buy_success(self, mock_signal, deps):
@@ -208,7 +212,10 @@ class TestRunLiveApply:
 
         assert report.order_success is None
         assert "qty resolved to 0" in report.message
-        deps["repo"].sp_ins_execution_event.assert_not_called()
+        deps["repo"].sp_ins_execution_event.assert_called_once()
+        ee_kwargs = deps["repo"].sp_ins_execution_event.call_args.kwargs
+        assert ee_kwargs["buy_sell_cd"] == "BUY"
+        assert ee_kwargs["is_success_ind"] == "Y"
 
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_audit_failure_does_not_crash(self, mock_signal, deps):

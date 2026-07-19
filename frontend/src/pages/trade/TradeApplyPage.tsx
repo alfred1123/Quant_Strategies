@@ -2,7 +2,9 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
+  IconButton,
   Paper,
   Stack,
   Table,
@@ -11,15 +13,24 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import PauseCircleIcon from '@mui/icons-material/PauseCircle';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PlayCircleIcon from '@mui/icons-material/PlayCircle';
+import ScienceIcon from '@mui/icons-material/Science';
+import StopCircleIcon from '@mui/icons-material/StopCircle';
 import { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useDeployments } from '../../api/trade';
+import { useDeployments, useDryRun, useStopDeployment, useUpdateDeployment } from '../../api/trade';
 import { useTradeSession, useTradeSessionFilters } from '../../trade/useTradeSession';
 import { ALL_ACCOUNTS } from '../../types/credentials';
+import type { DeploymentRow, DryRunReport } from '../../types/trade';
 import type { TradeApplyLocationState } from '../../types/strategies';
+import ApplyConfirmDialog from '../../components/trade/ApplyConfirmDialog';
 import DeploymentDialog, { type DeploymentSelection } from '../../components/trade/DeploymentDialog';
+import DryRunReportDialog from '../../components/trade/DryRunReportDialog';
 import StrategyPicker, { type StrategyPickerSelection } from '../../components/trade/StrategyPicker';
 
 function accountLabel(
@@ -49,8 +60,15 @@ export default function TradeApplyPage() {
   const { accounts, tradingMode, accountFilter, brokerFilter, appNameById } = useTradeSession();
   const { matchesSession, credentialsNotLoaded } = useTradeSessionFilters();
 
+  const dryRun = useDryRun();
+  const updateDep = useUpdateDeployment();
+  const stopDep = useStopDeployment();
+
   const [pickerSelection, setPickerSelection] = useState<StrategyPickerSelection | null>(null);
   const [deployOpen, setDeployOpen] = useState(false);
+  const [dryRunReport, setDryRunReport] = useState<DryRunReport | null>(null);
+  const [applyTarget, setApplyTarget] = useState<DeploymentRow | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Pre-select from Promotion → Trade navigation (optional location state).
   // Render-phase adjustment keyed on the routed strategy — applies once per
@@ -81,9 +99,54 @@ export default function TradeApplyPage() {
   }, [pickerSelection, routeState?.queueId]);
 
   const filtered = useMemo(
-    () => (deployments ?? []).filter(matchesSession),
+    () => (deployments ?? [])
+      .filter((row) => row.deployment_status !== 'STOPPED')
+      .filter(matchesSession),
     [deployments, matchesSession],
   );
+
+  const handleDryRun = async (row: DeploymentRow) => {
+    setActionError(null);
+    try {
+      const report = await dryRun.mutateAsync({
+        strategy_id: row.strategy_id,
+        strategy_vid: row.strategy_vid,
+        api_credential_id: row.api_credential_id,
+        app_id: row.app_id,
+        internal_cusip: row.internal_cusip,
+        qty: row.qty,
+        paper: row.is_paper_ind === 'Y',
+      });
+      setDryRunReport(report);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : 'Dry-run failed');
+    }
+  };
+
+  const handleToggleEnabled = async (row: DeploymentRow) => {
+    setActionError(null);
+    const enabling = row.is_enabled_ind !== 'Y';
+    try {
+      await updateDep.mutateAsync({
+        deploymentId: row.deployment_id,
+        enabled: enabling,
+      });
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : 'Update failed');
+    }
+  };
+
+  const handleStopDeployment = async (row: DeploymentRow) => {
+    if (!window.confirm('Stop this deployment? It will be disabled and hidden from the list.')) {
+      return;
+    }
+    setActionError(null);
+    try {
+      await stopDep.mutateAsync(row.deployment_id);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : 'Stop failed');
+    }
+  };
 
   const filterHint =
     accountFilter !== ALL_ACCOUNTS || brokerFilter !== 'all'
@@ -154,12 +217,13 @@ export default function TradeApplyPage() {
                   <TableCell>Mode</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell align="right">Qty</TableCell>
+                  <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={8}>
                       <Typography variant="body2" color="text.secondary">
                         No deployments yet. Select a strategy above and click Deploy, or use
                         Promotion → Deploy.
@@ -174,6 +238,7 @@ export default function TradeApplyPage() {
                     accounts,
                     appNameById,
                   );
+                  const enabled = row.is_enabled_ind === 'Y';
                   return (
                     <TableRow key={`${row.deployment_id}-${row.deployment_vid}`}>
                       <TableCell>{exchange}</TableCell>
@@ -183,8 +248,60 @@ export default function TradeApplyPage() {
                         {row.strategy_id.slice(0, 8)}… v{row.strategy_vid}
                       </TableCell>
                       <TableCell>{row.is_paper_ind === 'Y' ? 'Paper' : 'Live'}</TableCell>
-                      <TableCell>{row.deployment_status}</TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          label={row.deployment_status}
+                          color={enabled ? 'success' : 'default'}
+                          variant={enabled ? 'filled' : 'outlined'}
+                        />
+                      </TableCell>
                       <TableCell align="right">{row.qty}</TableCell>
+                      <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                        <Tooltip title="Dry run">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDryRun(row)}
+                            disabled={dryRun.isPending}
+                          >
+                            <ScienceIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title={enabled ? 'Apply signal' : 'Enable first'}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              disabled={!enabled}
+                              onClick={() => setApplyTarget(row)}
+                            >
+                              <PlayArrowIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title={enabled ? 'Disable (kill switch)' : 'Enable'}>
+                          <IconButton
+                            size="small"
+                            color={enabled ? 'warning' : 'success'}
+                            onClick={() => handleToggleEnabled(row)}
+                            disabled={updateDep.isPending}
+                          >
+                            {enabled
+                              ? <PauseCircleIcon fontSize="small" />
+                              : <PlayCircleIcon fontSize="small" />}
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Stop deployment">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleStopDeployment(row)}
+                            disabled={stopDep.isPending}
+                          >
+                            <StopCircleIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -194,11 +311,27 @@ export default function TradeApplyPage() {
         )}
       </Box>
 
+      {actionError && (
+        <Alert severity="error" onClose={() => setActionError(null)}>
+          {actionError}
+        </Alert>
+      )}
+
       <DeploymentDialog
         open={deployOpen}
         selection={deploySelection}
         onClose={() => setDeployOpen(false)}
         onSuccess={() => setDeployOpen(false)}
+      />
+
+      <DryRunReportDialog
+        report={dryRunReport}
+        onClose={() => setDryRunReport(null)}
+      />
+
+      <ApplyConfirmDialog
+        deployment={applyTarget}
+        onClose={() => setApplyTarget(null)}
       />
     </Stack>
   );

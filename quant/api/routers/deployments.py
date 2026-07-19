@@ -93,6 +93,18 @@ def update_deployment(
 
 
 @router.post(
+    "/deployments/{deployment_id}/stop",
+    response_model=DeploymentRow,
+)
+def stop_deployment(
+    deployment_id: UUID,
+    user: CurrentUser = Depends(require_user),
+    svc: TradeService = Depends(get_trade_service),
+) -> DeploymentRow:
+    return svc.stop_deployment(user.app_user_id, deployment_id)
+
+
+@router.post(
     "/deployments/{deployment_id}/apply",
     response_model=ApplyReport,
 )
