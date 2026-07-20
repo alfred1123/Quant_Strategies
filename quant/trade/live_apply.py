@@ -1,8 +1,4 @@
-"""Live apply orchestration — signal → order → audit.
-
-Phase 1.7: single-attempt execution. Retry/cancel policy (bounded backoff,
-cancel-before-retry, Notifier alerts) will be layered in Phase 2.
-"""
+"""Live apply orchestration — signal → order → audit → ops alert."""
 
 from __future__ import annotations
 
@@ -16,167 +12,256 @@ from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
 from quant.schemas.apply import ApplyReport
 from quant.schemas.deployments import DeploymentRow
+from quant.shared.notify import Notifier, TradeAlertFormatter
 from quant.strategy.live_service import LiveEvaluationError, compute_latest_position
 from quant.trade.errors import AdapterNotFoundError, TradeValidationError
-from quant.trade.models.order import IntendedAction
+from quant.trade.models.order import IntendedAction, OrderResult
 from quant.trade.db_repo import TradeRepo
+from quant.trade.order_policy import OrderRetryExecutor, OrderRetryResult
 from quant.trade.registry import AdapterRegistry
 
 logger = logging.getLogger(__name__)
 
+# Used only when INST.PRODUCT.CCY is not populated for the instrument.
+_FALLBACK_SETTLEMENT_CCY = "USDT"
 
-def run_live_apply(
-    *,
-    app_user_id: UUID,
-    deployment: DeploymentRow,
-    repo: TradeRepo,
-    bt: BtQueueRepo,
-    credential_service: CredentialService,
-    credential_repo: ApiCredentialRepo,
-    adapter_registry: AdapterRegistry,
-    data_caches: DataCaches,
-    user_id: str,
-) -> ApplyReport:
-    """Execute one apply cycle: signal evaluation → order → audit write."""
 
-    # ── adapter ──────────────────────────────────────────────────
-    if not adapter_registry.has_adapter(deployment.app_id):
-        raise AdapterNotFoundError(
-            f"no broker adapter registered for app_id={deployment.app_id}"
-        )
-    keys = credential_service.decrypt_credential(
-        credential_repo, app_user_id, deployment.api_credential_id
-    )
-    if keys is None:
-        raise TradeValidationError(
-            "API credential not found or cannot decrypt", status_code=404
-        )
+class LiveApplyOrchestrator:
+    """Execute one live-apply cycle: signal → order → audit → ops alert."""
 
-    # ── signal ───────────────────────────────────────────────────
-    strategy_rows = bt.sp_get_strategy(
-        deployment.strategy_id, strategy_vid=deployment.strategy_vid
-    )
-    if not strategy_rows:
-        raise TradeValidationError(
-            f"strategy {deployment.strategy_id} v{deployment.strategy_vid} not found",
-            status_code=404,
-        )
-    strategy_row = strategy_rows[0]
+    def __init__(
+        self,
+        repo: TradeRepo,
+        bt: BtQueueRepo,
+        credential_service: CredentialService,
+        credential_repo: ApiCredentialRepo,
+        adapter_registry: AdapterRegistry,
+        data_caches: DataCaches,
+        *,
+        retry_executor: OrderRetryExecutor | None = None,
+        alert_formatter: TradeAlertFormatter | None = None,
+        notifier: Notifier | None = None,
+    ) -> None:
+        self._repo = repo
+        self._bt = bt
+        self._credential_service = credential_service
+        self._credential_repo = credential_repo
+        self._adapter_registry = adapter_registry
+        self._data_caches = data_caches
+        self._retry_executor = retry_executor or OrderRetryExecutor()
+        self._alert_formatter = alert_formatter or TradeAlertFormatter()
+        self._notifier = notifier or Notifier.from_env()
 
-    result_payload = bt.fetch_result_payload(
-        deployment.strategy_id, deployment.strategy_vid
-    )
-    try:
-        signal, _data_as_of = compute_latest_position(
-            strategy_row["config_json"],
-            result_payload=result_payload,
-            caches=data_caches,
-        )
-    except LiveEvaluationError as exc:
-        raise TradeValidationError(str(exc)) from exc
-
-    # ── execute ──────────────────────────────────────────────────
-    adapter = adapter_registry.create(
-        deployment.app_id,
-        api_key=keys[0],
-        api_secret=keys[1],
-        paper=deployment.is_paper_ind == "Y",
-        inst_cache=data_caches.instrument_cache,
-    )
-    with adapter:
-        vendor_symbol = adapter.validate_for_dry_run(
-            deployment.internal_cusip, deployment.app_id
-        )
-        position_qty = adapter.get_position_qty(vendor_symbol)
-        action = adapter.intended_side(signal, position_qty)
-
-        if action is IntendedAction.HOLD:
-            _write_event(
-                repo, app_user_id=app_user_id, deployment=deployment,
-                buy_sell_cd=IntendedAction.HOLD.value, is_success="Y",
-                signal_value=signal, user_id=user_id,
+    def run(
+        self,
+        app_user_id: UUID,
+        deployment: DeploymentRow,
+        user_id: str,
+    ) -> ApplyReport:
+        if not self._adapter_registry.has_adapter(deployment.app_id):
+            raise AdapterNotFoundError(
+                f"no broker adapter registered for app_id={deployment.app_id}"
             )
-            return ApplyReport(
-                deployment_id=deployment.deployment_id,
-                deployment_vid=deployment.deployment_vid,
-                action=action,
-                vendor_symbol=vendor_symbol,
-                signal=signal,
-                position_qty=position_qty,
-                message="no order needed (HOLD)",
+        keys = self._credential_service.decrypt_credential(
+            self._credential_repo, app_user_id, deployment.api_credential_id
+        )
+        if keys is None:
+            raise TradeValidationError(
+                "API credential not found or cannot decrypt", status_code=404
             )
 
-        result = adapter.execute_action(
-            vendor_symbol, action, float(deployment.qty), position_qty
+        signal = self._compute_signal(deployment)
+
+        adapter = self._adapter_registry.create(
+            deployment.app_id,
+            api_key=keys[0],
+            api_secret=keys[1],
+            paper=deployment.is_paper_ind == "Y",
+            inst_cache=self._data_caches.instrument_cache,
         )
-        if result is None:
-            _write_event(
-                repo, app_user_id=app_user_id, deployment=deployment,
-                buy_sell_cd=action.order_side().value,
-                is_success="Y", signal_value=signal, user_id=user_id,
+        with adapter:
+            vendor_symbol = adapter.validate_for_dry_run(
+                deployment.internal_cusip, deployment.app_id
             )
-            return ApplyReport(
-                deployment_id=deployment.deployment_id,
-                deployment_vid=deployment.deployment_vid,
-                action=action,
-                vendor_symbol=vendor_symbol,
-                signal=signal,
-                position_qty=position_qty,
-                message="no order needed (qty resolved to 0)",
+            qty = float(deployment.qty)
+            outcome = self._retry_executor.execute(
+                adapter, vendor_symbol, signal, qty,
             )
 
-        # ── audit ────────────────────────────────────────────────
-        buy_sell = action.order_side().value
-        _write_event(
-            repo, app_user_id=app_user_id, deployment=deployment,
-            buy_sell_cd=buy_sell,
-            is_success="Y" if result.success else "N",
-            signal_value=signal, user_id=user_id,
-            quantity=result.filled_qty or float(deployment.qty),
-            vendor_order_id=result.vendor_order_id,
-        )
+            self._audit_attempts(
+                outcome, app_user_id=app_user_id, deployment=deployment,
+                signal=signal, user_id=user_id, qty=qty,
+            )
 
+            result = outcome.result
+            if result is None:
+                return self._report(deployment, outcome, vendor_symbol, signal,
+                                    message=outcome.no_order_message)
+
+            if result.success:
+                self._write_transaction(
+                    app_user_id=app_user_id, deployment=deployment,
+                    action=outcome.action, vendor_symbol=vendor_symbol,
+                    result=result, user_id=user_id,
+                )
+            else:
+                self._send_failure_alert(
+                    deployment, outcome, vendor_symbol, signal, qty,
+                )
+            return self._report(deployment, outcome, vendor_symbol, signal)
+
+    def _compute_signal(self, deployment: DeploymentRow) -> float:
+        strategy_rows = self._bt.sp_get_strategy(
+            deployment.strategy_id, strategy_vid=deployment.strategy_vid
+        )
+        if not strategy_rows:
+            raise TradeValidationError(
+                f"strategy {deployment.strategy_id} v{deployment.strategy_vid} not found",
+                status_code=404,
+            )
+        result_payload = self._bt.fetch_result_payload(
+            deployment.strategy_id, deployment.strategy_vid
+        )
+        try:
+            signal, _data_as_of = compute_latest_position(
+                strategy_rows[0]["config_json"],
+                result_payload=result_payload,
+                caches=self._data_caches,
+            )
+        except LiveEvaluationError as exc:
+            raise TradeValidationError(str(exc)) from exc
+        return signal
+
+    def _report(
+        self,
+        deployment: DeploymentRow,
+        outcome: OrderRetryResult,
+        vendor_symbol: str,
+        signal: float,
+        *,
+        message: str | None = None,
+    ) -> ApplyReport:
+        result = outcome.result
         return ApplyReport(
             deployment_id=deployment.deployment_id,
             deployment_vid=deployment.deployment_vid,
-            action=action,
+            action=outcome.action,
             vendor_symbol=vendor_symbol,
             signal=signal,
-            position_qty=position_qty,
-            order_success=result.success,
-            vendor_order_id=result.vendor_order_id,
-            filled_qty=result.filled_qty,
-            avg_price=result.avg_price,
-            fee=result.fee,
-            message=result.message,
+            position_qty=outcome.position_qty,
+            order_success=result.success if result else None,
+            vendor_order_id=result.vendor_order_id if result else None,
+            filled_qty=result.filled_qty if result else None,
+            avg_price=result.avg_price if result else None,
+            fee=result.fee if result else None,
+            message=message if message is not None else result.message,
         )
 
+    def _audit_attempts(
+        self,
+        outcome: OrderRetryResult,
+        *,
+        app_user_id: UUID,
+        deployment: DeploymentRow,
+        signal: float,
+        user_id: str,
+        qty: float,
+    ) -> None:
+        """Best-effort EXECUTION_EVENT row per attempt — never fails the cycle."""
+        for attempt in outcome.attempts:
+            try:
+                self._repo.sp_ins_execution_event(
+                    execution_event_id=uuid.uuid4(),
+                    app_user_id=app_user_id,
+                    deployment_id=deployment.deployment_id,
+                    deployment_vid=deployment.deployment_vid,
+                    buy_sell_cd=attempt.buy_sell_cd,
+                    is_success_ind=attempt.is_success_ind,
+                    user_id=user_id,
+                    signal_value=signal,
+                    quantity=attempt.quantity(qty),
+                    vendor_order_id=attempt.vendor_order_id,
+                )
+            except Exception:
+                logger.exception("audit write failed — apply cycle continues")
 
-def _write_event(
-    repo: TradeRepo,
-    *,
-    app_user_id: UUID,
-    deployment: DeploymentRow,
-    buy_sell_cd: str,
-    is_success: str,
-    signal_value: float,
-    user_id: str,
-    quantity: float | None = None,
-    vendor_order_id: str | None = None,
-) -> None:
-    """Best-effort audit write — never fails the apply cycle."""
-    try:
-        repo.sp_ins_execution_event(
-            execution_event_id=uuid.uuid4(),
-            app_user_id=app_user_id,
-            deployment_id=deployment.deployment_id,
-            deployment_vid=deployment.deployment_vid,
-            buy_sell_cd=buy_sell_cd,
-            is_success_ind=is_success,
-            user_id=user_id,
-            signal_value=signal_value,
-            quantity=quantity,
-            vendor_order_id=vendor_order_id,
+    def _write_transaction(
+        self,
+        *,
+        app_user_id: UUID,
+        deployment: DeploymentRow,
+        action: IntendedAction,
+        vendor_symbol: str,
+        result: OrderResult,
+        user_id: str,
+    ) -> None:
+        """Best-effort fill row — never fails the apply cycle."""
+        side = action.order_side()
+        if side is None or result.filled_qty is None:
+            return
+        notional = None
+        if result.avg_price is not None:
+            notional = float(result.filled_qty) * float(result.avg_price)
+        try:
+            self._repo.sp_ins_transaction(
+                transaction_id=uuid.uuid4(),
+                app_user_id=app_user_id,
+                deployment_id=deployment.deployment_id,
+                app_id=deployment.app_id,
+                internal_cusip=deployment.internal_cusip,
+                buy_sell_cd=side.value,
+                trans_ccy_cd=self._settlement_ccy(deployment.internal_cusip),
+                user_id=user_id,
+                vendor_symbol=vendor_symbol,
+                quantity=result.filled_qty,
+                price=result.avg_price,
+                notional_amt=notional,
+                fee_amt=result.fee,
+                vendor_order_id=result.vendor_order_id,
+            )
+        except Exception:
+            logger.exception("transaction write failed — apply cycle continues")
+
+    def _settlement_ccy(self, internal_cusip: str) -> str:
+        """Settlement currency from the instrument master (INST.PRODUCT.CCY)."""
+        product = self._data_caches.instrument_cache.get_product_by_cusip(
+            internal_cusip
         )
-    except Exception:
-        logger.exception("audit write failed — apply cycle continues")
+        ccy = (product or {}).get("ccy")
+        if ccy:
+            return ccy
+        logger.warning(
+            "no CCY on INST.PRODUCT for %s — falling back to %s",
+            internal_cusip, _FALLBACK_SETTLEMENT_CCY,
+        )
+        return _FALLBACK_SETTLEMENT_CCY
+
+    def _send_failure_alert(
+        self,
+        deployment: DeploymentRow,
+        outcome: OrderRetryResult,
+        vendor_symbol: str,
+        signal: float,
+        qty: float,
+    ) -> None:
+        assert outcome.result is not None
+        title = self._alert_formatter.title_for_apply_failure(
+            is_permanent=outcome.permanent_failure,
+        )
+        self._notifier.send(
+            self._alert_formatter.format_apply_failure(
+                title=title,
+                deployment_id=deployment.deployment_id,
+                strategy_id=deployment.strategy_id,
+                strategy_vid=deployment.strategy_vid,
+                symbol=vendor_symbol,
+                signal=signal,
+                action=outcome.action.value,
+                qty=qty,
+                paper=deployment.is_paper_ind == "Y",
+                attempt_count=len(outcome.attempts),
+                max_attempts=outcome.max_attempts,
+                last_message=outcome.result.message,
+                vendor_order_ids=outcome.vendor_order_ids,
+            )
+        )

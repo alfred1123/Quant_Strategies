@@ -9,6 +9,7 @@ import pytest
 
 from quant.schemas.deployments import CreateDeploymentRequest, UpdateDeploymentRequest
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
+from quant.trade.live_apply import LiveApplyOrchestrator
 from quant.trade.service import TradeService
 
 
@@ -206,7 +207,7 @@ class TestStopDeployment:
 
 
 class TestApplyDeployment:
-    @patch("quant.trade.service.run_live_apply")
+    @patch.object(LiveApplyOrchestrator, "run")
     def test_happy_path(self, mock_apply, svc):
         from quant.schemas.apply import ApplyReport
         from quant.trade.models.order import IntendedAction
