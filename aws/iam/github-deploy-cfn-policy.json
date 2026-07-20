@@ -26,8 +26,42 @@
         "arn:aws:cloudformation:ap-southeast-1:539163478329:stack/quant-network/*",
         "arn:aws:cloudformation:ap-southeast-1:539163478329:stack/quant-database/*",
         "arn:aws:cloudformation:ap-southeast-1:539163478329:stack/quant-compute/*",
+        "arn:aws:cloudformation:ap-southeast-1:539163478329:stack/quant-scheduler/*",
         "arn:aws:cloudformation:ap-southeast-1:539163478329:changeSet/*/*"
       ]
+    },
+    {
+      "Sid": "LambdaManageScheduledTask",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:DeleteFunction",
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration",
+        "lambda:AddPermission",
+        "lambda:RemovePermission",
+        "lambda:ListVersionsByFunction",
+        "lambda:TagResource",
+        "lambda:UntagResource",
+        "lambda:ListTags"
+      ],
+      "Resource": "arn:aws:lambda:ap-southeast-1:539163478329:function:quant-scheduled-task"
+    },
+    {
+      "Sid": "SchedulerManageTradeGroup",
+      "Effect": "Allow",
+      "Action": [
+        "scheduler:CreateScheduleGroup",
+        "scheduler:DeleteScheduleGroup",
+        "scheduler:GetScheduleGroup",
+        "scheduler:ListScheduleGroups",
+        "scheduler:ListTagsForResource",
+        "scheduler:TagResource",
+        "scheduler:UntagResource"
+      ],
+      "Resource": "*"
     },
     {
       "Sid": "CloudFormationValidateAnywhere",

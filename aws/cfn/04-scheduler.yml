@@ -1,0 +1,208 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Quant Strategies - EventBridge Scheduler + Lambda for scheduled API tasks
+  (trade apply now; price-bar ingestion later). Lambda is a generic HTTP
+  bridge routed by event.task; all business logic stays in FastAPI.
+  Per-deployment schedules are created/updated/deleted by the API (boto3)
+  using the EC2 instance role; this stack provides the shared Lambda target,
+  invoke role, and schedule group.
+
+Parameters:
+  Project:
+    Type: String
+    Default: quant
+
+  AppEnv:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, prod]
+
+  ApiBaseUrl:
+    Type: String
+    Default: https://algodaemon.com
+    Description: >-
+      Public FastAPI base URL the Lambda calls (no trailing slash).
+      Prod: https://algodaemon.com
+
+  Ec2RoleName:
+    Type: String
+    Default: quant-ec2-role
+    Description: Existing EC2 instance role that will manage schedules via boto3.
+
+  LambdaTimeoutSeconds:
+    Type: Number
+    Default: 120
+    MinValue: 10
+    MaxValue: 300
+    Description: >-
+      Live apply can retry orders with backoff + fill-confirmation polling
+      for 60s+; keep well above HTTP_TIMEOUT_S.
+
+  LambdaMemoryMb:
+    Type: Number
+    Default: 128
+    AllowedValues: [128, 256, 512]
+
+Resources:
+  # ── Schedule group (organises per-deployment schedules) ──────────────
+  TradeScheduleGroup:
+    Type: AWS::Scheduler::ScheduleGroup
+    Properties:
+      Name: !Sub "${Project}-trade-deployments"
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref AppEnv
+
+  # ── Lambda execution role ────────────────────────────────────────────
+  ScheduledTaskLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${Project}-scheduled-task-lambda"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        # Handler fetches the service token at cold start — CloudFormation
+        # does not support ssm-secure in Lambda environment variables.
+        - PolicyName: read-trade-service-token
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/quant/${AppEnv}/TRADE_SERVICE_TOKEN"
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+
+  # ── EventBridge Scheduler → Lambda invoke role ───────────────────────
+  SchedulerInvokeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${Project}-scheduler-invoke"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: invoke-scheduled-task-lambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt ScheduledTaskLambda.Arn
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+
+  # ── Lambda (stub code; deploy.sh overwrites from aws/lambda/scheduled-task) ─
+  ScheduledTaskLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${Project}-scheduled-task"
+      Description: EventBridge Scheduler → FastAPI task bridge (event.task routed)
+      Runtime: python3.12
+      Handler: handler.handler
+      Role: !GetAtt ScheduledTaskLambdaRole.Arn
+      Timeout: !Ref LambdaTimeoutSeconds
+      MemorySize: !Ref LambdaMemoryMb
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          API_BASE_URL: !Ref ApiBaseUrl
+          # Handler fetches + decrypts at cold start (ssm-secure is not
+          # supported in Lambda env vars). Create via init-ssm-params.sh.
+          TRADE_SERVICE_TOKEN_SSM_PATH: !Sub "/quant/${AppEnv}/TRADE_SERVICE_TOKEN"
+          HTTP_TIMEOUT_S: "110"
+      Code:
+        ZipFile: |
+          def handler(event, context):
+              raise RuntimeError(
+                  "Stub only — run aws/deploy.sh scheduler to upload "
+                  "aws/lambda/scheduled-task/handler.py"
+              )
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref AppEnv
+
+  # Allow Scheduler service principal to invoke (defence in depth with RoleArn)
+  ScheduledTaskLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ScheduledTaskLambda
+      Action: lambda:InvokeFunction
+      Principal: scheduler.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
+  # ── EC2 role: create/update/delete schedules + PassRole invoke role ──
+  Ec2SchedulerManagePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "${Project}-ec2-scheduler-manage"
+      Roles:
+        - !Ref Ec2RoleName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ManageTradeSchedules
+            Effect: Allow
+            Action:
+              - scheduler:CreateSchedule
+              - scheduler:UpdateSchedule
+              - scheduler:DeleteSchedule
+              - scheduler:GetSchedule
+              - scheduler:ListSchedules
+            Resource:
+              - !Sub "arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${TradeScheduleGroup}/*"
+              - !Sub "arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule-group/${TradeScheduleGroup}"
+          - Sid: PassSchedulerInvokeRole
+            Effect: Allow
+            Action: iam:PassRole
+            Resource: !GetAtt SchedulerInvokeRole.Arn
+            Condition:
+              StringEquals:
+                "iam:PassedToService": scheduler.amazonaws.com
+
+Outputs:
+  ScheduledTaskLambdaArn:
+    Description: ARN of the scheduled-task Lambda (EventBridge target)
+    Value: !GetAtt ScheduledTaskLambda.Arn
+    Export:
+      Name: !Sub "${Project}-ScheduledTaskLambdaArn"
+
+  ScheduledTaskLambdaName:
+    Description: Name of the scheduled-task Lambda
+    Value: !Ref ScheduledTaskLambda
+    Export:
+      Name: !Sub "${Project}-ScheduledTaskLambdaName"
+
+  SchedulerInvokeRoleArn:
+    Description: IAM role EventBridge Scheduler assumes to invoke Lambda
+    Value: !GetAtt SchedulerInvokeRole.Arn
+    Export:
+      Name: !Sub "${Project}-SchedulerInvokeRoleArn"
+
+  ScheduleGroupName:
+    Description: Schedule group for per-deployment schedules
+    Value: !Ref TradeScheduleGroup
+    Export:
+      Name: !Sub "${Project}-TradeScheduleGroupName"
+
+  ApiBaseUrl:
+    Description: Base URL the Lambda calls
+    Value: !Ref ApiBaseUrl
