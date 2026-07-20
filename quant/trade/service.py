@@ -19,7 +19,7 @@ from quant.schemas.dry_run import DryRunReport, DryRunRequest
 from quant.trade.db_repo import TradeRepo
 from quant.trade.dry_run import run_dry_run
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
-from quant.trade.live_apply import run_live_apply
+from quant.trade.live_apply import LiveApplyOrchestrator
 from quant.trade.registry import AdapterRegistry
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,14 @@ class TradeService:
         self._credential_repo = credential_repo
         self._adapter_registry = adapter_registry
         self._data_caches = data_caches
+        self._live_apply = LiveApplyOrchestrator(
+            repo,
+            bt,
+            credential_service,
+            credential_repo,
+            adapter_registry,
+            data_caches,
+        )
 
     def create_deployment(
         self,
@@ -145,16 +153,10 @@ class TradeService:
             raise TradeValidationError(
                 "deployment is disabled (kill switch)", status_code=400
             )
-        return run_live_apply(
-            app_user_id=app_user_id,
-            deployment=dep,
-            repo=self._repo,
-            bt=self._bt,
-            credential_service=self._credential_service,
-            credential_repo=self._credential_repo,
-            adapter_registry=self._adapter_registry,
-            data_caches=self._data_caches,
-            user_id=str(app_user_id),
+        return self._live_apply.run(
+            app_user_id,
+            dep,
+            str(app_user_id),
         )
 
     def dry_run(

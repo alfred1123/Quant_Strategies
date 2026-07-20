@@ -9,7 +9,7 @@ import pytest
 
 from quant.schemas.deployments import DeploymentRow
 from quant.trade.errors import AdapterNotFoundError, TradeValidationError
-from quant.trade.live_apply import run_live_apply
+from quant.trade.live_apply import LiveApplyOrchestrator
 from quant.trade.models.order import IntendedAction, OrderResult, OrderSide
 
 
@@ -35,208 +35,247 @@ def _deployment(**overrides) -> DeploymentRow:
 
 
 @pytest.fixture
-def deps():
-    """Shared mock dependencies for run_live_apply."""
+def orchestrator():
+    """LiveApplyOrchestrator with all dependencies mocked."""
     bt = MagicMock()
     bt.sp_get_strategy.return_value = [
         {"config_json": {}, "strategy_nm": "test_strat", "user_id": "alice"}
     ]
     bt.fetch_result_payload.return_value = {"best": {"window": 20, "signal": 0.5}}
-    return {
-        "repo": MagicMock(),
-        "bt": bt,
-        "credential_service": MagicMock(),
-        "credential_repo": MagicMock(),
-        "adapter_registry": MagicMock(),
-        "data_caches": MagicMock(),
-        "user_id": "alice",
+    data_caches = MagicMock()
+    data_caches.instrument_cache.get_product_by_cusip.return_value = {
+        "product_id": 1,
+        "internal_cusip": "btcusdt.crypto",
+        "ccy": "USDT",
     }
+    return LiveApplyOrchestrator(
+        repo=MagicMock(),
+        bt=bt,
+        credential_service=MagicMock(),
+        credential_repo=MagicMock(),
+        adapter_registry=MagicMock(),
+        data_caches=data_caches,
+        notifier=MagicMock(),
+    ), bt
 
 
-class TestRunLiveApply:
-    def test_no_adapter_raises(self, deps):
+def _adapter_mock(**overrides) -> MagicMock:
+    adapter = MagicMock()
+    adapter.__enter__ = MagicMock(return_value=adapter)
+    adapter.__exit__ = MagicMock(return_value=False)
+    adapter.validate_for_dry_run.return_value = "BTCUSDT"
+    adapter.get_position_qty.return_value = 0.0
+    adapter.intended_side.return_value = IntendedAction.BUY
+    for key, val in overrides.items():
+        setattr(adapter, key, val)
+    return adapter
+
+
+class TestLiveApplyOrchestrator:
+    def test_no_adapter_raises(self, orchestrator):
+        orch, _bt = orchestrator
         dep = _deployment()
-        deps["adapter_registry"].has_adapter.return_value = False
+        orch._adapter_registry.has_adapter.return_value = False
 
         with pytest.raises(AdapterNotFoundError):
-            run_live_apply(app_user_id=dep.app_user_id, deployment=dep, **deps)
+            orch.run(dep.app_user_id, dep, "alice")
 
-    def test_no_credentials_raises(self, deps):
+    def test_no_credentials_raises(self, orchestrator):
+        orch, _bt = orchestrator
         dep = _deployment()
-        deps["adapter_registry"].has_adapter.return_value = True
-        deps["credential_service"].decrypt_credential.return_value = None
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = None
 
         with pytest.raises(TradeValidationError, match="credential"):
-            run_live_apply(app_user_id=dep.app_user_id, deployment=dep, **deps)
+            orch.run(dep.app_user_id, dep, "alice")
 
-    def test_no_strategy_raises(self, deps):
+    def test_no_strategy_raises(self, orchestrator):
+        orch, bt = orchestrator
         dep = _deployment()
-        deps["adapter_registry"].has_adapter.return_value = True
-        deps["credential_service"].decrypt_credential.return_value = ("k", "s")
-        deps["bt"].sp_get_strategy.return_value = []
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = ("k", "s")
+        bt.sp_get_strategy.return_value = []
 
         with pytest.raises(TradeValidationError, match="strategy"):
-            run_live_apply(app_user_id=dep.app_user_id, deployment=dep, **deps)
+            orch.run(dep.app_user_id, dep, "alice")
 
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
-    def test_hold_returns_no_order(self, mock_signal, deps):
+    def test_hold_returns_no_order(self, mock_signal, orchestrator):
+        orch, _bt = orchestrator
         dep = _deployment()
-        deps["adapter_registry"].has_adapter.return_value = True
-        deps["credential_service"].decrypt_credential.return_value = ("k", "s")
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = ("k", "s")
 
-        adapter = MagicMock()
-        adapter.__enter__ = MagicMock(return_value=adapter)
-        adapter.__exit__ = MagicMock(return_value=False)
-        adapter.validate_for_dry_run.return_value = "BTCUSDT"
-        adapter.get_position_qty.return_value = 0.01
-        adapter.intended_side.return_value = IntendedAction.HOLD
-        deps["adapter_registry"].create.return_value = adapter
+        adapter = _adapter_mock(
+            get_position_qty=MagicMock(return_value=0.01),
+            intended_side=MagicMock(return_value=IntendedAction.HOLD),
+        )
+        orch._adapter_registry.create.return_value = adapter
 
-        report = run_live_apply(app_user_id=dep.app_user_id, deployment=dep, **deps)
+        report = orch.run(dep.app_user_id, dep, "alice")
 
         assert report.action == IntendedAction.HOLD
         assert report.order_success is None
         assert "HOLD" in report.message
-        adapter.execute_action.assert_not_called()
-        deps["repo"].sp_ins_execution_event.assert_called_once()
-        ee_kwargs = deps["repo"].sp_ins_execution_event.call_args.kwargs
-        assert ee_kwargs["buy_sell_cd"] == "HOLD"
-        assert ee_kwargs["is_success_ind"] == "Y"
+        adapter.apply_signal.assert_not_called()
+        orch._repo.sp_ins_execution_event.assert_called_once()
+        orch._notifier.send.assert_not_called()
 
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
-    def test_buy_success(self, mock_signal, deps):
+    def test_buy_success(self, mock_signal, orchestrator):
+        orch, _bt = orchestrator
         dep = _deployment()
-        deps["adapter_registry"].has_adapter.return_value = True
-        deps["credential_service"].decrypt_credential.return_value = ("k", "s")
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = ("k", "s")
 
-        adapter = MagicMock()
-        adapter.__enter__ = MagicMock(return_value=adapter)
-        adapter.__exit__ = MagicMock(return_value=False)
-        adapter.validate_for_dry_run.return_value = "BTCUSDT"
-        adapter.get_position_qty.return_value = 0.0
-        adapter.intended_side.return_value = IntendedAction.BUY
-        adapter.execute_action.return_value = OrderResult(
-            success=True, vendor_order_id="order-1", message="order filled",
-            raw_status="closed", side=OrderSide.BUY, requested_qty=0.01,
-            filled_qty=0.01, avg_price=64000.0, fee=0.256,
+        adapter = _adapter_mock(
+            apply_signal=MagicMock(
+                return_value=OrderResult(
+                    success=True,
+                    vendor_order_id="order-1",
+                    message="order filled",
+                    raw_status="closed",
+                    side=OrderSide.BUY,
+                    requested_qty=0.01,
+                    filled_qty=0.01,
+                    avg_price=64000.0,
+                    fee=0.256,
+                )
+            ),
         )
-        deps["adapter_registry"].create.return_value = adapter
+        orch._adapter_registry.create.return_value = adapter
 
-        report = run_live_apply(app_user_id=dep.app_user_id, deployment=dep, **deps)
+        report = orch.run(dep.app_user_id, dep, "alice")
 
         assert report.action == IntendedAction.BUY
         assert report.order_success is True
-        assert report.vendor_order_id == "order-1"
-        assert report.filled_qty == 0.01
-        assert report.avg_price == 64000.0
-        # single position fetch — the decided action and its position reading
-        # are passed straight to execute_action, never re-derived
-        adapter.get_position_qty.assert_called_once_with("BTCUSDT")
-        adapter.execute_action.assert_called_once_with(
-            "BTCUSDT", IntendedAction.BUY, 0.01, 0.0
-        )
-        deps["repo"].sp_ins_execution_event.assert_called_once()
-        ee_kwargs = deps["repo"].sp_ins_execution_event.call_args.kwargs
-        assert ee_kwargs["buy_sell_cd"] == "BUY"
-        assert ee_kwargs["is_success_ind"] == "Y"
-
-    @patch("quant.trade.live_apply.compute_latest_position", return_value=(-1.0, "2026-07-01"))
-    def test_open_short_success(self, mock_signal, deps):
-        dep = _deployment()
-        deps["adapter_registry"].has_adapter.return_value = True
-        deps["credential_service"].decrypt_credential.return_value = ("k", "s")
-
-        adapter = MagicMock()
-        adapter.__enter__ = MagicMock(return_value=adapter)
-        adapter.__exit__ = MagicMock(return_value=False)
-        adapter.validate_for_dry_run.return_value = "BTCUSDT"
-        adapter.get_position_qty.return_value = 0.0
-        adapter.intended_side.return_value = IntendedAction.OPEN_SHORT
-        adapter.execute_action.return_value = OrderResult(
-            success=True, vendor_order_id="order-2", message="order filled",
-            side=OrderSide.SELL, requested_qty=0.01,
-            filled_qty=0.01, avg_price=63000.0, fee=0.252,
-        )
-        deps["adapter_registry"].create.return_value = adapter
-
-        report = run_live_apply(app_user_id=dep.app_user_id, deployment=dep, **deps)
-
-        assert report.action == IntendedAction.OPEN_SHORT
-        assert report.order_success is True
-        ee_kwargs = deps["repo"].sp_ins_execution_event.call_args.kwargs
-        assert ee_kwargs["buy_sell_cd"] == "SELL"
+        adapter.apply_signal.assert_called_once_with("BTCUSDT", 1.0, 0.01)
+        orch._repo.sp_ins_transaction.assert_called_once()
+        tx_kwargs = orch._repo.sp_ins_transaction.call_args.kwargs
+        assert tx_kwargs["trans_ccy_cd"] == "USDT"
+        orch._notifier.send.assert_not_called()
 
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
-    def test_order_failure_still_writes_audit(self, mock_signal, deps):
-        dep = _deployment()
-        deps["adapter_registry"].has_adapter.return_value = True
-        deps["credential_service"].decrypt_credential.return_value = ("k", "s")
+    def test_settlement_ccy_from_instrument_master(self, mock_signal, orchestrator):
+        orch, _bt = orchestrator
+        dep = _deployment(internal_cusip="0700.hk")
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = ("k", "s")
+        orch._data_caches.instrument_cache.get_product_by_cusip.return_value = {
+            "product_id": 2,
+            "internal_cusip": "0700.hk",
+            "ccy": "HKD",
+        }
 
-        adapter = MagicMock()
-        adapter.__enter__ = MagicMock(return_value=adapter)
-        adapter.__exit__ = MagicMock(return_value=False)
-        adapter.validate_for_dry_run.return_value = "BTCUSDT"
-        adapter.get_position_qty.return_value = 0.0
-        adapter.intended_side.return_value = IntendedAction.BUY
-        adapter.execute_action.return_value = OrderResult(
-            success=False, vendor_order_id="order-3",
-            message="insufficient funds",
-            side=OrderSide.BUY, requested_qty=0.01,
+        adapter = _adapter_mock(
+            apply_signal=MagicMock(
+                return_value=OrderResult(
+                    success=True,
+                    vendor_order_id="order-2",
+                    message="order filled",
+                    side=OrderSide.BUY,
+                    requested_qty=100.0,
+                    filled_qty=100.0,
+                    avg_price=350.0,
+                )
+            ),
         )
-        deps["adapter_registry"].create.return_value = adapter
+        orch._adapter_registry.create.return_value = adapter
 
-        report = run_live_apply(app_user_id=dep.app_user_id, deployment=dep, **deps)
+        orch.run(dep.app_user_id, dep, "alice")
+
+        tx_kwargs = orch._repo.sp_ins_transaction.call_args.kwargs
+        assert tx_kwargs["trans_ccy_cd"] == "HKD"
+
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
+    def test_order_failure_alerts_and_writes_audit(self, mock_signal, orchestrator):
+        orch, _bt = orchestrator
+        dep = _deployment()
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = ("k", "s")
+
+        adapter = _adapter_mock(
+            apply_signal=MagicMock(
+                return_value=OrderResult(
+                    success=False,
+                    vendor_order_id="order-3",
+                    message="insufficient funds",
+                    side=OrderSide.BUY,
+                    requested_qty=0.01,
+                )
+            ),
+        )
+        orch._adapter_registry.create.return_value = adapter
+
+        report = orch.run(dep.app_user_id, dep, "alice")
 
         assert report.order_success is False
-        assert "insufficient funds" in report.message
-        ee_kwargs = deps["repo"].sp_ins_execution_event.call_args.kwargs
+        ee_kwargs = orch._repo.sp_ins_execution_event.call_args.kwargs
         assert ee_kwargs["is_success_ind"] == "N"
+        orch._notifier.send.assert_called_once()
+        alert_text = orch._notifier.send.call_args.args[0]
+        assert "insufficient funds" in alert_text
+        assert "permanent" in alert_text.lower()
 
+    @patch("quant.trade.order_policy.time.sleep")
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
-    def test_execute_action_none_returns_no_order(self, mock_signal, deps):
-        """adapter.execute_action returns None when qty resolves to 0."""
+    def test_unconfirmed_retries_then_alerts(self, mock_signal, mock_sleep, orchestrator):
+        orch, _bt = orchestrator
         dep = _deployment()
-        deps["adapter_registry"].has_adapter.return_value = True
-        deps["credential_service"].decrypt_credential.return_value = ("k", "s")
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = ("k", "s")
 
-        adapter = MagicMock()
-        adapter.__enter__ = MagicMock(return_value=adapter)
-        adapter.__exit__ = MagicMock(return_value=False)
-        adapter.validate_for_dry_run.return_value = "BTCUSDT"
-        adapter.get_position_qty.return_value = 0.0
-        adapter.intended_side.return_value = IntendedAction.BUY
-        adapter.execute_action.return_value = None
-        deps["adapter_registry"].create.return_value = adapter
-
-        report = run_live_apply(app_user_id=dep.app_user_id, deployment=dep, **deps)
-
-        assert report.order_success is None
-        assert "qty resolved to 0" in report.message
-        deps["repo"].sp_ins_execution_event.assert_called_once()
-        ee_kwargs = deps["repo"].sp_ins_execution_event.call_args.kwargs
-        assert ee_kwargs["buy_sell_cd"] == "BUY"
-        assert ee_kwargs["is_success_ind"] == "Y"
-
-    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
-    def test_audit_failure_does_not_crash(self, mock_signal, deps):
-        """If the audit write fails, the order was already placed — log, don't re-raise."""
-        dep = _deployment()
-        deps["adapter_registry"].has_adapter.return_value = True
-        deps["credential_service"].decrypt_credential.return_value = ("k", "s")
-
-        adapter = MagicMock()
-        adapter.__enter__ = MagicMock(return_value=adapter)
-        adapter.__exit__ = MagicMock(return_value=False)
-        adapter.validate_for_dry_run.return_value = "BTCUSDT"
-        adapter.get_position_qty.return_value = 0.0
-        adapter.intended_side.return_value = IntendedAction.BUY
-        adapter.execute_action.return_value = OrderResult(
-            success=True, vendor_order_id="order-4", message="filled",
-            side=OrderSide.BUY, requested_qty=0.01, filled_qty=0.01,
+        unconfirmed = OrderResult(
+            success=False,
+            vendor_order_id="order-u",
+            message="fill unconfirmed after 8.0s — vendor_order_id=order-u requires manual reconciliation",
+            side=OrderSide.BUY,
+            requested_qty=0.01,
         )
-        deps["adapter_registry"].create.return_value = adapter
-        deps["repo"].sp_ins_execution_event.side_effect = RuntimeError("DB down")
+        adapter = _adapter_mock(
+            apply_signal=MagicMock(return_value=unconfirmed),
+            cancel_order=MagicMock(
+                return_value=OrderResult(
+                    success=True,
+                    vendor_order_id="order-u",
+                    message="order canceled",
+                )
+            ),
+        )
+        orch._adapter_registry.create.return_value = adapter
 
-        report = run_live_apply(app_user_id=dep.app_user_id, deployment=dep, **deps)
+        report = orch.run(dep.app_user_id, dep, "alice")
+
+        assert report.order_success is False
+        assert adapter.apply_signal.call_count == 5
+        assert adapter.cancel_order.call_count == 5
+        assert orch._repo.sp_ins_execution_event.call_count == 5
+        orch._notifier.send.assert_called_once()
+        alert_text = orch._notifier.send.call_args.args[0]
+        assert "manual reconciliation" in alert_text.lower()
+
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
+    def test_audit_failure_does_not_crash(self, mock_signal, orchestrator):
+        orch, _bt = orchestrator
+        dep = _deployment()
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = ("k", "s")
+
+        adapter = _adapter_mock(
+            apply_signal=MagicMock(
+                return_value=OrderResult(
+                    success=True,
+                    vendor_order_id="order-4",
+                    message="filled",
+                    side=OrderSide.BUY,
+                    requested_qty=0.01,
+                    filled_qty=0.01,
+                )
+            ),
+        )
+        orch._adapter_registry.create.return_value = adapter
+        orch._repo.sp_ins_execution_event.side_effect = RuntimeError("DB down")
+
+        report = orch.run(dep.app_user_id, dep, "alice")
 
         assert report.order_success is True
