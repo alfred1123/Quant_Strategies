@@ -416,6 +416,8 @@ alerting design for the live order path itself.
 
 **Exit criteria:** **M1 — Pipeline** met: one real (or testnet) live apply completes end-to-end for Bollinger strategy. **Security:** backend rejects live apply without dry-run + confirm; paper/live cannot be bypassed via raw API; caller cannot deploy another user's strategy; deployment can be disabled via PATCH without DB access.
 
+**Promotion runbook:** when to move Slack to prod ops and Bybit to mainnet — [Live Trading Promotion](../guides/live-trading-promotion.md).
+
 **Result (2026-07-05):** Core order-placement mechanics (`CcxtTradeGateway.create_market_order`,
 `CcxtTradeAdapter.place_order`/`apply_signal`) implemented and validated end-to-end against Bybit
 testnet via the golden harness (`scripts/bybit_local_testnet.py --apply-signal {signal} --confirm`).
@@ -475,6 +477,8 @@ See [Scheduler, Price Bars & Data Consolidation](scheduler-price-bars.md) for th
 - [ ] AWS/app: service auth on `/apply` (`TRADE_SERVICE_TOKEN`) + boto3 create/update/delete schedules on deployment lifecycle.
 
 **Exit criteria:** A deployment scheduled `DAILY` executes automatically via EventBridge without manual intervention. `MARKET_DATA.PRICE_BAR` contains fresh bars for active products. Weekend consolidation deletes redundant `API_REQUEST_PAYLOAD` rows.
+
+**Promotion runbook:** [Live Trading Promotion](../guides/live-trading-promotion.md) — Slack ops channel and Bybit mainnet cutover.
 
 ---
 
