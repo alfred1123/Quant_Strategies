@@ -29,8 +29,12 @@ declare -A STACKS=(
   [network]="01-network.yml"
   [database]="02-database.yml"
   [compute]="03-compute.yml"
+  [scheduler]="04-scheduler.yml"
 )
-ORDERED=(ecr network database compute)
+ORDERED=(ecr network database compute scheduler)
+
+LAMBDA_SCHEDULED_TASK_DIR="${SCRIPT_DIR}/lambda/scheduled-task"
+LAMBDA_SCHEDULED_TASK_NAME="${PROJECT}-scheduled-task"
 
 deploy_stack() {
   local name="$1"
@@ -124,6 +128,21 @@ print(matches[0] if matches else '', end='')
     fi
   fi
 
+  if [[ "$name" == "scheduler" ]]; then
+    local token_path="/quant/${ENV}/TRADE_SERVICE_TOKEN"
+    if ! aws ssm get-parameter --name "$token_path" --region "$REGION" \
+         --no-cli-pager >/dev/null 2>&1; then
+      echo "ERROR: SSM parameter ${token_path} is required before deploying scheduler."
+      echo "  Create it with:"
+      echo "    bash aws/scripts/init-ssm-params.sh"
+      echo "  or:"
+      echo "    aws ssm put-parameter --name ${token_path} \\"
+      echo "      --value \"\$(openssl rand -base64 32)\" --type SecureString \\"
+      echo "      --region ${REGION}"
+      return 1
+    fi
+  fi
+
   aws cloudformation deploy \
     --template-file "$template" \
     --stack-name "$stack_name" \
@@ -135,6 +154,39 @@ print(matches[0] if matches else '', end='')
     --tags "Project=${PROJECT}" "Environment=${ENV}"
 
   echo "  ✓ ${stack_name} deployed."
+
+  if [[ "$name" == "scheduler" ]]; then
+    upload_scheduled_task_lambda
+  fi
+}
+
+upload_scheduled_task_lambda() {
+  local handler="${LAMBDA_SCHEDULED_TASK_DIR}/handler.py"
+  local zip_path
+  zip_path="$(mktemp -t quant-scheduled-task.XXXXXX.zip)"
+
+  if [[ ! -f "$handler" ]]; then
+    echo "ERROR: Lambda handler not found: ${handler}"
+    return 1
+  fi
+
+  echo "  Packaging Lambda from ${LAMBDA_SCHEDULED_TASK_DIR} ..."
+  (
+    cd "${LAMBDA_SCHEDULED_TASK_DIR}"
+    zip -q -j "${zip_path}" handler.py
+  )
+
+  echo "  Uploading code → ${LAMBDA_SCHEDULED_TASK_NAME}"
+  aws lambda update-function-code \
+    --function-name "${LAMBDA_SCHEDULED_TASK_NAME}" \
+    --zip-file "fileb://${zip_path}" \
+    --region "$REGION" \
+    --no-cli-pager \
+    --query '{FunctionName:FunctionName,LastUpdateStatus:LastUpdateStatus,CodeSize:CodeSize}' \
+    --output table
+
+  rm -f "${zip_path}"
+  echo "  ✓ Lambda code updated."
 }
 
 # ── Main ──────────────────────────────────────────────────────────────

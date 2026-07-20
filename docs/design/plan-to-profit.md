@@ -471,7 +471,8 @@ See [Scheduler, Price Bars & Data Consolidation](scheduler-price-bars.md) for th
 - [ ] Python: `PriceBarRepo`, `PriceBarService` (freshness check + ccxt fetch + insert), clock module (`next_run()` interval math); interval names resolved via `RedisRefData`, no hardcoded enum.
 - [ ] Integration: Wire price bar refresh into live apply flow — refresh bars before signal computation.
 - [ ] UI: Schedule interval dropdown (from `REFDATA.TM_INTERVAL`) in deployment dialog; show `next_run_at` / `last_run_at` in deployments table.
-- [ ] AWS: EventBridge Scheduler + Lambda (thin HTTP caller → `POST /deployments/{id}/apply`); CloudFormation stack; service auth token.
+- [x] AWS infra: EventBridge schedule group + `quant-scheduled-task` Lambda + IAM (`aws/cfn/04-scheduler.yml`); deploy via `bash aws/deploy.sh scheduler`.
+- [ ] AWS/app: service auth on `/apply` (`TRADE_SERVICE_TOKEN`) + boto3 create/update/delete schedules on deployment lifecycle.
 
 **Exit criteria:** A deployment scheduled `DAILY` executes automatically via EventBridge without manual intervention. `MARKET_DATA.PRICE_BAR` contains fresh bars for active products. Weekend consolidation deletes redundant `API_REQUEST_PAYLOAD` rows.
 

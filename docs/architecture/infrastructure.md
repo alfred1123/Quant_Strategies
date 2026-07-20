@@ -58,7 +58,10 @@ aws/
 │   ├── 00-ecr.yml             ← ECR repos quant-app, quant-nginx
 │   ├── 01-network.yml         ← security groups (EC2 + RDS)
 │   ├── 02-database.yml        ← Aurora PostgreSQL Serverless v2
-│   └── 03-compute.yml         ← EC2 + IAM role + EIP
+│   ├── 03-compute.yml         ← EC2 + IAM role + EIP
+│   └── 04-scheduler.yml       ← EventBridge Scheduler + scheduled-task Lambda
+├── lambda/
+│   └── scheduled-task/        ← Lambda handler (uploaded by deploy.sh)
 ├── params/
 │   └── prod.json              ← parameter values for prod
 ├── iam/
@@ -91,6 +94,7 @@ Stacks must be deployed in order due to cross-stack references.
 | 1 | `quant-network` | `01-network.yml` | EC2 SG (22/80/443), RDS SG (5432 from EC2 only) |
 | 2 | `quant-database` | `02-database.yml` | Aurora cluster, serverless instance, DB subnet group |
 | 3 | `quant-compute` | `03-compute.yml` | EC2 instance, IAM role (SSM access), Elastic IP |
+| 4 | `quant-scheduler` | `04-scheduler.yml` | scheduled-task Lambda, EventBridge schedule group, invoke + EC2 manage IAM |
 
 ---
 
@@ -124,6 +128,7 @@ bash aws/deploy.sh
 bash aws/deploy.sh network
 bash aws/deploy.sh database
 bash aws/deploy.sh compute
+bash aws/deploy.sh scheduler   # requires /quant/prod/TRADE_SERVICE_TOKEN in SSM
 ```
 
 ### Updating
@@ -190,6 +195,7 @@ All app secrets live under `/quant/<env>/` in SSM Parameter Store.
 | `CORS_ORIGINS` | String | `https://yourdomain.com` |
 | `FUTU_HOST` | String | `127.0.0.1` |
 | `FUTU_PORT` | String | `11111` |
+| `TRADE_SERVICE_TOKEN` | SecureString | Shared secret for Lambda → API scheduled apply (auto-created by `init-ssm-params.sh`) |
 
 The app loads these at startup via `quant/shared/config.py` when `USE_SSM=1`.
 
@@ -200,10 +206,87 @@ invalidates all stored credential ciphertext until users re-save keys.
 
 ---
 
+## Trade scheduler (EventBridge + Lambda)
+
+Phase 1.9 AWS side — see [Scheduler, Price Bars & Consolidation](../design/scheduler-price-bars.md).
+
+```
+EventBridge Scheduler (per deployment)
+        │  cron / rate, event {"task": "trade_apply", "deployment_id": "…"}
+        ▼
+quant-scheduled-task Lambda ──POST──►  https://algodaemon.com/api/v1/trade/deployments/{id}/apply
+        │                              Authorization: Bearer TRADE_SERVICE_TOKEN
+        ▼                              (token fetched from SSM at Lambda cold start)
+FastAPI on EC2 (business logic: bars → signal → order)
+```
+
+The Lambda is a **generic task bridge** routed by `event.task` — the planned
+price-bar ingestion schedule (Phase 1.9) reuses the same function with a
+`price_bar_sync` task instead of a second Lambda.
+
+**Prod only.** Dev boxes run `SCHEDULER_BACKEND=local` (the default): an
+in-process poller inside FastAPI reads `NEXT_RUN_AT` from the DB and applies
+due deployments directly — no EventBridge, Lambda, or service token. See
+[Scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-app--not-yet-wired).
+
+| Resource | Name | Purpose |
+|----------|------|---------|
+| Schedule group | `quant-trade-deployments` | Holds one schedule per active deployment |
+| Lambda | `quant-scheduled-task` | Task-routed HTTP bridge (`aws/lambda/scheduled-task/handler.py`) |
+| IAM role | `quant-scheduler-invoke` | Assumed by EventBridge Scheduler to invoke Lambda |
+| IAM role | `quant-scheduled-task-lambda` | Lambda execution (CloudWatch Logs + SSM read of `TRADE_SERVICE_TOKEN`) |
+| IAM policy | `quant-ec2-scheduler-manage` | Attached to `quant-ec2-role` — API/boto3 create/update/delete schedules |
+
+!!! warning "Schedule retry policy"
+    When the app creates schedules via boto3, it **must** set
+    `RetryPolicy.MaximumRetryAttempts = 0`. EventBridge Scheduler's default
+    (185 retries over 24h) would repeatedly re-invoke a failing trade apply —
+    order-level retries already live in the API (`OrderRetryExecutor`).
+
+### First-time deploy
+
+```bash
+# 1. Ensure TRADE_SERVICE_TOKEN exists in SSM
+bash aws/scripts/init-ssm-params.sh
+
+# 2. Deploy stack (CFN + upload Lambda zip from aws/lambda/scheduled-task/)
+bash aws/deploy.sh scheduler
+
+# 3. Smoke-test Lambda (expects 401 until API service-auth lands)
+aws lambda invoke \
+  --function-name quant-scheduled-task \
+  --payload '{"task":"trade_apply","deployment_id":"00000000-0000-0000-0000-000000000000"}' \
+  --cli-binary-format raw-in-base64-out \
+  /tmp/out.json && cat /tmp/out.json
+```
+
+### What this stack does **not** do yet
+
+- Create per-deployment schedules (API/boto3 on deployment create — app work)
+- Accept `TRADE_SERVICE_TOKEN` on the FastAPI `/apply` route (service auth — app work)
+
+Until those land, the Lambda and IAM are ready; schedules stay uncreated and invoke returns **401** from the API.
+
+### Outputs to use from the app
+
+```bash
+aws cloudformation describe-stacks --stack-name quant-scheduler \
+  --query 'Stacks[0].Outputs' --output table
+```
+
+| Output | App use |
+|--------|---------|
+| `ScheduledTaskLambdaArn` | EventBridge schedule `Target.Arn` |
+| `SchedulerInvokeRoleArn` | EventBridge schedule `Target.RoleArn` |
+| `ScheduleGroupName` | `GroupName` when creating schedules |
+
+---
+
 ## Tearing down
 
 ```bash
-# Reverse order — compute first, network last
+# Reverse order — scheduler/compute first, network last
+aws cloudformation delete-stack --stack-name quant-scheduler
 aws cloudformation delete-stack --stack-name quant-compute
 aws cloudformation delete-stack --stack-name quant-database   # DeletionPolicy: Snapshot
 aws cloudformation delete-stack --stack-name quant-network

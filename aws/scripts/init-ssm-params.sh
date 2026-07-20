@@ -70,6 +70,23 @@ put_secret "QUANTDB_USERNAME" "DB username"
 put_secret "QUANTDB_PASSWORD" "DB password"
 put_secret "JWT_SECRET"       "JWT secret (generate with: openssl rand -base64 32)"
 
+# Trade scheduler service token (Lambda → API). Auto-generate if missing.
+TRADE_TOKEN_PATH="${PREFIX}/TRADE_SERVICE_TOKEN"
+if aws ssm get-parameter --name "$TRADE_TOKEN_PATH" --region "$REGION" >/dev/null 2>&1; then
+  echo "  SKIP  $TRADE_TOKEN_PATH (already exists)"
+else
+  TRADE_TOKEN="$(openssl rand -base64 32)"
+  aws ssm put-parameter \
+    --name "$TRADE_TOKEN_PATH" \
+    --value "$TRADE_TOKEN" \
+    --type SecureString \
+    --region "$REGION" \
+    --no-cli-pager
+  echo "  SET   $TRADE_TOKEN_PATH (SecureString, auto-generated)"
+  echo "        Also set the same value on the API host as TRADE_SERVICE_TOKEN"
+  echo "        (or /quant/${ENV}/TRADE_SERVICE_TOKEN via USE_SSM=1) once service auth lands."
+fi
+
 echo ""
 echo "Done.  Verify with:"
 echo "  aws ssm get-parameters-by-path --path ${PREFIX}/ --with-decryption --region ${REGION} --output table"

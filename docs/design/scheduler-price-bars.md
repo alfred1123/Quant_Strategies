@@ -308,7 +308,7 @@ The consolidation is safe to run while the app is live — it only touches close
 flowchart TB
   subgraph aws [AWS]
     EB["EventBridge Scheduler<br/>(per deployment)"]
-    LAMBDA["Lambda function"]
+    LAMBDA["quant-scheduled-task Lambda<br/>(task-routed bridge)"]
   end
   subgraph ec2 [EC2]
     API["FastAPI<br/>POST /deployments/id/apply"]
@@ -316,7 +316,7 @@ flowchart TB
   end
 
   EB -->|"cron/rate trigger"| LAMBDA
-  LAMBDA -->|"HTTP + service auth"| API
+  LAMBDA -->|"HTTP + TRADE_SERVICE_TOKEN"| API
   API -->|"1. check PRICE_BAR freshness"| PG
   API -->|"2. refresh bars if stale"| CCXT["Exchange API"]
   API -->|"3. compute signal"| PG
@@ -326,36 +326,88 @@ flowchart TB
 
 Lambda is a thin HTTP caller with a service auth token. All business logic stays in the FastAPI app.
 
-### 6.1 Schedule management
+### 6.1 AWS resources (implemented)
+
+CloudFormation stack `quant-scheduler` — template [`aws/cfn/04-scheduler.yml`](../../aws/cfn/04-scheduler.yml). Ops detail: [Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge--lambda).
+
+| Resource | Name |
+|----------|------|
+| Schedule group | `quant-trade-deployments` |
+| Lambda | `quant-scheduled-task` ([`aws/lambda/scheduled-task/handler.py`](../../aws/lambda/scheduled-task/handler.py)) |
+| Scheduler invoke role | `quant-scheduler-invoke` |
+| Lambda execution role | `quant-scheduled-task-lambda` (CloudWatch Logs + SSM read of the service token) |
+| EC2 manage policy | `quant-ec2-scheduler-manage` (on `quant-ec2-role`) |
+| Service token SSM | `/quant/prod/TRADE_SERVICE_TOKEN` — fetched by the Lambda at cold start (CloudFormation does not support `ssm-secure` in Lambda env vars) |
+
+```bash
+bash aws/scripts/init-ssm-params.sh   # creates TRADE_SERVICE_TOKEN if missing
+bash aws/deploy.sh scheduler          # CFN + upload Lambda zip
+```
+
+### 6.2 Schedule management (app — not yet wired)
+
+Deployment create/update/stop talks to a **`ScheduleTrigger`** seam, not to
+boto3 directly. Two implementations, selected by `SCHEDULER_BACKEND`
+(default `local`):
+
+| Backend | Trigger | Used by |
+|---------|---------|---------|
+| `eventbridge` | Per-deployment EventBridge schedule → Lambda → API (HTTPS + service token) | Prod (EC2, `USE_SSM=1`) |
+| `local` | In-process poller inside FastAPI — no AWS needed | Dev / any box without AWS |
+
+**Shared state, different alarm clock.** The real schedule lives in the DB
+(`NEXT_RUN_AT` + `SP_GET_DUE_DEPLOYMENTS`); EventBridge and the local poller
+are just two ways of waking up. `NEXT_RUN_AT` computation (clock module),
+`LAST_RUN_AT` stamping, and the apply pipeline are identical in both
+environments — dev exercises the same scheduling logic as prod.
 
 When a deployment is created or updated with a non-NULL `SCHEDULE_TM_INTERVAL_ID`:
 
 1. Python computes `NEXT_RUN_AT` based on the interval and current time.
 2. `SP_INS_DEPLOYMENT` persists the schedule fields.
-3. The API creates/updates an EventBridge schedule via `boto3` targeting the Lambda.
+3. `ScheduleTrigger.sync(deployment)`:
+    - **eventbridge** — creates/updates the schedule via `boto3` targeting the Lambda (`ScheduledTaskLambdaArn` + `SchedulerInvokeRoleArn` from stack outputs), with **`RetryPolicy.MaximumRetryAttempts = 0`** — the Scheduler default (185 retries over 24h) must never re-invoke a failing trade apply; order-level retries live in `OrderRetryExecutor`.
+    - **local** — no-op; the poller reads `NEXT_RUN_AT` directly.
 
 When a deployment is stopped or the schedule is cleared (`SCHEDULE_TM_INTERVAL_ID = NULL`):
 
-1. The API deletes the EventBridge schedule.
+1. `ScheduleTrigger.remove(deployment)` (eventbridge deletes the schedule; local no-op).
 2. `NEXT_RUN_AT` is set to `NULL`.
 
-### 6.2 Lambda function
+**Local poller** (dev): an asyncio background task started at FastAPI startup
+when `SCHEDULER_BACKEND=local` — same polling pattern as the backtest
+`WorkerLoop`. Every ~30s it calls `SP_GET_DUE_DEPLOYMENTS` and invokes
+`TradeService.apply_deployment` **in-process** (no HTTP, no
+`TRADE_SERVICE_TOKEN`). Marking `LAST_RUN_AT`/advancing `NEXT_RUN_AT` on
+completion makes the due-check naturally idempotent — a crashed tick is
+simply picked up on the next poll.
 
-Minimal Python handler:
+Rejected for dev: **LocalStack** (EventBridge Scheduler emulation is
+paid-tier; would test the emulator, not our logic) and **cron + curl**
+(needs the service token on the dev box, machine must be awake, bypasses
+`NEXT_RUN_AT`/`LAST_RUN_AT` bookkeeping).
 
-```python
-def handler(event, context):
-    deployment_id = event["deployment_id"]
-    response = requests.post(
-        f"{API_URL}/api/v1/trade/deployments/{deployment_id}/apply",
-        headers={"Authorization": f"Bearer {SERVICE_TOKEN}"},
-    )
-    return {"statusCode": response.status_code}
+### 6.3 Lambda function
+
+Handler lives in-repo (stdlib + Lambda-bundled boto3 — no layers). It is a
+**generic task bridge**: the event names the task, a dict maps task → API
+path, and the token is fetched from SSM at cold start. Event shapes:
+
+```json
+{"task": "trade_apply", "deployment_id": "019abcde-…"}
+{"task": "price_bar_sync", "payload": {"internal_cusip": "…", "interval": "1H"}}
 ```
 
-### 6.3 Service auth
+`trade_apply` calls `POST {API_BASE_URL}/api/v1/trade/deployments/{id}/apply`
+with `Authorization: Bearer {TRADE_SERVICE_TOKEN}`. `price_bar_sync` is the
+planned second task for scheduled price-bar ingestion (§4) — enabling it is
+one entry in the handler's `_TASK_PATHS` dict once the FastAPI endpoint
+exists, with its own schedule(s) in the same group. No new Lambda or stack
+change.
 
-Lambda authenticates via a service API key or internal JWT (not a user JWT). The `/apply` endpoint accepts service auth for scheduled execution alongside user auth for manual apply.
+### 6.4 Service auth (app — not yet wired)
+
+Lambda authenticates via `TRADE_SERVICE_TOKEN` (SSM SecureString), not a user JWT. The `/apply` endpoint must accept this service token for scheduled execution alongside `require_user` for manual apply. Until that lands, Lambda invokes reach the API but return **401**.
 
 ---
 
@@ -407,6 +459,14 @@ class PriceBarRepo(DbGateway):
 
 ## 8. Files
 
+### New (AWS — done)
+
+| File | Content |
+|------|---------|
+| `aws/cfn/04-scheduler.yml` | Lambda + schedule group + IAM |
+| `aws/lambda/scheduled-task/handler.py` | Task-routed API bridge (`trade_apply` now, `price_bar_sync` later) |
+| `aws/deploy.sh` | `scheduler` stack + Lambda zip upload |
+
 ### New (DDL)
 
 | File | Content |
@@ -437,6 +497,8 @@ class PriceBarRepo(DbGateway):
 | File | Content |
 |------|---------|
 | `quant/trade/scheduler/clock.py` | `next_run()` interval math |
+| `quant/trade/scheduler/trigger.py` | `ScheduleTrigger` seam — `EventBridgeTrigger` (boto3) / `LocalTrigger` (no-op) |
+| `quant/trade/scheduler/poller.py` | Dev-mode asyncio poller — due-deployment loop (`SCHEDULER_BACKEND=local`) |
 | `quant/data/price_bar_repo.py` | `PriceBarRepo` — MARKET_DATA SP wrappers |
 | `quant/data/price_bar_service.py` | Freshness check + fetch + upsert orchestration |
 
