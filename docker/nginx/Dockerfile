@@ -1,6 +1,7 @@
 # Stage 1: Build React frontend
-# Must be a glibc image (node:22-slim, not node:22-alpine) — Vite 7 /
+# Must be a glibc image (node:24-slim, not node:24-alpine) — Vite /
 # rolldown ships glibc-only bindings and fails on musl with EBADPLATFORM.
+# Node major tracks .nvmrc and .github/workflows/{tests,deploy}.yml.
 #
 # The lockfile is generated cleanly from package.json (which does NOT
 # hard-pin any @rolldown/binding-* package). Rolldown's per-platform
@@ -8,7 +9,7 @@
 # in the lockfile, so `npm ci` correctly skips bindings that don't match
 # the build host's (os, cpu, libc) — works on both x64 dev machines and
 # arm64 (Graviton EC2).
-FROM node:22-slim AS frontend-build
+FROM node:24-slim AS frontend-build
 
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./

@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, createTheme } from '@mui/material';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { render, type RenderOptions } from '@testing-library/react';
 
 const theme = createTheme({ palette: { mode: 'dark' } });
