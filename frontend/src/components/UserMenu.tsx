@@ -3,7 +3,7 @@ import {
   Avatar, IconButton, Menu, MenuItem,
   ListItemText, Divider,
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useLogout, type CurrentUser } from '../api/auth';
 
 interface UserMenuProps {

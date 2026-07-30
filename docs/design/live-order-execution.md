@@ -223,6 +223,8 @@ Env: `SLACK_WEBHOOK_URL` in `.env` (not committed — same convention as other s
 `live_apply.py` logs the alert at `ERROR` level instead of raising — an alerting misconfiguration
 must never block order handling or crash the caller.
 
+**When to point the webhook at a prod ops channel vs test-env:** [Live Trading Promotion](../guides/live-trading-promotion.md#4-slack-test-channel--production-ops).
+
 ### Alert content
 
 Deployment id, strategy id/vid, symbol, signal, side + qty attempted, every `vendor_order_id`

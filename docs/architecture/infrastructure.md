@@ -224,10 +224,13 @@ The Lambda is a **generic task bridge** routed by `event.task` — the planned
 price-bar ingestion schedule (Phase 1.9) reuses the same function with a
 `price_bar_sync` task instead of a second Lambda.
 
-**Prod only.** Dev boxes run `SCHEDULER_BACKEND=local` (the default): an
-in-process poller inside FastAPI reads `NEXT_RUN_AT` from the DB and applies
-due deployments directly — no EventBridge, Lambda, or service token. See
+**Prod only.** Dev boxes run `SCHEDULER_BACKEND=local` (the default when implemented): an
+in-process poller inside FastAPI reads `NEXT_RUN_AT` from the DB and applies due deployments
+directly — no EventBridge, Lambda, or service token. See
 [Scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-app--not-yet-wired).
+
+**Slack + mainnet promotion:** when to move alerts to prod ops and orders to Bybit mainnet —
+[Live Trading Promotion](../guides/live-trading-promotion.md).
 
 | Resource | Name | Purpose |
 |----------|------|---------|

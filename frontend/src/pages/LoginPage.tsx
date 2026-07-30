@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router';
 import { useLogin } from '../api/auth';
 import BrandMark from '../components/BrandMark';
 import { APP_NAME } from '../constants/brand';

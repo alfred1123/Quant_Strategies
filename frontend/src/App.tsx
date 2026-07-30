@@ -1,5 +1,5 @@
 import { Box, CircularProgress, ThemeProvider, CssBaseline } from '@mui/material';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router';
 import BacktestPage from './pages/BacktestPage';
 import LoginPage from './pages/LoginPage';
 import TradeLayout from './layouts/TradeLayout';

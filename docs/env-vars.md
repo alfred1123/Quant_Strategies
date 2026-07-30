@@ -71,6 +71,12 @@ These vars only apply to local dev (`./scripts/appctl.sh dev start`). Teammates 
 | `EXCHANGE_SECRETS_KEY` | **Required in prod** (Phase 1.1+) | Fernet key for encrypting `CORE_ADMIN.API_CREDENTIAL` ciphertext (`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`). SSM: `/quant/prod/EXCHANGE_SECRETS_KEY`. Separate from `JWT_SECRET`. |
 | `COOKIE_SECURE` | Optional | `1` to force the `Secure` flag on the auth cookie. Default tracks `APP_ENV == prod`. |
 
+## Ops alerts (Slack)
+
+| Variable | Required? | Description |
+|---|---|---|
+| `SLACK_WEBHOOK_URL` | Optional | Incoming Webhook for **internal ops alerts** on live-apply failures. If unset, alerts are logged only. Use a **test channel** in dev; prod ops channel only after the pipeline checklist in [Live Trading Promotion](guides/live-trading-promotion.md). |
+
 User accounts are admin-managed — there is no signup endpoint. See [Login & Authentication](design/login.md) for the provisioning flow.
 
 ## Frontend (Vite dev server)

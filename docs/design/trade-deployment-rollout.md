@@ -345,6 +345,9 @@ These differ from the backtest worker and are **non-negotiable** for real money:
 For milestone **M1 — Pipeline**, a synchronous dry-run + manual apply
 (Option C) is enough.
 
+**Promotion runbook** (testnet → mainnet, Slack test → prod ops):
+[Live Trading Promotion](../guides/live-trading-promotion.md).
+
 
 ### Exit criteria
 
