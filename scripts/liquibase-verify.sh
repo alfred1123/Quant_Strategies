@@ -11,10 +11,15 @@
 #   DB_TARGET=prod   → QUANTDB_HOST / PROD_DB_PORT    (default localhost:5433)
 #
 # Liquibase commands used (none of these run update):
-#   validate    — parse changelogs; compares checksums (Liquibase 5 needs DB)
+#   validate    — parse the changelog tree: XML, include/sqlFile targets, duplicate ids
 #   status      — SELECT databasechangelog; list pending changesets
 #   update-sql  — print SQL that update WOULD run; does not execute it
-#   --offline   — Python XML + include checks only (no DB)
+#   --offline   — validate + update-sql against url=offline:postgresql (no DB)
+#
+# Convention rules Liquibase has no opinion on — a changeset missing its context,
+# or a procedure without splitStatements="false" — live in
+# tests/unit/test_liquibase_changelogs.py, since the policy engine
+# (`liquibase checks`) is a Pro-only feature.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -89,54 +94,62 @@ load_env() {
   export LIQUIBASE_COMMAND_PASSWORD="${LIQUIBASE_COMMAND_PASSWORD:-${QUANTDB_PASSWORD:?QUANTDB_PASSWORD required}}"
 }
 
-validate_changelog_xml() {
-  log "XML well-formedness"
-  python3 - "${LB_ROOT}" <<'PY'
-import sys
-import xml.etree.ElementTree as ET
-from pathlib import Path
+# An offline URL lets Liquibase parse the whole changelog tree and render every
+# changeset's SQL with no database behind it, which is what makes these checks
+# safe to run on a pull request.
+DEPLOY_CONTEXT="${LIQUIBASE_CONTEXTS:-prod-deploy}"
+OFFLINE_STATE_DIR=""
 
-root = Path(sys.argv[1])
-for path in sorted(root.rglob("*.xml")):
-    ET.parse(path)
-print(f"OK: {len(list(root.rglob('*.xml')))} well-formed XML files")
-PY
+offline_url() {
+  # An offline run records what it applied in a CSV and treats those changesets
+  # as done next time. Left beside the changelog that turns every later run into
+  # a no-op, so each run gets its own throwaway tracking file.
+  echo "offline:postgresql?changeLogFile=${OFFLINE_STATE_DIR}/${1//\//_}.csv"
+}
+
+run_offline_validate() {
+  local dir="$1"
+  local label="$2"
+  log "validate (offline): ${label}"
+  (
+    cd "${LB_ROOT}/${dir}"
+    liquibase --defaults-file=liquibase.properties --url="$(offline_url "$dir")" validate
+  )
+}
+
+run_offline_update_sql() {
+  local dir="$1"
+  local label="$2"
+  local outfile rendered
+  outfile="${OFFLINE_STATE_DIR}/${dir//\//_}.sql"
+  log "update-sql (offline, context=${DEPLOY_CONTEXT}): ${label}"
+  (
+    cd "${LB_ROOT}/${dir}"
+    liquibase --defaults-file=liquibase.properties --url="$(offline_url "$dir")" \
+      update-sql --context-filter="${DEPLOY_CONTEXT}" --output-file="$outfile"
+  )
+  rendered="$(grep -c '^-- Changeset' "$outfile" 2>/dev/null || true)"
+  log "  rendered ${rendered:-0} changeset(s)"
 }
 
 main_offline() {
-  log "Offline mode — XML + include checks only (no database, no Liquibase validate)"
-  validate_changelog_xml
-  check_include_paths
+  ensure_prereqs
+  OFFLINE_STATE_DIR="$(mktemp -d)"
+  trap 'rm -rf "${OFFLINE_STATE_DIR}"' EXIT
+  log "Offline mode — no database, no DDL applied"
+
+  # With a fresh tracking file nothing counts as applied, so this renders every
+  # changeset rather than only the outstanding ones. That is the point: it proves
+  # each one still parses, not what is pending.
+  run_offline_validate "." "master (public)"
+  run_offline_update_sql "." "master (public)"
+
+  for schema in "${SCHEMA_DIRS[@]}"; do
+    run_offline_validate "$schema" "${schema^^}"
+    run_offline_update_sql "$schema" "${schema^^}"
+  done
+
   log "Offline checks passed"
-}
-
-check_include_paths() {
-  log "Include path resolution"
-  python3 - "${LB_ROOT}" <<'PY'
-import sys
-import xml.etree.ElementTree as ET
-from pathlib import Path
-
-NS = {"lb": "http://www.liquibase.org/xml/ns/dbchangelog"}
-root = Path(sys.argv[1])
-errors = []
-checked = 0
-for changelog in sorted(root.rglob("*-changelog.xml")):
-    tree = ET.parse(changelog)
-    for node in tree.getroot().findall("lb:include", NS):
-        rel = node.get("file")
-        if not rel:
-            continue
-        checked += 1
-        target = (changelog.parent / rel).resolve()
-        if not target.is_file():
-            errors.append(f"{changelog.relative_to(root)}: missing include {rel}")
-if errors:
-    for e in errors:
-        print(e, file=sys.stderr)
-    sys.exit(1)
-print(f"OK: {checked} active include(s), all resolve")
-PY
 }
 
 run_validate() {

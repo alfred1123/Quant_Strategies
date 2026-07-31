@@ -168,9 +168,22 @@ source .env
 ./scripts/liquibase-deploy.sh
 
 # Dry-run — no DDL applied
-./scripts/liquibase-verify.sh --offline   # XML only
+./scripts/liquibase-verify.sh --offline   # validate + render prod-deploy SQL, no DB
 ./scripts/liquibase-verify.sh             # status + update-sql preview (needs DB)
 ```
+
+### Pre-merge checks
+
+Every pull request runs two independent gates, both of which fail the build:
+
+| Gate | Runs | Catches |
+|------|------|---------|
+| `liquibase (offline validate)` in **tests** | `liquibase-verify.sh --offline` against `url=offline:postgresql` | Malformed XML, an `<include>` or `<sqlFile>` that does not resolve, duplicate changeset ids, and any changeset whose SQL fails to render under `--context-filter=prod-deploy` |
+| `pytest` | `tests/unit/test_liquibase_changelogs.py` | A changeset with no `context` (which would join *every* filtered run, including the automated prod deploy), `prod-deploy` used without its schema context, and a procedure missing `splitStatements="false"` |
+
+The split is not arbitrary. Liquibase validates structure but has no view on convention — its policy engine (`liquibase checks`) is Pro-only — so the conventions this repo depends on are asserted in pytest instead.
+
+An offline run records what it applied in a `databasechangelog.csv`. The script points each run at a throwaway copy; a stale one left beside a changelog would make later runs report nothing pending and quietly pass.
 
 Or run schemas individually:
 
