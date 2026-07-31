@@ -7,7 +7,10 @@
 --                    DEPLOYMENT_ID, return the current open row only.
 -- When IN_DEPLOYMENT_ID is NULL, returns all current deployments for the user.
 --
--- Does not expose TRANSACT_FROM_TS / TRANSACT_TO_TS (internal versioning only).
+-- NEXT_DUE_AT = current DEPLOYMENT_SCHEDULE_STATUS.SCHEDULED_TS (IS_CURRENT_IND = 'Y').
+-- LAST_RUN_AT = NEXT_DUE_AT - interval when schedule VID > 1 (prior tick completed).
+-- TRANSACT_FROM_TS = when this deployment version became effective (user-facing).
+-- Does not expose CREATED_AT (audit only) or TRANSACT_TO_TS (versioning sentinel).
 -- Filter / ownership validation lives in Python (TradeRepo).
 CREATE OR REPLACE PROCEDURE TRADE.SP_GET_DEPLOYMENT(
     IN  IN_APP_USER_ID      UUID,
@@ -40,67 +43,112 @@ BEGIN
 
     IF IN_DEPLOYMENT_ID IS NOT NULL AND IN_DEPLOYMENT_VID IS NOT NULL THEN
         OPEN OUT_RESULT FOR
-            SELECT DEPLOYMENT_ID,
-                   DEPLOYMENT_VID,
-                   APP_USER_ID,
-                   STRATEGY_ID,
-                   STRATEGY_VID,
-                   API_CREDENTIAL_ID,
-                   APP_ID,
-                   INTERNAL_CUSIP,
-                   QTY,
-                   IS_PAPER_IND,
-                   IS_ENABLED_IND,
-                   DEPLOYMENT_STATUS,
-                   USER_ID,
-                   CREATED_AT
-              FROM TRADE.DEPLOYMENT
-             WHERE DEPLOYMENT_ID  = IN_DEPLOYMENT_ID
-               AND DEPLOYMENT_VID = IN_DEPLOYMENT_VID
-               AND APP_USER_ID    = IN_APP_USER_ID
-             ORDER BY DEPLOYMENT_VID DESC;
+            SELECT d.DEPLOYMENT_ID,
+                   d.DEPLOYMENT_VID,
+                   d.APP_USER_ID,
+                   d.STRATEGY_ID,
+                   d.STRATEGY_VID,
+                   d.API_CREDENTIAL_ID,
+                   d.APP_ID,
+                   d.INTERNAL_CUSIP,
+                   d.QTY,
+                   d.IS_PAPER_IND,
+                   d.IS_ENABLED_IND,
+                   d.DEPLOYMENT_STATUS,
+                   d.SCHEDULE_TM_INTERVAL_ID,
+                   CASE
+                       WHEN ss.STATUS = 'PENDING'
+                        AND ss.DEPLOYMENT_SCHEDULE_VID > 1
+                       THEN ss.SCHEDULED_TS - ti.PERIOD_LENGTH
+                   END AS LAST_RUN_AT,
+                   CASE
+                       WHEN ss.STATUS = 'PENDING'
+                       THEN ss.SCHEDULED_TS
+                   END AS NEXT_DUE_AT,
+                   d.TRANSACT_FROM_TS,
+                   d.USER_ID
+              FROM TRADE.DEPLOYMENT d
+              LEFT JOIN REFDATA.TM_INTERVAL ti
+                ON ti.TM_INTERVAL_ID = d.SCHEDULE_TM_INTERVAL_ID
+              LEFT JOIN TRADE.DEPLOYMENT_SCHEDULE_STATUS ss
+                ON ss.DEPLOYMENT_ID = d.DEPLOYMENT_ID
+               AND ss.IS_CURRENT_IND = 'Y'
+             WHERE d.DEPLOYMENT_ID  = IN_DEPLOYMENT_ID
+               AND d.DEPLOYMENT_VID = IN_DEPLOYMENT_VID
+               AND d.APP_USER_ID    = IN_APP_USER_ID
+             ORDER BY d.DEPLOYMENT_VID DESC;
 
     ELSIF IN_DEPLOYMENT_ID IS NOT NULL THEN
         OPEN OUT_RESULT FOR
-            SELECT DEPLOYMENT_ID,
-                   DEPLOYMENT_VID,
-                   APP_USER_ID,
-                   STRATEGY_ID,
-                   STRATEGY_VID,
-                   API_CREDENTIAL_ID,
-                   APP_ID,
-                   INTERNAL_CUSIP,
-                   QTY,
-                   IS_PAPER_IND,
-                   IS_ENABLED_IND,
-                   DEPLOYMENT_STATUS,
-                   USER_ID,
-                   CREATED_AT
-              FROM TRADE.DEPLOYMENT
-             WHERE DEPLOYMENT_ID  = IN_DEPLOYMENT_ID
-               AND APP_USER_ID    = IN_APP_USER_ID
-               AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00';
+            SELECT d.DEPLOYMENT_ID,
+                   d.DEPLOYMENT_VID,
+                   d.APP_USER_ID,
+                   d.STRATEGY_ID,
+                   d.STRATEGY_VID,
+                   d.API_CREDENTIAL_ID,
+                   d.APP_ID,
+                   d.INTERNAL_CUSIP,
+                   d.QTY,
+                   d.IS_PAPER_IND,
+                   d.IS_ENABLED_IND,
+                   d.DEPLOYMENT_STATUS,
+                   d.SCHEDULE_TM_INTERVAL_ID,
+                   CASE
+                       WHEN ss.STATUS = 'PENDING'
+                        AND ss.DEPLOYMENT_SCHEDULE_VID > 1
+                       THEN ss.SCHEDULED_TS - ti.PERIOD_LENGTH
+                   END AS LAST_RUN_AT,
+                   CASE
+                       WHEN ss.STATUS = 'PENDING'
+                       THEN ss.SCHEDULED_TS
+                   END AS NEXT_DUE_AT,
+                   d.TRANSACT_FROM_TS,
+                   d.USER_ID
+              FROM TRADE.DEPLOYMENT d
+              LEFT JOIN REFDATA.TM_INTERVAL ti
+                ON ti.TM_INTERVAL_ID = d.SCHEDULE_TM_INTERVAL_ID
+              LEFT JOIN TRADE.DEPLOYMENT_SCHEDULE_STATUS ss
+                ON ss.DEPLOYMENT_ID = d.DEPLOYMENT_ID
+               AND ss.IS_CURRENT_IND = 'Y'
+             WHERE d.DEPLOYMENT_ID  = IN_DEPLOYMENT_ID
+               AND d.APP_USER_ID    = IN_APP_USER_ID
+               AND d.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00';
 
     ELSE
         OPEN OUT_RESULT FOR
-            SELECT DEPLOYMENT_ID,
-                   DEPLOYMENT_VID,
-                   APP_USER_ID,
-                   STRATEGY_ID,
-                   STRATEGY_VID,
-                   API_CREDENTIAL_ID,
-                   APP_ID,
-                   INTERNAL_CUSIP,
-                   QTY,
-                   IS_PAPER_IND,
-                   IS_ENABLED_IND,
-                   DEPLOYMENT_STATUS,
-                   USER_ID,
-                   CREATED_AT
-              FROM TRADE.DEPLOYMENT
-             WHERE APP_USER_ID    = IN_APP_USER_ID
-               AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
-             ORDER BY CREATED_AT DESC;
+            SELECT d.DEPLOYMENT_ID,
+                   d.DEPLOYMENT_VID,
+                   d.APP_USER_ID,
+                   d.STRATEGY_ID,
+                   d.STRATEGY_VID,
+                   d.API_CREDENTIAL_ID,
+                   d.APP_ID,
+                   d.INTERNAL_CUSIP,
+                   d.QTY,
+                   d.IS_PAPER_IND,
+                   d.IS_ENABLED_IND,
+                   d.DEPLOYMENT_STATUS,
+                   d.SCHEDULE_TM_INTERVAL_ID,
+                   CASE
+                       WHEN ss.STATUS = 'PENDING'
+                        AND ss.DEPLOYMENT_SCHEDULE_VID > 1
+                       THEN ss.SCHEDULED_TS - ti.PERIOD_LENGTH
+                   END AS LAST_RUN_AT,
+                   CASE
+                       WHEN ss.STATUS = 'PENDING'
+                       THEN ss.SCHEDULED_TS
+                   END AS NEXT_DUE_AT,
+                   d.TRANSACT_FROM_TS,
+                   d.USER_ID
+              FROM TRADE.DEPLOYMENT d
+              LEFT JOIN REFDATA.TM_INTERVAL ti
+                ON ti.TM_INTERVAL_ID = d.SCHEDULE_TM_INTERVAL_ID
+              LEFT JOIN TRADE.DEPLOYMENT_SCHEDULE_STATUS ss
+                ON ss.DEPLOYMENT_ID = d.DEPLOYMENT_ID
+               AND ss.IS_CURRENT_IND = 'Y'
+             WHERE d.APP_USER_ID    = IN_APP_USER_ID
+               AND d.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
+             ORDER BY d.TRANSACT_FROM_TS DESC;
     END IF;
 
     OUT_SQLMSG := '30';

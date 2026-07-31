@@ -47,8 +47,8 @@ describe('useDeployments', () => {
           is_paper_ind: 'Y',
           is_enabled_ind: 'Y',
           deployment_status: 'CREATED',
+          transact_from_ts: '2026-05-20T12:00:00Z',
           user_id: 'alice',
-          created_at: '2026-05-20T12:00:00Z',
         },
       ],
     });

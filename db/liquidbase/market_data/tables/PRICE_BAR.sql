@@ -1,0 +1,21 @@
+-- Normalized OHLCV bars for live signal computation (Phase 1.9).
+-- Immutable facts — no soft-versioning. PK = natural bar key.
+CREATE TABLE MARKET_DATA.PRICE_BAR (
+    INTERNAL_CUSIP   TEXT          NOT NULL,
+    TM_INTERVAL_ID   INTEGER       NOT NULL,
+    BAR_TIMESTAMP    TIMESTAMPTZ   NOT NULL,
+    OPEN_PX          DECIMAL       NOT NULL,
+    HIGH_PX          DECIMAL       NOT NULL,
+    LOW_PX           DECIMAL       NOT NULL,
+    CLOSE_PX         DECIMAL       NOT NULL,
+    VOLUME           DECIMAL       NOT NULL,
+    SOURCE_APP_ID    INTEGER       NOT NULL,
+    USER_ID          TEXT          NOT NULL,
+    CREATED_AT       TIMESTAMPTZ   NOT NULL,
+
+    PRIMARY KEY (INTERNAL_CUSIP, TM_INTERVAL_ID, BAR_TIMESTAMP)
+);
+
+CREATE INDEX IX_PRICE_BAR_LATEST
+    ON MARKET_DATA.PRICE_BAR (INTERNAL_CUSIP, TM_INTERVAL_ID, BAR_TIMESTAMP DESC)
+    INCLUDE (CLOSE_PX);

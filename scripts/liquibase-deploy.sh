@@ -6,6 +6,11 @@
 #   DB_TARGET=local ./scripts/liquibase-deploy.sh   # local — LOCAL_DB_PORT (default 5432)
 #   APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh   # EC2: load /quant/prod/* from SSM
 #
+# LIQUIBASE_CONTEXTS restricts the run to changesets carrying one of the listed
+# contexts. Unset (the default) applies every pending changeset, which is what
+# manual runs want. The deploy workflow sets it to prod-deploy so only changesets
+# explicitly marked for automatic release are applied.
+#
 # Ports (set in .env or env):
 #   DB_TARGET=local  → LOCAL_DB_HOST / LOCAL_DB_PORT  (default 127.0.0.1:5432)
 #   DB_TARGET=prod   → QUANTDB_HOST / PROD_DB_PORT    (default localhost:5433)
@@ -17,6 +22,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LB_ROOT="${ROOT_DIR}/db/liquidbase"
 APP_ENV="${APP_ENV:-prod}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
+LB_ARGS=()
+[[ -n "${LIQUIBASE_CONTEXTS:-}" ]] && LB_ARGS+=("--context-filter=${LIQUIBASE_CONTEXTS}")
 
 log() { echo "[liquibase-deploy] $*"; }
 die() { echo "[liquibase-deploy] ERROR: $*" >&2; exit 1; }
@@ -89,7 +96,7 @@ run_update() {
   log "── ${label} ──"
   (
     cd "${LB_ROOT}/${dir}"
-    liquibase --defaults-file=liquibase.properties update
+    liquibase --defaults-file=liquibase.properties update ${LB_ARGS[@]+"${LB_ARGS[@]}"}
   )
 }
 
@@ -98,11 +105,12 @@ main() {
   load_env
 
   log "Target: ${LIQUIBASE_COMMAND_URL} (user=${LIQUIBASE_COMMAND_USERNAME})"
+  log "Contexts: ${LIQUIBASE_CONTEXTS:-<all>}"
 
   # Phase 0 — schemas + extensions (public.databasechangelog)
   (
     cd "${LB_ROOT}"
-    liquibase --defaults-file=liquibase.properties update
+    liquibase --defaults-file=liquibase.properties update ${LB_ARGS[@]+"${LB_ARGS[@]}"}
   )
 
   # Schema DDL/procs (core_admin first pass — grants changeset may run before BT/INST exist)
@@ -110,6 +118,7 @@ main() {
   run_update refdata "REFDATA"
   run_update bt "BT"
   run_update trade "TRADE"
+  run_update market_data "MARKET_DATA"
   run_update inst "INST"
 
   # Second pass — GRANTS.sql has runOnChange=true; picks up objects created above

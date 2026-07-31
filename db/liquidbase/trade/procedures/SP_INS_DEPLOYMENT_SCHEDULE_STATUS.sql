@@ -1,0 +1,104 @@
+-- Append one DEPLOYMENT_SCHEDULE_STATUS row (bumps DEPLOYMENT_SCHEDULE_VID).
+--
+-- IN_DEPLOYMENT_SCHEDULE_ID — stable id per deployment; use DEPLOYMENT_ID on first insert.
+-- IN_SCHEDULED_TS — next due time when STATUS = 'PENDING'.
+-- STATUS values: PENDING | SUCCESS | FAILED (application-enforced).
+-- Validation lives in Python (TradeRepo).
+CREATE OR REPLACE PROCEDURE TRADE.SP_INS_DEPLOYMENT_SCHEDULE_STATUS(
+    IN  IN_DEPLOYMENT_SCHEDULE_ID   UUID,
+    IN  IN_DEPLOYMENT_ID            UUID,
+    IN  IN_DEPLOYMENT_VID           INTEGER,
+    IN  IN_STATUS                   TEXT,
+    IN  IN_SCHEDULED_TS             TIMESTAMPTZ,
+    IN  IN_USER_ID                  TEXT,
+    OUT OUT_SQLSTATE                TEXT,
+    OUT OUT_SQLMSG                  TEXT,
+    OUT OUT_SQLERRMC                TEXT
+)
+LANGUAGE plpgsql
+SET plan_cache_mode = 'force_generic_plan'
+AS $$
+DECLARE
+    V_START_TS   TIMESTAMPTZ := CURRENT_TIMESTAMP;
+    V_OTHER_TEXT TEXT;
+    V_VID        INTEGER;
+    V_LOG_STATE  TEXT;
+    V_LOG_MSG    TEXT;
+BEGIN
+    OUT_SQLSTATE := '00000';
+    OUT_SQLMSG   := '0';
+    OUT_SQLERRMC := 'Stored Procedure completed successfully';
+
+    V_OTHER_TEXT := 'IN_DEPLOYMENT_SCHEDULE_ID=' || COALESCE(IN_DEPLOYMENT_SCHEDULE_ID::TEXT, '')
+                 || ', IN_DEPLOYMENT_ID=' || COALESCE(IN_DEPLOYMENT_ID::TEXT, '')
+                 || ', IN_DEPLOYMENT_VID=' || COALESCE(IN_DEPLOYMENT_VID::TEXT, '')
+                 || ', IN_STATUS=' || COALESCE(IN_STATUS, '');
+
+    OUT_SQLMSG := '10';
+    SELECT COALESCE(MAX(DEPLOYMENT_SCHEDULE_VID), 0) + 1
+      INTO V_VID
+      FROM TRADE.DEPLOYMENT_SCHEDULE_STATUS
+     WHERE DEPLOYMENT_SCHEDULE_ID = IN_DEPLOYMENT_SCHEDULE_ID;
+
+    OUT_SQLMSG := '15';
+    UPDATE TRADE.DEPLOYMENT_SCHEDULE_STATUS
+       SET IS_CURRENT_IND = 'N'
+     WHERE DEPLOYMENT_SCHEDULE_ID = IN_DEPLOYMENT_SCHEDULE_ID
+       AND IS_CURRENT_IND = 'Y';
+
+    OUT_SQLMSG := '20';
+    INSERT INTO TRADE.DEPLOYMENT_SCHEDULE_STATUS (
+        DEPLOYMENT_SCHEDULE_ID,
+        DEPLOYMENT_SCHEDULE_VID,
+        DEPLOYMENT_ID,
+        DEPLOYMENT_VID,
+        STATUS,
+        SCHEDULED_TS,
+        IS_CURRENT_IND,
+        USER_ID,
+        CREATED_AT
+    ) VALUES (
+        IN_DEPLOYMENT_SCHEDULE_ID,
+        V_VID,
+        IN_DEPLOYMENT_ID,
+        IN_DEPLOYMENT_VID,
+        IN_STATUS,
+        IN_SCHEDULED_TS,
+        'Y',
+        IN_USER_ID,
+        NOW()
+    );
+
+    OUT_SQLMSG := '30';
+    CALL CORE_ADMIN.CORE_INS_LOG_PROC(
+        'TRADE', 'SP_INS_DEPLOYMENT_SCHEDULE_STATUS', V_START_TS, NULL, V_OTHER_TEXT,
+        IN_USER_ID, V_LOG_STATE, V_LOG_MSG
+    );
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DECLARE
+            V_DETAIL  TEXT;
+            V_CONTEXT TEXT;
+        BEGIN
+            GET STACKED DIAGNOSTICS
+                OUT_SQLSTATE = RETURNED_SQLSTATE,
+                OUT_SQLERRMC = MESSAGE_TEXT,
+                V_DETAIL     = PG_EXCEPTION_DETAIL,
+                V_CONTEXT    = PG_EXCEPTION_CONTEXT;
+
+            RAISE WARNING '[SP_INS_DEPLOYMENT_SCHEDULE_STATUS] % (SQLSTATE: %). Detail: %. Context: %. Params: %',
+                OUT_SQLERRMC, OUT_SQLSTATE, V_DETAIL, V_CONTEXT, V_OTHER_TEXT;
+        END;
+END;
+$$;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
+    GRANT EXECUTE ON PROCEDURE TRADE.SP_INS_DEPLOYMENT_SCHEDULE_STATUS(
+        UUID, UUID, INTEGER, TEXT, TIMESTAMPTZ, TEXT,
+        OUT TEXT, OUT TEXT, OUT TEXT
+    ) TO quant_app;
+  END IF;
+END $$;

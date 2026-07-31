@@ -30,6 +30,8 @@ class CreateDeploymentRequest(BaseModel):
     confirm_live: bool = False
     enabled: bool = True
     deployment_status: DeploymentStatus = DeploymentStatus.CREATED
+    # REFDATA.TM_INTERVAL_ID. None = manual apply only, no scheduler row.
+    schedule_tm_interval_id: int | None = Field(None, ge=1)
 
     @field_validator("internal_cusip")
     @classmethod
@@ -41,10 +43,13 @@ class CreateDeploymentRequest(BaseModel):
 
 
 class UpdateDeploymentRequest(BaseModel):
-    """PATCH body for toggling deployment state (kill switch)."""
+    """PATCH body for toggling deployment state (kill switch) and schedule."""
 
     enabled: bool | None = None
     deployment_status: DeploymentStatus | None = None
+    # Explicit null clears the schedule (back to manual-only), so the service
+    # distinguishes "omitted" from "set to null" via model_fields_set.
+    schedule_tm_interval_id: int | None = Field(None, ge=1)
 
 
 class DeploymentRow(BaseModel):
@@ -62,5 +67,8 @@ class DeploymentRow(BaseModel):
     is_paper_ind: Literal["Y", "N"]
     is_enabled_ind: Literal["Y", "N"]
     deployment_status: DeploymentStatus
+    schedule_tm_interval_id: int | None = None
+    last_run_at: datetime | None = None
+    next_due_at: datetime | None = None
+    transact_from_ts: datetime
     user_id: str
-    created_at: datetime

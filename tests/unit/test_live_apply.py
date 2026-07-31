@@ -27,8 +27,8 @@ def _deployment(**overrides) -> DeploymentRow:
         "is_paper_ind": "Y",
         "is_enabled_ind": "Y",
         "deployment_status": "ACTIVE",
+        "transact_from_ts": datetime(2026, 7, 1, tzinfo=timezone.utc),
         "user_id": "alice",
-        "created_at": datetime(2026, 7, 1, tzinfo=timezone.utc),
     }
     base.update(overrides)
     return DeploymentRow(**base)
@@ -253,6 +253,47 @@ class TestLiveApplyOrchestrator:
         orch._notifier.send.assert_called_once()
         alert_text = orch._notifier.send.call_args.args[0]
         assert "manual reconciliation" in alert_text.lower()
+
+    @patch("quant.trade.order_policy.time.sleep")
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
+    def test_all_attempts_share_one_tick_time(
+        self, mock_signal, mock_sleep, orchestrator
+    ):
+        """TRANSACT_AT anchors the cycle, so retries must not each get their own."""
+        orch, _bt = orchestrator
+        dep = _deployment()
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = ("k", "s")
+
+        adapter = _adapter_mock(
+            apply_signal=MagicMock(
+                return_value=OrderResult(
+                    success=False,
+                    vendor_order_id="order-t",
+                    message="fill unconfirmed after 8.0s — requires manual reconciliation",
+                    side=OrderSide.BUY,
+                    requested_qty=0.01,
+                )
+            ),
+            cancel_order=MagicMock(
+                return_value=OrderResult(
+                    success=True,
+                    vendor_order_id="order-t",
+                    message="order canceled",
+                )
+            ),
+        )
+        orch._adapter_registry.create.return_value = adapter
+
+        orch.run(dep.app_user_id, dep, "alice")
+
+        ticks = {
+            call.kwargs["transact_at"]
+            for call in orch._repo.sp_ins_execution_event.call_args_list
+        }
+        assert orch._repo.sp_ins_execution_event.call_count == 5
+        assert len(ticks) == 1
+        assert ticks.pop().tzinfo is not None
 
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_audit_failure_does_not_crash(self, mock_signal, orchestrator):
