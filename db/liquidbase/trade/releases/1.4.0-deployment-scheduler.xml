@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Phase 1.9 — deployment scheduler.
+
+      Scheduler state lives in TRADE.DEPLOYMENT_SCHEDULE_STATUS; TRADE.EXECUTION_EVENT
+      stays an append-only diary. Requires REFDATA.TM_INTERVAL.PERIOD_LENGTH — refdata
+      runs before trade in scripts/liquibase-deploy.sh.
+
+      tables/DEPLOYMENT.sql and tables/EXECUTION_EVENT.sql already declare the columns
+      added below, so a database built from the baseline has them and one created before
+      it does not. ADD COLUMN IF NOT EXISTS covers both.
+    -->
+
+    <changeSet id="1.4.0-001-deployment-schedule-interval" author="alfcheun" context="trade,prod-deploy">
+        <comment>SCHEDULE_TM_INTERVAL_ID on TRADE.DEPLOYMENT — which cadence this deployment runs on</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE TRADE.DEPLOYMENT ADD COLUMN IF NOT EXISTS SCHEDULE_TM_INTERVAL_ID INTEGER;
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE TRADE.DEPLOYMENT DROP COLUMN IF EXISTS SCHEDULE_TM_INTERVAL_ID;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.4.0-002-backfill-schedule-interval" author="alfcheun" context="trade,prod-deploy">
+        <comment>Backfill SCHEDULE_TM_INTERVAL_ID = DAILY (1) on current open deployments</comment>
+        <sql splitStatements="true" stripComments="true">
+            UPDATE TRADE.DEPLOYMENT
+               SET SCHEDULE_TM_INTERVAL_ID = 1
+             WHERE SCHEDULE_TM_INTERVAL_ID IS NULL
+               AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00';
+        </sql>
+        <rollback>
+            <sql splitStatements="true" stripComments="true">
+                -- Cannot distinguish pre-backfill NULL (manual) from post-backfill; no-op.
+                SELECT 1;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.4.0-003-execution-event-transact-at" author="alfcheun" context="trade,prod-deploy">
+        <comment>TRANSACT_AT on EXECUTION_EVENT — when the apply tick occurred, separate from audit CREATED_AT</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE TRADE.EXECUTION_EVENT ADD COLUMN IF NOT EXISTS TRANSACT_AT TIMESTAMPTZ;
+
+            UPDATE TRADE.EXECUTION_EVENT
+               SET TRANSACT_AT = CREATED_AT
+             WHERE TRANSACT_AT IS NULL;
+
+            ALTER TABLE TRADE.EXECUTION_EVENT
+                ALTER COLUMN TRANSACT_AT SET NOT NULL;
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE TRADE.EXECUTION_EVENT DROP COLUMN IF EXISTS TRANSACT_AT;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.4.0-004-deployment-schedule-status-table" author="alfcheun" context="trade,prod-deploy">
+        <comment>TRADE.DEPLOYMENT_SCHEDULE_STATUS — scheduler state separate from EXECUTION_EVENT</comment>
+        <sqlFile path="../tables/DEPLOYMENT_SCHEDULE_STATUS.sql" relativeToChangelogFile="true"
+                 splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql>DROP TABLE IF EXISTS TRADE.DEPLOYMENT_SCHEDULE_STATUS;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.4.0-005-backfill-schedule-status" author="alfcheun" context="trade,prod-deploy">
+        <comment>Seed schedule rows for open deployments — next due from latest successful apply, else deployment start</comment>
+        <sql splitStatements="true" stripComments="true">
+            INSERT INTO TRADE.DEPLOYMENT_SCHEDULE_STATUS (
+                DEPLOYMENT_SCHEDULE_ID,
+                DEPLOYMENT_SCHEDULE_VID,
+                DEPLOYMENT_ID,
+                DEPLOYMENT_VID,
+                STATUS,
+                SCHEDULED_TS,
+                IS_CURRENT_IND,
+                USER_ID,
+                CREATED_AT
+            )
+            SELECT d.DEPLOYMENT_ID,
+                   1,
+                   d.DEPLOYMENT_ID,
+                   d.DEPLOYMENT_VID,
+                   CASE
+                       WHEN d.DEPLOYMENT_STATUS IN ('STOPPED', 'PAUSED')
+                            OR d.IS_ENABLED_IND = 'N' THEN 'SUCCESS'
+                       ELSE 'PENDING'
+                   END,
+                   COALESCE(lr.TRANSACT_AT + ti.PERIOD_LENGTH, d.TRANSACT_FROM_TS),
+                   'Y',
+                   d.USER_ID,
+                   NOW()
+              FROM TRADE.DEPLOYMENT d
+              JOIN REFDATA.TM_INTERVAL ti
+                ON ti.TM_INTERVAL_ID = d.SCHEDULE_TM_INTERVAL_ID
+              LEFT JOIN LATERAL (
+                   SELECT e.TRANSACT_AT
+                     FROM TRADE.EXECUTION_EVENT e
+                    WHERE e.DEPLOYMENT_ID = d.DEPLOYMENT_ID
+                      AND e.IS_SUCCESS_IND = 'Y'
+                    ORDER BY e.TRANSACT_AT DESC
+                    LIMIT 1
+              ) lr ON TRUE
+             WHERE d.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
+               AND d.SCHEDULE_TM_INTERVAL_ID IS NOT NULL
+               AND NOT EXISTS (
+                   SELECT 1
+                     FROM TRADE.DEPLOYMENT_SCHEDULE_STATUS ss
+                    WHERE ss.DEPLOYMENT_ID = d.DEPLOYMENT_ID
+               );
+        </sql>
+        <rollback>
+            <sql>DELETE FROM TRADE.DEPLOYMENT_SCHEDULE_STATUS;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.4.0-006-sp-ins-deployment-schedule-status" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_INS_DEPLOYMENT_SCHEDULE_STATUS — append scheduler state version</comment>
+        <sqlFile path="../procedures/SP_INS_DEPLOYMENT_SCHEDULE_STATUS.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.4.0-007-sp-ins-deployment" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_INS_DEPLOYMENT — schedule config; seeds / syncs DEPLOYMENT_SCHEDULE_STATUS</comment>
+        <sqlFile path="../procedures/SP_INS_DEPLOYMENT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.4.0-008-sp-get-deployment" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_GET_DEPLOYMENT — TRANSACT_FROM_TS plus LAST_RUN_AT / NEXT_DUE_AT from schedule status</comment>
+        <sqlFile path="../procedures/SP_GET_DEPLOYMENT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.4.0-009-sp-ins-execution-event" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_INS_EXECUTION_EVENT — diary only; persists IN_TRANSACT_AT</comment>
+        <sqlFile path="../procedures/SP_INS_EXECUTION_EVENT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.4.0-010-sp-get-missed-due-deployments" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_GET_MISSED_DUE_DEPLOYMENTS — poller apply-now rows for IN_TM_INTERVAL_ID; returns NEXT_SCHEDULED_TS</comment>
+        <sqlFile path="../procedures/SP_GET_MISSED_DUE_DEPLOYMENTS.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <changeSet id="1.4.0-011-sp-get-next-due-deployments" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_GET_NEXT_DUE_DEPLOYMENTS — UI / ops preview, SCHEDULED_TS &gt; NOW()</comment>
+        <sqlFile path="../procedures/SP_GET_NEXT_DUE_DEPLOYMENTS.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+    </changeSet>
+
+    <!--
+      Adding a parameter makes Postgres register a second overload rather than
+      replacing the procedure, so the pre-scheduler signatures survive and keep
+      resolving for any caller that still passes the old argument count. The
+      9-argument EXECUTION_EVENT one no longer works at all now that TRANSACT_AT
+      is NOT NULL. Drop both so only the current signature is callable.
+    -->
+    <changeSet id="1.4.0-012-drop-superseded-overloads" author="alfcheun" context="trade,prod-deploy">
+        <comment>Drop pre-scheduler SP_INS_DEPLOYMENT / SP_INS_EXECUTION_EVENT overloads</comment>
+        <sql splitStatements="true" stripComments="true">
+            DROP PROCEDURE IF EXISTS TRADE.SP_INS_DEPLOYMENT(
+                UUID, UUID, UUID, INTEGER, INTEGER, INTEGER, TEXT, NUMERIC,
+                CHAR(1), CHAR(1), TEXT, TEXT,
+                OUT TEXT, OUT TEXT, OUT TEXT
+            );
+
+            DROP PROCEDURE IF EXISTS TRADE.SP_INS_EXECUTION_EVENT(
+                UUID, UUID, INTEGER, NUMERIC, TEXT, NUMERIC, TEXT, CHAR(1), TEXT,
+                OUT TEXT, OUT TEXT, OUT TEXT
+            );
+        </sql>
+        <rollback>
+            <sql splitStatements="true" stripComments="true">
+                -- Superseded signatures are not restorable; the current ones remain.
+                SELECT 1;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

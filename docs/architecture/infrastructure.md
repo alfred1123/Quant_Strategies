@@ -208,7 +208,7 @@ invalidates all stored credential ciphertext until users re-save keys.
 
 ## Trade scheduler (EventBridge + Lambda)
 
-Phase 1.9 AWS side — see [Scheduler, Price Bars & Consolidation](../design/scheduler-price-bars.md).
+Phase 1.9 AWS side — see [Scheduler & Price Bars](../design/scheduler-price-bars.md).
 
 ```
 EventBridge Scheduler (per deployment)
@@ -225,8 +225,8 @@ price-bar ingestion schedule (Phase 1.9) reuses the same function with a
 `price_bar_sync` task instead of a second Lambda.
 
 **Prod only.** Dev boxes run `SCHEDULER_BACKEND=local` (the default when implemented): an
-in-process poller inside FastAPI reads `NEXT_RUN_AT` from the DB and applies due deployments
-directly — no EventBridge, Lambda, or service token. See
+in-process poller inside FastAPI reads missed-due deployments via `SP_GET_MISSED_DUE_DEPLOYMENTS`
+and applies them directly — no EventBridge, Lambda, or service token. See
 [Scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-app--not-yet-wired).
 
 **Slack + mainnet promotion:** when to move alerts to prod ops and orders to Bybit mainnet —

@@ -34,8 +34,8 @@ def _deployment_row(**overrides) -> DeploymentRow:
         "is_paper_ind": "Y",
         "is_enabled_ind": "Y",
         "deployment_status": "CREATED",
+        "transact_from_ts": datetime(2026, 5, 20, tzinfo=timezone.utc),
         "user_id": "alice",
-        "created_at": datetime(2026, 5, 20, tzinfo=timezone.utc),
     }
     base.update(overrides)
     return DeploymentRow(**base)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import UTC, datetime
 from uuid import UUID
 
 from quant.api.credentials.repo import ApiCredentialRepo
@@ -58,6 +59,9 @@ class LiveApplyOrchestrator:
         deployment: DeploymentRow,
         user_id: str,
     ) -> ApplyReport:
+        # One tick time for the whole cycle — every attempt shares this anchor
+        # so the diary groups by tick, not by per-row insert time.
+        tick_at = datetime.now(UTC)
         if not self._adapter_registry.has_adapter(deployment.app_id):
             raise AdapterNotFoundError(
                 f"no broker adapter registered for app_id={deployment.app_id}"
@@ -90,7 +94,7 @@ class LiveApplyOrchestrator:
 
             self._audit_attempts(
                 outcome, app_user_id=app_user_id, deployment=deployment,
-                signal=signal, user_id=user_id, qty=qty,
+                signal=signal, user_id=user_id, qty=qty, tick_at=tick_at,
             )
 
             result = outcome.result
@@ -166,6 +170,7 @@ class LiveApplyOrchestrator:
         signal: float,
         user_id: str,
         qty: float,
+        tick_at: datetime,
     ) -> None:
         """Best-effort EXECUTION_EVENT row per attempt — never fails the cycle."""
         for attempt in outcome.attempts:
@@ -181,6 +186,7 @@ class LiveApplyOrchestrator:
                     signal_value=signal,
                     quantity=attempt.quantity(qty),
                     vendor_order_id=attempt.vendor_order_id,
+                    transact_at=tick_at,
                 )
             except Exception:
                 logger.exception("audit write failed — apply cycle continues")

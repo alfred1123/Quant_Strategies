@@ -73,6 +73,7 @@ class TradeService:
             deployment_status=req.deployment_status,
             user_id=user_id,
             confirm_live=req.confirm_live,
+            schedule_tm_interval_id=req.schedule_tm_interval_id,
         )
         return DeploymentRow.model_validate(row)
 
@@ -115,6 +116,11 @@ class TradeService:
             ),
             deployment_status=req.deployment_status or current.deployment_status,
             user_id=str(app_user_id),
+            schedule_tm_interval_id=(
+                req.schedule_tm_interval_id
+                if "schedule_tm_interval_id" in req.model_fields_set
+                else current.schedule_tm_interval_id
+            ),
         )
         return DeploymentRow.model_validate(row)
 
@@ -141,6 +147,7 @@ class TradeService:
             is_enabled_ind="N",
             deployment_status=DeploymentStatus.STOPPED,
             user_id=str(app_user_id),
+            schedule_tm_interval_id=current.schedule_tm_interval_id,
         )
         logger.info("Deployment %s stopped by user %s", deployment_id, app_user_id)
         return DeploymentRow.model_validate(row)

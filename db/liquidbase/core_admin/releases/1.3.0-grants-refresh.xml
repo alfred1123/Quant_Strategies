@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Forward changeset for sql/GRANTS.sql, which until now only ran from the
+      archived baseline — so edits to it never reached an existing database.
+
+      runAlways (not runOnChange) because scripts/liquibase-deploy.sh runs
+      core_admin twice: once before the other schemas and once after. Only the
+      second pass sees routines created in between, and within a single deploy
+      the file checksum has not changed, so runOnChange would skip it there and
+      leave new procedures without EXECUTE until some later deploy.
+
+      GRANT is idempotent in Postgres, so repeating the file is free.
+    -->
+
+    <changeSet id="1.3.0-001-grants-refresh" author="alfcheun" context="grant,prod-deploy" runAlways="true">
+        <comment>Re-apply quant_app / quant_admin grants — picks up MARKET_DATA and any new routines</comment>
+        <sqlFile path="../sql/GRANTS.sql" relativeToChangelogFile="true"
+                 splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql splitStatements="true" stripComments="true">
+                -- Revoking would cut the running app off from every procedure.
+                -- Roles are provisioned outside Liquibase; nothing to undo here.
+                SELECT 1;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

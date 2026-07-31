@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.1.0-001-create-market-data-schema" author="alfcheun" context="schema,prod-deploy">
+        <comment>Phase 1.9 — MARKET_DATA schema for live price bars</comment>
+        <sql splitStatements="true" stripComments="true">
+            CREATE SCHEMA IF NOT EXISTS MARKET_DATA;
+        </sql>
+        <rollback>
+            <sql>DROP SCHEMA IF EXISTS MARKET_DATA CASCADE;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

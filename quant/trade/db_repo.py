@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -12,6 +13,9 @@ from quant.shared.db import DbGateway
 from quant.trade.errors import TradeValidationError
 
 logger = logging.getLogger(__name__)
+
+# DEPLOYMENT_SCHEDULE_STATUS.STATUS has no DB check constraint — enforced here.
+SCHEDULE_STATUSES = frozenset({"PENDING", "SUCCESS", "FAILED"})
 
 
 def _require(value: Any, name: str) -> None:
@@ -224,6 +228,37 @@ class TradeRepo(DbGateway):
                 "app_id does not match deployment", status_code=400
             )
 
+    def validate_schedule_status(
+        self,
+        *,
+        deployment_schedule_id: UUID,
+        deployment_id: UUID,
+        deployment_vid: int,
+        status: str,
+        scheduled_ts: datetime | None,
+        user_id: str,
+    ) -> None:
+        _require_all(
+            deployment_schedule_id=deployment_schedule_id,
+            deployment_id=deployment_id,
+            deployment_vid=deployment_vid,
+            status=status,
+            user_id=user_id,
+        )
+
+        if status not in SCHEDULE_STATUSES:
+            raise TradeValidationError(
+                f"status must be one of {sorted(SCHEDULE_STATUSES)}"
+            )
+        if status == "PENDING" and scheduled_ts is None:
+            raise TradeValidationError(
+                "scheduled_ts is required when status is PENDING — it is the next due time"
+            )
+
+        dep = self._fetch_deployment_version(deployment_id, deployment_vid)
+        if dep is None:
+            raise TradeValidationError("deployment not found", status_code=404)
+
     # ── writes ───────────────────────────────────────────────────────────
 
     def write_deployment(
@@ -241,12 +276,17 @@ class TradeRepo(DbGateway):
         is_enabled_ind: str,
         deployment_status: str,
         user_id: str,
+        schedule_tm_interval_id: int | None = None,
     ) -> dict:
-        """Raw SP_INS_DEPLOYMENT call + read-back — used by create and update."""
+        """Raw SP_INS_DEPLOYMENT call + read-back — used by create and update.
+
+        schedule_tm_interval_id NULL = manual-only; no scheduler row is created.
+        """
         self._call_write(
             "CALL trade.sp_ins_deployment("
             "%s::uuid, %s::uuid, %s::uuid, %s::integer, %s::integer, %s::integer,"
-            " %s::text, %s::numeric, %s::char(1), %s::char(1), %s::text, %s::text,"
+            " %s::text, %s::numeric, %s::char(1), %s::char(1), %s::text,"
+            " %s::integer, %s::text,"
             " NULL::text, NULL::text, NULL::text)",
             (
                 str(deployment_id),
@@ -260,6 +300,11 @@ class TradeRepo(DbGateway):
                 is_paper_ind,
                 is_enabled_ind,
                 deployment_status,
+                (
+                    int(schedule_tm_interval_id)
+                    if schedule_tm_interval_id is not None
+                    else None
+                ),
                 user_id,
             ),
         )
@@ -289,6 +334,7 @@ class TradeRepo(DbGateway):
         deployment_status: str,
         user_id: str,
         confirm_live: bool = False,
+        schedule_tm_interval_id: int | None = None,
     ) -> dict:
         self.validate_create_deployment(
             deployment_id=deployment_id,
@@ -318,6 +364,7 @@ class TradeRepo(DbGateway):
             is_enabled_ind=is_enabled_ind,
             deployment_status=deployment_status,
             user_id=user_id,
+            schedule_tm_interval_id=schedule_tm_interval_id,
         )
 
     def sp_ins_execution_event(
@@ -333,6 +380,7 @@ class TradeRepo(DbGateway):
         signal_value: float | Decimal | None = None,
         quantity: float | Decimal | None = None,
         vendor_order_id: str | None = None,
+        transact_at: datetime | None = None,
     ) -> None:
         self.validate_execution_event(
             app_user_id=app_user_id,
@@ -345,7 +393,7 @@ class TradeRepo(DbGateway):
         self._call_write(
             "CALL trade.sp_ins_execution_event("
             "%s::uuid, %s::uuid, %s::integer, %s::numeric, %s::text,"
-            " %s::numeric, %s::text, %s::char(1), %s::text,"
+            " %s::numeric, %s::text, %s::char(1), %s::text, %s::timestamptz,"
             " NULL::text, NULL::text, NULL::text)",
             (
                 str(execution_event_id),
@@ -356,6 +404,45 @@ class TradeRepo(DbGateway):
                 quantity,
                 vendor_order_id,
                 is_success_ind,
+                user_id,
+                transact_at or datetime.now(UTC),
+            ),
+        )
+
+    def sp_ins_deployment_schedule_status(
+        self,
+        *,
+        deployment_schedule_id: UUID,
+        deployment_id: UUID,
+        deployment_vid: int,
+        status: str,
+        user_id: str,
+        scheduled_ts: datetime | None = None,
+    ) -> None:
+        """Append a schedule-state row (bumps DEPLOYMENT_SCHEDULE_VID).
+
+        deployment_schedule_id is stable per deployment — pass DEPLOYMENT_ID on
+        the first insert. scheduled_ts is the next due time and is required
+        while status is PENDING; SUCCESS / FAILED rows close out a tick.
+        """
+        self.validate_schedule_status(
+            deployment_schedule_id=deployment_schedule_id,
+            deployment_id=deployment_id,
+            deployment_vid=deployment_vid,
+            status=status,
+            scheduled_ts=scheduled_ts,
+            user_id=user_id,
+        )
+        self._call_write(
+            "CALL trade.sp_ins_deployment_schedule_status("
+            "%s::uuid, %s::uuid, %s::integer, %s::text, %s::timestamptz, %s::text,"
+            " NULL::text, NULL::text, NULL::text)",
+            (
+                str(deployment_schedule_id),
+                str(deployment_id),
+                int(deployment_vid),
+                status,
+                scheduled_ts,
                 user_id,
             ),
         )
@@ -433,4 +520,26 @@ class TradeRepo(DbGateway):
                 str(deployment_id) if deployment_id else None,
                 deployment_vid,
             ),
+        )
+
+    def sp_get_missed_due_deployments(self, *, tm_interval_id: int) -> list[dict]:
+        """Deployments due for apply on this interval tick — poller entry point.
+
+        Each row carries NEXT_SCHEDULED_TS, which the caller feeds straight back
+        into sp_ins_deployment_schedule_status after the apply. Not user-scoped.
+        """
+        _require(tm_interval_id, "tm_interval_id")
+        return self._call_get(
+            "CALL trade.sp_get_missed_due_deployments("
+            "%s::integer,"
+            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (int(tm_interval_id),),
+        )
+
+    def sp_get_next_due_deployments(self) -> list[dict]:
+        """Scheduled deployments not yet due — UI / ops preview, not the poller."""
+        return self._call_get(
+            "CALL trade.sp_get_next_due_deployments("
+            "NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (),
         )

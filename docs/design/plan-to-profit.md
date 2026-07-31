@@ -460,23 +460,23 @@ deferred pending further detail).
 | **Depends on** | 1.7, 1.8 |
 | **Blocks** | 2.2 (daily Sharpe needs scheduled runs) |
 
-See [Scheduler, Price Bars & Data Consolidation](scheduler-price-bars.md) for the full design.
+See [Scheduler & Price Bars](scheduler-price-bars.md) for the full design.
 
-**Scope:** Three linked concerns — automated trade scheduling via EventBridge, normalized price bars for live signal computation, and weekend consolidation of backtest cache payloads.
+**Scope:** Two linked concerns — automated trade scheduling via EventBridge and normalized price bars for live signal computation. Backtest cache refresh stays application-owned via `BacktestCache.refresh_payload` (no DB consolidation SP).
 
 **Tasks**
 
-- [ ] REFDATA: seed `REFDATA.TM_INTERVAL` (`1=DAILY`, `2=1H`) — currently exists but empty; becomes the single source of truth for interval dropdowns.
-- [ ] DDL: `MARKET_DATA` schema with `PRICE_BAR` + `PRICE_BAR_SYNC` tables (keyed by `TM_INTERVAL_ID`) and stored procedures (`SP_INS_PRICE_BAR`, `SP_GET_PRICE_BAR`, `SP_GET_PRICE_BAR_SYNC`).
-- [ ] DDL: Add `SCHEDULE_TM_INTERVAL_ID` (NULL = manual), `NEXT_RUN_AT`, `LAST_RUN_AT` columns to `TRADE.DEPLOYMENT`; update `SP_INS_DEPLOYMENT` and `SP_GET_DEPLOYMENT`; create `SP_GET_DUE_DEPLOYMENTS`.
-- [ ] DDL: `BT.SP_CONSOLIDATE_API_REQUEST` — merges closed VIDs per subscription, deletes superseded payloads. Weekend pg_cron job.
+- [x] REFDATA: seed `REFDATA.TM_INTERVAL` (`1=DAILY`, `2=1H`) — `db/liquidbase/refdata/releases/1.5.0-tm-interval.xml`.
+- [x] DDL: `MARKET_DATA` schema with `PRICE_BAR` table and SPs — `db/liquidbase/market_data/releases/1.0.0-price-bars.xml`.
+- [x] DDL: `TRADE.DEPLOYMENT` schedule column, `DEPLOYMENT_SCHEDULE_STATUS` + `SP_INS_DEPLOYMENT` / `SP_GET_DEPLOYMENT` / `SP_GET_MISSED_DUE_DEPLOYMENTS` — `db/liquidbase/trade/releases/1.4.0-deployment-scheduler.xml`.
+- [x] ~~DDL: `BT.SP_CONSOLIDATE_API_REQUEST`~~ removed — `BacktestCache.refresh_payload` closes the prior VID and inserts the merged range; no scheduled DB purge.
 - [ ] Python: `PriceBarRepo`, `PriceBarService` (freshness check + ccxt fetch + insert), clock module (`next_run()` interval math); interval names resolved via `RedisRefData`, no hardcoded enum.
 - [ ] Integration: Wire price bar refresh into live apply flow — refresh bars before signal computation.
-- [ ] UI: Schedule interval dropdown (from `REFDATA.TM_INTERVAL`) in deployment dialog; show `next_run_at` / `last_run_at` in deployments table.
+- [ ] UI: Schedule interval dropdown (from `REFDATA.TM_INTERVAL`) in deployment dialog; show `last_run_at` in deployments table (optional computed next run for display).
 - [x] AWS infra: EventBridge schedule group + `quant-scheduled-task` Lambda + IAM (`aws/cfn/04-scheduler.yml`); deploy via `bash aws/deploy.sh scheduler`.
 - [ ] AWS/app: service auth on `/apply` (`TRADE_SERVICE_TOKEN`) + boto3 create/update/delete schedules on deployment lifecycle.
 
-**Exit criteria:** A deployment scheduled `DAILY` executes automatically via EventBridge without manual intervention. `MARKET_DATA.PRICE_BAR` contains fresh bars for active products. Weekend consolidation deletes redundant `API_REQUEST_PAYLOAD` rows.
+**Exit criteria:** A deployment scheduled `DAILY` executes automatically via EventBridge without manual intervention. `MARKET_DATA.PRICE_BAR` contains fresh bars for active products.
 
 **Promotion runbook:** [Live Trading Promotion](../guides/live-trading-promotion.md) — Slack ops channel and Bybit mainnet cutover.
 
@@ -1148,7 +1148,7 @@ This section records implementation viewpoints from the latest trade-readiness r
 | **1.6** | Strategy picker — `GET /api/v1/strategies` + `StrategyPicker` (reads `BT.STRATEGY`; not Backtest config UI) |
 | **1.7** | Live apply (dry-run → apply) |
 | **1.8** | Execution log UI + `TRADE.EXECUTION_EVENT` writes |
-| **1.9** | Scheduler (EventBridge + Lambda) + `MARKET_DATA.PRICE_BAR` + `BT.SP_CONSOLIDATE_API_REQUEST` — see [scheduler-price-bars.md](scheduler-price-bars.md) |
+| **1.9** | Scheduler (EventBridge + Lambda) + `MARKET_DATA.PRICE_BAR` — see [scheduler-price-bars.md](scheduler-price-bars.md) |
 | **2.1** | Reconcile snapshot schema + SP |
 | **2.2** | Daily Sharpe reconcile job |
 | **2.3** | Reconcile chart (Trade top-right) |
@@ -1199,7 +1199,7 @@ Notes mentioned alternative profit paths (e.g. horse racing, Poisson/Bernoulli m
 | [Frontend](../architecture/frontend.md) | React SPA structure |
 | [Paper Trading guide](../guides/trading.md) | Existing Futu utility (pattern reference) |
 | [Deploy Build Pipeline](../archive/deploy-build-pipeline.md) | ECR history — **live ops:** [infrastructure.md](../architecture/infrastructure.md#cicd--github-actions) |
-| [Scheduler, Price Bars & Consolidation](scheduler-price-bars.md) | EventBridge scheduler, `MARKET_DATA.PRICE_BAR`, `BT.SP_CONSOLIDATE_API_REQUEST` |
+| [Scheduler & Price Bars](scheduler-price-bars.md) | EventBridge scheduler, `MARKET_DATA.PRICE_BAR` |
 
 ---
 

@@ -63,9 +63,13 @@ All endpoints below are mounted under the `/api/v1` prefix.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/v1/trade/deployments` | Required | Create or re-apply a deployment. |
+| `POST` | `/api/v1/trade/deployments` | Required | Create or re-apply a deployment. Optional `schedule_tm_interval_id` (`REFDATA.TM_INTERVAL`) sets the apply cadence; omit for manual-only. |
 | `GET` | `/api/v1/trade/deployments` | Required | List current deployments for the authenticated user. |
 | `GET` | `/api/v1/trade/deployments/{id}` | Required | One deployment (current version). |
+| `PATCH` | `/api/v1/trade/deployments/{id}` | Required | Toggle `enabled` / `deployment_status`, or change `schedule_tm_interval_id`. Omitted fields keep their value; explicit `null` clears the schedule. |
+| `POST` | `/api/v1/trade/deployments/{id}/stop` | Required | Stop a deployment — disables it and sets `STOPPED`. Idempotent. |
+| `POST` | `/api/v1/trade/deployments/{id}/apply` | Required | Run one live-apply cycle now. |
+| `POST` | `/api/v1/trade/deployments/dry-run` | Required | Preflight a deployment without placing orders. |
 
 ### Credentials (Phase 1.1 — implemented)
 

@@ -7,7 +7,6 @@ on:
       - "docs/**"
       - "*.md"
       - "tests/**"
-      - "db/**"
       - "scripts/**"
       - "backup/**"
       - ".github/skills/**"
@@ -33,6 +32,7 @@ jobs:
       app: ${{ steps.flags.outputs.app }}
       nginx: ${{ steps.flags.outputs.nginx }}
       compose: ${{ steps.flags.outputs.compose }}
+      db: ${{ steps.flags.outputs.db }}
       deploy: ${{ steps.flags.outputs.deploy }}
     steps:
       - uses: actions/checkout@v4
@@ -54,6 +54,8 @@ jobs:
               - 'docker-compose.prod.yml'
               - 'docker-compose.tls.yml'
               - 'docker-compose.cloudflare.yml'
+            db:
+              - 'db/liquidbase/**'
 
       - name: Set deploy flags
         id: flags
@@ -63,6 +65,9 @@ jobs:
             echo "app=true" >> "$GITHUB_OUTPUT"
             echo "nginx=true" >> "$GITHUB_OUTPUT"
             echo "compose=true" >> "$GITHUB_OUTPUT"
+            # Migrations stay opt-in on manual dispatch — a rebuild of the images
+            # should not silently apply schema changes. Use the database workflow.
+            echo "db=false" >> "$GITHUB_OUTPUT"
             echo "deploy=true" >> "$GITHUB_OUTPUT"
             echo "Manual dispatch — rebuild all images and deploy"
             exit 0
@@ -71,17 +76,19 @@ jobs:
           app="${{ steps.filter.outputs.app }}"
           nginx="${{ steps.filter.outputs.nginx }}"
           compose="${{ steps.filter.outputs.compose }}"
+          db="${{ steps.filter.outputs.db }}"
           echo "app=$app" >> "$GITHUB_OUTPUT"
           echo "nginx=$nginx" >> "$GITHUB_OUTPUT"
           echo "compose=$compose" >> "$GITHUB_OUTPUT"
+          echo "db=$db" >> "$GITHUB_OUTPUT"
 
-          if [[ "$app" == "true" || "$nginx" == "true" || "$compose" == "true" ]]; then
+          if [[ "$app" == "true" || "$nginx" == "true" || "$compose" == "true" || "$db" == "true" ]]; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
           else
             echo "deploy=false" >> "$GITHUB_OUTPUT"
           fi
 
-          echo "Path filter: app=$app nginx=$nginx compose=$compose"
+          echo "Path filter: app=$app nginx=$nginx compose=$compose db=$db"
 
   test:
     name: test
@@ -315,6 +322,7 @@ jobs:
       DEPLOY_APP: ${{ needs.changes.outputs.app == 'true' || github.event_name == 'workflow_dispatch' }}
       DEPLOY_NGINX: ${{ needs.changes.outputs.nginx == 'true' || github.event_name == 'workflow_dispatch' }}
       DEPLOY_COMPOSE: ${{ needs.changes.outputs.compose == 'true' || github.event_name == 'workflow_dispatch' }}
+      DEPLOY_DB: ${{ needs.changes.outputs.db == 'true' }}
     steps:
       - name: Deploy via SSM Run Command
         uses: aws-actions/configure-aws-credentials@v4
@@ -323,6 +331,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-1
 
+      # Migrations run before the containers restart. The reverse order would
+      # leave the old image talking to the new schema — 1.4.0 drops superseded
+      # procedure overloads, so the running app would lose calls it still makes.
+      # Only changesets tagged prod-deploy are applied; everything else still
+      # goes through the manually gated database workflow.
       - name: Run deploy script on EC2
         run: |
           set -euo pipefail
@@ -341,7 +354,7 @@ jobs:
             exit 1
           fi
           echo "Deploy target instance: $INSTANCE_ID"
-          echo "Flags: DEPLOY_APP=${{ env.DEPLOY_APP }} DEPLOY_NGINX=${{ env.DEPLOY_NGINX }} DEPLOY_COMPOSE=${{ env.DEPLOY_COMPOSE }}"
+          echo "Flags: DEPLOY_APP=${{ env.DEPLOY_APP }} DEPLOY_NGINX=${{ env.DEPLOY_NGINX }} DEPLOY_COMPOSE=${{ env.DEPLOY_COMPOSE }} DEPLOY_DB=${{ env.DEPLOY_DB }}"
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
@@ -362,8 +375,16 @@ jobs:
               "DEPLOY_APP=${{ env.DEPLOY_APP }}",
               "DEPLOY_NGINX=${{ env.DEPLOY_NGINX }}",
               "DEPLOY_COMPOSE=${{ env.DEPLOY_COMPOSE }}",
+              "DEPLOY_DB=${{ env.DEPLOY_DB }}",
               "ECR_REGISTRY=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com",
               "IMAGE_TAG=${{ github.sha }}",
+              "if [ \"$DEPLOY_DB\" = \"true\" ]; then",
+              "  echo \"── DB MIGRATION ──\"",
+              "  bash aws/scripts/install-liquibase.sh",
+              "  APP_ENV=prod USE_SSM=1 LIQUIBASE_CONTEXTS=prod-deploy bash scripts/liquibase-deploy.sh",
+              "else",
+              "  echo \"Skip DB migration — no db/liquidbase changes in this push\"",
+              "fi",
               "COMPOSE=\"docker compose -f docker-compose.yml -f docker-compose.prod.yml\"",
               "DOMAIN=\"${{ vars.DOMAIN }}\"",
               "export DOMAIN",
@@ -435,7 +456,8 @@ jobs:
 
           echo "Command ID: $COMMAND_ID"
 
-          # Poll for up to ~10 min. Distinguish three outcomes:
+          # Poll for up to ~15 min — a first-time Liquibase install on the box
+          # downloads a JRE before any migration runs. Distinguish three outcomes:
           #   * aws CLI error            → print stderr, retry (don't mask)
           #   * Status in (Pending, InProgress, Delayed) → keep waiting
           #   * Status == Success                       → exit 0
@@ -445,7 +467,7 @@ jobs:
           # which silently swallowed real CLI errors and caused the loop
           # to print "Pending" forever — even after EC2 had finished
           # successfully. Surfacing stderr is critical for diagnosis.
-          MAX_ATTEMPTS=60
+          MAX_ATTEMPTS=90
           for i in $(seq 1 "$MAX_ATTEMPTS"); do
             sleep 10
             INVOCATION=$(aws ssm get-command-invocation \

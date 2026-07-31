@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.2.0-001-database-timezone-utc" author="alfcheun" context="schema,prod-deploy">
+        <comment>
+            Quant convention: database default timezone UTC (db-ddl skill).
+            Server postgresql.conf may still be regional; this overrides per-database
+            for all new sessions. Replaces Asia/Hong_Kong default on local installs.
+        </comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER DATABASE quantdb SET timezone TO 'UTC';
+            SET timezone TO 'UTC';
+        </sql>
+        <rollback>
+            <sql>ALTER DATABASE quantdb RESET timezone;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

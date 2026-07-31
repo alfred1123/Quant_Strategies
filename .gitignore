@@ -50,3 +50,6 @@ site/
 # Cursor hook runtime artifacts (logs / PID files); keep hooks.json + scripts tracked
 .cursor/hooks/logs/
 db/dumps/
+
+# Written by `liquibase --url=offline:...` dry runs next to the changelog
+db/liquidbase/**/databasechangelog.csv

@@ -3,6 +3,9 @@
 -- Records order submit attempts, rejects, and errors (e.g. min notional). Broker-
 -- confirmed fills live in TRADE.TRANSACTION — not here.
 --
+-- TRANSACT_AT = when the apply tick occurred (diary). CREATED_AT = audit insert.
+-- Scheduler state lives in TRADE.DEPLOYMENT_SCHEDULE_STATUS — not this table.
+--
 -- UI execution panel (Phase 1.8) reads from this table; reconcile uses
 -- TRADE.TRANSACTION.
 CREATE TABLE TRADE.EXECUTION_EVENT (
@@ -14,6 +17,7 @@ CREATE TABLE TRADE.EXECUTION_EVENT (
     QUANTITY            NUMERIC,
     VENDOR_ORDER_ID     TEXT,
     IS_SUCCESS_IND      CHAR(1) NOT NULL,
+    TRANSACT_AT         TIMESTAMPTZ NOT NULL,
     USER_ID             TEXT NOT NULL,
     CREATED_AT          TIMESTAMPTZ NOT NULL,
 

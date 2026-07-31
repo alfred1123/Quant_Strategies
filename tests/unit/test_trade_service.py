@@ -27,8 +27,8 @@ def _sp_row(**overrides):
         "is_paper_ind": "Y",
         "is_enabled_ind": "Y",
         "deployment_status": "CREATED",
+        "transact_from_ts": datetime(2026, 5, 20, tzinfo=timezone.utc),
         "user_id": "alice",
-        "created_at": datetime(2026, 5, 20, tzinfo=timezone.utc),
     }
     base.update(overrides)
     return base
@@ -80,6 +80,44 @@ class TestCreateDeployment:
         assert kwargs["is_paper_ind"] == "N"
         assert kwargs["confirm_live"] is True
         assert kwargs["strategy_id"] == strategy_id
+
+    def test_schedule_interval_passed_through(self, svc):
+        app_user_id = uuid4()
+        svc._repo.sp_ins_deployment.return_value = _sp_row(
+            app_user_id=app_user_id, schedule_tm_interval_id=2
+        )
+
+        req = CreateDeploymentRequest(
+            strategy_id=uuid4(),
+            strategy_vid=1,
+            api_credential_id=1,
+            app_id=10,
+            internal_cusip="btc-usd.crypto",
+            qty=Decimal("0.01"),
+            schedule_tm_interval_id=2,
+        )
+        result = svc.create_deployment(app_user_id, "alice", req)
+
+        assert result.schedule_tm_interval_id == 2
+        kwargs = svc._repo.sp_ins_deployment.call_args.kwargs
+        assert kwargs["schedule_tm_interval_id"] == 2
+
+    def test_schedule_defaults_to_manual_only(self, svc):
+        app_user_id = uuid4()
+        svc._repo.sp_ins_deployment.return_value = _sp_row(app_user_id=app_user_id)
+
+        req = CreateDeploymentRequest(
+            strategy_id=uuid4(),
+            strategy_vid=1,
+            api_credential_id=1,
+            app_id=10,
+            internal_cusip="btc-usd.crypto",
+            qty=Decimal("0.01"),
+        )
+        svc.create_deployment(app_user_id, "alice", req)
+
+        kwargs = svc._repo.sp_ins_deployment.call_args.kwargs
+        assert kwargs["schedule_tm_interval_id"] is None
 
     def test_generates_deployment_id_when_omitted(self, svc):
         app_user_id = uuid4()
@@ -153,6 +191,56 @@ class TestUpdateDeployment:
         kwargs = svc._repo.write_deployment.call_args.kwargs
         assert kwargs["deployment_status"] == "PAUSED"
         assert kwargs["is_enabled_ind"] == current["is_enabled_ind"]
+
+    def test_schedule_preserved_when_not_in_body(self, svc):
+        """Re-versioning on a kill-switch toggle must not silently unschedule."""
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        current = _sp_row(
+            deployment_id=dep_id, app_user_id=app_user_id, schedule_tm_interval_id=2
+        )
+        svc._repo.sp_get_deployment.return_value = [current]
+        svc._repo.write_deployment.return_value = _sp_row(schedule_tm_interval_id=2)
+
+        svc.update_deployment(app_user_id, dep_id, UpdateDeploymentRequest(enabled=False))
+
+        kwargs = svc._repo.write_deployment.call_args.kwargs
+        assert kwargs["schedule_tm_interval_id"] == 2
+
+    def test_schedule_changed(self, svc):
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        current = _sp_row(
+            deployment_id=dep_id, app_user_id=app_user_id, schedule_tm_interval_id=1
+        )
+        svc._repo.sp_get_deployment.return_value = [current]
+        svc._repo.write_deployment.return_value = _sp_row(schedule_tm_interval_id=2)
+
+        svc.update_deployment(
+            app_user_id, dep_id, UpdateDeploymentRequest(schedule_tm_interval_id=2)
+        )
+
+        kwargs = svc._repo.write_deployment.call_args.kwargs
+        assert kwargs["schedule_tm_interval_id"] == 2
+
+    def test_explicit_null_clears_schedule(self, svc):
+        """An explicit null is how a deployment goes back to manual-only."""
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        current = _sp_row(
+            deployment_id=dep_id, app_user_id=app_user_id, schedule_tm_interval_id=1
+        )
+        svc._repo.sp_get_deployment.return_value = [current]
+        svc._repo.write_deployment.return_value = _sp_row()
+
+        svc.update_deployment(
+            app_user_id,
+            dep_id,
+            UpdateDeploymentRequest.model_validate({"schedule_tm_interval_id": None}),
+        )
+
+        kwargs = svc._repo.write_deployment.call_args.kwargs
+        assert kwargs["schedule_tm_interval_id"] is None
 
     def test_enable_true_maps_to_Y(self, svc):
         app_user_id = uuid4()

@@ -7,7 +7,7 @@
 
 **Related:** [Plan to Profit §1.7](../design/plan-to-profit.md#phase-17--live-apply),
 [Live Order Execution](../design/live-order-execution.md),
-[Scheduler, Price Bars & Consolidation](../design/scheduler-price-bars.md),
+[Scheduler & Price Bars](../design/scheduler-price-bars.md),
 [Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge--lambda),
 [Phase 0.1 signoff](../archive/phase-0/phase-0.1-signoff.md)
 
@@ -206,7 +206,7 @@ flowchart TD
 Local dev does not need EventBridge or Lambda:
 
 - **`SCHEDULER_BACKEND=local`** (default when implemented): in-process poller reads
-  `NEXT_RUN_AT` and calls apply in-process — no HTTP, no `TRADE_SERVICE_TOKEN`.
+  `SP_GET_MISSED_DUE_DEPLOYMENTS` and calls apply in-process — no HTTP, no `TRADE_SERVICE_TOKEN`.
 - Keep **testnet keys** and **test Slack** (or log-only) locally.
 
 See [Scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-app--not-yet-wired)

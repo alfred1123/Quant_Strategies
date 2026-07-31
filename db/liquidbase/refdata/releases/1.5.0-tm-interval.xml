@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      REFDATA.TM_INTERVAL — seed + PERIOD_LENGTH, which the TRADE scheduler reads.
+
+      tables/TM_INTERVAL.sql declares PERIOD_LENGTH, so a database built from the
+      baseline already has the column, while one created before it does not.
+      ADD COLUMN IF NOT EXISTS covers both; the seed then supplies values and the
+      NOT NULL constraint is applied last.
+    -->
+
+    <changeSet id="1.5.0-001-tm-interval-period-length" author="alfcheun" context="refdata,prod-deploy">
+        <comment>PERIOD_LENGTH on TM_INTERVAL — scheduler step length, read by the trade due-check</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE REFDATA.TM_INTERVAL ADD COLUMN IF NOT EXISTS PERIOD_LENGTH INTERVAL;
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE REFDATA.TM_INTERVAL DROP COLUMN IF EXISTS PERIOD_LENGTH;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.5.0-002-seed-tm-interval" author="alfcheun" context="refdata,prod-deploy">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM REFDATA.TM_INTERVAL
+            </sqlCheck>
+        </preConditions>
+        <comment>Seed REFDATA.TM_INTERVAL — DAILY (id=1) and 1H (id=2)</comment>
+        <sqlFile path="../data/TM_INTERVAL.sql" relativeToChangelogFile="true"
+                 splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql>DELETE FROM REFDATA.TM_INTERVAL WHERE TM_INTERVAL_ID IN (1, 2);</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.5.0-003-tm-interval-period-length-not-null" author="alfcheun" context="refdata,prod-deploy">
+        <comment>Backfill PERIOD_LENGTH on rows seeded before the column existed, then enforce NOT NULL</comment>
+        <sql splitStatements="true" stripComments="true">
+            UPDATE REFDATA.TM_INTERVAL SET PERIOD_LENGTH = INTERVAL '1 day'
+             WHERE TM_INTERVAL_ID = 1 AND PERIOD_LENGTH IS NULL;
+
+            UPDATE REFDATA.TM_INTERVAL SET PERIOD_LENGTH = INTERVAL '1 hour'
+             WHERE TM_INTERVAL_ID = 2 AND PERIOD_LENGTH IS NULL;
+
+            ALTER TABLE REFDATA.TM_INTERVAL
+                ALTER COLUMN PERIOD_LENGTH SET NOT NULL;
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE REFDATA.TM_INTERVAL ALTER COLUMN PERIOD_LENGTH DROP NOT NULL;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

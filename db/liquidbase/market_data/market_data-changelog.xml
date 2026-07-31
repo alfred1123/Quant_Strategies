@@ -6,10 +6,9 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!--
-      TRADE schema (trade.databasechangelog).
+      MARKET_DATA schema (market_data.databasechangelog).
 
       PRODUCTION SAFETY
-      - Baseline: releases/archive/baseline-1.0.0.xml (REFERENCE ONLY — never <include> on prod).
       - Deploy applies ONLY changesets whose context includes prod-deploy.
         Anything else is manual: APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
 
@@ -18,10 +17,7 @@
       2. Create releases/X.Y.Z-name.xml
       3. Uncomment/add:
            <include file="releases/X.Y.Z-name.xml" relativeToChangelogFile="true"/>
-      4. Add prod-deploy to each changeset context to ship it with the app.
     -->
 
-    <include file="releases/1.3.0-deployment-check.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.4.0-deployment-scheduler.xml" relativeToChangelogFile="true"/>
-
+    <include file="releases/1.0.0-price-bars.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -11,13 +11,19 @@
       PRODUCTION SAFETY
       - Baseline: releases/archive/baseline-1.0.0.xml (REFERENCE ONLY — never <include> on prod).
       - Prod DATABASECHANGELOG already records v1.0.0; re-including archive risks DROP/CREATE.
-      - GitHub app deploy does NOT run Liquibase. Migrate manually when ready:
+      - The deploy workflow applies ONLY changesets whose context includes
+        prod-deploy. Anything else waits for a manual run:
           APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
 
       NEW MIGRATION
       1. Create releases/X.Y.Z-name.xml (forward-only changesets).
       2. Uncomment/add:
            <include file="releases/X.Y.Z-name.xml" relativeToChangelogFile="true"/>
+      3. Add prod-deploy to each changeset context when it should ship with the
+         app that needs it; leave it off to keep the change manual.
     -->
+
+    <include file="releases/1.1.0-market-data-schema.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.2.0-database-timezone-utc.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>
