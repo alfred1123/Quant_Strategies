@@ -150,6 +150,17 @@ APP_ENV=prod USE_SSM=1 LIQUIBASE_CONTEXTS=prod-deploy bash scripts/liquibase-dep
 
 It runs **before** the containers restart, so a release that the incoming app version depends on is in place by the time that version starts serving. The reverse order would leave the old image talking to the new schema.
 
+To read the result, look at the end of the **deploy to EC2** step for a per-schema recap:
+
+```text
+── MIGRATION SUMMARY (contexts: prod-deploy) ──
+  MASTER (schemas)                     2 applied
+  TRADE                               12 applied
+  TOTAL                               22 applied
+```
+
+The workflow prints only the tail of the remote output, and the image pull and container startup that follow a migration are long enough to push it out of view — so `liquibase-deploy.sh` also writes this block to a file that the workflow re-prints last. A migration that fails aborts the deploy before the containers restart, and the Liquibase error is then the final thing in the log.
+
 Tag a changeset `context="<schema>,prod-deploy"` when it must ship with the app that needs it. Leave the tag off and the changeset stays pending until someone runs a migration by hand — either the manually gated **database** workflow (verify / deploy, with a typed confirmation) or:
 
 ```bash
