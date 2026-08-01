@@ -378,10 +378,12 @@ jobs:
               "DEPLOY_DB=${{ env.DEPLOY_DB }}",
               "ECR_REGISTRY=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com",
               "IMAGE_TAG=${{ github.sha }}",
+              "MIGRATION_SUMMARY=/tmp/quant-migration-summary.txt",
+              "rm -f \"$MIGRATION_SUMMARY\"",
               "if [ \"$DEPLOY_DB\" = \"true\" ]; then",
               "  echo \"── DB MIGRATION ──\"",
               "  bash aws/scripts/install-liquibase.sh",
-              "  APP_ENV=prod USE_SSM=1 LIQUIBASE_CONTEXTS=prod-deploy bash scripts/liquibase-deploy.sh",
+              "  APP_ENV=prod USE_SSM=1 LIQUIBASE_CONTEXTS=prod-deploy MIGRATION_SUMMARY_FILE=\"$MIGRATION_SUMMARY\" bash scripts/liquibase-deploy.sh",
               "else",
               "  echo \"Skip DB migration — no db/liquidbase changes in this push\"",
               "fi",
@@ -449,7 +451,8 @@ jobs:
               "fi",
               "docker image prune -f",
               "echo \"── RUNNING ──\"",
-              "$COMPOSE ps"
+              "$COMPOSE ps",
+              "if [ -s \"$MIGRATION_SUMMARY\" ]; then cat \"$MIGRATION_SUMMARY\"; fi"
             ]' \
             --query Command.CommandId \
             --output text)
