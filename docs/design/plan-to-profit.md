@@ -470,11 +470,11 @@ See [Scheduler & Price Bars](scheduler-price-bars.md) for the full design.
 - [x] DDL: `MARKET_DATA` schema with `PRICE_BAR` table and SPs — `db/liquidbase/market_data/releases/1.0.0-price-bars.xml`.
 - [x] DDL: `TRADE.DEPLOYMENT` schedule column, `DEPLOYMENT_SCHEDULE_STATUS` + `SP_INS_DEPLOYMENT` / `SP_GET_DEPLOYMENT` / `SP_GET_MISSED_DUE_DEPLOYMENTS` — `db/liquidbase/trade/releases/1.4.0-deployment-scheduler.xml`.
 - [x] ~~DDL: `BT.SP_CONSOLIDATE_API_REQUEST`~~ removed — `BacktestCache.refresh_payload` closes the prior VID and inserts the merged range; no scheduled DB purge.
-- [ ] Python: `PriceBarRepo`, `PriceBarService` (freshness check + ccxt fetch + insert), clock module (`next_run()` interval math); interval names resolved via `RedisRefData`, no hardcoded enum.
-- [ ] Integration: Wire price bar refresh into live apply flow — refresh bars before signal computation.
+- [x] Python: `quant/market_data/` — `PriceBarRepo` (SP wrappers), `CcxtBarFetcher` (public `fetch_ohlcv`), `PriceBarService` (freshness check + gap fill + `read_bars`); interval math in `quant/shared/intervals.py` resolved from `REFDATA.TM_INTERVAL` via `RedisRefData`, no hardcoded enum.
+- [ ] Integration: Wire price bar refresh into live apply flow — refresh bars before signal computation. Also expose `POST /api/v1/market-data/price-bars/sync` (calls `PriceBarService.sync`) + the `price_bar_sync` Lambda task, so bars are warmed **once per interval** rather than once per deployment ([§6.2](scheduler-price-bars.md#bar-sync-is-one-schedule-per-interval-not-one-per-deployment)).
 - [ ] UI: Schedule interval dropdown (from `REFDATA.TM_INTERVAL`) in deployment dialog; show `last_run_at` in deployments table (optional computed next run for display).
 - [x] AWS infra: EventBridge schedule group + `quant-scheduled-task` Lambda + IAM (`aws/cfn/04-scheduler.yml`); deploy via `bash aws/deploy.sh scheduler`.
-- [ ] AWS/app: service auth on `/apply` (`TRADE_SERVICE_TOKEN`) + boto3 create/update/delete schedules on deployment lifecycle.
+- [ ] AWS/app: service auth on `/apply` (`TRADE_SERVICE_TOKEN`) + boto3 create/update/delete schedules on deployment lifecycle. Schedule expressions must fire **a minute or two past** the interval boundary, never on it — firing at `:00` races the exchange publishing the bar that just closed and fails the tick closed ([§6.2](scheduler-price-bars.md#required-fire-after-the-boundary-never-on-it)).
 
 **Exit criteria:** A deployment scheduled `DAILY` executes automatically via EventBridge without manual intervention. `MARKET_DATA.PRICE_BAR` contains fresh bars for active products.
 

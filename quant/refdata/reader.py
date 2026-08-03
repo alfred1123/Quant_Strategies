@@ -19,8 +19,11 @@ Behaviour notes
 
 import json
 import logging
+from datetime import timedelta
 
 import redis
+
+from quant.shared.intervals import parse_period
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +125,18 @@ class RedisRefData:
         """
         rows = self.get("promotion_metric")
         return sorted(rows, key=lambda r: int(r.get("priority", 999)))
+
+    def get_interval_period(self, tm_interval_id: int) -> timedelta:
+        """``PERIOD_LENGTH`` for a ``TM_INTERVAL_ID``, as a timedelta.
+
+        Parsed here rather than handed to callers as text: the publisher
+        serialises rows with ``json.dumps(default=str)``, so the Postgres
+        interval arrives from Redis stringified (``"1 day, 0:00:00"``).
+        """
+        for r in self.get("tm_interval"):
+            if int(r["tm_interval_id"]) == int(tm_interval_id):
+                return parse_period(r["period_length"])
+        raise RuntimeError(f"REFDATA.TM_INTERVAL missing TM_INTERVAL_ID={tm_interval_id}")
 
     def resolve_queue_status_id(self, name: str) -> int:
         for r in self.get("queue_status"):
