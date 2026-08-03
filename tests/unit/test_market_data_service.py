@@ -1,0 +1,377 @@
+"""Unit tests for :mod:`quant.market_data.service`."""
+
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from unittest.mock import MagicMock
+
+import pytest
+
+from quant.market_data.fetcher import OhlcvBar
+from quant.market_data.service import PriceBarService, StaleBarsError
+from quant.shared.db import ProcedureError
+
+CUSIP = "btc-usd.crypto"
+INTERVAL_1H = 2
+APP_ID = 10
+# 10:37 → 10:00 is still forming, so 09:00 is the newest closed bar.
+NOW = datetime(2026, 8, 1, 10, 37, tzinfo=UTC)
+
+
+def _ts(hour: int) -> datetime:
+    return datetime(2026, 8, 1, hour, 0, tzinfo=UTC)
+
+
+def _bar(hour: int, close: float = 105.0) -> OhlcvBar:
+    return OhlcvBar(
+        bar_timestamp=_ts(hour),
+        open_px=100.0,
+        high_px=110.0,
+        low_px=95.0,
+        close_px=close,
+        volume=12.5,
+    )
+
+
+class FakeRefData:
+    """Stands in for RedisRefData — only the interval resolver is used here."""
+
+    def get_interval_period(self, tm_interval_id):
+        return {1: timedelta(days=1), 2: timedelta(hours=1)}[tm_interval_id]
+
+
+class FakeFetcher:
+    def __init__(self, bars):
+        self.bars = bars
+        self.calls = []
+
+    def fetch_bars(self, *, vendor_symbol, period, since, until):
+        self.calls.append(
+            {"vendor_symbol": vendor_symbol, "period": period, "since": since, "until": until}
+        )
+        return [b for b in self.bars if since <= b.bar_timestamp <= until]
+
+
+def build_service(*, stored_bars=(), coverage_max=None, exchange_bars=()):
+    repo = MagicMock()
+    repo.get_coverage.return_value = (
+        {"min_bar_timestamp": _ts(0), "max_bar_timestamp": coverage_max}
+        if coverage_max
+        else None
+    )
+    repo.get_bars.return_value = [{"bar_timestamp": ts} for ts in stored_bars]
+    instruments = MagicMock()
+    instruments.resolve_internal_cusip.return_value = "BTCUSDT"
+    fetcher = FakeFetcher(list(exchange_bars))
+    service = PriceBarService(repo, FakeRefData(), instruments, fetcher)
+    return service, repo, fetcher
+
+
+def _ensure(service, lookback=3):
+    return service.ensure_fresh(
+        internal_cusip=CUSIP,
+        tm_interval_id=INTERVAL_1H,
+        source_app_id=APP_ID,
+        lookback=lookback,
+        now=NOW,
+    )
+
+
+def _inserted_timestamps(repo):
+    return [c.kwargs["bar_timestamp"] for c in repo.ins_bar.call_args_list]
+
+
+class TestFreshnessGate:
+    def test_newest_closed_bar_present_skips_the_exchange(self):
+        service, repo, fetcher = build_service(coverage_max=_ts(9))
+        assert _ensure(service) == 0
+        assert fetcher.calls == []
+        repo.get_bars.assert_not_called()
+        repo.ins_bar.assert_not_called()
+
+    def test_bars_ahead_of_the_boundary_still_count_as_fresh(self):
+        service, _repo, fetcher = build_service(coverage_max=_ts(11))
+        assert _ensure(service) == 0
+        assert fetcher.calls == []
+
+    def test_stale_tail_triggers_a_fetch(self):
+        service, repo, fetcher = build_service(
+            coverage_max=_ts(8),
+            stored_bars=[_ts(7), _ts(8)],
+            exchange_bars=[_bar(9)],
+        )
+        assert _ensure(service) == 1
+        assert _inserted_timestamps(repo) == [_ts(9)]
+        assert fetcher.calls[0]["since"] == _ts(9)
+        assert fetcher.calls[0]["until"] == _ts(9)
+
+
+class TestGapFilling:
+    def test_empty_table_backfills_the_whole_window(self):
+        service, repo, fetcher = build_service(
+            exchange_bars=[_bar(7), _bar(8), _bar(9)]
+        )
+        assert _ensure(service) == 3
+        assert _inserted_timestamps(repo) == [_ts(7), _ts(8), _ts(9)]
+        assert fetcher.calls[0]["since"] == _ts(7)
+
+    def test_only_missing_bars_are_inserted(self):
+        """SP_INS_PRICE_BAR is a plain INSERT — a repeat would raise."""
+        service, repo, _fetcher = build_service(
+            coverage_max=_ts(8),
+            stored_bars=[_ts(7), _ts(8)],
+            exchange_bars=[_bar(7), _bar(8), _bar(9)],
+        )
+        assert _ensure(service) == 1
+        assert _inserted_timestamps(repo) == [_ts(9)]
+
+    def test_inserts_run_oldest_first(self):
+        """A crash part-way leaves MAX short of the target so the next tick resumes."""
+        service, repo, _fetcher = build_service(
+            exchange_bars=[_bar(9), _bar(7), _bar(8)]
+        )
+        _ensure(service)
+        assert _inserted_timestamps(repo) == [_ts(7), _ts(8), _ts(9)]
+
+    def test_nothing_missing_after_the_range_read(self):
+        service, repo, fetcher = build_service(
+            coverage_max=_ts(8), stored_bars=[_ts(7), _ts(8), _ts(9)]
+        )
+        assert _ensure(service) == 0
+        assert fetcher.calls == []
+        repo.ins_bar.assert_not_called()
+
+    def test_leading_history_before_the_listing_is_tolerated(self):
+        """A symbol listed mid-window has no earlier bars — that is not a hole."""
+        service, repo, _fetcher = build_service(exchange_bars=[_bar(8), _bar(9)])
+        assert _ensure(service) == 2
+        assert _inserted_timestamps(repo) == [_ts(8), _ts(9)]
+
+
+class TestFailClosed:
+    def test_missing_newest_bar_raises(self):
+        service, repo, _fetcher = build_service(exchange_bars=[_bar(7), _bar(8)])
+        with pytest.raises(StaleBarsError, match="incomplete window"):
+            _ensure(service)
+        repo.ins_bar.assert_not_called()
+
+    def test_interior_hole_raises(self):
+        service, repo, _fetcher = build_service(exchange_bars=[_bar(7), _bar(9)])
+        with pytest.raises(StaleBarsError, match="incomplete window"):
+            _ensure(service)
+        repo.ins_bar.assert_not_called()
+
+    def test_exchange_returning_nothing_raises(self):
+        service, _repo, _fetcher = build_service(exchange_bars=[])
+        with pytest.raises(StaleBarsError, match="incomplete window"):
+            _ensure(service)
+
+    def test_unmapped_symbol_raises(self):
+        service, repo, _fetcher = build_service(exchange_bars=[_bar(9)])
+        service._instruments.resolve_internal_cusip.return_value = None
+        with pytest.raises(StaleBarsError, match="PRODUCT_XREF"):
+            _ensure(service)
+        repo.ins_bar.assert_not_called()
+
+    def test_lookback_must_be_positive(self):
+        service, _repo, _fetcher = build_service()
+        with pytest.raises(ValueError, match="lookback"):
+            _ensure(service, lookback=0)
+
+
+class TestConcurrentInsertRace:
+    """Deployments sharing an instrument fire at the same boundary."""
+
+    def _losing_repo(self, service):
+        service._repo.ins_bar.side_effect = ProcedureError(
+            proc="market_data.sp_ins_price_bar",
+            sqlstate="23505",
+            message="duplicate key value violates unique constraint",
+        )
+
+    def test_lost_race_is_not_an_error(self):
+        """Another worker storing the same bar first is benign, not a failure."""
+        service, repo, _fetcher = build_service(exchange_bars=[_bar(7), _bar(8), _bar(9)])
+        self._losing_repo(service)
+        assert _ensure(service) == 0
+        assert repo.ins_bar.call_count == 3
+
+    def test_partial_race_counts_only_what_this_run_stored(self):
+        service, repo, _fetcher = build_service(exchange_bars=[_bar(7), _bar(8), _bar(9)])
+        repo.ins_bar.side_effect = [
+            None,
+            ProcedureError(proc="p", sqlstate="23505", message="dup"),
+            None,
+        ]
+        assert _ensure(service) == 2
+
+    def test_other_procedure_errors_still_propagate(self):
+        """Only the unique violation is benign — a real failure must surface."""
+        service, repo, _fetcher = build_service(exchange_bars=[_bar(7), _bar(8), _bar(9)])
+        repo.ins_bar.side_effect = ProcedureError(
+            proc="p", sqlstate="23502", message="null value in column"
+        )
+        with pytest.raises(ProcedureError):
+            _ensure(service)
+
+
+class TestSync:
+    def _sync(self, service, instruments, lookback=3):
+        return service.sync(
+            instruments=instruments,
+            tm_interval_id=INTERVAL_1H,
+            lookback=lookback,
+            now=NOW,
+        )
+
+    def test_duplicate_instruments_are_fetched_once(self):
+        """The caller derives the list from deployments, so repeats are expected."""
+        service, repo, fetcher = build_service(exchange_bars=[_bar(7), _bar(8), _bar(9)])
+        result = self._sync(service, [(CUSIP, APP_ID)] * 4)
+        assert result.instruments == 1
+        assert len(fetcher.calls) == 1
+        assert repo.ins_bar.call_count == 3
+
+    def test_distinct_instruments_each_refresh(self):
+        service, _repo, fetcher = build_service(exchange_bars=[_bar(7), _bar(8), _bar(9)])
+        result = self._sync(service, [(CUSIP, APP_ID), ("eth-usd.crypto", APP_ID)])
+        assert result.instruments == 2
+        assert len(fetcher.calls) == 2
+        assert result.inserted == 6
+
+    def test_same_cusip_on_a_different_app_is_not_deduped(self):
+        service, _repo, fetcher = build_service(exchange_bars=[_bar(7), _bar(8), _bar(9)])
+        result = self._sync(service, [(CUSIP, APP_ID), (CUSIP, 99)])
+        assert result.instruments == 2
+        assert len(fetcher.calls) == 2
+
+    def test_one_bad_instrument_does_not_stop_the_batch(self):
+        """Best effort — apply is where an incomplete window stops the world."""
+        service, _repo, _fetcher = build_service(exchange_bars=[_bar(7), _bar(8)])
+        result = self._sync(service, [(CUSIP, APP_ID)])
+        assert "incomplete window" in result.failures[CUSIP]
+        assert result.inserted == 0
+
+    def test_failures_are_reported_per_instrument(self):
+        service, _repo, _fetcher = build_service(exchange_bars=[_bar(7), _bar(8), _bar(9)])
+
+        real = service.ensure_fresh
+
+        def flaky(*, internal_cusip, **kwargs):
+            if internal_cusip == "bad.crypto":
+                raise StaleBarsError("exchange down")
+            return real(internal_cusip=internal_cusip, **kwargs)
+
+        service.ensure_fresh = flaky
+        result = self._sync(service, [("bad.crypto", APP_ID), (CUSIP, APP_ID)])
+        assert list(result.failures) == ["bad.crypto"]
+        assert result.instruments == 2
+        assert result.inserted == 3
+
+    def test_empty_instrument_list(self):
+        service, _repo, fetcher = build_service()
+        result = self._sync(service, [])
+        assert (result.instruments, result.inserted, result.failures) == (0, 0, {})
+        assert fetcher.calls == []
+
+
+class TestInsertPayload:
+    def test_bar_columns_reach_the_repo(self):
+        service, repo, _fetcher = build_service(
+            coverage_max=_ts(8), stored_bars=[_ts(7), _ts(8)], exchange_bars=[_bar(9)]
+        )
+        _ensure(service)
+        kwargs = repo.ins_bar.call_args.kwargs
+        assert kwargs["internal_cusip"] == CUSIP
+        assert kwargs["tm_interval_id"] == INTERVAL_1H
+        assert kwargs["source_app_id"] == APP_ID
+        assert kwargs["bar_timestamp"] == _ts(9)
+        assert (kwargs["open_px"], kwargs["high_px"]) == (100.0, 110.0)
+        assert (kwargs["low_px"], kwargs["close_px"]) == (95.0, 105.0)
+        assert kwargs["volume"] == 12.5
+
+
+class TestReadBars:
+    def _rows(self):
+        return [
+            {
+                "bar_timestamp": _ts(9),
+                "open_px": Decimal("100"),
+                "high_px": Decimal("110"),
+                "low_px": Decimal("95"),
+                "close_px": Decimal("105"),
+                "volume": Decimal("12.5"),
+            },
+            {
+                "bar_timestamp": _ts(8),
+                "open_px": Decimal("90"),
+                "high_px": Decimal("99"),
+                "low_px": Decimal("88"),
+                "close_px": Decimal("98"),
+                "volume": Decimal("3.5"),
+            },
+        ]
+
+    def _read(self):
+        service, repo, _fetcher = build_service()
+        repo.get_bars.return_value = self._rows()
+        return service.read_bars(
+            internal_cusip=CUSIP, tm_interval_id=INTERVAL_1H, start=_ts(8), end=_ts(9)
+        )
+
+    def test_matches_the_pipeline_column_contract(self):
+        """Same shape as fetch_df so indicator math needs no branch on source."""
+        df = self._read()
+        assert list(df.columns) == [
+            "price", "factor", "Open", "High", "Low", "Close", "Volume",
+        ]
+        assert df.index.name == "datetime"
+        assert str(df.index.tz) == "UTC"
+
+    def test_sorted_ascending_by_timestamp(self):
+        df = self._read()
+        assert list(df.index) == [_ts(8), _ts(9)]
+
+    def test_price_and_factor_both_track_close(self):
+        df = self._read()
+        assert list(df["price"]) == [98.0, 105.0]
+        assert list(df["factor"]) == [98.0, 105.0]
+        assert list(df["Close"]) == [98.0, 105.0]
+
+    def test_decimals_are_converted_to_float(self):
+        df = self._read()
+        assert df["Open"].dtype == float
+        assert df["Volume"].dtype == float
+
+    def test_no_rows_gives_an_empty_frame(self):
+        service, repo, _fetcher = build_service()
+        repo.get_bars.return_value = []
+        df = service.read_bars(
+            internal_cusip=CUSIP, tm_interval_id=INTERVAL_1H, start=_ts(8), end=_ts(9)
+        )
+        assert df.empty
+
+
+class TestIntervalResolution:
+    def test_daily_window_uses_the_refdata_period(self):
+        service, repo, fetcher = build_service(
+            exchange_bars=[
+                OhlcvBar(
+                    bar_timestamp=datetime(2026, 7, d, tzinfo=UTC),
+                    open_px=1.0, high_px=1.0, low_px=1.0, close_px=1.0, volume=1.0,
+                )
+                for d in (30, 31)
+            ]
+        )
+        inserted = service.ensure_fresh(
+            internal_cusip=CUSIP,
+            tm_interval_id=1,
+            source_app_id=APP_ID,
+            lookback=2,
+            now=NOW,
+        )
+        assert inserted == 2
+        assert _inserted_timestamps(repo) == [
+            datetime(2026, 7, 30, tzinfo=UTC),
+            datetime(2026, 7, 31, tzinfo=UTC),
+        ]
+        assert fetcher.calls[0]["period"] == timedelta(days=1)

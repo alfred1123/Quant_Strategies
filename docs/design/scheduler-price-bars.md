@@ -233,10 +233,10 @@ Same contract philosophy as `BacktestCache`: **reads may degrade loudly, writes 
 | **Exchange fetch fails** (ccxt down, rate-limited, timeout) at scheduler tick | Do **not** compute a signal on stale bars. Abort the run, write `TRADE.EXECUTION_EVENT` row with `IS_SUCCESS_IND='N'` — schedule is **not** advanced (tick did not complete). Retry on next poll; does not consume the 3-attempt budget. |
 | **Bars stale but within tolerance** (fetch OK, exchange lagging one bar) | Freshness rule (§4.4) decides: if `MAX_BAR_TIMESTAMP` is within one interval of now, proceed; otherwise treat as fetch failure above. |
 | **Gap in bars** (exchange downtime, missed ticks) | `SP_GET_PRICE_BAR` returns what exists; `PriceBarService` validates row count vs expected window and refetches the missing range (ccxt `fetch_ohlcv` accepts a `since` param). If the gap persists, fail closed as above. |
-| **Partial (still-forming) bar** | Never inserted. The fetch drops the last row when its `BAR_TIMESTAMP + interval > now()` — only **closed bars** enter the table. The clock module fires just after the boundary, so the newest closed bar is always available. |
+| **Partial (still-forming) bar** | Never inserted, and guarded twice: `ensure_fresh` never requests past `last_closed_bar`, and the fetcher discards any row with `ts > until` — the exchange *does* return the current candle when the window includes it. This matters because `PRICE_BAR` is append-only with a natural PK: a forming bar's high/low reflect only the elapsed portion, so storing one would freeze wrong values permanently and the corrected bar would later hit `unique_violation` instead of replacing it. Requires schedules to fire *after* the boundary — see [§6.2](#required-fire-after-the-boundary-never-on-it). |
 | **Crash before insert commits** | `SP_GET_PRICE_BAR_COVERAGE` unchanged — refetch missing range, `SP_INS_PRICE_BAR` per bar. |
 | **Crash after insert, before apply** | Coverage shows new bars — skip fetch/insert, re-run apply. |
-| **Duplicate insert** (app bug) | `unique_violation` on `SP_INS_PRICE_BAR` — fail loud. |
+| **Duplicate insert** | `SP_INS_PRICE_BAR` stays a plain INSERT and reports `unique_violation` — the SP does not hide it. `PriceBarService` treats **that one SQLSTATE (23505)** as a lost race and moves on; any other `ProcedureError` propagates. Deployments sharing an instrument and interval fire at the same boundary, so several legitimately decide the same bar is missing before any of them writes; the winner stored the same bar the losers fetched. A genuine double-insert is already ruled out by the missing-set calculation, so absorbing it here costs no real safety. |
 | **DB write fails after successful fetch** | Propagates (same as `BacktestCache.refresh_payload` contract). The scheduler run fails loudly; no order is placed on unpersisted data. |
 | **Timezone bugs** | Everything is `TIMESTAMPTZ` stored UTC; `BAR_TIMESTAMP` is the bar **open** time. Python side uses tz-aware UTC (`pd.Timestamp` convention already enforced by `BacktestCache._to_utc`). |
 
@@ -345,6 +345,26 @@ paid-tier; would test the emulator, not our logic) and **cron + curl**
 (needs the service token on the dev box, machine must be awake, bypasses
 `EXECUTION_EVENT` bookkeeping).
 
+#### Bar sync is one schedule per interval, not one per deployment
+
+Apply schedules are per-deployment, so N deployments trading `btcusdt.crypto` on 1H wake at the same instant. Without a shared warm-up each one fetches the same bar and they race to insert it.
+
+`PriceBarService.sync(instruments, tm_interval_id, lookback)` collapses that: **one schedule per `TM_INTERVAL_ID`** fires shortly before the apply schedules, derives the distinct `(INTERNAL_CUSIP, APP_ID)` set from the due deployments, and fetches each instrument once. Duplicates are folded inside `sync`, since the caller passes deployment rows straight through.
+
+It is **best effort and not a correctness dependency.** One unreachable symbol is recorded in `SyncResult.failures` and the batch continues; every apply still calls `ensure_fresh` and still fails closed on its own. A failed sync costs a redundant fetch on the apply path, never a bad trade. That is what lets sync catch broadly where apply must not.
+
+Remaining wiring: the `POST /api/v1/market-data/price-bars/sync` endpoint, the `price_bar_sync` entry in the Lambda's `_TASK_PATHS` (already stubbed as a comment), and the per-interval schedule itself.
+
+#### Required: fire *after* the boundary, never on it
+
+**Every schedule expression must carry an offset of a minute or two past the interval boundary** — `cron(2 * * * ? *)` for hourly, `cron(2 0 * * ? *)` for daily. Not `0`.
+
+`PriceBarService` computes its target as `last_closed_bar(now, period)`, so a tick at exactly 10:00:00 demands the `09:00` bar the instant it closed. The exchange has not necessarily published it yet, and the service **fails closed** — `StaleBarsError`, no signal, no order. The run recovers on the next poll and does not consume the 3-attempt apply budget, so this is a wasted tick rather than a correctness bug, but it is entirely avoidable.
+
+The offset costs nothing: the target is derived by flooring `now` to the boundary, so any firing time within `[10:00, 11:00)` resolves to the same `09:00` bar. Firing at :02 is identical to firing at :00, minus the race.
+
+This applies to both backends — the `eventbridge` schedule expression and the `local` poller's interval. Note the local poller's ~30s cycle is naturally offset, so the risk is concentrated in the EventBridge path.
+
 ### 6.3 Lambda function
 
 Handler lives in-repo (stdlib + Lambda-bundled boto3 — no layers). It is a
@@ -375,43 +395,58 @@ Lambda authenticates via `TRADE_SERVICE_TOKEN` (SSM SecureString), not a user JW
 
 No hardcoded interval enum. Valid intervals come from `REFDATA.TM_INTERVAL` via `RedisRefData` (same pattern as indicator/strategy dropdowns). API request/response models carry `schedule_interval: str | None` (the `NAME`, e.g. `"DAILY"`; `None` = manual); the repo layer resolves `NAME` to `TM_INTERVAL_ID` before calling SPs — mirroring how `BacktestCache` resolves `app_id`/`app_metric_id` through its refdata reader.
 
-### 7.2 Clock module (display only)
+### 7.2 Interval arithmetic — `quant/shared/intervals.py`
+
+Bar boundaries and scheduler ticks are the same arithmetic, so it lives in one cross-cutting module instead of once per caller:
 
 ```python
-# quant/trade/scheduler/clock.py
-def next_run_at(interval_name: str, after: datetime) -> datetime:
-    """Compute the next execution time for UI display — not persisted."""
+parse_period(value)            # REFDATA PERIOD_LENGTH → timedelta
+floor_to_period(ts, period)    # bin from the Unix epoch: DAILY → 00:00 UTC, 1H → top of hour
+last_closed_bar(now, period)   # newest bar that has finished forming
+next_run_at(after, period)     # next boundary — UI display only
+ccxt_timeframe(period)         # timedelta → "1h" / "1d"
 ```
 
-Aligns to interval boundaries (`DAILY` runs at 00:00 UTC, `1H` at the top of each hour). Poller due-ness comes from `SP_GET_MISSED_DUE_DEPLOYMENTS`.
+The module is pure arithmetic and does no I/O. The REFDATA lookup itself is `RedisRefData.get_interval_period(tm_interval_id) -> timedelta`, which sits with the other resolvers (`resolve_app_id`, `resolve_queue_status_id`) rather than in `shared/`.
 
-### 7.3 Price bar service
+`parse_period` accepts both a `timedelta` (straight from psycopg) and the stringified form (`"1 day, 0:00:00"`) that REFDATA rows carry after the publisher's `json.dumps(default=str)` round-trip through Redis — a caller should not have to know which side its row came from.
+
+Poller due-ness still comes from `SP_GET_MISSED_DUE_DEPLOYMENTS`; `next_run_at` is display only.
+
+### 7.3 Price bar service — `quant/market_data/service.py`
 
 ```python
-# quant/data/price_bar_service.py
 class PriceBarService:
-    """Freshness check + ccxt fetch + insert orchestration."""
+    """Freshness check, gap fill and range read."""
 
-    def ensure_fresh(self, internal_cusip: str, tm_interval_id: int, lookback: int) -> None:
-        """Check coverage / latest bar; fetch from exchange if stale."""
+    def ensure_fresh(self, *, internal_cusip, tm_interval_id, source_app_id, lookback, now=None) -> int:
+        """Coverage probe; on a stale tail, reconcile the window and insert what is missing."""
 
-    def read_bars(self, internal_cusip: str, tm_interval_id: int, start: datetime, end: datetime) -> pd.DataFrame:
-        """Read bars from MARKET_DATA.PRICE_BAR via SP."""
+    def sync(self, *, instruments, tm_interval_id, lookback, now=None) -> SyncResult:
+        """Warm many instruments once per interval — see §6.2. Best effort."""
+
+    def read_bars(self, *, internal_cusip, tm_interval_id, start, end) -> pd.DataFrame:
+        """Bars in the DataFrame shape of §4.6."""
 ```
 
-### 7.4 Price bar repo
+`ensure_fresh` gates on `MAX_BAR_TIMESTAMP >= last_closed_bar` (§4.4). When stale it reads the window, computes the missing boundaries, fetches from the oldest gap forward, and inserts **oldest first** — so a crash part-way leaves `MAX` short of the target and the next tick resumes from there rather than stepping over the hole.
 
-Follows the `BacktestCache` pattern — extends `DbGateway` (persistent connection), all access via `CALL MARKET_DATA.SP_*`:
+It raises `StaleBarsError` when the exchange cannot supply the newest closed bar or leaves an interior gap. Bars missing *before* the oldest one the exchange returned are treated as history that predates the listing: logged, not fatal.
+
+### 7.4 Price bar repo — `quant/market_data/repo.py`
+
+Follows the `BacktestCache` pattern — extends `DbGateway` (persistent connection, since a backfill is one `CALL` per bar), all access via `CALL MARKET_DATA.SP_*`:
 
 ```python
-# quant/data/price_bar_repo.py
 class PriceBarRepo(DbGateway):
-    """SP wrappers for MARKET_DATA stored procedures."""
-
-    def ins_bar(self, *, bar_timestamp, open_px, high_px, low_px, close_px, volume, ...) -> None: ...
-    def get_coverage(self, cusip: str, tm_interval_id: int) -> dict | None: ...
-    def get_bars(self, cusip: str, tm_interval_id: int, start: datetime, end: datetime) -> list[dict]: ...
+    def get_coverage(self, *, internal_cusip, tm_interval_id) -> dict | None: ...
+    def get_bars(self, *, internal_cusip, tm_interval_id, range_start, range_end) -> list[dict]: ...
+    def ins_bar(self, *, internal_cusip, tm_interval_id, source_app_id, bar_timestamp, open_px, high_px, low_px, close_px, volume) -> None: ...
 ```
+
+### 7.5 Bar fetcher — `quant/market_data/fetcher.py`
+
+`CcxtBarFetcher` paginates `fetch_ohlcv` across the requested window and drops anything past the last closed boundary. It builds a **keyless** ccxt client rather than reusing `CcxtTradeGateway`: bars are public data, and market data must not depend on a user's API credentials or on a trading session being up. `PriceBarService` depends on the `BarFetcher` protocol, not on ccxt.
 
 ---
 
@@ -453,11 +488,12 @@ class PriceBarRepo(DbGateway):
 
 | File | Content |
 |------|---------|
-| `quant/trade/scheduler/clock.py` | `next_run()` interval math |
-| `quant/trade/scheduler/trigger.py` | `ScheduleTrigger` seam — `EventBridgeTrigger` (boto3) / `LocalTrigger` (no-op) |
-| `quant/trade/scheduler/poller.py` | Dev-mode asyncio poller — due-deployment loop (`SCHEDULER_BACKEND=local`) |
-| `quant/data/price_bar_repo.py` | `PriceBarRepo` — MARKET_DATA SP wrappers |
-| `quant/data/price_bar_service.py` | Freshness check + fetch + upsert orchestration |
+| `quant/shared/intervals.py` | Interval arithmetic — period parsing, boundary alignment, `next_run_at`, ccxt timeframe |
+| `quant/market_data/repo.py` | `PriceBarRepo` — MARKET_DATA SP wrappers |
+| `quant/market_data/fetcher.py` | `CcxtBarFetcher` — paginated public `fetch_ohlcv` |
+| `quant/market_data/service.py` | `PriceBarService` — freshness check, gap fill, range read |
+| `quant/trade/scheduler/trigger.py` | `ScheduleTrigger` seam — `EventBridgeTrigger` (boto3) / `LocalTrigger` (no-op) — *pending* |
+| `quant/trade/scheduler/poller.py` | Dev-mode asyncio poller — due-deployment loop (`SCHEDULER_BACKEND=local`) — *pending* |
 
 ### Modified (Python)
 
