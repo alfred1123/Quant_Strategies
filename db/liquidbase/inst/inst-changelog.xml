@@ -20,4 +20,6 @@
            <include file="releases/X.Y.Z-name.xml" relativeToChangelogFile="true"/>
     -->
 
+    <include file="releases/1.1.0-bybit-binance-xref.xml" relativeToChangelogFile="true"/>
+
 </databaseChangeLog>

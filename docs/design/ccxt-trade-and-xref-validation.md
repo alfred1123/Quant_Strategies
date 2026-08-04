@@ -166,6 +166,10 @@ proposal/approval before authoritative xref.
 3. **Verify** candidate `vendor_symbol` ∈ market set (and optionally fetch ticker for smoke test).
 4. Only then call `INST.SP_INS_PRODUCT_XREF` (or approved Liquibase seed after manual verification).
 
+**Adding a second ccxt broker (e.g. Binance after Bybit):** insert another xref on the **same**
+`PRODUCT_ID` with the new `APP_ID` — do **not** create `btcusdt.binance` as a separate product.
+See decision [#21 INTERNAL_CUSIP](../decisions.md) and [database.md §INTERNAL_CUSIP](../architecture/database.md#internal_cusip-convention).
+
 **Anti-pattern (do not do):**
 
 ```sql

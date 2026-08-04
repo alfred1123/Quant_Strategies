@@ -38,17 +38,39 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 
 ### INTERNAL_CUSIP Convention
 
-`INST.PRODUCT.INTERNAL_CUSIP` is the stable, human-readable product identifier used across the entire pipeline. Format: **`symbol.exchange`**, always **lowercase**.
+`INST.PRODUCT.INTERNAL_CUSIP` is the stable, human-readable product identifier used across the entire pipeline. Format: **`{symbol}.{suffix}`**, always **lowercase**.
 
-| Asset Class | Exchange Portion | Example | Notes |
+| Asset class | Suffix / venue portion | Example | Notes |
 |---|---|---|---|
-| Crypto spot | `crypto` | `btc-usd.crypto` | Venue-agnostic — same asset across exchanges |
-| Crypto derivatives | Actual exchange | `btc-perp.binance` | Exchange-specific (different margin/settlement) |
-| Listed equity | Listing exchange | `aapl.nyse` | Unambiguous listing venue |
-| OTC / fixed income | Clearing house | `ust10y.dtcc` | Clearing venue is the stable identifier |
-| Index | Provider | `spx.cboe` | Index publisher is the authority |
+| Crypto spot | `.crypto` | `btcusdt.crypto` | **One product per traded pair** — not per broker. Bybit and Binance share this row; xref supplies `BTCUSDT` (or each venue's ccxt id). Symbol encodes quote currency (`btcusdt`, not `btc-usd`). |
+| Crypto derivatives | actual exchange | `btc-perp.binance` | Exchange-specific when margin/settlement differs |
+| Listed equity | listing exchange | `aapl.nyse` | Unambiguous listing venue |
+| OTC / fixed income | clearing house | `ust10y.dtcc` | Clearing venue is the stable identifier |
+| Index | provider | `spx.cboe` | Index publisher is the authority |
 
-Vendor-specific symbols (exact case, format) live in `INST.PRODUCT_XREF.VENDOR_SYMBOL` — one row per `(PRODUCT_ID, APP_ID)` pair.
+#### Multi-broker crypto spot (Bybit + Binance)
+
+Brokers are **not** part of the cusip. Enabling a second ccxt venue does **not** create a second `INST.PRODUCT` row.
+
+```
+INST.PRODUCT          INTERNAL_CUSIP = btcusdt.crypto   (one row)
+INST.PRODUCT_XREF     app_id=34 (bybit)   → BTCUSDT
+INST.PRODUCT_XREF     app_id=35 (binance) → BTCUSDT
+INST.PRODUCT_XREF     app_id=1  (yahoo)   → BTC-USD   (research proxy)
+INST.PRODUCT_XREF     app_id=2  (glassnode) → BTC
+```
+
+`TRADE.DEPLOYMENT` stores `internal_cusip` + `app_id` (which broker). Live apply resolves xref for that pair, fetches bars from that venue, and places orders there. A deployment moved from Bybit to Binance keeps the same cusip — only `app_id` and xref change.
+
+**Anti-patterns**
+
+| Pattern | Why it breaks |
+|---|---|
+| `btcusdt.bybit` / `btcusdt.binance` | Duplicates one instrument; splits cache, price bars, and strategies |
+| `btc-usd.crypto` when trading USDT on exchanges | Cusip says USD; venues quote USDT — silent mismatch at apply |
+| `EXCHANGE = 'bybit'` on a `.crypto` row | Broker belongs in xref + deployment, not product identity |
+
+Vendor-specific symbols (exact case, ccxt format) live in `INST.PRODUCT_XREF.VENDOR_SYMBOL` — one current row per `(PRODUCT_ID, APP_ID)` pair.
 
 Current operating model:
 
