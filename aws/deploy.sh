@@ -157,6 +157,7 @@ print(matches[0] if matches else '', end='')
 
   if [[ "$name" == "scheduler" ]]; then
     upload_scheduled_task_lambda
+    sync_schedules
   fi
 }
 
@@ -187,6 +188,22 @@ upload_scheduled_task_lambda() {
 
   rm -f "${zip_path}"
   echo "  ✓ Lambda code updated."
+}
+
+sync_schedules() {
+  local sync_script="${SCRIPT_DIR}/../scripts/sync_schedules.py"
+  if [[ ! -f "$sync_script" ]]; then
+    echo "  WARN: sync_schedules.py not found — skipping schedule sync."
+    return 0
+  fi
+
+  echo "  Syncing EventBridge schedules from config/scheduler/ ..."
+  local flags=()
+  if $DRY_RUN; then
+    flags+=(--dry-run)
+  fi
+  python3 "$sync_script" "${flags[@]}"
+  echo "  ✓ Schedule sync complete."
 }
 
 # ── Main ──────────────────────────────────────────────────────────────

@@ -25,6 +25,7 @@ from quant.api.auth.router import limiter as auth_limiter, router as auth_router
 from quant.api.auth.service import AuthService  # noqa: E402
 from quant.api.credentials.router import limiter as credentials_limiter, router as credentials_router  # noqa: E402
 from quant.api.credentials.service import CredentialService  # noqa: E402
+from quant.api.admin.router import router as admin_router  # noqa: E402
 from quant.api.exception_handlers import register as register_exception_handlers  # noqa: E402
 from quant.api.routers import backtest, deployments, inst, jobs, promotion, refdata, strategies  # noqa: E402
 from quant.refdata.bundle import DataCaches  # noqa: E402
@@ -120,6 +121,7 @@ app.include_router(promotion.router, prefix="/api/v1", dependencies=[Depends(req
 app.include_router(refdata.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(deployments.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(credentials_router, prefix="/api/v1", dependencies=[Depends(require_user)])
+app.include_router(admin_router, prefix="/api/v1", dependencies=[Depends(require_user)])
 
 
 @app.get("/health")

@@ -25,5 +25,6 @@
 
     <include file="releases/1.2.0-credential-check.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.3.0-grants-refresh.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.4.0-log-proc-summary.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

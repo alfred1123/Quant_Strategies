@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.4.0-001-log-proc-summary-table" author="alfcheun" context="core_admin,prod-deploy">
+        <comment>Daily aggregation of LOG_PROC_DETAIL by (date, schema, proc)</comment>
+        <sqlFile path="../tables/LOG_PROC_SUMMARY.sql" relativeToChangelogFile="true"
+                 splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql splitStatements="true" stripComments="true">
+                DROP TABLE IF EXISTS CORE_ADMIN.LOG_PROC_SUMMARY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.4.0-002-sp-ins-log-proc-summary" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>Procedure to aggregate unsummarized days from LOG_PROC_DETAIL into LOG_PROC_SUMMARY</comment>
+        <sqlFile path="../procedures/SP_INS_LOG_PROC_SUMMARY.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+        <rollback>
+            <sql splitStatements="true" stripComments="true">
+                DROP PROCEDURE IF EXISTS CORE_ADMIN.SP_INS_LOG_PROC_SUMMARY(TEXT, INTEGER, OUT TEXT, OUT TEXT, OUT TEXT, OUT INTEGER);
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

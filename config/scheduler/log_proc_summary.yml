@@ -1,0 +1,20 @@
+# log_proc_summary — first scheduled job.
+#
+# Validates the EventBridge → Lambda → FastAPI pipeline end-to-end.
+# deploy.sh reads this file and upserts the schedule via boto3
+# (scripts/sync_schedules.py). No CFN change needed to add new jobs —
+# just drop another YAML file here.
+
+task: log_proc_summary
+description: Aggregate LOG_PROC_DETAIL into daily per-proc call counts
+enabled: true
+
+schedule:
+  expression: "cron(0 0 ? * SAT *)"
+  timezone: UTC
+
+endpoint: /api/v1/admin/log-proc-summary/summarize
+
+db:
+  table: CORE_ADMIN.LOG_PROC_SUMMARY
+  procedure: CORE_ADMIN.SP_INS_LOG_PROC_SUMMARY
