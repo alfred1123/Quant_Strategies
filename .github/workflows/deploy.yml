@@ -8,7 +8,6 @@ on:
       - "*.md"
       - "tests/**"
       - "scripts/**"
-      - "backup/**"
       - ".github/skills/**"
       - ".github/instructions/**"
       - ".cursor/**"

@@ -7,7 +7,7 @@ Supported sources:
     4. YahooFinance — free equity/crypto/ETF data via yfinance
     5. NasdaqDataLink — time-series and table data via Nasdaq Data Link API
 
-BybitData class moved to backup/deco/ — platform decommissioned.
+Live exchange OHLCV and ccxt trading live in ``quant/market_data/`` and ``quant/trade/brokers/ccxt/``.
 """
 
 import logging

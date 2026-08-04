@@ -42,8 +42,7 @@
 | `FutuTrader` | `quant/trade/futu_trader.py` | Procedural wrapper around `OpenSecTradeContext`; `place_order`, `apply_signal`, queries |
 | Quote data | `quant/data/sources.py::FutuOpenD` | `OpenQuoteContext` — **separate** from trade context (matches Futu docs) |
 | Deployments API | `quant/api/routers/deployments.py` | Persist strategy + `api_credential_id` + `app_id` |
-| Trade domain | `quant/trade/service.py`, `db_repo.py` | DB only — no broker calls yet |
-| Legacy scripts | `quant/trade/trade.py`, `source.py`, `repo.py` | Old Bybit/ccxt experiments — **do not extend**; delete or move to `backup/deco/` when Futu adapter lands |
+| Trade domain | `quant/trade/service.py`, `db_repo.py`, `live_apply.py` | Deployments, live apply, broker adapters |
 | Unit / E2E tests | `tests/unit/test_trade.py`, `tests/e2e/test_futu_trader_e2e.py` | Import via `quant.trade` (re-exported from `futu_trader`) |
 
 ### 2.2 Futu OpenD model (from official docs)
@@ -851,7 +850,7 @@ Until gateway registry exists, Trade → Config should treat **Futu as “connec
 | 3 | Multi-tenant Futu | **Deferred:** Bybit for SaaS multi-user; Futu house account v1 — §13 |
 | 4 | Paper order type default | Limit-at-last vs market-with-fallback |
 | 5 | Short selling | `apply_signal(-1)` — US/HK margin rules; may restrict to long-only v1 |
-| 6 | Legacy `quant/trade/trade.py` | Delete vs move to `backup/deco/` |
+| 6 | Legacy standalone trade scripts | Removed — logic lives in `quant/trade/` |
 
 Record resolutions in [decisions.md](../decisions.md).
 

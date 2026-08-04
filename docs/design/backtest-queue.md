@@ -905,7 +905,7 @@ After step 5, the FastAPI deployment unit can be removed entirely. The coordinat
 | **Docker Compose** (`docker-compose.yml`) | `api`, `frontend`, `nginx` | Add `coordinator` service. After full migration, remove `api`. |
 | **CI / CD** (`.github/workflows/`) | Builds Python + frontend | Add coordinator build (Bun image) + tests (`bun test`). |
 | **Observability** | Logging only | Add OpenTelemetry early — Python and TS both export to the same collector. Critical once requests hop runtimes. |
-| **Trade execution** (`backup/deco/`, future `src/trade.py`) | Python (Futu, Bybit SDKs) | **Stays Python** — broker SDKs only ship Python/C++. Coordinator could expose `/api/v1/trade/*` HTTP and dispatch to a long-running Python trade process via the same DB-only contract used for workers. |
+| **Trade execution** (`quant/trade/`) | Python (Futu, ccxt) | **Stays Python** — broker SDKs only ship Python/C++. Coordinator could expose `/api/v1/trade/*` HTTP and dispatch to a long-running Python trade process via the same DB-only contract used for workers. |
 | **Live market data ingestion** (future) | Not built | If/when added, evaluate Go for the ingestion daemon (binary deployable, small footprint). Coordinator stays the HTTP boundary. |
 
 ### 20.5 What this enables long-term

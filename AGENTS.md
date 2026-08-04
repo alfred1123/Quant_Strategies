@@ -9,7 +9,6 @@ This repository contains Python tooling for **backtesting**, **technical analysi
 | `quant/` | Backtesting pipeline + FastAPI backend — `shared/` (config, logging, db), `schemas/`, `data/`, `refdata/`, `strategy/`, `queue/`, `trade/`, `cli.py`, and `api/` (HTTP routers) |
 | `frontend/` | React/TypeScript SPA (replaced Streamlit) |
 | `docs/` | MkDocs Material wiki — architecture, guides, design docs, decisions log. Serve locally with `mkdocs serve`. |
-| `backup/deco/` | Decommissioned scripts (Bybit live trading — kept for reference) |
 
 Run backtest-style code via `python -m quant.cli` or import from the `quant` package (e.g. `from quant.data.sources import ...`).
 

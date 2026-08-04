@@ -390,7 +390,7 @@ Planned adapters:
 | Adapter | Gateway | Asset class | Reference |
 |---------|---------|-------------|-----------|
 | `FutuAdapter` | `FutuTradeGateway` (OpenD) | HK/US equities | [futu-trading.md](futu-trading.md) |
-| `BybitAdapter` | `CcxtTradeGateway` (ccxt) | Crypto perpetuals | `backup/deco/bybit._trade.py` |
+| `BybitAdapter` | `CcxtTradeGateway` (ccxt) | Crypto perpetuals | `quant/trade/brokers/ccxt/` |
 | `BinanceAdapter` | `CcxtTradeGateway` (ccxt) | Crypto spot/perps | — |
 
 ---

@@ -88,9 +88,7 @@ CCXT_PRESETS = {
 `ConnectParams(paper=…, demo=…)` is passed to `preset.wire(exchange, params)` before
 `load_markets()`. Bybit demo mode uses `demo=True` (not sandbox).
 
-Live order paths (`place_order`, `apply_signal`) remain `NotImplementedError` until Phase 1.7.
-
-Reference: `backup/deco/bybit._trade.py` (legacy ccxt script).
+Live order paths are implemented in `quant/trade/brokers/ccxt/` and `quant/trade/live_apply.py`.
 
 ---
 

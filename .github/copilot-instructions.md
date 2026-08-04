@@ -7,7 +7,6 @@
 | `quant/` | Pipeline + FastAPI: `data/`, `refdata/`, `strategy/`, `queue/`, `trade/`, `shared/`, `api/`, `cli.py` |
 | `frontend/` | React/TypeScript SPA |
 | `docs/` | MkDocs Material wiki — architecture, guides, design docs, decisions log |
-| `backup/deco/` | Decommissioned scripts (kept for reference) |
 | `tests/unit/` | Unit tests per module |
 | `tests/integration/` | End-to-end pipeline tests |
 | `db/` | PostgreSQL schema and Liquibase migrations |
