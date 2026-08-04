@@ -351,6 +351,100 @@ class TestReadBars:
         assert df.empty
 
 
+class TestLoadWindow:
+    """The live-apply entry point: complete the window, then hand it over."""
+
+    def _rows(self, hours):
+        return [
+            {
+                "bar_timestamp": _ts(h),
+                "open_px": Decimal("100"),
+                "high_px": Decimal("110"),
+                "low_px": Decimal("95"),
+                "close_px": Decimal("105"),
+                "volume": Decimal("12.5"),
+            }
+            for h in hours
+        ]
+
+    def test_reads_exactly_the_lookback_window(self):
+        service, repo, _fetcher = build_service(coverage_max=_ts(9))
+        repo.get_bars.return_value = self._rows([7, 8, 9])
+
+        df = service.load_window(
+            CUSIP, 3, tm_interval_id=INTERVAL_1H, source_app_id=APP_ID, now=NOW
+        )
+
+        assert len(df) == 3
+        # Newest closed bar back three, not three from `now`.
+        assert repo.get_bars.call_args.kwargs["range_start"] == _ts(7)
+        assert repo.get_bars.call_args.kwargs["range_end"] == _ts(9)
+
+    def test_fetches_before_reading_when_stale(self):
+        service, repo, fetcher = build_service(
+            coverage_max=_ts(8), exchange_bars=[_bar(9)]
+        )
+        # The gap check sees 09:00 missing; the read afterwards sees it stored.
+        repo.get_bars.side_effect = [
+            self._rows([7, 8]),
+            self._rows([7, 8, 9]),
+        ]
+
+        df = service.load_window(
+            CUSIP, 3, tm_interval_id=INTERVAL_1H, source_app_id=APP_ID, now=NOW
+        )
+
+        assert fetcher.calls, "expected the missing bar to be fetched"
+        assert _inserted_timestamps(repo) == [_ts(9)]
+        assert len(df) == 3
+
+    def test_incomplete_window_raises_instead_of_returning_short(self):
+        """Fail closed — a caller must never see a frame with a hole in it."""
+        service, _repo, _fetcher = build_service(exchange_bars=[])
+
+        with pytest.raises(StaleBarsError):
+            service.load_window(
+                CUSIP, 3, tm_interval_id=INTERVAL_1H, source_app_id=APP_ID, now=NOW
+            )
+
+    def test_short_history_is_refused_even_though_the_gap_is_tolerated(self):
+        """ensure_fresh allows pre-listing gaps; serving a signal does not.
+
+        A newly listed instrument leaves the window legitimately short. The
+        indicator would still compute on what arrived — on a fraction of the
+        lookback the strategy was fitted on — so the read side draws the line.
+        """
+        service, repo, _fetcher = build_service(coverage_max=_ts(9))
+        repo.get_bars.return_value = self._rows([8, 9])  # 2 of 10 requested
+
+        with pytest.raises(StaleBarsError, match="only 2 of 10"):
+            service.load_window(
+                CUSIP, 10, tm_interval_id=INTERVAL_1H, source_app_id=APP_ID, now=NOW
+            )
+
+    def test_slack_at_the_oldest_edge_is_allowed(self):
+        """80% is enough — the newest bar is what the signal turns on."""
+        service, repo, _fetcher = build_service(coverage_max=_ts(9))
+        repo.get_bars.return_value = self._rows([2, 3, 4, 5, 6, 7, 8, 9])
+
+        df = service.load_window(
+            CUSIP, 10, tm_interval_id=INTERVAL_1H, source_app_id=APP_ID, now=NOW
+        )
+
+        assert len(df) == 8
+
+    def test_single_bar_lookback_reads_one_boundary(self):
+        service, repo, _fetcher = build_service(coverage_max=_ts(9))
+        repo.get_bars.return_value = self._rows([9])
+
+        service.load_window(
+            CUSIP, 1, tm_interval_id=INTERVAL_1H, source_app_id=APP_ID, now=NOW
+        )
+
+        kwargs = repo.get_bars.call_args.kwargs
+        assert kwargs["range_start"] == kwargs["range_end"] == _ts(9)
+
+
 class TestIntervalResolution:
     def test_daily_window_uses_the_refdata_period(self):
         service, repo, fetcher = build_service(

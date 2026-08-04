@@ -138,6 +138,18 @@ class RedisRefData:
                 return parse_period(r["period_length"])
         raise RuntimeError(f"REFDATA.TM_INTERVAL missing TM_INTERVAL_ID={tm_interval_id}")
 
+    def resolve_interval_id(self, period: timedelta) -> int:
+        """``TM_INTERVAL_ID`` whose ``PERIOD_LENGTH`` equals *period*.
+
+        The inverse of :meth:`get_interval_period` — for code that knows the
+        cadence it needs (e.g. daily bars for an unscheduled live apply) but
+        must take the id from REFDATA rather than hardcode it.
+        """
+        for r in self.get("tm_interval"):
+            if parse_period(r["period_length"]) == period:
+                return int(r["tm_interval_id"])
+        raise RuntimeError(f"REFDATA.TM_INTERVAL has no row with PERIOD_LENGTH={period}")
+
     def resolve_queue_status_id(self, name: str) -> int:
         for r in self.get("queue_status"):
             if r["name"] == name:

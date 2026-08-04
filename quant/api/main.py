@@ -76,6 +76,12 @@ async def lifespan(app: FastAPI):
         )
         app.state.adapter_registry = AdapterRegistry()
 
+    # Application-scoped: holds a long-lived PriceBarRepo connection and caches
+    # a ccxt client per venue, so it must outlive the per-request TradeService.
+    from quant.trade.bar_source import PriceBarServiceFactory
+
+    app.state.price_bars = PriceBarServiceFactory(DB_CONNINFO, caches)
+
     yield
 
 

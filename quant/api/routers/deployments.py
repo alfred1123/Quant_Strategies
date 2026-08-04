@@ -40,6 +40,7 @@ def get_trade_service(request: Request) -> TradeService:
         credential_repo=ApiCredentialRepo(conninfo, user_id="system"),
         adapter_registry=request.app.state.adapter_registry,
         data_caches=request.app.state.data_caches,
+        price_bars=request.app.state.price_bars,
     )
 
 

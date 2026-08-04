@@ -320,3 +320,140 @@ class TestLiveApplyOrchestrator:
         report = orch.run(dep.app_user_id, dep, "alice")
 
         assert report.order_success is True
+
+
+class TestSignalDataSource:
+    """The venue decides the series: exchange bars whenever one exists,
+    provider only for brokers without a market-data venue."""
+
+    @patch("quant.trade.live_apply.exchange_id_for_app", return_value=None)
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
+    def test_venue_less_broker_uses_the_provider_path(
+        self, mock_signal, _mock_venue, orchestrator
+    ):
+        """e.g. Futu equities — the provider series is the only one that exists."""
+        orch, _bt = orchestrator
+
+        _signal, source = orch._compute_signal(
+            _deployment(schedule_tm_interval_id=None)
+        )
+
+        assert mock_signal.call_args.kwargs["bar_loader"] is None
+        assert source == "provider"
+
+    @patch("quant.trade.live_apply.exchange_id_for_app", return_value="bybit")
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
+    def test_manual_deployment_on_a_venue_defaults_to_daily_exchange_bars(
+        self, mock_signal, _mock_venue, orchestrator
+    ):
+        """No schedule means daily, not 'fall back to the provider'."""
+        from datetime import timedelta
+
+        orch, _bt = orchestrator
+        service = MagicMock()
+        orch._price_bars = MagicMock()
+        orch._price_bars.for_app.return_value = service
+        orch._data_caches.refdata.resolve_interval_id.return_value = 1
+        dep = _deployment(app_id=34, schedule_tm_interval_id=None)
+
+        _signal, source = orch._compute_signal(dep)
+
+        orch._data_caches.refdata.resolve_interval_id.assert_called_once_with(
+            timedelta(days=1)
+        )
+        assert source == "price_bar:bybit"
+        loader = mock_signal.call_args.kwargs["bar_loader"]
+        loader("btcusdt.crypto", 120)
+        service.load_window.assert_called_once_with(
+            "btcusdt.crypto", 120, tm_interval_id=1, source_app_id=34
+        )
+
+    @patch("quant.trade.live_apply.exchange_id_for_app", return_value="bybit")
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
+    def test_scheduled_deployment_names_the_venue_it_priced_from(
+        self, mock_signal, _mock_venue, orchestrator
+    ):
+        orch, _bt = orchestrator
+        orch._price_bars = MagicMock()
+
+        _signal, source = orch._compute_signal(_deployment(schedule_tm_interval_id=2))
+
+        assert source == "price_bar:bybit"
+
+    @patch("quant.trade.live_apply.exchange_id_for_app", return_value="bybit")
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
+    def test_scheduled_deployment_binds_its_interval_and_broker(
+        self, mock_signal, _mock_venue, orchestrator
+    ):
+        orch, _bt = orchestrator
+        service = MagicMock()
+        orch._price_bars = MagicMock()
+        orch._price_bars.for_app.return_value = service
+        dep = _deployment(app_id=34, schedule_tm_interval_id=2)
+
+        orch._compute_signal(dep)
+
+        orch._price_bars.for_app.assert_called_once_with(34)
+        loader = mock_signal.call_args.kwargs["bar_loader"]
+        loader("btcusdt.crypto", 120)
+        service.load_window.assert_called_once_with(
+            "btcusdt.crypto", 120, tm_interval_id=2, source_app_id=34
+        )
+
+    @patch("quant.trade.live_apply.exchange_id_for_app", return_value="bybit")
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
+    def test_venue_without_a_bar_source_refuses(
+        self, mock_signal, _mock_venue, orchestrator
+    ):
+        """Never silently price a venue-bound strategy off the provider feed."""
+        orch, _bt = orchestrator
+        orch._price_bars = None
+
+        with pytest.raises(TradeValidationError, match="no price bar source"):
+            orch._compute_signal(_deployment(schedule_tm_interval_id=2))
+        with pytest.raises(TradeValidationError, match="no price bar source"):
+            orch._compute_signal(_deployment(schedule_tm_interval_id=None))
+
+        mock_signal.assert_not_called()
+
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
+    def test_report_carries_the_source_to_the_caller(self, mock_signal, orchestrator):
+        """CloudWatch keeps the Lambda's response body — that is the audit trail."""
+        orch, _bt = orchestrator
+        dep = _deployment(schedule_tm_interval_id=None)
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = ("k", "s")
+        orch._adapter_registry.create.return_value = _adapter_mock(
+            apply_signal=MagicMock(
+                return_value=OrderResult(
+                    success=True,
+                    vendor_order_id="order-9",
+                    message="filled",
+                    side=OrderSide.BUY,
+                    requested_qty=0.01,
+                    filled_qty=0.01,
+                )
+            ),
+        )
+
+        report = orch.run(dep.app_user_id, dep, "alice")
+
+        assert report.bar_source == "provider"
+
+    @patch("quant.trade.live_apply.compute_latest_position")
+    def test_stale_bars_abort_the_apply_before_any_order(
+        self, mock_signal, orchestrator
+    ):
+        from quant.market_data.service import StaleBarsError
+
+        orch, _bt = orchestrator
+        orch._price_bars = MagicMock()
+        mock_signal.side_effect = StaleBarsError("exchange did not return 1 bar(s)")
+        dep = _deployment(schedule_tm_interval_id=2)
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = ("k", "s")
+
+        with pytest.raises(StaleBarsError):
+            orch.run(dep.app_user_id, dep, "alice")
+
+        orch._adapter_registry.create.assert_not_called()

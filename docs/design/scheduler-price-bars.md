@@ -233,6 +233,7 @@ Same contract philosophy as `BacktestCache`: **reads may degrade loudly, writes 
 | **Exchange fetch fails** (ccxt down, rate-limited, timeout) at scheduler tick | Do **not** compute a signal on stale bars. Abort the run, write `TRADE.EXECUTION_EVENT` row with `IS_SUCCESS_IND='N'` — schedule is **not** advanced (tick did not complete). Retry on next poll; does not consume the 3-attempt budget. |
 | **Bars stale but within tolerance** (fetch OK, exchange lagging one bar) | Freshness rule (§4.4) decides: if `MAX_BAR_TIMESTAMP` is within one interval of now, proceed; otherwise treat as fetch failure above. |
 | **Gap in bars** (exchange downtime, missed ticks) | `SP_GET_PRICE_BAR` returns what exists; `PriceBarService` validates row count vs expected window and refetches the missing range (ccxt `fetch_ohlcv` accepts a `since` param). If the gap persists, fail closed as above. |
+| **Instrument listed more recently than the lookback** | `ensure_fresh` tolerates it (warns, treats as pre-listing history) so warming still works; `load_window` refuses below **80% coverage** of the requested lookback, because an indicator computes happily on a short window and would return a plausible number off statistics the strategy was never fitted on. See [§7.3](#73-price-bar-service--quantmarket_dataservicepy). |
 | **Partial (still-forming) bar** | Never inserted, and guarded twice: `ensure_fresh` never requests past `last_closed_bar`, and the fetcher discards any row with `ts > until` — the exchange *does* return the current candle when the window includes it. This matters because `PRICE_BAR` is append-only with a natural PK: a forming bar's high/low reflect only the elapsed portion, so storing one would freeze wrong values permanently and the corrected bar would later hit `unique_violation` instead of replacing it. Requires schedules to fire *after* the boundary — see [§6.2](#required-fire-after-the-boundary-never-on-it). |
 | **Crash before insert commits** | `SP_GET_PRICE_BAR_COVERAGE` unchanged — refetch missing range, `SP_INS_PRICE_BAR` per bar. |
 | **Crash after insert, before apply** | Coverage shows new bars — skip fetch/insert, re-run apply. |
@@ -427,11 +428,111 @@ class PriceBarService:
 
     def read_bars(self, *, internal_cusip, tm_interval_id, start, end) -> pd.DataFrame:
         """Bars in the DataFrame shape of §4.6."""
+
+    def load_window(self, internal_cusip, lookback, *, tm_interval_id, source_app_id, now=None) -> pd.DataFrame:
+        """`ensure_fresh` then `read_bars` — the live-apply entry point."""
 ```
 
 `ensure_fresh` gates on `MAX_BAR_TIMESTAMP >= last_closed_bar` (§4.4). When stale it reads the window, computes the missing boundaries, fetches from the oldest gap forward, and inserts **oldest first** — so a crash part-way leaves `MAX` short of the target and the next tick resumes from there rather than stepping over the hole.
 
 It raises `StaleBarsError` when the exchange cannot supply the newest closed bar or leaves an interior gap. Bars missing *before* the oldest one the exchange returned are treated as history that predates the listing: logged, not fatal.
+
+`load_window` is the only method live apply calls: one window, complete or raising. Its positional `(internal_cusip, lookback)` exists so a caller can bind the interval and broker once and vary the symbol — which is exactly the `BarLoader` shape §7.6 needs.
+
+**Population tolerates a short window; serving a signal does not.** `ensure_fresh` deliberately allows bars older than the exchange's earliest — that is listing history, not a gap — because warming a newly listed instrument should not fail. `load_window` then applies a **coverage floor of 80% of the requested lookback** and raises `StaleBarsError` below it. Without the floor an indicator still computes on whatever arrived: a 20-bar Bollinger needs only 20 bars, so a 25-bar window returns a perfectly valid-looking number derived from statistics the strategy was never fitted on. The floor turns that into a loud failure:
+
+| Indicator window | Lookback requested | Bars required |
+|---|---|---|
+| 20 | 120 | 96 |
+| 60 | 240 | 192 |
+
+80% rather than 100% because the newest bar is what the signal turns on and the oldest edge of a 3x-padded lookback is slack; 80% rather than less because falling far below the padding starves the indicator itself.
+
+### 7.6 Signal source selection — `quant/strategy/live_service.py`
+
+`compute_latest_position` takes an optional `bar_loader`, typed
+`BarLoader = Callable[[str, int], pd.DataFrame]` — `(internal_cusip, lookback_bars)`.
+Supplying one switches every series the strategy reads from the provider path
+(`fetch_df`, addressed by **date**) to `MARKET_DATA.PRICE_BAR` (addressed by
+**bar count**). Which source is used is the *only* difference: both paths call
+one `build_data_dict_for_signal(config, load)`, differing only in the
+`SymbolLoader` they are handed (`provider_loader` or `bars_loader`).
+
+That single builder takes its symbol set from
+`StrategyConfig.get_internal_cusips()` — the same accessor `Performance` resolves
+factor frames through — so the data dict is keyed exactly the way the strategy
+will look it up. Keying it any other way is not a style question: the live path
+previously keyed factors by `symbol` while `build_config` writes
+`vendor_symbol or symbol` onto the substrategy, so any cross-product strategy
+using a `vendor_symbol` override (e.g. `^VIX`) raised `KeyError` in live and
+dry-run while backtesting fine.
+
+The lookback is `live_lookback_bars(window)` = `max_window * 3 + 60`. It is the
+bar-indexed twin of `live_lookback_days` and deliberately drops that function's
+`min(trading_period, 400)` floor, which buys roughly a year of daily history to
+survive weekends and holidays — meaningless when every element of the window is
+one bar of the interval being traded.
+
+**Factors come from the same venue or not at all.** `bars_loader` routes *every*
+symbol to the exchange, including factors that name their own `data_source`.
+Mixing an exchange series with a provider series would align bars that were never
+observed on the same clock; a symbol the exchange cannot supply raises out of the
+loader rather than falling back.
+
+### 7.7 Broker binding — `quant/trade/bar_source.py`
+
+`PriceBarServiceFactory.for_app(app_id)` returns the `PriceBarService` reading
+from the venue that `app_id` trades on, resolving it through
+`registry.exchange_id_for_app` so the ccxt id is never restated next to the
+price-bar code. Services are cached per `APP_ID` (a scheduled apply runs every
+boundary and each build starts a ccxt client); the `PriceBarRepo` is **not**
+per-broker, since it is one connection to one database and every venue's bars
+land in the same table. It is built once in the FastAPI lifespan and lives on
+`app.state.price_bars`, outliving the per-request `TradeService`.
+
+`LiveApplyOrchestrator` chooses the source **by venue, not by schedule**: a live
+signal reads the bars of the exchange it executes on whenever that exchange
+serves market data. The schedule only sets the bar interval — no schedule means
+**daily** (`resolve_interval_id(timedelta(days=1))`, id from REFDATA, never
+hardcoded). The provider path survives solely for brokers with no market-data
+venue, where the provider series is the only series that exists.
+
+| Deployment | Source |
+|---|---|
+| App has no ccxt venue (e.g. Futu equities) | Provider path (`fetch_df`, by date) |
+| Venue, no schedule (manual apply) | `PRICE_BAR` via `load_window`, daily interval |
+| Venue, scheduled | `PRICE_BAR` via `load_window`, schedule's interval |
+| Venue, factory missing | `TradeValidationError` — refuses rather than pricing a venue-bound strategy off the provider feed |
+
+This means manual and scheduled applies of the same deployment read the **same
+series** — attaching a schedule changes cadence, never the input data. Research
+(backtest, dry-run) keeps the provider: daily 10-year history is what providers
+are for, and the split matches how the data is used, not how the apply was
+triggered.
+
+`StaleBarsError` propagates out of the apply before an adapter is even
+constructed, so no order can be placed on an incomplete window. The API maps it
+to **503**, not 4xx: the request was valid and the caller should return on the
+next tick.
+
+#### Recording which series produced the signal
+
+`ApplyReport.bar_source` carries `"price_bar:<venue>"` or `"provider"`, and the
+same label is logged at apply time.
+
+This is not bookkeeping for its own sake. **Strategy parameters are fitted on
+provider history and a live apply trades them against exchange prints.**
+The Phase 0.1 candidate was signed off on Glassnode daily data; the same
+parameters now price against Bybit bars, which are a different series — so the
+same config can produce a different position on the same day. Recording the
+input next to the output is what makes such a divergence traceable instead of
+speculative.
+
+The label currently lives on the API response (which the Lambda logs to
+CloudWatch) and in the application log. It is **not** persisted:
+`TRADE.EXECUTION_EVENT` has no column for it, and adding one is a DDL change
+plus an `SP_INS_EXECUTION_EVENT` signature change — worth doing once the
+divergence is understood well enough to know what else belongs in that row.
 
 ### 7.4 Price bar repo — `quant/market_data/repo.py`
 
@@ -491,7 +592,8 @@ class PriceBarRepo(DbGateway):
 | `quant/shared/intervals.py` | Interval arithmetic — period parsing, boundary alignment, `next_run_at`, ccxt timeframe |
 | `quant/market_data/repo.py` | `PriceBarRepo` — MARKET_DATA SP wrappers |
 | `quant/market_data/fetcher.py` | `CcxtBarFetcher` — paginated public `fetch_ohlcv` |
-| `quant/market_data/service.py` | `PriceBarService` — freshness check, gap fill, range read |
+| `quant/market_data/service.py` | `PriceBarService` — freshness check, gap fill, range read, `load_window` |
+| `quant/trade/bar_source.py` | `PriceBarServiceFactory` — `APP_ID` → venue → price bar service |
 | `quant/trade/scheduler/trigger.py` | `ScheduleTrigger` seam — `EventBridgeTrigger` (boto3) / `LocalTrigger` (no-op) — *pending* |
 | `quant/trade/scheduler/poller.py` | Dev-mode asyncio poller — due-deployment loop (`SCHEDULER_BACKEND=local`) — *pending* |
 
@@ -501,14 +603,24 @@ class PriceBarRepo(DbGateway):
 |------|--------|
 | `quant/schemas/deployments.py` | `schedule_interval` / `last_run_at` fields (interval names from REFDATA) |
 | `quant/trade/db_repo.py` | Schedule fields in SP calls; `get_missed_due_deployments()` |
-| `quant/trade/service.py` | Next-run calculation on create/apply |
+| `quant/trade/service.py` | Next-run calculation on create/apply; passes the bar factory through |
+| `quant/trade/registry.py` | `exchange_id_for_app` — `APP_ID` → ccxt exchange id |
+| `quant/trade/live_apply.py` | Picks the signal source from `SCHEDULE_TM_INTERVAL_ID` (§7.7) |
+| `quant/strategy/live_service.py` | `SymbolLoader` seam; symbols via `get_internal_cusips()` |
+| `quant/strategy/performance.py` | `live_lookback_bars` alongside `live_lookback_days` |
+| `quant/api/exception_handlers.py` | `StaleBarsError` → 503 |
+| `quant/api/main.py` | `app.state.price_bars` built in the lifespan |
 
 ---
 
 ## 9. Implementation order
 
-1. **DDL** — `REFDATA.TM_INTERVAL` seed; MARKET_DATA schema + tables + SPs; DEPLOYMENT scheduler columns + SP updates.
-2. **Python** — schedule fields in schemas, `PriceBarRepo`, `PriceBarService`, db_repo schedule fields, clock module.
-3. **Integration** — Wire price bar refresh into live apply flow; connect scheduler tick.
+1. **DDL** — `REFDATA.TM_INTERVAL` seed; MARKET_DATA schema + tables + SPs; DEPLOYMENT scheduler columns + SP updates. ✅
+2. **Python** — schedule fields in schemas, `PriceBarRepo`, `PriceBarService`, db_repo schedule fields, clock module. ✅
+3. **Integration** — Price bar refresh wired into live apply ✅; scheduler tick *pending*.
 4. **UI + Lambda** — Schedule dropdown in DeploymentDialog; EventBridge/Lambda CloudFormation.
-5. **Tests** — Unit tests for clock, repos, service, updated schemas.
+5. **Tests** — Unit tests for clock, repos, service, updated schemas. ✅
+
+Still open before a scheduled apply can run end to end: service auth (§6.4 — every
+Lambda invoke 401s today), the `POST /api/v1/market-data/price-bars/sync` endpoint
+with its `_TASK_PATHS` entry (§6.2), and the `ScheduleTrigger` seam.

@@ -11,6 +11,7 @@ with holes in it.
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -25,6 +26,13 @@ from quant.shared.intervals import bar_starts, last_closed_bar
 logger = logging.getLogger(__name__)
 
 _UNIQUE_VIOLATION = "23505"
+
+#: Fraction of the requested lookback a window must reach before a signal may be
+#: computed on it. Not 1.0: the newest bar is what matters and the oldest edge of
+#: a padded lookback is slack, so a recently listed instrument should not be
+#: permanently untradeable. Not much lower either — the padding is roughly 3x the
+#: indicator window, so falling far below it starves the indicator itself.
+_MIN_WINDOW_COVERAGE = 0.8
 
 
 class StaleBarsError(RuntimeError):
@@ -268,6 +276,52 @@ class PriceBarService:
         )
 
     # ── read ─────────────────────────────────────────────────────────────
+
+    def load_window(
+        self,
+        internal_cusip: str,
+        lookback: int,
+        *,
+        tm_interval_id: int,
+        source_app_id: int,
+        now: datetime | None = None,
+    ) -> pd.DataFrame:
+        """The newest ``lookback`` closed bars, fetching whatever is missing.
+
+        The entry point for live signal computation: one call that leaves the
+        window complete or raises. Positional ``(internal_cusip, lookback)``
+        so the caller can bind the interval and app once and pass the rest
+        per symbol.
+        """
+        self.ensure_fresh(
+            internal_cusip=internal_cusip,
+            tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
+            lookback=lookback,
+            now=now,
+        )
+        period = self._refdata.get_interval_period(tm_interval_id)
+        newest = last_closed_bar(now or datetime.now(UTC), period)
+        bars = self.read_bars(
+            internal_cusip=internal_cusip,
+            tm_interval_id=tm_interval_id,
+            start=newest - period * (lookback - 1),
+            end=newest,
+        )
+
+        # ensure_fresh tolerates bars older than the exchange's earliest — that
+        # is listing history, not a gap. It stays tolerant because a short
+        # window is only a problem for a *signal*, and this is where signals are
+        # served: an indicator still computes on a fraction of its intended
+        # lookback, quietly, on statistics the strategy was never fitted on.
+        required = math.ceil(lookback * _MIN_WINDOW_COVERAGE)
+        if len(bars) < required:
+            raise StaleBarsError(
+                f"only {len(bars)} of {lookback} bar(s) available for "
+                f"{internal_cusip!r} on interval {tm_interval_id} (need at least "
+                f"{required}) — too little history to compute a comparable signal"
+            )
+        return bars
 
     def read_bars(
         self,

@@ -39,3 +39,22 @@ class TestGetIntervalPeriod:
         reader = _reader([{"tm_interval_id": 1, "period_length": "1 day, 0:00:00"}])
         with pytest.raises(RuntimeError, match="TM_INTERVAL_ID=99"):
             reader.get_interval_period(99)
+
+
+class TestResolveIntervalId:
+    """The inverse lookup — period → id, ids never hardcoded."""
+
+    def test_resolves_the_id_for_a_period(self):
+        reader = _reader(
+            [
+                {"tm_interval_id": 1, "name": "DAILY", "period_length": "1 day, 0:00:00"},
+                {"tm_interval_id": 2, "name": "1H", "period_length": "1:00:00"},
+            ]
+        )
+        assert reader.resolve_interval_id(timedelta(days=1)) == 1
+        assert reader.resolve_interval_id(timedelta(hours=1)) == 2
+
+    def test_unknown_period_raises(self):
+        reader = _reader([{"tm_interval_id": 1, "period_length": "1 day, 0:00:00"}])
+        with pytest.raises(RuntimeError, match="no row with PERIOD_LENGTH"):
+            reader.resolve_interval_id(timedelta(minutes=5))

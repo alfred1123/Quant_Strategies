@@ -3,6 +3,7 @@
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
+from quant.market_data.service import StaleBarsError
 from quant.shared.db import ProcedureError
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
 
@@ -48,7 +49,20 @@ async def handle_deployment_not_found(
     )
 
 
+async def handle_stale_bars(_request: Request, exc: StaleBarsError) -> JSONResponse:
+    """503, not 400 — the request was fine, the exchange data was not.
+
+    Distinguishing it matters to the scheduler: a caller seeing this should
+    come back on the next tick, whereas a 4xx means retrying changes nothing.
+    """
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={"detail": f"price bars unavailable — no signal computed: {exc}"},
+    )
+
+
 def register(app: FastAPI) -> None:
     app.add_exception_handler(ProcedureError, handle_procedure_error)
     app.add_exception_handler(TradeValidationError, handle_trade_validation_error)
     app.add_exception_handler(DeploymentNotFound, handle_deployment_not_found)
+    app.add_exception_handler(StaleBarsError, handle_stale_bars)

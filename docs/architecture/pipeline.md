@@ -76,7 +76,8 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/data/sources.py` | `YahooFinance`, `AlphaVantage`, `Glassnode`, `FutuOpenD` | Fetch OHLCV data, return normalized DataFrame. |
 | `quant/market_data/repo.py` | `PriceBarRepo(DbGateway)` | MARKET_DATA SP wrappers (`persistent=True`) — coverage probe, range read, one-bar insert. |
 | `quant/market_data/fetcher.py` | `CcxtBarFetcher` | Public `fetch_ohlcv` over ccxt, paginated. No API credentials — bars are public data. |
-| `quant/market_data/service.py` | `PriceBarService` | Freshness check, gap fill, and `read_bars()` in the same DataFrame shape `fetch_df` produces. Fails closed rather than signalling on an incomplete window. |
+| `quant/market_data/service.py` | `PriceBarService` | Freshness check, gap fill, and `read_bars()` in the same DataFrame shape `fetch_df` produces. `load_window()` composes the two for live apply. Fails closed rather than signalling on an incomplete window. |
+| `quant/trade/bar_source.py` | `PriceBarServiceFactory` | Binds a deployment's `APP_ID` to the venue its bars come from; one service per broker over a shared repo connection. |
 | `quant/shared/intervals.py` | `parse_period`, `floor_to_period`, `last_closed_bar`, `next_run_at`, `ccxt_timeframe` | Interval arithmetic from `REFDATA.TM_INTERVAL.PERIOD_LENGTH`; shared by price bars and the scheduler. Pure — the lookup is `RedisRefData.get_interval_period`. |
 | `quant/strategy/indicators.py` | `TechnicalAnalysis` | Calculate indicator values on the `factor` column. |
 | `quant/strategy/signals.py` | `SignalDirection` | Generate position array `{-1, 0, 1}` from indicator vs threshold. |

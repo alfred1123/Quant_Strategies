@@ -16,6 +16,7 @@ from quant.schemas.deployments import (
     UpdateDeploymentRequest,
 )
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
+from quant.trade.bar_source import PriceBarServiceFactory
 from quant.trade.db_repo import TradeRepo
 from quant.trade.dry_run import run_dry_run
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
@@ -36,6 +37,7 @@ class TradeService:
         credential_repo: ApiCredentialRepo,
         adapter_registry: AdapterRegistry,
         data_caches: DataCaches,
+        price_bars: PriceBarServiceFactory | None = None,
     ) -> None:
         self._repo = repo
         self._bt = bt
@@ -50,6 +52,7 @@ class TradeService:
             credential_repo,
             adapter_registry,
             data_caches,
+            price_bars=price_bars,
         )
 
     def create_deployment(

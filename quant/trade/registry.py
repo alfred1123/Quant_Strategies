@@ -62,3 +62,16 @@ def build_default_registry(refdata: RedisRefData) -> AdapterRegistry:
     for app_name, preset in CCXT_PRESETS.items():
         registry.register_by_name(app_name, _factory_for(preset), refdata=refdata)
     return registry
+
+
+def exchange_id_for_app(app_id: int, *, refdata: RedisRefData) -> str | None:
+    """ccxt exchange id behind a ``REFDATA.APP`` id, or ``None`` if not a broker.
+
+    Market data has to reach the same venue the orders go to, so the mapping is
+    read back out of ``CCXT_PRESETS`` rather than restated next to the price-bar
+    code where it could drift.
+    """
+    for app_name, preset in CCXT_PRESETS.items():
+        if refdata.resolve_app_id(app_name) == app_id:
+            return preset.exchange_id
+    return None

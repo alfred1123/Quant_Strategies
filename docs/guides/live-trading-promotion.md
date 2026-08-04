@@ -172,6 +172,22 @@ Use a **new deployment** — do not flip an existing testnet row to live in plac
 6. **Wait 48 hours** manual-only (no scheduler): confirm signals, holds, Slack on failure.
 7. **Then** attach schedule (`DAILY` or `1H`) for this deployment only.
 
+!!! warning "Live signals read the venue's own bars — not the research series"
+    Every apply of a deployment on a ccxt venue — manual **or** scheduled —
+    reads `MARKET_DATA.PRICE_BAR`, bars pulled from the exchange it trades on
+    (daily when no schedule is attached; the schedule only changes the interval
+    — [design §7.7](../design/scheduler-price-bars.md#77-broker-binding--quanttradebar_sourcepy)).
+    Backtest and dry-run keep the provider (Glassnode / Yahoo), and so do
+    brokers without a market-data venue (Futu equities).
+
+    These are different series. The Phase 0.1 parameters (Bollinger 60 / 1.75)
+    were fitted on Glassnode daily data; against Bybit prints the same config
+    can produce a different position on the same day. The 48h manual window in
+    step 6 already exercises the exchange series — compare those signals
+    against a dry-run (provider series) on the same day before attaching the
+    schedule. `ApplyReport.bar_source` names the series behind each signal
+    (`price_bar:bybit` vs `provider`).
+
 **Never:** point mainnet keys at testnet endpoints, or enable scheduler on mainnet before
 steps 5–6 succeed on testnet and manual mainnet.
 
