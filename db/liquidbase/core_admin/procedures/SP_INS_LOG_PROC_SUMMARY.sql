@@ -1,6 +1,9 @@
+-- No DEFAULTs on the IN parameters: Postgres rejects a procedure whose OUT
+-- parameters follow one carrying a default, and every caller passes both
+-- anyway. The retention default lives on LogProcRepo.summarize instead.
 CREATE OR REPLACE PROCEDURE CORE_ADMIN.SP_INS_LOG_PROC_SUMMARY(
-    IN  IN_USER_ID         TEXT    DEFAULT 'system',
-    IN  IN_RETENTION_DAYS  INTEGER DEFAULT 30,
+    IN  IN_USER_ID         TEXT,
+    IN  IN_RETENTION_DAYS  INTEGER,
     OUT OUT_SQLSTATE       TEXT,
     OUT OUT_SQLMSG         TEXT,
     OUT OUT_SQLERRMC       TEXT,
@@ -67,3 +70,16 @@ EXCEPTION
         OUT_SQLMSG := 'ERROR';
 END;
 $$;
+
+-- The grant ships with the procedure rather than being named in sql/GRANTS.sql.
+-- That file is runAlways and is included *before* this release, so naming a
+-- procedure there that only this file creates deadlocks a fresh database: the
+-- grant fails, which aborts the run before the CREATE it was waiting on.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
+    GRANT EXECUTE ON PROCEDURE CORE_ADMIN.SP_INS_LOG_PROC_SUMMARY(
+        TEXT, INTEGER, OUT TEXT, OUT TEXT, OUT TEXT, OUT INTEGER
+    ) TO quant_app;
+  END IF;
+END $$;

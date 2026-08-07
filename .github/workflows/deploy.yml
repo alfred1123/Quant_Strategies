@@ -519,3 +519,46 @@ jobs:
           DOMAIN: ${{ vars.DOMAIN }}
           AWS_REGION: ap-southeast-1
         run: bash aws/scripts/verify-https.sh
+
+  # A red deploy is only as loud as whoever happens to look at it. The
+  # log-proc-summary migration failed on 2026-08-04 and stayed broken for three
+  # days because the next push touched no db/liquibase files, so it skipped the
+  # migration and went green — the success hid the still-pending changeset.
+  #
+  # An issue is used rather than a webhook because it needs no secret and, unlike
+  # an email, it stays open until someone closes it.
+  report-failure:
+    name: report deploy failure
+    needs: [test, frontend, changes, build-and-push, cfn, deploy]
+    if: always() && contains(needs.*.result, 'failure')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open an issue for the failed deploy
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const failed = Object.entries(${{ toJSON(needs) }})
+              .filter(([, v]) => v.result === 'failure')
+              .map(([k]) => k);
+
+            const sha = context.sha.slice(0, 8);
+            const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+                        `/actions/runs/${context.runId}`;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Deploy failed on ${sha}`,
+              labels: ['deploy-failure'],
+              body: [
+                `Deploy of \`${sha}\` failed in **${failed.join('`, `')}**.`,
+                ``,
+                `[Run log](${url})`,
+                ``,
+                `Prod may be mid-way: migrations run before the containers restart,`,
+                `so a failure after the migration step can leave the new schema`,
+                `under the old image. Check which step failed before re-running.`,
+              ].join('\n'),
+            });
