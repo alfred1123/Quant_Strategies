@@ -22,7 +22,7 @@ def _sp_row(**overrides):
         "strategy_vid": 1,
         "api_credential_id": 1,
         "app_id": 10,
-        "internal_cusip": "btc-usd.crypto",
+        "internal_cusip": "btcusdt.crypto",
         "qty": Decimal("0.01"),
         "is_paper_ind": "Y",
         "is_enabled_ind": "Y",
@@ -62,7 +62,7 @@ class TestCreateDeployment:
             strategy_vid=1,
             api_credential_id=1,
             app_id=10,
-            internal_cusip="btc-usd.crypto",
+            internal_cusip="btcusdt.crypto",
             qty=Decimal("0.01"),
             paper=False,
             confirm_live=True,
@@ -92,7 +92,7 @@ class TestCreateDeployment:
             strategy_vid=1,
             api_credential_id=1,
             app_id=10,
-            internal_cusip="btc-usd.crypto",
+            internal_cusip="btcusdt.crypto",
             qty=Decimal("0.01"),
             schedule_tm_interval_id=2,
         )
@@ -111,7 +111,7 @@ class TestCreateDeployment:
             strategy_vid=1,
             api_credential_id=1,
             app_id=10,
-            internal_cusip="btc-usd.crypto",
+            internal_cusip="btcusdt.crypto",
             qty=Decimal("0.01"),
         )
         svc.create_deployment(app_user_id, "alice", req)
@@ -128,7 +128,7 @@ class TestCreateDeployment:
             strategy_vid=1,
             api_credential_id=1,
             app_id=10,
-            internal_cusip="btc-usd.crypto",
+            internal_cusip="btcusdt.crypto",
             qty=Decimal("0.01"),
         )
         svc.create_deployment(app_user_id, "alice", req)

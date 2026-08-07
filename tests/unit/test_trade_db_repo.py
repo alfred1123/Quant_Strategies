@@ -32,7 +32,7 @@ def _deployment_kwargs(**overrides):
         "strategy_vid": 1,
         "api_credential_id": 1,
         "app_id": 10,
-        "internal_cusip": "btc-usd.crypto",
+        "internal_cusip": "btcusdt.crypto",
         "qty": Decimal("0.01"),
         "is_paper_ind": "Y",
         "is_enabled_ind": "Y",
@@ -150,7 +150,7 @@ class TestValidateDryRun:
                 strategy_vid=None,
                 api_credential_id=1,
                 app_id=10,
-                internal_cusip="btc-usd.crypto",
+                internal_cusip="btcusdt.crypto",
                 qty=Decimal("0.01"),
             )
 
@@ -176,7 +176,7 @@ class TestValidateDryRun:
             strategy_vid=1,
             api_credential_id=1,
             app_id=10,
-            internal_cusip="btc-usd.crypto",
+            internal_cusip="btcusdt.crypto",
             qty=Decimal("0.01"),
         )
 

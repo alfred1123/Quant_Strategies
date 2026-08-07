@@ -6,6 +6,14 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <changeSet id="1.0.0-001-price-bar" author="alfcheun" context="market_data,prod-deploy">
+        <!--
+          tables/PRICE_BAR.sql is the canonical DDL that db/syncddl/ is diffed
+          against, so it tracks the current shape rather than the shape this
+          changeset first created — SOURCE_APP_ID joined the key in 1.1.0.
+          Databases that already ran this changeset are migrated there; this
+          allowance only stops the edited file failing their checksum.
+        -->
+        <validCheckSum>ANY</validCheckSum>
         <comment>Phase 1.9 — MARKET_DATA.PRICE_BAR normalized OHLCV rows</comment>
         <sqlFile path="../tables/PRICE_BAR.sql" relativeToChangelogFile="true"
                  splitStatements="true" stripComments="true"/>

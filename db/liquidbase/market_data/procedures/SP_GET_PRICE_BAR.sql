@@ -1,7 +1,11 @@
 -- Range read of normalized bars for live signal computation.
+--
+-- Scoped to one SOURCE_APP_ID: venues sharing an INTERNAL_CUSIP quote different
+-- prices, so an unscoped read would hand the caller a blend of order books.
 CREATE OR REPLACE PROCEDURE MARKET_DATA.SP_GET_PRICE_BAR(
     IN  IN_INTERNAL_CUSIP   TEXT,
     IN  IN_TM_INTERVAL_ID  INTEGER,
+    IN  IN_SOURCE_APP_ID    INTEGER,
     IN  IN_RANGE_START_TS   TIMESTAMPTZ,
     IN  IN_RANGE_END_TS     TIMESTAMPTZ,
     OUT OUT_RESULT          REFCURSOR,
@@ -24,6 +28,7 @@ BEGIN
 
     V_OTHER_TEXT := 'IN_INTERNAL_CUSIP=' || COALESCE(IN_INTERNAL_CUSIP, '')
                  || ', IN_TM_INTERVAL_ID=' || COALESCE(IN_TM_INTERVAL_ID::TEXT, '')
+                 || ', IN_SOURCE_APP_ID=' || COALESCE(IN_SOURCE_APP_ID::TEXT, '')
                  || ', IN_RANGE_START_TS=' || COALESCE(IN_RANGE_START_TS::TEXT, '')
                  || ', IN_RANGE_END_TS=' || COALESCE(IN_RANGE_END_TS::TEXT, '');
 
@@ -41,6 +46,7 @@ BEGIN
           FROM MARKET_DATA.PRICE_BAR
          WHERE INTERNAL_CUSIP = IN_INTERNAL_CUSIP
            AND TM_INTERVAL_ID = IN_TM_INTERVAL_ID
+           AND SOURCE_APP_ID  = IN_SOURCE_APP_ID
            AND BAR_TIMESTAMP >= IN_RANGE_START_TS
            AND BAR_TIMESTAMP <= IN_RANGE_END_TS
          ORDER BY BAR_TIMESTAMP ASC;
@@ -69,11 +75,18 @@ EXCEPTION
 END;
 $$;
 
+-- The pre-source signature would linger as an overload and keep serving blended
+-- reads to any caller that still matches it.
+DROP PROCEDURE IF EXISTS MARKET_DATA.SP_GET_PRICE_BAR(
+    TEXT, INTEGER, TIMESTAMPTZ, TIMESTAMPTZ,
+    OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+);
+
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
     GRANT EXECUTE ON PROCEDURE MARKET_DATA.SP_GET_PRICE_BAR(
-        TEXT, INTEGER, TIMESTAMPTZ, TIMESTAMPTZ,
+        TEXT, INTEGER, INTEGER, TIMESTAMPTZ, TIMESTAMPTZ,
         OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
     ) TO quant_app;
   END IF;

@@ -3,9 +3,16 @@
 The database stores and returns bars; deciding *which* bars are needed, pulling
 the missing ones from the exchange and persisting them is this module's job.
 
-The governing rule is **fail closed**: if the window a signal needs cannot be
-completed, raise rather than let the caller compute a position from a series
-with holes in it.
+The governing rule on the trade path is **fail closed**: if the window a signal
+needs cannot be completed, raise rather than let the caller compute a position
+from a series with holes in it.
+
+Maintenance is the deliberate exception. ``ensure_fresh`` repairs only the
+lookback a signal needs, so an outage longer than that window leaves older bars
+missing for good; ``backfill`` takes an explicit range and reports what it could
+not fill instead of aborting, because there a hole is ordinary — pre-listing
+history, or beyond what the exchange retains — and refusing would discard the
+bars that *were* recoverable.
 """
 
 from __future__ import annotations
@@ -46,6 +53,33 @@ class SyncResult:
     instruments: int
     inserted: int
     failures: dict[str, str]
+
+
+@dataclass(frozen=True)
+class BackfillResult:
+    """Outcome of a continuity repair over an explicit range.
+
+    ``unfilled`` holds the boundaries the exchange could not supply. Usually
+    empty or a leading run that predates the listing; a hole in the middle
+    means the series is genuinely not continuous and cannot be made so from
+    this source.
+    """
+
+    start: datetime
+    end: datetime
+    expected: int
+    missing: int
+    inserted: int
+    unfilled: tuple[datetime, ...]
+
+    @property
+    def is_continuous(self) -> bool:
+        """True when every boundary in the range is now stored."""
+        return not self.unfilled
+
+    @property
+    def oldest_unfilled(self) -> datetime | None:
+        return self.unfilled[0] if self.unfilled else None
 
 
 class PriceBarService:
@@ -89,7 +123,9 @@ class PriceBarService:
         window_start = newest - period * (lookback - 1)
 
         coverage = self._repo.get_coverage(
-            internal_cusip=internal_cusip, tm_interval_id=tm_interval_id
+            internal_cusip=internal_cusip,
+            tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
         )
         stored_max = coverage["max_bar_timestamp"] if coverage else None
         if stored_max is not None and stored_max >= newest:
@@ -99,17 +135,13 @@ class PriceBarService:
             )
             return 0
 
-        expected = bar_starts(window_start, newest, period)
-        stored = {
-            row["bar_timestamp"]
-            for row in self._repo.get_bars(
-                internal_cusip=internal_cusip,
-                tm_interval_id=tm_interval_id,
-                range_start=window_start,
-                range_end=newest,
-            )
-        }
-        missing = [ts for ts in expected if ts not in stored]
+        missing = self.find_gaps(
+            internal_cusip=internal_cusip,
+            tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
+            start=window_start,
+            end=newest,
+        )
         if not missing:
             return 0
 
@@ -124,20 +156,12 @@ class PriceBarService:
             internal_cusip=internal_cusip, missing=missing, fetched=fetched, newest=newest
         )
 
-        # Oldest first, so a crash part-way through leaves MAX_BAR_TIMESTAMP
-        # short of `newest` and the next tick reconciles from where this
-        # stopped rather than skipping the hole.
-        inserted = 0
-        for bar_timestamp in missing:
-            bar = fetched.get(bar_timestamp)
-            if bar is None:
-                continue
-            if self._insert(
-                bar, internal_cusip=internal_cusip, tm_interval_id=tm_interval_id,
-                source_app_id=source_app_id,
-            ):
-                inserted += 1
-
+        inserted = self._store(
+            missing, fetched,
+            internal_cusip=internal_cusip,
+            tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
+        )
         logger.info(
             "Inserted %d bar(s) for %s interval=%s up to %s",
             inserted, internal_cusip, tm_interval_id, newest,
@@ -196,6 +220,136 @@ class PriceBarService:
         )
         return SyncResult(instruments=len(seen), inserted=inserted, failures=failures)
 
+    def backfill(
+        self,
+        *,
+        internal_cusip: str,
+        tm_interval_id: int,
+        source_app_id: int,
+        start: datetime,
+        end: datetime | None = None,
+        now: datetime | None = None,
+    ) -> BackfillResult:
+        """Fill every hole in ``[start, end]``, whatever the live lookback is.
+
+        ``ensure_fresh`` only ever repairs the window a signal needs, so an
+        outage longer than that lookback leaves bars older than the window
+        permanently missing — nothing revisits them. This does: the range is
+        given explicitly, so history stays continuous rather than being a
+        rolling window maintained as a side effect of trading.
+
+        Deliberately **does not** fail closed. The trade path refuses to price
+        a signal on holes because a wrong trade is worse than no trade; here a
+        hole is ordinary — the range may predate the listing, or reach past
+        what the exchange retains — and aborting would throw away the bars that
+        *were* recoverable. What could not be filled is reported instead.
+        """
+        period = self._refdata.get_interval_period(tm_interval_id)
+        end = end or last_closed_bar(now or datetime.now(UTC), period)
+        if start > end:
+            raise ValueError(f"start {start} is after end {end}")
+
+        missing = self.find_gaps(
+            internal_cusip=internal_cusip,
+            tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
+            start=start,
+            end=end,
+        )
+        expected = len(bar_starts(start, end, period))
+        if not missing:
+            logger.info(
+                "Backfill %s interval=%s source=%s: already continuous over %d bar(s)",
+                internal_cusip, tm_interval_id, source_app_id, expected,
+            )
+            return BackfillResult(
+                start=start, end=end, expected=expected,
+                missing=0, inserted=0, unfilled=(),
+            )
+
+        fetched = self._fetch(
+            internal_cusip=internal_cusip,
+            source_app_id=source_app_id,
+            period=period,
+            since=missing[0],
+            until=end,
+        )
+        inserted = self._store(
+            missing, fetched,
+            internal_cusip=internal_cusip,
+            tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
+        )
+        unfilled = tuple(ts for ts in missing if ts not in fetched)
+
+        log = logger.warning if unfilled else logger.info
+        log(
+            "Backfill %s interval=%s source=%s: %d of %d hole(s) filled, %d unavailable",
+            internal_cusip, tm_interval_id, source_app_id,
+            inserted, len(missing), len(unfilled),
+        )
+        return BackfillResult(
+            start=start, end=end, expected=expected,
+            missing=len(missing), inserted=inserted, unfilled=unfilled,
+        )
+
+    def find_gaps(
+        self,
+        *,
+        internal_cusip: str,
+        tm_interval_id: int,
+        source_app_id: int,
+        start: datetime,
+        end: datetime,
+    ) -> list[datetime]:
+        """Bar boundaries in ``[start, end]`` with no stored row, oldest first.
+
+        Read-only — this is what "is the history continuous?" reduces to, and
+        both the freshness gate and :meth:`backfill` ask it before fetching
+        anything. The caller bounds the range: one entry per boundary, so a
+        decade of minute bars is millions of them.
+        """
+        period = self._refdata.get_interval_period(tm_interval_id)
+        expected = bar_starts(start, end, period)
+        stored = {
+            row["bar_timestamp"]
+            for row in self._repo.get_bars(
+                internal_cusip=internal_cusip,
+                tm_interval_id=tm_interval_id,
+                source_app_id=source_app_id,
+                range_start=start,
+                range_end=end,
+            )
+        }
+        return [ts for ts in expected if ts not in stored]
+
+    def _store(
+        self,
+        missing: list[datetime],
+        fetched: dict[datetime, object],
+        *,
+        internal_cusip: str,
+        tm_interval_id: int,
+        source_app_id: int,
+    ) -> int:
+        """Persist the fetched bars, oldest first.
+
+        Order matters: a crash part-way through leaves ``MAX_BAR_TIMESTAMP``
+        short of the target, so the next pass reconciles from where this one
+        stopped rather than stepping over the hole.
+        """
+        inserted = 0
+        for bar_timestamp in missing:
+            bar = fetched.get(bar_timestamp)
+            if bar is None:
+                continue
+            if self._insert(
+                bar, internal_cusip=internal_cusip, tm_interval_id=tm_interval_id,
+                source_app_id=source_app_id,
+            ):
+                inserted += 1
+        return inserted
+
     def _insert(
         self, bar, *, internal_cusip: str, tm_interval_id: int, source_app_id: int
     ) -> bool:
@@ -204,9 +358,11 @@ class PriceBarService:
         Deployments sharing an instrument and interval are scheduled at the
         same boundary, so several can decide the same bar is missing before
         any of them writes. They race on the natural primary key and all but
-        one lose. The bar they lose to is the same bar they fetched, so the
-        conflict is benign here — unlike a genuine double-insert, which the
-        missing-set calculation above already rules out.
+        one lose. Swallowing that is only safe because ``SOURCE_APP_ID`` is
+        part of the key: a conflict therefore means the same venue's same bar,
+        so the winner's row is the row this call would have written. Were the
+        key venue-blind, the same swallow would silently adopt another
+        exchange's print.
         """
         try:
             self._repo.ins_bar(
@@ -305,6 +461,7 @@ class PriceBarService:
         bars = self.read_bars(
             internal_cusip=internal_cusip,
             tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
             start=newest - period * (lookback - 1),
             end=newest,
         )
@@ -328,6 +485,7 @@ class PriceBarService:
         *,
         internal_cusip: str,
         tm_interval_id: int,
+        source_app_id: int,
         start: datetime,
         end: datetime,
     ) -> pd.DataFrame:
@@ -337,10 +495,15 @@ class PriceBarService:
         so indicator and performance math needs no branch on where bars came
         from: a UTC ``datetime`` index plus ``price``, ``factor`` and the
         ``Open``/``High``/``Low``/``Close``/``Volume`` set.
+
+        One source per window. Venues sharing an ``internal_cusip`` are separate
+        order books, so a series mixing them is not one any strategy was fitted
+        on and would not reproduce on a re-read.
         """
         rows = self._repo.get_bars(
             internal_cusip=internal_cusip,
             tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
             range_start=start,
             range_end=end,
         )

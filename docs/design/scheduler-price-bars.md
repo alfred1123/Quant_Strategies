@@ -64,7 +64,7 @@ The table (`TM_INTERVAL_ID IDENTITY`, `NAME`, `DESCRIPTION`) exists since baseli
 | `STATUS` | `PENDING` \| `SUCCESS` \| `FAILED` — poller reads `PENDING` only |
 | `SCHEDULED_TS` | **Next due** apply time |
 
-Due check: latest row where `STATUS = 'PENDING'` and `SCHEDULED_TS <= NOW()`. Poller calls **`SP_GET_MISSED_DUE_DEPLOYMENTS(IN_TM_INTERVAL_ID)`** per interval tick (DAILY, 1H, …). After apply, **`SP_INS_DEPLOYMENT_SCHEDULE_STATUS`** with `NEXT_SCHEDULED_TS` from the cursor — no separate advance proc. `TradeRepo` wraps all three; the poller that sequences them is not written yet.
+Due check: latest row where `STATUS = 'PENDING'` and `SCHEDULED_TS <= NOW()`. Poller calls **`SP_GET_MISSED_DUE_DEPLOYMENTS(IN_TM_INTERVAL_ID)`** per interval tick (DAILY, 1H, …). After apply, **`SP_INS_DEPLOYMENT_SCHEDULE_STATUS`** with `NEXT_SCHEDULED_TS` from the cursor — no separate advance proc. `TradeRepo` wraps all three; `ScheduleTickRunner` sequences them (§6.3).
 
 `EXECUTION_EVENT` remains a pure execution diary (`TRANSACT_AT` = tick time for audit). It carries **no scheduling anchor** — the diary never drives due-ness.
 
@@ -120,28 +120,37 @@ CREATE TABLE MARKET_DATA.PRICE_BAR (
     USER_ID          TEXT          NOT NULL,   -- audit convention (service user)
     CREATED_AT       TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
 
-    PRIMARY KEY (INTERNAL_CUSIP, TM_INTERVAL_ID, BAR_TIMESTAMP)
+    PRIMARY KEY (INTERNAL_CUSIP, TM_INTERVAL_ID, SOURCE_APP_ID, BAR_TIMESTAMP)
 );
 ```
 
-**PK rationale:** `(INTERNAL_CUSIP, TM_INTERVAL_ID, BAR_TIMESTAMP)` is the natural unique key. **`SP_INS_PRICE_BAR` is plain `INSERT`** — the app reads coverage / existing bars first and only passes missing bars. A duplicate PK raises `unique_violation` (visible failure); there is no silent upsert or `ON CONFLICT`.
+**PK rationale:** `(INTERNAL_CUSIP, TM_INTERVAL_ID, SOURCE_APP_ID, BAR_TIMESTAMP)` is the natural unique key. **`SP_INS_PRICE_BAR` is plain `INSERT`** — the app reads coverage / existing bars first and only passes missing bars. A duplicate PK raises `unique_violation` (visible failure); there is no silent upsert or `ON CONFLICT`.
+
+!!! warning "`SOURCE_APP_ID` is in the key, not payload — decision #47"
+    One `INTERNAL_CUSIP` is traded on several venues: decision #21 makes `btcusdt.crypto` a single product with a per-broker `INST.PRODUCT_XREF` row for Bybit **and** Binance. A venue-blind key lets whichever venue writes a timestamp first own it; the loser's insert raises `unique_violation`, `PriceBarService` absorbs it as a benign race, and that deployment's signal is then computed on the winner's prints. The window silently blends two order books and a backtest over it does not reproduce.
+
+    Consequences that follow from the wide key:
+
+    - **Every read scopes to one source.** `SP_GET_PRICE_BAR` and `SP_GET_PRICE_BAR_COVERAGE` both take `IN_SOURCE_APP_ID`. Coverage especially — unscoped, one venue's bars would mark another as fresh and the second venue would never fetch.
+    - **A paid backfill provider is just another `SOURCE_APP_ID`**, sitting alongside live exchange bars rather than colliding with them. This is what makes the table usable as one source of truth for backtest and trade.
+    - **Prices are not expected to agree across sources.** Bybit and Binance are separate order books, and provider daily bars differ again in session convention and adjustment. The guarantee is consistency *within* a series, not equality *between* them.
 
 !!! note "No soft-versioning columns — deliberate"
     `PRICE_BAR` intentionally has **no** `TRANSACT_FROM/TO_TS` or `IS_CURRENT_IND`. Those fit mutable entities (`DEPLOYMENT`, `STRATEGY`) where a logical row gets superseded. A price bar is an **immutable fact** — nothing supersedes it.
 
     **Latest bar / freshness:** `SP_GET_PRICE_BAR_COVERAGE` → `MAX_BAR_TIMESTAMP` (`ORDER BY … DESC LIMIT 1`). **Bounds for catch-up:** same proc → `MIN_BAR_TIMESTAMP` / `MAX_BAR_TIMESTAMP` (two index probes; gap count derived in app from interval).
 
-    1H and DAILY are separate PK subtrees — neither interval's volume affects the other's lookups.
+    1H and DAILY are separate PK subtrees — neither interval's volume affects the other's lookups. So are two venues on the same instrument.
 
 **Indexes:**
 
 ```sql
 CREATE INDEX IX_PRICE_BAR_LATEST
-    ON MARKET_DATA.PRICE_BAR (INTERNAL_CUSIP, TM_INTERVAL_ID, BAR_TIMESTAMP DESC)
+    ON MARKET_DATA.PRICE_BAR (INTERNAL_CUSIP, TM_INTERVAL_ID, SOURCE_APP_ID, BAR_TIMESTAMP DESC)
     INCLUDE (CLOSE_PX);
 ```
 
-`IX_PRICE_BAR_LATEST` serves range scans (DESC), latest-bar / coverage probes (`ORDER BY … LIMIT 1`), and index-only latest `CLOSE_PX`. PK covers uniqueness and forward ASC reads.
+`IX_PRICE_BAR_LATEST` serves range scans (DESC), latest-bar / coverage probes (`ORDER BY … LIMIT 1`), and index-only latest `CLOSE_PX`. PK covers uniqueness and forward ASC reads. Both lead with the same four columns every read filters on, so a venue's series is one contiguous subtree.
 
 ### 4.2 Stored procedures
 
@@ -223,6 +232,26 @@ Backtest is **not required** to read `PRICE_BAR`, but the read path must not pai
 
 Because the contract matches, `Performance` / indicator math work on bars from either source with **zero changes**. If backtest later wants intraday backtests on 1H bars, it plugs `read_bars()` in as another fetcher behind the same interface — an additive change, not a rework.
 
+Reproducibility is what makes that safe, and it rests on decision #47: a backtest must pin `source_app_id`, because the same `(internal_cusip, tm_interval_id, bar_timestamp)` legitimately holds a different price per venue. A run pinned to a source re-reads identically no matter how many venues later start writing; an unpinned run would not. A paid historical provider backfilled under its own `SOURCE_APP_ID` sits beside the live exchange bars rather than overwriting them, so research history and traded history stay separable and comparable.
+
+#### Continuity is not automatic — `ensure_fresh` is a rolling window
+
+`ensure_fresh` repairs only `[newest - period × (lookback - 1), newest]`, and `lookback` is `live_lookback_bars(window) = max_window × 3 + 60` — a **bar count**, so what it covers in wall-clock time depends entirely on the interval:
+
+| Interval | 120 bars covers | Host down 5 days | Host down 10 days |
+|----------|-----------------|------------------|-------------------|
+| DAILY | 120 days | fully repaired | fully repaired |
+| 1H | 5 days | just covered | days 5–10 never requested again |
+| 15m | 30 hours | lost | lost |
+
+Bars older than the window are never asked for a second time, so the hole is permanent. That is fine for trading — `load_window` needs only the window and fails closed if it cannot complete it — but it means the table is a rolling window maintained as a *side effect of trading*, not a continuous history.
+
+`PriceBarService.backfill(internal_cusip, tm_interval_id, source_app_id, start, end)` is what closes that gap: an explicit range, every hole in it filled. `find_gaps(...)` answers the same question read-only, without touching the exchange.
+
+Backfill deliberately **does not fail closed**, inverting the rule the rest of this module follows. On the trade path a hole must stop the run because a wrong trade beats no trade; during a repair a hole is ordinary — the range may predate the listing, or reach past what the venue retains — and aborting would discard the bars that *were* recoverable. `BackfillResult.unfilled` reports what could not be filled, and `is_continuous` is the check a backtest should make before trusting a range.
+
+Backfill depth is bounded by the venue, not by us: ccxt `fetch_ohlcv` history varies by exchange and timeframe, and deep intraday history is often unavailable at any price. A provider under its own `SOURCE_APP_ID` is the answer where the exchange cannot reach back far enough.
+
 ### 4.7 Failure modes and error handling
 
 Same contract philosophy as `BacktestCache`: **reads may degrade loudly, writes never silently fail.** For trading, the overriding rule is **fail closed — never trade on data we cannot verify.**
@@ -233,11 +262,12 @@ Same contract philosophy as `BacktestCache`: **reads may degrade loudly, writes 
 | **Exchange fetch fails** (ccxt down, rate-limited, timeout) at scheduler tick | Do **not** compute a signal on stale bars. Abort the run, write `TRADE.EXECUTION_EVENT` row with `IS_SUCCESS_IND='N'` — schedule is **not** advanced (tick did not complete). Retry on next poll; does not consume the 3-attempt budget. |
 | **Bars stale but within tolerance** (fetch OK, exchange lagging one bar) | Freshness rule (§4.4) decides: if `MAX_BAR_TIMESTAMP` is within one interval of now, proceed; otherwise treat as fetch failure above. |
 | **Gap in bars** (exchange downtime, missed ticks) | `SP_GET_PRICE_BAR` returns what exists; `PriceBarService` validates row count vs expected window and refetches the missing range (ccxt `fetch_ohlcv` accepts a `since` param). If the gap persists, fail closed as above. |
+| **Host down longer than the live lookback** | `ensure_fresh` refills the window and trading resumes on correct prices — a closed candle is immutable, so a bar fetched ten days late is identical to one fetched at the boundary. Bars *older* than the window are never requested again, so the table keeps a permanent hole (see [§4.6](#continuity-is-not-automatic--ensure_fresh-is-a-rolling-window)). Repair with `PriceBarService.backfill` over an explicit range; trading is unaffected either way. |
 | **Instrument listed more recently than the lookback** | `ensure_fresh` tolerates it (warns, treats as pre-listing history) so warming still works; `load_window` refuses below **80% coverage** of the requested lookback, because an indicator computes happily on a short window and would return a plausible number off statistics the strategy was never fitted on. See [§7.3](#73-price-bar-service--quantmarket_dataservicepy). |
 | **Partial (still-forming) bar** | Never inserted, and guarded twice: `ensure_fresh` never requests past `last_closed_bar`, and the fetcher discards any row with `ts > until` — the exchange *does* return the current candle when the window includes it. This matters because `PRICE_BAR` is append-only with a natural PK: a forming bar's high/low reflect only the elapsed portion, so storing one would freeze wrong values permanently and the corrected bar would later hit `unique_violation` instead of replacing it. Requires schedules to fire *after* the boundary — see [§6.2](#required-fire-after-the-boundary-never-on-it). |
 | **Crash before insert commits** | `SP_GET_PRICE_BAR_COVERAGE` unchanged — refetch missing range, `SP_INS_PRICE_BAR` per bar. |
 | **Crash after insert, before apply** | Coverage shows new bars — skip fetch/insert, re-run apply. |
-| **Duplicate insert** | `SP_INS_PRICE_BAR` stays a plain INSERT and reports `unique_violation` — the SP does not hide it. `PriceBarService` treats **that one SQLSTATE (23505)** as a lost race and moves on; any other `ProcedureError` propagates. Deployments sharing an instrument and interval fire at the same boundary, so several legitimately decide the same bar is missing before any of them writes; the winner stored the same bar the losers fetched. A genuine double-insert is already ruled out by the missing-set calculation, so absorbing it here costs no real safety. |
+| **Duplicate insert** | `SP_INS_PRICE_BAR` stays a plain INSERT and reports `unique_violation` — the SP does not hide it. `PriceBarService` treats **that one SQLSTATE (23505)** as a lost race and moves on; any other `ProcedureError` propagates. Deployments sharing an instrument and interval fire at the same boundary, so several legitimately decide the same bar is missing before any of them writes; the winner stored the same bar the losers fetched. That last clause only holds because `SOURCE_APP_ID` is in the key (decision #47) — a conflict therefore means the *same venue's* same bar. Venue-blind, this same swallow would quietly adopt another exchange's print. A genuine double-insert is already ruled out by the missing-set calculation, so absorbing it here costs no real safety. |
 | **DB write fails after successful fetch** | Propagates (same as `BacktestCache.refresh_payload` contract). The scheduler run fails loudly; no order is placed on unpersisted data. |
 | **Timezone bugs** | Everything is `TIMESTAMPTZ` stored UTC; `BAR_TIMESTAMP` is the bar **open** time. Python side uses tz-aware UTC (`pd.Timestamp` convention already enforced by `BacktestCache._to_utc`). |
 
@@ -333,13 +363,44 @@ When a deployment is stopped or the schedule is cleared (`SCHEDULE_TM_INTERVAL_I
 1. `ScheduleTrigger.remove(deployment)` (eventbridge deletes the schedule; local no-op).
 2. `SP_INS_DEPLOYMENT` with `SCHEDULE_TM_INTERVAL_ID = NULL`.
 
-**Local poller** (dev): an asyncio background task started at FastAPI startup
-when `SCHEDULER_BACKEND=local` — same polling pattern as the backtest
-`WorkerLoop`. Every ~30s, for each seeded `TM_INTERVAL_ID`, it calls
-`SP_GET_MISSED_DUE_DEPLOYMENTS(IN_TM_INTERVAL_ID)` and invokes
+**Local poller** (dev) — `SchedulePoller` in `quant/trade/scheduler/poller.py`:
+an asyncio background task started at FastAPI startup when
+`SCHEDULER_BACKEND=local`. Every `poll_interval_s` (default 60s) it sweeps
+every `TM_INTERVAL_ID` from `RedisRefData.interval_ids()` and hands each to
+`ScheduleTickRunner.run_interval`, which reads
+`SP_GET_MISSED_DUE_DEPLOYMENTS(IN_TM_INTERVAL_ID)`, invokes
 `TradeService.apply_deployment` **in-process** (no HTTP, no
-`TRADE_SERVICE_TOKEN`). After a completed tick it calls
-`SP_INS_DEPLOYMENT_SCHEDULE_STATUS` with `NEXT_SCHEDULED_TS` from the cursor.
+`TRADE_SERVICE_TOKEN`), then advances the cursor via
+`SP_INS_DEPLOYMENT_SCHEDULE_STATUS` using `NEXT_SCHEDULED_TS` off the due row.
+
+Sweeping all intervals beats tracking which ones have deployments: an empty
+interval costs one read returning no rows, which is cheaper than keeping a
+subscription list correct across create/pause/reschedule. `run_interval`
+blocks on HTTP and DB, so the poller dispatches it through `asyncio.to_thread`
+— an apply must not stall the API sharing the process.
+
+#### 6.3.1 Startup drain — missed wakeups are the normal case
+
+WSL stops outright when the laptop lid closes, so the local backend *will* miss
+ticks. `SchedulePoller.run` therefore drains before its first timed pass, and
+draining is only the tick repeated: each pass advances a due deployment by
+exactly one interval, so a three-day daily gap takes three passes and leaves a
+`DEPLOYMENT_SCHEDULE_STATUS` row per owed slot. That per-slot history is the
+record of what the downtime cost — see decision #46.
+
+The drain stops as soon as a pass moves nothing. A deployment that failed with
+attempts left reports `RETRYING` and is deliberately left due, so its budget is
+spent across poll cycles rather than burned in a tight loop. A pass reporting
+`STUCK` — applied, but the cursor would not move — **aborts** the drain: another
+immediate pass would place a second order seconds later. `max_drain_passes`
+(default 2000) bounds the loop regardless.
+
+> [!IMPORTANT]
+> Catch-up does **not** replay the missed period. `load_window` derives its
+> window from `now()`, so every pass computes today's signal and any order fills
+> at today's price. Repeated applies converge rather than stack — `intended_side`
+> compares the signal against the live broker position and returns `HOLD` once it
+> already matches, so a three-day gap is one trade plus two no-ops.
 
 Rejected for dev: **LocalStack** (EventBridge Scheduler emulation is
 paid-tier; would test the emulator, not our logic) and **cron + curl**
@@ -426,8 +487,14 @@ class PriceBarService:
     def sync(self, *, instruments, tm_interval_id, lookback, now=None) -> SyncResult:
         """Warm many instruments once per interval — see §6.2. Best effort."""
 
-    def read_bars(self, *, internal_cusip, tm_interval_id, start, end) -> pd.DataFrame:
-        """Bars in the DataFrame shape of §4.6."""
+    def backfill(self, *, internal_cusip, tm_interval_id, source_app_id, start, end=None) -> BackfillResult:
+        """Fill every hole in an explicit range — see §4.6. Reports, never raises."""
+
+    def find_gaps(self, *, internal_cusip, tm_interval_id, source_app_id, start, end) -> list[datetime]:
+        """Boundaries with no stored row. Read-only; no exchange call."""
+
+    def read_bars(self, *, internal_cusip, tm_interval_id, source_app_id, start, end) -> pd.DataFrame:
+        """Bars in the DataFrame shape of §4.6, from one source (decision #47)."""
 
     def load_window(self, internal_cusip, lookback, *, tm_interval_id, source_app_id, now=None) -> pd.DataFrame:
         """`ensure_fresh` then `read_bars` — the live-apply entry point."""
@@ -540,8 +607,8 @@ Follows the `BacktestCache` pattern — extends `DbGateway` (persistent connecti
 
 ```python
 class PriceBarRepo(DbGateway):
-    def get_coverage(self, *, internal_cusip, tm_interval_id) -> dict | None: ...
-    def get_bars(self, *, internal_cusip, tm_interval_id, range_start, range_end) -> list[dict]: ...
+    def get_coverage(self, *, internal_cusip, tm_interval_id, source_app_id) -> dict | None: ...
+    def get_bars(self, *, internal_cusip, tm_interval_id, source_app_id, range_start, range_end) -> list[dict]: ...
     def ins_bar(self, *, internal_cusip, tm_interval_id, source_app_id, bar_timestamp, open_px, high_px, low_px, close_px, volume) -> None: ...
 ```
 
@@ -594,8 +661,9 @@ class PriceBarRepo(DbGateway):
 | `quant/market_data/fetcher.py` | `CcxtBarFetcher` — paginated public `fetch_ohlcv` |
 | `quant/market_data/service.py` | `PriceBarService` — freshness check, gap fill, range read, `load_window` |
 | `quant/trade/bar_source.py` | `PriceBarServiceFactory` — `APP_ID` → venue → price bar service |
+| `quant/trade/scheduler/tick.py` | `ScheduleTickRunner` — due rows → apply → advance, with a cross-pass attempt budget. Shared by both backends |
+| `quant/trade/scheduler/poller.py` | `SchedulePoller` — dev asyncio loop with startup catch-up drain (`SCHEDULER_BACKEND=local`) |
 | `quant/trade/scheduler/trigger.py` | `ScheduleTrigger` seam — `EventBridgeTrigger` (boto3) / `LocalTrigger` (no-op) — *pending* |
-| `quant/trade/scheduler/poller.py` | Dev-mode asyncio poller — due-deployment loop (`SCHEDULER_BACKEND=local`) — *pending* |
 
 ### Modified (Python)
 

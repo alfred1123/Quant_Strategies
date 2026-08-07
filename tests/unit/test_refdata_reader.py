@@ -58,3 +58,21 @@ class TestResolveIntervalId:
         reader = _reader([{"tm_interval_id": 1, "period_length": "1 day, 0:00:00"}])
         with pytest.raises(RuntimeError, match="no row with PERIOD_LENGTH"):
             reader.resolve_interval_id(timedelta(minutes=5))
+
+
+class TestIntervalIds:
+    """The set the scheduler sweeps."""
+
+    def test_ordered_shortest_period_first(self):
+        reader = _reader(
+            [
+                {"tm_interval_id": 1, "period_length": "1 day, 0:00:00"},
+                {"tm_interval_id": 3, "period_length": "0:05:00"},
+                {"tm_interval_id": 2, "period_length": "1:00:00"},
+            ]
+        )
+        assert reader.interval_ids() == [3, 2, 1]
+
+    def test_ids_come_back_as_ints(self):
+        reader = _reader([{"tm_interval_id": "7", "period_length": "1:00:00"}])
+        assert reader.interval_ids() == [7]

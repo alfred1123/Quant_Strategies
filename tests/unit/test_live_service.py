@@ -27,7 +27,7 @@ def _sample_df(n: int = 120) -> pd.DataFrame:
 @pytest.fixture
 def strategy_json_doc():
     cfg = StrategyConfig.single(
-        "btc-usd.crypto",
+        "btcusdt.crypto",
         "get_bollinger_band",
         Strategy.momentum_band_signal,
         365,
@@ -60,7 +60,7 @@ def data_caches():
 class TestConfigFromJson:
     def test_round_trip(self, strategy_json_doc):
         cfg = config_from_json(strategy_json_doc)
-        assert cfg.internal_cusip == "btc-usd.crypto"
+        assert cfg.internal_cusip == "btcusdt.crypto"
         assert cfg.get_substrategies()[0].window == 20
 
 
@@ -109,7 +109,7 @@ class TestComputeLatestPosition:
     @patch("quant.strategy.live_service.fetch_df")
     def test_optimize_format_requires_result(self, mock_fetch, data_caches):
         config_json = {
-            "symbol": "btc-usd.crypto",
+            "symbol": "btcusdt.crypto",
             "start": "2020-01-01",
             "end": "2024-01-01",
             "trading_period": 365,
@@ -172,8 +172,8 @@ class TestBuildDataDictFromBars:
 
         data = build_data_dict_for_signal(cfg, bars_loader(self._loader(calls), 120))
 
-        assert calls == [("btc-usd.crypto", 120)]
-        assert set(data) == {"btc-usd.crypto"}
+        assert calls == [("btcusdt.crypto", 120)]
+        assert set(data) == {"btcusdt.crypto"}
 
     def test_empty_frame_is_refused(self, strategy_json_doc):
         cfg = config_from_json(strategy_json_doc)
@@ -199,7 +199,7 @@ class TestCrossProductSymbols:
 
     def _cross_product_req(self):
         return {
-            "symbol": "btc-usd.crypto",
+            "symbol": "btcusdt.crypto",
             "start": "2020-01-01",
             "end": "2024-01-01",
             "trading_period": 365,
@@ -235,7 +235,7 @@ class TestCrossProductSymbols:
         )
 
         loaded = {call.args[0] for call in mock_fetch.call_args_list}
-        assert loaded == {"btc-usd.crypto", "^VIX"}
+        assert loaded == {"btcusdt.crypto", "^VIX"}
         assert position in (-1.0, 0.0, 1.0)
 
     @patch("quant.strategy.live_service.fetch_df")
@@ -251,7 +251,7 @@ class TestCrossProductSymbols:
         )
 
         sources = {call.args[0]: call.args[3] for call in mock_fetch.call_args_list}
-        assert sources == {"btc-usd.crypto": "glassnode", "^VIX": "yahoo"}
+        assert sources == {"btcusdt.crypto": "glassnode", "^VIX": "yahoo"}
 
     def test_primary_symbol_is_loaded_first(self, data_caches):
         """An unavailable trade asset should fail before any factor work."""
@@ -270,7 +270,7 @@ class TestCrossProductSymbols:
             cfg, lambda c: (order.append(c), _sample_df())[1]
         )
 
-        assert order[0] == "btc-usd.crypto"
+        assert order[0] == "btcusdt.crypto"
 
 
 class TestComputeLatestPositionFromBars:
@@ -292,7 +292,7 @@ class TestComputeLatestPositionFromBars:
         )
 
         mock_fetch.assert_not_called()
-        assert calls == [("btc-usd.crypto", live_lookback_bars(20))]
+        assert calls == [("btcusdt.crypto", live_lookback_bars(20))]
         assert position in (-1.0, 0.0, 1.0)
         assert as_of
 

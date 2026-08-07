@@ -29,9 +29,15 @@ def repo():
     return instance
 
 
+def _coverage_kwargs(**overrides):
+    base = {"internal_cusip": "btcusdt.crypto", "tm_interval_id": 2, "source_app_id": 34}
+    base.update(overrides)
+    return base
+
+
 def _bar_kwargs(**overrides):
     base = {
-        "internal_cusip": "btc-usd.crypto",
+        "internal_cusip": "btcusdt.crypto",
         "tm_interval_id": 2,
         "source_app_id": 10,
         "bar_timestamp": BAR_TS,
@@ -73,15 +79,16 @@ class TestCallMatchesProcedureDdl:
 
     @patch.object(PriceBarRepo, "_call_get", return_value=[])
     def test_get_coverage(self, mock_get, repo):
-        repo.get_coverage(internal_cusip="btc-usd.crypto", tm_interval_id=2)
+        repo.get_coverage(**_coverage_kwargs())
         sql = mock_get.call_args.args[0]
         assert _call_arg_count(sql) == _ddl_param_count("SP_GET_PRICE_BAR_COVERAGE.sql")
 
     @patch.object(PriceBarRepo, "_call_get", return_value=[])
     def test_get_bars(self, mock_get, repo):
         repo.get_bars(
-            internal_cusip="btc-usd.crypto",
+            internal_cusip="btcusdt.crypto",
             tm_interval_id=2,
+            source_app_id=34,
             range_start=BAR_TS,
             range_end=BAR_TS,
         )
@@ -104,7 +111,7 @@ class TestCallMatchesProcedureDdl:
 class TestGetCoverage:
     @patch.object(PriceBarRepo, "_call_get", return_value=[])
     def test_no_rows_is_none(self, _get, repo):
-        assert repo.get_coverage(internal_cusip="btc-usd.crypto", tm_interval_id=2) is None
+        assert repo.get_coverage(**_coverage_kwargs()) is None
 
     @patch.object(
         PriceBarRepo,
@@ -113,7 +120,7 @@ class TestGetCoverage:
     )
     def test_empty_table_returns_none_not_a_row_of_nulls(self, _get, repo):
         """The coverage SP always returns one row; nulls mean nothing is stored."""
-        assert repo.get_coverage(internal_cusip="btc-usd.crypto", tm_interval_id=2) is None
+        assert repo.get_coverage(**_coverage_kwargs()) is None
 
     @patch.object(
         PriceBarRepo,
@@ -121,15 +128,51 @@ class TestGetCoverage:
         return_value=[{"min_bar_timestamp": BAR_TS, "max_bar_timestamp": BAR_TS}],
     )
     def test_returns_bounds(self, _get, repo):
-        coverage = repo.get_coverage(internal_cusip="btc-usd.crypto", tm_interval_id=2)
-        assert coverage["max_bar_timestamp"] == BAR_TS
+        assert repo.get_coverage(**_coverage_kwargs())["max_bar_timestamp"] == BAR_TS
+
+    @patch.object(PriceBarRepo, "_call_get", return_value=[])
+    def test_scopes_freshness_to_one_source(self, mock_get, repo):
+        """Another venue's bars say nothing about this venue's freshness."""
+        repo.get_coverage(**_coverage_kwargs(source_app_id=35))
+        assert 35 in mock_get.call_args.args[1]
+
+
+class TestSourceScoping:
+    """A window must come from one venue — see decision #47."""
+
+    @patch.object(PriceBarRepo, "_call_get", return_value=[])
+    def test_reads_pass_the_source_to_the_procedure(self, mock_get, repo):
+        repo.get_bars(
+            internal_cusip="btcusdt.crypto",
+            tm_interval_id=2,
+            source_app_id=35,
+            range_start=BAR_TS,
+            range_end=BAR_TS,
+        )
+        assert 35 in mock_get.call_args.args[1]
+
+    @pytest.mark.parametrize(
+        "proc_file", ["SP_GET_PRICE_BAR.sql", "SP_GET_PRICE_BAR_COVERAGE.sql"]
+    )
+    def test_read_procedures_filter_on_source(self, proc_file):
+        """Guards the SQL itself: a parameter that is accepted and then ignored
+        would leave every read blended while the call-site tests still pass."""
+        txt = (PROC_DIR / proc_file).read_text()
+        assert "SOURCE_APP_ID  = IN_SOURCE_APP_ID" in txt
+
+    def test_source_is_part_of_the_primary_key(self):
+        ddl = (PROC_DIR.parent / "tables" / "PRICE_BAR.sql").read_text()
+        pk = re.search(r"PRIMARY KEY \((.*?)\)", ddl, re.S)
+        assert pk and "SOURCE_APP_ID" in pk.group(1)
 
 
 class TestValidation:
-    @pytest.mark.parametrize("field", ["internal_cusip", "tm_interval_id"])
+    @pytest.mark.parametrize(
+        "field", ["internal_cusip", "tm_interval_id", "source_app_id"]
+    )
     def test_coverage_requires_key(self, repo, field):
         with pytest.raises(ValueError, match=field):
-            repo.get_coverage(**{"internal_cusip": "x", "tm_interval_id": 2, field: None})
+            repo.get_coverage(**_coverage_kwargs(**{field: None}))
 
     @pytest.mark.parametrize(
         "field",

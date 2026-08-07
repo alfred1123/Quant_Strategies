@@ -28,19 +28,23 @@ class PriceBarRepo(DbGateway):
     def __init__(self, conninfo: str, user_id: str = "quant_admin") -> None:
         super().__init__(conninfo, user_id, persistent=True)
 
-    def get_coverage(self, *, internal_cusip: str, tm_interval_id: int) -> dict | None:
+    def get_coverage(
+        self, *, internal_cusip: str, tm_interval_id: int, source_app_id: int
+    ) -> dict | None:
         """Oldest and newest stored bar open times, or ``None`` when empty.
 
         Two index probes rather than a range scan — this is the cheap
-        freshness gate, not a way to count what is stored.
+        freshness gate, not a way to count what is stored. Scoped to one
+        source: another venue's bars say nothing about this one's freshness.
         """
         _require(internal_cusip, "internal_cusip")
         _require(tm_interval_id, "tm_interval_id")
+        _require(source_app_id, "source_app_id")
         row = self._call_get_one(
             "CALL market_data.sp_get_price_bar_coverage("
-            "%s::text, %s::integer,"
+            "%s::text, %s::integer, %s::integer,"
             " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
-            (internal_cusip, tm_interval_id),
+            (internal_cusip, tm_interval_id, source_app_id),
         )
         if row is None or row.get("max_bar_timestamp") is None:
             return None
@@ -51,19 +55,25 @@ class PriceBarRepo(DbGateway):
         *,
         internal_cusip: str,
         tm_interval_id: int,
+        source_app_id: int,
         range_start: datetime,
         range_end: datetime,
     ) -> list[dict]:
-        """Bars in ``[range_start, range_end]`` inclusive, oldest first."""
+        """Bars in ``[range_start, range_end]`` inclusive, oldest first.
+
+        One source per call — venues sharing an instrument quote different
+        prices, so a blended window is not a series anyone fitted a strategy on.
+        """
         _require(internal_cusip, "internal_cusip")
         _require(tm_interval_id, "tm_interval_id")
+        _require(source_app_id, "source_app_id")
         _require(range_start, "range_start")
         _require(range_end, "range_end")
         return self._call_get(
             "CALL market_data.sp_get_price_bar("
-            "%s::text, %s::integer, %s::timestamptz, %s::timestamptz,"
+            "%s::text, %s::integer, %s::integer, %s::timestamptz, %s::timestamptz,"
             " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
-            (internal_cusip, tm_interval_id, range_start, range_end),
+            (internal_cusip, tm_interval_id, source_app_id, range_start, range_end),
         )
 
     def ins_bar(

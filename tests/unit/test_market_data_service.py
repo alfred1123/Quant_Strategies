@@ -10,7 +10,7 @@ from quant.market_data.fetcher import OhlcvBar
 from quant.market_data.service import PriceBarService, StaleBarsError
 from quant.shared.db import ProcedureError
 
-CUSIP = "btc-usd.crypto"
+CUSIP = "btcusdt.crypto"
 INTERVAL_1H = 2
 APP_ID = 10
 # 10:37 → 10:00 is still forming, so 09:00 is the newest closed bar.
@@ -78,6 +78,199 @@ def _ensure(service, lookback=3):
 
 def _inserted_timestamps(repo):
     return [c.kwargs["bar_timestamp"] for c in repo.ins_bar.call_args_list]
+
+
+def _backfill(service, start, end=None, **kwargs):
+    return service.backfill(
+        internal_cusip=CUSIP,
+        tm_interval_id=INTERVAL_1H,
+        source_app_id=APP_ID,
+        start=start,
+        end=end,
+        **kwargs,
+    )
+
+
+class TestFindGaps:
+    """Continuity as a read — no fetching, no writing."""
+
+    def test_reports_the_boundaries_with_no_stored_row(self):
+        service, repo, _fetcher = build_service()
+        repo.get_bars.return_value = [{"bar_timestamp": _ts(h)} for h in (5, 6, 9)]
+
+        gaps = service.find_gaps(
+            internal_cusip=CUSIP, tm_interval_id=INTERVAL_1H,
+            source_app_id=APP_ID, start=_ts(5), end=_ts(9),
+        )
+
+        assert gaps == [_ts(7), _ts(8)]
+
+    def test_a_continuous_range_has_no_gaps(self):
+        service, repo, _fetcher = build_service()
+        repo.get_bars.return_value = [{"bar_timestamp": _ts(h)} for h in (5, 6, 7)]
+
+        gaps = service.find_gaps(
+            internal_cusip=CUSIP, tm_interval_id=INTERVAL_1H,
+            source_app_id=APP_ID, start=_ts(5), end=_ts(7),
+        )
+
+        assert gaps == []
+
+    def test_does_not_touch_the_exchange(self):
+        service, repo, fetcher = build_service()
+        repo.get_bars.return_value = []
+
+        service.find_gaps(
+            internal_cusip=CUSIP, tm_interval_id=INTERVAL_1H,
+            source_app_id=APP_ID, start=_ts(5), end=_ts(7),
+        )
+
+        assert fetcher.calls == []
+        repo.ins_bar.assert_not_called()
+
+
+class TestBackfill:
+    """Continuity repair over an explicit range — the part `ensure_fresh` cannot do.
+
+    A host down longer than the live lookback leaves bars older than the window
+    missing for good, because `ensure_fresh` never asks for them again.
+    """
+
+    def test_fills_holes_older_than_any_live_lookback(self):
+        service, repo, fetcher = build_service(
+            exchange_bars=[_bar(h) for h in (5, 6, 7, 8, 9)]
+        )
+        repo.get_bars.return_value = [{"bar_timestamp": _ts(h)} for h in (5, 9)]
+
+        report = _backfill(service, _ts(5), _ts(9))
+
+        assert _inserted_timestamps(repo) == [_ts(6), _ts(7), _ts(8)]
+        assert report.inserted == 3
+        assert report.missing == 3
+        assert report.expected == 5
+        assert report.is_continuous
+
+    def test_a_continuous_range_does_not_hit_the_exchange(self):
+        service, repo, fetcher = build_service()
+        repo.get_bars.return_value = [{"bar_timestamp": _ts(h)} for h in (5, 6, 7)]
+
+        report = _backfill(service, _ts(5), _ts(7))
+
+        assert fetcher.calls == []
+        assert report.inserted == 0
+        assert report.is_continuous
+
+    def test_fetches_from_the_oldest_hole_not_the_range_start(self):
+        service, repo, fetcher = build_service(exchange_bars=[_bar(9)])
+        repo.get_bars.return_value = [{"bar_timestamp": _ts(h)} for h in (5, 6, 7, 8)]
+
+        _backfill(service, _ts(5), _ts(9))
+
+        assert fetcher.calls[0]["since"] == _ts(9)
+
+    def test_reports_what_the_exchange_could_not_supply(self):
+        """A range reaching past the listing, or past what the venue retains."""
+        service, repo, _fetcher = build_service(exchange_bars=[_bar(8), _bar(9)])
+        repo.get_bars.return_value = []
+
+        report = _backfill(service, _ts(6), _ts(9))
+
+        assert report.inserted == 2
+        assert report.unfilled == (_ts(6), _ts(7))
+        assert report.oldest_unfilled == _ts(6)
+        assert not report.is_continuous
+
+    def test_keeps_what_it_could_recover_rather_than_failing_closed(self):
+        """Unlike the trade path: aborting would discard recoverable bars."""
+        service, repo, _fetcher = build_service(exchange_bars=[_bar(9)])
+        repo.get_bars.return_value = []
+
+        report = _backfill(service, _ts(6), _ts(9))
+
+        assert _inserted_timestamps(repo) == [_ts(9)]
+        assert report.inserted == 1
+
+    def test_end_defaults_to_the_newest_closed_bar(self):
+        service, repo, _fetcher = build_service(exchange_bars=[_bar(9)])
+        repo.get_bars.return_value = []
+
+        report = _backfill(service, _ts(9), now=NOW)
+
+        assert report.end == _ts(9)  # 10:00 is still forming
+
+    def test_inverted_range_is_rejected(self):
+        service, _repo, _fetcher = build_service()
+        with pytest.raises(ValueError, match="after end"):
+            _backfill(service, _ts(9), _ts(5))
+
+    def test_writes_oldest_first_so_a_crash_resumes_cleanly(self):
+        service, repo, _fetcher = build_service(
+            exchange_bars=[_bar(h) for h in (5, 6, 7)]
+        )
+        repo.get_bars.return_value = []
+
+        _backfill(service, _ts(5), _ts(7))
+
+        assert _inserted_timestamps(repo) == [_ts(5), _ts(6), _ts(7)]
+
+    def test_scoped_to_one_source(self):
+        service, repo, _fetcher = build_service(exchange_bars=[_bar(9)])
+        repo.get_bars.return_value = []
+
+        service.backfill(
+            internal_cusip=CUSIP, tm_interval_id=INTERVAL_1H,
+            source_app_id=35, start=_ts(9), end=_ts(9),
+        )
+
+        assert repo.get_bars.call_args.kwargs["source_app_id"] == 35
+        assert repo.ins_bar.call_args.kwargs["source_app_id"] == 35
+
+
+class TestSourceScoping:
+    """Every read is scoped to the venue being priced — see decision #47.
+
+    ``btcusdt.crypto`` is one product across Bybit and Binance, so an unscoped
+    read would hand a strategy a window blended from two order books, and an
+    unscoped freshness probe would let one venue's bars mark another as fresh.
+    """
+
+    def test_freshness_probe_is_scoped(self):
+        service, repo, _fetcher = build_service(coverage_max=_ts(9))
+        _ensure(service)
+        assert repo.get_coverage.call_args.kwargs["source_app_id"] == APP_ID
+
+    def test_gap_check_is_scoped(self):
+        service, repo, _fetcher = build_service(
+            coverage_max=_ts(8), exchange_bars=[_bar(9)]
+        )
+        _ensure(service)
+        assert repo.get_bars.call_args.kwargs["source_app_id"] == APP_ID
+
+    def test_window_read_is_scoped(self):
+        service, repo, _fetcher = build_service(coverage_max=_ts(9))
+        repo.get_bars.return_value = [
+            {
+                "bar_timestamp": _ts(h),
+                "open_px": Decimal("1"), "high_px": Decimal("1"),
+                "low_px": Decimal("1"), "close_px": Decimal("1"),
+                "volume": Decimal("1"),
+            }
+            for h in (7, 8, 9)
+        ]
+
+        service.load_window(
+            CUSIP, 3, tm_interval_id=INTERVAL_1H, source_app_id=35, now=NOW
+        )
+
+        assert repo.get_bars.call_args.kwargs["source_app_id"] == 35
+
+    def test_a_second_venue_fetches_its_own_bars(self):
+        """The other venue having stored this bar must not read as fresh."""
+        service, repo, fetcher = build_service(exchange_bars=[_bar(h) for h in (7, 8, 9)])
+        repo.get_coverage.return_value = None  # nothing under *this* source
+
+        assert _ensure(service) == 3
+        assert fetcher.calls, "expected the second venue to fetch its own prints"
 
 
 class TestFreshnessGate:
@@ -233,7 +426,7 @@ class TestSync:
 
     def test_distinct_instruments_each_refresh(self):
         service, _repo, fetcher = build_service(exchange_bars=[_bar(7), _bar(8), _bar(9)])
-        result = self._sync(service, [(CUSIP, APP_ID), ("eth-usd.crypto", APP_ID)])
+        result = self._sync(service, [(CUSIP, APP_ID), ("ethusdt.crypto", APP_ID)])
         assert result.instruments == 2
         assert len(fetcher.calls) == 2
         assert result.inserted == 6
@@ -315,7 +508,11 @@ class TestReadBars:
         service, repo, _fetcher = build_service()
         repo.get_bars.return_value = self._rows()
         return service.read_bars(
-            internal_cusip=CUSIP, tm_interval_id=INTERVAL_1H, start=_ts(8), end=_ts(9)
+            internal_cusip=CUSIP,
+            tm_interval_id=INTERVAL_1H,
+            source_app_id=APP_ID,
+            start=_ts(8),
+            end=_ts(9),
         )
 
     def test_matches_the_pipeline_column_contract(self):
@@ -346,7 +543,11 @@ class TestReadBars:
         service, repo, _fetcher = build_service()
         repo.get_bars.return_value = []
         df = service.read_bars(
-            internal_cusip=CUSIP, tm_interval_id=INTERVAL_1H, start=_ts(8), end=_ts(9)
+            internal_cusip=CUSIP,
+            tm_interval_id=INTERVAL_1H,
+            source_app_id=APP_ID,
+            start=_ts(8),
+            end=_ts(9),
         )
         assert df.empty
 

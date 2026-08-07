@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Re-key MARKET_DATA.PRICE_BAR on SOURCE_APP_ID.
+
+      One INTERNAL_CUSIP is traded on several venues (decision #21 — btcusdt.crypto
+      covers both Bybit and Binance), so the original key let whichever venue wrote
+      a timestamp first own it. The loser's insert raised unique_violation, which
+      PriceBarService absorbed as a benign race, and its signal was then computed on
+      the winner's prints. Widening the key gives each source its own series.
+
+      tables/PRICE_BAR.sql carries the wide key, so a database built from the
+      baseline already has it — the guard below makes this a no-op there rather
+      than dropping and rebuilding a correct constraint.
+
+      The read procedures re-run on their own: 1.0.0-003 and 1.0.0-004 are
+      runOnChange and both files gained IN_SOURCE_APP_ID.
+    -->
+
+    <changeSet id="1.1.0-001-price-bar-source-key" author="alfcheun" context="market_data,prod-deploy">
+        <comment>SOURCE_APP_ID into the PRICE_BAR primary key and latest-bar index</comment>
+        <sql splitStatements="false" stripComments="true">
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                      FROM information_schema.key_column_usage
+                     WHERE table_schema    = 'market_data'
+                       AND table_name      = 'price_bar'
+                       AND constraint_name = 'price_bar_pkey'
+                       AND column_name     = 'source_app_id'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                ALTER TABLE MARKET_DATA.PRICE_BAR
+                    DROP CONSTRAINT IF EXISTS price_bar_pkey;
+
+                -- Always succeeds: a wider key cannot collide where a narrower one held.
+                ALTER TABLE MARKET_DATA.PRICE_BAR
+                    ADD CONSTRAINT price_bar_pkey
+                    PRIMARY KEY (INTERNAL_CUSIP, TM_INTERVAL_ID, SOURCE_APP_ID, BAR_TIMESTAMP);
+
+                DROP INDEX IF EXISTS MARKET_DATA.IX_PRICE_BAR_LATEST;
+                CREATE INDEX IX_PRICE_BAR_LATEST
+                    ON MARKET_DATA.PRICE_BAR (
+                        INTERNAL_CUSIP, TM_INTERVAL_ID, SOURCE_APP_ID, BAR_TIMESTAMP DESC
+                    )
+                    INCLUDE (CLOSE_PX);
+            END $$;
+        </sql>
+        <rollback>
+            <!--
+              Narrowing again fails if two venues ever stored the same timestamp,
+              which is precisely the state this changeset exists to make possible.
+              Drop the offending rows first if a rollback is genuinely needed.
+            -->
+            <sql splitStatements="true" stripComments="true">
+                DROP INDEX IF EXISTS MARKET_DATA.IX_PRICE_BAR_LATEST;
+                ALTER TABLE MARKET_DATA.PRICE_BAR DROP CONSTRAINT IF EXISTS price_bar_pkey;
+                ALTER TABLE MARKET_DATA.PRICE_BAR
+                    ADD CONSTRAINT price_bar_pkey
+                    PRIMARY KEY (INTERNAL_CUSIP, TM_INTERVAL_ID, BAR_TIMESTAMP);
+                CREATE INDEX IX_PRICE_BAR_LATEST
+                    ON MARKET_DATA.PRICE_BAR (INTERNAL_CUSIP, TM_INTERVAL_ID, BAR_TIMESTAMP DESC)
+                    INCLUDE (CLOSE_PX);
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

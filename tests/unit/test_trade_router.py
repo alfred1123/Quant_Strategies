@@ -29,7 +29,7 @@ def _deployment_row(**overrides) -> DeploymentRow:
         "strategy_vid": 1,
         "api_credential_id": 1,
         "app_id": 10,
-        "internal_cusip": "btc-usd.crypto",
+        "internal_cusip": "btcusdt.crypto",
         "qty": Decimal("0.01"),
         "is_paper_ind": "Y",
         "is_enabled_ind": "Y",
@@ -47,7 +47,7 @@ def _create_body(**overrides):
         "strategy_vid": 1,
         "api_credential_id": 1,
         "app_id": 10,
-        "internal_cusip": "btc-usd.crypto",
+        "internal_cusip": "btcusdt.crypto",
         "qty": "0.01",
     }
     base.update(overrides)
@@ -341,7 +341,7 @@ class TestDryRunDeployment:
             "strategy_vid": 1,
             "api_credential_id": 1,
             "app_id": 34,
-            "internal_cusip": "btc-usd.crypto",
+            "internal_cusip": "btcusdt.crypto",
             "qty": "0.01",
             "paper": True,
         }
@@ -355,7 +355,7 @@ class TestDryRunDeployment:
             strategy_id=sid,
             strategy_vid=1,
             strategy_nm="btc strat",
-            internal_cusip="btc-usd.crypto",
+            internal_cusip="btcusdt.crypto",
             vendor_symbol="BTCUSDT",
             app_id=34,
             paper=True,
@@ -384,7 +384,7 @@ class TestDryRunDeployment:
     def test_validation_error_returns_400(self, client_and_svc):
         client, svc, _ = client_and_svc
         svc.dry_run.side_effect = TradeValidationError(
-            "no INST.PRODUCT_XREF for 'btc-usd.crypto' app_id=34"
+            "no INST.PRODUCT_XREF for 'btcusdt.crypto' app_id=34"
         )
 
         resp = client.post(

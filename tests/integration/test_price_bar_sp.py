@@ -76,17 +76,17 @@ def repo():
     instance.close()
 
 
-def _seed(repo, cusip, hours=BAR_HOURS):
+def _seed(repo, cusip, hours=BAR_HOURS, source_app_id=APP_ID, px_offset=0):
     for hour in hours:
         repo.ins_bar(
             internal_cusip=cusip,
             tm_interval_id=INTERVAL_1H,
-            source_app_id=APP_ID,
+            source_app_id=source_app_id,
             bar_timestamp=_ts(hour),
-            open_px=Decimal("100") + hour,
-            high_px=Decimal("110") + hour,
-            low_px=Decimal("95") + hour,
-            close_px=Decimal("105") + hour,
+            open_px=Decimal("100") + hour + px_offset,
+            high_px=Decimal("110") + hour + px_offset,
+            low_px=Decimal("95") + hour + px_offset,
+            close_px=Decimal("105") + hour + px_offset,
             volume=Decimal("12.5"),
         )
 
@@ -94,11 +94,18 @@ def _seed(repo, cusip, hours=BAR_HOURS):
 @pytest.mark.skipif(DB_URL is None, reason="QUANTDB_URL not set or DB unreachable")
 class TestPriceBarStoredProcedures:
     def test_coverage_is_empty_before_any_insert(self, repo, cusip):
-        assert repo.get_coverage(internal_cusip=cusip, tm_interval_id=INTERVAL_1H) is None
+        assert (
+            repo.get_coverage(
+                internal_cusip=cusip, tm_interval_id=INTERVAL_1H, source_app_id=APP_ID
+            )
+            is None
+        )
 
     def test_insert_then_coverage_reports_the_bounds(self, repo, cusip):
         _seed(repo, cusip)
-        coverage = repo.get_coverage(internal_cusip=cusip, tm_interval_id=INTERVAL_1H)
+        coverage = repo.get_coverage(
+            internal_cusip=cusip, tm_interval_id=INTERVAL_1H, source_app_id=APP_ID
+        )
         assert coverage["min_bar_timestamp"] == _ts(9)
         assert coverage["max_bar_timestamp"] == _ts(11)
 
@@ -107,6 +114,7 @@ class TestPriceBarStoredProcedures:
         rows = repo.get_bars(
             internal_cusip=cusip,
             tm_interval_id=INTERVAL_1H,
+            source_app_id=APP_ID,
             range_start=_ts(9),
             range_end=_ts(11),
         )
@@ -119,6 +127,7 @@ class TestPriceBarStoredProcedures:
         rows = repo.get_bars(
             internal_cusip=cusip,
             tm_interval_id=INTERVAL_1H,
+            source_app_id=APP_ID,
             range_start=_ts(10),
             range_end=_ts(10),
         )
@@ -129,6 +138,7 @@ class TestPriceBarStoredProcedures:
         rows = repo.get_bars(
             internal_cusip=cusip,
             tm_interval_id=1,
+            source_app_id=APP_ID,
             range_start=_ts(9),
             range_end=_ts(11),
         )
@@ -146,12 +156,42 @@ class TestPriceBarStoredProcedures:
             _seed(repo, cusip, hours=(9,))
         assert exc.value.sqlstate == "23505"
 
+    def test_two_venues_hold_the_same_timestamp_independently(self, repo, cusip):
+        """The point of the wide key: Bybit and Binance share one INTERNAL_CUSIP
+        (decision #21) and quote different prices for the same bar."""
+        _seed(repo, cusip, hours=(9,), source_app_id=34)
+        _seed(repo, cusip, hours=(9,), source_app_id=35, px_offset=1000)
+
+        bybit = repo.get_bars(
+            internal_cusip=cusip, tm_interval_id=INTERVAL_1H, source_app_id=34,
+            range_start=_ts(9), range_end=_ts(9),
+        )
+        binance = repo.get_bars(
+            internal_cusip=cusip, tm_interval_id=INTERVAL_1H, source_app_id=35,
+            range_start=_ts(9), range_end=_ts(9),
+        )
+
+        assert [r["close_px"] for r in bybit] == [Decimal("114")]
+        assert [r["close_px"] for r in binance] == [Decimal("1114")]
+
+    def test_coverage_of_one_venue_ignores_another(self, repo, cusip):
+        """Otherwise the second venue reads as fresh and never fetches its own bars."""
+        _seed(repo, cusip, source_app_id=34)
+
+        assert (
+            repo.get_coverage(
+                internal_cusip=cusip, tm_interval_id=INTERVAL_1H, source_app_id=35
+            )
+            is None
+        )
+
     def test_service_read_bars_returns_the_pipeline_shape(self, repo, cusip):
         _seed(repo, cusip)
         service = PriceBarService(repo, FakeRefData(), instruments=None, fetcher=None)
         df = service.read_bars(
             internal_cusip=cusip,
             tm_interval_id=INTERVAL_1H,
+            source_app_id=APP_ID,
             start=_ts(9),
             end=_ts(11),
         )

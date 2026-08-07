@@ -150,6 +150,19 @@ class RedisRefData:
                 return int(r["tm_interval_id"])
         raise RuntimeError(f"REFDATA.TM_INTERVAL has no row with PERIOD_LENGTH={period}")
 
+    def interval_ids(self) -> list[int]:
+        """Every ``TM_INTERVAL_ID``, shortest period first.
+
+        The scheduler sweeps intervals rather than deployments, so it needs the
+        set to sweep. Ordered by period so a poll pass settles the fast cadences
+        before the slow ones.
+        """
+        rows = self.get("tm_interval")
+        return [
+            int(r["tm_interval_id"])
+            for r in sorted(rows, key=lambda r: parse_period(r["period_length"]))
+        ]
+
     def resolve_queue_status_id(self, name: str) -> int:
         for r in self.get("queue_status"):
             if r["name"] == name:
