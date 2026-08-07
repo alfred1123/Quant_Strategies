@@ -10,8 +10,7 @@ import logging
 from fastapi import APIRouter, Depends, Request
 
 from quant.api.admin.repo import LogProcRepo
-from quant.api.auth.dependencies import require_user
-from quant.api.auth.models import CurrentUser
+from quant.api.auth.dependencies import require_user_or_service
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +23,10 @@ def _get_log_proc_repo(request: Request) -> LogProcRepo:
 
 @router.post("/log-proc-summary/summarize")
 def summarize_log_proc(
-    user: CurrentUser = Depends(require_user),
+    caller: str = Depends(require_user_or_service),
     repo: LogProcRepo = Depends(_get_log_proc_repo),
 ) -> dict:
     """Aggregate LOG_PROC_DETAIL into daily per-proc summaries."""
     rows_affected = repo.summarize()
-    logger.info("log-proc-summary: %d rows upserted by user=%s", rows_affected, user.username)
+    logger.info("log-proc-summary: %d rows upserted by caller=%s", rows_affected, caller)
     return {"rows_affected": rows_affected}
