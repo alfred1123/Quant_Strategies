@@ -198,8 +198,9 @@ jobs:
     needs: [test]
     runs-on: ubuntu-latest
     environment: production
-    # All three stacks are safe to auto-deploy on intentional infra commits:
-    #   * Path filter (aws/cfn/** or aws/params/**) means app-only pushes skip.
+    # Every stack here is safe to auto-deploy on intentional infra commits:
+    #   * Path filter (aws/cfn/**, aws/params/**, config/scheduler/**) means
+    #     app-only pushes skip.
     #   * RDS is guarded at the AWS layer: DeletionPolicy=Retain,
     #     UpdateReplacePolicy=Snapshot, DeletionProtection=true,
     #     BackupRetentionPeriod=7. Data loss is not reachable from CFN.
@@ -232,11 +233,16 @@ jobs:
           echo "base=${base}"
           echo "$changed" | sed 's/^/    /'
 
-          network=false; database=false; compute=false; ecr=false
+          network=false; database=false; compute=false; ecr=false; scheduler=false
           echo "$changed" | grep -qE '^aws/cfn/00-ecr\.yml'      && ecr=true
           echo "$changed" | grep -qE '^aws/cfn/01-network\.yml'  && network=true
           echo "$changed" | grep -qE '^aws/cfn/02-database\.yml' && database=true
           echo "$changed" | grep -qE '^aws/cfn/03-compute\.yml'  && compute=true
+          # The scheduler step also uploads the Lambda zip and syncs schedules,
+          # so job definitions and handler code redeploy it, not just the template.
+          echo "$changed" | grep -qE '^aws/cfn/04-scheduler\.yml'   && scheduler=true
+          echo "$changed" | grep -qE '^aws/lambda/scheduled-task/'  && scheduler=true
+          echo "$changed" | grep -qE '^config/scheduler/'           && scheduler=true
 
           if echo "$changed" | grep -q '^aws/params/prod.json'; then
             pdiff=$(git diff "$base" HEAD -- aws/params/prod.json)
@@ -248,7 +254,7 @@ jobs:
           fi
 
           if [[ "$force" == "true" ]]; then
-            ecr=true; network=true; compute=true
+            ecr=true; network=true; compute=true; scheduler=true
             [[ "${{ inputs.deploy_database }}" == "true" ]] && database=true
           fi
 
@@ -256,6 +262,7 @@ jobs:
           echo "network=$network"   >> "$GITHUB_OUTPUT"
           echo "database=$database" >> "$GITHUB_OUTPUT"
           echo "compute=$compute"   >> "$GITHUB_OUTPUT"
+          echo "scheduler=$scheduler" >> "$GITHUB_OUTPUT"
 
       - name: Deploy ECR stack
         if: steps.changes.outputs.ecr == 'true'
@@ -302,6 +309,20 @@ jobs:
           json.dump(arr, open(p, 'w'))
           "
           bash aws/deploy.sh database
+
+      # deploy.sh does three things for this stack: CFN, `aws lambda
+      # update-function-code` with a zip of handler.py, then sync_schedules.py.
+      # Only the last needs anything installed on the runner.
+      - name: Install schedule-sync dependencies
+        if: steps.changes.outputs.scheduler == 'true'
+        run: pip install boto3 pyyaml
+
+      - name: Deploy scheduler stack
+        if: steps.changes.outputs.scheduler == 'true'
+        env:
+          APP_ENV: prod
+          AWS_REGION: ap-southeast-1
+        run: bash aws/deploy.sh scheduler
 
   deploy:
     name: deploy to EC2

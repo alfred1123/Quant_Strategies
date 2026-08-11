@@ -128,7 +128,7 @@ bash aws/deploy.sh
 bash aws/deploy.sh network
 bash aws/deploy.sh database
 bash aws/deploy.sh compute
-bash aws/deploy.sh scheduler   # requires /quant/prod/TRADE_SERVICE_TOKEN in SSM
+bash aws/deploy.sh scheduler   # normally CI; requires /quant/prod/TRADE_SERVICE_TOKEN in SSM
 ```
 
 ### Updating
@@ -246,19 +246,35 @@ and applies them directly — no EventBridge, Lambda, or service token. See
     (185 retries over 24h) would repeatedly re-invoke a failing trade apply —
     order-level retries already live in the API (`OrderRetryExecutor`).
 
-### First-time deploy
+### Deploying
+
+The `deploy` workflow owns this stack, same as the other four. Its `cfn` job runs
+`bash aws/deploy.sh scheduler` — CFN, then the Lambda zip upload, then
+`scripts/sync_schedules.py` — whenever a push to `main` touches
+`aws/cfn/04-scheduler.yml`, `aws/lambda/scheduled-task/**`, or
+`config/scheduler/**`. A manual **Run workflow** deploys it unconditionally,
+which is how you redeploy without an infra commit.
+
+One bootstrap step still needs admin credentials, because the GitHub deploy user
+can read SSM but not write it:
 
 ```bash
-# 1. Ensure TRADE_SERVICE_TOKEN exists in SSM
-bash aws/scripts/init-ssm-params.sh
+# Once per environment — the deploy fails with instructions if it is missing.
+aws ssm put-parameter --name /quant/prod/TRADE_SERVICE_TOKEN \
+  --value "$(openssl rand -base64 32)" --type SecureString \
+  --region ap-southeast-1
+```
 
-# 2. Deploy stack (CFN + upload Lambda zip from aws/lambda/scheduled-task/)
-bash aws/deploy.sh scheduler
+The API host picks the same value up automatically: it runs with `USE_SSM=1`,
+and `load_config()` loads every parameter under `/quant/prod/` into the
+environment, where `require_user_or_service` reads it.
 
-# 3. Smoke-test Lambda (expects 401 until API service-auth lands)
+Smoke-test the Lambda directly once the stack is up:
+
+```bash
 aws lambda invoke \
   --function-name quant-scheduled-task \
-  --payload '{"task":"trade_apply","deployment_id":"00000000-0000-0000-0000-000000000000"}' \
+  --payload '{"task":"log_proc_summary"}' \
   --cli-binary-format raw-in-base64-out \
   /tmp/out.json && cat /tmp/out.json
 ```
@@ -266,9 +282,8 @@ aws lambda invoke \
 ### What this stack does **not** do yet
 
 - Create per-deployment schedules (API/boto3 on deployment create — app work)
-- Accept `TRADE_SERVICE_TOKEN` on the FastAPI `/apply` route (service auth — app work)
-
-Until those land, the Lambda and IAM are ready; schedules stay uncreated and invoke returns **401** from the API.
+- Accept `TRADE_SERVICE_TOKEN` on the FastAPI `/apply` route — only the `admin`
+  router takes the service token so far, so a `trade_apply` invoke returns **401**
 
 ### Outputs to use from the app
 

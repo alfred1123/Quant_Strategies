@@ -4,17 +4,19 @@
 # deploy.sh reads this file and upserts the schedule via boto3
 # (scripts/sync_schedules.py). No CFN change needed to add new jobs —
 # just drop another YAML file here.
+#
+# The schedule only carries `task` — the endpoint it maps to is owned by
+# `_TASK_PATHS` in aws/lambda/scheduled-task/handler.py, which whitelists the
+# paths the service token may reach. Naming a path here as well would be a
+# second source of truth with nothing to keep the two in step.
 
 task: log_proc_summary
 description: Aggregate LOG_PROC_DETAIL into daily per-proc call counts
 enabled: true
 
 schedule:
-  expression: "cron(0 0 ? * SAT *)"
-  timezone: UTC
-
-endpoint: /api/v1/admin/log-proc-summary/summarize
-
-db:
-  table: CORE_ADMIN.LOG_PROC_SUMMARY
-  procedure: CORE_ADMIN.SP_INS_LOG_PROC_SUMMARY
+  # TEMPORARY one-off to watch the first real fire end-to-end. FlexibleTimeWindow
+  # is OFF, so a schedule created after this instant simply never fires — push
+  # the time out if CI is slow. Restore "cron(0 0 ? * SAT *)" / UTC afterwards.
+  expression: "at(2026-08-11T09:30:00)"
+  timezone: Asia/Hong_Kong

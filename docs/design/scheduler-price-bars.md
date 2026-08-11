@@ -328,9 +328,13 @@ CloudFormation stack `quant-scheduler` — template [`aws/cfn/04-scheduler.yml`]
 | EC2 manage policy | `quant-ec2-scheduler-manage` (on `quant-ec2-role`) |
 | Service token SSM | `/quant/prod/TRADE_SERVICE_TOKEN` — fetched by the Lambda at cold start (CloudFormation does not support `ssm-secure` in Lambda env vars) |
 
+The `deploy` workflow's `cfn` job runs this stack on pushes touching
+`aws/cfn/04-scheduler.yml`, `aws/lambda/scheduled-task/**`, or
+`config/scheduler/**`, and on a manual dispatch. Locally:
+
 ```bash
 bash aws/scripts/init-ssm-params.sh   # creates TRADE_SERVICE_TOKEN if missing
-bash aws/deploy.sh scheduler          # CFN + upload Lambda zip
+bash aws/deploy.sh scheduler          # CFN + Lambda zip + sync_schedules.py
 ```
 
 ### 6.2 Schedule management (app — not yet wired)
