@@ -163,8 +163,12 @@ print(matches[0] if matches else '', end='')
 
 upload_scheduled_task_lambda() {
   local handler="${LAMBDA_SCHEDULED_TASK_DIR}/handler.py"
-  local zip_path
-  zip_path="$(mktemp -t quant-scheduled-task.XXXXXX.zip)"
+  local zip_dir zip_path
+  # A temp *directory*: mktemp on a file leaves a 0-byte one behind, and an
+  # archiver handed an existing path treats it as an archive to update, so
+  # packaging died with "Zip file structure invalid" the first time this ran.
+  zip_dir="$(mktemp -d)"
+  zip_path="${zip_dir}/handler.zip"
 
   if [[ ! -f "$handler" ]]; then
     echo "ERROR: Lambda handler not found: ${handler}"
@@ -172,9 +176,13 @@ upload_scheduled_task_lambda() {
   fi
 
   echo "  Packaging Lambda from ${LAMBDA_SCHEDULED_TASK_DIR} ..."
+  # python3 rather than `zip`, which is not installed everywhere (and is one
+  # more thing to install on a runner); this script already requires python3.
+  # Running from the handler's directory keeps it at the archive root, which is
+  # where the `handler.handler` entry point looks for it.
   (
     cd "${LAMBDA_SCHEDULED_TASK_DIR}"
-    zip -q -j "${zip_path}" handler.py
+    python3 -m zipfile -c "${zip_path}" handler.py
   )
 
   echo "  Uploading code → ${LAMBDA_SCHEDULED_TASK_NAME}"
@@ -186,7 +194,7 @@ upload_scheduled_task_lambda() {
     --query '{FunctionName:FunctionName,LastUpdateStatus:LastUpdateStatus,CodeSize:CodeSize}' \
     --output table
 
-  rm -f "${zip_path}"
+  rm -rf "${zip_dir}"
   echo "  ✓ Lambda code updated."
 }
 

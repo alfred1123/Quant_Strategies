@@ -240,9 +240,12 @@ jobs:
           echo "$changed" | grep -qE '^aws/cfn/03-compute\.yml'  && compute=true
           # The scheduler step also uploads the Lambda zip and syncs schedules,
           # so job definitions and handler code redeploy it, not just the template.
+          # deploy.sh is included because it owns that packaging and sync logic —
+          # the only stack for which it does more than call CloudFormation.
           echo "$changed" | grep -qE '^aws/cfn/04-scheduler\.yml'   && scheduler=true
           echo "$changed" | grep -qE '^aws/lambda/scheduled-task/'  && scheduler=true
           echo "$changed" | grep -qE '^config/scheduler/'           && scheduler=true
+          echo "$changed" | grep -qE '^aws/deploy\.sh'              && scheduler=true
 
           if echo "$changed" | grep -q '^aws/params/prod.json'; then
             pdiff=$(git diff "$base" HEAD -- aws/params/prod.json)
