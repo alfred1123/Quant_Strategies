@@ -36,6 +36,11 @@ services:
     container_name: quant-worker
     restart: unless-stopped
     command: ["python", "-m", "quant.queue.worker_loop"]
+    # The image HEALTHCHECK probes /health/ready, which only the api serves.
+    # Inheriting it parked this container at "unhealthy" for its whole life,
+    # so a genuinely dead worker looked exactly like a working one.
+    healthcheck:
+      disable: true
     environment:
       - APP_ENV=${APP_ENV:-dev}
       - USE_SSM=${USE_SSM:-1}

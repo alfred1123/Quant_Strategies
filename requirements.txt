@@ -13,7 +13,9 @@ optuna
 fastapi
 uvicorn[standard]
 psycopg[binary]
-redis
+# Floored at 8 so a local env matches the image: 8.0 changed the default
+# socket_timeout from None to 5s, which behaves differently under BLPOP.
+redis>=8
 httpx
 argon2-cffi
 pyjwt[crypto]

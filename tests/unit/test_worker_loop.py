@@ -267,6 +267,51 @@ class TestDrain:
         assert slow.killed
 
 
+# ── default redis client ────────────────────────────────────────────────
+
+
+class TestWakeClientTimeouts:
+    """The client built when no ``redis_client`` is injected.
+
+    ``wait_for_wake`` parks on BLPOP for ``BLPOP_TIMEOUT_S``. If the socket read
+    expires first, redis-py raises and the loop degrades to polling BT.QUEUE at
+    the socket timeout instead — silently, because ``wake.py`` treats the error
+    as a timeout. redis-py 8 defaults that socket timeout to 5s, so it must be
+    set explicitly rather than left to the library.
+    """
+
+    def _connect_kwargs(self):
+        loop = WorkerLoop(
+            db_url="postgresql://stub",
+            redis_url="redis://stub",
+            repo=MagicMock(),
+            refdata=FakeRefData(),
+        )
+        return loop._redis.connection_pool.connection_kwargs
+
+    def test_socket_timeout_outlasts_the_blpop_park(self):
+        assert self._connect_kwargs()["socket_timeout"] > WorkerLoop.BLPOP_TIMEOUT_S
+
+    def test_socket_timeout_is_the_park_plus_margin(self):
+        expected = WorkerLoop.BLPOP_TIMEOUT_S + WorkerLoop.WAKE_SOCKET_MARGIN_S
+        assert self._connect_kwargs()["socket_timeout"] == expected
+
+    def test_connect_timeout_is_set_so_a_dead_host_fails_fast(self):
+        assert self._connect_kwargs()["socket_connect_timeout"] > 0
+
+    def test_injected_client_is_used_verbatim(self):
+        """Tests and callers passing their own client must not be overridden."""
+        stub = MagicMock()
+        loop = WorkerLoop(
+            db_url="postgresql://stub",
+            redis_url="redis://stub",
+            repo=MagicMock(),
+            refdata=FakeRefData(),
+            redis_client=stub,
+        )
+        assert loop._redis is stub
+
+
 # ── stop ────────────────────────────────────────────────────────────────
 
 
