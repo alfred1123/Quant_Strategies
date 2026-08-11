@@ -100,12 +100,12 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: requirements.txt
+          cache-dependency-path: requirements-dev.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       - name: Run unit tests
         run: python -m pytest tests/unit/ -v
@@ -145,15 +145,18 @@ jobs:
       needs.changes.outputs.app == 'true' ||
       needs.changes.outputs.nginx == 'true' ||
       github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    # Native arm64, matching the `platforms:` below. Cross-building from x64
+    # meant QEMU emulated every step of the image, and pip does not benefit:
+    # it downloads prebuilt manylinux aarch64 wheels, so emulation only slowed
+    # down unzipping and byte-compiling them. That one phase cost 288s of an
+    # 8m build. Free and unlimited on public repos, same 4 vCPU / 16 GB.
+    runs-on: ubuntu-24.04-arm
     environment: production
     env:
       AWS_REGION: ap-southeast-1
       ECR_REGISTRY: 539163478329.dkr.ecr.ap-southeast-1.amazonaws.com
     steps:
       - uses: actions/checkout@v4
-
-      - uses: docker/setup-qemu-action@v3
 
       - uses: docker/setup-buildx-action@v3
 

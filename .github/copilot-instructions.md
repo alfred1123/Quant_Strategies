@@ -39,8 +39,8 @@ python -m quant.cli               # Run backtest
 - Keep changes **focused** — extend existing functions/classes rather than duplicating logic.
 - **Testing**: After any change to `quant/`, review and update the corresponding unit tests in `tests/unit/` and integration tests in `tests/integration/`. New functions or classes must have unit tests. Run `python -m pytest tests/ -v` and confirm all tests pass before considering the change complete.
 - **Secrets**: API keys live in `.env` (gitignored) at the project root. Never commit credentials.
-- `env/` is gitignored — always recreate via `setup.sh` or `requirements.txt`.
-- New dependencies go in `requirements.txt`.
+- `env/` is gitignored — always recreate via `setup.sh` or `requirements-dev.txt`.
+- New dependencies go in `requirements.txt` if the API or worker imports them at runtime, since that file is what the `Dockerfile` installs. Test and tooling packages go in `requirements-dev.txt`.
 - **README**: After any change that affects usage, setup, CLI options, directory structure, data sources, or dependencies, review and update `README.md` to keep it accurate.
 - **Wiki**: After any change that affects architecture, API endpoints, database schema, indicators, strategies, or design decisions, review and update the relevant page in `docs/` (MkDocs wiki).
 

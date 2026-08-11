@@ -351,7 +351,7 @@ The workflow uses `paths-ignore` for `docs/**`, `*.md`, `tests/**`, `db/**`, `sc
 2. **Test job** — runs `pytest tests/unit/` on GitHub's runner (Python 3.12)
 3. **Frontend job** — `npm ci`, `npm audit --audit-level=high`, `npm run build` (type-check + Vite build), `npm test` on Node 22. Validates the SPA on the runner; a build/audit/test failure blocks `build-and-push`.
 4. **CFN job** — deploys infra stacks when the matching `aws/cfn/**` template or relevant `aws/params/prod.json` keys change (per-stack detection). The **database** stack only deploys when `02-database.yml` / DB params change and requires the `DB_MASTER_PASSWORD` secret (it is otherwise guarded by `DeletionPolicy=Retain`, `UpdateReplacePolicy=Snapshot`, `DeletionProtection=true`).
-5. **Build-and-push job** — skipped when neither app nor nginx changed; otherwise builds only the affected image(s) for `linux/arm64` (qemu/buildx) with GitHub Actions layer cache and pushes to ECR (tags: git SHA + `latest`).
+5. **Build-and-push job** — skipped when neither app nor nginx changed; otherwise builds only the affected image(s) for `linux/arm64` with GitHub Actions layer cache and pushes to ECR (tags: git SHA + `latest`). Runs on a native arm64 runner (`ubuntu-24.04-arm`), so there is no QEMU in the path — see [Why the build runs on arm64](#why-the-build-runs-on-arm64).
 6. **Deploy job** — skipped when no app/nginx/compose changes; otherwise SSM Run Command runs the inline deploy script (see [Deployment logic](#deployment-logic) below). **Liquibase is not run automatically** — apply DB migrations manually when ready (see [Database](database.md#deployment)).
 
 **Manual full deploy:** Actions → deploy → Run workflow (`workflow_dispatch`). Rebuilds both images and deploys regardless of paths. The optional `deploy_database` input (default off) additionally deploys the RDS stack — leave unchecked unless you intend an Aurora change.
@@ -362,6 +362,19 @@ No SSH keys needed — deploy uses SSM Run Command (same IAM role the EC2 alread
 
 !!! note "Frontend build vs CI check"
     The production SPA bundle ships **inside the quant-nginx Docker image** (built in CI for arm64). The separate `frontend` runner job is a fast **validation gate** (build + `npm audit` + unit tests) — it does not produce the deployed artifact.
+
+### Why the build runs on arm64
+
+The EC2 host is Graviton, so the images must be `linux/arm64`. That used to be produced by cross-building from an x64 runner under QEMU, which made image builds bimodal: ~1 min when `requirements.txt` was untouched and BuildKit reused the cached pip layer, but 4–17 min whenever it changed.
+
+Emulation bought nothing. Every dependency resolves to a prebuilt `manylinux_2_28_aarch64` wheel, and the only source build (`futu-api`) finishes in seconds. What QEMU actually slowed down was pip unpacking ~120 wheels and byte-compiling them to `.pyc` — a single phase that took 288s of an 8m build on 2026-08-11.
+
+Two changes address it:
+
+- **`runs-on: ubuntu-24.04-arm`** and no `setup-qemu-action`. Native arm64 runners are free and unlimited on public repos, with the same 4 vCPU / 16 GB as the x64 ones.
+- **`requirements.txt` is runtime-only.** `pytest`, `mkdocs-material` and `pyyaml` moved to `requirements-dev.txt`, which starts with `-r requirements.txt`. That drops ~18 packages of test and docs tooling (mkdocs, babel, pygments, watchdog, …) out of the API and worker containers — nothing under `quant/` imports them.
+
+Install `requirements-dev.txt` locally; `setup.sh` and the CI test jobs already do. The `Dockerfile` installs `requirements.txt` alone, so a package added there ships to production.
 
 ### Deployment logic
 

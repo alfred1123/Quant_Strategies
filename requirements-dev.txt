@@ -1,0 +1,14 @@
+# Everything the runtime needs, plus the tooling that only ever runs on a
+# developer machine or a CI runner. Keeping these out of requirements.txt keeps
+# them out of the image: pip unpacking and byte-compiling them was pure cost on
+# every cache-missing build, and mkdocs has no business inside a trading
+# container. Install this file locally; setup.sh already does.
+-r requirements.txt
+
+pytest
+
+# scripts/sync_schedules.py reads config/scheduler/*.yml. Listed because a
+# system python3 often has it via the distro package and so hides the gap.
+pyyaml
+
+mkdocs-material

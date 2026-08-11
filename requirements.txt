@@ -1,3 +1,6 @@
+# Runtime only — this file is what the Dockerfile installs, so anything added
+# here ends up in the API and worker containers. Test and tooling packages go
+# in requirements-dev.txt, which pulls this file in.
 pandas
 numpy
 requests
@@ -21,10 +24,5 @@ argon2-cffi
 pyjwt[crypto]
 cryptography
 slowapi
-pytest
 boto3
-# scripts/sync_schedules.py reads config/scheduler/*.yml. Listed because a
-# system python3 often has it via the distro package and so hides the gap.
-pyyaml
-mkdocs-material
 ccxt
