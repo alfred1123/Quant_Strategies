@@ -7,7 +7,7 @@
 
     <changeSet id="1.4.0-001-create-promotion-state" author="alfcheun" context="refdata">
         <comment>REFDATA.PROMOTION_STATE — valid outcomes for BT.PROMOTION decisions</comment>
-        <sqlFile path="../tables/PROMOTION_STATE.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../tables/PROMOTION_STATE.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

@@ -7,7 +7,7 @@
 
     <changeSet id="1.1.0-001-refdata-app-bybit" author="alfcheun" context="refdata" runOnChange="false">
         <comment>Phase 1.1 — REFDATA.APP broker row for Bybit</comment>
-        <sqlFile path="../data/APP_BYBIT.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../data/APP_BYBIT.sql" relativeToChangelogFile="true"
                  splitStatements="true" stripComments="true"/>
         <rollback>
             <sql>DELETE FROM REFDATA.APP WHERE NAME = 'bybit';</sql>

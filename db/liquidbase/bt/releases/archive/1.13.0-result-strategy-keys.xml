@@ -43,13 +43,13 @@
 
     <changeSet id="1.13.0-004-sp-ins-result" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_INS_RESULT — denormalize STRATEGY_ID/STRATEGY_VID from BT.QUEUE at insert</comment>
-        <sqlFile path="../procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
     <changeSet id="1.13.0-005-sp-get-result" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_GET_RESULT — include STRATEGY_ID/STRATEGY_VID in cursor</comment>
-        <sqlFile path="../procedures/SP_GET_RESULT.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_RESULT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

@@ -9,7 +9,7 @@
 
     <changeSet id="1.8.0-001-promotion-table" author="alfcheun" context="bt">
         <comment>BT.PROMOTION — persists auto-promote decisions per completed backtest</comment>
-        <sqlFile path="../tables/PROMOTION.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../tables/PROMOTION.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
@@ -17,7 +17,7 @@
 
     <changeSet id="1.8.0-002-sp-ins-promotion" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_INS_PROMOTION — insert one promotion decision row</comment>
-        <sqlFile path="../procedures/SP_INS_PROMOTION.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_PROMOTION.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
@@ -64,7 +64,7 @@
 
     <changeSet id="1.8.0-006-sp-ins-result" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_INS_RESULT — shred metrics from PAYLOAD_JSON, USER_ID derived from QUEUE</comment>
-        <sqlFile path="../procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
@@ -72,7 +72,7 @@
 
     <changeSet id="1.8.0-007-sp-get-result" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_GET_RESULT — fetch latest result row for a queue_id</comment>
-        <sqlFile path="../procedures/SP_GET_RESULT.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_RESULT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

@@ -15,26 +15,26 @@
         -->
         <validCheckSum>ANY</validCheckSum>
         <comment>Phase 1.9 — MARKET_DATA.PRICE_BAR normalized OHLCV rows</comment>
-        <sqlFile path="../tables/PRICE_BAR.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../tables/PRICE_BAR.sql" relativeToChangelogFile="true"
                  splitStatements="true" stripComments="true"/>
         <rollback><sql>DROP TABLE IF EXISTS MARKET_DATA.PRICE_BAR;</sql></rollback>
     </changeSet>
 
     <changeSet id="1.0.0-002-sp-ins-price-bar" author="alfcheun" context="market_data,prod-deploy" runOnChange="true">
         <comment>MARKET_DATA.SP_INS_PRICE_BAR — single-row insert</comment>
-        <sqlFile path="../procedures/SP_INS_PRICE_BAR.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_PRICE_BAR.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
     <changeSet id="1.0.0-003-sp-get-price-bar" author="alfcheun" context="market_data,prod-deploy" runOnChange="true">
         <comment>MARKET_DATA.SP_GET_PRICE_BAR — range read</comment>
-        <sqlFile path="../procedures/SP_GET_PRICE_BAR.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_PRICE_BAR.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
     <changeSet id="1.0.0-004-sp-get-price-bar-coverage" author="alfcheun" context="market_data,prod-deploy" runOnChange="true">
         <comment>MARKET_DATA.SP_GET_PRICE_BAR_COVERAGE — MIN/MAX via ORDER BY LIMIT 1 (crash catch-up + freshness)</comment>
-        <sqlFile path="../procedures/SP_GET_PRICE_BAR_COVERAGE.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_PRICE_BAR_COVERAGE.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

@@ -22,7 +22,7 @@
 
     <changeSet id="1.14.0-002-sp-upd-promote-strategy" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_UPD_PROMOTE_STRATEGY — demote-only falls back to VID 1 as default best</comment>
-        <sqlFile path="../procedures/SP_UPD_PROMOTE_STRATEGY.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_UPD_PROMOTE_STRATEGY.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

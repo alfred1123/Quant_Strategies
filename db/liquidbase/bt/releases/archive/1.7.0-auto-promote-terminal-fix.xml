@@ -9,7 +9,7 @@
 
     <changeSet id="1.7.0-001-sp-get-strategy-best-mode" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_GET_STRATEGY: add IN_IS_BEST_IND param — 3 modes (exact VID, best, active)</comment>
-        <sqlFile path="../procedures/SP_GET_STRATEGY.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_STRATEGY.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
@@ -17,7 +17,7 @@
 
     <changeSet id="1.7.0-002-sp-get-queue-for-terminal" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_GET_QUEUE_FOR_TERMINAL: derive STRAT_CURRENT_IND from TRANSACT_TO_TS, add IS_BEST_IND</comment>
-        <sqlFile path="../procedures/SP_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
@@ -30,7 +30,7 @@
 
     <changeSet id="1.7.0-003-fn-get-queue-for-terminal" author="alfcheun" context="bt" runOnChange="true">
         <comment>FN_GET_QUEUE_FOR_TERMINAL: derive STRAT_CURRENT_IND from TRANSACT_TO_TS, add IS_BEST_IND</comment>
-        <sqlFile path="../functions/FN_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../functions/FN_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

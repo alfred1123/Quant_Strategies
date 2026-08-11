@@ -7,7 +7,7 @@
 
     <changeSet id="1.3.0-001-create-promotion-metric" author="alfcheun" context="refdata">
         <comment>REFDATA.PROMOTION_METRIC — metrics available for IS_BEST_IND auto-promote comparison</comment>
-        <sqlFile path="../tables/PROMOTION_METRIC.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../tables/PROMOTION_METRIC.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

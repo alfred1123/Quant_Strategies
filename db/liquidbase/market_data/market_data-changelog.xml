@@ -19,7 +19,5 @@
            <include file="releases/X.Y.Z-name.xml" relativeToChangelogFile="true"/>
     -->
 
-    <include file="releases/1.0.0-price-bars.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.1.0-price-bar-source-key.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.2.0-log-duration-clock-timestamp.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -14,7 +14,7 @@
             rewrites the stale "BTC-USD" description left by the rename to
             btcusdt.crypto. Soft-versioned via SP_INS_PRODUCT; idempotent.
         </comment>
-        <sqlFile path="../data/CRYPTO_SPOT_EXCHANGE_NULL.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../data/CRYPTO_SPOT_EXCHANGE_NULL.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="false"/>
         <rollback>
             <!--

@@ -12,7 +12,7 @@
             ccxt public markets for both exchanges. Idempotent — skips if xref
             already exists. Required for live apply + price bar fetch (decision #21).
         </comment>
-        <sqlFile path="../data/XREF_BYBIT_BINANCE.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../data/XREF_BYBIT_BINANCE.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="false"/>
         <rollback>
             <sql>

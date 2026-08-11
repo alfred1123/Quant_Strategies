@@ -7,28 +7,28 @@
 
     <changeSet id="1.2.1-001-sp-ins-deployment" author="alfcheun" context="trade" runOnChange="true">
         <comment>Phase 1.2 — create / version TRADE.DEPLOYMENT</comment>
-        <sqlFile path="../procedures/SP_INS_DEPLOYMENT.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_DEPLOYMENT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
         <rollback><sql>DROP PROCEDURE IF EXISTS TRADE.SP_INS_DEPLOYMENT;</sql></rollback>
     </changeSet>
 
     <changeSet id="1.2.1-002-sp-get-deployment" author="alfcheun" context="trade" runOnChange="true">
         <comment>Phase 1.2 — read TRADE.DEPLOYMENT</comment>
-        <sqlFile path="../procedures/SP_GET_DEPLOYMENT.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_DEPLOYMENT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
         <rollback><sql>DROP PROCEDURE IF EXISTS TRADE.SP_GET_DEPLOYMENT;</sql></rollback>
     </changeSet>
 
     <changeSet id="1.2.1-003-sp-ins-execution-event" author="alfcheun" context="trade" runOnChange="true">
         <comment>Phase 1.2 — append TRADE.EXECUTION_EVENT</comment>
-        <sqlFile path="../procedures/SP_INS_EXECUTION_EVENT.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_EXECUTION_EVENT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
         <rollback><sql>DROP PROCEDURE IF EXISTS TRADE.SP_INS_EXECUTION_EVENT;</sql></rollback>
     </changeSet>
 
     <changeSet id="1.2.1-004-sp-ins-transaction" author="alfcheun" context="trade" runOnChange="true">
         <comment>Phase 1.2 — append TRADE.TRANSACTION</comment>
-        <sqlFile path="../procedures/SP_INS_TRANSACTION.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_TRANSACTION.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
         <rollback><sql>DROP PROCEDURE IF EXISTS TRADE.SP_INS_TRANSACTION;</sql></rollback>
     </changeSet>

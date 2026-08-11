@@ -5,9 +5,9 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <changeSet id="1.3.0-001-sp-get-deployment-check" author="alfcheun" context="trade" runOnChange="true">
-        <comment>SP_GET_DEPLOYMENT_CHECK — validation read for deployment mutations</comment>
-        <sqlFile path="../procedures/SP_GET_DEPLOYMENT_CHECK.sql" relativeToChangelogFile="true"
+    <changeSet id="1.9.0-001-sp-get-promotion" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_GET_PROMOTION — read promotion decision log (newest first)</comment>
+        <sqlFile path="../../procedures/SP_GET_PROMOTION.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

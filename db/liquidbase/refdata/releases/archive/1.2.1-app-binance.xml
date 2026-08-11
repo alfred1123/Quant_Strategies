@@ -7,7 +7,7 @@
 
     <changeSet id="1.2.1-001-app-binance" author="alfcheun" context="refdata" runOnChange="false">
         <comment>Seed Binance exchange into REFDATA.APP</comment>
-        <sqlFile path="../data/APP_BINANCE.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../data/APP_BINANCE.sql" relativeToChangelogFile="true"
                  splitStatements="true" stripComments="true"/>
     </changeSet>
 

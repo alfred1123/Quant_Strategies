@@ -40,7 +40,7 @@
 
     <changeSet id="1.4.0-004-sp-ins-strategy" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_INS_STRATEGY: close prior row via TRANSACT_TO_TS instead of IS_CURRENT_IND flip</comment>
-        <sqlFile path="../procedures/SP_INS_STRATEGY.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_STRATEGY.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
@@ -48,7 +48,7 @@
 
     <changeSet id="1.4.0-005-sp-get-strategy" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_GET_STRATEGY: filter on TRANSACT_TO_TS = 9999-12-31 instead of IS_CURRENT_IND</comment>
-        <sqlFile path="../procedures/SP_GET_STRATEGY.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_STRATEGY.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
@@ -56,13 +56,13 @@
 
     <changeSet id="1.4.0-006-sp-get-queue-for-terminal" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_GET_QUEUE_FOR_TERMINAL: drop STRAT_CURRENT_IND column reference</comment>
-        <sqlFile path="../procedures/SP_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
     <changeSet id="1.4.0-007-fn-get-queue-for-terminal" author="alfcheun" context="bt" runOnChange="true">
         <comment>FN_GET_QUEUE_FOR_TERMINAL: drop STRAT_CURRENT_IND from RETURNS TABLE and SELECT</comment>
-        <sqlFile path="../functions/FN_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../functions/FN_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

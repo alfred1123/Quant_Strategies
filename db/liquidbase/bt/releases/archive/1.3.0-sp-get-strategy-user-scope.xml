@@ -14,7 +14,7 @@
 
     <changeSet id="1.3.0-002-sp-get-strategy-user-scope" author="alfcheun" context="bt" runOnChange="true">
         <comment>Extend SP_GET_STRATEGY — list current strategies by IN_USER_ID when IN_STRATEGY_ID is NULL</comment>
-        <sqlFile path="../procedures/SP_GET_STRATEGY.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_STRATEGY.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

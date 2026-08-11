@@ -7,7 +7,7 @@
 
     <changeSet id="1.10.0-001-strategy-vid-truncate" author="alfcheun" context="bt" runOnChange="false">
         <comment>Pre-live: TRUNCATE BT strategy/queue/result/promotion (one-off)</comment>
-        <sqlFile path="../data/strategy_vid_truncate.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../data/strategy_vid_truncate.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
@@ -20,7 +20,7 @@
 
     <changeSet id="1.10.0-003-sp-ins-strategy-vid-by-name" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_INS_STRATEGY: resolve id from (USER_ID, STRATEGY_NM); OUT_STRATEGY_ID + OUT_STRATEGY_VID</comment>
-        <sqlFile path="../procedures/SP_INS_STRATEGY_VID_BY_NM.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_STRATEGY_VID_BY_NM.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

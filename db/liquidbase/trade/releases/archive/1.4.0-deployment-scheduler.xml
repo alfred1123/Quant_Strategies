@@ -62,7 +62,7 @@
 
     <changeSet id="1.4.0-004-deployment-schedule-status-table" author="alfcheun" context="trade,prod-deploy">
         <comment>TRADE.DEPLOYMENT_SCHEDULE_STATUS — scheduler state separate from EXECUTION_EVENT</comment>
-        <sqlFile path="../tables/DEPLOYMENT_SCHEDULE_STATUS.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../tables/DEPLOYMENT_SCHEDULE_STATUS.sql" relativeToChangelogFile="true"
                  splitStatements="true" stripComments="true"/>
         <rollback>
             <sql>DROP TABLE IF EXISTS TRADE.DEPLOYMENT_SCHEDULE_STATUS;</sql>
@@ -122,37 +122,37 @@
 
     <changeSet id="1.4.0-006-sp-ins-deployment-schedule-status" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
         <comment>SP_INS_DEPLOYMENT_SCHEDULE_STATUS — append scheduler state version</comment>
-        <sqlFile path="../procedures/SP_INS_DEPLOYMENT_SCHEDULE_STATUS.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_DEPLOYMENT_SCHEDULE_STATUS.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
     <changeSet id="1.4.0-007-sp-ins-deployment" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
         <comment>SP_INS_DEPLOYMENT — schedule config; seeds / syncs DEPLOYMENT_SCHEDULE_STATUS</comment>
-        <sqlFile path="../procedures/SP_INS_DEPLOYMENT.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_DEPLOYMENT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
     <changeSet id="1.4.0-008-sp-get-deployment" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
         <comment>SP_GET_DEPLOYMENT — TRANSACT_FROM_TS plus LAST_RUN_AT / NEXT_DUE_AT from schedule status</comment>
-        <sqlFile path="../procedures/SP_GET_DEPLOYMENT.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_DEPLOYMENT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
     <changeSet id="1.4.0-009-sp-ins-execution-event" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
         <comment>SP_INS_EXECUTION_EVENT — diary only; persists IN_TRANSACT_AT</comment>
-        <sqlFile path="../procedures/SP_INS_EXECUTION_EVENT.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_EXECUTION_EVENT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
     <changeSet id="1.4.0-010-sp-get-missed-due-deployments" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
         <comment>SP_GET_MISSED_DUE_DEPLOYMENTS — poller apply-now rows for IN_TM_INTERVAL_ID; returns NEXT_SCHEDULED_TS</comment>
-        <sqlFile path="../procedures/SP_GET_MISSED_DUE_DEPLOYMENTS.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_MISSED_DUE_DEPLOYMENTS.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
     <changeSet id="1.4.0-011-sp-get-next-due-deployments" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
         <comment>SP_GET_NEXT_DUE_DEPLOYMENTS — UI / ops preview, SCHEDULED_TS &gt; NOW()</comment>
-        <sqlFile path="../procedures/SP_GET_NEXT_DUE_DEPLOYMENTS.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_NEXT_DUE_DEPLOYMENTS.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

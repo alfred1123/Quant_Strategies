@@ -23,7 +23,4 @@
          app that needs it; leave it off to keep the change manual.
     -->
 
-    <include file="releases/1.1.0-market-data-schema.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.2.0-database-timezone-utc.xml" relativeToChangelogFile="true"/>
-
 </databaseChangeLog>

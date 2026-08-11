@@ -238,9 +238,11 @@ cd db/liquidbase/core_admin && liquibase --defaults-file=liquibase.properties up
 
 Each schema root (`*-changelog.xml`) includes **forward-only** release files under `releases/`. **Baseline DDL is not included** — prod already has data and `DATABASECHANGELOG` tracks applied history.
 
-Active changelogs are empty manifests — see XML comments in each `db/liquidbase/*/*-changelog.xml`. Archive baselines live under `releases/archive/baseline-1.0.0.xml` (reference only, never included on prod).
+Active changelogs are short manifests — see XML comments in each `db/liquidbase/*/*-changelog.xml`. Archive baselines live under `releases/archive/baseline-1.0.0.xml` (reference only, never included on prod).
 
-**Release lifecycle:** After a forward release is applied to prod, its `<include>` is removed from the active changelog (release SQL files remain under `releases/` for history). Recent examples applied and archived: `core_admin` 1.1.0–1.1.1 (credentials SPs), `refdata` 1.2.0–1.2.1 (`IS_EXCHANGE_IND`, Binance seed).
+**Release lifecycle:** once a release is applied to prod, drop its `<include>` and `git mv` the file into `releases/archive/`, bumping the `<sqlFile path="...">` prefix from `../` to `../../` so it still resolves from one level deeper. `releases/` then holds exactly what is pending, and `git log` still has the history. Applied status comes from each schema's `DATABASECHANGELOG`, not from age — a release that looks old may simply never have run.
+
+**Archiving can silently orphan a procedure.** Whether a procedure is still deployable is an emergent property of which releases happen to remain included: a `runOnChange` changeset is what re-applies a body after you edit the `.sql`. Archive the last release that referenced one and the file goes quiet — the edit lands in git, the deploy goes green, and prod keeps the old body. This is why `core_admin` 1.4.0 stays included even though it is fully applied: its changeset is the only one re-applying `SP_INS_LOG_PROC_SUMMARY`. `test_liquibase_changelogs.py::test_every_procedure_is_still_managed_by_an_active_release` fails the build rather than letting it happen.
 
 ## Stored Procedures
 

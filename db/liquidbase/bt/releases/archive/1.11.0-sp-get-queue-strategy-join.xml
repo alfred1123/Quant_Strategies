@@ -5,9 +5,9 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <changeSet id="1.2.0-001-sp-get-credential-check" author="alfcheun" context="core_admin" runOnChange="true">
-        <comment>SP_GET_CREDENTIAL_CHECK — validation read for deployment creation</comment>
-        <sqlFile path="../procedures/SP_GET_CREDENTIAL_CHECK.sql" relativeToChangelogFile="true"
+    <changeSet id="1.11.0-001-sp-get-queue" author="alfcheun" context="bt" runOnChange="true">
+        <comment>SP_GET_QUEUE — LEFT JOIN BT.STRATEGY for STRATEGY_NM, IS_BEST_IND, CONFIG_JSON</comment>
+        <sqlFile path="../../procedures/SP_GET_QUEUE.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

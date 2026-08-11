@@ -27,7 +27,7 @@
 
     <changeSet id="1.6.0-002-sp-ins-strategy" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_INS_STRATEGY: VID 1 gets IS_BEST_IND=Y, VID 2+ gets N</comment>
-        <sqlFile path="../procedures/SP_INS_STRATEGY.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_STRATEGY.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
@@ -35,7 +35,7 @@
 
     <changeSet id="1.6.0-003-sp-promote-strategy" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_PROMOTE_STRATEGY: flip IS_BEST_IND — exactly one best per STRATEGY_ID</comment>
-        <sqlFile path="../procedures/SP_UPD_PROMOTE_STRATEGY.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_UPD_PROMOTE_STRATEGY.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
@@ -43,7 +43,7 @@
 
     <changeSet id="1.6.0-004-sp-get-strategy" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_GET_STRATEGY: add IS_BEST_IND to cursor SELECT lists; filter on TRANSACT_TO_TS</comment>
-        <sqlFile path="../procedures/SP_GET_STRATEGY.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_STRATEGY.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 

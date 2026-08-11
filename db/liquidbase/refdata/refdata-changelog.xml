@@ -22,9 +22,6 @@
       4. After deploy, refresh Redis REFDATA: POST /api/v1/refdata/refresh
     -->
 
-    <include file="releases/1.3.0-promotion-metric.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.4.0-promotion-state.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.5.0-tm-interval.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.6.0-log-duration-clock-timestamp.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

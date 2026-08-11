@@ -56,19 +56,19 @@
 
     <changeSet id="1.15.0-004-sp-ins-result" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_INS_RESULT — bump RESULT_VID and flip IS_CURRENT_IND per strategy VID</comment>
-        <sqlFile path="../procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
     <changeSet id="1.15.0-005-sp-get-result" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_GET_RESULT — include RESULT_VID and IS_CURRENT_IND in cursor</comment>
-        <sqlFile path="../procedures/SP_GET_RESULT.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_RESULT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
     <changeSet id="1.15.0-006-sp-get-strategy-list" author="alfcheun" context="bt" runOnChange="true">
         <comment>SP_GET_STRATEGY_LIST — join current BT.RESULT via IS_CURRENT_IND</comment>
-        <sqlFile path="../procedures/SP_GET_STRATEGY_LIST.sql" relativeToChangelogFile="true"
+        <sqlFile path="../../procedures/SP_GET_STRATEGY_LIST.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="true"/>
     </changeSet>
 
