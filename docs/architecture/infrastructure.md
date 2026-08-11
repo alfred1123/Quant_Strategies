@@ -251,9 +251,16 @@ and applies them directly — no EventBridge, Lambda, or service token. See
 The `deploy` workflow owns this stack, same as the other four. Its `cfn` job runs
 `bash aws/deploy.sh scheduler` — CFN, then the Lambda zip upload, then
 `scripts/sync_schedules.py` — whenever a push to `main` touches
-`aws/cfn/04-scheduler.yml`, `aws/lambda/scheduled-task/**`, or
+`aws/cfn/04-scheduler.yml`, `aws/lambda/scheduled-task/**`, `aws/deploy.sh`, or
 `config/scheduler/**`. A manual **Run workflow** deploys it unconditionally,
 which is how you redeploy without an infra commit.
+
+Running it by hand needs `boto3` and `pyyaml` importable by the `python3` on
+your PATH — `sync_schedules.py` is invoked as a plain script, so having them in
+the repo's `env/` does not count. The deploy checks this before touching
+CloudFormation and tells you what to install. The Lambda package itself is built
+with the standard library (`python3 -m zipfile`), so no `zip` binary is needed
+on the runner or the host.
 
 One bootstrap step still needs admin credentials, because the GitHub deploy user
 can read SSM but not write it:

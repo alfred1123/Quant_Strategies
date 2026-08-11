@@ -141,6 +141,17 @@ print(matches[0] if matches else '', end='')
       echo "      --region ${REGION}"
       return 1
     fi
+
+    # sync_schedules.py runs under system python3, not the repo virtualenv, so
+    # having these in env/ is not enough. Checked here rather than at the sync
+    # call so the run stops before CloudFormation, instead of leaving a fresh
+    # stack whose schedules were never created.
+    if ! python3 -c "import boto3, yaml" >/dev/null 2>&1; then
+      echo "ERROR: python3 cannot import boto3 and pyyaml, both needed to sync schedules."
+      echo "  Install them for the interpreter on PATH:"
+      echo "    python3 -m pip install boto3 pyyaml"
+      return 1
+    fi
   fi
 
   aws cloudformation deploy \

@@ -23,5 +23,8 @@ cryptography
 slowapi
 pytest
 boto3
+# scripts/sync_schedules.py reads config/scheduler/*.yml. Listed because a
+# system python3 often has it via the distro package and so hides the gap.
+pyyaml
 mkdocs-material
 ccxt
