@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Every LOG_PROC_DETAIL.DURATION ever written was 0. Procedures timed
+      themselves with CURRENT_TIMESTAMP, which in Postgres is the transaction
+      start and does not advance, so start and end were the same instant.
+      Timing now uses clock_timestamp() via V_LOG_START. Bodies only — no
+      signature or behaviour changes, so these re-apply with runOnChange.
+
+      Rollback is deliberately empty: these procedures pre-date the changeset,
+      and dropping them would remove objects the application depends on. To
+      revert, redeploy the previous revision of the .sql files.
+    -->
+
+    <changeSet id="1.16.0-001-fn-get-queue-for-terminal" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>FN_GET_QUEUE_FOR_TERMINAL — time the body with clock_timestamp()</comment>
+        <sqlFile path="../functions/FN_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-002-sp-get-api-limit-chk" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_API_LIMIT_CHK — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_API_LIMIT_CHK.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-003-sp-get-api-request" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_API_REQUEST — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_API_REQUEST.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-004-sp-get-promotion" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_PROMOTION — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_PROMOTION.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-005-sp-get-queue" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_QUEUE — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_QUEUE.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-006-sp-get-queued-count" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_QUEUED_COUNT — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_QUEUED_COUNT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-007-sp-get-queue-for-terminal" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_QUEUE_FOR_TERMINAL — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_QUEUE_FOR_TERMINAL.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-008-sp-get-queue-latest" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_QUEUE_LATEST — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_QUEUE_LATEST.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-009-sp-get-result" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_RESULT — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_RESULT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-010-sp-get-strategy" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_STRATEGY — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_STRATEGY.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-011-sp-get-strategy-list" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_STRATEGY_LIST — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_STRATEGY_LIST.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-012-sp-ins-api-request" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_INS_API_REQUEST — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_API_REQUEST.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-013-sp-ins-promotion" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_INS_PROMOTION — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_PROMOTION.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-014-sp-ins-queue" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_INS_QUEUE — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_QUEUE.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-015-sp-ins-result" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_INS_RESULT — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-016-sp-ins-strategy" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_INS_STRATEGY — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_STRATEGY.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-017-sp-ins-strategy-vid-by-nm" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_INS_STRATEGY_VID_BY_NM — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_STRATEGY_VID_BY_NM.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.16.0-018-sp-upd-promote-strategy" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_UPD_PROMOTE_STRATEGY — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_UPD_PROMOTE_STRATEGY.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

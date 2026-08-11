@@ -10,7 +10,7 @@ LANGUAGE plpgsql
 SET plan_cache_mode = 'force_generic_plan'
 AS $$
 DECLARE
-    V_START_TS     TIMESTAMPTZ := CURRENT_TIMESTAMP;
+    V_LOG_START    TIMESTAMPTZ := clock_timestamp();
     V_OTHER_TEXT   TEXT;
     V_LOG_STATE    TEXT;
     V_LOG_MSG      TEXT;
@@ -91,7 +91,7 @@ BEGIN
 
     OUT_SQLMSG := '20';
     CALL CORE_ADMIN.CORE_INS_LOG_PROC(
-        'BT', 'SP_INS_RESULT', V_START_TS, NULL, V_OTHER_TEXT,
+        'BT', 'SP_INS_RESULT', V_LOG_START, NULL, V_OTHER_TEXT,
         COALESCE(V_USER_ID, 'system'), V_LOG_STATE, V_LOG_MSG
     );
 

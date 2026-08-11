@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Every LOG_PROC_DETAIL.DURATION ever written was 0. Procedures timed
+      themselves with CURRENT_TIMESTAMP, which in Postgres is the transaction
+      start and does not advance, so start and end were the same instant.
+      Timing now uses clock_timestamp() via V_LOG_START. Bodies only — no
+      signature or behaviour changes, so these re-apply with runOnChange.
+
+      Rollback is deliberately empty: these procedures pre-date the changeset,
+      and dropping them would remove objects the application depends on. To
+      revert, redeploy the previous revision of the .sql files.
+    -->
+
+    <changeSet id="1.5.0-001-core-ins-log-proc" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>CORE_INS_LOG_PROC — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/CORE_INS_LOG_PROC.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-002-sp-get-api-credential" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>SP_GET_API_CREDENTIAL — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_API_CREDENTIAL.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-003-sp-get-app-user-by-id" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>SP_GET_APP_USER_BY_ID — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_APP_USER_BY_ID.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-004-sp-get-app-user-by-username" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>SP_GET_APP_USER_BY_USERNAME — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_APP_USER_BY_USERNAME.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-005-sp-get-credential-check" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>SP_GET_CREDENTIAL_CHECK — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_CREDENTIAL_CHECK.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-006-sp-ins-api-credential" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>SP_INS_API_CREDENTIAL — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_API_CREDENTIAL.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-007-sp-ins-app-user" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>SP_INS_APP_USER — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_APP_USER.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-008-sp-upd-api-credential-revoke" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>SP_UPD_API_CREDENTIAL_REVOKE — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_UPD_API_CREDENTIAL_REVOKE.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-009-sp-upd-app-user-active" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>SP_UPD_APP_USER_ACTIVE — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_UPD_APP_USER_ACTIVE.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-010-sp-upd-app-user-bump-token" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>SP_UPD_APP_USER_BUMP_TOKEN — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_UPD_APP_USER_BUMP_TOKEN.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-011-sp-upd-app-user-last-login" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>SP_UPD_APP_USER_LAST_LOGIN — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_UPD_APP_USER_LAST_LOGIN.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-012-sp-upd-app-user-password" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>SP_UPD_APP_USER_PASSWORD — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_UPD_APP_USER_PASSWORD.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

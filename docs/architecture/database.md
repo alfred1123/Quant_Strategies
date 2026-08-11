@@ -244,9 +244,17 @@ Active changelogs are empty manifests — see XML comments in each `db/liquidbas
 
 ## Stored Procedures
 
+### Timing a procedure: `clock_timestamp()`, never `CURRENT_TIMESTAMP`
+
+A procedure that logs itself declares `V_LOG_START TIMESTAMPTZ := clock_timestamp();` and passes it to `CORE_INS_LOG_PROC` as the start instant. `CORE_INS_LOG_PROC` closes the interval with `clock_timestamp()` when the caller passes `NULL` for the end.
+
+`CURRENT_TIMESTAMP` (and its aliases `now()` and `transaction_timestamp()`) is the *transaction* start. It does not move for the life of the transaction, so subtracting two readings always yields exactly `0` — which is what every one of the 109,985 `LOG_PROC_DETAIL.DURATION` rows written before 2026-08-11 contained. `statement_timestamp()` does not help either: a `CALL` is a single top-level statement and the whole body runs inside it. Timezone is unrelated — `now() AT TIME ZONE 'UTC'` only reformats the same frozen instant.
+
+`V_START_TS` remains `CURRENT_TIMESTAMP` in the seven procedures that also stamp `TRANSACT_FROM_TS` / `TRANSACT_TO_TS`. Transaction time is correct there: the closed row's end and the new row's start must be the same instant, leaving no gap in the version window. Those procedures declare both variables. `tests/unit/test_proc_log_timing.py` enforces the split.
+
 | Procedure | Schema | Type |
 |-----------|--------|------|
-| `CORE_INS_LOG_PROC` | `CORE_ADMIN` | Central logging for all SPs |
+| `CORE_INS_LOG_PROC` | `CORE_ADMIN` | Central logging for all SPs — measures with `clock_timestamp()` |
 | `SP_GET_ENUM` | `REFDATA` | Generic REFCURSOR select for any REFDATA table |
 | `SP_INS_STRATEGY` | `BT` | Resolves `STRATEGY_ID` from `(USER_ID, STRATEGY_NM)`; bumps VID; returns `OUT_STRATEGY_ID` + `OUT_STRATEGY_VID`. Advisory lock per identity. See [strategy-vid-versioning.md](../design/strategy-vid-versioning.md). |
 | `SP_INS_QUEUE` | `BT` | **Unified queue state machine**: `IN_ACTION` = **`ENQUEUE`**, **`CLAIM_NEXT`**, **`TERMINAL`**, **`CANCEL`** — all **`BT.QUEUE`** transitions |

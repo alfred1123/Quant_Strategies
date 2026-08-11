@@ -15,6 +15,9 @@ SET plan_cache_mode = 'force_custom_plan'
 AS $$
 DECLARE
     V_START_TS      TIMESTAMPTZ := CURRENT_TIMESTAMP;
+    -- V_START_TS is the transaction timestamp and stamps the version window;
+    -- the log needs wall-clock, which CURRENT_TIMESTAMP does not advance.
+    V_LOG_START     TIMESTAMPTZ := clock_timestamp();
     V_OTHER_TEXT    TEXT;
     V_CNT           INTEGER;
     V_LOG_STATE     TEXT;
@@ -52,7 +55,7 @@ BEGIN
             OUT_MAX_VALUE   := R_LIMIT.MAX_VALUE;
 
             OUT_SQLMSG := '40';
-            CALL CORE_ADMIN.CORE_INS_LOG_PROC('BT', 'SP_GET_API_LIMIT_CHK', V_START_TS, NULL,
+            CALL CORE_ADMIN.CORE_INS_LOG_PROC('BT', 'SP_GET_API_LIMIT_CHK', V_LOG_START, NULL,
                 V_OTHER_TEXT || ', BREACH=' || R_LIMIT.LIMIT_TYPE || ', CNT=' || V_CNT::TEXT || '/' || R_LIMIT.MAX_VALUE::TEXT,
                 NULL, V_LOG_STATE, V_LOG_MSG);
             RETURN;
@@ -61,7 +64,7 @@ BEGIN
 
     -- All limits passed
     OUT_SQLMSG := '50';
-    CALL CORE_ADMIN.CORE_INS_LOG_PROC('BT', 'SP_GET_API_LIMIT_CHK', V_START_TS, NULL, V_OTHER_TEXT, NULL, V_LOG_STATE, V_LOG_MSG);
+    CALL CORE_ADMIN.CORE_INS_LOG_PROC('BT', 'SP_GET_API_LIMIT_CHK', V_LOG_START, NULL, V_OTHER_TEXT, NULL, V_LOG_STATE, V_LOG_MSG);
 
 EXCEPTION
     WHEN OTHERS THEN

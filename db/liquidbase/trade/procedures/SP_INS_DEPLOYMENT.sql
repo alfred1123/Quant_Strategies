@@ -30,6 +30,9 @@ SET plan_cache_mode = 'force_generic_plan'
 AS $$
 DECLARE
     V_START_TS            TIMESTAMPTZ := CURRENT_TIMESTAMP;
+    -- V_START_TS is the transaction timestamp and stamps the version window;
+    -- the log needs wall-clock, which CURRENT_TIMESTAMP does not advance.
+    V_LOG_START           TIMESTAMPTZ := clock_timestamp();
     V_OTHER_TEXT          TEXT;
     V_VID                 INTEGER;
     V_LOG_STATE           TEXT;
@@ -165,7 +168,7 @@ BEGIN
 
     OUT_SQLMSG := '40';
     CALL CORE_ADMIN.CORE_INS_LOG_PROC(
-        'TRADE', 'SP_INS_DEPLOYMENT', V_START_TS, NULL, V_OTHER_TEXT,
+        'TRADE', 'SP_INS_DEPLOYMENT', V_LOG_START, NULL, V_OTHER_TEXT,
         IN_USER_ID, V_LOG_STATE, V_LOG_MSG
     );
 

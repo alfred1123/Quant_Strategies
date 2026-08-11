@@ -18,8 +18,11 @@ BEGIN
     OUT_SQLSTATE := '00000';
     OUT_SQLERRMC := NULL;
 
+    -- clock_timestamp(), not CURRENT_TIMESTAMP: the latter is the transaction
+    -- start and never moves, so every duration came out as exactly 0. Callers
+    -- pass a clock_timestamp() start (V_LOG_START) for the same reason.
     IF IN_END_AT IS NULL THEN
-        V_END_AT := CURRENT_TIMESTAMP;
+        V_END_AT := clock_timestamp();
     ELSE
         V_END_AT := IN_END_AT;
     END IF;

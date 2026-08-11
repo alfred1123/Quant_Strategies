@@ -32,5 +32,6 @@
     <include file="releases/1.12.0-strategy-list.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.14.0-vid1-default-best.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.15.0-result-vid-versioning.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.16.0-log-duration-clock-timestamp.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

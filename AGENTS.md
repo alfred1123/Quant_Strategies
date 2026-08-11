@@ -29,6 +29,12 @@ Recurring pitfalls to self-check before finishing a change:
 - **Put logic where it belongs.** Domain logic (e.g. promotion) goes in its own module/repo, not dumped into an orchestrator like the worker. Analyse ownership before placing code.
 - **After a rename, grep for stale references.** A dispatch map once pointed at a function name that no longer existed after a rename — a latent bug. Search all call sites and run the suite after any rename.
 
+### Timing Inside Stored Procedures
+
+Measure elapsed time with **`clock_timestamp()`**, never `CURRENT_TIMESTAMP`. The latter is the transaction start and does not advance, so a duration computed from it is always exactly `0` — the bug that left all 109,985 `LOG_PROC_DETAIL.DURATION` rows at zero. `statement_timestamp()` is equally frozen inside a `CALL`. A procedure that logs declares `V_LOG_START TIMESTAMPTZ := clock_timestamp();` and passes it to `CORE_INS_LOG_PROC`.
+
+Keep `V_START_TS TIMESTAMPTZ := CURRENT_TIMESTAMP;` for `TRANSACT_FROM_TS` / `TRANSACT_TO_TS`: every row a transaction versions must share one instant so the window has no gap. Procedures doing both declare both variables.
+
 ### Database Column Naming
 
 - Version columns: `<TABLE>_VID INTEGER` (e.g. `STRATEGY_VID`)

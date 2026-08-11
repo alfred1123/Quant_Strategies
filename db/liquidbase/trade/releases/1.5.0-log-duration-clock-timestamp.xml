@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Every LOG_PROC_DETAIL.DURATION ever written was 0. Procedures timed
+      themselves with CURRENT_TIMESTAMP, which in Postgres is the transaction
+      start and does not advance, so start and end were the same instant.
+      Timing now uses clock_timestamp() via V_LOG_START. Bodies only — no
+      signature or behaviour changes, so these re-apply with runOnChange.
+
+      Rollback is deliberately empty: these procedures pre-date the changeset,
+      and dropping them would remove objects the application depends on. To
+      revert, redeploy the previous revision of the .sql files.
+    -->
+
+    <changeSet id="1.5.0-001-sp-get-deployment" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_GET_DEPLOYMENT — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_DEPLOYMENT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-002-sp-get-deployment-check" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_GET_DEPLOYMENT_CHECK — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_DEPLOYMENT_CHECK.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-003-sp-get-missed-due-deployments" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_GET_MISSED_DUE_DEPLOYMENTS — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_MISSED_DUE_DEPLOYMENTS.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-004-sp-get-next-due-deployments" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_GET_NEXT_DUE_DEPLOYMENTS — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_NEXT_DUE_DEPLOYMENTS.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-005-sp-ins-deployment" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_INS_DEPLOYMENT — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_DEPLOYMENT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-006-sp-ins-deployment-schedule-status" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_INS_DEPLOYMENT_SCHEDULE_STATUS — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_DEPLOYMENT_SCHEDULE_STATUS.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-007-sp-ins-execution-event" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_INS_EXECUTION_EVENT — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_EXECUTION_EVENT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.5.0-008-sp-ins-transaction" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_INS_TRANSACTION — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_TRANSACTION.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

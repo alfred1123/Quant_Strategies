@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Every LOG_PROC_DETAIL.DURATION ever written was 0. Procedures timed
+      themselves with CURRENT_TIMESTAMP, which in Postgres is the transaction
+      start and does not advance, so start and end were the same instant.
+      Timing now uses clock_timestamp() via V_LOG_START. Bodies only — no
+      signature or behaviour changes, so these re-apply with runOnChange.
+
+      Rollback is deliberately empty: these procedures pre-date the changeset,
+      and dropping them would remove objects the application depends on. To
+      revert, redeploy the previous revision of the .sql files.
+    -->
+
+    <changeSet id="1.6.0-001-sp-get-enum" author="alfcheun" context="refdata,prod-deploy" runOnChange="true">
+        <comment>SP_GET_ENUM — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_ENUM.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

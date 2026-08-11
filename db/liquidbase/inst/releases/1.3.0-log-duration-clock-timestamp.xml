@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Every LOG_PROC_DETAIL.DURATION ever written was 0. Procedures timed
+      themselves with CURRENT_TIMESTAMP, which in Postgres is the transaction
+      start and does not advance, so start and end were the same instant.
+      Timing now uses clock_timestamp() via V_LOG_START. Bodies only — no
+      signature or behaviour changes, so these re-apply with runOnChange.
+
+      Rollback is deliberately empty: these procedures pre-date the changeset,
+      and dropping them would remove objects the application depends on. To
+      revert, redeploy the previous revision of the .sql files.
+    -->
+
+    <changeSet id="1.3.0-001-sp-get-product" author="alfcheun" context="inst,prod-deploy" runOnChange="true">
+        <comment>SP_GET_PRODUCT — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_PRODUCT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.3.0-002-sp-get-product-xref" author="alfcheun" context="inst,prod-deploy" runOnChange="true">
+        <comment>SP_GET_PRODUCT_XREF — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_GET_PRODUCT_XREF.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.3.0-003-sp-ins-product" author="alfcheun" context="inst,prod-deploy" runOnChange="true">
+        <comment>SP_INS_PRODUCT — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_PRODUCT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.3.0-004-sp-ins-product-grp" author="alfcheun" context="inst,prod-deploy" runOnChange="true">
+        <comment>SP_INS_PRODUCT_GRP — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_PRODUCT_GRP.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.3.0-005-sp-ins-product-grp-member" author="alfcheun" context="inst,prod-deploy" runOnChange="true">
+        <comment>SP_INS_PRODUCT_GRP_MEMBER — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_PRODUCT_GRP_MEMBER.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.3.0-006-sp-ins-product-xref" author="alfcheun" context="inst,prod-deploy" runOnChange="true">
+        <comment>SP_INS_PRODUCT_XREF — time the body with clock_timestamp()</comment>
+        <sqlFile path="../procedures/SP_INS_PRODUCT_XREF.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>
