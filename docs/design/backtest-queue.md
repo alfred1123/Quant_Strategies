@@ -731,6 +731,50 @@ Each slice is independently shippable.
 2. Multiple coordinator instances behind ALB (requires `SP_CLAIM_NEXT` from Phase 2).
 3. Heartbeat-based stale detection finer than `WORKER_TIMEOUT_SECONDS`.
 4. Optional partial-result persistence so a restart can resume mid-run.
+5. Per-job CPU / memory / disk envelope — see below.
+
+### Worker resource envelope
+
+Nothing constrains what a job consumes today. There is no `mem_limit`, `cpus`
+or `pids_limit` on the `worker` service, and `MAX_CONCURRENT_WORKERS=1` is the
+only throttle. On a shared t4g.medium (decision #34) that makes a runaway grid
+search a host-wide event: the kernel OOM killer picks its victim by badness
+score, which can be `quant-api` rather than the job that caused it. Once the
+TRADE executor shares the box (decision #35, through Phase 3.7) that is a
+missed trade — schedules run with `RetryPolicy.n = 0`, so a skipped tick waits
+a full interval rather than retrying.
+
+The choice is really about *where* a job runs, because per-job sizing is a
+property of the execution substrate:
+
+| Option | Per-job sizing | Ceiling | Change required |
+|---|---|---|---|
+| Compose `mem_limit` / `cpus` | No — one static size for every job | Host: 2 vCPU / 4 GiB | None |
+| Fargate task per job | Yes — 0.25–16 vCPU, 0.5–120 GiB, 20–200 GiB ephemeral | None | Spawn call only; worker code unchanged |
+| Lambda per job | Yes — 128 MiB–10 GiB (vCPU scales with it), 512 MiB–10 GiB `/tmp` | **15 min, hard** | Job must shard; queue trigger redesigned |
+
+`WorkerLoop.DEFAULT_JOB_TIMEOUT_S = 6000` — the design already permits a job to
+run 100 minutes, 6.7× Lambda's ceiling. Lambda therefore cannot host a backtest
+as a single invocation, and no tuning changes that; it is a platform limit.
+It becomes viable only if a run is split into sub-15-minute shards. Grid search
+is embarrassingly parallel across parameter combinations and shards cleanly —
+it would get *faster*, not merely cheaper. Optuna resists sharding because TPE
+is adaptive and needs prior trials, though its RDS storage backend supports
+distributed trials against the Postgres already in use.
+
+Fargate is the drop-in. The task runs the same `python -m quant.queue.worker
+<queue_id>`, claims from the same `BT.QUEUE` and writes the same `BT.RESULT`;
+only the spawn changes, and size becomes a per-job argument rather than a host
+property. It also removes co-tenancy instead of merely containing it. Both
+paths need `SP_CLAIM_NEXT` (Phase 2) first, since claiming stops being
+single-process.
+
+!!! note "Lambda is already in the stack, but as a doorbell"
+    `aws/lambda/scheduled-task/handler.py` is an HTTP bridge — EventBridge
+    invokes it, it calls the FastAPI route, and the work still executes on EC2.
+    It offloads the *trigger*, not the *load*. Short, I/O-bound scheduled work
+    (price bar sync) is the case where moving execution into the Lambda itself
+    genuinely takes load off the box. Backtests are not that case.
 
 ---
 
@@ -861,7 +905,7 @@ After step 5, the FastAPI deployment unit can be removed entirely. The coordinat
 | **Docker Compose** (`docker-compose.yml`) | `api`, `frontend`, `nginx` | Add `coordinator` service. After full migration, remove `api`. |
 | **CI / CD** (`.github/workflows/`) | Builds Python + frontend | Add coordinator build (Bun image) + tests (`bun test`). |
 | **Observability** | Logging only | Add OpenTelemetry early — Python and TS both export to the same collector. Critical once requests hop runtimes. |
-| **Trade execution** (`backup/deco/`, future `src/trade.py`) | Python (Futu, Bybit SDKs) | **Stays Python** — broker SDKs only ship Python/C++. Coordinator could expose `/api/v1/trade/*` HTTP and dispatch to a long-running Python trade process via the same DB-only contract used for workers. |
+| **Trade execution** (`quant/trade/`) | Python (Futu, ccxt) | **Stays Python** — broker SDKs only ship Python/C++. Coordinator could expose `/api/v1/trade/*` HTTP and dispatch to a long-running Python trade process via the same DB-only contract used for workers. |
 | **Live market data ingestion** (future) | Not built | If/when added, evaluate Go for the ingestion daemon (binary deployable, small footprint). Coordinator stays the HTTP boundary. |
 
 ### 20.5 What this enables long-term

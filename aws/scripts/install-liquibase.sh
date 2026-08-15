@@ -8,6 +8,7 @@
 set -euo pipefail
 
 LIQUIBASE_VERSION="${LIQUIBASE_VERSION:-4.29.2}"
+LIQUIBASE_MIN_VERSION="${LIQUIBASE_MIN_VERSION:-4.24}"
 LIQUIBASE_HOME="${LIQUIBASE_HOME:-/opt/liquibase}"
 JDBC_VERSION="${JDBC_VERSION:-42.7.5}"
 CHECK_ONLY=false
@@ -78,19 +79,33 @@ install_liquibase() {
   log "Installing Liquibase ${LIQUIBASE_VERSION} -> ${LIQUIBASE_HOME}"
   mkdir -p "${LIQUIBASE_HOME}"
   # Stream extract — no mktemp/rm; nothing shared under /tmp to track or clean up.
+  # --no-same-owner: the tarball carries the packager's uid/gid, which a non-root
+  # install cannot restore and would otherwise abort on.
   curl -fsSL \
     "https://github.com/liquibase/liquibase/releases/download/v${LIQUIBASE_VERSION}/liquibase-${LIQUIBASE_VERSION}.tar.gz" \
-    | tar -xzf - -C "${LIQUIBASE_HOME}"
+    | tar -xzf - --no-same-owner -C "${LIQUIBASE_HOME}"
 
   chmod +x "${LIQUIBASE_HOME}/liquibase"
-  ln -sf "${LIQUIBASE_HOME}/liquibase" /usr/local/bin/liquibase
+  # A non-root install (CI, dev box) cannot write /usr/local/bin. That is fine
+  # as long as the caller puts LIQUIBASE_HOME on PATH itself.
+  ln -sf "${LIQUIBASE_HOME}/liquibase" /usr/local/bin/liquibase 2>/dev/null ||
+    log "Could not symlink into /usr/local/bin — add ${LIQUIBASE_HOME} to PATH"
 }
 
 verify_liquibase_cli() {
   command -v liquibase >/dev/null || die "liquibase not on PATH"
-  local out
+  local out version oldest
   out="$(liquibase --version 2>&1)" || die "liquibase --version failed (is Java working?)"
-  log "Liquibase OK: $(echo "$out" | head -1)"
+  version="$(echo "$out" | awk -F': *' '/^Liquibase Version:/ {print $2; exit}')"
+  [[ -n "$version" ]] || die "could not parse a version from: $(echo "$out" | head -1)"
+
+  # install_liquibase() leaves an existing install alone whatever LIQUIBASE_VERSION
+  # says, so a host provisioned long ago keeps the version it was given. Deploys
+  # pass --context-filter, which only exists from 4.24 onwards.
+  oldest="$(printf '%s\n%s\n' "$LIQUIBASE_MIN_VERSION" "$version" | sort -V | head -1)"
+  [[ "$oldest" == "$LIQUIBASE_MIN_VERSION" ]] || die \
+    "Liquibase ${version} predates ${LIQUIBASE_MIN_VERSION}, which --context-filter needs; remove ${LIQUIBASE_HOME} and re-run to reinstall"
+  log "Liquibase OK: ${version} (>= ${LIQUIBASE_MIN_VERSION})"
 }
 
 main() {

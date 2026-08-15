@@ -76,7 +76,7 @@ Source: `aws/cfn/03-compute.yml`, `aws/params/prod.json`.
 
 | Priority | Process | Action |
 |----------|---------|--------|
-| 1 | Manual / legacy Bybit scripts on host | Stop or containerize; see `backup/deco/` |
+| 1 | Manual / legacy Bybit scripts on host | Removed — ccxt live path is `quant/trade/brokers/ccxt/` |
 | 2 | Heavy backtest queue during live trading hours | Rate-limit queue or run TRADE on separate host |
 | 3 | certbot sidecar | Keep (minimal); TLS required for prod |
 | 4 | Upgrade path | t4g.medium before adding trade container |

@@ -31,6 +31,7 @@ logger.setLevel(logging.INFO)
 # POST endpoints on the FastAPI app; formatted with fields from the event.
 _TASK_PATHS = {
     "trade_apply": "/api/v1/trade/deployments/{deployment_id}/apply",
+    "log_proc_summary": "/api/v1/admin/log-proc-summary/summarize",
     # Phase 1.9 follow-up — price-bar ingestion, once the endpoint exists:
     # "price_bar_sync": "/api/v1/market-data/price-bars/sync",
 }

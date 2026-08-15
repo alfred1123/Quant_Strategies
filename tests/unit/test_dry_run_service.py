@@ -18,7 +18,7 @@ def _dry_run_request(**overrides):
         "strategy_vid": 1,
         "api_credential_id": 1,
         "app_id": 34,
-        "internal_cusip": "btc-usd.crypto",
+        "internal_cusip": "btcusdt.crypto",
         "qty": Decimal("0.01"),
         "paper": True,
     }
@@ -32,7 +32,7 @@ def deps():
     repo = MagicMock()
     repo.validate_dry_run.return_value = {
         "strategy_nm": "test-strategy",
-        "config_json": {"internal_cusip": "btc-usd.crypto", "substrategies": []},
+        "config_json": {"internal_cusip": "btcusdt.crypto", "substrategies": []},
     }
     bt = MagicMock()
     credential_service = MagicMock()
@@ -158,7 +158,7 @@ class TestDryRunReportNotional:
             strategy_id=uuid4(),
             strategy_vid=1,
             strategy_nm="x",
-            internal_cusip="btc-usd.crypto",
+            internal_cusip="btcusdt.crypto",
             vendor_symbol="BTCUSDT",
             app_id=34,
             paper=True,

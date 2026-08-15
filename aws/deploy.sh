@@ -141,6 +141,17 @@ print(matches[0] if matches else '', end='')
       echo "      --region ${REGION}"
       return 1
     fi
+
+    # sync_schedules.py runs under system python3, not the repo virtualenv, so
+    # having these in env/ is not enough. Checked here rather than at the sync
+    # call so the run stops before CloudFormation, instead of leaving a fresh
+    # stack whose schedules were never created.
+    if ! python3 -c "import boto3, yaml" >/dev/null 2>&1; then
+      echo "ERROR: python3 cannot import boto3 and pyyaml, both needed to sync schedules."
+      echo "  Install them for the interpreter on PATH:"
+      echo "    python3 -m pip install boto3 pyyaml"
+      return 1
+    fi
   fi
 
   aws cloudformation deploy \
@@ -157,13 +168,18 @@ print(matches[0] if matches else '', end='')
 
   if [[ "$name" == "scheduler" ]]; then
     upload_scheduled_task_lambda
+    sync_schedules
   fi
 }
 
 upload_scheduled_task_lambda() {
   local handler="${LAMBDA_SCHEDULED_TASK_DIR}/handler.py"
-  local zip_path
-  zip_path="$(mktemp -t quant-scheduled-task.XXXXXX.zip)"
+  local zip_dir zip_path
+  # A temp *directory*: mktemp on a file leaves a 0-byte one behind, and an
+  # archiver handed an existing path treats it as an archive to update, so
+  # packaging died with "Zip file structure invalid" the first time this ran.
+  zip_dir="$(mktemp -d)"
+  zip_path="${zip_dir}/handler.zip"
 
   if [[ ! -f "$handler" ]]; then
     echo "ERROR: Lambda handler not found: ${handler}"
@@ -171,9 +187,13 @@ upload_scheduled_task_lambda() {
   fi
 
   echo "  Packaging Lambda from ${LAMBDA_SCHEDULED_TASK_DIR} ..."
+  # python3 rather than `zip`, which is not installed everywhere (and is one
+  # more thing to install on a runner); this script already requires python3.
+  # Running from the handler's directory keeps it at the archive root, which is
+  # where the `handler.handler` entry point looks for it.
   (
     cd "${LAMBDA_SCHEDULED_TASK_DIR}"
-    zip -q -j "${zip_path}" handler.py
+    python3 -m zipfile -c "${zip_path}" handler.py
   )
 
   echo "  Uploading code → ${LAMBDA_SCHEDULED_TASK_NAME}"
@@ -185,8 +205,24 @@ upload_scheduled_task_lambda() {
     --query '{FunctionName:FunctionName,LastUpdateStatus:LastUpdateStatus,CodeSize:CodeSize}' \
     --output table
 
-  rm -f "${zip_path}"
+  rm -rf "${zip_dir}"
   echo "  ✓ Lambda code updated."
+}
+
+sync_schedules() {
+  local sync_script="${SCRIPT_DIR}/../scripts/sync_schedules.py"
+  if [[ ! -f "$sync_script" ]]; then
+    echo "  WARN: sync_schedules.py not found — skipping schedule sync."
+    return 0
+  fi
+
+  echo "  Syncing EventBridge schedules from config/scheduler/ ..."
+  local flags=()
+  if $DRY_RUN; then
+    flags+=(--dry-run)
+  fi
+  python3 "$sync_script" "${flags[@]}"
+  echo "  ✓ Schedule sync complete."
 }
 
 # ── Main ──────────────────────────────────────────────────────────────

@@ -21,7 +21,7 @@ Entry point: `python -m quant.cli` (`quant/cli.py`).
 from quant.strategy.signals import StrategyConfig, SignalDirection, SubStrategy
 
 config = StrategyConfig(
-    internal_cusip="btc-usd.crypto",
+    internal_cusip="btcusdt.crypto",
     indicator_name="get_bollinger_band",
     signal_func=SignalDirection.momentum_band_signal,
     trading_period=365,

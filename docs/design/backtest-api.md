@@ -157,7 +157,7 @@ There is **no** `mode` discriminator and no separate single-factor branch. Every
 ### Single factor (1-element list, no `conjunction`)
 ```json
 {
-  "symbol": "btc-usd.crypto",
+  "symbol": "btcusdt.crypto",
   "start": "2024-01-01",
   "end": "2024-12-31",
   "trading_period": 365,
@@ -199,7 +199,7 @@ There is **no** `mode` discriminator and no separate single-factor branch. Every
 ### Multi-factor (2+ elements + `conjunction`)
 ```json
 {
-  "symbol": "btc-usd.crypto",
+  "symbol": "btcusdt.crypto",
   "start": "2024-01-01",
   "end": "2024-12-31",
   "trading_period": 365,

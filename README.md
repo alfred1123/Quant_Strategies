@@ -108,7 +108,6 @@ Quant_Strategies/
 ├── scripts/appctl.sh          # dev/prod lifecycle (uvicorn, vite, tunnel, compose)
 ├── scripts/dbctl.sh           # local Postgres dump/restore/reset
 ├── .github/workflows/         # CI/CD (tests + deploy)
-└── backup/deco/               # Decommissioned Bybit scripts (reference only)
 ```
 
 See the [wiki](https://alfred1123.github.io/Quant_Strategies/) for detailed architecture, database schema, API reference, and contributor guides.

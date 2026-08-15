@@ -66,7 +66,7 @@ See [Best-VID Promotion §5](../design/best-vid-promotion.md#5-ui--pipeline-tab-
 - **CSV download** of full grid search results
 - **Queue tab** — jobs table with VID column (`v{N}` + "Best" chip), status filter chips, View/Clone/Promote actions
 - **Authentication** — cookie-based login; 401 interceptor auto-redirects to `/login`
-- **Client-side routing** — `/login` (guest-only), `/backtest`, `/trade/config`, `/trade/apply` (auth-required) via `react-router-dom`
+- **Client-side routing** — `/login` (guest-only), `/backtest`, `/trade/config`, `/trade/apply` (auth-required) via `react-router`
 - **Trade UI (Phase 1.4+)** — multi-broker layout with compact Exchange / Account filters, Paper / Live toggle, accounts table on Config (credentials CRUD), deployments table on Trade (see [Trade UI](#trade-ui-phase-14) below)
 
 ## Trade UI (Phase 1.4+)

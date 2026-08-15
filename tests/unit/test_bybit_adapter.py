@@ -32,7 +32,7 @@ def inst_cache():
     cache = MagicMock()
     cache.get_product_by_cusip.return_value = {
         "product_id": 1,
-        "internal_cusip": "btc-usd.crypto",
+        "internal_cusip": "btcusdt.crypto",
     }
     cache.resolve_internal_cusip.return_value = "BTCUSDT"
     return cache
@@ -297,7 +297,7 @@ class TestCreateCcxtAdapter:
             paper=True,
             inst_cache=inst_cache,
         )
-        symbol = adapter.validate_for_dry_run("btc-usd.crypto", 34)
+        symbol = adapter.validate_for_dry_run("btcusdt.crypto", 34)
         assert symbol == "BTCUSDT"
         assert adapter.gateway._config.preset.exchange_id == "bybit"
 
@@ -313,7 +313,7 @@ class TestCreateCcxtAdapter:
             paper=True,
             inst_cache=inst_cache,
         )
-        symbol = adapter.validate_for_dry_run("btc-usd.crypto", 35)
+        symbol = adapter.validate_for_dry_run("btcusdt.crypto", 35)
         assert symbol == "BTC/USDT:USDT"
         assert adapter.gateway._config.preset.exchange_id == "binanceusdm"
 

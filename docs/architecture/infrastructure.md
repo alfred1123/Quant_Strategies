@@ -128,7 +128,7 @@ bash aws/deploy.sh
 bash aws/deploy.sh network
 bash aws/deploy.sh database
 bash aws/deploy.sh compute
-bash aws/deploy.sh scheduler   # requires /quant/prod/TRADE_SERVICE_TOKEN in SSM
+bash aws/deploy.sh scheduler   # normally CI; requires /quant/prod/TRADE_SERVICE_TOKEN in SSM
 ```
 
 ### Updating
@@ -208,7 +208,7 @@ invalidates all stored credential ciphertext until users re-save keys.
 
 ## Trade scheduler (EventBridge + Lambda)
 
-Phase 1.9 AWS side — see [Scheduler, Price Bars & Consolidation](../design/scheduler-price-bars.md).
+Phase 1.9 AWS side — see [Scheduler & Price Bars](../design/scheduler-price-bars.md).
 
 ```
 EventBridge Scheduler (per deployment)
@@ -224,10 +224,13 @@ The Lambda is a **generic task bridge** routed by `event.task` — the planned
 price-bar ingestion schedule (Phase 1.9) reuses the same function with a
 `price_bar_sync` task instead of a second Lambda.
 
-**Prod only.** Dev boxes run `SCHEDULER_BACKEND=local` (the default): an
-in-process poller inside FastAPI reads `NEXT_RUN_AT` from the DB and applies
-due deployments directly — no EventBridge, Lambda, or service token. See
+**Prod only.** Dev boxes run `SCHEDULER_BACKEND=local` (the default when implemented): an
+in-process poller inside FastAPI reads missed-due deployments via `SP_GET_MISSED_DUE_DEPLOYMENTS`
+and applies them directly — no EventBridge, Lambda, or service token. See
 [Scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-app--not-yet-wired).
+
+**Slack + mainnet promotion:** when to move alerts to prod ops and orders to Bybit mainnet —
+[Live Trading Promotion](../guides/live-trading-promotion.md).
 
 | Resource | Name | Purpose |
 |----------|------|---------|
@@ -243,19 +246,42 @@ due deployments directly — no EventBridge, Lambda, or service token. See
     (185 retries over 24h) would repeatedly re-invoke a failing trade apply —
     order-level retries already live in the API (`OrderRetryExecutor`).
 
-### First-time deploy
+### Deploying
+
+The `deploy` workflow owns this stack, same as the other four. Its `cfn` job runs
+`bash aws/deploy.sh scheduler` — CFN, then the Lambda zip upload, then
+`scripts/sync_schedules.py` — whenever a push to `main` touches
+`aws/cfn/04-scheduler.yml`, `aws/lambda/scheduled-task/**`, `aws/deploy.sh`, or
+`config/scheduler/**`. A manual **Run workflow** deploys it unconditionally,
+which is how you redeploy without an infra commit.
+
+Running it by hand needs `boto3` and `pyyaml` importable by the `python3` on
+your PATH — `sync_schedules.py` is invoked as a plain script, so having them in
+the repo's `env/` does not count. The deploy checks this before touching
+CloudFormation and tells you what to install. The Lambda package itself is built
+with the standard library (`python3 -m zipfile`), so no `zip` binary is needed
+on the runner or the host.
+
+One bootstrap step still needs admin credentials, because the GitHub deploy user
+can read SSM but not write it:
 
 ```bash
-# 1. Ensure TRADE_SERVICE_TOKEN exists in SSM
-bash aws/scripts/init-ssm-params.sh
+# Once per environment — the deploy fails with instructions if it is missing.
+aws ssm put-parameter --name /quant/prod/TRADE_SERVICE_TOKEN \
+  --value "$(openssl rand -base64 32)" --type SecureString \
+  --region ap-southeast-1
+```
 
-# 2. Deploy stack (CFN + upload Lambda zip from aws/lambda/scheduled-task/)
-bash aws/deploy.sh scheduler
+The API host picks the same value up automatically: it runs with `USE_SSM=1`,
+and `load_config()` loads every parameter under `/quant/prod/` into the
+environment, where `require_user_or_service` reads it.
 
-# 3. Smoke-test Lambda (expects 401 until API service-auth lands)
+Smoke-test the Lambda directly once the stack is up:
+
+```bash
 aws lambda invoke \
   --function-name quant-scheduled-task \
-  --payload '{"task":"trade_apply","deployment_id":"00000000-0000-0000-0000-000000000000"}' \
+  --payload '{"task":"log_proc_summary"}' \
   --cli-binary-format raw-in-base64-out \
   /tmp/out.json && cat /tmp/out.json
 ```
@@ -263,9 +289,8 @@ aws lambda invoke \
 ### What this stack does **not** do yet
 
 - Create per-deployment schedules (API/boto3 on deployment create — app work)
-- Accept `TRADE_SERVICE_TOKEN` on the FastAPI `/apply` route (service auth — app work)
-
-Until those land, the Lambda and IAM are ready; schedules stay uncreated and invoke returns **401** from the API.
+- Accept `TRADE_SERVICE_TOKEN` on the FastAPI `/apply` route — only the `admin`
+  router takes the service token so far, so a `trade_apply` invoke returns **401**
 
 ### Outputs to use from the app
 
@@ -314,7 +339,7 @@ push to main → changes (path filter) ─┐
 
 `deploy` waits on `test`, `cfn`, and `build-and-push` (the last two may be skipped). `build-and-push` requires both `test` **and** `frontend` to pass.
 
-The workflow uses `paths-ignore` for `docs/**`, `*.md`, `tests/**`, `db/**`, `scripts/**`, `backup/**`, `.github/skills/**`, `.github/instructions/**`, `.cursor/**` — pushes touching only ignored paths do **not** trigger the workflow. The docs site has its own workflow (`.github/workflows/docs.yml`).
+The workflow uses `paths-ignore` for `docs/**`, `*.md`, `tests/**`, `db/**`, `scripts/**`, `.github/skills/**`, `.github/instructions/**`, `.cursor/**` — pushes touching only ignored paths do **not** trigger the workflow. The docs site has its own workflow (`.github/workflows/docs.yml`).
 
 ### How it works
 
@@ -326,7 +351,7 @@ The workflow uses `paths-ignore` for `docs/**`, `*.md`, `tests/**`, `db/**`, `sc
 2. **Test job** — runs `pytest tests/unit/` on GitHub's runner (Python 3.12)
 3. **Frontend job** — `npm ci`, `npm audit --audit-level=high`, `npm run build` (type-check + Vite build), `npm test` on Node 22. Validates the SPA on the runner; a build/audit/test failure blocks `build-and-push`.
 4. **CFN job** — deploys infra stacks when the matching `aws/cfn/**` template or relevant `aws/params/prod.json` keys change (per-stack detection). The **database** stack only deploys when `02-database.yml` / DB params change and requires the `DB_MASTER_PASSWORD` secret (it is otherwise guarded by `DeletionPolicy=Retain`, `UpdateReplacePolicy=Snapshot`, `DeletionProtection=true`).
-5. **Build-and-push job** — skipped when neither app nor nginx changed; otherwise builds only the affected image(s) for `linux/arm64` (qemu/buildx) with GitHub Actions layer cache and pushes to ECR (tags: git SHA + `latest`).
+5. **Build-and-push job** — skipped when neither app nor nginx changed; otherwise builds only the affected image(s) for `linux/arm64` with GitHub Actions layer cache and pushes to ECR (tags: git SHA + `latest`). Runs on a native arm64 runner (`ubuntu-24.04-arm`), so there is no QEMU in the path — see [Why the build runs on arm64](#why-the-build-runs-on-arm64).
 6. **Deploy job** — skipped when no app/nginx/compose changes; otherwise SSM Run Command runs the inline deploy script (see [Deployment logic](#deployment-logic) below). **Liquibase is not run automatically** — apply DB migrations manually when ready (see [Database](database.md#deployment)).
 
 **Manual full deploy:** Actions → deploy → Run workflow (`workflow_dispatch`). Rebuilds both images and deploys regardless of paths. The optional `deploy_database` input (default off) additionally deploys the RDS stack — leave unchecked unless you intend an Aurora change.
@@ -337,6 +362,19 @@ No SSH keys needed — deploy uses SSM Run Command (same IAM role the EC2 alread
 
 !!! note "Frontend build vs CI check"
     The production SPA bundle ships **inside the quant-nginx Docker image** (built in CI for arm64). The separate `frontend` runner job is a fast **validation gate** (build + `npm audit` + unit tests) — it does not produce the deployed artifact.
+
+### Why the build runs on arm64
+
+The EC2 host is Graviton, so the images must be `linux/arm64`. That used to be produced by cross-building from an x64 runner under QEMU, which made image builds bimodal: ~1 min when `requirements.txt` was untouched and BuildKit reused the cached pip layer, but 4–17 min whenever it changed.
+
+Emulation bought nothing. Every dependency resolves to a prebuilt `manylinux_2_28_aarch64` wheel, and the only source build (`futu-api`) finishes in seconds. What QEMU actually slowed down was pip unpacking ~120 wheels and byte-compiling them to `.pyc` — a single phase that took 288s of an 8m build on 2026-08-11.
+
+Two changes address it:
+
+- **`runs-on: ubuntu-24.04-arm`** and no `setup-qemu-action`. Native arm64 runners are free and unlimited on public repos, with the same 4 vCPU / 16 GB as the x64 ones.
+- **`requirements.txt` is runtime-only.** `pytest`, `mkdocs-material` and `pyyaml` moved to `requirements-dev.txt`, which starts with `-r requirements.txt`. That drops ~18 packages of test and docs tooling (mkdocs, babel, pygments, watchdog, …) out of the API and worker containers — nothing under `quant/` imports them.
+
+Install `requirements-dev.txt` locally; `setup.sh` and the CI test jobs already do. The `Dockerfile` installs `requirements.txt` alone, so a package added there ships to production.
 
 ### Deployment logic
 

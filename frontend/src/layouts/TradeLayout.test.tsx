@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router';
 import TradeLayout from './TradeLayout';
 import TradeConfigPage from '../pages/trade/TradeConfigPage';
 import TradeApplyPage from '../pages/trade/TradeApplyPage';

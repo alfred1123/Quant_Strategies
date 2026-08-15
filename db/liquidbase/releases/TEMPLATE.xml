@@ -9,6 +9,10 @@
   - sqlFile paths from releases/ use ../tables/, ../procedures/, ../data/
   - Procedures: splitStatements="false", runOnChange="true"
   - Tables/seeds: splitStatements="true", runOnChange="false"
+  - Context carries the schema name. Append prod-deploy (e.g. context="bt,prod-deploy")
+    when the change should be applied automatically by the deploy workflow —
+    typically because the app version shipping alongside it depends on the change.
+    Without it the changeset waits for a manual liquibase-deploy.sh run.
 -->
 <databaseChangeLog
     xmlns="http://www.liquibase.org/xml/ns/dbchangelog"

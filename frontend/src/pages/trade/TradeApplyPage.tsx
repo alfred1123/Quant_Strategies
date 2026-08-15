@@ -22,7 +22,7 @@ import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import ScienceIcon from '@mui/icons-material/Science';
 import StopCircleIcon from '@mui/icons-material/StopCircle';
 import { useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 import { useDeployments, useDryRun, useStopDeployment, useUpdateDeployment } from '../../api/trade';
 import { useTradeSession, useTradeSessionFilters } from '../../trade/useTradeSession';
 import { ALL_ACCOUNTS } from '../../types/credentials';

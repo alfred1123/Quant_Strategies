@@ -42,13 +42,13 @@ describe('useDeployments', () => {
           strategy_vid: 1,
           api_credential_id: 1,
           app_id: 10,
-          internal_cusip: 'btc-usd.crypto',
+          internal_cusip: 'btcusdt.crypto',
           qty: '0.01',
           is_paper_ind: 'Y',
           is_enabled_ind: 'Y',
           deployment_status: 'CREATED',
+          transact_from_ts: '2026-05-20T12:00:00Z',
           user_id: 'alice',
-          created_at: '2026-05-20T12:00:00Z',
         },
       ],
     });
@@ -58,6 +58,6 @@ describe('useDeployments', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(apiClient.get).toHaveBeenCalledWith('/trade/deployments');
     expect(result.current.data).toHaveLength(1);
-    expect(result.current.data?.[0].internal_cusip).toBe('btc-usd.crypto');
+    expect(result.current.data?.[0].internal_cusip).toBe('btcusdt.crypto');
   });
 });

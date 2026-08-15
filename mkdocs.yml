@@ -86,6 +86,7 @@ nav:
       - New User Guide (Website): guides/new-user-website.md
       - Indicators & Strategies: guides/indicators-strategies.md
       - Paper Trading (Futu): guides/trading.md
+      - Live Trading Promotion (Slack & Mainnet): guides/live-trading-promotion.md
       - Adding Indicators: guides/adding-indicators.md
       - Adding Strategies: guides/adding-strategies.md
       - Running Tests: guides/testing.md

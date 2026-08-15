@@ -20,20 +20,35 @@ from quant.strategy.signals import StrategyConfig, combine_positions
 logger = logging.getLogger(__name__)
 
 
+def _max_window(window) -> int:
+    """Largest indicator window in a scalar or per-substrategy collection."""
+    if isinstance(window, (tuple, list)):
+        return max(int(w) for w in window)
+    return int(window)
+
+
 def live_lookback_days(max_window: int, trading_period: int) -> int:
     """Calendar days of history to fetch so indicators are valid on the latest bar."""
     return max(max_window * 3 + 60, min(trading_period, 400))
+
+
+def live_lookback_bars(window) -> int:
+    """Bars of history to fetch so indicators are valid on the latest bar.
+
+    The bar-indexed twin of :func:`live_lookback_days`, for sources addressed
+    by interval rather than by date. It drops that function's
+    ``min(trading_period, 400)`` floor: the floor buys roughly a year of daily
+    history to survive weekends and holidays, which is meaningless when every
+    element of the window is one bar of the interval being traded.
+    """
+    return _max_window(window) * 3 + 60
 
 
 def live_date_range(window, trading_period: int) -> tuple[str, str]:
     """ISO ``(start, end)`` for live position evaluation ending today."""
     from datetime import date, timedelta
 
-    if isinstance(window, (tuple, list)):
-        max_window = max(int(w) for w in window)
-    else:
-        max_window = int(window)
-    days = live_lookback_days(max_window, trading_period)
+    days = live_lookback_days(_max_window(window), trading_period)
     end = date.today()
     start = end - timedelta(days=days)
     return start.isoformat(), end.isoformat()

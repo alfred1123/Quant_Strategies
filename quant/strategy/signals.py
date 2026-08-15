@@ -42,7 +42,7 @@ class SubStrategy:
 class StrategyConfig:
     """Immutable identity of a trading strategy — portable across backtest and live."""
 
-    internal_cusip: str        # INST.PRODUCT.INTERNAL_CUSIP, e.g. "btc-usd.crypto"
+    internal_cusip: str        # INST.PRODUCT.INTERNAL_CUSIP, e.g. "btcusdt.crypto"
     indicator_name: str        # TechnicalAnalysis method name, e.g. "get_bollinger_band"
     signal_func: Callable      # e.g. SignalDirection.momentum_band_signal
     trading_period: int        # 365 (crypto) or 252 (equity)

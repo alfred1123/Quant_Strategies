@@ -1,3 +1,6 @@
+# Runtime only — this file is what the Dockerfile installs, so anything added
+# here ends up in the API and worker containers. Test and tooling packages go
+# in requirements-dev.txt, which pulls this file in.
 pandas
 numpy
 requests
@@ -13,13 +16,13 @@ optuna
 fastapi
 uvicorn[standard]
 psycopg[binary]
-redis
+# Floored at 8 so a local env matches the image: 8.0 changed the default
+# socket_timeout from None to 5s, which behaves differently under BLPOP.
+redis>=8
 httpx
 argon2-cffi
 pyjwt[crypto]
 cryptography
 slowapi
-pytest
 boto3
-mkdocs-material
 ccxt

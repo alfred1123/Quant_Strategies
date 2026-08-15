@@ -103,7 +103,8 @@ DDL: `db/liquidbase/trade/tables/DEPLOYMENT.sql` (soft-versioned).
   "qty": 100,
   "paper": true,
   "enabled": true,
-  "deployment_status": "CREATED"
+  "deployment_status": "CREATED",
+  "schedule_tm_interval_id": 1
 }
 ```
 
@@ -119,12 +120,12 @@ DDL: `db/liquidbase/trade/tables/DEPLOYMENT.sql` (soft-versioned).
 | `paper` | bool | Paper / testnet (`IS_PAPER_IND` = Y/N) |
 | `enabled` | bool | Kill switch (`IS_ENABLED_IND` = Y/N) |
 | `deployment_status` | string | `CREATED`, `ACTIVE`, `PAUSED`, `STOPPED` |
+| `schedule_tm_interval_id` | int (optional) | FK → `REFDATA.TM_INTERVAL` — when to evaluate. Omit or send `null` for manual apply only |
 
 **Not yet implemented** (planned extensions to `TRADE.DEPLOYMENT`):
 
 | Field | Purpose |
 |-------|---------|
-| `schedule` | When to evaluate: `daily_close`, `hourly`, `manual` |
 | `risk_limits_json` | Safety guardrails (see §4) — `max_position_usd`, `max_daily_trades`, `stop_loss_pct` |
 | `portfolio` | Portfolio grouping label |
 | `market` | Market code (US, HK) — currently inferred from `internal_cusip` |
@@ -213,14 +214,13 @@ Create/update remain on the jobs/backtest path until a dedicated editor is neede
 POST   /api/v1/trade/deployments               → Create / re-apply deployment    ✅ live
 GET    /api/v1/trade/deployments               → List deployments for user       ✅ live
 GET    /api/v1/trade/deployments/{id}          → One deployment (current ver.)   ✅ live
+PATCH  /api/v1/trade/deployments/{id}          → Toggle enabled / status / sched ✅ live
+POST   /api/v1/trade/deployments/{id}/stop     → Stop deployment (idempotent)    ✅ live
 ```
 
-**Planned:**
+`DeploymentRow` response fields include `transact_from_ts` (when this version became effective), `schedule_tm_interval_id`, `last_run_at`, and `next_due_at` (from `DEPLOYMENT_SCHEDULE_STATUS.SCHEDULED_TS`). **`created_at` is not returned** — table `CREATED_AT` is audit-only.
 
-```
-PATCH  /api/v1/trade/deployments/{id}          → Update (toggle enabled, qty)    — planned
-DELETE /api/v1/trade/deployments/{id}          → Stop deployment                 — planned
-```
+`PATCH` accepts `enabled`, `deployment_status`, and `schedule_tm_interval_id`. Omitted fields keep their current value; sending `schedule_tm_interval_id: null` explicitly clears the schedule back to manual-only.
 
 ### 2.3 Credentials — implemented (Phase 1.1)
 
@@ -390,7 +390,7 @@ Planned adapters:
 | Adapter | Gateway | Asset class | Reference |
 |---------|---------|-------------|-----------|
 | `FutuAdapter` | `FutuTradeGateway` (OpenD) | HK/US equities | [futu-trading.md](futu-trading.md) |
-| `BybitAdapter` | `CcxtTradeGateway` (ccxt) | Crypto perpetuals | `backup/deco/bybit._trade.py` |
+| `BybitAdapter` | `CcxtTradeGateway` (ccxt) | Crypto perpetuals | `quant/trade/brokers/ccxt/` |
 | `BinanceAdapter` | `CcxtTradeGateway` (ccxt) | Crypto spot/perps | — |
 
 ---

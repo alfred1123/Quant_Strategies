@@ -17,8 +17,11 @@ export interface DeploymentRow {
   is_paper_ind: 'Y' | 'N';
   is_enabled_ind: 'Y' | 'N';
   deployment_status: string;
+  schedule_tm_interval_id?: number | null;
+  last_run_at?: string | null;
+  next_due_at?: string | null;
+  transact_from_ts: string;
   user_id: string;
-  created_at: string;
 }
 
 export interface CreateDeploymentRequest {

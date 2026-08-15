@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      MARKET_DATA schema (market_data.databasechangelog).
+
+      PRODUCTION SAFETY
+      - Deploy applies ONLY changesets whose context includes prod-deploy.
+        Anything else is manual: APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
+
+      NEW MIGRATION
+      1. Add SQL under tables/ or procedures/.
+      2. Create releases/X.Y.Z-name.xml
+      3. Uncomment/add:
+           <include file="releases/X.Y.Z-name.xml" relativeToChangelogFile="true"/>
+    -->
+
+    <include file="releases/1.0.0-price-bars.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.1.0-price-bar-source-key.xml" relativeToChangelogFile="true"/>
+</databaseChangeLog>

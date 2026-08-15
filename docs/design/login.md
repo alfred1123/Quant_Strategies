@@ -392,7 +392,7 @@ Hard upper bounds prevent a 100 MB POST from triggering Argon2 on giant input â€
 
 ### 9.1 Route guard
 
-`App.tsx` uses `react-router-dom` `BrowserRouter` with two route wrappers:
+`App.tsx` uses `react-router` `BrowserRouter` with two route wrappers:
 
 | Route | Wrapper | Behavior |
 |-------|---------|----------|

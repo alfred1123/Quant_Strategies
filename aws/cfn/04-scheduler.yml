@@ -149,6 +149,20 @@ Resources:
       Principal: scheduler.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
 
+  # ── Schedule group for system/admin jobs (static CFN-managed schedules) ──
+  SystemJobsScheduleGroup:
+    Type: AWS::Scheduler::ScheduleGroup
+    Properties:
+      Name: !Sub "${Project}-system-jobs"
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref AppEnv
+
+  # Individual schedules are managed by scripts/sync_schedules.py
+  # from config/scheduler/*.yml — not declared in CFN.
+
   # ── EC2 role: create/update/delete schedules + PassRole invoke role ──
   Ec2SchedulerManagePolicy:
     Type: AWS::IAM::Policy
@@ -170,6 +184,8 @@ Resources:
             Resource:
               - !Sub "arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${TradeScheduleGroup}/*"
               - !Sub "arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule-group/${TradeScheduleGroup}"
+              - !Sub "arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${SystemJobsScheduleGroup}/*"
+              - !Sub "arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule-group/${SystemJobsScheduleGroup}"
           - Sid: PassSchedulerInvokeRole
             Effect: Allow
             Action: iam:PassRole
@@ -202,6 +218,12 @@ Outputs:
     Value: !Ref TradeScheduleGroup
     Export:
       Name: !Sub "${Project}-TradeScheduleGroupName"
+
+  SystemJobsScheduleGroupName:
+    Description: Schedule group for static system/admin jobs
+    Value: !Ref SystemJobsScheduleGroup
+    Export:
+      Name: !Sub "${Project}-SystemJobsScheduleGroupName"
 
   ApiBaseUrl:
     Description: Base URL the Lambda calls

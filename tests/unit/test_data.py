@@ -547,22 +547,22 @@ class TestInstrumentCache:
 
     SAMPLE_PRODUCTS = [
         {"product_id": 1, "product_vid": 1, "is_current_ind": "Y",
-         "internal_cusip": "btc-usd.crypto", "display_nm": "Bitcoin",
+         "internal_cusip": "btcusdt.crypto", "display_nm": "Bitcoin",
          "asset_type_id": 1, "exchange": None, "ccy": "USD", "description": None},
         {"product_id": 2, "product_vid": 1, "is_current_ind": "Y",
-         "internal_cusip": "eth-usd.crypto", "display_nm": "Ethereum",
+         "internal_cusip": "ethusdt.crypto", "display_nm": "Ethereum",
          "asset_type_id": 1, "exchange": None, "ccy": "USD", "description": None},
     ]
 
     SAMPLE_XREFS = [
         {"product_xref_id": 1, "product_xref_vid": 1, "product_id": 1,
-         "internal_cusip": "btc-usd.crypto", "display_nm": "Bitcoin",
+         "internal_cusip": "btcusdt.crypto", "display_nm": "Bitcoin",
          "app_id": 1, "vendor_symbol": "BTC-USD", "is_current_ind": "Y"},
         {"product_xref_id": 2, "product_xref_vid": 1, "product_id": 1,
-         "internal_cusip": "btc-usd.crypto", "display_nm": "Bitcoin",
+         "internal_cusip": "btcusdt.crypto", "display_nm": "Bitcoin",
          "app_id": 2, "vendor_symbol": "BTC", "is_current_ind": "Y"},
         {"product_xref_id": 3, "product_xref_vid": 1, "product_id": 2,
-         "internal_cusip": "eth-usd.crypto", "display_nm": "Ethereum",
+         "internal_cusip": "ethusdt.crypto", "display_nm": "Ethereum",
          "app_id": 1, "vendor_symbol": "ETH-USD", "is_current_ind": "Y"},
     ]
 
@@ -587,13 +587,13 @@ class TestInstrumentCache:
 
     def test_get_product_by_id_found(self, cache):
         p = cache.get_product_by_id(1)
-        assert p["internal_cusip"] == "btc-usd.crypto"
+        assert p["internal_cusip"] == "btcusdt.crypto"
 
     def test_get_product_by_id_not_found(self, cache):
         assert cache.get_product_by_id(999) is None
 
     def test_get_product_by_cusip_found(self, cache):
-        p = cache.get_product_by_cusip("eth-usd.crypto")
+        p = cache.get_product_by_cusip("ethusdt.crypto")
         assert p["product_id"] == 2
 
     def test_get_product_by_cusip_not_found(self, cache):
@@ -627,15 +627,15 @@ class TestInstrumentCache:
         assert cache.resolve_vendor_symbol(999, 1) is None
 
     def test_resolve_internal_cusip_found(self, cache):
-        assert cache.resolve_internal_cusip("btc-usd.crypto", 1) == "BTC-USD"
-        assert cache.resolve_internal_cusip("btc-usd.crypto", 2) == "BTC"
-        assert cache.resolve_internal_cusip("eth-usd.crypto", 1) == "ETH-USD"
+        assert cache.resolve_internal_cusip("btcusdt.crypto", 1) == "BTC-USD"
+        assert cache.resolve_internal_cusip("btcusdt.crypto", 2) == "BTC"
+        assert cache.resolve_internal_cusip("ethusdt.crypto", 1) == "ETH-USD"
 
     def test_resolve_internal_cusip_unknown_product(self, cache):
         assert cache.resolve_internal_cusip("nonexistent", 1) is None
 
     def test_resolve_internal_cusip_missing_xref(self, cache):
-        assert cache.resolve_internal_cusip("eth-usd.crypto", 2) is None
+        assert cache.resolve_internal_cusip("ethusdt.crypto", 2) is None
 
     @patch("quant.shared.db.psycopg.connect", return_value=MagicMock())
     @patch("quant.shared.db.DbGateway._call_get")

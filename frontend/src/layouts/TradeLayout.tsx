@@ -9,7 +9,7 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router';
 import UserMenu from '../components/UserMenu';
 import AppModeSwitch from '../components/AppModeSwitch';
 import BrandMark from '../components/BrandMark';

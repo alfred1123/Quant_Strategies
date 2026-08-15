@@ -416,6 +416,8 @@ alerting design for the live order path itself.
 
 **Exit criteria:** **M1 — Pipeline** met: one real (or testnet) live apply completes end-to-end for Bollinger strategy. **Security:** backend rejects live apply without dry-run + confirm; paper/live cannot be bypassed via raw API; caller cannot deploy another user's strategy; deployment can be disabled via PATCH without DB access.
 
+**Promotion runbook:** when to move Slack to prod ops and Bybit to mainnet — [Live Trading Promotion](../guides/live-trading-promotion.md).
+
 **Result (2026-07-05):** Core order-placement mechanics (`CcxtTradeGateway.create_market_order`,
 `CcxtTradeAdapter.place_order`/`apply_signal`) implemented and validated end-to-end against Bybit
 testnet via the golden harness (`scripts/bybit_local_testnet.py --apply-signal {signal} --confirm`).
@@ -458,23 +460,26 @@ deferred pending further detail).
 | **Depends on** | 1.7, 1.8 |
 | **Blocks** | 2.2 (daily Sharpe needs scheduled runs) |
 
-See [Scheduler, Price Bars & Data Consolidation](scheduler-price-bars.md) for the full design.
+See [Scheduler & Price Bars](scheduler-price-bars.md) for the full design.
 
-**Scope:** Three linked concerns — automated trade scheduling via EventBridge, normalized price bars for live signal computation, and weekend consolidation of backtest cache payloads.
+**Scope:** Two linked concerns — automated trade scheduling via EventBridge and normalized price bars for live signal computation. Backtest cache refresh stays application-owned via `BacktestCache.refresh_payload` (no DB consolidation SP).
 
 **Tasks**
 
-- [ ] REFDATA: seed `REFDATA.TM_INTERVAL` (`1=DAILY`, `2=1H`) — currently exists but empty; becomes the single source of truth for interval dropdowns.
-- [ ] DDL: `MARKET_DATA` schema with `PRICE_BAR` + `PRICE_BAR_SYNC` tables (keyed by `TM_INTERVAL_ID`) and stored procedures (`SP_INS_PRICE_BAR`, `SP_GET_PRICE_BAR`, `SP_GET_PRICE_BAR_SYNC`).
-- [ ] DDL: Add `SCHEDULE_TM_INTERVAL_ID` (NULL = manual), `NEXT_RUN_AT`, `LAST_RUN_AT` columns to `TRADE.DEPLOYMENT`; update `SP_INS_DEPLOYMENT` and `SP_GET_DEPLOYMENT`; create `SP_GET_DUE_DEPLOYMENTS`.
-- [ ] DDL: `BT.SP_CONSOLIDATE_API_REQUEST` — merges closed VIDs per subscription, deletes superseded payloads. Weekend pg_cron job.
-- [ ] Python: `PriceBarRepo`, `PriceBarService` (freshness check + ccxt fetch + insert), clock module (`next_run()` interval math); interval names resolved via `RedisRefData`, no hardcoded enum.
-- [ ] Integration: Wire price bar refresh into live apply flow — refresh bars before signal computation.
-- [ ] UI: Schedule interval dropdown (from `REFDATA.TM_INTERVAL`) in deployment dialog; show `next_run_at` / `last_run_at` in deployments table.
+- [x] REFDATA: seed `REFDATA.TM_INTERVAL` (`1=DAILY`, `2=1H`) — `db/liquidbase/refdata/releases/1.5.0-tm-interval.xml`.
+- [x] DDL: `MARKET_DATA` schema with `PRICE_BAR` table and SPs — `db/liquidbase/market_data/releases/1.0.0-price-bars.xml`.
+- [x] DDL: `TRADE.DEPLOYMENT` schedule column, `DEPLOYMENT_SCHEDULE_STATUS` + `SP_INS_DEPLOYMENT` / `SP_GET_DEPLOYMENT` / `SP_GET_MISSED_DUE_DEPLOYMENTS` — `db/liquidbase/trade/releases/1.4.0-deployment-scheduler.xml`.
+- [x] ~~DDL: `BT.SP_CONSOLIDATE_API_REQUEST`~~ removed — `BacktestCache.refresh_payload` closes the prior VID and inserts the merged range; no scheduled DB purge.
+- [x] Python: `quant/market_data/` — `PriceBarRepo` (SP wrappers), `CcxtBarFetcher` (public `fetch_ohlcv`), `PriceBarService` (freshness check + gap fill + `read_bars`); interval math in `quant/shared/intervals.py` resolved from `REFDATA.TM_INTERVAL` via `RedisRefData`, no hardcoded enum.
+- [x] Integration: price bar refresh wired into live apply — venue-bound deployments (e.g. Bybit) compute signals from `PRICE_BAR` via `PriceBarService.load_window` (daily when unscheduled; schedule sets interval only), provider-only brokers (e.g. Futu) keep the provider path, and a missing bar source is refused rather than silently priced off the daily feed ([§7.6–7.7](scheduler-price-bars.md#76-signal-source-selection--quantstrategylive_servicepy)).
+- [ ] Integration: expose `POST /api/v1/market-data/price-bars/sync` (calls `PriceBarService.sync`) + the `price_bar_sync` Lambda task, so bars are warmed **once per interval** rather than once per deployment ([§6.2](scheduler-price-bars.md#bar-sync-is-one-schedule-per-interval-not-one-per-deployment)).
+- [ ] UI: Schedule interval dropdown (from `REFDATA.TM_INTERVAL`) in deployment dialog; show `last_run_at` in deployments table (optional computed next run for display).
 - [x] AWS infra: EventBridge schedule group + `quant-scheduled-task` Lambda + IAM (`aws/cfn/04-scheduler.yml`); deploy via `bash aws/deploy.sh scheduler`.
-- [ ] AWS/app: service auth on `/apply` (`TRADE_SERVICE_TOKEN`) + boto3 create/update/delete schedules on deployment lifecycle.
+- [ ] AWS/app: service auth on `/apply` (`TRADE_SERVICE_TOKEN`) + boto3 create/update/delete schedules on deployment lifecycle. Schedule expressions must fire **a minute or two past** the interval boundary, never on it — firing at `:00` races the exchange publishing the bar that just closed and fails the tick closed ([§6.2](scheduler-price-bars.md#required-fire-after-the-boundary-never-on-it)).
 
-**Exit criteria:** A deployment scheduled `DAILY` executes automatically via EventBridge without manual intervention. `MARKET_DATA.PRICE_BAR` contains fresh bars for active products. Weekend consolidation deletes redundant `API_REQUEST_PAYLOAD` rows.
+**Exit criteria:** A deployment scheduled `DAILY` executes automatically via EventBridge without manual intervention. `MARKET_DATA.PRICE_BAR` contains fresh bars for active products.
+
+**Promotion runbook:** [Live Trading Promotion](../guides/live-trading-promotion.md) — Slack ops channel and Bybit mainnet cutover.
 
 ---
 
@@ -992,7 +997,7 @@ Recommendation: start with **B** — matches mental model (strategy artifact vs 
 3. Apply uses BT strategy + `TRADE.DEPLOYMENT` (holds `API_CREDENTIAL_ID`); **audit = `TRADE.EXECUTION_EVENT` + `TRADE.TRANSACTION`**, not connection history ([Decisions log](../decisions.md) #36).
 4. Errors → Telegram; refer strategy detail via Backtest/leaderboard when drill-down exists.
 
-**Bybit:** Reference implementation in `backup/deco/`; active experimentation in `quant/trade/`. Adapter pattern: `BybitAdapter` in [Trade API](trade-api.md).
+**Bybit:** ccxt adapter in `quant/trade/brokers/ccxt/`; live apply via `LiveApplyOrchestrator`. See [Trade API](trade-api.md).
 
 **Futu:** Prototype in `quant/trade/futu_trader.py`; target architecture in [Futu Trading — OOP Implementation](futu-trading.md) (`FutuAdapter`, `FutuTradeGateway`, `AdapterRegistry`).
 
@@ -1144,7 +1149,7 @@ This section records implementation viewpoints from the latest trade-readiness r
 | **1.6** | Strategy picker — `GET /api/v1/strategies` + `StrategyPicker` (reads `BT.STRATEGY`; not Backtest config UI) |
 | **1.7** | Live apply (dry-run → apply) |
 | **1.8** | Execution log UI + `TRADE.EXECUTION_EVENT` writes |
-| **1.9** | Scheduler (EventBridge + Lambda) + `MARKET_DATA.PRICE_BAR` + `BT.SP_CONSOLIDATE_API_REQUEST` — see [scheduler-price-bars.md](scheduler-price-bars.md) |
+| **1.9** | Scheduler (EventBridge + Lambda) + `MARKET_DATA.PRICE_BAR` — see [scheduler-price-bars.md](scheduler-price-bars.md) |
 | **2.1** | Reconcile snapshot schema + SP |
 | **2.2** | Daily Sharpe reconcile job |
 | **2.3** | Reconcile chart (Trade top-right) |
@@ -1195,7 +1200,7 @@ Notes mentioned alternative profit paths (e.g. horse racing, Poisson/Bernoulli m
 | [Frontend](../architecture/frontend.md) | React SPA structure |
 | [Paper Trading guide](../guides/trading.md) | Existing Futu utility (pattern reference) |
 | [Deploy Build Pipeline](../archive/deploy-build-pipeline.md) | ECR history — **live ops:** [infrastructure.md](../architecture/infrastructure.md#cicd--github-actions) |
-| [Scheduler, Price Bars & Consolidation](scheduler-price-bars.md) | EventBridge scheduler, `MARKET_DATA.PRICE_BAR`, `BT.SP_CONSOLIDATE_API_REQUEST` |
+| [Scheduler & Price Bars](scheduler-price-bars.md) | EventBridge scheduler, `MARKET_DATA.PRICE_BAR` |
 
 ---
 

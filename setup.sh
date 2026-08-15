@@ -24,7 +24,7 @@ pip install --upgrade pip --quiet
 
 # 4. Install dependencies
 echo "Installing dependencies..."
-pip install -r "$REPO_DIR/requirements.txt" --quiet
+pip install -r "$REPO_DIR/requirements-dev.txt" --quiet
 
 # 5. Check for .env configuration
 if [ ! -f "$REPO_DIR/.env" ]; then

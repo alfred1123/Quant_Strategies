@@ -3,7 +3,11 @@
 from unittest.mock import MagicMock
 
 from quant.trade.brokers.ccxt.adapter import CcxtTradeAdapter
-from quant.trade.registry import AdapterRegistry, build_default_registry
+from quant.trade.registry import (
+    AdapterRegistry,
+    build_default_registry,
+    exchange_id_for_app,
+)
 
 
 class TestAdapterRegistry:
@@ -67,3 +71,26 @@ class TestAdapterRegistry:
             assert "no adapter registered" in str(exc)
         else:
             raise AssertionError("expected AdapterNotFoundError")
+
+
+class TestExchangeIdForApp:
+    """Market data must reach the same venue the orders go to."""
+
+    def _refdata(self):
+        refdata = MagicMock()
+        refdata.resolve_app_id.side_effect = lambda name: {
+            "bybit": 34,
+            "binance": 35,
+        }[name]
+        return refdata
+
+    def test_resolves_each_broker_to_its_ccxt_id(self):
+        refdata = self._refdata()
+
+        assert exchange_id_for_app(34, refdata=refdata) == "bybit"
+        # Binance trades under a different ccxt class than its REFDATA name.
+        assert exchange_id_for_app(35, refdata=refdata) == "binanceusdm"
+
+    def test_non_broker_app_returns_none(self):
+        # e.g. the glassnode data app — it has an APP_ID but no venue.
+        assert exchange_id_for_app(2, refdata=self._refdata()) is None

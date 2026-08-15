@@ -19,8 +19,11 @@ Behaviour notes
 
 import json
 import logging
+from datetime import timedelta
 
 import redis
+
+from quant.shared.intervals import parse_period
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +125,43 @@ class RedisRefData:
         """
         rows = self.get("promotion_metric")
         return sorted(rows, key=lambda r: int(r.get("priority", 999)))
+
+    def get_interval_period(self, tm_interval_id: int) -> timedelta:
+        """``PERIOD_LENGTH`` for a ``TM_INTERVAL_ID``, as a timedelta.
+
+        Parsed here rather than handed to callers as text: the publisher
+        serialises rows with ``json.dumps(default=str)``, so the Postgres
+        interval arrives from Redis stringified (``"1 day, 0:00:00"``).
+        """
+        for r in self.get("tm_interval"):
+            if int(r["tm_interval_id"]) == int(tm_interval_id):
+                return parse_period(r["period_length"])
+        raise RuntimeError(f"REFDATA.TM_INTERVAL missing TM_INTERVAL_ID={tm_interval_id}")
+
+    def resolve_interval_id(self, period: timedelta) -> int:
+        """``TM_INTERVAL_ID`` whose ``PERIOD_LENGTH`` equals *period*.
+
+        The inverse of :meth:`get_interval_period` — for code that knows the
+        cadence it needs (e.g. daily bars for an unscheduled live apply) but
+        must take the id from REFDATA rather than hardcode it.
+        """
+        for r in self.get("tm_interval"):
+            if parse_period(r["period_length"]) == period:
+                return int(r["tm_interval_id"])
+        raise RuntimeError(f"REFDATA.TM_INTERVAL has no row with PERIOD_LENGTH={period}")
+
+    def interval_ids(self) -> list[int]:
+        """Every ``TM_INTERVAL_ID``, shortest period first.
+
+        The scheduler sweeps intervals rather than deployments, so it needs the
+        set to sweep. Ordered by period so a poll pass settles the fast cadences
+        before the slow ones.
+        """
+        rows = self.get("tm_interval")
+        return [
+            int(r["tm_interval_id"])
+            for r in sorted(rows, key=lambda r: parse_period(r["period_length"]))
+        ]
 
     def resolve_queue_status_id(self, name: str) -> int:
         for r in self.get("queue_status"):

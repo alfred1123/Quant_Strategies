@@ -64,6 +64,21 @@
       "Resource": "*"
     },
     {
+      "Sid": "SchedulerManageJobSchedules",
+      "Effect": "Allow",
+      "Action": [
+        "scheduler:CreateSchedule",
+        "scheduler:UpdateSchedule",
+        "scheduler:DeleteSchedule",
+        "scheduler:GetSchedule",
+        "scheduler:ListSchedules"
+      ],
+      "Resource": [
+        "arn:aws:scheduler:ap-southeast-1:539163478329:schedule/quant-system-jobs/*",
+        "arn:aws:scheduler:ap-southeast-1:539163478329:schedule-group/quant-system-jobs"
+      ]
+    },
+    {
       "Sid": "CloudFormationValidateAnywhere",
       "Effect": "Allow",
       "Action": "cloudformation:ValidateTemplate",

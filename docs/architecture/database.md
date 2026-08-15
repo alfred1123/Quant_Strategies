@@ -12,7 +12,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `PROMOTION_METRIC`, …) + `SP_GET_ENUM` procedure for cache loading. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `REFDATA.PROMOTION_METRIC` stores auto-promote rules (HARD gates + SOFT comparison metrics). |
 | `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `PROMOTION`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert/get procedures |
 | `TRADE` | Live trading: `DEPLOYMENT`, `EXECUTION_EVENT`, `TRANSACTION` + SPs (no `INTENT` — decision #38) |
-| `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows), `PRICE_BAR_SYNC` (sync metadata) — see [Scheduler, Price Bars & Consolidation](../design/scheduler-price-bars.md) |
+| `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows) — see [Scheduler & Price Bars](../design/scheduler-price-bars.md) |
 | `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) — `REFDATA.TICKER_MAPPING` has been dropped |
 
 ## Conventions
@@ -38,17 +38,39 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 
 ### INTERNAL_CUSIP Convention
 
-`INST.PRODUCT.INTERNAL_CUSIP` is the stable, human-readable product identifier used across the entire pipeline. Format: **`symbol.exchange`**, always **lowercase**.
+`INST.PRODUCT.INTERNAL_CUSIP` is the stable, human-readable product identifier used across the entire pipeline. Format: **`{symbol}.{suffix}`**, always **lowercase**.
 
-| Asset Class | Exchange Portion | Example | Notes |
+| Asset class | Suffix / venue portion | Example | Notes |
 |---|---|---|---|
-| Crypto spot | `crypto` | `btc-usd.crypto` | Venue-agnostic — same asset across exchanges |
-| Crypto derivatives | Actual exchange | `btc-perp.binance` | Exchange-specific (different margin/settlement) |
-| Listed equity | Listing exchange | `aapl.nyse` | Unambiguous listing venue |
-| OTC / fixed income | Clearing house | `ust10y.dtcc` | Clearing venue is the stable identifier |
-| Index | Provider | `spx.cboe` | Index publisher is the authority |
+| Crypto spot | `.crypto` | `btcusdt.crypto` | **One product per traded pair** — not per broker. Bybit and Binance share this row; xref supplies `BTCUSDT` (or each venue's ccxt id). Symbol encodes quote currency (`btcusdt`, not `btc-usd`). |
+| Crypto derivatives | actual exchange | `btc-perp.binance` | Exchange-specific when margin/settlement differs |
+| Listed equity | listing exchange | `aapl.nyse` | Unambiguous listing venue |
+| OTC / fixed income | clearing house | `ust10y.dtcc` | Clearing venue is the stable identifier |
+| Index | provider | `spx.cboe` | Index publisher is the authority |
 
-Vendor-specific symbols (exact case, format) live in `INST.PRODUCT_XREF.VENDOR_SYMBOL` — one row per `(PRODUCT_ID, APP_ID)` pair.
+#### Multi-broker crypto spot (Bybit + Binance)
+
+Brokers are **not** part of the cusip. Enabling a second ccxt venue does **not** create a second `INST.PRODUCT` row.
+
+```
+INST.PRODUCT          INTERNAL_CUSIP = btcusdt.crypto   (one row)
+INST.PRODUCT_XREF     app_id=34 (bybit)   → BTCUSDT
+INST.PRODUCT_XREF     app_id=35 (binance) → BTCUSDT
+INST.PRODUCT_XREF     app_id=1  (yahoo)   → BTC-USD   (research proxy)
+INST.PRODUCT_XREF     app_id=2  (glassnode) → BTC
+```
+
+`TRADE.DEPLOYMENT` stores `internal_cusip` + `app_id` (which broker). Live apply resolves xref for that pair, fetches bars from that venue, and places orders there. A deployment moved from Bybit to Binance keeps the same cusip — only `app_id` and xref change.
+
+**Anti-patterns**
+
+| Pattern | Why it breaks |
+|---|---|
+| `btcusdt.bybit` / `btcusdt.binance` | Duplicates one instrument; splits cache, price bars, and strategies |
+| `btc-usd.crypto` when trading USDT on exchanges | Cusip says USD; venues quote USDT — silent mismatch at apply |
+| `EXCHANGE = 'bybit'` on a `.crypto` row | Broker belongs in xref + deployment, not product identity |
+
+Vendor-specific symbols (exact case, ccxt format) live in `INST.PRODUCT_XREF.VENDOR_SYMBOL` — one current row per `(PRODUCT_ID, APP_ID)` pair.
 
 Current operating model:
 
@@ -89,7 +111,7 @@ PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, 
 | Table | Role |
 |-------|------|
 | `DEPLOYMENT` | Apply target: pinned strategy, credential, product, qty (soft-versioned via `DEPLOYMENT_VID` + `TRANSACT_FROM/TO`) |
-| `EXECUTION_EVENT` | Append-only submit / error diary |
+| `EXECUTION_EVENT` | Append-only submit / error diary; `TRANSACT_AT` = tick time, `CREATED_AT` = audit insert |
 | `TRANSACTION` | Append-only broker-confirmed fills |
 
 **Not stored:** current signal / target position between ticks (`TRADE.INTENT` rejected — decision #38).
@@ -142,10 +164,29 @@ Loaded at runtime via `RedisRefData.get_promotion_metrics()`. See [Best-VID Prom
 
 ### Automated (production)
 
-**App deploy does not run Liquibase.** GitHub Actions only updates Docker containers on EC2. Database schema changes are applied manually when you add a forward release file and run:
+The deploy workflow runs Liquibase on EC2 when a push to `main` touches `db/liquidbase/**`, but only for changesets whose `context` includes **`prod-deploy`**:
 
 ```bash
-# On EC2 (or locally with tunnel to prod)
+APP_ENV=prod USE_SSM=1 LIQUIBASE_CONTEXTS=prod-deploy bash scripts/liquibase-deploy.sh
+```
+
+It runs **before** the containers restart, so a release that the incoming app version depends on is in place by the time that version starts serving. The reverse order would leave the old image talking to the new schema.
+
+To read the result, look at the end of the **deploy to EC2** step for a per-schema recap:
+
+```text
+── MIGRATION SUMMARY (contexts: prod-deploy) ──
+  MASTER (schemas)                     2 applied
+  TRADE                               12 applied
+  TOTAL                               22 applied
+```
+
+The workflow prints only the tail of the remote output, and the image pull and container startup that follow a migration are long enough to push it out of view — so `liquibase-deploy.sh` also writes this block to a file that the workflow re-prints last. A migration that fails aborts the deploy before the containers restart, and the Liquibase error is then the final thing in the log.
+
+Tag a changeset `context="<schema>,prod-deploy"` when it must ship with the app that needs it. Leave the tag off and the changeset stays pending until someone runs a migration by hand — either the manually gated **database** workflow (verify / deploy, with a typed confirmation) or:
+
+```bash
+# On EC2 (or locally with tunnel to prod) — no filter, applies everything pending
 cd /opt/quant && APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
 ```
 
@@ -160,17 +201,35 @@ source .env
 ./scripts/liquibase-deploy.sh
 
 # Dry-run — no DDL applied
-./scripts/liquibase-verify.sh --offline   # XML only
+./scripts/liquibase-verify.sh --offline   # validate + render prod-deploy SQL, no DB
 ./scripts/liquibase-verify.sh             # status + update-sql preview (needs DB)
 ```
+
+### Pre-merge checks
+
+Every pull request runs two independent gates, both of which fail the build:
+
+| Gate | Runs | Catches |
+|------|------|---------|
+| `liquibase (offline validate)` in **tests** | `liquibase-verify.sh --offline` against `url=offline:postgresql` | Malformed XML, an `<include>` or `<sqlFile>` that does not resolve, duplicate changeset ids, and any changeset whose SQL fails to render under `--context-filter=prod-deploy` |
+| `pytest` | `tests/unit/test_liquibase_changelogs.py` | A changeset with no `context` (which would join *every* filtered run, including the automated prod deploy), `prod-deploy` used without its schema context, and a procedure missing `splitStatements="false"` |
+
+The split is not arbitrary. Liquibase validates structure but has no view on convention — its policy engine (`liquibase checks`) is Pro-only — so the conventions this repo depends on are asserted in pytest instead.
+
+An offline run records what it applied in a `databasechangelog.csv`. The script points each run at a throwaway copy; a stale one left beside a changelog would make later runs report nothing pending and quietly pass.
 
 Or run schemas individually:
 
 ```bash
 source .env
-cd db/liquidbase && liquibase --defaults-file=liquibase.properties update
-cd core_admin && liquibase --defaults-file=liquibase.properties update
-# ... refdata, bt, trade, inst — then core_admin again for GRANTS refresh
+cd db/liquidbase && liquibase --defaults-file=liquibase.properties update   # schemas (MARKET_DATA)
+cd db/liquidbase/core_admin && liquibase --defaults-file=liquibase.properties update
+cd db/liquidbase/refdata && liquibase --defaults-file=liquibase.properties update
+cd db/liquidbase/bt && liquibase --defaults-file=liquibase.properties update
+cd db/liquidbase/trade && liquibase --defaults-file=liquibase.properties update
+cd db/liquidbase/market_data && liquibase --defaults-file=liquibase.properties update
+cd db/liquidbase/inst && liquibase --defaults-file=liquibase.properties update
+cd db/liquidbase/core_admin && liquibase --defaults-file=liquibase.properties update   # GRANTS refresh
 ```
 
 **Developer copy of prod data:** see [Database dump & restore](../guides/database-dump-restore.md) (`./scripts/dbctl.sh`).
@@ -205,11 +264,17 @@ Active changelogs are empty manifests — see XML comments in each `db/liquidbas
 | `SP_UPD_PROMOTE_STRATEGY` | `BT` | Flip `IS_BEST_IND`: demote current best + promote target VID. `IN_STRATEGY_VID = NULL` = demote-only (no replacement) |
 | `SP_INS_PROMOTION` | `BT` | Persist auto-promote decision (outcome, gate results, decisive metric) — one row per completed backtest |
 | `SP_GET_STRATEGY` | `BT` | Get-one by id/vid; **list by `IN_USER_ID`** when `IN_STRATEGY_ID` is NULL (Phase 1.6). `IN_IS_BEST_IND = 'Y'` fetches the best VID directly. |
-| `SP_INS_DEPLOYMENT` | `TRADE` | Create or version deployment |
+| `SP_INS_DEPLOYMENT` | `TRADE` | Create or version deployment (includes schedule fields) |
 | `SP_GET_DEPLOYMENT` | `TRADE` | Read deployment rows (REFCURSOR) |
+| `SP_GET_MISSED_DUE_DEPLOYMENTS` | `TRADE` | Apply-now rows for `IN_TM_INTERVAL_ID` (poller); includes `NEXT_SCHEDULED_TS` |
+| `SP_GET_NEXT_DUE_DEPLOYMENTS` | `TRADE` | Not-yet-due preview (UI / ops, optional) |
+| `SP_INS_DEPLOYMENT_SCHEDULE_STATUS` | `TRADE` | Append schedule version (poller advance after apply) |
 | `SP_GET_DEPLOYMENT_CHECK` | `TRADE` | Validation read by `DEPLOYMENT_ID` — no owner filter; caller checks ownership |
-| `SP_INS_EXECUTION_EVENT` | `TRADE` | Append execution event |
+| `SP_INS_EXECUTION_EVENT` | `TRADE` | Append event; diary only, no scheduler side effects |
 | `SP_INS_TRANSACTION` | `TRADE` | Append fill row |
+| `SP_INS_PRICE_BAR` | `MARKET_DATA` | Insert one OHLCV bar (one row per call) |
+| `SP_GET_PRICE_BAR` | `MARKET_DATA` | Range read by `(INTERNAL_CUSIP, TM_INTERVAL_ID, start, end)` |
+| `SP_GET_PRICE_BAR_COVERAGE` | `MARKET_DATA` | `MIN`/`MAX` timestamps via index `LIMIT 1` probes |
 
 ## Directory Layout
 
@@ -223,6 +288,7 @@ db/
 │   ├── refdata/                  # REFDATA + releases/
 │   ├── bt/                       # BT + releases/
 │   ├── trade/                    # TRADE + releases/
+│   ├── market_data/              # MARKET_DATA price bars + releases/
 │   └── inst/                     # INST + releases/
 ├── sql/                          # Standalone SQL scripts
 └── syncddl/                      # Extracted live DDL (gitignored, for diff)

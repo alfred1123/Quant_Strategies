@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.2.0-001-crypto-spot-exchange-null" author="alfcheun" context="inst,prod-deploy">
+        <comment>
+            EXCHANGE is the listing/clearing venue and belongs to equities only, so
+            decision #21 requires it NULL on .crypto spot — the venue is carried by
+            INST.PRODUCT_XREF instead. Also sets CCY to the pair's quote leg, which
+            LiveApplyOrchestrator stamps onto TRADE.TRANSACTION.TRANS_CCY_CD, and
+            rewrites the stale "BTC-USD" description left by the rename to
+            btcusdt.crypto. Soft-versioned via SP_INS_PRODUCT; idempotent.
+        </comment>
+        <sqlFile path="../data/CRYPTO_SPOT_EXCHANGE_NULL.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+        <rollback>
+            <!--
+              Restoring the old value means writing yet another version, since the
+              prior one is retained as IS_CURRENT_IND='N' rather than overwritten.
+            -->
+            <sql splitStatements="false" stripComments="true">
+                DO $$
+                DECLARE
+                    R          RECORD;
+                    V_SQLSTATE TEXT;
+                    V_SQLMSG   TEXT;
+                    V_SQLERRMC TEXT;
+                BEGIN
+                    FOR R IN
+                        SELECT PRODUCT_ID, INTERNAL_CUSIP, DISPLAY_NM, ASSET_TYPE_ID,
+                               CASE WHEN INTERNAL_CUSIP LIKE '%usdt.crypto' THEN 'USD' ELSE CCY END AS CCY,
+                               REPLACE(DESCRIPTION, 'BTC/USDT', 'BTC-USD') AS DESCRIPTION
+                          FROM INST.PRODUCT
+                         WHERE IS_CURRENT_IND = 'Y'
+                           AND INTERNAL_CUSIP LIKE '%.crypto'
+                           AND EXCHANGE IS NULL
+                    LOOP
+                        CALL INST.SP_INS_PRODUCT(
+                            R.PRODUCT_ID, R.INTERNAL_CUSIP, R.DISPLAY_NM, R.ASSET_TYPE_ID,
+                            'crypto', R.CCY, R.DESCRIPTION, 'system',
+                            V_SQLSTATE, V_SQLMSG, V_SQLERRMC
+                        );
+                    END LOOP;
+                END $$;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -9,9 +9,12 @@ import pytest
 from quant.queue.repo import BtQueueRepo
 from quant.strategy.live_service import (
     LiveEvaluationError,
+    bars_loader,
     build_data_dict_for_signal,
     compute_latest_position,
+    provider_loader,
 )
+from quant.strategy.performance import live_lookback_bars, live_lookback_days
 from quant.strategy.signals import Strategy, StrategyConfig, config_from_json, strategy_to_json
 
 
@@ -24,7 +27,7 @@ def _sample_df(n: int = 120) -> pd.DataFrame:
 @pytest.fixture
 def strategy_json_doc():
     cfg = StrategyConfig.single(
-        "btc-usd.crypto",
+        "btcusdt.crypto",
         "get_bollinger_band",
         Strategy.momentum_band_signal,
         365,
@@ -57,7 +60,7 @@ def data_caches():
 class TestConfigFromJson:
     def test_round_trip(self, strategy_json_doc):
         cfg = config_from_json(strategy_json_doc)
-        assert cfg.internal_cusip == "btc-usd.crypto"
+        assert cfg.internal_cusip == "btcusdt.crypto"
         assert cfg.get_substrategies()[0].window == 20
 
 
@@ -76,12 +79,15 @@ class TestBuildDataDictForSignal:
         }
         build_data_dict_for_signal(
             cfg,
-            None,
-            start="2024-01-01",
-            end="2024-06-01",
-            cache=cache,
-            inst_cache=data_caches.instrument_cache,
-            bt_cache=None,
+            provider_loader(
+                cfg,
+                None,
+                start="2024-01-01",
+                end="2024-06-01",
+                cache=cache,
+                inst_cache=data_caches.instrument_cache,
+                bt_cache=None,
+            ),
         )
         mock_sync.assert_not_called()
 
@@ -103,7 +109,7 @@ class TestComputeLatestPosition:
     @patch("quant.strategy.live_service.fetch_df")
     def test_optimize_format_requires_result(self, mock_fetch, data_caches):
         config_json = {
-            "symbol": "btc-usd.crypto",
+            "symbol": "btcusdt.crypto",
             "start": "2020-01-01",
             "end": "2024-01-01",
             "trading_period": 365,
@@ -139,6 +145,168 @@ class TestComputeLatestPosition:
             config_json, result_payload=payload, caches=data_caches
         )
         assert position in (-1.0, 0.0, 1.0)
+
+
+class TestLiveLookbackBars:
+    def test_scales_with_the_widest_indicator_window(self):
+        assert live_lookback_bars(20) == 120
+        assert live_lookback_bars((20, 50)) == 210
+
+    def test_drops_the_calendar_floor_the_day_version_applies(self):
+        """A 365 floor is weekends and holidays — meaningless in bar counts."""
+        assert live_lookback_days(20, 365) == 365
+        assert live_lookback_bars(20) == 120
+
+
+class TestBuildDataDictFromBars:
+    def _loader(self, calls):
+        def loader(cusip, lookback):
+            calls.append((cusip, lookback))
+            return _sample_df()
+
+        return loader
+
+    def test_loads_every_symbol_the_strategy_reads(self, strategy_json_doc):
+        calls = []
+        cfg = config_from_json(strategy_json_doc)
+
+        data = build_data_dict_for_signal(cfg, bars_loader(self._loader(calls), 120))
+
+        assert calls == [("btcusdt.crypto", 120)]
+        assert set(data) == {"btcusdt.crypto"}
+
+    def test_empty_frame_is_refused(self, strategy_json_doc):
+        cfg = config_from_json(strategy_json_doc)
+
+        with pytest.raises(LiveEvaluationError, match="No data returned"):
+            build_data_dict_for_signal(
+                cfg, bars_loader(lambda *_: pd.DataFrame(), 120)
+            )
+
+    def test_loader_failures_propagate(self, strategy_json_doc):
+        """Fail closed — a symbol the exchange can't serve stops the signal."""
+        cfg = config_from_json(strategy_json_doc)
+
+        def boom(*_):
+            raise RuntimeError("exchange unreachable")
+
+        with pytest.raises(RuntimeError, match="exchange unreachable"):
+            build_data_dict_for_signal(cfg, bars_loader(boom, 120))
+
+
+class TestCrossProductSymbols:
+    """The symbol set comes from the config, so live matches backtest."""
+
+    def _cross_product_req(self):
+        return {
+            "symbol": "btcusdt.crypto",
+            "start": "2020-01-01",
+            "end": "2024-01-01",
+            "trading_period": 365,
+            "data_source": "glassnode",
+            "factors": [
+                {
+                    "indicator": "get_bollinger_band",
+                    "strategy": "momentum",
+                    "data_column": "price",
+                    "vendor_symbol": "^VIX",
+                    "data_source": "yahoo",
+                    "window_range": {"min": 20, "max": 20, "step": 1},
+                    "signal_range": {"min": 1.0, "max": 1.0, "step": 0.1},
+                }
+            ],
+        }
+
+    @patch("quant.strategy.live_service.fetch_df")
+    def test_vendor_symbol_factor_is_loaded_under_the_key_performance_uses(
+        self, mock_fetch, data_caches
+    ):
+        """`build_config` writes `vendor_symbol or symbol` onto the substrategy.
+
+        Keying the data dict by `symbol` alone left `Performance` looking up a
+        frame that was never loaded — a KeyError on any cross-product strategy.
+        """
+        mock_fetch.return_value = _sample_df()
+
+        position, _ = compute_latest_position(
+            self._cross_product_req(),
+            result_payload={"best": {"window": 20, "signal": 1.0}},
+            caches=data_caches,
+        )
+
+        loaded = {call.args[0] for call in mock_fetch.call_args_list}
+        assert loaded == {"btcusdt.crypto", "^VIX"}
+        assert position in (-1.0, 0.0, 1.0)
+
+    @patch("quant.strategy.live_service.fetch_df")
+    def test_per_factor_data_source_override_is_honoured(
+        self, mock_fetch, data_caches
+    ):
+        mock_fetch.return_value = _sample_df()
+
+        compute_latest_position(
+            self._cross_product_req(),
+            result_payload={"best": {"window": 20, "signal": 1.0}},
+            caches=data_caches,
+        )
+
+        sources = {call.args[0]: call.args[3] for call in mock_fetch.call_args_list}
+        assert sources == {"btcusdt.crypto": "glassnode", "^VIX": "yahoo"}
+
+    def test_primary_symbol_is_loaded_first(self, data_caches):
+        """An unavailable trade asset should fail before any factor work."""
+        from quant.schemas.backtest import OptimizeRequest
+        from quant.strategy.backtest_service import build_config
+
+        cfg = build_config(
+            OptimizeRequest.model_validate(self._cross_product_req()),
+            {
+                "indicator": data_caches.refdata.get("indicator"),
+                "signal_type": data_caches.refdata.get("signal_type"),
+            },
+        )
+        order = []
+        build_data_dict_for_signal(
+            cfg, lambda c: (order.append(c), _sample_df())[1]
+        )
+
+        assert order[0] == "btcusdt.crypto"
+
+
+class TestComputeLatestPositionFromBars:
+    @patch("quant.strategy.live_service.fetch_df")
+    def test_bar_loader_replaces_the_provider(
+        self, mock_fetch, strategy_json_doc, data_caches
+    ):
+        calls = []
+
+        def loader(cusip, lookback):
+            calls.append((cusip, lookback))
+            return _sample_df()
+
+        position, as_of = compute_latest_position(
+            strategy_json_doc,
+            result_payload=None,
+            caches=data_caches,
+            bar_loader=loader,
+        )
+
+        mock_fetch.assert_not_called()
+        assert calls == [("btcusdt.crypto", live_lookback_bars(20))]
+        assert position in (-1.0, 0.0, 1.0)
+        assert as_of
+
+    @patch("quant.strategy.live_service.fetch_df")
+    def test_without_a_loader_the_provider_path_is_unchanged(
+        self, mock_fetch, strategy_json_doc, data_caches
+    ):
+        mock_fetch.return_value = _sample_df()
+
+        compute_latest_position(
+            strategy_json_doc, result_payload=None, caches=data_caches
+        )
+
+        mock_fetch.assert_called()
 
 
 class TestFetchResultPayload:

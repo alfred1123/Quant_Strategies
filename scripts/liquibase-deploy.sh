@@ -6,6 +6,11 @@
 #   DB_TARGET=local ./scripts/liquibase-deploy.sh   # local — LOCAL_DB_PORT (default 5432)
 #   APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh   # EC2: load /quant/prod/* from SSM
 #
+# LIQUIBASE_CONTEXTS restricts the run to changesets carrying one of the listed
+# contexts. Unset (the default) applies every pending changeset, which is what
+# manual runs want. The deploy workflow sets it to prod-deploy so only changesets
+# explicitly marked for automatic release are applied.
+#
 # Ports (set in .env or env):
 #   DB_TARGET=local  → LOCAL_DB_HOST / LOCAL_DB_PORT  (default 127.0.0.1:5432)
 #   DB_TARGET=prod   → QUANTDB_HOST / PROD_DB_PORT    (default localhost:5433)
@@ -17,6 +22,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LB_ROOT="${ROOT_DIR}/db/liquidbase"
 APP_ENV="${APP_ENV:-prod}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
+LB_ARGS=()
+[[ -n "${LIQUIBASE_CONTEXTS:-}" ]] && LB_ARGS+=("--context-filter=${LIQUIBASE_CONTEXTS}")
 
 log() { echo "[liquibase-deploy] $*"; }
 die() { echo "[liquibase-deploy] ERROR: $*" >&2; exit 1; }
@@ -83,14 +90,43 @@ load_env() {
   export LIQUIBASE_COMMAND_PASSWORD="${LIQUIBASE_COMMAND_PASSWORD:-${QUANTDB_PASSWORD:?QUANTDB_PASSWORD required}}"
 }
 
+APPLIED_LABELS=()
+APPLIED_COUNTS=()
+
 run_update() {
   local dir="$1"
   local label="$2"
+  local out count
+  out="$(mktemp)"
   log "── ${label} ──"
   (
     cd "${LB_ROOT}/${dir}"
-    liquibase --defaults-file=liquibase.properties update
-  )
+    liquibase --defaults-file=liquibase.properties update ${LB_ARGS[@]+"${LB_ARGS[@]}"}
+  ) | tee "${out}"
+  # Liquibase reports what it applied in an UPDATE SUMMARY block. No block at
+  # all means it had nothing pending to report.
+  count="$(awk '/^Run:/ {print $2; exit}' "${out}")"
+  APPLIED_LABELS+=("${label}")
+  APPLIED_COUNTS+=("${count:-0}")
+  rm -f "${out}"
+}
+
+print_summary() {
+  local total=0 i line
+  local -a lines=("── MIGRATION SUMMARY (contexts: ${LIQUIBASE_CONTEXTS:-<all>}) ──")
+  for i in "${!APPLIED_LABELS[@]}"; do
+    lines+=("$(printf '  %-34s %3s applied' "${APPLIED_LABELS[$i]}" "${APPLIED_COUNTS[$i]}")")
+    total=$((total + APPLIED_COUNTS[i]))
+  done
+  lines+=("$(printf '  %-34s %3d applied' 'TOTAL' "${total}")")
+  printf '%s\n' "${lines[@]}" | while IFS= read -r line; do log "${line}"; done
+
+  # The deploy workflow only prints the tail of this script's output, and the
+  # container startup that follows would push the migration off the top. It
+  # re-reads this file at the very end so the result stays visible.
+  if [[ -n "${MIGRATION_SUMMARY_FILE:-}" ]]; then
+    printf '%s\n' "${lines[@]}" > "${MIGRATION_SUMMARY_FILE}"
+  fi
 }
 
 main() {
@@ -98,23 +134,23 @@ main() {
   load_env
 
   log "Target: ${LIQUIBASE_COMMAND_URL} (user=${LIQUIBASE_COMMAND_USERNAME})"
+  log "Contexts: ${LIQUIBASE_CONTEXTS:-<all>}"
 
   # Phase 0 — schemas + extensions (public.databasechangelog)
-  (
-    cd "${LB_ROOT}"
-    liquibase --defaults-file=liquibase.properties update
-  )
+  run_update "." "MASTER (schemas)"
 
   # Schema DDL/procs (core_admin first pass — grants changeset may run before BT/INST exist)
   run_update core_admin "CORE_ADMIN (tables + procedures)"
   run_update refdata "REFDATA"
   run_update bt "BT"
   run_update trade "TRADE"
+  run_update market_data "MARKET_DATA"
   run_update inst "INST"
 
   # Second pass — GRANTS.sql has runOnChange=true; picks up objects created above
   run_update core_admin "CORE_ADMIN (grants refresh)"
 
+  print_summary
   log "Done — all pending release migrations applied"
 }
 

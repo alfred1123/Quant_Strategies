@@ -10,7 +10,8 @@
 
       PRODUCTION SAFETY
       - Baseline: releases/archive/baseline-1.0.0.xml (REFERENCE ONLY — never <include> on prod).
-      - App deploy does NOT run Liquibase. Manual: APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
+      - Deploy applies ONLY changesets whose context includes prod-deploy.
+        Anything else is manual: APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
 
       NEW MIGRATION
       1. Add SQL under tables/ or procedures/.
@@ -18,5 +19,8 @@
       3. Uncomment/add:
            <include file="releases/X.Y.Z-name.xml" relativeToChangelogFile="true"/>
     -->
+
+    <include file="releases/1.1.0-bybit-binance-xref.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.2.0-crypto-spot-exchange-null.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

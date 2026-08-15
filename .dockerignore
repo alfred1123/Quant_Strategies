@@ -29,7 +29,6 @@ LICENSE
 # Infrastructure (not needed in app image)
 aws/
 db/
-backup/
 scripts/
 
 # Env / secrets

@@ -121,6 +121,8 @@ class WorkerLoop:
     BLPOP_TIMEOUT_S = 30
     DRAIN_TIMEOUT_S = 30
     DEFAULT_JOB_TIMEOUT_S = 6000  # 100 min hard cap per backtest job — presented as FAILED.
+    # Headroom so the socket read outlives the BLPOP park rather than racing it.
+    WAKE_SOCKET_MARGIN_S = 5
 
     def __init__(
         self,
@@ -141,7 +143,16 @@ class WorkerLoop:
         self._spawn = spawn_fn or default_spawn
         self._repo = repo or WorkerLoopRepo(db_url)
         self._refdata = refdata or RedisRefData(redis_url)
-        self._redis = redis_client or redis.Redis.from_url(redis_url)
+        # BLPOP parks for BLPOP_TIMEOUT_S, so the socket read has to outlast it.
+        # redis-py 8 defaults socket_timeout to 5s where 7.x defaulted to None,
+        # which silently killed the wake channel: every park died at 5s, the loop
+        # fell back to polling BT.QUEUE six times more often than intended, and
+        # logged a warning on each pass.
+        self._redis = redis_client or redis.Redis.from_url(
+            redis_url,
+            socket_connect_timeout=5,
+            socket_timeout=self.BLPOP_TIMEOUT_S + self.WAKE_SOCKET_MARGIN_S,
+        )
         # Tracks (Popen, start_monotonic, job_row) per claimed queue_id so we
         # can kill + mark FAILED after JOB_TIMEOUT_S.
         self._active: dict[uuid.UUID, tuple[subprocess.Popen, float, dict]] = {}
