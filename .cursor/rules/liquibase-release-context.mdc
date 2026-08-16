@@ -1,0 +1,53 @@
+---
+description: Never default a Liquibase changeset to prod-deploy — it migrates production unattended
+globs: db/liquidbase/**
+alwaysApply: false
+---
+
+# `prod-deploy` is opt-in, and the user opts in — not you
+
+Pushing to `main` runs `liquibase-deploy.sh` with `--context-filter=prod-deploy`
+against the production Aurora instance, **before** the containers restart. The
+`context` attribute is the only thing standing between a changeset and that run.
+
+| `context=` | Automated deploy on push to `main` | Manual `database.yml` (no filter) |
+|---|---|---|
+| `"bt"` (schema only) | skipped — **the default you write** | applied |
+| `"bt,prod-deploy"` | **applied unattended** | applied |
+| omitted | **applied** — no context matches *every* filter | applied |
+
+Write the schema context alone. Then tell the user the changeset is staged and
+ask whether to add `prod-deploy`. Only add it once they say yes.
+
+```xml
+<!-- ✅ Default: staged, waits for a human -->
+<changeSet id="1.17.0-001-sp-get-thing" author="alfcheun" context="bt" runOnChange="true">
+
+<!-- ⚠️ Only after the user confirms this specific release -->
+<changeSet id="1.17.0-001-sp-get-thing" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+```
+
+Never omit `context` to "keep it out" of the deploy — that does the opposite.
+
+## Holding a changeset back is not a dead end
+
+A schema-only changeset stays pending until someone runs the **database**
+workflow with `action=deploy` and types `deploy` into `confirm_deploy`. That
+run applies every pending changeset regardless of context. Say this when you
+report the work, so the user knows the migration is waiting rather than lost.
+
+## Editing a procedure `.sql` is itself a production migration
+
+48 of the 49 files under `*/procedures/` and `*/functions/` are already covered
+by an active `runOnChange` changeset tagged `prod-deploy` — that coverage is
+deliberate, so an edit redeploys rather than going quiet. The consequence: a
+one-line change to a procedure body migrates prod on the next push to `main`,
+with no new changeset involved. Treat any edit under `db/liquidbase/*/procedures/`
+as a production change and say so before making it.
+
+## Say what a release will actually do
+
+Give the blast radius before the user decides: which schemas, how many
+changesets, and whether any replace a procedure body. Sweeping "re-apply every
+procedure" releases are the risky shape — one killed the 2026-08-16 deploy 15
+changesets into `BT`. Prefer the narrowest set of files that fixes the problem.

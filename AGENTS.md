@@ -58,6 +58,22 @@ Keep `V_START_TS TIMESTAMPTZ := CURRENT_TIMESTAMP;` for `TRANSACT_FROM_TS` / `TR
 
 - Scripts may touch **live trading** or exchange APIs. Treat order placement and production paths as **high risk**; confirm intent before suggesting automated execution or destructive operations.
 
+### Never Default a Changeset to `prod-deploy`
+
+A push to `main` runs Liquibase against production Aurora with `--context-filter=prod-deploy`, before the containers restart. A changeset's `context` is the only thing gating that:
+
+| `context=` | Push to `main` | Manual `database.yml` |
+|---|---|---|
+| `"bt"` (schema only) | skipped — **write this** | applied |
+| `"bt,prod-deploy"` | **applied unattended** | applied |
+| omitted | **applied** — no context matches *every* filter | applied |
+
+Write the schema context alone, then tell the user the release is staged and ask before adding `prod-deploy`. Never omit `context` to hold something back — that does the opposite. A staged changeset is not stranded: the **database** workflow with `action=deploy` (type `deploy` to confirm) applies everything pending, context ignored.
+
+**Editing a procedure body is itself a production migration.** 48 of the 49 files under `*/procedures/` and `*/functions/` are already covered by an active `runOnChange` changeset tagged `prod-deploy` — deliberate, so an edit redeploys instead of going quiet. A one-line change to a procedure therefore migrates prod on the next push, with no new changeset involved. Flag it before editing.
+
+When proposing a release, state the blast radius — which schemas, how many changesets, and whether any replace a procedure body. Sweeping "re-apply every procedure" releases are the dangerous shape; that is how the 2026-08-16 deploy died 15 changesets into `BT`.
+
 ### No Direct DML — Use Stored Procedures
 
 **Never** write raw `INSERT`, `UPDATE`, or `DELETE` statements against application tables in Python, API services, or migration seed scripts, **except**:
