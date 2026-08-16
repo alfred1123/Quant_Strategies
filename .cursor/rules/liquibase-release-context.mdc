@@ -6,18 +6,22 @@ alwaysApply: false
 
 # `prod-deploy` is opt-in, and the user opts in — not you
 
-Pushing to `main` runs `liquibase-deploy.sh` with `--context-filter=prod-deploy`
-against the production Aurora instance, **before** the containers restart. The
-`context` attribute is the only thing standing between a changeset and that run.
+Pushing to `main` queues the `migrate` job, which runs `liquibase-deploy.sh`
+with `--context-filter=prod-deploy` against production Aurora before any
+container restarts. That job sits in the `production-db` environment behind a
+required reviewer, so it waits for a human — but `context` still decides
+whether a changeset is in that batch at all.
 
-| `context=` | Automated deploy on push to `main` | Manual `database.yml` (no filter) |
+| `context=` | Push to `main` | Manual `database.yml` (no filter) |
 |---|---|---|
 | `"bt"` (schema only) | skipped — **the default you write** | applied |
-| `"bt,prod-deploy"` | **applied unattended** | applied |
-| omitted | **applied** — no context matches *every* filter | applied |
+| `"bt,prod-deploy"` | queued for `migrate`, applied on approval | applied |
+| omitted | **queued too** — no context matches *every* filter | applied |
 
 Write the schema context alone. Then tell the user the changeset is staged and
-ask whether to add `prod-deploy`. Only add it once they say yes.
+ask whether to add `prod-deploy`. Only add it once they say yes. The reviewer
+gate is a backstop against mistakes, not a substitute for asking: it shows a
+job name, not a diff, so an approver cannot see what they are approving.
 
 ```xml
 <!-- ✅ Default: staged, waits for a human -->
@@ -41,9 +45,9 @@ report the work, so the user knows the migration is waiting rather than lost.
 48 of the 49 files under `*/procedures/` and `*/functions/` are already covered
 by an active `runOnChange` changeset tagged `prod-deploy` — that coverage is
 deliberate, so an edit redeploys rather than going quiet. The consequence: a
-one-line change to a procedure body migrates prod on the next push to `main`,
-with no new changeset involved. Treat any edit under `db/liquidbase/*/procedures/`
-as a production change and say so before making it.
+one-line change to a procedure body queues a production migration on the next
+push, with no new changeset involved. Treat any edit under
+`db/liquidbase/*/procedures/` as a production change and say so before making it.
 
 ## Say what a release will actually do
 

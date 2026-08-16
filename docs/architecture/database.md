@@ -164,15 +164,17 @@ Loaded at runtime via `RedisRefData.get_promotion_metrics()`. See [Best-VID Prom
 
 ### Automated (production)
 
-The deploy workflow runs Liquibase on EC2 when a push to `main` touches `db/liquidbase/**`, but only for changesets whose `context` includes **`prod-deploy`**:
+A push to `main` touching `db/liquidbase/**` queues the **migrate database** job, which applies only changesets whose `context` includes **`prod-deploy`**:
 
 ```bash
 APP_ENV=prod USE_SSM=1 LIQUIBASE_CONTEXTS=prod-deploy bash scripts/liquibase-deploy.sh
 ```
 
-It runs **before** the containers restart, so a release that the incoming app version depends on is in place by the time that version starts serving. The reverse order would leave the old image talking to the new schema.
+That job sits in the `production-db` environment behind a **required reviewer**, so it parks in *Waiting* until a human approves it — see [Approving a migration](infrastructure.md#approving-a-migration). It is pinned to the pushed commit rather than `main`, so a long approval cannot silently widen what gets applied.
 
-To read the result, look at the end of the **deploy to EC2** step for a per-schema recap:
+It runs **before** the containers restart — `deploy` takes a `needs:` on it — so a release that the incoming app version depends on is in place by the time that version starts serving. The reverse order would leave the old image talking to the new schema. Reject the approval and `deploy` is held back too, leaving prod on a matched old schema and old image.
+
+To read the result, look at the end of the **migrate database** job for a per-schema recap:
 
 ```text
 ── MIGRATION SUMMARY (contexts: prod-deploy) ──
@@ -181,9 +183,9 @@ To read the result, look at the end of the **deploy to EC2** step for a per-sche
   TOTAL                               22 applied
 ```
 
-The workflow prints only the tail of the remote output, and the image pull and container startup that follow a migration are long enough to push it out of view — so `liquibase-deploy.sh` also writes this block to a file that the workflow re-prints last. A migration that fails aborts the deploy before the containers restart, and the Liquibase error is then the final thing in the log.
+The workflow prints only the tail of the remote output, so `liquibase-deploy.sh` also writes this block to a file that `liquibase-ssm-run.sh` re-prints last. A migration that fails leaves `deploy` unrun, so no container restarts, and the Liquibase error is the final thing in the job log.
 
-Tag a changeset `context="<schema>,prod-deploy"` when it must ship with the app that needs it. Leave the tag off and the changeset stays pending until someone runs a migration by hand — either the manually gated **database** workflow (verify / deploy, with a typed confirmation) or:
+Tag a changeset `context="<schema>,prod-deploy"` when it must ship with the app that needs it, and only after the person owning the release agrees — the reviewer gate shows a job name, not a diff, so it cannot catch a changeset that was tagged by mistake but looks routine. Leave the tag off and the changeset stays pending until someone runs a migration by hand — either the manually gated **database** workflow (verify / deploy, with a typed confirmation) or:
 
 ```bash
 # On EC2 (or locally with tunnel to prod) — no filter, applies everything pending

@@ -348,11 +348,13 @@ The workflow uses `paths-ignore` for `docs/**`, `*.md`, `tests/**`, `db/**`, `sc
    - **nginx** — `frontend/**`, `docker/nginx/**`
    - **compose** — `docker-compose.yml`, `docker-compose.prod.yml`, `docker-compose.tls.yml`, `docker-compose.cloudflare.yml`
    - **deploy** — true when any of app / nginx / compose changed (gate for the deploy job)
+   - **db** — `db/liquidbase/**` (gate for the migrate job)
 2. **Test job** — runs `pytest tests/unit/` on GitHub's runner (Python 3.12)
 3. **Frontend job** — `npm ci`, `npm audit --audit-level=high`, `npm run build` (type-check + Vite build), `npm test` on Node 22. Validates the SPA on the runner; a build/audit/test failure blocks `build-and-push`.
 4. **CFN job** — deploys infra stacks when the matching `aws/cfn/**` template or relevant `aws/params/prod.json` keys change (per-stack detection). The **database** stack only deploys when `02-database.yml` / DB params change and requires the `DB_MASTER_PASSWORD` secret (it is otherwise guarded by `DeletionPolicy=Retain`, `UpdateReplacePolicy=Snapshot`, `DeletionProtection=true`).
 5. **Build-and-push job** — skipped when neither app nor nginx changed; otherwise builds only the affected image(s) for `linux/arm64` with GitHub Actions layer cache and pushes to ECR (tags: git SHA + `latest`). Runs on a native arm64 runner (`ubuntu-24.04-arm`), so there is no QEMU in the path — see [Why the build runs on arm64](#why-the-build-runs-on-arm64).
-6. **Deploy job** — skipped when no app/nginx/compose changes; otherwise SSM Run Command runs the inline deploy script (see [Deployment logic](#deployment-logic) below). **Liquibase is not run automatically** — apply DB migrations manually when ready (see [Database](database.md#deployment)).
+6. **Migrate job** — skipped unless `db/liquidbase/**` changed; otherwise runs `aws/scripts/liquibase-ssm-run.sh deploy <sha>` on EC2 with `LIQUIBASE_CONTEXTS=prod-deploy`. Gated by the `production-db` environment (see [Approving a migration](#approving-a-migration)).
+7. **Deploy job** — skipped when no app/nginx/compose changes; otherwise SSM Run Command runs the inline deploy script (see [Deployment logic](#deployment-logic) below). Waits on `migrate`, so containers never restart ahead of the schema.
 
 **Manual full deploy:** Actions → deploy → Run workflow (`workflow_dispatch`). Rebuilds both images and deploys regardless of paths. The optional `deploy_database` input (default off) additionally deploys the RDS stack — leave unchecked unless you intend an Aurora change.
 
@@ -405,7 +407,20 @@ The `deploy` job sends one `AWS-RunShellScript` SSM command to the EC2 and polls
 | `EC2_INSTANCE_ID` | *(optional fallback only)* | Deploy workflow resolves `InstanceId` from the `quant-compute` stack at runtime; set this var only if CFN lookup fails |
 | `DOMAIN` | Public domain (e.g. `algodaemon.com`). When set, the deploy job fetches `ORIGIN_TLS_CERT`/`ORIGIN_TLS_KEY` from SSM and merges `docker-compose.cloudflare.yml` for HTTPS. Unset → HTTP-only. |
 
-**Environment**: Create a `production` environment (repo → Settings → Environments) for deploy approvals (optional).
+**Environments** (repo → Settings → Environments):
+
+- `production` — used by `build-and-push`, `cfn`, and `deploy`. No protection rules; it exists to scope secrets, not to gate.
+- `production-db` — used by `migrate` only. Carries a **required reviewer**, which is what makes a schema change wait for a human.
+
+### Approving a migration
+
+A push touching `db/liquidbase/**` parks the `migrate` job in *Waiting* and notifies the reviewer. Approve it in the run page and the migration proceeds, then `deploy` restarts the containers. Reject it and `deploy` is held back too, so prod keeps both the old schema and the old image — a consistent pair.
+
+Only `migrate` is gated. An app-only push still deploys with no prompt; gating every job would mean approving container-only changes as well, and a reviewer who clicks through by reflex is not a gate.
+
+The job runs against `github.sha`, not `main`. Approval can sit for hours, and pinning the commit means the migration that runs is the one that was reviewed, even if `main` has moved on.
+
+Two things the gate deliberately does not do. It shows a job name rather than a diff, so it catches an unintended migration but cannot tell you whether the SQL is correct — read the changesets before approving. And it does not distinguish a one-line procedure edit from a schema rewrite: 48 of the 49 procedure and function files sit behind an active `prod-deploy` `runOnChange` changeset, so editing any of them queues this job.
 
 ### Bootstrap the EC2 (one-time)
 

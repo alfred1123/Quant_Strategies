@@ -13,6 +13,11 @@
 #   EC2_INSTANCE_ID         optional fallback if CFN output missing
 #   SSM_TIMEOUT_SECONDS     send-command timeout (default 900)
 #   SSM_POLL_ATTEMPTS       poll loop count (default 90, 10s interval)
+#   LIQUIBASE_CONTEXTS      restrict to changesets carrying one of these contexts.
+#                           Unset applies everything pending, which is what a
+#                           hand-run migration wants. The deploy workflow sets
+#                           prod-deploy so a changeset tagged with its schema
+#                           alone stays staged until someone asks for it.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -59,11 +64,21 @@ run_liquibase_cmd() {
     run_script="./scripts/liquibase-deploy.sh"
   fi
 
+  # A summary file makes the applied changesets visible in the job log. Without
+  # it a migration that ran and a migration that was filtered out both look the
+  # same from the outside, which is how a pending changeset once hid behind
+  # three green deploys.
+  local summary="/tmp/quant-migration-summary.txt"
+  local contexts="${LIQUIBASE_CONTEXTS:-}"
+  log "Contexts: ${contexts:-<all pending>}"
+
   # JSON array for SSM — keep commands short; heredoc-style via jq.
   local commands_json
   commands_json=$(jq -n \
     --arg ref "$git_ref" \
     --arg run "$run_script" \
+    --arg ctx "$contexts" \
+    --arg summary "$summary" \
     '[
       "set -euo pipefail",
       "mkdir -p /opt/quant",
@@ -76,8 +91,10 @@ run_liquibase_cmd() {
       "git reset --hard FETCH_HEAD",
       "echo \"── AFTER  ──\"",
       "git rev-parse --short HEAD",
+      "rm -f " + $summary,
       "bash aws/scripts/install-liquibase.sh",
-      "APP_ENV=prod USE_SSM=1 " + $run
+      "APP_ENV=prod USE_SSM=1 LIQUIBASE_CONTEXTS=\"" + $ctx + "\" MIGRATION_SUMMARY_FILE=\"" + $summary + "\" " + $run,
+      "if [ -s " + $summary + " ]; then cat " + $summary + "; fi"
     ]')
 
   local command_id

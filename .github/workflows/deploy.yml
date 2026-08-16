@@ -330,14 +330,55 @@ jobs:
           AWS_REGION: ap-southeast-1
         run: bash aws/deploy.sh scheduler
 
-  deploy:
-    name: deploy to EC2
+  # Schema changes wait for a human. The `production-db` environment carries a
+  # required reviewer, so this job parks in "Waiting" until someone approves it,
+  # while an app-only push never reaches here and deploys untouched.
+  #
+  # Split out of `deploy` rather than gating that job, because gating the whole
+  # deploy would prompt on container-only pushes too and train the reviewer to
+  # click through. Runs before `deploy` for the ordering reason below: the old
+  # image must not meet the new schema.
+  #
+  # Pinned to github.sha, not main. Approval can sit for hours, and main may
+  # have moved on by then — the migration that runs must be the one reviewed.
+  migrate:
+    name: migrate database
     needs: [test, changes, build-and-push, cfn]
     if: >-
       always() &&
       needs.test.result == 'success' &&
       (needs.cfn.result == 'success' || needs.cfn.result == 'skipped') &&
       (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped') &&
+      needs.changes.outputs.db == 'true'
+    runs-on: ubuntu-latest
+    environment: production-db
+    env:
+      AWS_REGION: ap-southeast-1
+      # Only changesets tagged prod-deploy. One carrying just its schema context
+      # stays staged for the manually gated database workflow.
+      LIQUIBASE_CONTEXTS: prod-deploy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-1
+
+      - name: Apply pending changesets on EC2
+        run: bash aws/scripts/liquibase-ssm-run.sh deploy "${{ github.sha }}"
+
+  deploy:
+    name: deploy to EC2
+    needs: [test, changes, build-and-push, cfn, migrate]
+    if: >-
+      always() &&
+      needs.test.result == 'success' &&
+      (needs.cfn.result == 'success' || needs.cfn.result == 'skipped') &&
+      (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped') &&
+      (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') &&
       (needs.changes.outputs.deploy == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     environment: production
@@ -348,7 +389,6 @@ jobs:
       DEPLOY_APP: ${{ needs.changes.outputs.app == 'true' || github.event_name == 'workflow_dispatch' }}
       DEPLOY_NGINX: ${{ needs.changes.outputs.nginx == 'true' || github.event_name == 'workflow_dispatch' }}
       DEPLOY_COMPOSE: ${{ needs.changes.outputs.compose == 'true' || github.event_name == 'workflow_dispatch' }}
-      DEPLOY_DB: ${{ needs.changes.outputs.db == 'true' }}
     steps:
       - name: Deploy via SSM Run Command
         uses: aws-actions/configure-aws-credentials@v4
@@ -357,11 +397,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-1
 
-      # Migrations run before the containers restart. The reverse order would
-      # leave the old image talking to the new schema — 1.4.0 drops superseded
-      # procedure overloads, so the running app would lose calls it still makes.
-      # Only changesets tagged prod-deploy are applied; everything else still
-      # goes through the manually gated database workflow.
+      # Containers restart only after the `migrate` job has finished. The reverse
+      # order would leave the old image talking to the new schema — 1.4.0 drops
+      # superseded procedure overloads, so the running app would lose calls it
+      # still makes. That ordering is held by `needs: migrate` above, not by
+      # sequencing inside this script.
       - name: Run deploy script on EC2
         run: |
           set -euo pipefail
@@ -380,7 +420,7 @@ jobs:
             exit 1
           fi
           echo "Deploy target instance: $INSTANCE_ID"
-          echo "Flags: DEPLOY_APP=${{ env.DEPLOY_APP }} DEPLOY_NGINX=${{ env.DEPLOY_NGINX }} DEPLOY_COMPOSE=${{ env.DEPLOY_COMPOSE }} DEPLOY_DB=${{ env.DEPLOY_DB }}"
+          echo "Flags: DEPLOY_APP=${{ env.DEPLOY_APP }} DEPLOY_NGINX=${{ env.DEPLOY_NGINX }} DEPLOY_COMPOSE=${{ env.DEPLOY_COMPOSE }}"
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
@@ -401,18 +441,8 @@ jobs:
               "DEPLOY_APP=${{ env.DEPLOY_APP }}",
               "DEPLOY_NGINX=${{ env.DEPLOY_NGINX }}",
               "DEPLOY_COMPOSE=${{ env.DEPLOY_COMPOSE }}",
-              "DEPLOY_DB=${{ env.DEPLOY_DB }}",
               "ECR_REGISTRY=539163478329.dkr.ecr.ap-southeast-1.amazonaws.com",
               "IMAGE_TAG=${{ github.sha }}",
-              "MIGRATION_SUMMARY=/tmp/quant-migration-summary.txt",
-              "rm -f \"$MIGRATION_SUMMARY\"",
-              "if [ \"$DEPLOY_DB\" = \"true\" ]; then",
-              "  echo \"── DB MIGRATION ──\"",
-              "  bash aws/scripts/install-liquibase.sh",
-              "  APP_ENV=prod USE_SSM=1 LIQUIBASE_CONTEXTS=prod-deploy MIGRATION_SUMMARY_FILE=\"$MIGRATION_SUMMARY\" bash scripts/liquibase-deploy.sh",
-              "else",
-              "  echo \"Skip DB migration — no db/liquidbase changes in this push\"",
-              "fi",
               "COMPOSE=\"docker compose -f docker-compose.yml -f docker-compose.prod.yml\"",
               "DOMAIN=\"${{ vars.DOMAIN }}\"",
               "export DOMAIN",
@@ -477,8 +507,7 @@ jobs:
               "fi",
               "docker image prune -f",
               "echo \"── RUNNING ──\"",
-              "$COMPOSE ps",
-              "if [ -s \"$MIGRATION_SUMMARY\" ]; then cat \"$MIGRATION_SUMMARY\"; fi"
+              "$COMPOSE ps"
             ]' \
             --query Command.CommandId \
             --output text)
@@ -556,7 +585,7 @@ jobs:
   # an email, it stays open until someone closes it.
   report-failure:
     name: report deploy failure
-    needs: [test, frontend, changes, build-and-push, cfn, deploy]
+    needs: [test, frontend, changes, build-and-push, cfn, migrate, deploy]
     if: always() && contains(needs.*.result, 'failure')
     runs-on: ubuntu-latest
     permissions:
@@ -584,8 +613,9 @@ jobs:
                 ``,
                 `[Run log](${url})`,
                 ``,
-                `Prod may be mid-way: migrations run before the containers restart,`,
-                `so a failure after the migration step can leave the new schema`,
-                `under the old image. Check which step failed before re-running.`,
+                `Prod may be mid-way. \`migrate\` runs before \`deploy\`, so a`,
+                `failure in \`deploy\` can leave the new schema under the old`,
+                `image. A failure in \`migrate\` stops the rollout before any`,
+                `container restarts. Check which job failed before re-running.`,
               ].join('\n'),
             });

@@ -60,17 +60,17 @@ Keep `V_START_TS TIMESTAMPTZ := CURRENT_TIMESTAMP;` for `TRANSACT_FROM_TS` / `TR
 
 ### Never Default a Changeset to `prod-deploy`
 
-A push to `main` runs Liquibase against production Aurora with `--context-filter=prod-deploy`, before the containers restart. A changeset's `context` is the only thing gating that:
+A push to `main` queues the `migrate` job, which runs Liquibase against production Aurora with `--context-filter=prod-deploy` before any container restarts. That job lives in the `production-db` environment behind a required reviewer, so it waits for approval — but `context` still decides whether a changeset is in the batch:
 
 | `context=` | Push to `main` | Manual `database.yml` |
 |---|---|---|
 | `"bt"` (schema only) | skipped — **write this** | applied |
-| `"bt,prod-deploy"` | **applied unattended** | applied |
-| omitted | **applied** — no context matches *every* filter | applied |
+| `"bt,prod-deploy"` | queued for `migrate`, applied on approval | applied |
+| omitted | **queued too** — no context matches *every* filter | applied |
 
-Write the schema context alone, then tell the user the release is staged and ask before adding `prod-deploy`. Never omit `context` to hold something back — that does the opposite. A staged changeset is not stranded: the **database** workflow with `action=deploy` (type `deploy` to confirm) applies everything pending, context ignored.
+Write the schema context alone, then tell the user the release is staged and ask before adding `prod-deploy`. Never omit `context` to hold something back — that does the opposite. A staged changeset is not stranded: the **database** workflow with `action=deploy` (type `deploy` to confirm) applies everything pending, context ignored. The reviewer gate is a backstop, not a substitute for asking — it shows a job name, not a diff.
 
-**Editing a procedure body is itself a production migration.** 48 of the 49 files under `*/procedures/` and `*/functions/` are already covered by an active `runOnChange` changeset tagged `prod-deploy` — deliberate, so an edit redeploys instead of going quiet. A one-line change to a procedure therefore migrates prod on the next push, with no new changeset involved. Flag it before editing.
+**Editing a procedure body is itself a production migration.** 48 of the 49 files under `*/procedures/` and `*/functions/` are already covered by an active `runOnChange` changeset tagged `prod-deploy` — deliberate, so an edit redeploys instead of going quiet. A one-line change to a procedure therefore queues a production migration on the next push, with no new changeset involved. Flag it before editing.
 
 When proposing a release, state the blast radius — which schemas, how many changesets, and whether any replace a procedure body. Sweeping "re-apply every procedure" releases are the dangerous shape; that is how the 2026-08-16 deploy died 15 changesets into `BT`.
 
