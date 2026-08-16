@@ -20,7 +20,8 @@ from pathlib import Path
 
 import pytest
 
-LB_ROOT = Path(__file__).resolve().parents[2] / "db" / "liquidbase"
+from tests.unit.liquibase_sources import LB_ROOT, is_frozen
+
 LOGGER_SQL = LB_ROOT / "core_admin" / "procedures" / "CORE_INS_LOG_PROC.sql"
 
 CALL_RE = re.compile(r"CORE_ADMIN\.CORE_INS_LOG_PROC\s*\((.*?)\);", re.S)
@@ -30,11 +31,19 @@ DECL_RE = re.compile(
 
 
 def _callers() -> list[Path]:
-    """Procedure and function bodies that write an audit log entry."""
+    """Procedure and function bodies that write an audit log entry.
+
+    Frozen files are excluded: they are superseded bodies that no deploy
+    re-applies, so retrofitting the timing fix into them would change nothing
+    in the database while breaking the checksum of the archived changeset that
+    still points at them.
+    """
     return sorted(
         p
         for p in LB_ROOT.rglob("*.sql")
-        if p != LOGGER_SQL and "CORE_INS_LOG_PROC" in p.read_text()
+        if p != LOGGER_SQL
+        and "CORE_INS_LOG_PROC" in p.read_text()
+        and not is_frozen(p)
     )
 
 

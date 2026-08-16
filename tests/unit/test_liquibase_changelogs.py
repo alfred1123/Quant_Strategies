@@ -19,7 +19,8 @@ from pathlib import Path
 
 import pytest
 
-LB_ROOT = Path(__file__).resolve().parents[2] / "db" / "liquidbase"
+from tests.unit.liquibase_sources import LB_ROOT, is_frozen
+
 NS = {"lb": "http://www.liquibase.org/xml/ns/dbchangelog"}
 
 
@@ -116,8 +117,28 @@ ALL_PROC_SQL = sorted(LB_ROOT.glob("*/procedures/*.sql")) + sorted(
     LB_ROOT.glob("*/functions/*.sql")
 )
 
+LIVE_PROC_SQL = [p for p in ALL_PROC_SQL if not is_frozen(p)]
+FROZEN_PROC_SQL = [p for p in ALL_PROC_SQL if is_frozen(p)]
 
-@pytest.mark.parametrize("path", ALL_PROC_SQL, ids=_name)
+
+@pytest.mark.parametrize("path", FROZEN_PROC_SQL, ids=_name)
+def test_no_active_release_reapplies_a_frozen_file(path):
+    """A frozen body must stay out of the include graph.
+
+    Its OUT list is one release behind the live routine, and a procedure's OUT
+    list is its return type, so re-applying it aborts the deploy with "cannot
+    change return type of existing function". The 1.16.0 timing release shipped
+    with a changeset for SP_INS_STRATEGY.sql and took prod's migration down
+    mid-run on 2026-08-16; only the archived 1.6.0 release may reference it.
+    """
+    assert path.resolve() not in _sql_managed_by_active_releases(), (
+        f"{_name(path)}: frozen files are superseded bodies and must only be "
+        "referenced from releases/archive/. Point the changeset at the file "
+        "that holds the live definition instead."
+    )
+
+
+@pytest.mark.parametrize("path", LIVE_PROC_SQL, ids=_name)
 def test_every_procedure_is_still_managed_by_an_active_release(path):
     """Editing a procedure must be enough to redeploy it.
 

@@ -122,12 +122,15 @@
         <rollback/>
     </changeSet>
 
-    <changeSet id="1.16.0-016-sp-ins-strategy" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
-        <comment>SP_INS_STRATEGY — time the body with clock_timestamp()</comment>
-        <sqlFile path="../procedures/SP_INS_STRATEGY.sql" relativeToChangelogFile="true"
-                 splitStatements="false" stripComments="true"/>
-        <rollback/>
-    </changeSet>
+    <!--
+      No changeset for procedures/SP_INS_STRATEGY.sql. That file is frozen at
+      1.6.0 and declares four OUT parameters; the live BT.SP_INS_STRATEGY has
+      five (it also returns OUT_STRATEGY_ID) and comes from
+      SP_INS_STRATEGY_VID_BY_NM.sql below. Re-applying the frozen file makes
+      Postgres reject the CREATE OR REPLACE — the OUT list is the procedure's
+      return type, and that cannot change in place. The timing fix reaches the
+      live procedure through 1.16.0-017.
+    -->
 
     <changeSet id="1.16.0-017-sp-ins-strategy-vid-by-nm" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
         <comment>SP_INS_STRATEGY_VID_BY_NM — time the body with clock_timestamp()</comment>
