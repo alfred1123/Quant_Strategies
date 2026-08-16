@@ -95,6 +95,7 @@ nav:
   - Design Docs:
       - Backtest API: design/backtest-api.md
       - Backtest Queue: design/backtest-queue.md
+      - Backtest Queue JSON Viewer: design/backtest-queue-json-viewer.md
       - Jobs Table Detail UX: design/jobs-table-detail-ux.md
       - Trade API: design/trade-api.md
       - Futu Trading (OOP): design/futu-trading.md
