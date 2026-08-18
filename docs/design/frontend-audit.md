@@ -24,10 +24,10 @@ flowchart LR
     BrowserRouter -->|/login| GuestOnly
     BrowserRouter -->|/| RequireAuth
     GuestOnly -->|loading| Spinner
-    GuestOnly -->|authed| "Redirect /"
+    GuestOnly -->|authed| RedirectHome["Redirect /"]
     GuestOnly -->|guest| LoginPage
     RequireAuth -->|loading| Spinner
-    RequireAuth -->|guest| "Redirect /login"
+    RequireAuth -->|guest| RedirectLogin["Redirect /login"]
     RequireAuth -->|authed| BacktestPage
     BacktestPage --> ConfigDrawer
     ConfigDrawer --> FactorCard

@@ -89,9 +89,9 @@ sequenceDiagram
   participant PG as CORE_ADMIN (Postgres)
 
   UI->>R: POST /api/v1/credentials {app_id,label,api_key,api_secret}
-  R->>R: require_user → app_user_id; rate-limit 5/15min
+  R->>R: require_user → app_user_id, rate-limit 5/15min
   R->>S: create_credential(...)
-  S->>S: key_ct = encrypt(api_key); secret_ct = encrypt(api_secret)
+  S->>S: key_ct = encrypt(api_key), secret_ct = encrypt(api_secret)
   S->>Repo: insert_credential(...ciphertext...)
   Repo->>PG: CALL CORE_ADMIN.SP_INS_API_CREDENTIAL(...)
   PG-->>Repo: (api_credential_id, api_credential_vid)

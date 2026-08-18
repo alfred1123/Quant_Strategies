@@ -6,6 +6,7 @@ on:
     paths:
       - "docs/**"
       - "mkdocs.yml"
+      - "scripts/mermaid-check/**"
       - ".github/workflows/docs.yml"
 
   workflow_dispatch:
@@ -18,9 +19,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A malformed diagram does not fail `mkdocs build` — it publishes as raw text,
+  # because mermaid only parses it in the browser. So parse them here instead.
+  mermaid:
+    name: mermaid syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: scripts/mermaid-check/package-lock.json
+
+      - name: Install the mermaid parser
+        run: npm ci
+        working-directory: scripts/mermaid-check
+
+      - name: Parse every diagram in docs/
+        run: node scripts/mermaid-check/check.mjs docs
+
   deploy:
     name: deploy docs
     runs-on: ubuntu-latest
+    # Gate the publish: a broken diagram should not reach the wiki.
+    needs: mermaid
     steps:
       - uses: actions/checkout@v4
 

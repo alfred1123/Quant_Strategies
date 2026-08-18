@@ -47,6 +47,9 @@ db/syncddl/
 # MkDocs build output
 site/
 
+# Node dependencies (frontend/, scripts/mermaid-check/)
+node_modules/
+
 # Cursor hook runtime artifacts (logs / PID files); keep hooks.json + scripts tracked
 .cursor/hooks/logs/
 db/dumps/

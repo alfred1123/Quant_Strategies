@@ -1,0 +1,14 @@
+{
+  "name": "mermaid-check",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Parses every mermaid diagram in docs/ so a malformed one fails CI instead of rendering as raw text on the wiki.",
+  "scripts": {
+    "check": "node check.mjs ../../docs"
+  },
+  "dependencies": {
+    "jsdom": "29.1.1",
+    "mermaid": "11.16.1"
+  }
+}
