@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      SP_GET_SCHEDULED_INSTRUMENTS — the read behind the price-bar warmer
+      (POST /api/v1/market-data/price-bars/sync).
+
+      Neither existing read fits: SP_GET_MISSED_DUE_DEPLOYMENTS returns only rows
+      already due, and warming has to happen before a deployment comes due;
+      SP_GET_DEPLOYMENT requires IN_APP_USER_ID, so it cannot see the whole
+      estate. Hence a new, unscoped read.
+
+      Rollback drops the procedure — unlike the 1.5.0 changesets, this object is
+      new here, so removing it restores the prior schema exactly.
+    -->
+
+    <changeSet id="1.6.0-001-sp-get-scheduled-instruments" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_GET_SCHEDULED_INSTRUMENTS — distinct (interval, cusip, app) to warm</comment>
+        <sqlFile path="../procedures/SP_GET_SCHEDULED_INSTRUMENTS.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback>
+            DROP PROCEDURE IF EXISTS TRADE.SP_GET_SCHEDULED_INSTRUMENTS(
+                OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+            );
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

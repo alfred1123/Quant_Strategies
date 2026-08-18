@@ -331,3 +331,11 @@ class TestCallMatchesProcedureDdl:
         assert _call_arg_count(sql) == _ddl_param_count(
             "SP_GET_NEXT_DUE_DEPLOYMENTS.sql"
         )
+
+    @patch.object(TradeRepo, "_call_get", return_value=[])
+    def test_get_scheduled_instruments(self, mock_get, repo):
+        repo.sp_get_scheduled_instruments()
+        sql = mock_get.call_args.args[0]
+        assert _call_arg_count(sql) == _ddl_param_count(
+            "SP_GET_SCHEDULED_INSTRUMENTS.sql"
+        )

@@ -317,7 +317,7 @@ Lambda is a thin HTTP caller with a service auth token. All business logic stays
 
 ### 6.1 AWS resources (implemented)
 
-CloudFormation stack `quant-scheduler` — template [`aws/cfn/04-scheduler.yml`](../../aws/cfn/04-scheduler.yml). Ops detail: [Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge--lambda).
+CloudFormation stack `quant-scheduler` — template [`aws/cfn/04-scheduler.yml`](../../aws/cfn/04-scheduler.yml). Ops detail: [Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge-lambda).
 
 | Resource | Name |
 |----------|------|
@@ -449,9 +449,11 @@ one entry in the handler's `_TASK_PATHS` dict once the FastAPI endpoint
 exists, with its own schedule(s) in the same group. No new Lambda or stack
 change.
 
-### 6.4 Service auth (app — not yet wired)
+### 6.4 Service auth (implemented)
 
-Lambda authenticates via `TRADE_SERVICE_TOKEN` (SSM SecureString), not a user JWT. The `/apply` endpoint must accept this service token for scheduled execution alongside `require_user` for manual apply. Until that lands, Lambda invokes reach the API but return **401**.
+Lambda authenticates via `TRADE_SERVICE_TOKEN` (SSM SecureString), not a user JWT. `require_user_or_service` admits either: the service token for scheduled execution, or a session for manual apply.
+
+The gate is applied at **router level** in `quant/api/main.py` for the two routers the Lambda drives (`admin`, `market_data`), so a new maintenance route cannot be added without one; a route that needs a human adds `require_user` itself. Refusals are pinned in `tests/unit/test_service_token_auth.py` — an unset, blank or placeholder secret admits nothing, since a gate that fails open is worse than one that never worked.
 
 ---
 
@@ -620,6 +622,46 @@ class PriceBarRepo(DbGateway):
 
 `CcxtBarFetcher` paginates `fetch_ohlcv` across the requested window and drops anything past the last closed boundary. It builds a **keyless** ccxt client rather than reusing `CcxtTradeGateway`: bars are public data, and market data must not depend on a user's API credentials or on a trading session being up. `PriceBarService` depends on the `BarFetcher` protocol, not on ccxt.
 
+### 7.8 Scheduled bar warming — `quant/trade/scheduler/warm.py`
+
+`BarWarmer` is the `price_bar_sync` task: it reads every instrument a scheduled
+deployment will trade and pre-fetches its bars, so the applies find them stored.
+
+It lives in `quant/trade/` rather than `quant/market_data/` because the question
+it answers — *which* instruments matter — is a deployment question. Composition
+runs one way only: `quant/market_data/` still knows nothing about deployments.
+
+**The read is new.** Neither existing query fits, which is why
+`TRADE.SP_GET_SCHEDULED_INSTRUMENTS` exists: `SP_GET_MISSED_DUE_DEPLOYMENTS`
+returns only rows already *due*, and warming has to happen before a deployment
+comes due; `SP_GET_DEPLOYMENT` requires `IN_APP_USER_ID` and so cannot see the
+whole estate. It returns `DISTINCT (TM_INTERVAL_ID, INTERNAL_CUSIP, APP_ID)` for
+every interval in one read — the warmer sweeps all of them, and an interval with
+no deployments simply contributes no rows.
+
+Rows are grouped by `(interval, venue)` and each group becomes one
+`PriceBarService.sync` call. Venue is part of the key because a `PriceBarService`
+is bound to one exchange, and because one `INTERNAL_CUSIP` on two venues is two
+separate order books (decision #47).
+
+**Nothing downstream trusts it.** Every apply still calls `ensure_fresh` and
+still fails closed, so a failed warm costs a redundant fetch later, never a bad
+trade. That is what licenses the broad `except` per group: one unreachable venue
+must not stop the rest of the estate. It is also why a partial failure still
+returns 200 — reporting it as an error would make the Lambda log a pass that did
+most of its work as failed.
+
+**Lookback is fixed**, sized by the same `live_lookback_bars` rule the live path
+uses. The warmer cannot know each deployment's indicator windows without reading
+every strategy config, and warming short is safe by construction: `ensure_fresh`
+completes whatever the real window needs.
+
+**Timing is the whole design.** See the schedule note in
+[Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge-lambda):
+it fires *on* the boundary so the warm precedes the applies, and sleeps
+`DEFAULT_SETTLE_S` before reading the clock, because the instant it captures is
+what every downstream "newest closed bar" derives from.
+
 ---
 
 ## 8. Files
@@ -645,6 +687,8 @@ class PriceBarRepo(DbGateway):
 | `db/liquidbase/market_data/market_data-changelog.xml` | Liquibase changelog |
 | `db/liquidbase/trade/procedures/SP_GET_MISSED_DUE_DEPLOYMENTS.sql` | Poller — apply-now rows |
 | `db/liquidbase/trade/procedures/SP_GET_NEXT_DUE_DEPLOYMENTS.sql` | UI / ops — not-yet-due preview |
+| `db/liquidbase/trade/procedures/SP_GET_SCHEDULED_INSTRUMENTS.sql` | Bar warmer — distinct `(interval, cusip, app)` to warm |
+| `db/liquidbase/trade/releases/1.6.0-scheduled-instruments.xml` | `SP_GET_SCHEDULED_INSTRUMENTS` |
 | `db/liquidbase/trade/releases/1.4.0-deployment-scheduler.xml` | `SCHEDULE_TM_INTERVAL_ID`, `EXECUTION_EVENT.TRANSACT_AT`, `DEPLOYMENT_SCHEDULE_STATUS` + scheduler SPs |
 
 ### Modified (DDL)
@@ -667,6 +711,9 @@ class PriceBarRepo(DbGateway):
 | `quant/trade/bar_source.py` | `PriceBarServiceFactory` — `APP_ID` → venue → price bar service |
 | `quant/trade/scheduler/tick.py` | `ScheduleTickRunner` — due rows → apply → advance, with a cross-pass attempt budget. Shared by both backends |
 | `quant/trade/scheduler/poller.py` | `SchedulePoller` — dev asyncio loop with startup catch-up drain (`SCHEDULER_BACKEND=local`) |
+| `quant/trade/scheduler/warm.py` | `BarWarmer` — the `price_bar_sync` task: scheduled instruments → grouped `PriceBarService.sync` (§7.8) |
+| `quant/api/market_data/router.py` | `POST /api/v1/market-data/price-bars/sync` — service-token gated |
+| `config/scheduler/price_bar_sync.yml` | Hourly warm schedule, on the boundary |
 | `quant/trade/scheduler/trigger.py` | `ScheduleTrigger` seam — `EventBridgeTrigger` (boto3) / `LocalTrigger` (no-op) — *pending* |
 
 ### Modified (Python)
@@ -681,7 +728,9 @@ class PriceBarRepo(DbGateway):
 | `quant/strategy/live_service.py` | `SymbolLoader` seam; symbols via `get_internal_cusips()` |
 | `quant/strategy/performance.py` | `live_lookback_bars` alongside `live_lookback_days` |
 | `quant/api/exception_handlers.py` | `StaleBarsError` → 503 |
-| `quant/api/main.py` | `app.state.price_bars` built in the lifespan |
+| `quant/api/main.py` | `app.state.price_bars` built in the lifespan; market-data router mounted behind the service gate |
+| `quant/trade/db_repo.py` | `sp_get_scheduled_instruments()` for the warmer |
+| `aws/lambda/scheduled-task/handler.py` | `price_bar_sync` in `_TASK_PATHS` |
 
 ---
 
@@ -689,10 +738,19 @@ class PriceBarRepo(DbGateway):
 
 1. **DDL** — `REFDATA.TM_INTERVAL` seed; MARKET_DATA schema + tables + SPs; DEPLOYMENT scheduler columns + SP updates. ✅
 2. **Python** — schedule fields in schemas, `PriceBarRepo`, `PriceBarService`, db_repo schedule fields, clock module. ✅
-3. **Integration** — Price bar refresh wired into live apply ✅; scheduler tick *pending*.
+3. **Integration** — Price bar refresh wired into live apply ✅; scheduled bar warming ✅; scheduler tick *pending*.
 4. **UI + Lambda** — Schedule dropdown in DeploymentDialog; EventBridge/Lambda CloudFormation.
 5. **Tests** — Unit tests for clock, repos, service, updated schemas. ✅
 
-Still open before a scheduled apply can run end to end: service auth (§6.4 — every
-Lambda invoke 401s today), the `POST /api/v1/market-data/price-bars/sync` endpoint
-with its `_TASK_PATHS` entry (§6.2), and the `ScheduleTrigger` seam.
+**Service auth is done** (§6.4). It was the blocker this section used to name
+first — "every Lambda invoke 401s today" — but `require_user_or_service` is live
+and `log_proc_summary` has been reaching the API through it on schedule.
+
+**Scheduled bar warming is done.** `POST /api/v1/market-data/price-bars/sync`
+(§7.8) is served, its `_TASK_PATHS` entry is uncommented, and
+`config/scheduler/price_bar_sync.yml` schedules it hourly on the boundary.
+
+Still open before a scheduled *apply* runs end to end: the `ScheduleTrigger` seam
+(§6.2), which is what creates a per-deployment EventBridge schedule. Until it
+exists, nothing invokes `trade_apply` in prod — the warmer keeps bars current,
+but only the local poller applies.

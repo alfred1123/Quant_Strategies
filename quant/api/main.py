@@ -26,6 +26,7 @@ from quant.api.auth.service import AuthService  # noqa: E402
 from quant.api.credentials.router import limiter as credentials_limiter, router as credentials_router  # noqa: E402
 from quant.api.credentials.service import CredentialService  # noqa: E402
 from quant.api.admin.router import router as admin_router  # noqa: E402
+from quant.api.market_data.router import router as market_data_router  # noqa: E402
 from quant.api.exception_handlers import register as register_exception_handlers  # noqa: E402
 from quant.api.routers import backtest, deployments, inst, jobs, promotion, refdata, strategies  # noqa: E402
 from quant.refdata.bundle import DataCaches  # noqa: E402
@@ -121,10 +122,11 @@ app.include_router(promotion.router, prefix="/api/v1", dependencies=[Depends(req
 app.include_router(refdata.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(deployments.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(credentials_router, prefix="/api/v1", dependencies=[Depends(require_user)])
-# Admin is the one router the scheduler Lambda drives, so its gate also admits
-# the service token. Kept at router level so a new admin route cannot be added
-# without a gate; a route needing a human specifically adds require_user itself.
+# The two routers the scheduler Lambda drives, so their gates also admit the
+# service token. Kept at router level so a new route cannot be added without a
+# gate; a route needing a human specifically adds require_user itself.
 app.include_router(admin_router, prefix="/api/v1", dependencies=[Depends(require_user_or_service)])
+app.include_router(market_data_router, prefix="/api/v1", dependencies=[Depends(require_user_or_service)])
 
 
 @app.get("/health")

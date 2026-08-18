@@ -543,3 +543,16 @@ class TradeRepo(DbGateway):
             "NULL::refcursor, NULL::text, NULL::text, NULL::text)",
             (),
         )
+
+    def sp_get_scheduled_instruments(self) -> list[dict]:
+        """Distinct (tm_interval_id, internal_cusip, app_id) to warm bars for.
+
+        Every interval in one read: the warmer sweeps all of them, and an
+        interval with no deployments simply contributes no rows. Not scoped to a
+        user or to due-ness — see the procedure comment.
+        """
+        return self._call_get(
+            "CALL trade.sp_get_scheduled_instruments("
+            "NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (),
+        )

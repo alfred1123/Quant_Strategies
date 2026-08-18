@@ -8,7 +8,7 @@
 **Related:** [Plan to Profit §1.7](../design/plan-to-profit.md#phase-17--live-apply),
 [Live Order Execution](../design/live-order-execution.md),
 [Scheduler & Price Bars](../design/scheduler-price-bars.md),
-[Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge--lambda),
+[Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge-lambda),
 [Phase 0.1 signoff](../archive/phase-0/phase-0.1-signoff.md)
 
 ---
@@ -121,7 +121,7 @@ Complete on testnet before any mainnet credential:
 - [ ] Manual apply on testnet; verify fill on `testnet.bybit.com` + `TRADE.EXECUTION_EVENT` / `TRANSACTION`.
 - [ ] Kill switch: `PATCH` deployment `enabled=false` stops apply ([Trade API §4](../design/trade-api.md#4-risk--safety)).
 - [ ] Slack alert tested: failure → alert; success → no alert.
-- [ ] Scheduler (when app work lands): `TRADE_SERVICE_TOKEN` accepted by API; one scheduled testnet apply completes; EventBridge schedule uses **`MaximumRetryAttempts = 0`** ([scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-app--not-yet-wired)).
+- [ ] Scheduler: `TRADE_SERVICE_TOKEN` accepted by API — **done**, `log_proc_summary` and `price_bar_sync` both reach it on schedule. Still to verify: one scheduled testnet apply completes, and the EventBridge schedule the app creates uses **`MaximumRetryAttempts = 0`** — that waits on the `ScheduleTrigger` seam ([scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-app--not-yet-wired)).
 - [ ] Price bars (Phase 1.9): live apply fails closed on stale data — do not trade on unverified bars ([scheduler design §4.8](../design/scheduler-price-bars.md#48-failure-modes-and-error-handling)).
 
 Remaining Phase 1.7 security items (ownership, dry-run-before-apply enforcement) should
@@ -226,7 +226,7 @@ Local dev does not need EventBridge or Lambda:
 - Keep **testnet keys** and **test Slack** (or log-only) locally.
 
 See [Scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-app--not-yet-wired)
-and [Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge--lambda).
+and [Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge-lambda).
 
 ---
 

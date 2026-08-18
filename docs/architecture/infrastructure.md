@@ -220,9 +220,35 @@ quant-scheduled-task Lambda ──POST──►  https://algodaemon.com/api/v1/t
 FastAPI on EC2 (business logic: bars → signal → order)
 ```
 
-The Lambda is a **generic task bridge** routed by `event.task` — the planned
-price-bar ingestion schedule (Phase 1.9) reuses the same function with a
-`price_bar_sync` task instead of a second Lambda.
+The Lambda is a **generic task bridge** routed by `event.task`, so a new job is a
+YAML file in `config/scheduler/` plus an entry in `_TASK_PATHS` — never a second
+Lambda or a stack change.
+
+| Task | Schedule | Endpoint | Purpose |
+|------|----------|----------|---------|
+| `trade_apply` | One per deployment (created by the app) | `/api/v1/trade/deployments/{id}/apply` | Bars → signal → order |
+| `log_proc_summary` | `cron(15 23 ? * SAT *)` | `/api/v1/admin/log-proc-summary/summarize` | Aggregate `LOG_PROC_DETAIL` into daily summaries |
+| `price_bar_sync` | `cron(0 * * * ? *)` | `/api/v1/market-data/price-bars/sync` | Warm `MARKET_DATA.PRICE_BAR` for scheduled deployments |
+
+Three files have to agree for a job to run — the YAML's `task`, `_TASK_PATHS`, and
+the route FastAPI serves. A mismatch only shows up when the schedule fires, as a
+404 on a tick that is not retried, so `tests/unit/test_scheduled_task_paths.py`
+checks all three against each other.
+
+!!! note "`price_bar_sync` takes the boundary; `log_proc_summary` dodges it"
+    The two jobs want opposite phases. Summarisation runs at `:15` to stay clear
+    of deployments and container restarts. The bar warmer is only worth anything
+    if it lands *before* the applies it is warming for — a pass that runs after
+    they have fetched their own bars has done nothing — so it takes `cron(0 …)`
+    and `BarWarmer` sleeps `DEFAULT_SETTLE_S` before reading the clock. Sleeping
+    first is the point: everything downstream derives the newest closed bar from
+    that instant, so the pause both lets the exchange finish publishing the
+    candle and keeps an early delivery from making `floor_to_period` land a
+    period back on a bar already stored.
+
+    It is hourly to serve the `1H` interval. `DAILY` instruments are swept on
+    every pass too and cost one coverage read each, returning immediately once
+    the bar is stored.
 
 **Prod only.** Dev boxes run `SCHEDULER_BACKEND=local` (the default when implemented): an
 in-process poller inside FastAPI reads missed-due deployments via `SP_GET_MISSED_DUE_DEPLOYMENTS`
@@ -340,6 +366,34 @@ push to main → changes (path filter) ─┐
 `deploy` waits on `test`, `cfn`, and `build-and-push` (the last two may be skipped). `build-and-push` requires both `test` **and** `frontend` to pass.
 
 The workflow uses `paths-ignore` for `docs/**`, `*.md`, `tests/**`, `db/**`, `scripts/**`, `.github/skills/**`, `.github/instructions/**`, `.cursor/**` — pushes touching only ignored paths do **not** trigger the workflow. The docs site has its own workflow (`.github/workflows/docs.yml`).
+
+### Docs workflow — the mermaid gate
+
+`docs.yml` runs two jobs: `mermaid`, then `deploy` (which `needs` it). The gate
+exists because **a malformed diagram does not fail `mkdocs build`**. MkDocs emits
+the block as `<pre class="mermaid">` whatever it contains, `mermaid-init.js`
+flattens it to raw text, and `mermaid.run()` only then throws — in the reader's
+browser. The result is the diagram source displayed as a code block, with a green
+build behind it. Two diagrams sat broken in the wiki that way.
+
+`scripts/mermaid-check/check.mjs` parses every ```` ```mermaid ```` fence under
+`docs/` with the real mermaid parser (via jsdom, since mermaid is a browser
+library) and exits non-zero on the first failure, naming `file:line`. Run it
+locally the same way CI does:
+
+```bash
+cd scripts/mermaid-check && npm ci
+node scripts/mermaid-check/check.mjs docs   # from the repo root
+```
+
+Parsing the raw fence is faithful to what the browser parses: MkDocs escapes the
+block to entities (`--&gt;`), but `mermaid-init.js` reads it back through
+`code.textContent`, which unescapes them.
+
+Two syntax traps account for both historical breakages — a `;` inside a
+sequence-diagram message, which mermaid reads as a statement separator, and a
+bare quoted string where a node id belongs (`-->|authed| "Redirect /"` rather
+than `-->|authed| RedirectHome["Redirect /"]`).
 
 ### How it works
 

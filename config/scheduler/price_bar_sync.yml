@@ -1,0 +1,25 @@
+# price_bar_sync — pre-fetch bars for scheduled deployments.
+#
+# Deployments on the same instrument all decide the newest bar is missing at the
+# same boundary and race to insert it. This warms each instrument once so they
+# find the bar already stored. Purely an optimisation: every apply still calls
+# PriceBarService.ensure_fresh and still fails closed, so a lost tick costs a
+# redundant fetch, never a bad trade.
+
+task: price_bar_sync
+description: Warm MARKET_DATA.PRICE_BAR for every scheduled deployment's instrument
+enabled: true
+
+schedule:
+  # On the hour, unlike log_proc_summary at :15. A warm pass is only worth
+  # anything if it lands *before* the applies it is warming for — one that runs
+  # after they have already fetched their own bars has done nothing. So it takes
+  # the boundary rather than dodging it, and BarWarmer sleeps DEFAULT_SETTLE_S
+  # before reading the clock to clear the two edges that sit there: an exchange
+  # that has only just closed the candle, and early delivery, which would make
+  # floor_to_period target the previous bar.
+  #
+  # Hourly serves the shortest interval (1H). DAILY instruments are swept too and
+  # cost one coverage read each, returning immediately once the bar is stored.
+  expression: "cron(0 * * * ? *)"
+  timezone: UTC
