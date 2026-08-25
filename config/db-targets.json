@@ -1,0 +1,44 @@
+{
+  "_comment": [
+    "Single source of truth for the two databases this project talks to.",
+    "DB_TARGET picks one. Read by quant/shared/config.py (Python entry points)",
+    "and scripts/lib/db-target.sh (appctl.sh, dbctl.sh, liquibase-deploy.sh),",
+    "so neither side can drift from the other.",
+    "",
+    "Per field, 'env' lists the environment variables that override the default,",
+    "highest precedence first. That is how the same 'prod' entry works from a",
+    "laptop and from the EC2 host: the default port 5433 is the SSM tunnel, while",
+    "on EC2 the SSM-supplied QUANTDB_HOST/QUANTDB_PORT point straight at Aurora",
+    "on 5432. Setting QUANTDB_CONNINFO bypasses all of this with a literal DSN."
+  ],
+
+  "default_target": "prod",
+
+  "targets": {
+    "local": {
+      "description": "Laptop Postgres 17 on loopback, populated by ./scripts/dbctl.sh restore",
+      "sslmode": "disable",
+      "notes": "Password is not a secret: a throwaway database bound to loopback, rebuilt from a dump. Credentials come from .env, never SSM.",
+      "fields": {
+        "host": { "default": "127.0.0.1", "env": ["LOCAL_DB_HOST"] },
+        "port": { "default": "5432", "env": ["LOCAL_DB_PORT"] },
+        "dbname": { "default": "quantdb", "env": ["LOCAL_DB_NAME"] },
+        "user": { "default": "quant_admin", "env": ["LOCAL_DB_USER"] },
+        "password": { "default": "LetsGetRich888", "env": ["LOCAL_DB_PASSWORD"] }
+      }
+    },
+
+    "prod": {
+      "description": "Aurora PostgreSQL Serverless v2. From a laptop: SSM port-forward on 127.0.0.1:5433. On EC2: the cluster endpoint on 5432 via SSM.",
+      "sslmode": "require",
+      "notes": "No password default — it must come from SSM or .env. Never commit one here.",
+      "fields": {
+        "host": { "default": "127.0.0.1", "env": ["QUANTDB_HOST"] },
+        "port": { "default": "5433", "env": ["PROD_DB_PORT", "QUANTDB_PORT"] },
+        "dbname": { "default": "quantdb", "env": ["QUANTDB_NAME"] },
+        "user": { "default": "quant_admin", "env": ["QUANTDB_USERNAME"] },
+        "password": { "default": null, "env": ["QUANTDB_PASSWORD"] }
+      }
+    }
+  }
+}

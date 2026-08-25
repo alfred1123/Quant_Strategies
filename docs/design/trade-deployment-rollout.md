@@ -152,13 +152,14 @@ from `QUANTDB_*` env vars and stored on `app.state.db_conninfo`
 
 | Context | Host : Port | Source |
 |---------|-------------|--------|
-| **Local dev (native Postgres)** | `127.0.0.1:5432` | `docker-compose.dev.yml` (`QUANTDB_PORT=5432`, host networking) |
-| **Local tooling via SSM tunnel** | `localhost:5433` → Aurora `5432` | `.env` (`QUANTDB_PORT`), SSM port-forward task |
+| **Local dev (native Postgres)** | `127.0.0.1:5432` | `DB_TARGET=local` → `config/db-targets.json` |
+| **Local tooling via SSM tunnel** | `localhost:5433` → Aurora `5432` | `DB_TARGET=prod` (default) → `config/db-targets.json` |
 | **Production (EC2)** | Aurora cluster endpoint `:5432` | SSM Parameter Store `/quant/prod/QUANTDB_*` |
 
-`_build_db_conninfo()` defaults to port **5433** (the SSM-tunnel convention) but
-the deployed app always supplies an explicit `QUANTDB_PORT`. Use `sslmode=require`
-for Aurora; local dev compose sets `QUANTDB_SSLMODE=disable`.
+`db_settings()` resolves all three from `config/db-targets.json`: the `prod`
+entry defaults to the tunnel port **5433**, and on EC2 the SSM-supplied
+`QUANTDB_HOST`/`QUANTDB_PORT` override it. `sslmode` comes from the target —
+`require` for Aurora, `disable` for the loopback server.
 
 ## Data model (Trade side)
 

@@ -60,12 +60,16 @@ services:
     environment:
       - REDIS_URL=redis://127.0.0.1:6379
       - USE_SSM=0
-      - QUANTDB_HOST=${LOCAL_DB_HOST:-127.0.0.1}
-      - QUANTDB_PORT=${LOCAL_DB_PORT:-5432}
-      - QUANTDB_USERNAME=${LOCAL_DB_USER:-quant_admin}
-      - QUANTDB_PASSWORD=${LOCAL_DB_PASSWORD:-LetsGetRich888}
-      - QUANTDB_DATABASE=${LOCAL_DB_NAME:-quantdb}
-      - QUANTDB_SSLMODE=disable
+      # The target only. quant/shared/config.py resolves host/port/user from
+      # config/db-targets.json, so this file cannot drift from it — the earlier
+      # QUANTDB_DATABASE and QUANTDB_SSLMODE here were never read at all.
+      # LOCAL_DB_* from .env still override, exactly as on the host.
+      - DB_TARGET=local
+      - LOCAL_DB_HOST=${LOCAL_DB_HOST:-}
+      - LOCAL_DB_PORT=${LOCAL_DB_PORT:-}
+      - LOCAL_DB_NAME=${LOCAL_DB_NAME:-}
+      - LOCAL_DB_USER=${LOCAL_DB_USER:-}
+      - LOCAL_DB_PASSWORD=${LOCAL_DB_PASSWORD:-}
       - MAX_CONCURRENT_WORKERS=${MAX_CONCURRENT_WORKERS:-1}
       - LOG_LEVEL=${LOG_LEVEL:-info}
     depends_on:

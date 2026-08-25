@@ -26,19 +26,26 @@ if [[ -n "${_db_target_override}" ]]; then
   DB_TARGET="${_db_target_override}"
 fi
 
-# DB_TARGET selects where dev's API connects:
-#   prod  → AWS Aurora via SSM port-forward on 127.0.0.1:5433  (default — works for everyone)
-#   local → local Postgres 17 on 127.0.0.1:5432                (requires `./scripts/dbctl.sh reset/restore`)
-DB_TARGET="${DB_TARGET:-prod}"
+# DB_TARGET selects where dev's API connects — both ends are declared in
+# config/db-targets.json, which quant/shared/config.py reads as well:
+#   prod  → Aurora via the SSM port-forward on loopback  (default — works for everyone)
+#   local → laptop Postgres 17                           (needs `./scripts/dbctl.sh reset/restore`)
+# shellcheck source=lib/db-target.sh
+source "$ROOT_DIR/scripts/lib/db-target.sh"
+DB_TARGET="${DB_TARGET:-$(db_default_target)}"
+db_local_env
 
 if [[ "$DB_TARGET" == "local" ]]; then
-  DB_PORT="${LOCAL_DB_PORT:-5432}"
-  LOCAL_DB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
-  LOCAL_DB_NAME="${LOCAL_DB_NAME:-quantdb}"
-  LOCAL_DB_USER="${LOCAL_DB_USER:-quant_admin}"
-  LOCAL_DB_PASSWORD="${LOCAL_DB_PASSWORD:-LetsGetRich888}"
+  DB_PORT="$DB_LOCAL_PORT"
+  LOCAL_DB_HOST="$DB_LOCAL_HOST"
+  LOCAL_DB_NAME="$DB_LOCAL_NAME"
+  LOCAL_DB_USER="$DB_LOCAL_USER"
+  LOCAL_DB_PASSWORD="$DB_LOCAL_PASSWORD"
 else
-  DB_PORT=5433
+  # The tunnel's declared port, not QUANTDB_PORT: .env may legitimately point
+  # QUANTDB_PORT at the local server for app dev, and this end is the tunnel.
+  DB_PORT="${PROD_DB_PORT:-$(db_field prod port)}"
+  db_assert_not_local 127.0.0.1 "$DB_PORT" || exit 1
 fi
 
 # AWS SSM port-forward target (override via .env if needed).
@@ -179,14 +186,12 @@ backend_command() {
   # the Vite proxy regardless of network mode.
   local db_overrides=""
   if [[ "$DB_TARGET" == "local" ]]; then
-    # Override DB connection to point at local Postgres (no SSL, no SSM tunnel).
-    # Also disable USE_SSM so the API doesn't try Parameter Store and fall back.
-    db_overrides="export USE_SSM=0 && \
-export QUANTDB_HOST='$LOCAL_DB_HOST' && \
-export QUANTDB_PORT='$DB_PORT' && \
-export QUANTDB_USERNAME='$LOCAL_DB_USER' && \
-export QUANTDB_PASSWORD='$LOCAL_DB_PASSWORD' && \
-export QUANTDB_CONNINFO=\"host=$LOCAL_DB_HOST port=$DB_PORT dbname=$LOCAL_DB_NAME user=$LOCAL_DB_USER password=$LOCAL_DB_PASSWORD sslmode=disable\" && "
+    # Pass the target, not a connection string: quant/shared/config.py resolves
+    # it from config/db-targets.json, the same file this script read. Spelling
+    # out QUANTDB_* here is what let the two drift apart.
+    # USE_SSM=0 as well, or the API queries Parameter Store for prod credentials
+    # it is not going to use.
+    db_overrides="export DB_TARGET=local && export USE_SSM=0 && "
   fi
   printf '%s' "cd '$ROOT_DIR' && source '$ROOT_DIR/env/bin/activate' && ${db_overrides}uvicorn quant.api.main:app --reload --reload-dir '$ROOT_DIR/quant' --host 0.0.0.0 --port 8000"
 }

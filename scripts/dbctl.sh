@@ -24,18 +24,28 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DUMP_DIR="$ROOT_DIR/db/dumps"
 PG_DUMP_BIN="/usr/lib/postgresql/17/bin/pg_dump"
 
-# Aurora (via SSM tunnel)
+# dump/restore is the one command that spans both ends — it copies prod into
+# local — so it resolves both rather than switching on DB_TARGET.
+# shellcheck source=lib/db-target.sh
+source "$ROOT_DIR/scripts/lib/db-target.sh"
+db_local_env
+db_prod_env
+
+# Aurora, always via the SSM tunnel: this script only ever runs on a laptop,
+# so the host is loopback whatever QUANTDB_HOST says, and the port is the
+# tunnel's rather than the QUANTDB_PORT the app may point at a local server.
 RDS_HOST=127.0.0.1
-RDS_PORT=5433
-RDS_USER=quant_admin
-RDS_DB=quantdb
+RDS_PORT="${PROD_DB_PORT:-$(db_field prod port)}"
+RDS_USER="${DB_PROD_USER}"
+RDS_DB="${DB_PROD_NAME}"
+db_assert_not_local "$RDS_HOST" "$RDS_PORT" || exit 1
 
 # Local
-LOCAL_HOST=localhost
-LOCAL_PORT=5432
-LOCAL_USER=quant_admin
-LOCAL_DB=quantdb
-LOCAL_PASSWORD=LetsGetRich888
+LOCAL_HOST="${DB_LOCAL_HOST}"
+LOCAL_PORT="${DB_LOCAL_PORT}"
+LOCAL_USER="${DB_LOCAL_USER}"
+LOCAL_DB="${DB_LOCAL_NAME}"
+LOCAL_PASSWORD="${DB_LOCAL_PASSWORD}"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -48,10 +58,10 @@ require_tunnel() {
 import socket, sys
 s = socket.socket(); s.settimeout(10)
 try:
-    s.connect(('127.0.0.1', 5433)); s.close()
+    s.connect(('$RDS_HOST', $RDS_PORT)); s.close()
 except Exception:
     sys.exit(1)
-" || error "SSM tunnel is not running on :5433. Start it with: ./scripts/appctl.sh dev tunnel start"
+" || error "SSM tunnel is not running on :$RDS_PORT. Start it with: ./scripts/appctl.sh dev tunnel start"
 }
 
 require_local_pg() {
@@ -117,8 +127,8 @@ cmd_bootstrap_roles() {
     set -a; source "$ROOT_DIR/.env"; set +a
   fi
   local app_pw="${QUANTDB_PASSWORD_APP:-LetsGetRich888App}"
-  info "Creating quant_app login role (matches Aurora / :5433) if missing..."
-  sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
+  info "Creating quant_app login role (matches Aurora) if missing..."
+  sudo -u postgres psql -d "$LOCAL_DB" -v ON_ERROR_STOP=1 <<SQL
 DO \$\$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
@@ -128,7 +138,7 @@ BEGIN
     RAISE NOTICE 'Role quant_app already exists';
   END IF;
 END \$\$;
-GRANT USAGE ON SCHEMA CORE_ADMIN, REFDATA, BT, INST, TRADE TO quant_app;
+GRANT USAGE ON SCHEMA CORE_ADMIN, REFDATA, BT, INST, TRADE, MARKET_DATA TO quant_app;
 SQL
   info "Done. Re-run: DB_TARGET=local ./scripts/liquibase-deploy.sh"
 }

@@ -49,6 +49,8 @@ if str(ROOT) not in sys.path:
 
 from dotenv import load_dotenv
 
+from quant.shared.config import LOCAL, db_settings
+
 load_dotenv(ROOT / ".env")
 
 BYBIT_APP_ID = 34
@@ -139,17 +141,19 @@ def _warn_step(name: str, detail: str, *, data: dict | None = None) -> StepResul
 
 
 def _local_conninfo() -> str:
-    host = os.getenv("LOCAL_DB_HOST", "127.0.0.1")
-    port = os.getenv("LOCAL_DB_PORT", "5432")
-    name = os.getenv("LOCAL_DB_NAME", "quantdb")
-    user = os.getenv("LOCAL_DB_USER", "quant_admin")
-    password = os.getenv("LOCAL_DB_PASSWORD", "LetsGetRich888")
+    """DSN for the local database, from ``config/db-targets.json``.
+
+    Pinned to ``local`` rather than following ``DB_TARGET``: this script places
+    real orders and writes fills, so it must never be one stray variable away
+    from doing that against Aurora.
+    """
     override = os.getenv("QUANTDB_CONNINFO")
     if override:
         return override
+    settings = db_settings(LOCAL)
     return (
-        f"host={host} port={port} dbname={name} user={user} "
-        f"password={password} sslmode=disable connect_timeout=5"
+        "host={host} port={port} dbname={dbname} user={user} "
+        "password={password} sslmode={sslmode} connect_timeout=5".format(**settings)
     )
 
 

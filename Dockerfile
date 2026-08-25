@@ -10,6 +10,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY quant/ quant/
+# Read at startup by quant/shared/config.py to resolve DB_TARGET. The app does
+# not boot without it, so it ships in the image rather than being mounted.
+COPY config/db-targets.json config/db-targets.json
 
 EXPOSE 8000
 

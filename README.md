@@ -101,6 +101,8 @@ Quant_Strategies/
 ├── tests/                     # Unit, integration, and e2e tests
 ├── docs/                      # MkDocs Material wiki
 ├── db/liquidbase/             # Liquibase changelogs (per-schema deployment)
+├── config/db-targets.json     # what DB_TARGET=local / prod mean (host, port, TLS)
+├── config/scheduler/          # EventBridge schedules for recurring tasks
 ├── docker-compose.yml         # prod base — redis, api, worker, nginx
 ├── docker-compose.prod.yml    # prod overrides (APP_ENV, USE_SSM, COOKIE_SECURE)
 ├── docker-compose.dev.yml     # dev support stack — redis + worker only (DB_TARGET=local)

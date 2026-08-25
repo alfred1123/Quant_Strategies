@@ -12,8 +12,9 @@ See [System Overview](overview.md) for runtime topologies.
 
 | Setting | Dev (laptop) | Prod (EC2) | Where it lives |
 |---------|-------------|------------|----------------|
-| `QUANTDB_HOST` | `localhost` | `quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com` | SSM `/quant/dev/` / SSM `/quant/prod/` |
-| `QUANTDB_PORT` | `5433` (tunnel) or `5432` (`DB_TARGET=local`) | `5432` | SSM / `.env` |
+| `DB_TARGET` | `prod` (tunnel, default) or `local` | `prod` | `.env` — resolved via `config/db-targets.json` |
+| `QUANTDB_HOST` | `localhost` (tunnel) | `quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com` | SSM `/quant/dev/` / SSM `/quant/prod/` |
+| `QUANTDB_PORT` | leave unset — `config/db-targets.json` supplies `5433` | `5432` | SSM (prod); setting it to `5432` in `.env` is refused for `prod` |
 | `QUANTDB_USERNAME` | shared DB user | same | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | `QUANTDB_PASSWORD` | shared DB password | same | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | `APP_ENV` | `dev` (default) | `prod` | `docker-compose.prod.yml` |
@@ -241,11 +242,50 @@ To switch back to the shared prod DB, comment out / remove `DB_TARGET=local`
 from `.env` (or run `DB_TARGET=prod ./scripts/appctl.sh dev start` for a
 one-off override).
 
-How it works: `appctl.sh` reads `DB_TARGET` and, when set to `local`, exports
-`USE_SSM=0` plus a `QUANTDB_CONNINFO` pointing at `127.0.0.1:5432` with
-`sslmode=disable` before launching uvicorn. `quant/shared/config.py` honours
-`QUANTDB_CONNINFO` over the individual `QUANTDB_*` vars, so .env defaults
-remain untouched.
+How it works: `appctl.sh` passes `DB_TARGET=local` (plus `USE_SSM=0`, so the API
+does not fetch prod credentials it will not use) to uvicorn and to the worker
+container. Nothing hands over a host or a port — both ends resolve the target
+themselves from `config/db-targets.json`, described next.
+
+---
+
+## Where `local` and `prod` are defined
+
+`config/db-targets.json` is the single declaration of the two databases this
+project talks to. `DB_TARGET` picks one:
+
+| Target | Host | Port | TLS | What it is |
+|--------|------|------|-----|------------|
+| `local` | `127.0.0.1` | `5432` | disabled | Laptop Postgres 17, restored from a dump |
+| `prod` | `127.0.0.1` | `5433` | required | Aurora through the SSM tunnel |
+
+Two consumers read that file, which is the point — before it existed, six
+places carried their own copy of these values and they had drifted:
+
+- `quant/shared/config.py` — `db_target()` and `db_settings()`, for the API,
+  the worker, the CLI and `scripts/bybit_local_testnet.py`.
+- `scripts/lib/db-target.sh` — for `appctl.sh`, `dbctl.sh`,
+  `liquibase-deploy.sh` and `liquibase-verify.sh`.
+
+Per field the file also lists the environment variables that override the
+default, highest precedence first. That is how one `prod` entry serves both
+ends: on a laptop the default `5433` is the tunnel, while on EC2 the
+SSM-supplied `QUANTDB_HOST` and `QUANTDB_PORT` point straight at Aurora on
+`5432`. `QUANTDB_CONNINFO` still bypasses everything with a literal DSN.
+
+The file ships in the application image (`COPY config/db-targets.json` in the
+`Dockerfile`) because the API reads it during startup and will not boot without
+it.
+
+!!! warning "`prod` may never resolve onto the local database"
+    Both resolvers refuse a `prod` connection to loopback on the local port,
+    because that combination can only be the laptop. It is reachable through a
+    stale `QUANTDB_PORT=5432` in `.env`, and the failure it prevents is the bad
+    kind: writes labelled prod landing in the local dump, or a "prod check"
+    reporting local rows. The guard cannot fire on EC2, where prod is the
+    cluster endpoint rather than loopback. If you hit it, remove `QUANTDB_PORT`
+    from `.env` — the tunnel port is already the declared default — or select
+    `DB_TARGET=local` if that is what you meant.
 
 ---
 
@@ -319,6 +359,8 @@ aws ssm send-command --instance-ids "$INSTANCE_ID" \
 
 | File | What it configures |
 |------|--------------------|
+| `config/db-targets.json` | What `local` and `prod` mean — host, port, database, user, TLS |
+| `scripts/lib/db-target.sh` | Shell resolver for the above (`appctl`, `dbctl`, Liquibase) |
 | `.env.example` | Template for developers — all values are dev defaults |
 | `.env` | Actual dev config (gitignored, never committed) |
 | `docker-compose.yml` | Base services — `USE_SSM=1` default, SSM-first for all envs |

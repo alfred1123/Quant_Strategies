@@ -2,8 +2,8 @@
 # Apply pending Liquibase migrations (prod deploy or local).
 #
 # Usage:
-#   ./scripts/liquibase-deploy.sh              # prod — PROD_DB_PORT (default 5433, SSM tunnel)
-#   DB_TARGET=local ./scripts/liquibase-deploy.sh   # local — LOCAL_DB_PORT (default 5432)
+#   ./scripts/liquibase-deploy.sh                   # prod — Aurora via SSM tunnel
+#   DB_TARGET=local ./scripts/liquibase-deploy.sh   # local — laptop Postgres
 #   APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh   # EC2: load /quant/prod/* from SSM
 #
 # LIQUIBASE_CONTEXTS restricts the run to changesets carrying one of the listed
@@ -11,14 +11,14 @@
 # manual runs want. The deploy workflow sets it to prod-deploy so only changesets
 # explicitly marked for automatic release are applied.
 #
-# Ports (set in .env or env):
-#   DB_TARGET=local  → LOCAL_DB_HOST / LOCAL_DB_PORT  (default 127.0.0.1:5432)
-#   DB_TARGET=prod   → QUANTDB_HOST / PROD_DB_PORT    (default localhost:5433)
+# Where each target points is declared in config/db-targets.json, not here.
 #
 # Order: master (schemas) → per-schema DDL/procs → core_admin grants refresh.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/db-target.sh
+source "${ROOT_DIR}/scripts/lib/db-target.sh"
 LB_ROOT="${ROOT_DIR}/db/liquidbase"
 APP_ENV="${APP_ENV:-prod}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
@@ -68,26 +68,13 @@ load_env() {
     )
   fi
 
-  # Port selection — explicit per target; do not reuse QUANTDB_PORT from .env
-  # (often 5432 for local app dev while Liquibase prod deploy uses the tunnel).
-  if [[ "${DB_TARGET:-prod}" == "local" ]]; then
-    export QUANTDB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
-    export QUANTDB_PORT="${LOCAL_DB_PORT:-5432}"
-    export QUANTDB_USERNAME="${LOCAL_DB_USER:-quant_admin}"
-    export QUANTDB_PASSWORD="${LOCAL_DB_PASSWORD:-LetsGetRich888}"
-    export LIQUIBASE_COMMAND_URL="jdbc:postgresql://${QUANTDB_HOST}:${QUANTDB_PORT}/quantdb?sslmode=disable"
-  else
-    export QUANTDB_HOST="${QUANTDB_HOST:-localhost}"
-    # PROD_DB_PORT overrides (laptop SSM tunnel :5433). Else QUANTDB_PORT from SSM on EC2 (:5432).
-    export QUANTDB_PORT="${PROD_DB_PORT:-${QUANTDB_PORT:-5433}}"
-    if [[ -n "${_lb_url_override}" ]]; then
-      export LIQUIBASE_COMMAND_URL="${_lb_url_override}"
-    else
-      export LIQUIBASE_COMMAND_URL="jdbc:postgresql://${QUANTDB_HOST}:${QUANTDB_PORT}/quantdb?sslmode=require"
-    fi
-  fi
-  export LIQUIBASE_COMMAND_USERNAME="${LIQUIBASE_COMMAND_USERNAME:-${QUANTDB_USERNAME:?QUANTDB_USERNAME required}}"
-  export LIQUIBASE_COMMAND_PASSWORD="${LIQUIBASE_COMMAND_PASSWORD:-${QUANTDB_PASSWORD:?QUANTDB_PASSWORD required}}"
+  # config/db-targets.json decides where DB_TARGET points, for both ends.
+  db_target_env || die "could not resolve DB_TARGET"
+  log "Target ${DB_TARGET} — ${DB_HOST}:${DB_PORT}/${DB_NAME} (sslmode=${DB_SSLMODE})"
+
+  export LIQUIBASE_COMMAND_URL="${_lb_url_override:-$(db_target_jdbc_url)}"
+  export LIQUIBASE_COMMAND_USERNAME="${LIQUIBASE_COMMAND_USERNAME:-${DB_USER:?DB_USER required}}"
+  export LIQUIBASE_COMMAND_PASSWORD="${LIQUIBASE_COMMAND_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD required — set QUANTDB_PASSWORD}}"
 }
 
 APPLIED_LABELS=()

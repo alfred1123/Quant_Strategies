@@ -45,6 +45,9 @@ jobs:
               - 'quant/**'
               - 'Dockerfile'
               - 'requirements.txt'
+              # Baked into the image and read at startup, so a change to it
+              # alone still has to rebuild — otherwise prod keeps the old copy.
+              - 'config/db-targets.json'
             nginx:
               - 'frontend/**'
               - 'docker/nginx/**'

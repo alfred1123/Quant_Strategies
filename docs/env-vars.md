@@ -24,26 +24,30 @@ The variables below mirror `.env.example`. Variables with `export` are also sour
 
 | Variable | Required? | Description |
 |---|---|---|
-| `QUANTDB_HOST` | Optional | PostgreSQL host (default: `localhost`). |
-| `QUANTDB_PORT` | Optional | PostgreSQL port (default: `5433`). |
+| `QUANTDB_HOST` | Optional | PostgreSQL host for the `prod` target (default: `localhost`, i.e. the SSM tunnel). |
+| `QUANTDB_PORT` | Optional | Port for the `prod` target. **Leave unset on a laptop** — `config/db-targets.json` supplies `5433`. Setting it to `5432` makes `prod` point at the local database, which both resolvers refuse. Prod EC2 gets `5432` from SSM together with the real cluster host. |
 | `QUANTDB_USERNAME` | Yes | Database user. |
 | `QUANTDB_PASSWORD` | Yes | Database password. |
 | `QUANTDB_CONNINFO` | Optional | Full libpq connection string. **Overrides** the four `QUANTDB_*` vars above. Must include `sslmode=require`. Use only when you need non-standard libpq options. |
 | `QUANTDB_CONNECT_TIMEOUT` | Optional | Seconds for Postgres `connect_timeout` added to the DSN when absent (default: `15`). Prevents hung API requests when the tunnel or host is unreachable. |
 | `PGPASSWORD` | Optional | Mirrors `QUANTDB_PASSWORD` so `psql` doesn't prompt interactively. |
 
-## Dev DB target (scripts/appctl.sh)
+## DB target
 
-These vars only apply to local dev (`./scripts/appctl.sh dev start`). Teammates without a local Postgres can ignore them — leaving `DB_TARGET` unset uses the shared Aurora cluster via the SSM tunnel.
+`DB_TARGET` selects which of the two databases declared in
+`config/db-targets.json` everything connects to — the API, the worker, the CLI,
+`dbctl.sh` and Liquibase. Defaults shown below come from that file, not from
+code; see [Dev vs Prod](architecture/dev-vs-prod.md#where-local-and-prod-are-defined).
 
 | Variable | Required? | Description |
 |---|---|---|
-| `DB_TARGET` | Optional | `prod` (default) → SSM tunnel on `127.0.0.1:5433` to Aurora. `local` → host-side Postgres 17 on `127.0.0.1:5432` (set up via `./scripts/dbctl.sh`). When `local`, `appctl.sh dev start` ALSO brings up Redis + the Python queue worker via `docker-compose.dev.yml`. |
-| `LOCAL_DB_HOST` | Optional | Local Postgres host (default `127.0.0.1`). |
-| `LOCAL_DB_PORT` | Optional | Local Postgres port (default `5432`). |
-| `LOCAL_DB_NAME` | Optional | Local DB name (default `quantdb`). |
-| `LOCAL_DB_USER` | Optional | Local user (default `quant_admin`). |
+| `DB_TARGET` | Optional | `prod` (default) → Aurora, via the SSM tunnel from a laptop. `local` → host-side Postgres 17 (set up via `./scripts/dbctl.sh`). When `local`, `appctl.sh dev start` ALSO brings up Redis + the Python queue worker via `docker-compose.dev.yml`. |
+| `LOCAL_DB_HOST` | Optional | Overrides the `local` host (default `127.0.0.1`). |
+| `LOCAL_DB_PORT` | Optional | Overrides the `local` port (default `5432`). |
+| `LOCAL_DB_NAME` | Optional | Overrides the `local` database (default `quantdb`). |
+| `LOCAL_DB_USER` | Optional | Overrides the `local` user (default `quant_admin`). |
 | `LOCAL_DB_PASSWORD` | Optional | Local user password (default `LetsGetRich888` — change for non-default installs). |
+| `PROD_DB_PORT` | Optional | Overrides the `prod` port ahead of `QUANTDB_PORT`. For a tunnel on a non-standard local port. |
 | `MAX_CONCURRENT_WORKERS` | Optional | Max concurrent backtest worker subprocesses spawned by one `quant.queue.worker_loop` (default `1`). Bump only after `SP_CLAIM_NEXT` becomes atomic — see `docs/design/backtest-queue.md` §0. |
 
 ## Liquibase (DB migrations)

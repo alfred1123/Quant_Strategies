@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Run Liquibase verify or deploy on prod EC2 via SSM Run Command.
 #
-# EC2 loads /quant/prod/* from SSM and connects to Aurora directly (port 5432).
-# Laptop tunnel deploys use DB_TARGET=prod PROD_DB_PORT=5433 instead.
+# EC2 loads /quant/prod/* from SSM and connects to Aurora directly (port 5432),
+# which is why the SSM-supplied QUANTDB_HOST/QUANTDB_PORT override the prod
+# defaults in config/db-targets.json. A laptop deploy needs no override: the
+# declared prod default is already the tunnel.
 #
 # Usage:
 #   bash aws/scripts/liquibase-ssm-run.sh verify [git-ref]
