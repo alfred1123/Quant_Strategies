@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      A live dry-run reported "no optimization result found for strategy" for
+      every version of a strategy whose BT.RESULT rows were all present and
+      valid. The payload was only reachable by walking BT.QUEUE to a QUEUE_ID,
+      and the queue had been purged, so the live path could no longer see the
+      parameters it trades on.
+
+      SP_GET_RESULT_BY_STRATEGY reads BT.RESULT by (STRATEGY_ID, STRATEGY_VID)
+      instead — the columns denormalized onto that table for this lookup, with
+      IX_RESULT_STRATEGY_CURRENT already in place to serve it.
+
+      New procedure, so the rollback drops it.
+    -->
+
+    <changeSet id="1.17.0-001-sp-get-result-by-strategy" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_RESULT_BY_STRATEGY — reach a result without going through BT.QUEUE</comment>
+        <sqlFile path="../procedures/SP_GET_RESULT_BY_STRATEGY.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback>
+            DROP PROCEDURE IF EXISTS BT.SP_GET_RESULT_BY_STRATEGY(
+                IN UUID, IN INTEGER, OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+            );
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -270,6 +270,7 @@ A procedure that logs itself declares `V_LOG_START TIMESTAMPTZ := clock_timestam
 | `SP_GET_QUEUE_LATEST` | `BT` | **Queue worker**: active row for one **`QUEUE_ID`** + frozen **`CONFIG_JSON`** (`QUEUE` ⋈ **`STRATEGY`** on **`STRATEGY_VID`**) |
 | `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`** with shredded metrics from `PAYLOAD_JSON` + denormalized `STRATEGY_ID`/`STRATEGY_VID` from `BT.QUEUE`; bumps `RESULT_VID` and flips prior rows' `IS_CURRENT_IND` within the same strategy VID; **`IN_RESULT_ID`** is caller-supplied UUID; OUT row is status triplet only |
 | `SP_GET_RESULT` | `BT` | Fetch result row for a `QUEUE_ID` (REFCURSOR); includes `RESULT_VID`, `IS_CURRENT_IND` |
+| `SP_GET_RESULT_BY_STRATEGY` | `BT` | Current result for `(STRATEGY_ID, STRATEGY_VID)` where `IS_CURRENT_IND = 'Y'` (REFCURSOR). What the **live trading path** reads — see [Reading a result without the queue](#reading-a-result-without-the-queue) |
 | `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`) |
 | `SP_INS_API_CREDENTIAL` | `CORE_ADMIN` | New exchange credential or rotate keys (soft-version); status triplet OUT first |
 | `SP_GET_API_CREDENTIAL` | `CORE_ADMIN` | List/get credentials for `APP_USER_ID` (REFCURSOR) |
@@ -289,6 +290,37 @@ A procedure that logs itself declares `V_LOG_START TIMESTAMPTZ := clock_timestam
 | `SP_INS_PRICE_BAR` | `MARKET_DATA` | Insert one OHLCV bar (one row per call) |
 | `SP_GET_PRICE_BAR` | `MARKET_DATA` | Range read by `(INTERNAL_CUSIP, TM_INTERVAL_ID, start, end)` |
 | `SP_GET_PRICE_BAR_COVERAGE` | `MARKET_DATA` | `MIN`/`MAX` timestamps via index `LIMIT 1` probes |
+
+### Reading a result without the queue
+
+`BT.RESULT` can be reached two ways, and the live trading path must use the
+second one:
+
+| Procedure | Keyed on | Used by |
+|---|---|---|
+| `SP_GET_RESULT` | `QUEUE_ID` | Job views — "what did *this run* produce?" |
+| `SP_GET_RESULT_BY_STRATEGY` | `(STRATEGY_ID, STRATEGY_VID)` | Live dry-run and apply — "what parameters does this strategy trade on?" |
+
+`BtQueueRepo.fetch_result_payload` originally answered the second question with
+the first procedure: it listed `BT.QUEUE` for the strategy, matched a row on
+`STRATEGY_VID`, then fetched that row's result. That made live trading depend on
+`BT.QUEUE`, which is transient work-tracking data. When the queue was purged in
+production, every `QUEUE_ID` on `BT.RESULT` became an orphan and a live dry-run
+failed with `no optimization result found for strategy — run backtest first`,
+while all four result payloads sat in the table intact.
+
+`SP_INS_RESULT` denormalizes `STRATEGY_ID` and `STRATEGY_VID` onto `BT.RESULT`
+at insert time precisely so this lookup needs no join, and
+`IX_RESULT_STRATEGY_CURRENT` is a partial index on those columns for
+`IS_CURRENT_IND = 'Y'`. The filter on `IS_CURRENT_IND` is what makes the live
+path follow the newest backtest automatically: re-running a strategy version
+bumps `RESULT_VID` and flips the prior row.
+
+!!! note "Purging `BT.QUEUE` is safe"
+    That is the point of this split. Nothing on the live path reads the queue to
+    find parameters, so queue rows can be cleared without stranding a
+    deployment. Anything that still needs "which submission produced this?" has
+    `BT.RESULT.QUEUE_ID` to follow, and tolerates it pointing nowhere.
 
 ## Directory Layout
 

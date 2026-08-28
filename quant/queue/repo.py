@@ -191,23 +191,40 @@ class BtQueueRepo(DbGateway):
             (str(queue_id),),
         )
 
+    def sp_get_result_by_strategy(
+        self,
+        strategy_id: uuid.UUID | str,
+        strategy_vid: int,
+    ) -> dict | None:
+        """Wrap ``BT.SP_GET_RESULT_BY_STRATEGY`` — current result for a version."""
+        return self._call_get_one(
+            "CALL bt.sp_get_result_by_strategy("
+            "%s::uuid, %s::integer,"
+            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (str(strategy_id), int(strategy_vid)),
+        )
+
     def fetch_result_payload(
         self,
         strategy_id: uuid.UUID | str,
         strategy_vid: int,
     ) -> dict | None:
-        """Load ``BT.RESULT.PAYLOAD_JSON`` for a strategy version, if any."""
-        rows = self.sp_get_queue(strategy_id=strategy_id, limit=200)
-        for row in rows:
-            if int(row["strategy_vid"]) != int(strategy_vid):
-                continue
-            result = self.sp_get_result(row["queue_id"])
-            if result and result.get("payload_json"):
-                payload = result["payload_json"]
-                if isinstance(payload, str):
-                    return json.loads(payload)
-                return payload
-        return None
+        """Load ``BT.RESULT.PAYLOAD_JSON`` for a strategy version, if any.
+
+        Keyed on the strategy rather than on a queue id. Walking BT.QUEUE to
+        find the originating submission made the live path depend on transient
+        work-tracking data: once the queue was purged, a deployment could no
+        longer read the parameters it trades on, and a live dry-run failed with
+        "no optimization result found" while the payload was sitting in
+        BT.RESULT untouched.
+        """
+        result = self.sp_get_result_by_strategy(strategy_id, strategy_vid)
+        if not result or not result.get("payload_json"):
+            return None
+        payload = result["payload_json"]
+        if isinstance(payload, str):
+            return json.loads(payload)
+        return payload
 
     def sp_get_strategy(
         self,
