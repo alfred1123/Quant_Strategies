@@ -19,10 +19,32 @@ logger = logging.getLogger(__name__)
 
 _PROC_NAME_RE = re.compile(r"CALL\s+([\w.]+)\s*\(", re.IGNORECASE)
 
+#: Every Fernet token starts with a 0x80 version byte, which base64-encodes to
+#: this prefix. Encrypted exchange keys reach _call_write as ordinary strings,
+#: so the format is the only thing that marks them as secret.
+_FERNET_PREFIX = "gAAAAA"
+
 
 def _proc_name_from_sql(sql: str) -> str:
     match = _PROC_NAME_RE.search(sql)
     return match.group(1) if match else "database"
+
+
+def _redact(params: tuple) -> tuple:
+    """Replace encrypted values so they never reach a log sink.
+
+    The ciphertext alone does not reveal a key, but logs are handled far more
+    loosely than the database — shipped, tailed, pasted into tickets — and
+    ciphertext there plus a leaked EXCHANGE_SECRETS_KEY is a plaintext key.
+    Matching on the token format rather than the parameter position keeps this
+    working for any procedure that carries an encrypted column.
+    """
+    return tuple(
+        f"<encrypted:{len(p)} chars>"
+        if isinstance(p, str) and p.startswith(_FERNET_PREFIX)
+        else p
+        for p in params
+    )
 
 
 class ProcedureError(RuntimeError):
@@ -108,14 +130,16 @@ class DbGateway:
                     sqlstate,
                     proc,
                     status[3],
-                    params,
+                    _redact(params),
                 )
                 raise ProcedureError(proc=proc, sqlstate=sqlstate, message=status[3])
             cur.execute(f'FETCH ALL FROM "{cursor_name}"')
             cols = [desc.name for desc in cur.description]
             rows = [dict(zip(cols, r)) for r in cur.fetchall()]
             cur.execute(f'CLOSE "{cursor_name}"')
-            logger.info("_call_get returned %d row(s) — params=%s", len(rows), params)
+            logger.info(
+                "_call_get returned %d row(s) — params=%s", len(rows), _redact(params)
+            )
             return rows
 
         rows, _ = self._run(work)
@@ -137,7 +161,9 @@ class DbGateway:
             cur.execute(sql, params)
             row = cur.fetchone()
             if row is None or len(row) < 3:
-                logger.error("_call_write: no row or short OUT — params=%s", params)
+                logger.error(
+                    "_call_write: no row or short OUT — params=%s", _redact(params)
+                )
                 raise RuntimeError("Proc returned no row or invalid OUT shape")
             sqlstate, _sqlmsg, sqlerrmc = row[0], row[1], row[2]
             if sqlstate != "00000":
@@ -147,7 +173,7 @@ class DbGateway:
                     sqlstate,
                     proc,
                     sqlerrmc,
-                    params,
+                    _redact(params),
                 )
                 raise ProcedureError(proc=proc, sqlstate=sqlstate, message=sqlerrmc)
             return row[3:]
@@ -155,7 +181,7 @@ class DbGateway:
         tail, held = self._run(work)
         if held is not None:
             held.commit()
-        logger.info("_call_write committed — params=%s", params)
+        logger.info("_call_write committed — params=%s", _redact(params))
         return tail
 
     def _query(self, sql: str, params: tuple = ()) -> list[dict]:

@@ -1,10 +1,85 @@
 """Unit tests for ``DbGateway`` helpers."""
 
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from quant.shared.db import DbGateway, ProcedureError
+from quant.shared.db import DbGateway, ProcedureError, _redact
+
+# Shape of a real Fernet token: the 0x80 version byte base64-encodes to "gAAAAA".
+_CIPHERTEXT = "gAAAAABqkYSOK9y-7-avVAadofsaAWhCOziTPCcZxFE5u1bq5LnAWYuZ"
+
+
+class TestRedact:
+    """Encrypted exchange keys must not reach a log sink."""
+
+    def test_replaces_a_fernet_token_with_its_length(self):
+        assert _redact((_CIPHERTEXT,)) == (f"<encrypted:{len(_CIPHERTEXT)} chars>",)
+
+    def test_keeps_ordinary_params_readable(self):
+        """Redacting everything would make the log useless for debugging."""
+        params = ("btcusdt.crypto", 34, None, 0.001)
+        assert _redact(params) == params
+
+    def test_redacts_only_the_encrypted_positions(self):
+        params = ("user-1", _CIPHERTEXT, 34, _CIPHERTEXT, "label")
+        got = _redact(params)
+        assert got[0] == "user-1" and got[2] == 34 and got[4] == "label"
+        assert _CIPHERTEXT not in got
+
+    def test_matches_on_format_not_position(self):
+        """Any proc may carry an encrypted column, so position cannot be assumed."""
+        assert _redact((1, 2, _CIPHERTEXT))[2].startswith("<encrypted:")
+
+    def test_leaves_a_string_that_merely_starts_similarly(self):
+        assert _redact(("gAAAA",)) == ("gAAAA",)
+
+
+class TestWriteLoggingRedaction:
+    @patch("quant.shared.db.psycopg.connect")
+    def test_commit_log_carries_no_ciphertext(self, mock_connect, caplog):
+        """The credential insert logged its ciphertext at INFO before this."""
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_connect.return_value.__enter__.return_value = mock_conn
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+        mock_cur.fetchone.return_value = ("00000", "", "")
+
+        gw = DbGateway("postgresql://test")
+        with caplog.at_level(logging.INFO, logger="quant.shared.db"):
+            gw._call_write("CALL core_admin.sp_ins_api_credential(%s)", (_CIPHERTEXT,))
+
+        assert _CIPHERTEXT not in caplog.text
+        assert "<encrypted:" in caplog.text
+
+    @patch("quant.shared.db.psycopg.connect")
+    def test_failure_log_carries_no_ciphertext(self, mock_connect, caplog):
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_connect.return_value.__enter__.return_value = mock_conn
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+        mock_cur.fetchone.return_value = ("23505", "msg", "detail")
+
+        gw = DbGateway("postgresql://test")
+        with caplog.at_level(logging.ERROR, logger="quant.shared.db"):
+            with pytest.raises(ProcedureError):
+                gw._call_write("CALL x(%s)", (_CIPHERTEXT,))
+
+        assert _CIPHERTEXT not in caplog.text
+
+    @patch("quant.shared.db.psycopg.connect")
+    def test_the_real_parameters_still_reach_the_database(self, mock_connect):
+        """Redaction is a logging concern only — the proc gets the ciphertext."""
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_connect.return_value.__enter__.return_value = mock_conn
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+        mock_cur.fetchone.return_value = ("00000", "", "")
+
+        gw = DbGateway("postgresql://test")
+        gw._call_write("CALL x(%s)", (_CIPHERTEXT,))
+        mock_cur.execute.assert_called_once_with("CALL x(%s)", (_CIPHERTEXT,))
 
 
 class TestCallWrite:
