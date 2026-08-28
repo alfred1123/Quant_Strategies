@@ -70,6 +70,33 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `POST` | `/api/v1/trade/deployments/{id}/stop` | Required | Stop a deployment — disables it and sets `STOPPED`. Idempotent. |
 | `POST` | `/api/v1/trade/deployments/{id}/apply` | Required | Run one live-apply cycle now. |
 | `POST` | `/api/v1/trade/deployments/dry-run` | Required | Preflight a deployment without placing orders. |
+| `GET` | `/api/v1/trade/accounts/{api_credential_id}/snapshot` | Required | Live balances and open positions for one broker account. Read-only. Query `paper` (default `true`). **404** if the credential is not owned. |
+
+#### Account snapshot
+
+Every field is read from the exchange at request time — nothing comes from our
+tables. The point is to show what the account *actually* holds, so a position
+opened by hand or left behind by a stopped deployment appears here even though no
+`TRADE.DEPLOYMENT` row explains it. Compare with `POSITION_QTY` on
+`TRADE.EXECUTION_EVENT`, which records what one apply *saw* at its moment;
+this endpoint answers what is true now.
+
+- `balances[]` — `code`, `free`, `used`, `total` per currency. Currencies with
+  nothing in them are dropped: a unified account reports every listed asset, and
+  a hundred zero rows would bury the one that matters. A currency held only as
+  margin (`free` 0, `used` > 0) is kept.
+- `positions[]` — signed `qty` (negative short), plus `entry_price`,
+  `mark_price`, `notional`, `unrealized_pnl`, `leverage`, `liquidation_price`.
+  Optional fields are `null` when the exchange omits them; one missing field
+  never fails the snapshot. `symbol` is the raw exchange symbol so it lines up
+  with `INST.PRODUCT_XREF`.
+- `app_id` is read off the credential row, not taken from the caller — a client
+  cannot pair one exchange's keys with another's adapter.
+- `paper` defaults to `true`, so a caller that omits it reaches the demo account
+  and never real money. The same credential can address both, and they hold
+  different money.
+- Not cached server-side: each call is a rate-limited exchange round-trip. The
+  frontend uses a 30s stale window with an explicit refresh rather than polling.
 
 ### Credentials (Phase 1.1 — implemented)
 

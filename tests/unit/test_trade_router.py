@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from quant.schemas.account import AccountSnapshot, BalanceRow, PositionRow
 from quant.schemas.apply import ApplyReport
 from quant.schemas.deployments import DeploymentRow
 from quant.schemas.dry_run import DryRunReport
@@ -400,3 +401,74 @@ class TestDryRunDeployment:
         del body["qty"]
         resp = client.post("/api/v1/trade/deployments/dry-run", json=body)
         assert resp.status_code == 422
+
+
+class TestAccountSnapshot:
+    def _snapshot(self, paper=True):
+        return AccountSnapshot(
+            api_credential_id=7,
+            app_id=34,
+            paper=paper,
+            balances=[BalanceRow(code="USDT", free=900.0, used=100.0, total=1000.0)],
+            positions=[
+                PositionRow(
+                    symbol="BTCUSDT",
+                    unified_symbol="BTC/USDT:USDT",
+                    qty=0.003,
+                    side="long",
+                    entry_price=60000.0,
+                    unrealized_pnl=3.0,
+                )
+            ],
+        )
+
+    def test_happy_path(self, client_and_svc):
+        client, svc, user = client_and_svc
+        svc.account_snapshot.return_value = self._snapshot()
+
+        resp = client.get("/api/v1/trade/accounts/7/snapshot?paper=true")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["balances"][0]["total"] == 1000.0
+        assert data["positions"][0]["symbol"] == "BTCUSDT"
+        assert svc.account_snapshot.call_args.args[0] == user.app_user_id
+
+    def test_paper_defaults_to_the_safe_environment(self, client_and_svc):
+        """Omitting the flag must never reach a real-money account."""
+        client, svc, _ = client_and_svc
+        svc.account_snapshot.return_value = self._snapshot()
+
+        client.get("/api/v1/trade/accounts/7/snapshot")
+
+        assert svc.account_snapshot.call_args.kwargs["paper"] is True
+
+    def test_live_is_explicit(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        svc.account_snapshot.return_value = self._snapshot(paper=False)
+
+        resp = client.get("/api/v1/trade/accounts/7/snapshot?paper=false")
+
+        assert svc.account_snapshot.call_args.kwargs["paper"] is False
+        assert resp.json()["paper"] is False
+
+    def test_unowned_credential_returns_404(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        svc.account_snapshot.side_effect = TradeValidationError(
+            "API credential not found or not owned", status_code=404
+        )
+
+        resp = client.get("/api/v1/trade/accounts/7/snapshot")
+        assert resp.status_code == 404
+
+    def test_an_empty_account_is_200_not_404(self, client_and_svc):
+        """No cash and no positions is a valid answer, not a missing resource."""
+        client, svc, _ = client_and_svc
+        svc.account_snapshot.return_value = AccountSnapshot(
+            api_credential_id=7, app_id=34, paper=True, balances=[], positions=[]
+        )
+
+        resp = client.get("/api/v1/trade/accounts/7/snapshot")
+
+        assert resp.status_code == 200
+        assert resp.json()["positions"] == []

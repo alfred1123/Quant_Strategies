@@ -53,6 +53,14 @@ the same error as §2 seen from the other side, and both resolve together.
     Every column is currently accurate. The error is latent, and netting is what
     would activate it.
 
+`GET /api/v1/trade/accounts/{id}/snapshot` reads the same account-level truth
+directly and is keyed by *(credential, environment)* — no deployment involved.
+It is the read side of what §4 proposes, and useful in its own right long before
+netting exists: it is the only place that shows a position no deployment
+explains. It is not a substitute for the schema change, because a snapshot is
+current state with no history, whereas `APPLY_INTENT` would record which
+strategy asked for what at each apply.
+
 ## 4. The shape that resolves it
 
 Three entities are presently squeezed into two tables:

@@ -76,7 +76,7 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 | Route | Page | Purpose |
 |-------|------|---------|
 | `/trade/config` | `TradeConfigPage` | Register broker accounts — table + compact add form |
-| `/trade/apply` | `TradeApplyPage` | Strategy picker, deployments table, dry-run / apply buttons |
+| `/trade/apply` | `TradeApplyPage` | Strategy picker, live account snapshot, deployments table, dry-run / apply buttons |
 
 **Layout:** `TradeLayout` — permanent sidebar (Config \| Trade), **filter toolbar** (`TradeNavBar`), main content (`<Outlet />`), bottom execution-log placeholder.
 
@@ -95,7 +95,24 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 | `BrokerAccountsTable` | Exchange · Account · masked key · Status; **Rotate** / **Revoke** dialogs; row click sets account filter |
 | `TradeConfigPage` | Accounts table + add-account form wired to credentials API (create) |
 | `StrategyPicker` | Selectable caller-owned `BT.STRATEGY` catalog via `GET /api/v1/strategies` |
-| `TradeApplyPage` | Strategy picker + Deploy button + deployments table; `useDeployments()` |
+| `AccountSnapshotPanel` | Live cash + open positions for the selected account via `useAccountSnapshot()`; read-only |
+| `TradeApplyPage` | Strategy picker + Deploy button + account snapshot + deployments table; `useDeployments()` |
+
+**Account snapshot panel**
+
+Sits above the deployments table and reads
+`GET /api/v1/trade/accounts/{id}/snapshot`, so it shows the exchange's own view
+of the account rather than ours — including positions no deployment opened.
+
+It takes both inputs from the existing toolbar rather than adding controls:
+`accountFilter` picks the credential and the Paper / Live toggle picks the
+environment. A snapshot is one call to one exchange account, so `ALL_ACCOUNTS`
+has no sensible answer; the panel then asks the user to choose an account and
+sets `accountFilter` from its own selector.
+
+Deliberately not polled — each render would be a rate-limited exchange call.
+The query key includes the paper flag, so demo and real accounts never share a
+cache entry, and refresh is manual behind a 30s stale window.
 
 **Strategy picker — not Backtest config UI**
 
@@ -174,7 +191,8 @@ frontend/src/
 │   ├── ErrorBoundary.tsx # React error boundary
 │   └── trade/
 │       ├── TradeNavBar.tsx         # Exchange / Account filters + Paper / Live toggle
-│       └── BrokerAccountsTable.tsx # Multi-broker accounts table (Config page)
+│       ├── BrokerAccountsTable.tsx # Multi-broker accounts table (Config page)
+│       └── AccountSnapshotPanel.tsx # Live cash + open positions (Apply page)
 │   StrategyPicker.tsx              # BT.STRATEGY catalog table (Phase 1.6)
 │
 ├── layouts/
@@ -185,7 +203,7 @@ frontend/src/
     ├── LoginPage.tsx     # Login form
     └── trade/
         ├── TradeConfigPage.tsx  # Exchange accounts table + add form
-        └── TradeApplyPage.tsx   # Deployments table + StrategyPicker
+        └── TradeApplyPage.tsx   # StrategyPicker + account snapshot + deployments table
 ```
 
 ## Reading Guide — Where to Start

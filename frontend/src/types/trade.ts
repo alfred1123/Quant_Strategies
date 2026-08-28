@@ -83,3 +83,40 @@ export interface ApplyReport {
   fee: number | null;
   message: string;
 }
+
+/** One currency's cash on a broker account. */
+export interface BalanceRow {
+  code: string;
+  free: number | null;
+  used: number | null;
+  total: number | null;
+}
+
+/** One open position, as the exchange reports it. */
+export interface PositionRow {
+  /** Raw exchange symbol (e.g. BTCUSDT) — matches INST.PRODUCT_XREF. */
+  symbol: string;
+  unified_symbol: string | null;
+  /** Signed: positive long, negative short. */
+  qty: number;
+  side: string | null;
+  entry_price: number | null;
+  mark_price: number | null;
+  notional: number | null;
+  unrealized_pnl: number | null;
+  leverage: number | null;
+  liquidation_price: number | null;
+}
+
+/**
+ * Live broker state for one credential. Every field comes from the exchange,
+ * nothing from our tables — it shows what is actually held, including
+ * positions opened by hand or left by a stopped deployment.
+ */
+export interface AccountSnapshot {
+  api_credential_id: number;
+  app_id: number;
+  paper: boolean;
+  balances: BalanceRow[];
+  positions: PositionRow[];
+}

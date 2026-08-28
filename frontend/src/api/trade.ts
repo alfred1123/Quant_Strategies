@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 import type {
+  AccountSnapshot,
   ApplyReport,
   CreateDeploymentRequest,
   DeploymentRow,
@@ -10,6 +11,8 @@ import type {
 } from '../types/trade';
 
 export const DEPLOYMENTS_QUERY_KEY = ['trade', 'deployments'] as const;
+
+export const ACCOUNT_SNAPSHOT_QUERY_KEY = ['trade', 'account-snapshot'] as const;
 
 async function listDeployments(): Promise<DeploymentRow[]> {
   const { data } = await apiClient.get<DeploymentRow[]>('/trade/deployments');
@@ -52,6 +55,17 @@ async function updateDeployment(
 async function stopDeployment(deploymentId: string): Promise<DeploymentRow> {
   const { data } = await apiClient.post<DeploymentRow>(
     `/trade/deployments/${deploymentId}/stop`,
+  );
+  return data;
+}
+
+async function fetchAccountSnapshot(
+  apiCredentialId: number,
+  paper: boolean,
+): Promise<AccountSnapshot> {
+  const { data } = await apiClient.get<AccountSnapshot>(
+    `/trade/accounts/${apiCredentialId}/snapshot`,
+    { params: { paper } },
   );
   return data;
 }
@@ -109,4 +123,24 @@ export function useStopDeployment() {
   });
 }
 
-export { getDeployment, listDeployments, createDeployment };
+/**
+ * Live balances and open positions for one broker account.
+ *
+ * Each call is a rate-limited exchange round-trip with no server-side cache, so
+ * it does not poll: a 30s stale window plus refetch-on-focus, and the panel
+ * offers an explicit refresh. Disabled until a credential is chosen.
+ */
+export function useAccountSnapshot(
+  apiCredentialId: number | null,
+  paper: boolean,
+) {
+  return useQuery({
+    queryKey: [...ACCOUNT_SNAPSHOT_QUERY_KEY, apiCredentialId, paper],
+    queryFn: () => fetchAccountSnapshot(apiCredentialId as number, paper),
+    enabled: apiCredentialId !== null,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+export { getDeployment, listDeployments, createDeployment, fetchAccountSnapshot };

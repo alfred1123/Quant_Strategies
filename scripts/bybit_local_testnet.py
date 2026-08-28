@@ -11,6 +11,8 @@ Individual steps (same code paths the suite calls):
   --diagnose           Which Bybit env accepts your key (testnet/demo/mainnet)
   --save               Persist BYBIT_TESTNET_* keys to CORE_ADMIN.API_CREDENTIAL
   --gateway            ccxt connect + xref + position (+ balance when available)
+  --snapshot           Live balances + open positions (read-only, no orders)
+  --api-snapshot       Same via GET /api/v1/trade/accounts/{id}/snapshot
   --refresh-data       Refresh strategy price cache (Yahoo per strategy config)
   --dry-run            Full deployment dry-run (signal + broker, no orders)
   --dry-run --refresh-data   Dry-run with fresh cache (avoids CacheMissError)
@@ -155,6 +157,28 @@ def _local_conninfo() -> str:
         "host={host} port={port} dbname={dbname} user={user} "
         "password={password} sslmode={sslmode} connect_timeout=5".format(**settings)
     )
+
+
+def _load_caches(conninfo: str):
+    """Redis-backed REFDATA + instrument caches, published on first use.
+
+    The same six lines were repeated by every step that needs caches; the
+    variation between copies (one skipped the ping check) was accidental, so
+    they all get the clearer failure.
+    """
+    from quant.refdata.bundle import DataCaches
+    from quant.refdata.publisher import RefDataPublisher
+
+    redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379")
+    caches = DataCaches(conninfo, redis_url)
+    if not caches.refdata.ping():
+        raise SystemExit("Redis unreachable — run: ./scripts/appctl.sh dev start")
+    try:
+        caches.refdata.get("app")
+    except ValueError:
+        RefDataPublisher(conninfo, redis_url).publish_all()
+    caches.load_instruments(soft_fail=False)
+    return caches
 
 
 def _env_uuid(name: str) -> UUID:
@@ -339,12 +363,8 @@ def run_gateway(paper: bool, *, bybit_demo: bool = False) -> None:
         adapter.gateway.validate_credentials()
         vendor = adapter.validate_for_dry_run(cusip, app_id)
         qty = adapter.get_position_qty(vendor)
-        balance = adapter.gateway.exchange.fetch_balance()
-        usdt = balance.get("USDT") or balance.get("usdt") or {}
-        nav = usdt.get("total")
-        if nav is None:
-            total = balance.get("total") or {}
-            nav = total.get("USDT") or total.get("usdt")
+        balances = adapter.get_balances()
+        nav = next((b["total"] for b in balances if b["code"] == "USDT"), None)
         print(f"[gateway] OK paper={paper} demo={bybit_demo} vendor_symbol={vendor} position_qty={qty} usdt_nav={nav}")
     finally:
         adapter.disconnect()
@@ -429,19 +449,15 @@ def run_dry_run(paper: bool, *, refresh_data: bool = False) -> None:
     print(f"  data_as_of: {report.data_as_of}")
 
 
-def run_api_dry_run(paper: bool) -> None:
-    """POST /api/v1/trade/deployments/dry-run on running local API."""
+def _login_token(base: str, *, purpose: str) -> str:
+    """Log in to the local API and return the ``qs_token`` cookie value."""
     import urllib.error
     import urllib.request
 
-    base = os.getenv("LOCAL_API_URL", "http://127.0.0.1:8000")
     username = os.getenv("LOCAL_LOGIN_USERNAME", "alfcheun")
     password = os.getenv("LOCAL_LOGIN_PASSWORD", "")
     if not password:
-        raise SystemExit(
-            "Set LOCAL_LOGIN_PASSWORD to call the dry-run API, "
-            "or use --dry-run (direct orchestration)"
-        )
+        raise SystemExit(f"Set LOCAL_LOGIN_PASSWORD to {purpose}")
 
     login_body = json.dumps({"username": username, "password": password}).encode()
     login_req = urllib.request.Request(
@@ -456,13 +472,105 @@ def run_api_dry_run(paper: bool) -> None:
     except urllib.error.HTTPError as exc:
         raise SystemExit(f"Login failed ({exc.code}): {exc.read().decode()}") from exc
 
-    token = ""
     for part in cookie.split(";"):
         if part.strip().startswith("qs_token="):
-            token = part.strip().split("=", 1)[1]
-            break
-    if not token:
-        raise SystemExit("Login succeeded but qs_token cookie missing")
+            return part.strip().split("=", 1)[1]
+    raise SystemExit("Login succeeded but qs_token cookie missing")
+
+
+def run_snapshot(paper: bool) -> None:
+    """Live account snapshot via the real service path (no orders).
+
+    Calls ``quant.trade.account.fetch_account_snapshot`` — the same function the
+    API route calls — so it exercises credential ownership and the adapter build,
+    not just the raw ccxt reads. Reads the credential from the local DB for that
+    reason, so unlike ``--gateway`` it ignores ``BYBIT_TESTNET_*`` env keys.
+    """
+    from quant.api.credentials.repo import ApiCredentialRepo
+    from quant.api.credentials.service import CredentialService
+    from quant.shared.secrets_crypto import CredentialCrypto
+    from quant.trade.account import fetch_account_snapshot
+    from quant.trade.registry import build_default_registry
+
+    conninfo = _local_conninfo()
+    app_user_id = _env_uuid("CCXT_ITEST_USER_ID")
+    cred_id = _env_int("CCXT_ITEST_CREDENTIAL_ID")
+
+    caches = _load_caches(conninfo)
+    snap = fetch_account_snapshot(
+        app_user_id=app_user_id,
+        api_credential_id=cred_id,
+        paper=paper,
+        credential_service=CredentialService(CredentialCrypto()),
+        credential_repo=ApiCredentialRepo(conninfo, user_id="bybit_local_testnet"),
+        adapter_registry=build_default_registry(caches.refdata),
+        data_caches=caches,
+    )
+    _print_snapshot(snap.model_dump(mode="json"))
+
+
+def _print_snapshot(snap: dict) -> None:
+    """Render a snapshot payload — shared by the direct and API paths."""
+    print(
+        f"[snapshot] credential={snap['api_credential_id']} "
+        f"app_id={snap['app_id']} paper={snap['paper']}"
+    )
+    balances = snap["balances"]
+    if not balances:
+        print("  balances: (none)")
+    for b in balances:
+        print(
+            f"  balance {b['code']:6} free={b['free']} used={b['used']} total={b['total']}"
+        )
+    positions = snap["positions"]
+    if not positions:
+        print("  positions: flat")
+    for p in positions:
+        print(
+            f"  position {p['symbol']:12} qty={p['qty']} side={p['side']} "
+            f"entry={p['entry_price']} mark={p['mark_price']} "
+            f"upnl={p['unrealized_pnl']} lev={p['leverage']}"
+        )
+
+
+def run_api_snapshot(paper: bool) -> None:
+    """GET /api/v1/trade/accounts/{id}/snapshot on the running local API.
+
+    The direct path above skips the HTTP boundary, so this is what catches an
+    auth or serialization break in the route itself.
+    """
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    base = os.getenv("LOCAL_API_URL", "http://127.0.0.1:8000")
+    token = _login_token(base, purpose="call the snapshot API, or use --snapshot")
+    cred_id = _env_int("CCXT_ITEST_CREDENTIAL_ID")
+    query = urllib.parse.urlencode({"paper": str(paper).lower()})
+    req = urllib.request.Request(
+        f"{base}/api/v1/trade/accounts/{cred_id}/snapshot?{query}",
+        headers={"Cookie": f"qs_token={token}"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        raise SystemExit(f"Snapshot failed ({exc.code}): {exc.read().decode()}") from exc
+
+    print("[api snapshot] success")
+    _print_snapshot(data)
+
+
+def run_api_dry_run(paper: bool) -> None:
+    """POST /api/v1/trade/deployments/dry-run on running local API."""
+    import urllib.error
+    import urllib.request
+
+    base = os.getenv("LOCAL_API_URL", "http://127.0.0.1:8000")
+    token = _login_token(
+        base, purpose="call the dry-run API, or use --dry-run (direct orchestration)"
+    )
 
     body = {
         "strategy_id": os.environ["CCXT_ITEST_STRATEGY_ID"],
@@ -752,8 +860,6 @@ def run_dry_run_report(paper: bool, *, refresh_data: bool = False):
     from quant.api.credentials.repo import ApiCredentialRepo
     from quant.api.credentials.service import CredentialService
     from quant.queue.repo import BtQueueRepo
-    from quant.refdata.bundle import DataCaches
-    from quant.refdata.publisher import RefDataPublisher
     from quant.schemas.dry_run import DryRunRequest
     from quant.shared.secrets_crypto import CredentialCrypto
     from quant.trade.db_repo import TradeRepo
@@ -769,15 +875,7 @@ def run_dry_run_report(paper: bool, *, refresh_data: bool = False):
     cusip = os.getenv("CCXT_ITEST_INTERNAL_CUSIP", "btcusdt.crypto")
     qty = Decimal(os.getenv("CCXT_ITEST_QTY", "0.01"))
 
-    redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379")
-    caches = DataCaches(conninfo, redis_url)
-    if not caches.refdata.ping():
-        raise SystemExit("Redis unreachable — run: ./scripts/appctl.sh dev start")
-    try:
-        caches.refdata.get("app")
-    except ValueError:
-        RefDataPublisher(conninfo, redis_url).publish_all()
-    caches.load_instruments(soft_fail=False)
+    caches = _load_caches(conninfo)
     registry = build_default_registry(caches.refdata)
 
     if refresh_data:
@@ -874,17 +972,14 @@ def run_suite(
 
     report.add(_run_step("probe_intended", _probe))
 
-    def _refresh():
-        redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379")
-        from quant.refdata.bundle import DataCaches
-        from quant.refdata.publisher import RefDataPublisher
+    def _snapshot():
+        run_snapshot(paper)
+        return "balances + open positions read", {}
 
-        caches = DataCaches(conninfo, redis_url)
-        try:
-            caches.refdata.get("app")
-        except ValueError:
-            RefDataPublisher(conninfo, redis_url).publish_all()
-        caches.load_instruments(soft_fail=False)
+    report.add(_run_step("account_snapshot", _snapshot))
+
+    def _refresh():
+        caches = _load_caches(conninfo)
         refresh_live_data(
             caches,
             strategy_id=_env_uuid("CCXT_ITEST_STRATEGY_ID"),
@@ -905,14 +1000,22 @@ def run_suite(
     if include_api:
         if not os.getenv("LOCAL_LOGIN_PASSWORD"):
             report.add(_skip_step("api_dry_run", "LOCAL_LOGIN_PASSWORD unset"))
+            report.add(_skip_step("api_snapshot", "LOCAL_LOGIN_PASSWORD unset"))
         else:
             def _api():
                 run_api_dry_run(paper)
                 return "POST /trade/deployments/dry-run OK", {}
 
             report.add(_run_step("api_dry_run", _api))
+
+            def _api_snap():
+                run_api_snapshot(paper)
+                return "GET /trade/accounts/{id}/snapshot OK", {}
+
+            report.add(_run_step("api_snapshot", _api_snap))
     else:
         report.add(_skip_step("api_dry_run", "use --suite --with-api to include"))
+        report.add(_skip_step("api_snapshot", "use --suite --with-api to include"))
 
     report.summary()
     return report
@@ -991,6 +1094,16 @@ def main() -> None:
     )
     parser.add_argument("--save", action="store_true", help="Save keys from BYBIT_TESTNET_* env")
     parser.add_argument("--gateway", action="store_true", help="ccxt gateway smoke test")
+    parser.add_argument(
+        "--snapshot",
+        action="store_true",
+        help="Live balances + open positions via the service path (read-only)",
+    )
+    parser.add_argument(
+        "--api-snapshot",
+        action="store_true",
+        help="GET /api/v1/trade/accounts/{id}/snapshot (needs LOCAL_LOGIN_PASSWORD)",
+    )
     parser.add_argument(
         "--refresh-data",
         action="store_true",
@@ -1072,11 +1185,13 @@ def main() -> None:
         or args.dry_run
         or args.api_dry_run
         or args.refresh_data
+        or args.snapshot
+        or args.api_snapshot
     ):
         parser.error(
             "Specify --suite, --check, --intended-matrix, --probe-intended, "
-            "or at least one of --save, --gateway, --dry-run, "
-            "--api-dry-run, --diagnose, --refresh-data"
+            "or at least one of --save, --gateway, --snapshot, --api-snapshot, "
+            "--dry-run, --api-dry-run, --diagnose, --refresh-data"
         )
 
     if args.ensure_xref:
@@ -1090,19 +1205,14 @@ def main() -> None:
     if args.gateway:
         run_gateway(paper, bybit_demo=bybit_demo)
 
-    if args.refresh_data and not args.dry_run:
-        redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379")
-        from quant.refdata.bundle import DataCaches
-        from quant.refdata.publisher import RefDataPublisher
+    if args.snapshot:
+        run_snapshot(paper)
 
-        caches = DataCaches(conninfo, redis_url)
-        if not caches.refdata.ping():
-            raise SystemExit("Redis unreachable — run: ./scripts/appctl.sh dev start")
-        try:
-            caches.refdata.get("app")
-        except ValueError:
-            RefDataPublisher(conninfo, redis_url).publish_all()
-        caches.load_instruments(soft_fail=False)
+    if args.api_snapshot:
+        run_api_snapshot(paper)
+
+    if args.refresh_data and not args.dry_run:
+        caches = _load_caches(conninfo)
         refresh_live_data(
             caches,
             strategy_id=_env_uuid("CCXT_ITEST_STRATEGY_ID"),

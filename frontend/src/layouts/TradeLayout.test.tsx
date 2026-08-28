@@ -27,6 +27,7 @@ vi.mock('../api/trade', () => ({
   useApplyDeployment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateDeployment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useStopDeployment: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useAccountSnapshot: () => ({ data: undefined, isLoading: false, isFetching: false }),
 }));
 
 vi.mock('../api/credentials', () => ({

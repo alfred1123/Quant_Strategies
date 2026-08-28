@@ -8,6 +8,7 @@ from quant.api.credentials.repo import ApiCredentialRepo
 from quant.api.credentials.service import CredentialService
 from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
+from quant.schemas.account import AccountSnapshot
 from quant.schemas.apply import ApplyReport
 from quant.schemas.deployments import (
     CreateDeploymentRequest,
@@ -16,6 +17,7 @@ from quant.schemas.deployments import (
     UpdateDeploymentRequest,
 )
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
+from quant.trade.account import fetch_account_snapshot
 from quant.trade.bar_source import PriceBarServiceFactory
 from quant.trade.db_repo import TradeRepo
 from quant.trade.dry_run import run_dry_run
@@ -179,6 +181,24 @@ class TradeService:
             req=req,
             repo=self._repo,
             bt=self._bt,
+            credential_service=self._credential_service,
+            credential_repo=self._credential_repo,
+            adapter_registry=self._adapter_registry,
+            data_caches=self._data_caches,
+        )
+
+    def account_snapshot(
+        self,
+        app_user_id: UUID,
+        api_credential_id: int,
+        *,
+        paper: bool,
+    ) -> AccountSnapshot:
+        """Balances and open positions as the broker reports them right now."""
+        return fetch_account_snapshot(
+            app_user_id=app_user_id,
+            api_credential_id=api_credential_id,
+            paper=paper,
             credential_service=self._credential_service,
             credential_repo=self._credential_repo,
             adapter_registry=self._adapter_registry,

@@ -55,6 +55,25 @@ class TradeAdapter(BrokerSession):
         """Best-effort last traded price for notional estimates; ``None`` if unavailable."""
         return None
 
+    def get_balances(self) -> list[dict]:
+        """Per-currency cash — ``code``, ``free``, ``used``, ``total``.
+
+        Concrete rather than abstract: a broker with no balance endpoint
+        reports nothing instead of forcing every adapter to implement a stub,
+        and the caller renders an empty table either way.
+        """
+        return []
+
+    def get_open_positions(self) -> list[dict]:
+        """Every open position on the account, not just deployed symbols.
+
+        Distinct from :meth:`get_position_qty`, which answers "what is my
+        exposure to *this* symbol" for a trade decision. This answers "what does
+        this account hold", so it surfaces manual trades and positions left by a
+        stopped deployment.
+        """
+        return []
+
     @abstractmethod
     def execute_action(
         self,

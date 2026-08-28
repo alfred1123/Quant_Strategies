@@ -14,6 +14,21 @@ from quant.trade.models.session import BrokerSessionState
 logger = logging.getLogger(__name__)
 
 
+def _as_float(value) -> float | None:
+    """Coerce a ccxt numeric field, tolerating None and empty strings.
+
+    Exchanges return these as strings, as numbers, or omit them entirely
+    depending on the endpoint and the account mode, so a snapshot must not fail
+    on one missing optional field.
+    """
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 @dataclass(frozen=True)
 class CcxtSessionConfig:
     api_key: str = field(repr=False)
@@ -163,6 +178,78 @@ class CcxtTradeGateway:
             if val is not None:
                 return float(val)
         return None
+
+    def fetch_balances(self) -> list[dict]:
+        """Per-currency cash: ``code``, ``free``, ``used``, ``total``.
+
+        Currencies with nothing in them are dropped — a unified account reports
+        every listed asset, and a table of a hundred zeroes hides the one row
+        that matters. A currency held only as margin (``free`` 0, ``used`` > 0)
+        is kept, since that is a real holding.
+        """
+        try:
+            raw = self.exchange.fetch_balance()
+        except ccxt.AuthenticationError as exc:
+            raise self._auth_error(exc, phase="fetch_balance") from exc
+        except ccxt.BaseError as exc:
+            raise BrokerConnectionError(f"fetch_balance failed: {exc}") from exc
+
+        totals = raw.get("total") or {}
+        free = raw.get("free") or {}
+        used = raw.get("used") or {}
+        rows = []
+        for code in sorted(totals):
+            row = {
+                "code": code,
+                "free": _as_float(free.get(code)),
+                "used": _as_float(used.get(code)),
+                "total": _as_float(totals.get(code)),
+            }
+            if row["total"] or row["free"] or row["used"]:
+                rows.append(row)
+        return rows
+
+    def fetch_open_positions(self) -> list[dict]:
+        """Every open position on the account, signed and flattened.
+
+        Not filtered to symbols the platform deploys on: a position opened by
+        hand, or left behind by a stopped deployment, is exactly what an
+        operator needs to see. Zero-size entries are dropped — exchanges return
+        placeholder rows for symbols once traded.
+        """
+        try:
+            positions = self.exchange.fetch_positions()
+        except ccxt.AuthenticationError as exc:
+            raise self._auth_error(exc, phase="fetch_positions") from exc
+        except ccxt.BaseError as exc:
+            raise BrokerConnectionError(f"fetch_positions failed: {exc}") from exc
+
+        rows = []
+        for pos in positions:
+            info = pos.get("info") or {}
+            qty = _as_float(pos.get("contracts"))
+            if qty is None:
+                qty = _as_float(info.get("size")) or 0.0
+            if not qty:
+                continue
+            side = pos.get("side")
+            rows.append(
+                {
+                    # Prefer the exchange's own symbol so it matches
+                    # INST.PRODUCT_XREF and the deployment rows beside it.
+                    "symbol": info.get("symbol") or pos.get("symbol") or "",
+                    "unified_symbol": pos.get("symbol"),
+                    "qty": -abs(qty) if side == "short" else abs(qty),
+                    "side": side,
+                    "entry_price": _as_float(pos.get("entryPrice")),
+                    "mark_price": _as_float(pos.get("markPrice")),
+                    "notional": _as_float(pos.get("notional")),
+                    "unrealized_pnl": _as_float(pos.get("unrealizedPnl")),
+                    "leverage": _as_float(pos.get("leverage")),
+                    "liquidation_price": _as_float(pos.get("liquidationPrice")),
+                }
+            )
+        return rows
 
     def fetch_position_qty(self, vendor_symbol: str) -> float:
         """Signed position size: positive for long, negative for short.

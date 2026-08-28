@@ -28,6 +28,7 @@ import { useTradeSession, useTradeSessionFilters } from '../../trade/useTradeSes
 import { ALL_ACCOUNTS } from '../../types/credentials';
 import type { DeploymentRow, DryRunReport } from '../../types/trade';
 import type { TradeApplyLocationState } from '../../types/strategies';
+import AccountSnapshotPanel from '../../components/trade/AccountSnapshotPanel';
 import ApplyConfirmDialog from '../../components/trade/ApplyConfirmDialog';
 import DeploymentDialog, { type DeploymentSelection } from '../../components/trade/DeploymentDialog';
 import DryRunReportDialog from '../../components/trade/DryRunReportDialog';
@@ -57,7 +58,14 @@ export default function TradeApplyPage() {
   const routeState = (location.state ?? null) as TradeApplyLocationState | null;
 
   const { data: deployments, isLoading, isError, error } = useDeployments();
-  const { accounts, tradingMode, accountFilter, brokerFilter, appNameById } = useTradeSession();
+  const {
+    accounts,
+    tradingMode,
+    accountFilter,
+    brokerFilter,
+    appNameById,
+    setAccountFilter,
+  } = useTradeSession();
   const { matchesSession, credentialsNotLoaded } = useTradeSessionFilters();
 
   const dryRun = useDryRun();
@@ -178,6 +186,14 @@ export default function TradeApplyPage() {
           )}
         </Stack>
       </Paper>
+
+      <AccountSnapshotPanel
+        apiCredentialId={accountFilter === ALL_ACCOUNTS ? null : accountFilter}
+        tradingMode={tradingMode}
+        accounts={accounts}
+        appNameById={appNameById}
+        onSelectAccount={setAccountFilter}
+      />
 
       <Box>
         <Stack

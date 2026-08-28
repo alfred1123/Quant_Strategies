@@ -13,6 +13,7 @@ from quant.api.auth.dependencies import require_user
 from quant.api.auth.models import CurrentUser
 from quant.api.credentials.repo import ApiCredentialRepo
 from quant.queue.repo import BtQueueRepo
+from quant.schemas.account import AccountSnapshot
 from quant.schemas.apply import ApplyReport
 from quant.schemas.deployments import (
     CreateDeploymentRequest,
@@ -60,6 +61,26 @@ def dry_run_deployment(
     svc: TradeService = Depends(get_trade_service),
 ) -> DryRunReport:
     return svc.dry_run(user.app_user_id, req)
+
+
+@router.get(
+    "/accounts/{api_credential_id}/snapshot",
+    response_model=AccountSnapshot,
+)
+def account_snapshot(
+    api_credential_id: int,
+    paper: bool = True,
+    user: CurrentUser = Depends(require_user),
+    svc: TradeService = Depends(get_trade_service),
+) -> AccountSnapshot:
+    """Live balances and open positions for one broker account.
+
+    Read-only — reaches the exchange but places nothing. ``paper`` defaults to
+    the safe environment: a caller that omits it gets the demo account, never a
+    real one. Not cached server-side; every call is a rate-limited exchange
+    round-trip, so the client decides how often to ask.
+    """
+    return svc.account_snapshot(user.app_user_id, api_credential_id, paper=paper)
 
 
 @router.post(
