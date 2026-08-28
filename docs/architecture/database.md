@@ -111,7 +111,7 @@ PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, 
 | Table | Role |
 |-------|------|
 | `DEPLOYMENT` | Apply target: pinned strategy, credential, product, qty (soft-versioned via `DEPLOYMENT_VID` + `TRANSACT_FROM/TO`) |
-| `EXECUTION_EVENT` | Append-only submit / error diary; `TRANSACT_AT` = tick time, `CREATED_AT` = audit insert |
+| `EXECUTION_EVENT` | Append-only submit / error diary; `TRANSACT_AT` = tick time, `CREATED_AT` = audit insert, `POSITION_QTY` = signed broker position the attempt decided against |
 | `TRANSACTION` | Append-only broker-confirmed fills |
 
 **Not stored:** current signal / target position between ticks (`TRADE.INTENT` rejected — decision #38).
@@ -121,7 +121,7 @@ PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, 
 | `SP_INS_DEPLOYMENT` | Create or version deployment |
 | `SP_GET_DEPLOYMENT` | Read current or historical deployment (owner-scoped, REFCURSOR) |
 | `SP_GET_DEPLOYMENT_CHECK` | Validation read by deployment_id — no owner filter (caller checks) |
-| `SP_INS_EXECUTION_EVENT` | Append execution event |
+| `SP_INS_EXECUTION_EVENT` | Append execution event, incl. the position it decided against — see [Recording the position an apply saw](#recording-the-position-an-apply-saw) |
 | `SP_INS_TRANSACTION` | Append fill row |
 
 Validation: Python `TradeRepo` before SP calls. See [Plan to Profit §1.2](../design/plan-to-profit.md#phase-12--trade-schema--apply-api).
@@ -285,7 +285,7 @@ A procedure that logs itself declares `V_LOG_START TIMESTAMPTZ := clock_timestam
 | `SP_GET_NEXT_DUE_DEPLOYMENTS` | `TRADE` | Not-yet-due preview (UI / ops, optional) |
 | `SP_INS_DEPLOYMENT_SCHEDULE_STATUS` | `TRADE` | Append schedule version (poller advance after apply) |
 | `SP_GET_DEPLOYMENT_CHECK` | `TRADE` | Validation read by `DEPLOYMENT_ID` — no owner filter; caller checks ownership |
-| `SP_INS_EXECUTION_EVENT` | `TRADE` | Append event; diary only, no scheduler side effects |
+| `SP_INS_EXECUTION_EVENT` | `TRADE` | Append event; diary only, no scheduler side effects. `IN_POSITION_QTY` since `1.7.0` — see [Recording the position an apply saw](#recording-the-position-an-apply-saw) |
 | `SP_INS_TRANSACTION` | `TRADE` | Append fill row |
 | `SP_INS_PRICE_BAR` | `MARKET_DATA` | Insert one OHLCV bar (one row per call) |
 | `SP_GET_PRICE_BAR` | `MARKET_DATA` | Range read by `(INTERNAL_CUSIP, TM_INTERVAL_ID, start, end)` |
@@ -321,6 +321,46 @@ bumps `RESULT_VID` and flips the prior row.
     find parameters, so queue rows can be cleared without stranding a
     deployment. Anything that still needs "which submission produced this?" has
     `BT.RESULT.QUEUE_ID` to follow, and tolerates it pointing nowhere.
+
+### Recording the position an apply saw
+
+`TRADE.EXECUTION_EVENT.POSITION_QTY` is the signed broker position — negative
+for short — read immediately before an order attempt. It is not a diagnostic
+extra: `intended_side(signal, position_qty)` answers HOLD when the position
+already agrees with the signal, so it is half of every trade decision, and it is
+what stops repeated applies from stacking.
+
+It is written **per attempt**, not per apply cycle, because each attempt
+re-reads the book — a partial fill between two attempts then shows as a moving
+position instead of one number repeated.
+
+The number was previously fetched, used, and discarded: it reached `ApplyReport`
+and the UI and was never written down. That held up while every apply was a
+human reading the report back. The hourly scheduler tick made it a gap, because
+unattended **a HOLD and a tick that did nothing leave the same trace**, and a
+liquidation or a manual trade on the exchange moves the position with nothing
+recording that it moved.
+
+!!! warning "`0` and `NULL` are not the same"
+    `0.0` is a flat book — the position was read and there is none. `NULL` means
+    it was never read, because the apply raised before reaching the broker. The
+    column is nullable rather than `DEFAULT 0` so those two stay distinguishable;
+    treating an unknown position as flat is how a reconciliation quietly agrees
+    with itself.
+
+!!! note "Adding a parameter creates an overload"
+    `1.7.0` appends `IN_POSITION_QTY` to `SP_INS_EXECUTION_EVENT`, and
+    `CREATE OR REPLACE PROCEDURE` with a longer parameter list **adds a second
+    procedure** rather than replacing the first — verified locally, where the
+    catalog briefly held both a 10-argument and an 11-argument version. Two live
+    signatures is how an un-migrated caller silently writes `NULL` positions, so
+    the release closes with an explicit `DROP PROCEDURE` of the old signature,
+    the same step `1.4.0-012` took when `IN_TRANSACT_AT` was added. Any future
+    signature change on a procedure owes the same three changesets: alter,
+    replace, drop.
+
+Nothing reads the diary yet — there is no `SP_GET_EXECUTION_EVENT`; the UI
+execution panel is Phase 1.8. Until then the column is queryable directly.
 
 ## Directory Layout
 

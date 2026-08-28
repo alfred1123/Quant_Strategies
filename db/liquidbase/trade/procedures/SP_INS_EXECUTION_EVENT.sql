@@ -2,8 +2,14 @@
 --
 -- IN_EXECUTION_EVENT_ID supplied by caller (UUID).
 -- IN_TRANSACT_AT = when the apply tick occurred (diary only — not scheduler state).
+-- IN_POSITION_QTY = signed broker position before this attempt (negative short).
 -- Scheduler due-ness lives in TRADE.DEPLOYMENT_SCHEDULE_STATUS.
 -- Validation lives in Python (TradeRepo).
+--
+-- IN_POSITION_QTY is appended last, after IN_TRANSACT_AT, so the parameter list
+-- stays additive. That makes this a new overload rather than a replacement, and
+-- the release drops the ten-argument signature explicitly — the same pattern
+-- 1.4.0-012 used when IN_TRANSACT_AT was added.
 CREATE OR REPLACE PROCEDURE TRADE.SP_INS_EXECUTION_EVENT(
     IN  IN_EXECUTION_EVENT_ID  UUID,
     IN  IN_DEPLOYMENT_ID       UUID,
@@ -15,6 +21,7 @@ CREATE OR REPLACE PROCEDURE TRADE.SP_INS_EXECUTION_EVENT(
     IN  IN_IS_SUCCESS_IND      CHAR(1),
     IN  IN_USER_ID             TEXT,
     IN  IN_TRANSACT_AT         TIMESTAMPTZ,
+    IN  IN_POSITION_QTY        NUMERIC,
     OUT OUT_SQLSTATE           TEXT,
     OUT OUT_SQLMSG             TEXT,
     OUT OUT_SQLERRMC           TEXT
@@ -42,6 +49,7 @@ BEGIN
         DEPLOYMENT_ID,
         DEPLOYMENT_VID,
         SIGNAL_VALUE,
+        POSITION_QTY,
         BUY_SELL_CD,
         QUANTITY,
         VENDOR_ORDER_ID,
@@ -54,6 +62,7 @@ BEGIN
         IN_DEPLOYMENT_ID,
         IN_DEPLOYMENT_VID,
         IN_SIGNAL_VALUE,
+        IN_POSITION_QTY,
         IN_BUY_SELL_CD,
         IN_QUANTITY,
         IN_VENDOR_ORDER_ID,
@@ -92,7 +101,7 @@ BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
     GRANT EXECUTE ON PROCEDURE TRADE.SP_INS_EXECUTION_EVENT(
         UUID, UUID, INTEGER, NUMERIC, TEXT, NUMERIC, TEXT, CHAR(1), TEXT, TIMESTAMPTZ,
-        OUT TEXT, OUT TEXT, OUT TEXT
+        NUMERIC, OUT TEXT, OUT TEXT, OUT TEXT
     ) TO quant_app;
   END IF;
 END $$;

@@ -8,9 +8,13 @@ from quant.api.scheduler.router import _get_sweeper, run_schedule_tick
 from quant.trade.scheduler.tick import TickOutcome, TickReport, TickResult
 
 
-def _result(outcome=TickOutcome.APPLIED, error=None):
+def _result(outcome=TickOutcome.APPLIED, error=None, position_qty=None):
     return TickResult(
-        deployment_id=uuid4(), outcome=outcome, attempt=1, error=error
+        deployment_id=uuid4(),
+        outcome=outcome,
+        attempt=1,
+        error=error,
+        position_qty=position_qty,
     )
 
 
@@ -81,6 +85,42 @@ class TestResponse:
 
         assert body["due"] == 2
         assert body["outcomes"][TickOutcome.ABANDONED] == 1
+
+
+class TestPositionInTheResponse:
+    """The Lambda log is the only witness to an unattended tick's reasoning."""
+
+    def test_reports_the_position_behind_the_decision(self):
+        body = run_schedule_tick(
+            caller="service",
+            sweeper=_sweeper(
+                TickReport(tm_interval_id=1, results=[_result(position_qty=-0.002)])
+            ),
+        )
+
+        assert body["results"][0]["deployments"][0]["position_qty"] == -0.002
+
+    def test_a_flat_book_is_reported_as_zero(self):
+        """Distinguishes a HOLD on a flat book from a position never read."""
+        body = run_schedule_tick(
+            caller="service",
+            sweeper=_sweeper(
+                TickReport(tm_interval_id=1, results=[_result(position_qty=0.0)])
+            ),
+        )
+
+        assert body["results"][0]["deployments"][0]["position_qty"] == 0.0
+
+    def test_unknown_position_is_present_as_null(self):
+        """The key is always there, so a reader never has to guess."""
+        body = run_schedule_tick(
+            caller="service",
+            sweeper=_sweeper(TickReport(tm_interval_id=1, results=[_result()])),
+        )
+
+        deployment = body["results"][0]["deployments"][0]
+        assert "position_qty" in deployment
+        assert deployment["position_qty"] is None
 
 
 class TestSweeperIsApplicationScoped:

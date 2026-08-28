@@ -288,7 +288,11 @@ class TestCallMatchesProcedureDdl:
     def test_execution_event_transact_at_is_never_null(
         self, mock_write, _validate, repo
     ):
-        """TRANSACT_AT is NOT NULL with no default — the repo must always send one."""
+        """TRANSACT_AT is NOT NULL with no default — the repo must always send one.
+
+        Found by type rather than by position: this used to check the last
+        parameter, which quietly became POSITION_QTY when that was appended.
+        """
         repo.sp_ins_execution_event(
             execution_event_id=uuid4(),
             app_user_id=uuid4(),
@@ -298,7 +302,48 @@ class TestCallMatchesProcedureDdl:
             is_success_ind="Y",
             user_id="alice",
         )
-        assert mock_write.call_args.args[1][-1] is not None
+        params = mock_write.call_args.args[1]
+        assert len([p for p in params if isinstance(p, datetime)]) == 1
+
+    @patch.object(TradeRepo, "validate_execution_event")
+    @patch.object(TradeRepo, "_call_write")
+    def test_execution_event_records_the_position(self, mock_write, _validate, repo):
+        """The position the decision was made against has to reach the row."""
+        repo.sp_ins_execution_event(
+            execution_event_id=uuid4(),
+            app_user_id=uuid4(),
+            deployment_id=uuid4(),
+            deployment_vid=1,
+            buy_sell_cd="SELL",
+            is_success_ind="Y",
+            user_id="alice",
+            position_qty=-0.003,
+        )
+        assert -0.003 in mock_write.call_args.args[1]
+
+    @patch.object(TradeRepo, "validate_execution_event")
+    @patch.object(TradeRepo, "_call_write")
+    def test_execution_event_keeps_flat_distinct_from_unknown(
+        self, mock_write, _validate, repo
+    ):
+        """0.0 means a flat book; None means the position was never read."""
+        common = {
+            "app_user_id": uuid4(),
+            "deployment_id": uuid4(),
+            "deployment_vid": 1,
+            "buy_sell_cd": "BUY",
+            "is_success_ind": "Y",
+            "user_id": "alice",
+        }
+        repo.sp_ins_execution_event(
+            execution_event_id=uuid4(), position_qty=0.0, **common
+        )
+        flat = mock_write.call_args.args[1]
+        repo.sp_ins_execution_event(execution_event_id=uuid4(), **common)
+        unknown = mock_write.call_args.args[1]
+
+        assert 0.0 in flat
+        assert unknown[-1] is None
 
     @patch.object(TradeRepo, "validate_schedule_status")
     @patch.object(TradeRepo, "_call_write")

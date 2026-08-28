@@ -36,6 +36,21 @@ ApplyDeployment = Callable[[UUID, UUID], ApplyReport]
 DEFAULT_MAX_ATTEMPTS = 3
 
 
+def _position_of(report) -> float | None:
+    """``position_qty`` off an :class:`ApplyReport`, or None if unreadable.
+
+    ``apply_deployment`` is injected, so the tick cannot assume the shape of
+    what comes back. Anything that is not a number becomes None rather than
+    travelling into the response as-is — a wrong position is worse than a
+    missing one.
+    """
+    qty = getattr(report, "position_qty", None)
+    try:
+        return None if qty is None else float(qty)
+    except (TypeError, ValueError):
+        return None
+
+
 class TickOutcome(StrEnum):
     """What one due deployment did on this pass."""
 
@@ -51,6 +66,11 @@ class TickResult:
     outcome: TickOutcome
     attempt: int
     error: str | None = None
+    #: Signed broker position the apply decided against — negative short, 0.0
+    #: flat, None when the apply never got far enough to read it. Carried up so
+    #: an unattended tick reports the number behind its decision; the durable
+    #: record is TRADE.EXECUTION_EVENT.POSITION_QTY, written per attempt.
+    position_qty: float | None = None
 
 
 @dataclass(frozen=True)
@@ -121,12 +141,16 @@ class ScheduleTickRunner:
         attempt = self._count_attempt(deployment_id, scheduled_ts)
 
         try:
-            self._apply(row["app_user_id"], deployment_id)
+            report = self._apply(row["app_user_id"], deployment_id)
         except Exception as exc:
+            # No position: the apply raised, so it may never have reached the
+            # broker read at all.
             return self._on_failure(row, attempt, exc)
 
         self._attempts.pop(deployment_id, None)
-        return self._advance(row, TickOutcome.APPLIED, attempt)
+        return self._advance(
+            row, TickOutcome.APPLIED, attempt, position_qty=_position_of(report)
+        )
 
     def _on_failure(self, row: dict, attempt: int, exc: Exception) -> TickResult:
         deployment_id = row["deployment_id"]
@@ -163,6 +187,7 @@ class ScheduleTickRunner:
         attempt: int,
         *,
         error: str | None = None,
+        position_qty: float | None = None,
     ) -> TickResult:
         """Move the cursor to NEXT_SCHEDULED_TS from the due row.
 
@@ -195,6 +220,7 @@ class ScheduleTickRunner:
                 outcome=TickOutcome.STUCK,
                 attempt=attempt,
                 error=str(exc),
+                position_qty=position_qty,
             )
 
         return TickResult(
@@ -202,6 +228,7 @@ class ScheduleTickRunner:
             outcome=outcome,
             attempt=attempt,
             error=error,
+            position_qty=position_qty,
         )
 
     def _count_attempt(self, deployment_id: UUID, scheduled_ts: datetime) -> int:

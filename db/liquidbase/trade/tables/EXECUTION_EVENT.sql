@@ -6,6 +6,13 @@
 -- TRANSACT_AT = when the apply tick occurred (diary). CREATED_AT = audit insert.
 -- Scheduler state lives in TRADE.DEPLOYMENT_SCHEDULE_STATUS — not this table.
 --
+-- SIGNAL_VALUE and POSITION_QTY are the two inputs to the decision this row
+-- records: intended_side() compares the signal against the position the broker
+-- reported, and answers HOLD when they already agree. POSITION_QTY is signed —
+-- negative is short — and is the book *before* this attempt. Without it a HOLD
+-- is indistinguishable from a missed tick, and on a scheduled apply nobody sees
+-- the ApplyReport that used to be the only place the number appeared.
+--
 -- UI execution panel (Phase 1.8) reads from this table; reconcile uses
 -- TRADE.TRANSACTION.
 CREATE TABLE TRADE.EXECUTION_EVENT (
@@ -13,6 +20,7 @@ CREATE TABLE TRADE.EXECUTION_EVENT (
     DEPLOYMENT_ID       UUID NOT NULL,
     DEPLOYMENT_VID      INTEGER NOT NULL,
     SIGNAL_VALUE        NUMERIC,
+    POSITION_QTY        NUMERIC,
     BUY_SELL_CD         TEXT NOT NULL,
     QUANTITY            NUMERIC,
     VENDOR_ORDER_ID     TEXT,

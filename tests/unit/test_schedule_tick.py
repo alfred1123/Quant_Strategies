@@ -7,6 +7,8 @@ from uuid import uuid4
 
 import pytest
 
+from quant.schemas.apply import ApplyReport
+from quant.trade.models.order import IntendedAction
 from quant.trade.scheduler.tick import ScheduleTickRunner, TickOutcome
 
 DUE_AT = datetime(2026, 8, 1, 9, 0, tzinfo=UTC)
@@ -34,6 +36,19 @@ def _due_row(**overrides):
     }
     base.update(overrides)
     return base
+
+
+def _apply_report(*, position_qty: float) -> ApplyReport:
+    """A real ApplyReport, so renaming ``position_qty`` fails here."""
+    return ApplyReport(
+        deployment_id=uuid4(),
+        deployment_vid=3,
+        action=IntendedAction.HOLD,
+        vendor_symbol="BTCUSDT",
+        signal=1.0,
+        position_qty=position_qty,
+        message="no order needed (HOLD)",
+    )
 
 
 @pytest.fixture
@@ -107,6 +122,47 @@ class TestApplied:
 
         assert apply_fn.call_count == 3
         assert report.advanced == 3
+
+
+class TestPositionIsCarriedUp:
+    """An unattended tick is the only witness to what it decided against."""
+
+    def test_position_travels_from_the_apply_report(self, repo):
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(return_value=_apply_report(position_qty=-0.002))
+
+        report = _runner(repo, apply_fn).run_interval(1)
+
+        assert report.results[0].position_qty == -0.002
+
+    def test_a_flat_book_reports_zero_not_none(self, repo):
+        """0.0 and None mean different things: flat, versus never read."""
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(return_value=_apply_report(position_qty=0.0))
+
+        report = _runner(repo, apply_fn).run_interval(1)
+
+        assert report.results[0].position_qty == 0.0
+
+    def test_no_position_when_the_apply_raised(self, repo):
+        """It may never have reached the broker read at all."""
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(side_effect=RuntimeError("bybit 403"))
+
+        report = _runner(repo, apply_fn).run_interval(1)
+
+        assert report.results[0].position_qty is None
+
+    @pytest.mark.parametrize("returned", [None, object(), "0.01"])
+    def test_an_unusable_report_yields_none_rather_than_garbage(self, repo, returned):
+        """apply_deployment is injected, so its shape cannot be assumed —
+        a wrong position would be worse than a missing one."""
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+
+        report = _runner(repo, MagicMock(return_value=returned)).run_interval(1)
+
+        assert report.results[0].position_qty is None
+        assert report.results[0].outcome is TickOutcome.APPLIED
 
 
 class TestFailureKeepsTheRowDue:

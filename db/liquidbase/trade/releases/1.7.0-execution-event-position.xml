@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Record the broker position each apply attempt saw.
+
+      The position is already fetched on every attempt — intended_side()
+      compares it against the signal and answers HOLD when they agree, which is
+      what stops repeated applies from stacking. It was then discarded: it
+      reached ApplyReport and the UI, and nothing wrote it down. That was
+      survivable while every apply was a human reading the report back. It is a
+      hole now the hourly tick applies unattended, where a HOLD and a missed
+      tick leave the same trace, and a liquidation or a manual trade on the
+      exchange moves the position invisibly.
+
+      Additive: the column is nullable, so rows written before this deploy stay
+      valid and simply carry no position.
+    -->
+
+    <!--
+      prod-deploy on all three, and it is not optional here. SP_INS_EXECUTION_EVENT.sql
+      is already covered by 1.5.0-007 (runOnChange, context trade,prod-deploy), so
+      editing it queues a production migration whatever this release is tagged.
+      Tagging only "trade" would re-apply the procedure that writes POSITION_QTY while
+      holding back the ALTER that creates the column — and since audit writes are
+      best-effort, trading would carry on with the diary silently broken. All three
+      land together or none do.
+    -->
+
+    <changeSet id="1.7.0-001-execution-event-position-qty" author="alfcheun" context="trade,prod-deploy">
+        <comment>POSITION_QTY on TRADE.EXECUTION_EVENT — signed broker position before the attempt</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE TRADE.EXECUTION_EVENT ADD COLUMN IF NOT EXISTS POSITION_QTY NUMERIC;
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE TRADE.EXECUTION_EVENT DROP COLUMN IF EXISTS POSITION_QTY;</sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+      Deliberately overlaps 1.5.0-007, which already re-applies this file on
+      change. Kept so the release reads as one unit — alter, replace, drop — and
+      so the current definition stays managed if 1.5.0 is ever archived. Both
+      are CREATE OR REPLACE of the same file, so the second is a no-op.
+    -->
+    <changeSet id="1.7.0-002-sp-ins-execution-event" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_INS_EXECUTION_EVENT — persist IN_POSITION_QTY</comment>
+        <sqlFile path="../procedures/SP_INS_EXECUTION_EVENT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <!--
+      IN_POSITION_QTY is appended to the parameter list, so CREATE OR REPLACE
+      above adds an eleven-argument overload and leaves the ten-argument one
+      behind. Two live signatures is how a caller ends up silently writing NULL
+      positions, so drop the old one — the same closing step 1.4.0-012 took when
+      IN_TRANSACT_AT was added. Must run after 1.7.0-002.
+    -->
+    <changeSet id="1.7.0-003-drop-superseded-overload" author="alfcheun" context="trade,prod-deploy">
+        <comment>Drop the pre-POSITION_QTY SP_INS_EXECUTION_EVENT overload</comment>
+        <sql splitStatements="true" stripComments="true">
+            DROP PROCEDURE IF EXISTS TRADE.SP_INS_EXECUTION_EVENT(
+                UUID, UUID, INTEGER, NUMERIC, TEXT, NUMERIC, TEXT, CHAR(1), TEXT, TIMESTAMPTZ,
+                OUT TEXT, OUT TEXT, OUT TEXT
+            );
+        </sql>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

@@ -179,7 +179,7 @@ Pre-completion aborts do not call SP_INS — row stays due.
 | `TRANSACT_AT` on `EXECUTION_EVENT` (diary) | Done | Done — one apply-cycle tick time shared by every attempt |
 | `DEPLOYMENT_SCHEDULE_STATUS` + GET/SP_INS advance | Done | Driven hourly by `POST /api/v1/scheduler/tick` |
 | Missed / next due split procs | Done | Driven hourly by `POST /api/v1/scheduler/tick` |
-| `SCHEDULE_TM_INTERVAL_ID` on create / update | Done | Repo + service + API done; UI (pending) |
+| `SCHEDULE_TM_INTERVAL_ID` on create / update | Done | Repo + service + API done; UI pending — REFDATA dropdown, manual default, no auto-enable on deploy ([§3.1](scheduler-price-bars.md#31-product-ux-how-scheduling-is-enabled)) |
 | Schedule backfill DAILY | Done | — |
 | Apply-time due gate | — | Pending |
 | In-flight lease | — | Pending |

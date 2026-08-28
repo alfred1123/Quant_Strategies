@@ -235,7 +235,12 @@ class LiveApplyOrchestrator:
         qty: float,
         tick_at: datetime,
     ) -> None:
-        """Best-effort EXECUTION_EVENT row per attempt — never fails the cycle."""
+        """Best-effort EXECUTION_EVENT row per attempt — never fails the cycle.
+
+        ``position_qty`` is per attempt rather than per cycle: every attempt
+        re-reads the book, so a partial fill between two of them shows up as a
+        moving position instead of one number repeated.
+        """
         for attempt in outcome.attempts:
             try:
                 self._repo.sp_ins_execution_event(
@@ -250,6 +255,7 @@ class LiveApplyOrchestrator:
                     quantity=attempt.quantity(qty),
                     vendor_order_id=attempt.vendor_order_id,
                     transact_at=tick_at,
+                    position_qty=attempt.position_qty,
                 )
             except Exception:
                 logger.exception("audit write failed — apply cycle continues")

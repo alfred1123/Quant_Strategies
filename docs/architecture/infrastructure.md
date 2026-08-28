@@ -352,13 +352,17 @@ aws lambda invoke \
 
 ### What this stack does **not** do yet
 
-- Put a deployment **on** a schedule from the product. `SCHEDULE_TM_INTERVAL_ID`
+- Put a deployment **on** a schedule from the product UI. `SCHEDULE_TM_INTERVAL_ID`
   is accepted by the API and honoured all the way down, but `DeploymentDialog`
-  has no schedule control, so deployments created in the UI are manual-apply only
-  and the hourly tick finds nothing due.
+  has no schedule control yet ([scheduler design §3.1](../design/scheduler-price-bars.md#31-product-ux-how-scheduling-is-enabled)).
+  Deployments created in the UI default to manual-apply only; the hourly tick
+  finds nothing due until a schedule is set via `PATCH /trade/deployments/{id}`.
+  **Platform schedulers are already enabled** — `price_bar_sync` and
+  `trade_apply_tick` do not need a separate toggle; they pick up any deployment
+  with a non-null schedule.
 
-Both former entries here are resolved: per-deployment schedules were dropped by
-design ([scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)),
+Both former entries here are resolved: per-deployment EventBridge schedules were
+dropped by design ([scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)),
 and the service token is now accepted by the `admin`, `market_data` and
 `scheduler` routers.
 

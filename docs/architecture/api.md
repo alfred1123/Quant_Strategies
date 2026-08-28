@@ -63,7 +63,7 @@ All endpoints below are mounted under the `/api/v1` prefix.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/v1/trade/deployments` | Required | Create or re-apply a deployment. Optional `schedule_tm_interval_id` (`REFDATA.TM_INTERVAL`) sets the apply cadence; omit for manual-only. |
+| `POST` | `/api/v1/trade/deployments` | Required | Create or re-apply a deployment. Optional `schedule_tm_interval_id` (`REFDATA.TM_INTERVAL`) sets the apply cadence; omit or `null` for manual-only (intended UI default — see [scheduler §3.1](../design/scheduler-price-bars.md#31-product-ux-how-scheduling-is-enabled)). |
 | `GET` | `/api/v1/trade/deployments` | Required | List current deployments for the authenticated user. |
 | `GET` | `/api/v1/trade/deployments/{id}` | Required | One deployment (current version). |
 | `PATCH` | `/api/v1/trade/deployments/{id}` | Required | Toggle `enabled` / `deployment_status`, or change `schedule_tm_interval_id`. Omitted fields keep their value; explicit `null` clears the schedule. |

@@ -71,6 +71,10 @@ def run_schedule_tick(
                         "deployment_id": str(result.deployment_id),
                         "outcome": result.outcome,
                         "attempt": result.attempt,
+                        # The position the decision was made against. Nothing
+                        # else in an unattended run reports it, and without it a
+                        # HOLD reads the same as a tick that did nothing.
+                        "position_qty": result.position_qty,
                         "error": result.error,
                     }
                     for result in report.results

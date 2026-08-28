@@ -381,7 +381,15 @@ class TradeRepo(DbGateway):
         quantity: float | Decimal | None = None,
         vendor_order_id: str | None = None,
         transact_at: datetime | None = None,
+        position_qty: float | Decimal | None = None,
     ) -> None:
+        """Append one execution diary row.
+
+        ``position_qty`` is the signed broker position the attempt decided
+        against — negative for short, 0.0 for a flat book. None means it was
+        never read, which is not the same thing and is why the column is
+        nullable rather than defaulted to zero.
+        """
         self.validate_execution_event(
             app_user_id=app_user_id,
             deployment_id=deployment_id,
@@ -394,7 +402,7 @@ class TradeRepo(DbGateway):
             "CALL trade.sp_ins_execution_event("
             "%s::uuid, %s::uuid, %s::integer, %s::numeric, %s::text,"
             " %s::numeric, %s::text, %s::char(1), %s::text, %s::timestamptz,"
-            " NULL::text, NULL::text, NULL::text)",
+            " %s::numeric, NULL::text, NULL::text, NULL::text)",
             (
                 str(execution_event_id),
                 str(deployment_id),
@@ -406,6 +414,7 @@ class TradeRepo(DbGateway):
                 is_success_ind,
                 user_id,
                 transact_at or datetime.now(UTC),
+                position_qty,
             ),
         )
 
