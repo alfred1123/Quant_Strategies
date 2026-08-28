@@ -134,7 +134,20 @@ Two enabled deployments on the same `(api_credential_id, internal_cusip, paper/l
 
 **Recommendation documented:** Enforce **one active slot per `(api_credential_id, internal_cusip, is_paper_ind)`** at create/enable; live apply continues to use **broker `get_position_qty`** at tick time (full account exposure on symbol).
 
-**Current state:** No duplicate guard in Python (reverted). Broker read path unchanged.
+**Superseded — do not implement the slot guard.** The chosen direction is
+**netting**: sum the quantity each strategy wants per asset, compare to the
+account position, place **one** net order for the difference. That resolves the
+same conflict *and* minimises fees, because offsetting intentions cancel before
+reaching the exchange rather than after. The one-slot guard would forbid exactly
+the multi-strategy case netting is meant to enable, so adding it now would have
+to be undone. See [Multi-strategy netting](multi-strategy-netting.md).
+
+**Current state:** No duplicate guard in Python (reverted), and none planned.
+Broker read path unchanged — `get_position_qty` is account-level, which is the
+right unit for a netted order and is why `EXECUTION_EVENT.POSITION_QTY` records
+it. Two enabled deployments on one asset **would still fight today**; nothing
+prevents it, so treat one-deployment-per-asset as an operational rule until
+netting lands.
 
 ---
 

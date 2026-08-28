@@ -362,6 +362,20 @@ recording that it moved.
 Nothing reads the diary yet — there is no `SP_GET_EXECUTION_EVENT`; the UI
 execution panel is Phase 1.8. Until then the column is queryable directly.
 
+!!! info "It is the *account's* position, not the deployment's"
+    `fetch_positions([symbol])` reports what the **credential** holds in that
+    symbol; Bybit in one-way mode keeps one net position per symbol per account
+    and has no notion of a strategy's share. With one enabled deployment per
+    symbol the two are the same number, which is the case today. With several
+    they are not, and the column then describes the *(credential, symbol)* pair
+    rather than the row's `DEPLOYMENT_ID`.
+
+    That pair has no table of its own, which is the deeper issue:
+    `EXECUTION_EVENT` merges "what one strategy wanted" with "what we sent to
+    the exchange", and those separate as soon as orders are netted across
+    strategies. Recorded, deliberately not built — see
+    [Multi-strategy netting](../design/multi-strategy-netting.md).
+
 ## Directory Layout
 
 ```
