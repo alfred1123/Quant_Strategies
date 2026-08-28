@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from quant.market_data.service import SyncResult
-from quant.trade.scheduler.warm import DEFAULT_WARM_LOOKBACK, BarWarmer
+from quant.trade.scheduler.warm import DEFAULT_SETTLE_S, DEFAULT_WARM_LOOKBACK, BarWarmer
 
 FIXED_NOW = datetime(2026, 8, 18, 9, 0, tzinfo=UTC)
 
@@ -184,6 +184,9 @@ class TestFailuresAreAbsorbed:
 
 class TestBoundarySettle:
     """The schedule fires on the boundary, so the clock is read after a pause."""
+
+    def test_default_settle_matches_scheduler_config(self):
+        assert DEFAULT_SETTLE_S == 10.0
 
     def test_sleeps_then_reads_the_clock_when_now_is_not_given(
         self, repo, factory, no_sleep

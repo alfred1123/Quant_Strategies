@@ -423,12 +423,12 @@ one hourly wakeup serve a `DAILY` strategy — that deployment is simply not due
 on most passes.
 
 `ScheduleSweeper.settle_s` (`DEFAULT_SETTLE_S = 10s`, used by the endpoint and
-not by the poller) waits before asking what is due, because the schedule fires
-*on* the boundary. A cursor standing exactly at 22:00:00 with delivery a few
-milliseconds early would answer "not yet" and wait a whole interval. The wait
-also lets `price_bar_sync`, on the same boundary, land first — overlap is safe
-regardless, since the bar insert treats a unique violation as a concurrent
-write.
+not by the poller) waits before asking what is due. The apply schedule fires at
+`:05` UTC (`cron(5 * * * ? *)`), five minutes after `price_bar_sync` at `:00`,
+so the warm usually finishes first. The settle still clears a cursor standing
+exactly on the boundary: delivery a few milliseconds early would answer "not yet"
+and wait a whole interval. Overlap is safe regardless — the bar insert treats a
+unique violation as a concurrent write.
 
 The tick runner is **application-scoped** (`app.state.schedule_sweeper`, built
 in `quant/api/main.py`). Its per-`(deployment, due time)` attempt budget lives in
@@ -479,15 +479,28 @@ It is **best effort and not a correctness dependency.** One unreachable symbol i
 
 All of that wiring is now in place: `POST /api/v1/market-data/price-bars/sync` is served, and `config/scheduler/price_bar_sync.yml` declares the task, its path and an hourly expression. One schedule covers every interval rather than one per `TM_INTERVAL_ID` — the warmer sweeps them all, so an interval with no deployments contributes no rows (§7.8).
 
-#### Required: fire *after* the boundary, never on it
+#### Schedule timing — warm at :00, apply at :05
 
-**Every schedule expression must carry an offset of a minute or two past the interval boundary** — `cron(2 * * * ? *)` for hourly, `cron(2 0 * * ? *)` for daily. Not `0`.
+Two platform schedules, staggered:
 
-`PriceBarService` computes its target as `last_closed_bar(now, period)`, so a tick at exactly 10:00:00 demands the `09:00` bar the instant it closed. The exchange has not necessarily published it yet, and the service **fails closed** — `StaleBarsError`, no signal, no order. The run recovers on the next poll and does not consume the 3-attempt apply budget, so this is a wasted tick rather than a correctness bug, but it is entirely avoidable.
+| Task | Expression | In-process settle | Effective start |
+|------|------------|-------------------|-----------------|
+| `price_bar_sync` | `cron(0 * * * ? *)` | `BarWarmer.DEFAULT_SETTLE_S` = 10s | ~`:00:10` UTC |
+| `trade_apply_tick` | `cron(5 * * * ? *)` | `ScheduleSweeper.DEFAULT_SETTLE_S` = 10s | ~`:05:10` UTC |
 
-The offset costs nothing: the target is derived by flooring `now` to the boundary, so any firing time within `[10:00, 11:00)` resolves to the same `09:00` bar. Firing at :02 is identical to firing at :00, minus the race.
+**Warm on the boundary, apply five minutes later.** `price_bar_sync` fires at
+`:00` and sleeps before reading the clock so the exchange can publish the candle
+that just closed. `trade_apply_tick` at `:05` gives the warm several minutes to
+finish; every apply still calls `ensure_fresh` and fails closed on its own, so a
+slow warm costs a redundant fetch, never a bad trade.
 
-This applies to both backends — the `eventbridge` schedule expression and the `local` poller's interval. Note the local poller's ~30s cycle is naturally offset, so the risk is concentrated in the EventBridge path.
+`PriceBarService` computes its target as `last_closed_bar(now, period)`, so any
+firing time within the same closed interval resolves to the same bar. The 10s
+warm settle and the `:05` apply offset are about exchange publish latency and
+ordering, not changing which bar is targeted.
+
+This applies to the EventBridge path. The local poller's ~60s cycle is naturally
+offset; `ScheduleSweeper` uses `settle_s=0` there.
 
 ### 6.3 Lambda function
 
@@ -826,7 +839,7 @@ what every downstream "newest closed bar" derives from.
 | `quant/api/market_data/router.py` | `POST /api/v1/market-data/price-bars/sync` — service-token gated |
 | `quant/api/scheduler/router.py` | `POST /api/v1/scheduler/tick` — service-token gated; the platform's own wakeup |
 | `config/scheduler/price_bar_sync.yml` | Hourly warm schedule, on the boundary |
-| `config/scheduler/trade_apply_tick.yml` | Hourly apply sweep, same boundary, 10s settle |
+| `config/scheduler/trade_apply_tick.yml` | Hourly apply sweep at :05 UTC, 10s settle |
 
 ### Modified (Python)
 
@@ -861,13 +874,13 @@ first — "every Lambda invoke 401s today" — but `require_user_or_service` is 
 and `log_proc_summary` has been reaching the API through it on schedule.
 
 **Scheduled bar warming is done.** `POST /api/v1/market-data/price-bars/sync`
-(§7.8) is served and `config/scheduler/price_bar_sync.yml` schedules it hourly on
-the boundary.
+(§7.8) is served and `config/scheduler/price_bar_sync.yml` schedules it at `:00`
+UTC with a 10s in-process settle.
 
 **The scheduled apply is done**, as one platform tick rather than the
 `ScheduleTrigger` seam this section used to be waiting on — see §6.2 for why the
 per-deployment design was dropped. `POST /api/v1/scheduler/tick` is served and
-`config/scheduler/trade_apply_tick.yml` schedules it hourly.
+`config/scheduler/trade_apply_tick.yml` schedules it at `:05` UTC.
 
 Still open before a deployment can be *put* on a schedule from the product: §3.1
 UI. `SCHEDULE_TM_INTERVAL_ID` is persisted by `SP_INS_DEPLOYMENT` and honoured

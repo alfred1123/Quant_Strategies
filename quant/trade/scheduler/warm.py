@@ -13,8 +13,8 @@ the rest of the estate from being warmed.
 
 Because it is an optimisation, *when* it runs decides whether it is worth
 anything. A pass that lands after the applies have already fetched their own
-bars has done nothing, so the schedule sits just past the interval boundary —
-see ``config/scheduler/price_bar_sync.yml``.
+bars has done nothing — see ``config/scheduler/price_bar_sync.yml`` (:00 fire,
+10s settle) and ``trade_apply_tick`` at :05.
 """
 
 from __future__ import annotations
@@ -39,11 +39,10 @@ logger = logging.getLogger(__name__)
 DEFAULT_WARM_LOOKBACK = live_lookback_bars(110)
 
 #: Seconds to let the interval boundary settle before deciding which bar is the
-#: newest closed one. The schedule fires *on* the boundary so the warm can land
-#: before any apply, which puts it right on top of two edges — see
-#: :meth:`BarWarmer.run`. Small on purpose: the point is to clear the boundary,
-#: not to wait for anything in particular.
-DEFAULT_SETTLE_S = 2.0
+#: newest closed one. The schedule fires *on* the boundary (`cron(0 …)`), so
+#: the warm can land before `trade_apply_tick` at `:05`. Sleeping *before*
+#: reading the clock clears two edges — see :meth:`BarWarmer.run`.
+DEFAULT_SETTLE_S = 10.0
 
 
 @dataclass(frozen=True)

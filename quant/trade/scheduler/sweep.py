@@ -32,10 +32,10 @@ logger = logging.getLogger(__name__)
 #: - A cursor stands at exactly the boundary (22:00:00) and the tick asks for
 #:   ``SCHEDULED_TS <= NOW()``. Delivery a few milliseconds early answers "not
 #:   yet" and the deployment then waits a whole interval for the next wakeup.
-#: - ``price_bar_sync`` takes the same boundary, and the apply wants the warm to
-#:   have landed. Overlap is safe rather than fatal — the bar insert treats a
-#:   unique violation as a concurrent write — but a warm bar spares the apply
-#:   a fetch it would otherwise make itself.
+#: - ``price_bar_sync`` fires at :00 and sleeps before fetching; apply follows
+#:   at :05 so the warm usually finishes first. Overlap is safe rather than
+#:   fatal — the bar insert treats a unique violation as a concurrent write —
+#:   but a warm bar spares the apply a fetch it would otherwise make itself.
 #:
 #: Zero for the dev poller, which wakes on its own cadence and has no boundary
 #: to clear.
