@@ -5,12 +5,14 @@ which the project does not depend on.
 """
 
 import asyncio
+import time
 from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
 
 from quant.trade.scheduler.poller import SchedulePoller
+from quant.trade.scheduler.sweep import ScheduleSweeper
 from quant.trade.scheduler.tick import TickOutcome, TickReport, TickResult
 
 
@@ -41,28 +43,35 @@ def runner():
 
 def _poller(runner, refdata, **kwargs):
     kwargs.setdefault("poll_interval_s", 0.01)
-    return SchedulePoller(runner, refdata, **kwargs)
+    # A real sweeper over the mocked runner: the drain and loop assertions below
+    # count run_interval calls, so the pass has to be the one prod runs.
+    return SchedulePoller(ScheduleSweeper(runner, refdata), **kwargs)
 
 
 class TestPollOnce:
-    def test_sweeps_every_interval(self, runner, refdata):
+    def test_runs_the_sweep(self, runner, refdata):
         reports = asyncio.run(_poller(runner, refdata).poll_once())
 
         assert [c.args[0] for c in runner.run_interval.call_args_list] == [1, 2]
         assert len(reports) == 2
 
-    def test_a_failing_interval_does_not_stop_the_others(self, runner, refdata):
-        runner.run_interval.side_effect = [RuntimeError("db down"), _report(2)]
+    def test_keeps_the_blocking_sweep_off_the_event_loop(self, runner, refdata):
+        """An apply blocks on HTTP and DB; the API shares this process."""
+        poller = _poller(runner, refdata)
 
-        reports = asyncio.run(_poller(runner, refdata).poll_once())
+        async def drive():
+            ticked = asyncio.Event()
+            runner.run_interval.side_effect = lambda _id: (
+                time.sleep(0.05), ticked.set(), _report()
+            )[-1]
+            task = asyncio.create_task(poller.poll_once())
+            # The loop stays responsive while the sweep occupies a thread.
+            await asyncio.sleep(0)
+            responsive = not task.done()
+            await task
+            return responsive
 
-        assert len(reports) == 1
-        assert reports[0].tm_interval_id == 2
-
-    def test_no_intervals_is_not_an_error(self, runner, refdata):
-        refdata.interval_ids.return_value = []
-
-        assert asyncio.run(_poller(runner, refdata).poll_once()) == []
+        assert asyncio.run(drive()) is True
 
 
 class TestDrain:

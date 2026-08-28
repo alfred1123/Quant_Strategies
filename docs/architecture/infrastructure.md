@@ -211,29 +211,54 @@ invalidates all stored credential ciphertext until users re-save keys.
 Phase 1.9 AWS side — see [Scheduler & Price Bars](../design/scheduler-price-bars.md).
 
 ```
-EventBridge Scheduler (per deployment)
-        │  cron / rate, event {"task": "trade_apply", "deployment_id": "…"}
+EventBridge Scheduler (one schedule per task, not per deployment)
+        │  cron, event {"task": "trade_apply_tick",
+        │               "path": "/api/v1/scheduler/tick"}   ← both from the YAML
         ▼
-quant-scheduled-task Lambda ──POST──►  https://algodaemon.com/api/v1/trade/deployments/{id}/apply
+quant-scheduled-task Lambda ──POST──►  https://algodaemon.com/api/v1/scheduler/tick
         │                              Authorization: Bearer TRADE_SERVICE_TOKEN
         ▼                              (token fetched from SSM at Lambda cold start)
-FastAPI on EC2 (business logic: bars → signal → order)
+FastAPI on EC2 (every due deployment: bars → signal → order)
 ```
 
-The Lambda is a **generic task bridge** routed by `event.task`, so a new job is a
-YAML file in `config/scheduler/` plus an entry in `_TASK_PATHS` — never a second
-Lambda or a stack change.
+The Lambda is a **generic bridge**: the schedule's event carries both the task
+name and the path to post to, so a new job is a YAML file in `config/scheduler/`
+and nothing else — no handler change, no Lambda redeploy, no stack change.
+
+Each row below is one file in `config/scheduler/`, which declares the `task`,
+the `path`, the cron expression and whether it is enabled:
 
 | Task | Schedule | Endpoint | Purpose |
 |------|----------|----------|---------|
-| `trade_apply` | One per deployment (created by the app) | `/api/v1/trade/deployments/{id}/apply` | Bars → signal → order |
+| `trade_apply_tick` | `cron(0 * * * ? *)` | `/api/v1/scheduler/tick` | Apply every due deployment, all intervals |
 | `log_proc_summary` | `cron(15 23 ? * SAT *)` | `/api/v1/admin/log-proc-summary/summarize` | Aggregate `LOG_PROC_DETAIL` into daily summaries |
 | `price_bar_sync` | `cron(0 * * * ? *)` | `/api/v1/market-data/price-bars/sync` | Warm `MARKET_DATA.PRICE_BAR` for scheduled deployments |
 
-Three files have to agree for a job to run — the YAML's `task`, `_TASK_PATHS`, and
-the route FastAPI serves. A mismatch only shows up when the schedule fires, as a
-404 on a tick that is not retried, so `tests/unit/test_scheduled_task_paths.py`
-checks all three against each other.
+No path takes substitution fields, and none points at
+`/trade/deployments/{id}/apply`. That route requires a human — it trades on the
+caller's own account — so a schedule aimed at it could only ever 401. The tick
+resolves each deployment's owner from the database instead, which is what lets
+one schedule serve every deployment.
+
+Two things have to agree for a job to run: the `path` in the YAML and the route
+FastAPI serves. A mismatch only shows up when the schedule fires, as a 404 on a
+tick that is not retried, so `tests/unit/test_scheduled_task_paths.py` checks
+every declared path against the routers behind the service-token gate, along
+with the properties above.
+
+!!! note "Why the path lives in the config, not the Lambda"
+    It used to be a `_TASK_PATHS` map in `handler.py`, which made three files
+    have to agree instead of two — and the map was a second copy of what the
+    YAML already implied, kept in step only by that test. The handler now takes
+    the path from the event and holds no task knowledge, so a job can be added
+    or repointed without touching Lambda code.
+
+    That map doubled as an allowlist of paths the service token could reach. The
+    real control is the API's own gate: `require_user_or_service` admits the
+    service token on exactly three routers, and anything acting on a user's
+    account requires a human token and refuses the Lambda regardless of path.
+    The handler still rejects a `path` that is a URL rather than an absolute
+    path, so an event cannot redirect the token to another host.
 
 !!! note "`price_bar_sync` takes the boundary; `log_proc_summary` dodges it"
     The two jobs want opposite phases. Summarisation runs at `:15` to stay clear
@@ -250,27 +275,40 @@ checks all three against each other.
     every pass too and cost one coverage read each, returning immediately once
     the bar is stored.
 
-**Prod only.** Dev boxes run `SCHEDULER_BACKEND=local` (the default when implemented): an
-in-process poller inside FastAPI reads missed-due deployments via `SP_GET_MISSED_DUE_DEPLOYMENTS`
-and applies them directly — no EventBridge, Lambda, or service token. See
-[Scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-app--not-yet-wired).
+`trade_apply_tick` shares the `:00` boundary with the warmer and waits
+`ScheduleSweeper.DEFAULT_SETTLE_S` (10s) before asking what is due. Two reasons:
+a cursor sitting exactly on the boundary would answer "not yet" to a delivery a
+few milliseconds early and then wait a whole interval, and the pause lets the
+warm land first so the apply usually finds its bars stored. Overlap is safe
+either way — the bar insert treats a unique violation as a concurrent write.
+
+**Prod only.** Dev boxes run an in-process poller inside FastAPI that supplies
+the same wakeups on a timer — no EventBridge, Lambda, or service token. Both
+drivers run the identical pass (`ScheduleSweeper`). See
+[Scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment).
 
 **Slack + mainnet promotion:** when to move alerts to prod ops and orders to Bybit mainnet —
 [Live Trading Promotion](../guides/live-trading-promotion.md).
 
 | Resource | Name | Purpose |
 |----------|------|---------|
-| Schedule group | `quant-trade-deployments` | Holds one schedule per active deployment |
+| Schedule group | `quant-trade-deployments` | Holds the task schedules from `config/scheduler/` |
 | Lambda | `quant-scheduled-task` | Task-routed HTTP bridge (`aws/lambda/scheduled-task/handler.py`) |
 | IAM role | `quant-scheduler-invoke` | Assumed by EventBridge Scheduler to invoke Lambda |
 | IAM role | `quant-scheduled-task-lambda` | Lambda execution (CloudWatch Logs + SSM read of `TRADE_SERVICE_TOKEN`) |
-| IAM policy | `quant-ec2-scheduler-manage` | Attached to `quant-ec2-role` — API/boto3 create/update/delete schedules |
+| IAM policy | `quant-ec2-scheduler-manage` | Attached to `quant-ec2-role` — boto3 create/update/delete schedules |
 
 !!! warning "Schedule retry policy"
-    When the app creates schedules via boto3, it **must** set
-    `RetryPolicy.MaximumRetryAttempts = 0`. EventBridge Scheduler's default
-    (185 retries over 24h) would repeatedly re-invoke a failing trade apply —
-    order-level retries already live in the API (`OrderRetryExecutor`).
+    Every schedule sets `RetryPolicy.MaximumRetryAttempts = 0`, in
+    `scripts/sync_schedules.py`. EventBridge Scheduler's default (185 retries
+    over 24h) would repeatedly re-invoke a failing trade apply — order-level
+    retries live in the API (`OrderRetryExecutor`), and the scheduler tick's own
+    attempt budget decides when to try a deployment again, on the next wakeup
+    rather than seconds later.
+
+    `quant-ec2-scheduler-manage` is now only used by that script. Application
+    code creates no schedules: deployment create, update and stop write to the
+    database alone, so there is no second source of truth to keep in step.
 
 ### Deploying
 
@@ -314,9 +352,15 @@ aws lambda invoke \
 
 ### What this stack does **not** do yet
 
-- Create per-deployment schedules (API/boto3 on deployment create — app work)
-- Accept `TRADE_SERVICE_TOKEN` on the FastAPI `/apply` route — only the `admin`
-  router takes the service token so far, so a `trade_apply` invoke returns **401**
+- Put a deployment **on** a schedule from the product. `SCHEDULE_TM_INTERVAL_ID`
+  is accepted by the API and honoured all the way down, but `DeploymentDialog`
+  has no schedule control, so deployments created in the UI are manual-apply only
+  and the hourly tick finds nothing due.
+
+Both former entries here are resolved: per-deployment schedules were dropped by
+design ([scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)),
+and the service token is now accepted by the `admin`, `market_data` and
+`scheduler` routers.
 
 ### Outputs to use from the app
 
@@ -325,11 +369,11 @@ aws cloudformation describe-stacks --stack-name quant-scheduler \
   --query 'Stacks[0].Outputs' --output table
 ```
 
-| Output | App use |
+| Output | Used by |
 |--------|---------|
-| `ScheduledTaskLambdaArn` | EventBridge schedule `Target.Arn` |
-| `SchedulerInvokeRoleArn` | EventBridge schedule `Target.RoleArn` |
-| `ScheduleGroupName` | `GroupName` when creating schedules |
+| `ScheduledTaskLambdaArn` | `sync_schedules.py` — schedule `Target.Arn` |
+| `SchedulerInvokeRoleArn` | `sync_schedules.py` — schedule `Target.RoleArn` |
+| `ScheduleGroupName` | `sync_schedules.py` — `GroupName` |
 
 ---
 

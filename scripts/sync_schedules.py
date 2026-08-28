@@ -4,6 +4,10 @@
 Reads each YAML job definition, resolves Lambda ARN and invoke role from
 the CFN scheduler stack outputs, then creates or updates the schedule.
 
+Each job's ``task`` and ``path`` become the schedule's target input, which is
+the whole event the Lambda receives. The handler keeps no task-to-path map, so
+these files are the only place a scheduled endpoint is named.
+
 Usage:
     python3 scripts/sync_schedules.py              # apply all
     python3 scripts/sync_schedules.py --dry-run    # preview only
@@ -40,6 +44,15 @@ def _load_jobs() -> list[dict]:
         if not job or not job.get("task"):
             print(f"  SKIP {path.name}: missing 'task' field")
             continue
+        # The Lambda holds no task table, so a job without a path has nowhere to
+        # be sent. Fatal rather than skipped: a silently omitted schedule is the
+        # kind of thing nobody notices until the job is found never to have run.
+        if not job.get("path"):
+            sys.exit(
+                f"ERROR {path.name}: missing 'path' field. The schedule's event "
+                f"carries the API path, so each job must declare where it posts "
+                f"(e.g. path: /api/v1/scheduler/tick)."
+            )
         job["_file"] = path.name
         jobs.append(job)
     return jobs
@@ -116,7 +129,7 @@ def main():
             description=job.get("description", ""),
             target_arn=lambda_arn,
             role_arn=role_arn,
-            event_input={"task": job["task"]},
+            event_input={"task": job["task"], "path": job["path"]},
             enabled=job.get("enabled", True),
             dry_run=dry_run,
         )

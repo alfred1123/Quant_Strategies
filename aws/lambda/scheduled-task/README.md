@@ -18,12 +18,35 @@ Authorization: Bearer {TRADE_SERVICE_TOKEN}
 
 ## Event payload
 
-| Task | Event | Endpoint |
-|------|-------|----------|
-| `trade_apply` | `{"task": "trade_apply", "deployment_id": "<uuid>"}` | `POST /api/v1/trade/deployments/{id}/apply` |
-| `price_bar_sync` (planned) | `{"task": "price_bar_sync", "payload": {...}}` | `POST /api/v1/market-data/price-bars/sync` — add to `_TASK_PATHS` once the endpoint exists |
+The event carries **both** the task name and the path to post to:
+
+```json
+{"task": "trade_apply_tick", "path": "/api/v1/scheduler/tick"}
+```
+
+Both come from `config/scheduler/<task>.yml`, which `scripts/sync_schedules.py`
+reads when it creates or updates the schedule. This handler holds no
+task-to-path table, so adding or repointing a job is a YAML change with no
+Lambda redeploy. Current jobs:
+
+| Task | Endpoint | Config |
+|------|----------|--------|
+| `trade_apply_tick` | `POST /api/v1/scheduler/tick` | `config/scheduler/trade_apply_tick.yml` |
+| `price_bar_sync` | `POST /api/v1/market-data/price-bars/sync` | `config/scheduler/price_bar_sync.yml` |
+| `log_proc_summary` | `POST /api/v1/admin/log-proc-summary/summarize` | `config/scheduler/log_proc_summary.yml` |
 
 An optional `payload` object becomes the POST body (defaults to `{}`).
+
+No path takes substitution fields, and deliberately so: each route acts on
+everything currently due, which is what lets one schedule serve every
+deployment. There is no per-deployment `trade_apply` job — that route requires a
+human, since it trades on the caller's own account, so a schedule pointing at it
+could only return 401. `trade_apply_tick` applies each due deployment as the
+owner the database resolves for it.
+
+Because the path comes from the event, the handler validates it: it must be an
+absolute path, never a URL. Every request leaves here with the service token
+attached, so an event must not be able to choose the host it is sent to.
 
 ## Env (set by CloudFormation)
 
@@ -35,10 +58,12 @@ An optional `payload` object becomes the POST body (defaults to `{}`).
 
 ## Scheduler retry policy — important
 
-The apply endpoint places **orders**. When the app creates schedules via
-boto3, it must set `RetryPolicy.MaximumRetryAttempts = 0` — EventBridge
-Scheduler's default (185 retries over 24h) would hammer a failing apply.
-Order-level retries already live in the API (`OrderRetryExecutor`).
+The tick places **orders**. `scripts/sync_schedules.py` sets
+`RetryPolicy.MaximumRetryAttempts = 0` on every schedule it creates —
+EventBridge Scheduler's default (185 retries over 24h) would hammer a failing
+apply. Order-level retries live in the API (`OrderRetryExecutor`), and the tick's
+own attempt budget retries a deployment on the next wakeup rather than seconds
+later.
 
 ## Prerequisite
 

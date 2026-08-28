@@ -1,9 +1,12 @@
 """Poll the schedule on a timer — the local stand-in for EventBridge.
 
-In prod a tick fires because AWS decided it was time: each interval owns an
-EventBridge schedule that invokes a Lambda. A developer laptop has no such
-timer, and WSL stops outright when the lid closes, so this loop supplies the
-wakeups instead.
+In prod a tick fires because AWS decided it was time: one hourly EventBridge
+schedule invokes a Lambda, which posts to ``/api/v1/scheduler/tick``. A
+developer laptop has no such timer, and WSL stops outright when the lid closes,
+so this loop supplies the wakeups instead.
+
+Only the wakeups. The pass itself is :class:`ScheduleSweeper`, shared with the
+prod endpoint so the two drivers cannot disagree about what a tick does.
 
 Missed wakeups are therefore the normal case here rather than a fault, and the
 loop opens by draining whatever fell due while the process was down. Draining
@@ -25,8 +28,8 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from quant.refdata.reader import RedisRefData
-from quant.trade.scheduler.tick import ScheduleTickRunner, TickOutcome, TickReport
+from quant.trade.scheduler.sweep import ScheduleSweeper
+from quant.trade.scheduler.tick import TickReport
 
 logger = logging.getLogger(__name__)
 
@@ -40,24 +43,16 @@ DEFAULT_MAX_DRAIN_PASSES = 2000
 
 
 class SchedulePoller:
-    """Drives :class:`ScheduleTickRunner` on a timer, catching up on boot.
-
-    Sweeps every interval in ``REFDATA.TM_INTERVAL`` per pass rather than
-    tracking which ones have deployments: an interval with nothing due costs one
-    read returning no rows, and that is cheaper than keeping a subscription list
-    correct as deployments are created, paused and rescheduled.
-    """
+    """Drives :class:`ScheduleSweeper` on a timer, catching up on boot."""
 
     def __init__(
         self,
-        runner: ScheduleTickRunner,
-        refdata: RedisRefData,
+        sweeper: ScheduleSweeper,
         *,
         poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
         max_drain_passes: int = DEFAULT_MAX_DRAIN_PASSES,
     ) -> None:
-        self._runner = runner
-        self._refdata = refdata
+        self._sweeper = sweeper
         self._poll_interval_s = poll_interval_s
         self._max_drain_passes = max_drain_passes
         self._running = False
@@ -93,7 +88,7 @@ class SchedulePoller:
         advanced_total = 0
         for _ in range(self._max_drain_passes):
             reports = await self.poll_once()
-            if self._has_stuck(reports):
+            if ScheduleSweeper.has_stuck(reports):
                 # Applied but the cursor would not move, so the row is still
                 # due. Another pass would re-trade it within seconds; the
                 # steady loop is slow enough to be survivable and the CRITICAL
@@ -116,36 +111,15 @@ class SchedulePoller:
         return advanced_total
 
     async def poll_once(self) -> list[TickReport]:
-        """One tick across every interval.
+        """One sweep, off the event loop.
 
-        A read that fails takes its interval down for this pass only: the loop
-        outlives any single broken interval, and the row stays due so the next
-        pass picks it up.
+        The sweep blocks on HTTP and DB the whole way through, so it runs in a
+        worker thread: an apply must not stall the API sharing this process.
         """
-        reports: list[TickReport] = []
-        for interval_id in self._refdata.interval_ids():
-            try:
-                # run_interval blocks on HTTP and DB; keep it off the event loop
-                # so an apply cannot stall the API sharing this process.
-                reports.append(
-                    await asyncio.to_thread(self._runner.run_interval, interval_id)
-                )
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("tick failed for interval=%s — skipping this pass", interval_id)
-        return reports
+        return await asyncio.to_thread(self._sweeper.sweep)
 
     def stop(self) -> None:
         """Ask :meth:`run` to finish after the pass in flight."""
         if self._running:
             logger.info("schedule poller stop requested")
             self._running = False
-
-    @staticmethod
-    def _has_stuck(reports: list[TickReport]) -> bool:
-        return any(
-            result.outcome is TickOutcome.STUCK
-            for report in reports
-            for result in report.results
-        )

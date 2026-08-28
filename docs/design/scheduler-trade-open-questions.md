@@ -177,8 +177,8 @@ Pre-completion aborts do not call SP_INS — row stays due.
 |------|------------|-------------|
 | `PERIOD_LENGTH` in REFDATA | Done | — |
 | `TRANSACT_AT` on `EXECUTION_EVENT` (diary) | Done | Done — one apply-cycle tick time shared by every attempt |
-| `DEPLOYMENT_SCHEDULE_STATUS` + GET/SP_INS advance | Done | Repo done; poller wiring (pending) |
-| Missed / next due split procs | Done | Repo done; poller wiring (pending) |
+| `DEPLOYMENT_SCHEDULE_STATUS` + GET/SP_INS advance | Done | Driven hourly by `POST /api/v1/scheduler/tick` |
+| Missed / next due split procs | Done | Driven hourly by `POST /api/v1/scheduler/tick` |
 | `SCHEDULE_TM_INTERVAL_ID` on create / update | Done | Repo + service + API done; UI (pending) |
 | Schedule backfill DAILY | Done | — |
 | Apply-time due gate | — | Pending |
@@ -186,6 +186,6 @@ Pre-completion aborts do not call SP_INS — row stays due.
 | Auto-pause on failure | — | Pending |
 | Pause = flatten + disable | — | Pending |
 | One deployment per credential+product slot | — | Pending |
-| `ScheduleTrigger` / EventBridge sync | — | Pending |
+| `ScheduleTrigger` / EventBridge sync | Dropped | Replaced by one platform tick — [design §6.2](scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment). Application code creates no AWS schedules |
 
 See also: [Scheduler & Price Bars](scheduler-price-bars.md).

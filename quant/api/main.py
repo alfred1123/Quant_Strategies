@@ -27,6 +27,7 @@ from quant.api.credentials.router import limiter as credentials_limiter, router 
 from quant.api.credentials.service import CredentialService  # noqa: E402
 from quant.api.admin.router import router as admin_router  # noqa: E402
 from quant.api.market_data.router import router as market_data_router  # noqa: E402
+from quant.api.scheduler.router import router as scheduler_router  # noqa: E402
 from quant.api.exception_handlers import register as register_exception_handlers  # noqa: E402
 from quant.api.routers import backtest, deployments, inst, jobs, promotion, refdata, strategies  # noqa: E402
 from quant.refdata.bundle import DataCaches  # noqa: E402
@@ -84,6 +85,31 @@ async def lifespan(app: FastAPI):
 
     app.state.price_bars = PriceBarServiceFactory(DB_CONNINFO, caches)
 
+    # Application-scoped for a different reason than the factory above: the tick
+    # counts apply attempts per (deployment, due time) in memory, and that budget
+    # is what eventually abandons a broken deployment so its schedule moves on.
+    # Rebuilt per request, the count would restart on every hourly wakeup and a
+    # deployment that can never trade would retry for ever.
+    from quant.api.routers.deployments import build_trade_service
+    from quant.queue.repo import BtQueueRepo
+    from quant.trade.db_repo import TradeRepo
+    from quant.trade.scheduler.sweep import DEFAULT_SETTLE_S, ScheduleSweeper
+    from quant.trade.scheduler.tick import ScheduleTickRunner
+
+    tick_bt = BtQueueRepo(DB_CONNINFO, user_id="system")
+    app.state.schedule_sweeper = ScheduleSweeper(
+        ScheduleTickRunner(
+            TradeRepo(DB_CONNINFO, bt=tick_bt, user_id="system"),
+            # A TradeService per apply, so one deployment's failure cannot leave
+            # shared state behind for the next.
+            lambda app_user_id, deployment_id: build_trade_service(
+                app.state
+            ).apply_deployment(app_user_id, deployment_id),
+        ),
+        caches.refdata,
+        settle_s=DEFAULT_SETTLE_S,
+    )
+
     yield
 
 
@@ -122,11 +148,12 @@ app.include_router(promotion.router, prefix="/api/v1", dependencies=[Depends(req
 app.include_router(refdata.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(deployments.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(credentials_router, prefix="/api/v1", dependencies=[Depends(require_user)])
-# The two routers the scheduler Lambda drives, so their gates also admit the
+# The routers the scheduler Lambda drives, so their gates also admit the
 # service token. Kept at router level so a new route cannot be added without a
 # gate; a route needing a human specifically adds require_user itself.
 app.include_router(admin_router, prefix="/api/v1", dependencies=[Depends(require_user_or_service)])
 app.include_router(market_data_router, prefix="/api/v1", dependencies=[Depends(require_user_or_service)])
+app.include_router(scheduler_router, prefix="/api/v1", dependencies=[Depends(require_user_or_service)])
 
 
 @app.get("/health")

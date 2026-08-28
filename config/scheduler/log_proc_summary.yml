@@ -5,12 +5,19 @@
 # (scripts/sync_schedules.py). No CFN change needed to add new jobs —
 # just drop another YAML file here.
 #
-# The schedule only carries `task` — the endpoint it maps to is owned by
-# `_TASK_PATHS` in aws/lambda/scheduled-task/handler.py, which whitelists the
-# paths the service token may reach. Naming a path here as well would be a
-# second source of truth with nothing to keep the two in step.
+# `path` is declared here, and only here. It used to live in a `_TASK_PATHS` map
+# in the Lambda handler, on the reasoning that naming it here too would be a
+# second source of truth — which had it backwards: the map *was* the second copy,
+# and the only thing keeping it in step with these files was a unit test.
+#
+# That map also acted as an allowlist of paths the service token could reach, but
+# the real control is the API's own gate. `require_user_or_service` admits the
+# service token on exactly three routers (admin, market_data, scheduler); every
+# route that acts on a user's account requires a human token and would refuse
+# this Lambda whatever path it was handed.
 
 task: log_proc_summary
+path: /api/v1/admin/log-proc-summary/summarize
 description: Aggregate LOG_PROC_DETAIL into daily per-proc call counts
 enabled: true
 

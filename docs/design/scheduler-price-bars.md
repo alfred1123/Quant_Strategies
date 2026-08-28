@@ -337,51 +337,85 @@ bash aws/scripts/init-ssm-params.sh   # creates TRADE_SERVICE_TOKEN if missing
 bash aws/deploy.sh scheduler          # CFN + Lambda zip + sync_schedules.py
 ```
 
-### 6.2 Schedule management (app — not yet wired)
+### 6.2 Schedule management — one platform tick, not a schedule per deployment
 
-Deployment create/update/stop talks to a **`ScheduleTrigger`** seam, not to
-boto3 directly. Two implementations, selected by `SCHEDULER_BACKEND`
-(default `local`):
+!!! note "Supersedes the `ScheduleTrigger` seam"
+    This section previously specified a `ScheduleTrigger` abstraction that
+    created, updated and deleted **one EventBridge schedule per deployment** via
+    boto3 on create/update/stop. That was dropped in favour of a single
+    platform-owned schedule. Reasons below; nothing creates AWS schedules from
+    application code any more, so `SCHEDULER_BACKEND` is gone too.
 
-| Backend | Trigger | Used by |
-|---------|---------|---------|
-| `eventbridge` | Per-deployment EventBridge schedule → Lambda → API (HTTPS + service token) | Prod (EC2, `USE_SSM=1`) |
-| `local` | In-process poller inside FastAPI — no AWS needed | Dev / any box without AWS |
+Deployment create/update/stop writes only to the database. **Nothing calls
+boto3.** One EventBridge schedule, defined in
+`config/scheduler/trade_apply_tick.yml` and applied by `sync_schedules.py` like
+every other job, wakes the platform hourly:
+
+```
+EventBridge (hourly) → Lambda {"task": "trade_apply_tick"}
+                     → POST /api/v1/scheduler/tick
+                     → ScheduleSweeper.sweep()
+                     → ScheduleTickRunner.run_interval() per TM_INTERVAL_ID
+```
+
+**Why not a schedule per deployment.** It would make AWS a second source of
+truth for something the database already owns. A stop that succeeds in Postgres
+but fails to delete the schedule leaves an orphan that keeps invoking apply — a
+live trader absent from the UI. With one sweep, stopping a deployment removes it
+from `SP_GET_MISSED_DUE_DEPLOYMENTS` and it stops trading by construction. The
+sweep also needs no IAM role for the app, no schedule naming scheme and no
+reconciliation job.
+
+The cost is granularity: the sweep can only act as often as it wakes. Hourly
+covers `REFDATA.TM_INTERVAL` as it stands (`DAILY`, `1H`); an interval shorter
+than the wakeup would need the schedule tightened.
+
+**Auth.** `/trade/deployments/{id}/apply` requires a human — it trades on the
+caller's own account — so the Lambda's service token cannot use it, and no
+scheduled job names it. The tick is the platform's own route, gated by
+`require_user_or_service`, and it applies each due deployment as the
+`APP_USER_ID` that `SP_GET_MISSED_DUE_DEPLOYMENTS` returns for it. Scheduled
+trading therefore needs no human token and no loosening of the human route.
 
 **Shared state, different alarm clock.** Schedule config lives on soft-versioned
 `DEPLOYMENT`; scheduler cursor on append-only `DEPLOYMENT_SCHEDULE_STATUS`.
 Due-ness = latest `PENDING` row with `SCHEDULED_TS <= NOW()` via
 `SP_GET_MISSED_DUE_DEPLOYMENTS`. EventBridge and the local poller are just two
-ways of waking up. Poller calls `SP_INS_DEPLOYMENT_SCHEDULE_STATUS` after apply;
-`live_apply` appends `EXECUTION_EVENT` only — separate concerns.
+ways of waking up. The tick calls `SP_INS_DEPLOYMENT_SCHEDULE_STATUS` after
+apply; `live_apply` appends `EXECUTION_EVENT` only — separate concerns.
 
-When a deployment is created or updated with a non-NULL `SCHEDULE_TM_INTERVAL_ID`:
-
-1. `SP_INS_DEPLOYMENT` persists `SCHEDULE_TM_INTERVAL_ID` (config change only — versions if other fields changed).
-2. `ScheduleTrigger.sync(deployment)`:
-    - **eventbridge** — creates/updates the schedule via `boto3` targeting the Lambda (`ScheduledTaskLambdaArn` + `SchedulerInvokeRoleArn` from stack outputs), with **`RetryPolicy.MaximumRetryAttempts = 0`** — the Scheduler default (185 retries over 24h) must never re-invoke a failing trade apply; order-level retries live in `OrderRetryExecutor`.
-    - **local** — no-op; the poller reads `SP_GET_MISSED_DUE_DEPLOYMENTS` directly.
-
-When a deployment is stopped or the schedule is cleared (`SCHEDULE_TM_INTERVAL_ID = NULL`):
-
-1. `ScheduleTrigger.remove(deployment)` (eventbridge deletes the schedule; local no-op).
-2. `SP_INS_DEPLOYMENT` with `SCHEDULE_TM_INTERVAL_ID = NULL`.
-
-**Local poller** (dev) — `SchedulePoller` in `quant/trade/scheduler/poller.py`:
-an asyncio background task started at FastAPI startup when
-`SCHEDULER_BACKEND=local`. Every `poll_interval_s` (default 60s) it sweeps
-every `TM_INTERVAL_ID` from `RedisRefData.interval_ids()` and hands each to
-`ScheduleTickRunner.run_interval`, which reads
-`SP_GET_MISSED_DUE_DEPLOYMENTS(IN_TM_INTERVAL_ID)`, invokes
-`TradeService.apply_deployment` **in-process** (no HTTP, no
-`TRADE_SERVICE_TOKEN`), then advances the cursor via
-`SP_INS_DEPLOYMENT_SCHEDULE_STATUS` using `NEXT_SCHEDULED_TS` off the due row.
+**The pass itself** — `ScheduleSweeper` in `quant/trade/scheduler/sweep.py`,
+shared by both drivers so they cannot disagree about what a tick does. It reads
+`RedisRefData.interval_ids()` and hands each to `ScheduleTickRunner.run_interval`,
+which reads `SP_GET_MISSED_DUE_DEPLOYMENTS(IN_TM_INTERVAL_ID)`, invokes
+`TradeService.apply_deployment` **in-process**, then advances the cursor via
+`SP_INS_DEPLOYMENT_SCHEDULE_STATUS` using `NEXT_SCHEDULED_TS` off the due row. A
+failure in one interval is logged and the others continue.
 
 Sweeping all intervals beats tracking which ones have deployments: an empty
 interval costs one read returning no rows, which is cheaper than keeping a
-subscription list correct across create/pause/reschedule. `run_interval`
-blocks on HTTP and DB, so the poller dispatches it through `asyncio.to_thread`
-— an apply must not stall the API sharing the process.
+subscription list correct across create/pause/reschedule. It is also what lets
+one hourly wakeup serve a `DAILY` strategy — that deployment is simply not due
+on most passes.
+
+`ScheduleSweeper.settle_s` (`DEFAULT_SETTLE_S = 10s`, used by the endpoint and
+not by the poller) waits before asking what is due, because the schedule fires
+*on* the boundary. A cursor standing exactly at 22:00:00 with delivery a few
+milliseconds early would answer "not yet" and wait a whole interval. The wait
+also lets `price_bar_sync`, on the same boundary, land first — overlap is safe
+regardless, since the bar insert treats a unique violation as a concurrent
+write.
+
+The tick runner is **application-scoped** (`app.state.schedule_sweeper`, built
+in `quant/api/main.py`). Its per-`(deployment, due time)` attempt budget lives in
+memory, and that budget is what eventually abandons a deployment that cannot
+trade so its schedule moves on. Rebuilt per request, the count would reset on
+every wakeup and a broken deployment would retry for ever.
+
+**Local poller** (dev) — `SchedulePoller` in `quant/trade/scheduler/poller.py`
+supplies wakeups only, every `poll_interval_s` (default 60s), plus a startup
+drain. It dispatches the sweep through `asyncio.to_thread`, since the pass blocks
+on HTTP and DB and must not stall the API sharing the process.
 
 #### 6.3.1 Startup drain — missed wakeups are the normal case
 
@@ -419,7 +453,7 @@ Apply schedules are per-deployment, so N deployments trading `btcusdt.crypto` on
 
 It is **best effort and not a correctness dependency.** One unreachable symbol is recorded in `SyncResult.failures` and the batch continues; every apply still calls `ensure_fresh` and still fails closed on its own. A failed sync costs a redundant fetch on the apply path, never a bad trade. That is what lets sync catch broadly where apply must not.
 
-Remaining wiring: the `POST /api/v1/market-data/price-bars/sync` endpoint, the `price_bar_sync` entry in the Lambda's `_TASK_PATHS` (already stubbed as a comment), and the per-interval schedule itself.
+All of that wiring is now in place: `POST /api/v1/market-data/price-bars/sync` is served, and `config/scheduler/price_bar_sync.yml` declares the task, its path and an hourly expression. One schedule covers every interval rather than one per `TM_INTERVAL_ID` — the warmer sweeps them all, so an interval with no deployments contributes no rows (§7.8).
 
 #### Required: fire *after* the boundary, never on it
 
@@ -434,26 +468,47 @@ This applies to both backends — the `eventbridge` schedule expression and the 
 ### 6.3 Lambda function
 
 Handler lives in-repo (stdlib + Lambda-bundled boto3 — no layers). It is a
-**generic task bridge**: the event names the task, a dict maps task → API
-path, and the token is fetched from SSM at cold start. Event shapes:
+**generic bridge**: the event carries the task name *and* the path, and the
+token is fetched from SSM at cold start. Event shapes:
 
 ```json
-{"task": "trade_apply", "deployment_id": "019abcde-…"}
-{"task": "price_bar_sync", "payload": {"internal_cusip": "…", "interval": "1H"}}
+{"task": "trade_apply_tick",  "path": "/api/v1/scheduler/tick"}
+{"task": "price_bar_sync",    "path": "/api/v1/market-data/price-bars/sync"}
+{"task": "log_proc_summary",  "path": "/api/v1/admin/log-proc-summary/summarize"}
 ```
 
-`trade_apply` calls `POST {API_BASE_URL}/api/v1/trade/deployments/{id}/apply`
-with `Authorization: Bearer {TRADE_SERVICE_TOKEN}`. `price_bar_sync` is the
-planned second task for scheduled price-bar ingestion (§4) — enabling it is
-one entry in the handler's `_TASK_PATHS` dict once the FastAPI endpoint
-exists, with its own schedule(s) in the same group. No new Lambda or stack
-change.
+Each calls `POST {API_BASE_URL}<path>` with
+`Authorization: Bearer {TRADE_SERVICE_TOKEN}`.
+
+**The path is declared in `config/scheduler/<task>.yml`, and nowhere else.**
+`sync_schedules.py` copies both fields into the schedule's target input, so
+adding a task is one YAML file — no handler change and no Lambda redeploy.
+
+That replaced a `_TASK_PATHS` dict in the handler. The dict made three artefacts
+have to agree (YAML `task`, the map, the served route) when it was itself a
+second copy of what the YAML implied, kept in step only by a unit test. It also
+served as an allowlist of paths the service token could reach; the API's own gate
+is the real control there, since `require_user_or_service` admits the token on
+three routers and every route touching a user's account demands a human token
+regardless of path. The handler does still reject a `path` that is a URL rather
+than an absolute path, so an event cannot redirect the token to another host.
+
+No path carries substitution fields, because every scheduled route acts on
+*everything due* — which is what keeps one schedule serving all deployments; a
+`{deployment_id}` would imply something has to create a schedule per row (§6.2).
+`tests/unit/test_scheduled_task_paths.py` checks each declared path against the
+gated routers and pins both that property and the absence of any job pointing at
+the human-only apply route.
 
 ### 6.4 Service auth (implemented)
 
 Lambda authenticates via `TRADE_SERVICE_TOKEN` (SSM SecureString), not a user JWT. `require_user_or_service` admits either: the service token for scheduled execution, or a session for manual apply.
 
-The gate is applied at **router level** in `quant/api/main.py` for the two routers the Lambda drives (`admin`, `market_data`), so a new maintenance route cannot be added without one; a route that needs a human adds `require_user` itself. Refusals are pinned in `tests/unit/test_service_token_auth.py` — an unset, blank or placeholder secret admits nothing, since a gate that fails open is worse than one that never worked.
+The gate is applied at **router level** in `quant/api/main.py` for the routers the Lambda drives (`admin`, `market_data`, `scheduler`), so a new maintenance route cannot be added without one; a route that needs a human adds `require_user` itself. Refusals are pinned in `tests/unit/test_service_token_auth.py` — an unset, blank or placeholder secret admits nothing, since a gate that fails open is worse than one that never worked.
+
+This is what makes scheduled trading possible without a per-user token: the tick
+route admits the service token, and resolves each deployment's owner from the
+database rather than from the caller (§6.2).
 
 ---
 
@@ -709,12 +764,14 @@ what every downstream "newest closed bar" derives from.
 | `quant/market_data/fetcher.py` | `CcxtBarFetcher` — paginated public `fetch_ohlcv` |
 | `quant/market_data/service.py` | `PriceBarService` — freshness check, gap fill, range read, `load_window` |
 | `quant/trade/bar_source.py` | `PriceBarServiceFactory` — `APP_ID` → venue → price bar service |
-| `quant/trade/scheduler/tick.py` | `ScheduleTickRunner` — due rows → apply → advance, with a cross-pass attempt budget. Shared by both backends |
-| `quant/trade/scheduler/poller.py` | `SchedulePoller` — dev asyncio loop with startup catch-up drain (`SCHEDULER_BACKEND=local`) |
+| `quant/trade/scheduler/tick.py` | `ScheduleTickRunner` — due rows → apply → advance, with a cross-pass attempt budget. One interval per call |
+| `quant/trade/scheduler/sweep.py` | `ScheduleSweeper` — one tick per interval, plus the boundary settle. Shared by the endpoint and the poller (§6.2) |
+| `quant/trade/scheduler/poller.py` | `SchedulePoller` — dev asyncio loop supplying wakeups, with a startup catch-up drain |
 | `quant/trade/scheduler/warm.py` | `BarWarmer` — the `price_bar_sync` task: scheduled instruments → grouped `PriceBarService.sync` (§7.8) |
 | `quant/api/market_data/router.py` | `POST /api/v1/market-data/price-bars/sync` — service-token gated |
+| `quant/api/scheduler/router.py` | `POST /api/v1/scheduler/tick` — service-token gated; the platform's own wakeup |
 | `config/scheduler/price_bar_sync.yml` | Hourly warm schedule, on the boundary |
-| `quant/trade/scheduler/trigger.py` | `ScheduleTrigger` seam — `EventBridgeTrigger` (boto3) / `LocalTrigger` (no-op) — *pending* |
+| `config/scheduler/trade_apply_tick.yml` | Hourly apply sweep, same boundary, 10s settle |
 
 ### Modified (Python)
 
@@ -728,9 +785,11 @@ what every downstream "newest closed bar" derives from.
 | `quant/strategy/live_service.py` | `SymbolLoader` seam; symbols via `get_internal_cusips()` |
 | `quant/strategy/performance.py` | `live_lookback_bars` alongside `live_lookback_days` |
 | `quant/api/exception_handlers.py` | `StaleBarsError` → 503 |
-| `quant/api/main.py` | `app.state.price_bars` built in the lifespan; market-data router mounted behind the service gate |
+| `quant/api/main.py` | `app.state.price_bars` and `app.state.schedule_sweeper` built in the lifespan; market-data and scheduler routers mounted behind the service gate |
 | `quant/trade/db_repo.py` | `sp_get_scheduled_instruments()` for the warmer |
-| `aws/lambda/scheduled-task/handler.py` | `price_bar_sync` in `_TASK_PATHS` |
+| `quant/api/routers/deployments.py` | `build_trade_service(state)` split out of the request dependency, so the tick can build one per apply |
+| `aws/lambda/scheduled-task/handler.py` | Task table removed — the path comes from the event, validated as a path rather than a URL |
+| `scripts/sync_schedules.py` | Copies `task` **and** `path` from each YAML into the schedule's target input; a job without a `path` is fatal |
 
 ---
 
@@ -738,8 +797,8 @@ what every downstream "newest closed bar" derives from.
 
 1. **DDL** — `REFDATA.TM_INTERVAL` seed; MARKET_DATA schema + tables + SPs; DEPLOYMENT scheduler columns + SP updates. ✅
 2. **Python** — schedule fields in schemas, `PriceBarRepo`, `PriceBarService`, db_repo schedule fields, clock module. ✅
-3. **Integration** — Price bar refresh wired into live apply ✅; scheduled bar warming ✅; scheduler tick *pending*.
-4. **UI + Lambda** — Schedule dropdown in DeploymentDialog; EventBridge/Lambda CloudFormation.
+3. **Integration** — Price bar refresh wired into live apply ✅; scheduled bar warming ✅; scheduler tick ✅.
+4. **UI + Lambda** — EventBridge/Lambda CloudFormation ✅; schedule dropdown in `DeploymentDialog` *pending*.
 5. **Tests** — Unit tests for clock, repos, service, updated schemas. ✅
 
 **Service auth is done** (§6.4). It was the blocker this section used to name
@@ -747,10 +806,16 @@ first — "every Lambda invoke 401s today" — but `require_user_or_service` is 
 and `log_proc_summary` has been reaching the API through it on schedule.
 
 **Scheduled bar warming is done.** `POST /api/v1/market-data/price-bars/sync`
-(§7.8) is served, its `_TASK_PATHS` entry is uncommented, and
-`config/scheduler/price_bar_sync.yml` schedules it hourly on the boundary.
+(§7.8) is served and `config/scheduler/price_bar_sync.yml` schedules it hourly on
+the boundary.
 
-Still open before a scheduled *apply* runs end to end: the `ScheduleTrigger` seam
-(§6.2), which is what creates a per-deployment EventBridge schedule. Until it
-exists, nothing invokes `trade_apply` in prod — the warmer keeps bars current,
-but only the local poller applies.
+**The scheduled apply is done**, as one platform tick rather than the
+`ScheduleTrigger` seam this section used to be waiting on — see §6.2 for why the
+per-deployment design was dropped. `POST /api/v1/scheduler/tick` is served and
+`config/scheduler/trade_apply_tick.yml` schedules it hourly.
+
+Still open before a deployment can actually be *put* on a schedule from the
+product: the UI has no schedule control. `SCHEDULE_TM_INTERVAL_ID` is persisted
+by `SP_INS_DEPLOYMENT` and honoured everywhere below it, but `DeploymentDialog`
+never sets it, so every deployment created today is manual-apply only and the
+tick finds nothing due. Adding the dropdown is what turns scheduled trading on.

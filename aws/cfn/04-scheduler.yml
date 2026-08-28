@@ -44,7 +44,7 @@ Parameters:
     AllowedValues: [128, 256, 512]
 
 Resources:
-  # ── Schedule group (organises per-deployment schedules) ──────────────
+  # ── Schedule group (holds the task schedules from config/scheduler/) ──
   TradeScheduleGroup:
     Type: AWS::Scheduler::ScheduleGroup
     Properties:
@@ -214,7 +214,7 @@ Outputs:
       Name: !Sub "${Project}-SchedulerInvokeRoleArn"
 
   ScheduleGroupName:
-    Description: Schedule group for per-deployment schedules
+    Description: Schedule group for the scheduled-task schedules
     Value: !Ref TradeScheduleGroup
     Export:
       Name: !Sub "${Project}-TradeScheduleGroupName"

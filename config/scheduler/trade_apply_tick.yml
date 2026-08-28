@@ -1,0 +1,41 @@
+# trade_apply_tick — apply every deployment that is due.
+#
+# The platform's own wakeup, not one schedule per deployment. Keeping the
+# schedule only in TRADE.DEPLOYMENT means stopping a deployment stops it
+# trading; a schedule per deployment would be a second source of truth that
+# keeps firing if its delete ever fails — an invisible live trader.
+#
+# One wakeup serves every interval. A deployment is applied when its cursor has
+# come due, so an hourly pass covers 1H strategies every time and DAILY ones on
+# the pass where their cursor comes up. Intervals with nothing due cost one
+# indexed read each.
+#
+# Nothing happens until a deployment actually has SCHEDULE_TM_INTERVAL_ID set:
+# with none scheduled, every pass reads no rows and returns immediately.
+
+task: trade_apply_tick
+# Deliberately not /trade/deployments/{id}/apply. That route requires a human —
+# it trades on the caller's own account — and the Lambda carries a service
+# token, so a schedule aimed at it could only ever 401.
+path: /api/v1/scheduler/tick
+description: Apply all due trade deployments across every interval
+enabled: true
+
+schedule:
+  # On the hour, same boundary as price_bar_sync, and ScheduleSweeper waits
+  # DEFAULT_SETTLE_S before asking what is due. Two reasons for the wait:
+  #
+  #   - A cursor sits exactly on the boundary and the tick asks for
+  #     SCHEDULED_TS <= NOW(). Delivery a few milliseconds early answers "not
+  #     yet", and the deployment would then wait a whole hour for the next pass.
+  #   - It lets the warm land first, so the apply usually finds its bars already
+  #     stored. Overlap is safe either way — the bar insert treats a unique
+  #     violation as a concurrent write — so this only saves a refetch.
+  #
+  # scripts/sync_schedules.py sets RetryPolicy.MaximumRetryAttempts = 0 on every
+  # schedule it creates, which is what makes this safe for a route that places
+  # orders: the Scheduler default of 185 retries over 24h must never re-invoke a
+  # failing apply. The tick's own attempt budget decides when to retry, and it
+  # retries on the next wakeup rather than seconds later.
+  expression: "cron(0 * * * ? *)"
+  timezone: UTC

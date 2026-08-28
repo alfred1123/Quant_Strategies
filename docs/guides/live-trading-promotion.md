@@ -48,7 +48,7 @@ in §5–§6 clear.
 
 | Environment | Bybit | Slack webhook | Scheduler |
 |-------------|-------|---------------|-----------|
-| **Local dev** | Testnet keys only | `#quant-test-env` (or unset → log-only) | `SCHEDULER_BACKEND=local` (when poller lands) |
+| **Local dev** | Testnet keys only | `#quant-test-env` (or unset → log-only) | In-process `SchedulePoller`, no AWS |
 | **Prod EC2 (pre-mainnet)** | Testnet deployment | Test channel OK; prod ops channel once §4 done | EventBridge → Lambda → API (testnet deployment) |
 | **Prod EC2 (mainnet)** | Mainnet deployment, min size first | **Prod ops channel** (§4) | Manual apply 48h before enabling schedule (§6) |
 
@@ -121,7 +121,7 @@ Complete on testnet before any mainnet credential:
 - [ ] Manual apply on testnet; verify fill on `testnet.bybit.com` + `TRADE.EXECUTION_EVENT` / `TRANSACTION`.
 - [ ] Kill switch: `PATCH` deployment `enabled=false` stops apply ([Trade API §4](../design/trade-api.md#4-risk--safety)).
 - [ ] Slack alert tested: failure → alert; success → no alert.
-- [ ] Scheduler: `TRADE_SERVICE_TOKEN` accepted by API — **done**, `log_proc_summary` and `price_bar_sync` both reach it on schedule. Still to verify: one scheduled testnet apply completes, and the EventBridge schedule the app creates uses **`MaximumRetryAttempts = 0`** — that waits on the `ScheduleTrigger` seam ([scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-app--not-yet-wired)).
+- [ ] Scheduler: `TRADE_SERVICE_TOKEN` accepted by API — **done**; `log_proc_summary`, `price_bar_sync` and `trade_apply_tick` all reach it on schedule, and `MaximumRetryAttempts = 0` is set by `scripts/sync_schedules.py` for every schedule rather than by application code ([scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)). Still to verify: one scheduled apply completes end to end — which needs a deployment with `SCHEDULE_TM_INTERVAL_ID` set, and the UI has no schedule control yet, so set it via `PATCH /trade/deployments/{id}`.
 - [ ] Price bars (Phase 1.9): live apply fails closed on stale data — do not trade on unverified bars ([scheduler design §4.8](../design/scheduler-price-bars.md#48-failure-modes-and-error-handling)).
 
 Remaining Phase 1.7 security items (ownership, dry-run-before-apply enforcement) should
@@ -221,11 +221,13 @@ flowchart TD
 
 Local dev does not need EventBridge or Lambda:
 
-- **`SCHEDULER_BACKEND=local`** (default when implemented): in-process poller reads
-  `SP_GET_MISSED_DUE_DEPLOYMENTS` and calls apply in-process — no HTTP, no `TRADE_SERVICE_TOKEN`.
+- **`SchedulePoller`** supplies the wakeups a laptop has no EventBridge for, and
+  runs the same pass prod runs (`ScheduleSweeper`) — reading
+  `SP_GET_MISSED_DUE_DEPLOYMENTS` and applying in-process, with no HTTP and no
+  `TRADE_SERVICE_TOKEN`.
 - Keep **testnet keys** and **test Slack** (or log-only) locally.
 
-See [Scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-app--not-yet-wired)
+See [Scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)
 and [Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge-lambda).
 
 ---
@@ -238,5 +240,5 @@ and [Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade
 | Separate webhooks per Slack channel | Reuse test webhook for prod ops |
 | New mainnet deployment + min qty | Flip testnet deployment to `paper=false` |
 | Manual mainnet 48h before scheduler | Enable EventBridge on mainnet day one |
-| Set `MaximumRetryAttempts = 0` on schedules | Rely on Scheduler default retries for apply |
+| Keep `MaximumRetryAttempts = 0` on schedules | Rely on Scheduler default retries for apply |
 | Keep dev on testnet + test Slack | Mainnet keys in local `.env` |

@@ -28,20 +28,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/trade", tags=["trade"])
 
 
-def get_trade_service(request: Request) -> TradeService:
-    """Build a per-request ``TradeService`` with all deps from app state."""
-    conninfo = request.app.state.db_conninfo
+def build_trade_service(state) -> TradeService:
+    """A fresh ``TradeService`` over the singletons on app state.
+
+    Takes the state rather than the request because the scheduler tick builds
+    one per apply too, and it has no request to build it from.
+    """
+    conninfo = state.db_conninfo
     bt = BtQueueRepo(conninfo, user_id="system")
     repo = TradeRepo(conninfo, bt=bt, user_id="system")
     return TradeService(
         repo=repo,
         bt=bt,
-        credential_service=request.app.state.credential_service,
+        credential_service=state.credential_service,
         credential_repo=ApiCredentialRepo(conninfo, user_id="system"),
-        adapter_registry=request.app.state.adapter_registry,
-        data_caches=request.app.state.data_caches,
-        price_bars=request.app.state.price_bars,
+        adapter_registry=state.adapter_registry,
+        data_caches=state.data_caches,
+        price_bars=state.price_bars,
     )
+
+
+def get_trade_service(request: Request) -> TradeService:
+    """Build a per-request ``TradeService`` with all deps from app state."""
+    return build_trade_service(request.app.state)
 
 
 @router.post("/deployments/dry-run", response_model=DryRunReport)
