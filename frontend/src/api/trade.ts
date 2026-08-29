@@ -8,6 +8,7 @@ import type {
   DryRunReport,
   DryRunRequest,
   ExecutionEventRow,
+  ScheduleOptions,
   TransactionRow,
   UpdateDeploymentRequest,
 } from '../types/trade';
@@ -19,6 +20,8 @@ export const ACCOUNT_SNAPSHOT_QUERY_KEY = ['trade', 'account-snapshot'] as const
 export const EXECUTION_EVENTS_QUERY_KEY = ['trade', 'execution-events'] as const;
 
 export const TRANSACTIONS_QUERY_KEY = ['trade', 'transactions'] as const;
+
+export const SCHEDULE_OPTIONS_QUERY_KEY = ['trade', 'schedule-options'] as const;
 
 async function listDeployments(): Promise<DeploymentRow[]> {
   const { data } = await apiClient.get<DeploymentRow[]>('/trade/deployments');
@@ -80,6 +83,11 @@ async function listExecutionEvents(limit = 50): Promise<ExecutionEventRow[]> {
   const { data } = await apiClient.get<ExecutionEventRow[]>('/trade/execution-events', {
     params: { limit },
   });
+  return data;
+}
+
+async function fetchScheduleOptions(): Promise<ScheduleOptions> {
+  const { data } = await apiClient.get<ScheduleOptions>('/trade/schedule-options');
   return data;
 }
 
@@ -164,6 +172,22 @@ export function useAccountSnapshot(
     enabled: apiCredentialId !== null,
     staleTime: 30_000,
     retry: false,
+  });
+}
+
+/**
+ * Cadences the schedule control may offer, from the API that enforces them.
+ *
+ * Fixed for the life of a deployed backend, so it is fetched once and never
+ * refetched. Callers treat "not loaded" as "no restriction" — the API refuses
+ * the write regardless, and greying out every option on a failed read would
+ * be a worse lie than briefly offering one that gets rejected.
+ */
+export function useScheduleOptions() {
+  return useQuery({
+    queryKey: SCHEDULE_OPTIONS_QUERY_KEY,
+    queryFn: fetchScheduleOptions,
+    staleTime: Infinity,
   });
 }
 

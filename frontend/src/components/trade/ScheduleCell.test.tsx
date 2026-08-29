@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ScheduleCell from './ScheduleCell';
 import { useTmIntervals } from '../../api/refdata';
-import { useUpdateDeployment } from '../../api/trade';
+import { useScheduleOptions, useUpdateDeployment } from '../../api/trade';
 import type { DeploymentRow } from '../../types/trade';
 import type { TmIntervalRow } from '../../types/refdata';
 
@@ -15,6 +15,7 @@ vi.mock('../../api/refdata', async (importOriginal) => ({
 
 vi.mock('../../api/trade', () => ({
   useUpdateDeployment: vi.fn(),
+  useScheduleOptions: vi.fn(),
 }));
 
 const INTERVALS: TmIntervalRow[] = [
@@ -61,11 +62,17 @@ let mutateAsync: ReturnType<typeof vi.fn>;
 
 function setup(
   row: DeploymentRow,
-  { intervals = INTERVALS }: { intervals?: TmIntervalRow[] } = {},
+  {
+    intervals = INTERVALS,
+    schedulableIds = [1, 2],
+  }: { intervals?: TmIntervalRow[]; schedulableIds?: number[] } = {},
 ) {
   vi.mocked(useTmIntervals).mockReturnValue({
     data: intervals,
   } as unknown as ReturnType<typeof useTmIntervals>);
+  vi.mocked(useScheduleOptions).mockReturnValue({
+    data: { tm_interval_ids: schedulableIds },
+  } as unknown as ReturnType<typeof useScheduleOptions>);
   vi.mocked(useUpdateDeployment).mockReturnValue({
     mutateAsync,
     isPending: false,
@@ -92,6 +99,7 @@ describe('ScheduleCell', () => {
   beforeEach(() => {
     mutateAsync = vi.fn().mockResolvedValue({});
     vi.mocked(useTmIntervals).mockReset();
+    vi.mocked(useScheduleOptions).mockReset();
     vi.mocked(useUpdateDeployment).mockReset();
   });
 
@@ -125,6 +133,19 @@ describe('ScheduleCell', () => {
       intervals: [{ ...INTERVALS[0], display_name: null }],
     });
     expect(screen.getByRole('combobox')).toHaveTextContent('DAILY');
+  });
+
+  it('disables a cadence the strategy was not fitted on', async () => {
+    setup(deployment(), { schedulableIds: [1] });
+    await userEvent.setup().click(screen.getByRole('combobox'));
+    expect(screen.getByRole('option', { name: 'Hourly' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    expect(screen.getByRole('option', { name: 'Daily' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
   });
 
   it('patches the chosen interval id', async () => {

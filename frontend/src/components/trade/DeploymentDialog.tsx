@@ -22,7 +22,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useMemo, useState } from 'react';
-import { useCreateDeployment, useDryRun } from '../../api/trade';
+import { useCreateDeployment, useDryRun, useScheduleOptions } from '../../api/trade';
 import { useJob } from '../../api/jobs';
 import { useBrokerAccounts } from '../../api/credentials';
 import { useProductXrefs, useProducts } from '../../api/inst';
@@ -74,6 +74,7 @@ function DeploymentDialogContent({
   const { data: accounts = [] } = useBrokerAccounts();
   const { data: apps = [] } = useApps();
   const { data: intervals = [] } = useTmIntervals();
+  const { data: scheduleOptions } = useScheduleOptions();
   const { data: products = [] } = useProducts();
   const create = useCreateDeployment();
   const dryRun = useDryRun();
@@ -112,6 +113,16 @@ function DeploymentDialogContent({
   const sortedIntervals = useMemo(
     () => [...intervals].sort((a, b) => a.tm_interval_id - b.tm_interval_id),
     [intervals],
+  );
+
+  // The schedule sets the bars the live signal is computed from, so a cadence
+  // the strategy was not fitted on would trade on statistics no backtest
+  // produced. The API refuses those; offering them greyed out says why,
+  // where hiding them would just look like a missing feature.
+  const schedulableIds = scheduleOptions?.tm_interval_ids;
+  const isSchedulable = (id: number) => !schedulableIds || schedulableIds.includes(id);
+  const hasUnfittedCadence = sortedIntervals.some(
+    (iv) => !isSchedulable(iv.tm_interval_id),
   );
 
   const { data: xrefs = [] } = useProductXrefs(selectedProduct?.product_id ?? null);
@@ -334,7 +345,11 @@ function DeploymentDialogContent({
               >
                 <MenuItem value={MANUAL_SCHEDULE}>Manual only</MenuItem>
                 {sortedIntervals.map((iv) => (
-                  <MenuItem key={iv.tm_interval_id} value={String(iv.tm_interval_id)}>
+                  <MenuItem
+                    key={iv.tm_interval_id}
+                    value={String(iv.tm_interval_id)}
+                    disabled={!isSchedulable(iv.tm_interval_id)}
+                  >
                     {intervalLabel(iv)}
                   </MenuItem>
                 ))}
@@ -343,6 +358,8 @@ function DeploymentDialogContent({
                 {isScheduled
                   ? 'Applies automatically on each closed bar, and keeps this product’s price data up to date.'
                   : 'Apply button only — no automatic trading, and no scheduled price data.'}
+                {hasUnfittedCadence &&
+                  ' Cadences the strategy was not fitted on are disabled — the schedule decides which bars the signal is computed from.'}
               </FormHelperText>
             </FormControl>
 

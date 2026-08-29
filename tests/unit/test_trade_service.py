@@ -11,6 +11,7 @@ from quant.schemas.deployments import CreateDeploymentRequest, UpdateDeploymentR
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
 from quant.trade.live_apply import LiveApplyOrchestrator
 from quant.trade.service import TradeService
+from tests.conftest import StubRefData
 
 
 def _sp_row(**overrides):
@@ -36,13 +37,17 @@ def _sp_row(**overrides):
 
 @pytest.fixture
 def svc():
+    data_caches = MagicMock()
+    # Real reader over a fixed snapshot, so the cadence guard resolves ids the
+    # way it does in production instead of against a mock that always agrees.
+    data_caches.refdata = StubRefData()
     return TradeService(
         repo=MagicMock(),
         bt=MagicMock(),
         credential_service=MagicMock(),
         credential_repo=MagicMock(),
         adapter_registry=MagicMock(),
-        data_caches=MagicMock(),
+        data_caches=data_caches,
     )
 
 
@@ -84,7 +89,7 @@ class TestCreateDeployment:
     def test_schedule_interval_passed_through(self, svc):
         app_user_id = uuid4()
         svc._repo.sp_ins_deployment.return_value = _sp_row(
-            app_user_id=app_user_id, schedule_tm_interval_id=2
+            app_user_id=app_user_id, schedule_tm_interval_id=1
         )
 
         req = CreateDeploymentRequest(
@@ -94,13 +99,30 @@ class TestCreateDeployment:
             app_id=10,
             internal_cusip="btcusdt.crypto",
             qty=Decimal("0.01"),
-            schedule_tm_interval_id=2,
+            schedule_tm_interval_id=1,
         )
         result = svc.create_deployment(app_user_id, "alice", req)
 
-        assert result.schedule_tm_interval_id == 2
+        assert result.schedule_tm_interval_id == 1
         kwargs = svc._repo.sp_ins_deployment.call_args.kwargs
-        assert kwargs["schedule_tm_interval_id"] == 2
+        assert kwargs["schedule_tm_interval_id"] == 1
+
+    def test_cadence_the_strategy_was_not_fitted_on_is_refused(self, svc):
+        """Hourly bars through daily-fitted parameters would trade silently."""
+        req = CreateDeploymentRequest(
+            strategy_id=uuid4(),
+            strategy_vid=1,
+            api_credential_id=1,
+            app_id=10,
+            internal_cusip="btcusdt.crypto",
+            qty=Decimal("0.01"),
+            schedule_tm_interval_id=2,
+        )
+
+        with pytest.raises(TradeValidationError, match="Hourly"):
+            svc.create_deployment(uuid4(), "alice", req)
+
+        svc._repo.sp_ins_deployment.assert_not_called()
 
     def test_schedule_defaults_to_manual_only(self, svc):
         app_user_id = uuid4()
@@ -211,17 +233,48 @@ class TestUpdateDeployment:
         app_user_id = uuid4()
         dep_id = uuid4()
         current = _sp_row(
-            deployment_id=dep_id, app_user_id=app_user_id, schedule_tm_interval_id=1
+            deployment_id=dep_id, app_user_id=app_user_id, schedule_tm_interval_id=None
         )
         svc._repo.sp_get_deployment.return_value = [current]
-        svc._repo.write_deployment.return_value = _sp_row(schedule_tm_interval_id=2)
+        svc._repo.write_deployment.return_value = _sp_row(schedule_tm_interval_id=1)
 
         svc.update_deployment(
-            app_user_id, dep_id, UpdateDeploymentRequest(schedule_tm_interval_id=2)
+            app_user_id, dep_id, UpdateDeploymentRequest(schedule_tm_interval_id=1)
         )
 
         kwargs = svc._repo.write_deployment.call_args.kwargs
-        assert kwargs["schedule_tm_interval_id"] == 2
+        assert kwargs["schedule_tm_interval_id"] == 1
+
+    def test_cadence_the_strategy_was_not_fitted_on_is_refused(self, svc):
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        svc._repo.sp_get_deployment.return_value = [
+            _sp_row(deployment_id=dep_id, app_user_id=app_user_id)
+        ]
+
+        with pytest.raises(TradeValidationError, match="Hourly"):
+            svc.update_deployment(
+                app_user_id, dep_id, UpdateDeploymentRequest(schedule_tm_interval_id=2)
+            )
+
+        svc._repo.write_deployment.assert_not_called()
+
+    def test_kill_switch_still_works_on_a_row_with_an_unfitted_cadence(self, svc):
+        """Refusing to disable a bad deployment would be the worse failure."""
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        svc._repo.sp_get_deployment.return_value = [
+            _sp_row(
+                deployment_id=dep_id, app_user_id=app_user_id, schedule_tm_interval_id=2
+            )
+        ]
+        svc._repo.write_deployment.return_value = _sp_row(is_enabled_ind="N")
+
+        result = svc.update_deployment(
+            app_user_id, dep_id, UpdateDeploymentRequest(enabled=False)
+        )
+
+        assert result.is_enabled_ind == "N"
 
     def test_explicit_null_clears_schedule(self, svc):
         """An explicit null is how a deployment goes back to manual-only."""

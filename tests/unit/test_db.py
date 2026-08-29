@@ -35,6 +35,18 @@ class TestRedact:
     def test_leaves_a_string_that_merely_starts_similarly(self):
         assert _redact(("gAAAA",)) == ("gAAAA",)
 
+    def test_truncates_a_bulk_payload(self):
+        """A cached price payload once wrote hundreds of KB per line at INFO,
+        pushing every surrounding line out of a readable log window."""
+        payload = "x" * 5000
+        (got,) = _redact((payload,))
+        assert len(got) < 300
+        assert got.startswith("xxx")
+        assert "5000 chars total" in got
+
+    def test_keeps_a_short_string_verbatim(self):
+        assert _redact(("btcusdt.crypto",)) == ("btcusdt.crypto",)
+
 
 class TestWriteLoggingRedaction:
     @patch("quant.shared.db.psycopg.connect")

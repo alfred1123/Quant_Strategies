@@ -52,6 +52,17 @@ class UpdateDeploymentRequest(BaseModel):
     schedule_tm_interval_id: int | None = Field(None, ge=1)
 
 
+class ScheduleOptions(BaseModel):
+    """Cadences a deployment may be scheduled on.
+
+    Exists so the schedule control can grey out what the API would refuse,
+    rather than the frontend keeping its own copy of a rule that belongs to
+    the backtest side of the platform.
+    """
+
+    tm_interval_ids: list[int]
+
+
 class DeploymentRow(BaseModel):
     """One TRADE.DEPLOYMENT row returned by SP_GET_DEPLOYMENT."""
 

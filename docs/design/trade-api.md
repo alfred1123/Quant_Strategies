@@ -120,7 +120,7 @@ DDL: `db/liquidbase/trade/tables/DEPLOYMENT.sql` (soft-versioned).
 | `paper` | bool | Paper / testnet (`IS_PAPER_IND` = Y/N) |
 | `enabled` | bool | Kill switch (`IS_ENABLED_IND` = Y/N) |
 | `deployment_status` | string | `CREATED`, `ACTIVE`, `PAUSED`, `STOPPED` |
-| `schedule_tm_interval_id` | int (optional) | FK → `REFDATA.TM_INTERVAL` — when to evaluate. Omit or send `null` for manual apply only |
+| `schedule_tm_interval_id` | int (optional) | FK → `REFDATA.TM_INTERVAL` — when to evaluate, and therefore which bars the signal reads. Must be a cadence the strategy was fitted on (**400** otherwise — see [scheduler §3.1.1](scheduler-price-bars.md#311-the-cadence-is-not-free-it-selects-the-bars-not-just-the-clock)). Omit or send `null` for manual apply only |
 
 **Not yet implemented** (planned extensions to `TRADE.DEPLOYMENT`):
 
@@ -216,11 +216,12 @@ GET    /api/v1/trade/deployments               → List deployments for user    
 GET    /api/v1/trade/deployments/{id}          → One deployment (current ver.)   ✅ live
 PATCH  /api/v1/trade/deployments/{id}          → Toggle enabled / status / sched ✅ live
 POST   /api/v1/trade/deployments/{id}/stop     → Stop deployment (idempotent)    ✅ live
+GET    /api/v1/trade/schedule-options          → Cadences a deployment may use   ✅ live
 ```
 
 `DeploymentRow` response fields include `transact_from_ts` (when this version became effective), `schedule_tm_interval_id`, `last_run_at`, and `next_due_at` (from `DEPLOYMENT_SCHEDULE_STATUS.SCHEDULED_TS`). **`created_at` is not returned** — table `CREATED_AT` is audit-only.
 
-`PATCH` accepts `enabled`, `deployment_status`, and `schedule_tm_interval_id`. Omitted fields keep their current value; sending `schedule_tm_interval_id: null` explicitly clears the schedule back to manual-only.
+`PATCH` accepts `enabled`, `deployment_status`, and `schedule_tm_interval_id`. Omitted fields keep their current value; sending `schedule_tm_interval_id: null` explicitly clears the schedule back to manual-only. A cadence the strategy was not fitted on is rejected with **400**, but only when the request actually sets it — a stored value is never re-validated, so the kill switch always gets through. `GET /api/v1/trade/schedule-options` returns the acceptable ids for the UI.
 
 ### 2.3 Credentials — implemented (Phase 1.1)
 

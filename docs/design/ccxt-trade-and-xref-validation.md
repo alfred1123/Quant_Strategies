@@ -90,6 +90,25 @@ CCXT_PRESETS = {
 
 Live order paths are implemented in `quant/trade/brokers/ccxt/` and `quant/trade/live_apply.py`.
 
+### Credential rejection is the caller's error, not a gateway failure
+
+`load_markets()` is public, so a connection succeeds with any key at all; the
+first *authenticated* call is where a wrong key surfaces. `_auth_error` raises
+**`BrokerAuthError`** (400) and appends the preset's `auth_hint`, while
+`BrokerConnectionError` (503) stays for a venue that is unreachable or erroring.
+The split is retry semantics: one needs a new key, the other needs another tick.
+
+This matters more than it looks because **paper mode is a different endpoint,
+not a flag**. `_wire_bybit` calls `set_sandbox_mode(True)` when `paper=True`, so
+a paper deployment authenticates against `testnet.bybit.com` and a mainnet key
+is rejected there — which is precisely what `_bybit_auth_hint` says. Returning
+that sentence as a 5xx classified a user's key mistake as a platform outage and
+let a proxy substitute its own error page for the one message that named the
+fix.
+
+`demo` reaches `ConnectParams` but no caller sets it, so today `paper` always
+means testnet rather than Bybit Demo Trading.
+
 ---
 
 ## Exchange market cache

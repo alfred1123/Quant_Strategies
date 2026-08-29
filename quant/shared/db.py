@@ -24,6 +24,9 @@ _PROC_NAME_RE = re.compile(r"CALL\s+([\w.]+)\s*\(", re.IGNORECASE)
 #: so the format is the only thing that marks them as secret.
 _FERNET_PREFIX = "gAAAAA"
 
+#: Longest string parameter reproduced verbatim in a log line.
+_MAX_LOGGED_PARAM_CHARS = 200
+
 
 def _proc_name_from_sql(sql: str) -> str:
     match = _PROC_NAME_RE.search(sql)
@@ -31,20 +34,32 @@ def _proc_name_from_sql(sql: str) -> str:
 
 
 def _redact(params: tuple) -> tuple:
-    """Replace encrypted values so they never reach a log sink.
+    """Prepare parameters for a log sink — hide secrets, shorten bulk.
 
     The ciphertext alone does not reveal a key, but logs are handled far more
     loosely than the database — shipped, tailed, pasted into tickets — and
     ciphertext there plus a leaked EXCHANGE_SECRETS_KEY is a plaintext key.
     Matching on the token format rather than the parameter position keeps this
     working for any procedure that carries an encrypted column.
+
+    Length matters for a different reason: a cached price payload is a JSON
+    string of every bar in the range, so one API_REQUEST write emitted
+    hundreds of KB at INFO and pushed the surrounding lines out of any
+    practical `docker logs` window. The head identifies the value; the rest
+    only buries whatever was logged next.
     """
-    return tuple(
-        f"<encrypted:{len(p)} chars>"
-        if isinstance(p, str) and p.startswith(_FERNET_PREFIX)
-        else p
-        for p in params
-    )
+    return tuple(_redact_one(p) for p in params)
+
+
+def _redact_one(param: object) -> object:
+    if not isinstance(param, str):
+        return param
+    if param.startswith(_FERNET_PREFIX):
+        return f"<encrypted:{len(param)} chars>"
+    if len(param) > _MAX_LOGGED_PARAM_CHARS:
+        head = param[:_MAX_LOGGED_PARAM_CHARS]
+        return f"{head}...<truncated, {len(param)} chars total>"
+    return param
 
 
 class ProcedureError(RuntimeError):

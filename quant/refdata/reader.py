@@ -150,6 +150,18 @@ class RedisRefData:
                 return int(r["tm_interval_id"])
         raise RuntimeError(f"REFDATA.TM_INTERVAL has no row with PERIOD_LENGTH={period}")
 
+    def interval_label(self, tm_interval_id: int) -> str:
+        """``DISPLAY_NAME`` for a ``TM_INTERVAL_ID``, for text a user reads.
+
+        Falls back to ``NAME``, then to the id itself, because the only callers
+        are error messages: one that cannot name an interval must still say
+        which one it meant rather than raise on top of the original problem.
+        """
+        for r in self.get("tm_interval"):
+            if int(r["tm_interval_id"]) == int(tm_interval_id):
+                return str(r.get("display_name") or r.get("name") or tm_interval_id)
+        return str(tm_interval_id)
+
     def interval_ids(self) -> list[int]:
         """Every ``TM_INTERVAL_ID``, shortest period first.
 

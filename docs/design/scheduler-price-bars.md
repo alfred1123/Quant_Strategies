@@ -114,15 +114,56 @@ Two layers must not be conflated:
 
 **Shipped UI:**
 
-1. **`DeploymentDialog`** — `REFDATA.TM_INTERVAL` dropdown: *Manual only* (`null`), *Daily* (`1`), *Hourly* (`2`). Default selection: **Manual only**. Helper copy states that manual means the Apply button only and no scheduled price data, while a cadence applies on each closed bar and keeps the product's bars current.
+1. **`DeploymentDialog`** — `REFDATA.TM_INTERVAL` dropdown: *Manual only* (`null`), *Daily* (`1`), *Hourly* (`2`, disabled — see §3.1.1). Default selection: **Manual only**. Helper copy states that manual means the Apply button only and no scheduled price data, while a cadence applies on each closed bar and keeps the product's bars current.
 2. **`TradeApplyPage`** — `ScheduleCell` in a Schedule column: the same dropdown, editable in place via `PATCH /trade/deployments/{id}`, with `next_due_at` beneath it when scheduled.
 3. **Live cadence takes its own confirmation.** Automating a live deployment is a second, separate tick-box in the dialog (`I confirm automatic live trading on this schedule`) and a `window.confirm` on the inline edit. One manual live apply is a human watching a single order; an hourly cadence is unattended real money, so the existing live confirmation does not cover it. Switching mode re-arms it.
 
 Labels come from `REFDATA.TM_INTERVAL.DISPLAY_NAME` (`1.7.0`). The table had no such column, since nothing displayed an interval until this control; without it the frontend would have to map `NAME` (`DAILY`, `1H`) to friendly text, which the REFDATA single-source-of-truth decision forbids. `intervalLabel()` falls back to `NAME` so a database that predates the migration renders `DAILY` rather than a blank row. `REFDATA.SP_GET_ENUM` opens `SELECT *`, so the column reached Redis and the API with no procedure change.
 
-**Still optional:** smart pre-selection — when launching from Promotion with a backtest job, pre-select the interval matching the job's bar cadence if known, otherwise stay on Manual. Not built; Manual is always the default today.
+**Still optional:** smart pre-selection — when launching from Promotion with a backtest job, pre-select the interval matching the job's bar cadence if known, otherwise stay on Manual. Not built; Manual is always the default today. Note that §3.1.1 makes this cosmetic rather than protective: an unfitted cadence can no longer be *chosen*, so pre-selection would only save a click.
 
 `schedule_tm_interval_id` remains settable directly via `PATCH /api/v1/trade/deployments/{id}` or on `POST /api/v1/trade/deployments`.
+
+#### 3.1.1 The cadence is not free — it selects the bars, not just the clock
+
+Choosing a cadence looks like choosing a frequency, but `LiveApplyOrchestrator`
+resolves the deployment's interval straight into the window it loads, so the
+schedule also decides **which bars the signal is computed from**. Every backtest
+on this platform fits on **daily** bars, so putting a strategy on the hourly
+cadence would run daily-fitted parameters over hourly bars.
+
+That combination fails **silently**, which is what makes it the dangerous one: a
+20-period band computes perfectly well over 20 hourly bars, the signal has the
+right shape, the order places, and the execution diary looks healthy. Nothing in
+the stack can tell the difference between a position justified by a backtest and
+one justified by arithmetic nobody fitted.
+
+`quant/trade/schedule_policy.py` closes it:
+
+| Piece | Behaviour |
+|---|---|
+| `schedulable_interval_ids(refdata)` | `RedisRefData.resolve_interval_id(FITTED_BAR_PERIOD)` — the module states the fitted **period** (`timedelta(days=1)`) and REFDATA owns what that period is numbered, exactly as an unscheduled apply resolves its cadence (decision #45). No interval id is hardcoded, so renumbering `DAILY` moves the guard with it |
+| `require_fitted_interval()` | **400** on create and on update, naming both the rejected and the fitted cadence via `RedisRefData.interval_label()`. `null` (manual) always passes — it prices off the fitted daily interval |
+| `GET /trade/schedule-options` | Publishes the same set so `DeploymentDialog` and `ScheduleCell` grey out what the API would refuse, instead of the frontend re-stating a backtest-side rule |
+
+`interval_label()` lives on `RedisRefData` beside `resolve_interval_id` and
+`get_interval_period`, not in the trade module: every `REFDATA.TM_INTERVAL`
+lookup stays in the one class that owns the snapshot (decision #44), so no
+caller reads raw `tm_interval` rows to render a name. It falls back
+`DISPLAY_NAME → NAME → id`, because its only callers are error messages and one
+that cannot name an interval must still say which one it meant.
+
+The fitted period widens to a set when multi-interval backtests land, and
+`FITTED_BAR_PERIOD` is the one line that changes.
+
+Two deliberate choices in that guard:
+
+- **Update validates only what the caller sets**, never the stored value.
+ A deployment whose cadence predates this rule must stay reachable by the kill
+ switch; refusing its `PATCH` would mean refusing to disable it.
+- **Unfitted cadences are disabled, not hidden.** A missing option reads as a
+ missing feature; a greyed one with the helper line beneath it says the schedule
+ chooses the bars, which is the thing users do not expect.
 
 ### 3.2 Capturing bars for an instrument nobody trades yet
 
@@ -885,7 +926,7 @@ what every downstream "newest closed bar" derives from.
 | `quant/trade/live_apply.py` | Picks the signal source from `SCHEDULE_TM_INTERVAL_ID` (§7.7) |
 | `quant/strategy/live_service.py` | `SymbolLoader` seam; symbols via `get_internal_cusips()` |
 | `quant/strategy/performance.py` | `live_lookback_bars` alongside `live_lookback_days` |
-| `quant/api/exception_handlers.py` | `StaleBarsError` → 503 |
+| `quant/api/exception_handlers.py` | `StaleBarsError` → 503; every handled error logged once ([api.md](../architecture/api.md#broker-failures-status-says-whether-to-retry)) |
 | `quant/api/main.py` | `app.state.price_bars` and `app.state.schedule_sweeper` built in the lifespan; market-data and scheduler routers mounted behind the service gate |
 | `quant/trade/db_repo.py` | `sp_get_scheduled_instruments()` for the warmer |
 | `quant/api/routers/deployments.py` | `build_trade_service(state)` split out of the request dependency, so the tick can build one per apply |

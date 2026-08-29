@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DeploymentDialog from './DeploymentDialog';
-import { useCreateDeployment, useDryRun } from '../../api/trade';
+import { useCreateDeployment, useDryRun, useScheduleOptions } from '../../api/trade';
 import { useJob } from '../../api/jobs';
 import { useBrokerAccounts } from '../../api/credentials';
 import { useProductXrefs, useProducts } from '../../api/inst';
@@ -12,6 +12,7 @@ import type { TmIntervalRow } from '../../types/refdata';
 vi.mock('../../api/trade', () => ({
   useCreateDeployment: vi.fn(),
   useDryRun: vi.fn(),
+  useScheduleOptions: vi.fn(),
 }));
 vi.mock('../../api/jobs', () => ({ useJob: vi.fn() }));
 vi.mock('../../api/credentials', () => ({ useBrokerAccounts: vi.fn() }));
@@ -45,8 +46,16 @@ const INTERVALS: TmIntervalRow[] = [
 
 let createMutate: ReturnType<typeof vi.fn>;
 
-function setup({ intervals = INTERVALS }: { intervals?: TmIntervalRow[] } = {}) {
+function setup({
+  intervals = INTERVALS,
+  // Both cadences schedulable by default, so the tests below exercise the
+  // confirmation flows they are about rather than the fitted-cadence rule.
+  schedulableIds = [1, 2],
+}: { intervals?: TmIntervalRow[]; schedulableIds?: number[] | null } = {}) {
   createMutate = vi.fn().mockResolvedValue({});
+  vi.mocked(useScheduleOptions).mockReturnValue({
+    data: schedulableIds === null ? undefined : { tm_interval_ids: schedulableIds },
+  } as unknown as ReturnType<typeof useScheduleOptions>);
   vi.mocked(useCreateDeployment).mockReturnValue({
     mutateAsync: createMutate,
     isPending: false,
@@ -129,6 +138,35 @@ describe('DeploymentDialog schedule control', () => {
     expect(screen.getByRole('option', { name: 'Manual only' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Daily' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Hourly' })).toBeInTheDocument();
+  });
+
+  it('disables a cadence the strategy was not fitted on', async () => {
+    const user = setup({ schedulableIds: [1] });
+    await user.click(screen.getByLabelText('Schedule'));
+    expect(screen.getByRole('option', { name: 'Daily' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    expect(screen.getByRole('option', { name: 'Hourly' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+
+  it('says why a cadence is unavailable instead of hiding it', () => {
+    setup({ schedulableIds: [1] });
+    expect(screen.getByText(/not fitted on are disabled/i)).toBeInTheDocument();
+  });
+
+  it('restricts nothing until the options load', async () => {
+    // The API refuses the write anyway; greying out every cadence on a failed
+    // read would claim scheduling is unavailable when it is not.
+    const user = setup({ schedulableIds: null });
+    await user.click(screen.getByLabelText('Schedule'));
+    expect(screen.getByRole('option', { name: 'Hourly' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
   });
 
   it('falls back to NAME when the database predates DISPLAY_NAME', async () => {

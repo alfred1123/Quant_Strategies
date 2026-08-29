@@ -79,6 +79,51 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `GET` | `/api/v1/trade/deployments/{id}/events` | Required | Execution diary for one deployment. |
 | `GET` | `/api/v1/trade/deployments/{id}/transactions` | Required | Fill history for one deployment. |
 | `GET` | `/api/v1/trade/accounts/{api_credential_id}/snapshot` | Required | Live balances and open positions for one broker account. Read-only. Query `paper` (default `true`). **404** if the credential is not owned. |
+| `GET` | `/api/v1/trade/schedule-options` | Required | `tm_interval_ids` a deployment may be scheduled on — see [the cadence guard](#the-schedule-cadence-must-match-the-fitted-bars) below. |
+
+#### The schedule cadence must match the fitted bars
+
+A schedule decides more than *when* an apply runs. `LiveApplyOrchestrator`
+resolves the deployment's interval into the bar window it loads, so the cadence
+also decides **which bars the signal is computed from**. Every backtest fits on
+daily bars, so an hourly schedule would push hourly bars through daily-fitted
+parameters — which fails silently: the indicator still returns a number and the
+order still places.
+
+`POST /trade/deployments` and `PATCH /trade/deployments/{id}` therefore reject a
+`schedule_tm_interval_id` outside `schedulable_interval_ids()` with **400** and a
+message naming both cadences. `null` (manual) is always accepted. A PATCH is
+checked only on the value it *sets*, so the kill switch still reaches a row
+whose cadence predates the rule.
+
+`GET /trade/schedule-options` publishes the same set, which is how
+`DeploymentDialog` and `ScheduleCell` grey out the cadences the API would refuse
+rather than keeping their own copy of the rule.
+
+#### Broker failures — status says whether to retry
+
+Anything that reaches an exchange (`dry-run`, `apply`, the account snapshot) can
+fail at the broker rather than in our code, and the status separates the two
+things a caller can do about it:
+
+| Condition | Status | What the caller does |
+|---|---|---|
+| Broker rejected the credentials (`BrokerAuthError`) | **400** | Fix the key — retrying is pointless |
+| Broker unreachable or erroring (`BrokerConnectionError`) | **503** | Come back on the next tick |
+| Bars incomplete (`StaleBarsError`) | **503** | Come back on the next tick |
+| Unknown product / no xref (`SymbolMappingError`) | **400** | Fix the request or seed `INST.PRODUCT_XREF` |
+
+A rejected key used to answer **502**, which put a wrong API key in the same
+bucket as a platform outage. That is worth stating because the response body
+carries the broker's own explanation and the remedy — a **paper** deployment
+connects to the venue's *testnet*, so mainnet keys are rejected there — and a
+5xx is exactly the response an intermediate proxy is entitled to replace with
+its own error page before anyone reads it.
+
+Every handled error is also logged once by `quant/api/exception_handlers.py`
+(`METHOD /path -> status: detail`), at `WARNING` for 4xx and `ERROR` for 5xx.
+Handling an exception consumes it, so before that a failed request left no
+server-side trace at all and could only be reconstructed from the client.
 
 #### Account snapshot
 
