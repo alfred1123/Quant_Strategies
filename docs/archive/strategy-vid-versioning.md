@@ -1,6 +1,12 @@
 # Strategy VID Versioning by Name
 
-**Status:** Implemented (release `1.10.0` — SP + Python + frontend name builder + data merge).
+!!! warning "Archived — migration complete"
+    **Shipped in release `1.10.0`** (SP + Python + frontend name builder + data
+    merge). Kept for the audit trail and the reasoning behind the identity key.
+    Current `SP_INS_STRATEGY` behaviour is summarised in
+    [Architecture → Database](../architecture/database.md). The one-off SQL below
+    (truncate, duplicate audit, merge cleanup) **has already been applied — do
+    not re-run it.**
 
 How to make repeated submissions of the **same strategy identity** increment
 `STRATEGY_VID` (`v1`, `v2`, `v3`, …) under **one** `STRATEGY_ID`, add a
@@ -74,7 +80,7 @@ version resolution.
 
 ## Strategy name selection and identity
 
-With [separated underlying](separate-underlying.md), the **trade product** (what
+With [separated underlying](../design/separate-underlying.md), the **trade product** (what
 we buy/sell for PnL) and the **indicator underlying** (what each factor reads)
 can differ. You do not necessarily trade the same product you use for the signal.
 
@@ -269,7 +275,7 @@ flowchart TD
 
 !!! note "Scoping: `(USER_ID, STRATEGY_NM, STRATEGY_VID)` — not global `(STRATEGY_NM, VID)`"
     Strategies are owned (`BT.STRATEGY.USER_ID`, see
-    [User isolation](user-isolation.md)). Two different users may legitimately
+    [User isolation](../design/user-isolation.md)). Two different users may legitimately
     pick the same `STRATEGY_NM`. A **global** `UNIQUE (STRATEGY_NM, STRATEGY_VID)`
     would block user B from ever using a name user A already used.
 
@@ -1146,13 +1152,13 @@ owner**, not opaque UUIDs.
 
 - Lead with **Strategy** (`strategy_nm`) and **Owner** (`user_id`); drop visible
   `Queue ID` (keep `queue_id` in row data for actions).
-- See [Jobs Table Detail UX](jobs-table-detail-ux.md) for the full column plan.
+- See [Jobs Table Detail UX](../design/jobs-table-detail-ux.md) for the full column plan.
 
 ## Related
 
 - `BT.STRATEGY` table (`db/liquidbase/bt/tables/STRATEGY.sql`)
 - `BT.SP_INS_STRATEGY` (`db/liquidbase/bt/procedures/SP_INS_STRATEGY.sql`)
-- [Separate underlying & cache](separate-underlying.md) — trade vs indicator product
-- [Trade Deployment Rollout](trade-deployment-rollout.md) — **parallel track** (no queue changes; deploy pins explicit `(STRATEGY_ID, STRATEGY_VID)`)
-- [Best-VID Promotion](best-vid-promotion.md) — `IS_BEST_IND` semantics (orthogonal to VID increment)
-- [User isolation](user-isolation.md) — why scoping is per-`USER_ID`
+- [Separate underlying & cache](../design/separate-underlying.md) — trade vs indicator product
+- [Trade Deployment Rollout](../design/trade-deployment-rollout.md) — **parallel track** (no queue changes; deploy pins explicit `(STRATEGY_ID, STRATEGY_VID)`)
+- [Best-VID Promotion](../design/best-vid-promotion.md) — `IS_BEST_IND` semantics (orthogonal to VID increment)
+- [User isolation](../design/user-isolation.md) — why scoping is per-`USER_ID`

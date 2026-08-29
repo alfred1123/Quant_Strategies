@@ -9,7 +9,7 @@
 !!! note "Same name, duplicate VID=1 rows"
     A separate bug causes every enqueue to mint a **new** `STRATEGY_ID`, so the
     same `STRATEGY_NM` never increments VID. That breaks the Promotion UI (two
-    cards both at `v1`). See [Strategy VID Versioning by Name](strategy-vid-versioning.md)
+    cards both at `v1`). See [Strategy VID Versioning by Name](../archive/strategy-vid-versioning.md)
     for the fix, data cleanup, and `UNIQUE (USER_ID, STRATEGY_NM, STRATEGY_VID)`.
 
 ## Design — `IS_BEST_IND` column

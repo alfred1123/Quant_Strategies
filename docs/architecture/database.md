@@ -269,7 +269,7 @@ A procedure that logs itself declares `V_LOG_START TIMESTAMPTZ := clock_timestam
 |-----------|--------|------|
 | `CORE_INS_LOG_PROC` | `CORE_ADMIN` | Central logging for all SPs — measures with `clock_timestamp()` |
 | `SP_GET_ENUM` | `REFDATA` | Generic REFCURSOR select for any REFDATA table |
-| `SP_INS_STRATEGY` | `BT` | Resolves `STRATEGY_ID` from `(USER_ID, STRATEGY_NM)`; bumps VID; returns `OUT_STRATEGY_ID` + `OUT_STRATEGY_VID`. Advisory lock per identity. See [strategy-vid-versioning.md](../design/strategy-vid-versioning.md). |
+| `SP_INS_STRATEGY` | `BT` | Resolves `STRATEGY_ID` from `(USER_ID, STRATEGY_NM)`; bumps VID; returns `OUT_STRATEGY_ID` + `OUT_STRATEGY_VID`. Advisory lock per identity. See [strategy-vid-versioning.md](../archive/strategy-vid-versioning.md). |
 | `SP_INS_QUEUE` | `BT` | **Unified queue state machine**: `IN_ACTION` = **`ENQUEUE`**, **`CLAIM_NEXT`**, **`TERMINAL`**, **`CANCEL`** — all **`BT.QUEUE`** transitions |
 | `SP_GET_QUEUE` | `BT` | Flexible queue reader (REFCURSOR); FastAPI jobs list/detail |
 | `SP_GET_QUEUE_FOR_TERMINAL` | `BT` | Active rows + strategy metadata (REFCURSOR) |
