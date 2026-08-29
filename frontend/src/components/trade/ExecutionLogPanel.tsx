@@ -168,6 +168,16 @@ const FILL_COLUMNS: GridColDef<TransactionRow>[] = [
   },
 ];
 
+const GRID_SX = {
+  border: 'none',
+  '& .MuiDataGrid-columnHeaders': { bgcolor: 'action.hover' },
+} as const;
+
+const GRID_PAGE = {
+  pageSizeOptions: [10, 25, 50] as const,
+  initialState: { pagination: { paginationModel: { pageSize: 10 } } },
+};
+
 /** Bottom panel — recent order attempts and confirmed fills (Phase 1.8). */
 export default function ExecutionLogPanel() {
   const [tab, setTab] = useState(0);
@@ -191,13 +201,21 @@ export default function ExecutionLogPanel() {
   const error = tab === 0 ? events.error : fills.error;
   const refetch = tab === 0 ? events.refetch : fills.refetch;
 
-  const rows = tab === 0 ? filteredEvents : filteredFills;
-  const columns = tab === 0 ? EVENT_COLUMNS : FILL_COLUMNS;
+  const emptyMessage =
+    tab === 0
+      ? 'No order attempts yet — apply a deployment or wait for a scheduled tick.'
+      : 'No confirmed fills yet — fills appear after a successful order at the broker.';
+
+  const rowCount = tab === 0 ? filteredEvents.length : filteredFills.length;
 
   return (
     <Box>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ mb: 1, alignItems: 'center', justifyContent: 'space-between' }}
+      >
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <Typography variant="subtitle2" color="text.secondary">
             Execution log
           </Typography>
@@ -238,34 +256,38 @@ export default function ExecutionLogPanel() {
       )}
 
       {loading ? (
-        <Stack alignItems="center" sx={{ py: 3 }}>
+        <Stack sx={{ py: 3, alignItems: 'center' }}>
           <CircularProgress size={28} />
         </Stack>
-      ) : rows.length === 0 ? (
+      ) : rowCount === 0 ? (
         <Typography variant="body2" color="text.disabled">
-          {tab === 0
-            ? 'No order attempts yet — apply a deployment or wait for a scheduled tick.'
-            : 'No confirmed fills yet — fills appear after a successful order at the broker.'}
+          {emptyMessage}
         </Typography>
-      ) : (
+      ) : tab === 0 ? (
         <DataGrid
-          rows={rows}
-          columns={columns}
-          getRowId={(row) =>
-            tab === 0
-              ? (row as ExecutionEventRow).execution_event_id
-              : (row as TransactionRow).transaction_id
-          }
+          rows={filteredEvents}
+          columns={EVENT_COLUMNS}
+          getRowId={(row) => row.execution_event_id}
           autoHeight
           density="compact"
           disableRowSelectionOnClick
-          hideFooter={rows.length <= 10}
-          pageSizeOptions={[10, 25, 50]}
-          initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
-          sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': { bgcolor: 'action.hover' },
-          }}
+          hideFooter={filteredEvents.length <= 10}
+          pageSizeOptions={[...GRID_PAGE.pageSizeOptions]}
+          initialState={GRID_PAGE.initialState}
+          sx={GRID_SX}
+        />
+      ) : (
+        <DataGrid
+          rows={filteredFills}
+          columns={FILL_COLUMNS}
+          getRowId={(row) => row.transaction_id}
+          autoHeight
+          density="compact"
+          disableRowSelectionOnClick
+          hideFooter={filteredFills.length <= 10}
+          pageSizeOptions={[...GRID_PAGE.pageSizeOptions]}
+          initialState={GRID_PAGE.initialState}
+          sx={GRID_SX}
         />
       )}
     </Box>
