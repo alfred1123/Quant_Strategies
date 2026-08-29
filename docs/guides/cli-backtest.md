@@ -61,7 +61,7 @@ Run `python -m quant.cli --help` for the full list.
 
 ## Output Files
 
-Saved to `results/` by default. The `<tag>` suffix is `<symbol-without-dashes-lower>_<indicator>` (e.g. `btcusd_bollinger`).
+Saved to `../results` by default (relative to the working directory). The `<tag>` suffix is `<symbol-without-dashes-lower>_<indicator>` (e.g. `btcusd_bollinger`).
 
 | File | Contents |
 |---|---|

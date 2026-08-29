@@ -1,10 +1,10 @@
 # Design: Live Order Execution — Fill Confirmation, Retry, Alerting
 
 !!! info "Status"
-    **Design — not yet implemented.** Golden-harness manual testing (`--apply-signal --confirm`)
-    against Bybit testnet has validated order submission and surfaced two real bugs (fixed) plus
-    two account-level blockers (resolved). The retry/alert orchestration described here
-    (`quant/trade/live_apply.py`) does not exist yet.
+    **Implemented.** Golden-harness manual testing against Bybit testnet validated order
+    submission. `quant/trade/live_apply.py` (`LiveApplyOrchestrator`) orchestrates signal
+    computation, order retry, execution diary writes, and Slack alerting via
+    `quant/shared/notify.py`.
 
 **Related:** [Plan to Profit §1.7](plan-to-profit.md#phase-17-live-apply),
 [Trade Deployment Rollout](trade-deployment-rollout.md),

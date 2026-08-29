@@ -36,7 +36,7 @@ test channel you never check.
 | Bybit testnet apply | Done — 6 lifecycle actions verified on `testnet.bybit.com` |
 | Bybit mainnet | Not started — requires `is_paper_ind='N'`, mainnet API keys, `confirm_live=true` |
 | Slack | Wired for apply failures; webhook should point at **test-env** until §4 |
-| Scheduler (Phase 1.9) | AWS infra deployed; app work remaining — service auth, boto3 schedule sync, local poller for dev |
+| Scheduler (Phase 1.9) | **Done** — service auth, `sync_schedules.py`, in-process `SchedulePoller` (dev), EventBridge → Lambda → API (prod). Remaining: verify one scheduled apply end-to-end |
 | Phase 1.7 security | Partial — ownership, dry-run-before-apply, kill switch enforcement still on checklist |
 
 **Honest default:** stay on **testnet + test Slack** until research and pipeline gates
@@ -121,7 +121,7 @@ Complete on testnet before any mainnet credential:
 - [ ] Manual apply on testnet; verify fill on `testnet.bybit.com` + `TRADE.EXECUTION_EVENT` / `TRANSACTION`.
 - [ ] Kill switch: `PATCH` deployment `enabled=false` stops apply ([Trade API §4](../design/trade-api.md#4-risk-safety)).
 - [ ] Slack alert tested: failure → alert; success → no alert.
-- [ ] Scheduler: `TRADE_SERVICE_TOKEN` accepted by API — **done**; `log_proc_summary`, `price_bar_sync` and `trade_apply_tick` all reach it on schedule, and `MaximumRetryAttempts = 0` is set by `scripts/sync_schedules.py` for every schedule rather than by application code ([scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)). Still to verify: one scheduled apply completes end to end — set `schedule_tm_interval_id` on a deployment via `PATCH /trade/deployments/{id}` until the UI dropdown ships ([§3.1](../design/scheduler-price-bars.md#31-product-ux-how-scheduling-is-enabled); manual is the intended create default, not auto-enable on deploy).
+- [ ] Scheduler: `TRADE_SERVICE_TOKEN` accepted by API — **done**; `log_proc_summary`, `price_bar_sync` and `trade_apply_tick` all reach it on schedule, and `MaximumRetryAttempts = 0` is set by `scripts/sync_schedules.py` for every schedule rather than by application code ([scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)). Still to verify: one scheduled apply completes end to end — set the schedule via the **Schedule** dropdown on the deployment row (or `PATCH /trade/deployments/{id}`); manual is the intended create default, not auto-enable on deploy ([§3.1](../design/scheduler-price-bars.md#31-product-ux-how-scheduling-is-enabled)).
 - [ ] Price bars (Phase 1.9): live apply fails closed on stale data — do not trade on unverified bars ([scheduler design §4.7](../design/scheduler-price-bars.md#47-failure-modes-and-error-handling)).
 
 Remaining Phase 1.7 security items (ownership, dry-run-before-apply enforcement) should

@@ -1,7 +1,7 @@
 # Indicators & Strategies
 
 !!! note "Scope"
-    Indicators and strategies described here are available via the **API/web UI**. The **CLI** (`python main.py`) currently exposes a subset — see [CLI Backtest](cli-backtest.md) for the supported flags.
+    Indicators and strategies described here are available via the **API/web UI**. The **CLI** (`python -m quant.cli`) currently exposes a subset — see [CLI Backtest](cli-backtest.md) for the supported flags.
 
 ## Available Indicators
 
@@ -54,7 +54,7 @@ The `trading_period` parameter controls Sharpe ratio annualization:
 
 ## Transaction Costs
 
-`perf.py` applies **5 bps (0.05%) fee per unit of turnover** by default. Override via `--fee` in the CLI or the "Transaction fee" input in the dashboard.
+`quant/strategy/performance.py` applies **5 bps (0.05%) fee per unit of turnover** by default (`DEFAULT_FEE_BPS = 5.0`). Override via `--fee` in the CLI or the **Fee (bps)** input in the dashboard.
 
 ## Data Source Behaviour
 

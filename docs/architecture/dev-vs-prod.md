@@ -20,7 +20,7 @@ See [System Overview](overview.md) for runtime topologies.
 | `APP_ENV` | `dev` (default) | `prod` | `docker-compose.prod.yml` |
 | `USE_SSM` | `1` (default) | `1` | `docker-compose.yml` (default for both) |
 | `COOKIE_SECURE` | unset (defaults to `APP_ENV == prod`) | `0` (HTTP) / `1` (HTTPS) | `docker-compose.prod.yml` / `docker-compose.cloudflare.yml` |
-| `CORS_ORIGINS` | SSM `/quant/dev/` or `.env` (no in-code default) | SSM `/quant/prod/` (public site URL(s)) | SSM / `.env` |
+| `CORS_ORIGINS` | SSM `/quant/dev/` or `.env` (in-code default `http://localhost:5173`) | SSM `/quant/prod/` (public site URL(s)) | SSM / `.env` |
 | `JWT_SECRET` | shared dev secret from SSM | fixed value from SSM | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | `EXCHANGE_SECRETS_KEY` | dev SSM or auto-generated ephemeral | **required** — Fernet for credentials | SSM `/quant/prod/EXCHANGE_SECRETS_KEY` |
 | EC2 instance | **None** (laptop) | **One** `quant-compute` host (prod only) | CFN stack `quant-compute` → output `InstanceId` |

@@ -1,8 +1,8 @@
 # Trade Deployment Rollout (Queue-free path)
 
-**Status:** Design — active track. Implements Phases **1.6 → 1.7 → 1.8** from
-[Plan to Profit](plan-to-profit.md) without touching the backtest **queue** or
-strategy **VID increment** work.
+**Status:** Phases **1.6 → 1.9 shipped** (picker, dry-run/apply, execution writes, scheduler
+tick + price bars, schedule UI). This doc records the rollout design; see
+[Plan to Profit](plan-to-profit.md) for current phase status.
 
 ## Why this path first
 
@@ -284,7 +284,7 @@ sequenceDiagram
 |--------|------|---------|
 | `POST` | `/api/v1/trade/deployments/dry-run` | No DB write; returns report |
 | `POST` | `/api/v1/trade/deployments` | **Exists** — wire from UI |
-| `PATCH` | `/api/v1/trade/deployments/{id}` | Kill switch / pause (planned) |
+| `PATCH` | `/api/v1/trade/deployments/{id}` | Toggle `enabled` / `deployment_status`, schedule, qty — **live** |
 
 ### Security (server-side — non-negotiable)
 

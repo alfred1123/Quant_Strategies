@@ -23,28 +23,9 @@ E2E tests are excluded by default. Pytest configuration (markers, default option
 
 ## Test Structure
 
-```
-tests/
-├── conftest.py                # Shared fixtures
-├── unit/                      # Fast, mocked tests
-│   ├── test_data.py
-│   ├── test_strat.py
-│   ├── test_perf.py
-│   ├── test_param_opt.py
-│   ├── test_walk_forward.py
-│   ├── test_main.py
-│   ├── test_ta.py
-│   ├── test_trade.py
-│   ├── test_api.py
-│   ├── test_auth_service.py
-│   └── test_log_config.py
-├── integration/
-│   └── test_backtest_pipeline.py
-└── e2e/
-    ├── test_yahoo_finance_e2e.py
-    ├── test_alphavantage_e2e.py
-    └── test_futu_trader_e2e.py
-```
+`tests/unit/` holds ~50 fast, mocked test files (strategy, API, trade, scheduler, promotion, market data, …). `tests/integration/` has four SP/pipeline tests. `tests/e2e/` holds opt-in live-provider tests (excluded by default via `-m 'not e2e'`).
+
+Representative unit files: `test_strat.py`, `test_ta.py`, `test_trade*.py`, `test_live_apply.py`, `test_schedule_poller.py`, `test_bybit_adapter.py`, `test_market_data_service.py`.
 
 ## Frontend Tests
 

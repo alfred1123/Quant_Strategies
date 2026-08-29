@@ -96,11 +96,11 @@ DB_TARGET=local ./scripts/liquibase-deploy.sh
 ```
 
 !!! tip "Local port override"
-    If `.env` sets `LIQUIBASE_COMMAND_URL=…:5433`, it overrides `DB_TARGET=local`. Either unset it or pass an explicit URL:
-
-    ```bash
-    DB_TARGET=local LIQUIBASE_COMMAND_URL=jdbc:postgresql://127.0.0.1:5432/quantdb?sslmode=disable ./scripts/liquibase-deploy.sh
-    ```
+    An explicit `DB_TARGET` always wins over `LIQUIBASE_COMMAND_URL`. If `.env` sets
+    `LIQUIBASE_COMMAND_URL=…:5433` and you run `DB_TARGET=local`, the script uses
+    the local target URL — a shell-exported URL that contradicts `DB_TARGET` makes
+    the script exit with a conflict error. To aim at a custom URL without a target,
+    leave `DB_TARGET` unset and set `LIQUIBASE_COMMAND_URL` directly.
 
 Compare live DB vs source DDL: `.github/skills/extractddl/extract_ddl.sh` → diff against `db/liquidbase/` (see [Database](architecture/database.md)).
 

@@ -340,7 +340,7 @@ Realistic phases with effort estimates. Items marked **parallel** do not block P
 These can ship while Phase 1 is in progress:
 
 - **Phase 3** walk-forward gate — uses existing `walk_forward.py` + promotion evaluator
-- **Trade 1.6–1.7** — strategy picker + paper apply ([rollout doc](../design/trade-deployment-rollout.md))
+- **Trade 1.6–1.7** — strategy picker + live apply (**shipped** — see [rollout doc](../design/trade-deployment-rollout.md))
 - **Phase 5 (procedural)** — new `SIGNAL_TYPE` rows + `signals.py` functions
 
 ---

@@ -1,7 +1,7 @@
 # Design Doc: Strategy JSON → Trade API
 
 !!! info "Status"
-    **Partially implemented.** Live today: deployment persistence (`GET`/`POST /api/v1/trade/deployments`), credentials CRUD (`/api/v1/credentials`), Trade UI shell (1.4–1.5), Promotion tab with Deploy → Trade navigation. **Next:** strategy picker (1.6), dry-run + apply (1.7), execution log (1.8) — see [Trade Deployment Rollout](trade-deployment-rollout.md). A `FutuTrader` utility exists in `quant/trade/futu_trader.py` ([Paper Trading guide](../guides/trading.md)).
+    **Mostly implemented.** Live today: deployment CRUD + dry-run/apply, credentials CRUD, strategy picker (`GET /api/v1/strategies`), Promotion tab, schedule UI, scheduler tick + bar warm, execution diary writes, and deployment-scoped event/transaction reads (release 1.8.0). **Remaining:** dedicated results endpoints (§2.5), some §7 aspirational schema. A `FutuTrader` utility exists in `quant/trade/futu_trader.py` ([Paper Trading guide](../guides/trading.md)).
 
 !!! warning "Schema accuracy"
     §7 (DB Schema) is the **reference** for table DDL. The JSON examples in §1.2 and the pseudocode in §6 are **aspirational** — they show the target design, not what is implemented today. Always cross-check against the Liquibase DDL in `db/liquidbase/trade/tables/`.
@@ -236,15 +236,18 @@ DELETE /api/v1/credentials/{id}                → Revoke credential            
 
 See [plan-to-profit §1.1](plan-to-profit.md#phase-11-user-secrets) and [login.md §6.4](login.md#64-reuse-from-login-jwt-credential-api-phase-11).
 
-### 2.4 Execution Log — planned (Phase 1.8)
-
-!!! note ""
-    Not yet implemented. DB tables (`TRADE.EXECUTION_EVENT`, `TRADE.TRANSACTION`) and SPs exist; HTTP layer does not.
+### 2.4 Execution Log — implemented (Phase 1.8)
 
 ```
-GET    /api/v1/trade/deployments/{id}/events   → Execution events for deployment — planned
-GET    /api/v1/trade/deployments/{id}/trades   → Filled transactions             — planned
+GET    /api/v1/trade/execution-events              → Recent order attempts (caller-scoped)     ✅ live
+GET    /api/v1/trade/transactions                  → Recent fills (caller-scoped)              ✅ live
+GET    /api/v1/trade/deployments/{id}/events      → Execution events for one deployment       ✅ live
+GET    /api/v1/trade/deployments/{id}/transactions → Fills for one deployment                 ✅ live
 ```
+
+Writes happen on every apply via `LiveApplyOrchestrator` → `SP_INS_EXECUTION_EVENT` /
+`SP_INS_TRANSACTION`. The Trade UI **`ExecutionLogPanel`** renders the list endpoints
+(release **1.8.0** — in tree, not yet on prod).
 
 ### 2.5 Backtest Results — planned
 

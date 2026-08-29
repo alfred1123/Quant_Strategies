@@ -20,7 +20,7 @@ See also the [official Program Samples](https://openapi.futunn.com/futu-api-doc/
 
 ```python
 # Run from the project root
-from quant.trade import FutuTrader
+from quant.trade.futu_trader import FutuTrader
 
 with FutuTrader(paper=True) as trader:
     result = trader.place_order("US.AAPL", 10, "BUY")

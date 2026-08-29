@@ -179,7 +179,7 @@ netting lands.
 
 Pre-completion aborts do not call SP_INS — row stays due.
 
-**Current state:** `SP_ADVANCE_DEPLOYMENT_SCHEDULE` was dropped before it ever shipped, so it is absent from release `1.4.0`. `TradeRepo` now exposes `sp_get_missed_due_deployments`, `sp_get_next_due_deployments`, and `sp_ins_deployment_schedule_status`, so the three calls above are available; the poller that sequences them is **not** written yet.
+**Current state:** `SchedulePoller` (dev) and `ScheduleSweeper` + `POST /api/v1/scheduler/tick` (prod) sequence the three SP calls above. The apply-time due gate, in-flight lease, and auto-pause items below remain open.
 
 
 ---
@@ -192,7 +192,7 @@ Pre-completion aborts do not call SP_INS — row stays due.
 | `TRANSACT_AT` on `EXECUTION_EVENT` (diary) | Done | Done — one apply-cycle tick time shared by every attempt |
 | `DEPLOYMENT_SCHEDULE_STATUS` + GET/SP_INS advance | Done | Driven hourly by `POST /api/v1/scheduler/tick` |
 | Missed / next due split procs | Done | Driven hourly by `POST /api/v1/scheduler/tick` |
-| `SCHEDULE_TM_INTERVAL_ID` on create / update | Done | Repo + service + API done; UI pending — REFDATA dropdown, manual default, no auto-enable on deploy ([§3.1](scheduler-price-bars.md#31-product-ux-how-scheduling-is-enabled)) |
+| `SCHEDULE_TM_INTERVAL_ID` on create / update | Done | Done — `DeploymentDialog` + `ScheduleCell` ([§3.1](scheduler-price-bars.md#31-product-ux-how-scheduling-is-enabled)) |
 | Schedule backfill DAILY | Done | — |
 | Apply-time due gate | — | Pending |
 | In-flight lease | — | Pending |

@@ -295,10 +295,10 @@ Unlocks 5–10 crypto pairs without full OOP refactor if signals stay procedural
 |-------|--------|-------|
 | Trade UI + deployments | ✅ | Phase 1.2–1.5 |
 | `FutuTrader` (paper flag) | ✅ | `quant/trade/futu_trader.py` |
-| Bybit adapter dry-run | ⬜ | Plan 1.3 |
-| Trade worker / scheduler | ⬜ | No loop polling `TRADE.DEPLOYMENT` yet |
+| Bybit adapter dry-run | ✅ | Plan 1.3 — `quant/trade/dry_run.py`, ccxt adapter |
+| Trade worker / scheduler | ✅ | Platform tick via `POST /api/v1/scheduler/tick` + in-process `SchedulePoller` (dev) |
 | Fill simulator (backtest-style) | ⬜ | For crypto paper without exchange |
-| `EXECUTION_EVENT` writes | ⬜ | SP exists; worker ⬜ |
+| `EXECUTION_EVENT` writes | ✅ | `live_apply.py` → `SP_INS_EXECUTION_EVENT`; read UI in release 1.8.0 |
 | Promotion rule: paper before live | ⬜ | REFDATA or deployment status check |
 
 **Implementation steps:** follow [Trade Deployment Rollout](../design/trade-deployment-rollout.md) (picker → dry-run → apply → execution log). Add promotion HARD gate: “must have paper deployment with N days / M fills” later.
@@ -342,7 +342,7 @@ Unlocks 5–10 crypto pairs without full OOP refactor if signals stay procedural
 
 | Model | Backtest | Live | Priority |
 |-------|----------|------|----------|
-| Market | 🟡 fee-adjusted returns | ⬜ adapters | **P0** |
+| Market | 🟡 fee-adjusted returns | ✅ ccxt live apply | **P0** |
 | Limit | ⬜ | ⬜ | P1 |
 | Slippage / partial fill | ⬜ | ⬜ | P1 |
 | TWAP / VWAP | ⬜ | ⬜ | P2 |
@@ -356,8 +356,8 @@ Start with `MarketExecutionModel` in backtest (wrap current fill logic), then sa
 
 | Rule | Promotion (HARD) | Live pre-trade |
 |------|------------------|----------------|
-| Max drawdown | ✅ `max_dd_gate` in REFDATA | ⬜ |
-| Sharpe &gt; 0 | ✅ `sharpe_gate` | ⬜ |
+| Max drawdown | ✅ HARD gate in `REFDATA.PROMOTION_METRIC` ("Max DD LTE 40%") | ⬜ |
+| Sharpe &gt; 0 | ✅ HARD gate in `REFDATA.PROMOTION_METRIC` ("Sharpe GT 0") | ⬜ |
 | Max position size | ⬜ | ⬜ |
 | Max leverage | ⬜ | ⬜ |
 | Correlation / factor exposure | ⬜ | ⬜ |

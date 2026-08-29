@@ -290,7 +290,8 @@ drivers run the identical pass (`ScheduleSweeper`). See
 
 | Resource | Name | Purpose |
 |----------|------|---------|
-| Schedule group | `quant-trade-deployments` | Holds the task schedules from `config/scheduler/` |
+| Schedule group (tasks) | `quant-system-jobs` | Task schedules from `config/scheduler/` — written by `scripts/sync_schedules.py` |
+| Schedule group (legacy) | `quant-trade-deployments` | Created by CFN; per-deployment schedules were dropped in favour of the platform tick |
 | Lambda | `quant-scheduled-task` | Task-routed HTTP bridge (`aws/lambda/scheduled-task/handler.py`) |
 | IAM role | `quant-scheduler-invoke` | Assumed by EventBridge Scheduler to invoke Lambda |
 | IAM role | `quant-scheduled-task-lambda` | Lambda execution (CloudWatch Logs + SSM read of `TRADE_SERVICE_TOKEN`) |
@@ -348,21 +349,17 @@ aws lambda invoke \
   /tmp/out.json && cat /tmp/out.json
 ```
 
-### What this stack does **not** do yet
+### Scheduling from the UI
 
-- Put a deployment **on** a schedule from the product UI. `SCHEDULE_TM_INTERVAL_ID`
-  is accepted by the API and honoured all the way down, but `DeploymentDialog`
-  has no schedule control yet ([scheduler design §3.1](../design/scheduler-price-bars.md#31-product-ux-how-scheduling-is-enabled)).
-  Deployments created in the UI default to manual-apply only; the hourly tick
-  finds nothing due until a schedule is set via `PATCH /trade/deployments/{id}`.
-  **Platform schedulers are already enabled** — `price_bar_sync` and
-  `trade_apply_tick` do not need a separate toggle; they pick up any deployment
-  with a non-null schedule.
+Deployments can be put on a schedule from **`DeploymentDialog`** (create) or
+**`ScheduleCell`** (inline edit on the deployments table). Manual is the default;
+the hourly platform tick (`trade_apply_tick`) picks up any non-null schedule.
+Platform schedulers (`price_bar_sync`, `trade_apply_tick`) need no separate toggle.
+See [scheduler design §3.1](../design/scheduler-price-bars.md#31-product-ux-how-scheduling-is-enabled).
 
-Both former entries here are resolved: per-deployment EventBridge schedules were
-dropped by design ([scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)),
-and the service token is now accepted by the `admin`, `market_data` and
-`scheduler` routers.
+Per-deployment EventBridge schedules were dropped in favour of the platform tick
+([scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)).
+The service token is accepted by the `admin`, `market_data`, and `scheduler` routers.
 
 ### Outputs to use from the app
 
@@ -385,7 +382,7 @@ aws cloudformation describe-stacks --stack-name quant-scheduler \
 # Reverse order — scheduler/compute first, network last
 aws cloudformation delete-stack --stack-name quant-scheduler
 aws cloudformation delete-stack --stack-name quant-compute
-aws cloudformation delete-stack --stack-name quant-database   # DeletionPolicy: Snapshot
+aws cloudformation delete-stack --stack-name quant-database   # DeletionPolicy: Retain
 aws cloudformation delete-stack --stack-name quant-network
 ```
 
@@ -404,14 +401,15 @@ push to main → changes (path filter) ─┐
                test ──────────────────┤
                frontend (build+audit) ─┤
                                        ├─→ build-and-push (only changed images)
-               cfn (infra, parallel) ──┘             │
+               cfn (infra, parallel) ──┤
+               migrate (db, gated) ────┘             │
                                                       ▼
                                                    deploy (SSM: selective pull + up)
 ```
 
-`deploy` waits on `test`, `cfn`, and `build-and-push` (the last two may be skipped). `build-and-push` requires both `test` **and** `frontend` to pass.
+`deploy` waits on `test`, `cfn`, `build-and-push`, and `migrate` (the last three may be skipped). `build-and-push` requires both `test` **and** `frontend` to pass.
 
-The workflow uses `paths-ignore` for `docs/**`, `*.md`, `tests/**`, `db/**`, `scripts/**`, `.github/skills/**`, `.github/instructions/**`, `.cursor/**` — pushes touching only ignored paths do **not** trigger the workflow. The docs site has its own workflow (`.github/workflows/docs.yml`).
+The workflow uses `paths-ignore` for `docs/**`, `*.md`, `tests/**`, `scripts/**`, `.github/skills/**`, `.github/instructions/**`, `.cursor/**` — pushes touching only ignored paths do **not** trigger the workflow. A push to `db/liquidbase/**` **does** trigger the workflow (so the `migrate` job can run). The docs site has its own workflow (`.github/workflows/docs.yml`).
 
 ### Docs workflow — the mermaid gate
 
@@ -444,13 +442,13 @@ than `-->|authed| RedirectHome["Redirect /"]`).
 ### How it works
 
 1. **Changes job** — `dorny/paths-filter` detects which artifacts changed:
-   - **app** — `quant/**`, `Dockerfile`, `requirements.txt`
+   - **app** — `quant/**`, `Dockerfile`, `requirements.txt`, `config/db-targets.json`
    - **nginx** — `frontend/**`, `docker/nginx/**`
    - **compose** — `docker-compose.yml`, `docker-compose.prod.yml`, `docker-compose.tls.yml`, `docker-compose.cloudflare.yml`
    - **deploy** — true when any of app / nginx / compose changed (gate for the deploy job)
    - **db** — `db/liquidbase/**` (gate for the migrate job)
 2. **Test job** — runs `pytest tests/unit/` on GitHub's runner (Python 3.12)
-3. **Frontend job** — `npm ci`, `npm audit --audit-level=high`, `npm run build` (type-check + Vite build), `npm test` on Node 22. Validates the SPA on the runner; a build/audit/test failure blocks `build-and-push`.
+3. **Frontend job** — `npm ci`, `npm audit --audit-level=high`, `npm run build` (type-check + Vite build), `npm test` on Node 24. Validates the SPA on the runner; a build/audit/test failure blocks `build-and-push`.
 4. **CFN job** — deploys infra stacks when the matching `aws/cfn/**` template or relevant `aws/params/prod.json` keys change (per-stack detection). The **database** stack only deploys when `02-database.yml` / DB params change and requires the `DB_MASTER_PASSWORD` secret (it is otherwise guarded by `DeletionPolicy=Retain`, `UpdateReplacePolicy=Snapshot`, `DeletionProtection=true`).
 5. **Build-and-push job** — skipped when neither app nor nginx changed; otherwise builds only the affected image(s) for `linux/arm64` with GitHub Actions layer cache and pushes to ECR (tags: git SHA + `latest`). Runs on a native arm64 runner (`ubuntu-24.04-arm`), so there is no QEMU in the path — see [Why the build runs on arm64](#why-the-build-runs-on-arm64).
 6. **Migrate job** — skipped unless `db/liquidbase/**` changed; otherwise runs `aws/scripts/liquibase-ssm-run.sh deploy <sha>` on EC2 with `LIQUIBASE_CONTEXTS=prod-deploy`. Gated by the `production-db` environment (see [Approving a migration](#approving-a-migration)).
@@ -480,7 +478,7 @@ Install `requirements-dev.txt` locally; `setup.sh` and the CI test jobs already 
 
 ### Deployment logic
 
-The `deploy` job sends one `AWS-RunShellScript` SSM command to the EC2 and polls `ssm get-command-invocation` for up to ~10 min. The inline script (in `.github/workflows/deploy.yml`, `deploy` job) does, in order:
+The `deploy` job sends one `AWS-RunShellScript` SSM command to the EC2 and polls `ssm get-command-invocation` for up to ~15 min. The inline script (in `.github/workflows/deploy.yml`, `deploy` job) does, in order:
 
 1. **Resolve target** — `InstanceId` from the `quant-compute` CFN output (falls back to the `EC2_INSTANCE_ID` repo var).
 2. **Sync source** — clone `/opt/quant` if missing, else `git fetch --prune` + `git reset --hard origin/main` (compose/nginx config come from the repo).
@@ -520,7 +518,7 @@ Only `migrate` is gated. An app-only push still deploys with no prompt; gating e
 
 The job runs against `github.sha`, not `main`. Approval can sit for hours, and pinning the commit means the migration that runs is the one that was reviewed, even if `main` has moved on.
 
-Two things the gate deliberately does not do. It shows a job name rather than a diff, so it catches an unintended migration but cannot tell you whether the SQL is correct — read the changesets before approving. And it does not distinguish a one-line procedure edit from a schema rewrite: 48 of the 49 procedure and function files sit behind an active `prod-deploy` `runOnChange` changeset, so editing any of them queues this job.
+Two things the gate deliberately does not do. It shows a job name rather than a diff, so it catches an unintended migration but cannot tell you whether the SQL is correct — read the changesets before approving. And it does not distinguish a one-line procedure edit from a schema rewrite: nearly every procedure and function file under `db/liquidbase/` sits behind an active `prod-deploy` `runOnChange` changeset, so editing any of them queues this job.
 
 ### Bootstrap the EC2 (one-time)
 

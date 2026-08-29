@@ -40,9 +40,9 @@ Work **one subphase at a time** — finish exit criteria before starting the nex
 | [1.4](#phase-14-trade-ui-shell) | Trade UI shell | done |
 | [1.5](#phase-15-exchange-config-ui) | Exchange config UI | done |
 | [1.6](#phase-16-strategy-picker) | Strategy picker | done |
-| [1.7](#phase-17-live-apply) | Live apply | — |
-| [1.8](#phase-18-execution-log) | Execution log | — |
-| [1.9](#phase-19-scheduler-price-bars) | Scheduler + price bars | — |
+| [1.7](#phase-17-live-apply) | Live apply | done |
+| [1.8](#phase-18-execution-log) | Execution log | done (writes); read UI in release 1.8.0 |
+| [1.9](#phase-19-scheduler-price-bars) | Scheduler + price bars | done |
 | [2.1](#phase-21-reconcile-data-model) | Reconcile data model | — |
 | [2.2](#phase-22-daily-sharpe-job) | Daily Sharpe job | — |
 | [2.3](#phase-23-reconcile-ui) | Reconcile UI | — |

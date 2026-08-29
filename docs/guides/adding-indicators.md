@@ -34,7 +34,7 @@ To add a new technical indicator to the backtest pipeline, follow this pattern.
 
     `NAME` is the canonical short name (NOT NULL); `METHOD_NAME` must match the method on `TechnicalAnalysis` exactly.
 
-4. **Write tests** in `tests/unit/test_strat.py` — verify output shape, edge cases, NaN handling.
+4. **Write tests** in `tests/unit/test_ta.py` — verify output shape, edge cases, NaN handling.
 
 5. **Run all tests**: `python -m pytest tests/ -v`
 

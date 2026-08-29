@@ -6,7 +6,7 @@ Copy the template and fill in any keys you need:
 cp .env.example .env
 ```
 
-The variables below mirror `.env.example`. Variables with `export` are also sourced by bash scripts (psql, liquibase). Variables without `export` are read by Python (`python-dotenv`).
+The variables below cover the core runtime set. See `.env.example` for the full template (Cloudflare, Bybit testnet, ECR image tags, and other optional blocks).
 
 ## Data Sources
 
