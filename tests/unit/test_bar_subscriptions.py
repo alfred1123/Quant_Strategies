@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from quant.market_data.service import MAX_BACKFILL_BARS
 from quant.market_data.subscriptions import (
     BarSubscriptionRepo,
     BarSubscriptionService,
@@ -327,6 +328,36 @@ class TestListing:
         service.list_subscriptions()
 
         assert repo.sp_get_bar_subscription.call_args.kwargs == {}
+
+
+class TestVenueDepth:
+    """Passes the venue's floor through, with the ceiling one fill may span."""
+
+    def test_carries_the_fill_ceiling_so_the_page_can_warn_before_the_click(self):
+        service, _repo, factory, bar_service = build_service()
+        bar_service.venue_depth.return_value = (FIRST_BAR, 2349)
+
+        depth = service.venue_depth(
+            internal_cusip=CUSIP, tm_interval_id=DAILY, source_app_id=BYBIT,
+        )
+
+        assert depth == {
+            "earliest": FIRST_BAR,
+            "bars_available": 2349,
+            "max_backfill_bars": MAX_BACKFILL_BARS,
+        }
+        factory.for_app.assert_called_once_with(BYBIT)
+
+    def test_a_venue_serving_nothing_still_reports_the_ceiling(self):
+        service, _repo, _factory, bar_service = build_service()
+        bar_service.venue_depth.return_value = (None, None)
+
+        depth = service.venue_depth(
+            internal_cusip=CUSIP, tm_interval_id=DAILY, source_app_id=BYBIT,
+        )
+
+        assert depth["earliest"] is None
+        assert depth["max_backfill_bars"] == MAX_BACKFILL_BARS
 
 
 class TestBackfill:

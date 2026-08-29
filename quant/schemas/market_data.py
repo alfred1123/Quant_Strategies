@@ -57,6 +57,27 @@ class SubscribeRequest(BaseModel):
     bar_subscription_id: UUID | None = None
 
 
+class VenueDepth(BaseModel):
+    """How far back a venue will actually serve one series.
+
+    The floor on any capture target. Without it a "history wanted from" is a
+    date somebody typed, and one earlier than the pair's listing can never be
+    met — leaving the page reporting a shortfall against history that was never
+    obtainable rather than against anything a backfill could fix.
+    """
+
+    #: ``None`` when the venue would not say — either it served no bars for this
+    #: symbol and interval, or it publishes no listing time to anchor the read
+    #: on. Deliberately not distinguished: both mean the caller has to supply a
+    #: date, and neither justifies putting a guessed one in front of them.
+    earliest: datetime | None = None
+    #: How many bars separate ``earliest`` from now at this interval, so a
+    #: caller can see a fill is impossible before starting one.
+    bars_available: int | None = None
+    #: Largest number of bars one blocking fill may span.
+    max_backfill_bars: int
+
+
 class BackfillRequest(BaseModel):
     """Fill one series over an explicit range. ``end`` defaults to the last close."""
 

@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
-from quant.market_data.service import StaleBarsError
+from quant.market_data.service import BackfillTooLargeError, StaleBarsError
 from quant.market_data.subscriptions import SubscriptionError
 from quant.shared.db import ProcedureError
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
@@ -106,9 +106,28 @@ async def handle_subscription_error(
     )
 
 
+async def handle_backfill_too_large(
+    request: Request,
+    exc: BackfillTooLargeError,
+) -> JSONResponse:
+    """400 — the range is fillable in principle, just not in one blocking call.
+
+    Refused before any work starts rather than attempted and abandoned: a fill
+    that spans millions of boundaries would hold the connection past every
+    proxy timeout and store nothing, so the caller would learn only that the
+    request died. The message names a range that fits instead.
+    """
+    _log(request, status.HTTP_400_BAD_REQUEST, exc)
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": str(exc)},
+    )
+
+
 def register(app: FastAPI) -> None:
     app.add_exception_handler(ProcedureError, handle_procedure_error)
     app.add_exception_handler(TradeValidationError, handle_trade_validation_error)
     app.add_exception_handler(DeploymentNotFound, handle_deployment_not_found)
     app.add_exception_handler(StaleBarsError, handle_stale_bars)
     app.add_exception_handler(SubscriptionError, handle_subscription_error)
+    app.add_exception_handler(BackfillTooLargeError, handle_backfill_too_large)

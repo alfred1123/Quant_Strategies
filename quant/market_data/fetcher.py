@@ -50,6 +50,10 @@ class BarFetcher(Protocol):
         until: datetime,
     ) -> list[OhlcvBar]: ...
 
+    def earliest_bar(
+        self, *, vendor_symbol: str, period: timedelta
+    ) -> datetime | None: ...
+
 
 class CcxtBarFetcher:
     """Public OHLCV reads over ccxt, paginated across the requested window."""
@@ -128,10 +132,74 @@ class CcxtBarFetcher:
         )
         return bars
 
-    def _fetch_page(self, vendor_symbol: str, timeframe: str, since_ms: int) -> list:
+    def earliest_bar(
+        self, *, vendor_symbol: str, period: timedelta
+    ) -> datetime | None:
+        """Open time of the oldest bar this venue still serves, or ``None``.
+
+        Asking beats guessing. A capture target is otherwise a date somebody
+        typed, and one before the pair listed can never be satisfied — the page
+        then reports a permanent shortfall against history that was never
+        obtainable rather than against anything a backfill could fix.
+
+        Reading it takes a deliberate two steps, because the obvious one step
+        silently lies. ``since=0`` does **not** mean "from the beginning": it is
+        falsy, so no start reaches the venue, and Bybit answers with the *newest*
+        page — asked that way for daily BTCUSDT it reports today, which would
+        make every series look as though it began this morning. So anchor on the
+        listing time ccxt normalises into ``market['created']`` and let the venue
+        clamp forward from there.
+
+        The listing time is the anchor, never the answer: Bybit lists BTCUSDT at
+        2020-03-15 and prints its first daily bar on 2020-03-25. Retention also
+        differs per timeframe, and is far shallower below daily, so the bar has
+        to be read per ``(symbol, period)``.
+
+        ``None`` when the venue publishes no listing time. Guessing an anchor
+        old enough to clamp — a fixed date predating every exchange — would work
+        until it did not, and a wrong floor is worse than an absent one: it puts
+        a date in front of the user carrying none of the authority the rest of
+        this answer has. Callers treat ``None`` as "unknown", not "no bars".
+        """
+        listing_ms = self._listing_ms(vendor_symbol)
+        if listing_ms is None:
+            logger.warning(
+                "%s publishes no listing time for %s — cannot read its earliest bar",
+                self._exchange_id, vendor_symbol,
+            )
+            return None
+
+        timeframe = ccxt_timeframe(period)
+        batch = self._fetch_page(vendor_symbol, timeframe, listing_ms, limit=1)
+        if not batch:
+            logger.warning(
+                "%s served no %s bars at all for %s",
+                self._exchange_id, timeframe, vendor_symbol,
+            )
+            return None
+        return datetime.fromtimestamp(int(batch[0][0]) / 1000, tz=UTC)
+
+    def _listing_ms(self, vendor_symbol: str) -> int | None:
+        """When the venue says this pair listed, in epoch ms.
+
+        ``load_markets`` first because ``market()`` raises until the symbol
+        table is populated — ccxt caches it on the client, so the cost is once
+        per venue per process, not once per lookup.
+        """
+        try:
+            self.exchange.load_markets()
+            created = self.exchange.market(vendor_symbol).get("created")
+        except Exception as exc:
+            logger.debug("no listing time for %s: %s", vendor_symbol, exc)
+            return None
+        return int(created) if created else None
+
+    def _fetch_page(
+        self, vendor_symbol: str, timeframe: str, since_ms: int, *, limit: int = _PAGE_LIMIT
+    ) -> list:
         try:
             return self.exchange.fetch_ohlcv(
-                vendor_symbol, timeframe, since=since_ms, limit=_PAGE_LIMIT
+                vendor_symbol, timeframe, since=since_ms, limit=limit
             )
         except ccxt.BadSymbol as exc:
             raise BarFetchError(f"unknown symbol {vendor_symbol!r}: {exc}") from exc
