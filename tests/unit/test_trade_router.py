@@ -4,6 +4,7 @@ Auth is bypassed via ``app.dependency_overrides[require_user]`` and
 ``TradeService`` is replaced with a mock to avoid touching DB.
 """
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -17,6 +18,7 @@ from quant.schemas.apply import ApplyReport
 from quant.schemas.deployments import DeploymentRow
 from quant.schemas.dry_run import DryRunReport
 from quant.schemas.execution import ExecutionEventRow, TransactionRow
+from quant.trade.errors import BrokerAuthError, BrokerConnectionError
 from quant.trade.errors import TradeValidationError
 from quant.trade.errors import DeploymentNotFound
 from quant.trade.models.order import IntendedAction
@@ -402,6 +404,58 @@ class TestDryRunDeployment:
         del body["qty"]
         resp = client.post("/api/v1/trade/deployments/dry-run", json=body)
         assert resp.status_code == 422
+
+    def test_rejected_credentials_return_400_with_the_broker_hint(
+        self, client_and_svc
+    ):
+        """The hint names the fix, so it must survive as a client error.
+
+        Reported as a 5xx it read as a platform outage and the sentence that
+        says which keys to use never reached the operator.
+        """
+        client, svc, _ = client_and_svc
+        svc.dry_run.side_effect = BrokerAuthError(
+            "authentication failed during fetch_balance: bybit api_key invalid."
+            " Paper/testnet mode uses https://testnet.bybit.com/ — mainnet and"
+            " Demo Trading keys will not work."
+        )
+
+        resp = client.post(
+            "/api/v1/trade/deployments/dry-run",
+            json=self._dry_run_body(),
+        )
+        assert resp.status_code == 400
+        assert "testnet.bybit.com" in resp.json()["detail"]
+
+    def test_unreachable_broker_returns_503(self, client_and_svc):
+        """Distinct from a rejected key: coming back later is the right move."""
+        client, svc, _ = client_and_svc
+        svc.dry_run.side_effect = BrokerConnectionError(
+            "broker unreachable: connection timed out"
+        )
+
+        resp = client.post(
+            "/api/v1/trade/deployments/dry-run",
+            json=self._dry_run_body(),
+        )
+        assert resp.status_code == 503
+
+    def test_failure_is_logged_server_side(self, client_and_svc, caplog):
+        """A handled error leaves a trace, or prod failures need a forensic dig."""
+        client, svc, _ = client_and_svc
+        svc.dry_run.side_effect = BrokerAuthError("authentication failed: bad key")
+
+        with caplog.at_level(logging.WARNING, logger="quant.api.exception_handlers"):
+            client.post(
+                "/api/v1/trade/deployments/dry-run",
+                json=self._dry_run_body(),
+            )
+
+        assert any(
+            "/api/v1/trade/deployments/dry-run" in r.getMessage()
+            and "authentication failed" in r.getMessage()
+            for r in caplog.records
+        )
 
 
 class TestAccountSnapshot:

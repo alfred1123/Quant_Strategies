@@ -7,6 +7,7 @@ import stays light — no broker SDKs are loaded here.
 
 from quant.trade.errors import (
     AdapterNotFoundError,
+    BrokerAuthError,
     BrokerConnectionError,
     DeploymentNotFound,
     SymbolMappingError,
@@ -22,6 +23,7 @@ from quant.trade.models.order import (
 
 __all__ = [
     "AdapterNotFoundError",
+    "BrokerAuthError",
     "BrokerConnectionError",
     "DeploymentNotFound",
     "IntendedAction",

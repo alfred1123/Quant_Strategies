@@ -885,7 +885,7 @@ what every downstream "newest closed bar" derives from.
 | `quant/trade/live_apply.py` | Picks the signal source from `SCHEDULE_TM_INTERVAL_ID` (§7.7) |
 | `quant/strategy/live_service.py` | `SymbolLoader` seam; symbols via `get_internal_cusips()` |
 | `quant/strategy/performance.py` | `live_lookback_bars` alongside `live_lookback_days` |
-| `quant/api/exception_handlers.py` | `StaleBarsError` → 503 |
+| `quant/api/exception_handlers.py` | `StaleBarsError` → 503; every handled error logged once ([api.md](../architecture/api.md#broker-failures-status-says-whether-to-retry)) |
 | `quant/api/main.py` | `app.state.price_bars` and `app.state.schedule_sweeper` built in the lifespan; market-data and scheduler routers mounted behind the service gate |
 | `quant/trade/db_repo.py` | `sp_get_scheduled_instruments()` for the warmer |
 | `quant/api/routers/deployments.py` | `build_trade_service(state)` split out of the request dependency, so the tick can build one per apply |

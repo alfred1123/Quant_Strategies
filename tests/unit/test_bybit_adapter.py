@@ -14,6 +14,7 @@ from quant.trade.brokers.ccxt.config import (
 )
 from quant.trade.brokers.ccxt.gateway import CcxtSessionConfig, CcxtTradeGateway
 from quant.trade.errors import (
+    BrokerAuthError,
     BrokerConnectionError,
     SymbolMappingError,
     TradeValidationError,
@@ -281,8 +282,12 @@ class TestCcxtTradeGateway:
             )
         )
         gw.connect()
-        with pytest.raises(BrokerConnectionError, match="authentication"):
+        with pytest.raises(BrokerAuthError, match="authentication") as exc_info:
             gw.validate_credentials()
+        # A rejected key is the caller's to fix, so it must not read as an
+        # outage — and the hint naming testnet is the actionable part.
+        assert exc_info.value.status_code == 400
+        assert "testnet.bybit.com" in str(exc_info.value)
 
 
 class TestCreateCcxtAdapter:

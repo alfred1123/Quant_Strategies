@@ -8,7 +8,11 @@ from dataclasses import dataclass, field
 import ccxt
 
 from quant.trade.brokers.ccxt.config import CcxtExchangePreset, ConnectParams
-from quant.trade.errors import BrokerConnectionError, OrderNotFoundError
+from quant.trade.errors import (
+    BrokerAuthError,
+    BrokerConnectionError,
+    OrderNotFoundError,
+)
 from quant.trade.models.session import BrokerSessionState
 
 logger = logging.getLogger(__name__)
@@ -82,14 +86,14 @@ class CcxtTradeGateway:
             len(self._exchange.markets),
         )
 
-    def _auth_error(self, exc: ccxt.AuthenticationError, *, phase: str) -> BrokerConnectionError:
+    def _auth_error(self, exc: ccxt.AuthenticationError, *, phase: str) -> BrokerAuthError:
         hint = ""
         auth_hint = self._config.preset.auth_hint
         if auth_hint is not None:
             hint = auth_hint(
                 ConnectParams(paper=self._config.paper, demo=self._config.demo)
             )
-        return BrokerConnectionError(f"authentication failed during {phase}: {exc}.{hint}")
+        return BrokerAuthError(f"authentication failed during {phase}: {exc}.{hint}")
 
     def disconnect(self) -> None:
         if self._exchange is not None:

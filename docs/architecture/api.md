@@ -80,6 +80,31 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `GET` | `/api/v1/trade/deployments/{id}/transactions` | Required | Fill history for one deployment. |
 | `GET` | `/api/v1/trade/accounts/{api_credential_id}/snapshot` | Required | Live balances and open positions for one broker account. Read-only. Query `paper` (default `true`). **404** if the credential is not owned. |
 
+#### Broker failures — status says whether to retry
+
+Anything that reaches an exchange (`dry-run`, `apply`, the account snapshot) can
+fail at the broker rather than in our code, and the status separates the two
+things a caller can do about it:
+
+| Condition | Status | What the caller does |
+|---|---|---|
+| Broker rejected the credentials (`BrokerAuthError`) | **400** | Fix the key — retrying is pointless |
+| Broker unreachable or erroring (`BrokerConnectionError`) | **503** | Come back on the next tick |
+| Bars incomplete (`StaleBarsError`) | **503** | Come back on the next tick |
+| Unknown product / no xref (`SymbolMappingError`) | **400** | Fix the request or seed `INST.PRODUCT_XREF` |
+
+A rejected key used to answer **502**, which put a wrong API key in the same
+bucket as a platform outage. That is worth stating because the response body
+carries the broker's own explanation and the remedy — a **paper** deployment
+connects to the venue's *testnet*, so mainnet keys are rejected there — and a
+5xx is exactly the response an intermediate proxy is entitled to replace with
+its own error page before anyone reads it.
+
+Every handled error is also logged once by `quant/api/exception_handlers.py`
+(`METHOD /path -> status: detail`), at `WARNING` for 4xx and `ERROR` for 5xx.
+Handling an exception consumes it, so before that a failed request left no
+server-side trace at all and could only be reconstructed from the client.
+
 #### Account snapshot
 
 Every field is read from the exchange at request time — nothing comes from our

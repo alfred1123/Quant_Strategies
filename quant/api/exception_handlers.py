@@ -1,11 +1,33 @@
 """App-wide exception handlers — map domain/infra errors to HTTP responses."""
 
+import logging
+
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from quant.market_data.service import StaleBarsError
 from quant.shared.db import ProcedureError
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
+
+logger = logging.getLogger(__name__)
+
+
+def _log(request: Request, status_code: int, detail: object) -> None:
+    """Record one line for every error response these handlers produce.
+
+    Handling an exception here consumes it, so without this the reason travels
+    only in the response body and the server keeps no trace: a failure a user
+    reports cannot be reconstructed afterwards, and an intermediate proxy is
+    free to replace the body before they ever read it.
+    """
+    logger.log(
+        logging.ERROR if status_code >= 500 else logging.WARNING,
+        "%s %s -> %d: %s",
+        request.method,
+        request.url.path,
+        status_code,
+        detail,
+    )
 
 
 def _procedure_status_code(sqlstate: str) -> int:
@@ -16,9 +38,11 @@ def _procedure_status_code(sqlstate: str) -> int:
     return status.HTTP_502_BAD_GATEWAY
 
 
-async def handle_procedure_error(_request: Request, exc: ProcedureError) -> JSONResponse:
+async def handle_procedure_error(request: Request, exc: ProcedureError) -> JSONResponse:
+    status_code = _procedure_status_code(exc.sqlstate)
+    _log(request, status_code, f"{exc.proc} [{exc.sqlstate}]: {exc.message}")
     return JSONResponse(
-        status_code=_procedure_status_code(exc.sqlstate),
+        status_code=status_code,
         content={
             "detail": {
                 "proc": exc.proc,
@@ -30,9 +54,10 @@ async def handle_procedure_error(_request: Request, exc: ProcedureError) -> JSON
 
 
 async def handle_trade_validation_error(
-    _request: Request,
+    request: Request,
     exc: TradeValidationError,
 ) -> JSONResponse:
+    _log(request, exc.status_code, exc)
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": str(exc)},
@@ -40,21 +65,23 @@ async def handle_trade_validation_error(
 
 
 async def handle_deployment_not_found(
-    _request: Request,
+    request: Request,
     exc: DeploymentNotFound,
 ) -> JSONResponse:
+    _log(request, status.HTTP_404_NOT_FOUND, f"deployment not found: {exc}")
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
         content={"detail": f"deployment not found: {exc}"},
     )
 
 
-async def handle_stale_bars(_request: Request, exc: StaleBarsError) -> JSONResponse:
+async def handle_stale_bars(request: Request, exc: StaleBarsError) -> JSONResponse:
     """503, not 400 — the request was fine, the exchange data was not.
 
     Distinguishing it matters to the scheduler: a caller seeing this should
     come back on the next tick, whereas a 4xx means retrying changes nothing.
     """
+    _log(request, status.HTTP_503_SERVICE_UNAVAILABLE, exc)
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content={"detail": f"price bars unavailable — no signal computed: {exc}"},
