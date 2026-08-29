@@ -141,12 +141,16 @@ Two things make the coupling incidental rather than necessary:
   produce a different position on the same day. Capturing a venue's bars ahead of
   time is what would let a strategy be fitted on the series it will actually trade.
 
-A design for this is **pending**. It needs an instrument subscription independent
-of `TRADE.DEPLOYMENT` (the warmer would union it with `SP_GET_SCHEDULED_INSTRUMENTS`),
-`PriceBarService.backfill` exposed — it exists and is reachable from no route or
-CLI — and the backtest read path pointed at `PRICE_BAR`, which §4.6 argues is
-additive but is not wired. Capture alone would accumulate bars that backtest
-still cannot see.
+It needs an instrument subscription independent of `TRADE.DEPLOYMENT` (the warmer
+would union it with `SP_GET_SCHEDULED_INSTRUMENTS`), `PriceBarService.backfill`
+exposed — it exists and is reachable from no route or CLI — and the backtest read
+path pointed at `PRICE_BAR`, which §4.6 argues is additive but is not wired.
+Capture alone would accumulate bars that backtest still cannot see.
+
+**Designed in full, not built:** [Market Data Capture](market-data-capture.md)
+carries the subscription shape, where the warm loop should live once "which
+instruments matter" stops being a deployment question (§7.8), and the
+`data_source`-based backtest seam.
 
 ---
 

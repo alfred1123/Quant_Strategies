@@ -109,6 +109,7 @@ nav:
       - ccxt Trade & XREF Validation: design/ccxt-trade-and-xref-validation.md
       - Live Order Execution: design/live-order-execution.md
       - Scheduler, Price Bars & Consolidation: design/scheduler-price-bars.md
+      - Market Data Capture: design/market-data-capture.md
       - Multi-Strategy Netting: design/multi-strategy-netting.md
       - Strategy VID Versioning: design/strategy-vid-versioning.md
       - Frontend Code Audit: design/frontend-audit.md
