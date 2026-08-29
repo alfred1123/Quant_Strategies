@@ -96,6 +96,7 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 | `TradeConfigPage` | Accounts table + add-account form wired to credentials API (create) |
 | `StrategyPicker` | Selectable caller-owned `BT.STRATEGY` catalog via `GET /api/v1/strategies` |
 | `AccountSnapshotPanel` | Live cash + open positions for the selected account via `useAccountSnapshot()`; read-only |
+| `ScheduleCell` | Cadence per deployment row, editable in place; `useTmIntervals()` + `PATCH /trade/deployments/{id}` |
 | `TradeApplyPage` | Strategy picker + Deploy button + account snapshot + deployments table; `useDeployments()` |
 
 **Account snapshot panel**
@@ -113,6 +114,25 @@ sets `accountFilter` from its own selector.
 Deliberately not polled — each render would be a rate-limited exchange call.
 The query key includes the paper flag, so demo and real accounts never share a
 cache entry, and refresh is manual behind a 30s stale window.
+
+**Schedule control — the one switch that automates a deployment**
+
+`DeploymentDialog` sets the cadence on create and the Schedule column's
+`ScheduleCell` edits it afterwards, both offering *Manual* plus every
+`REFDATA.TM_INTERVAL` row (`DISPLAY_NAME` for the label, `NAME` as a fallback for
+a database predating that column). **Manual is the default and a real option, not
+an empty one** — picking it sends an explicit `null`, which the backend
+distinguishes from an omitted field.
+
+Choosing a cadence is also what puts the product's price data on the platform's
+hourly warm, because `SP_GET_SCHEDULED_INSTRUMENTS` returns exactly the enabled,
+non-manual deployments. There is deliberately no separate "sync price data"
+toggle for a deployed product.
+
+Automating a **live** deployment asks a second time — its own checkbox in the
+dialog, a `window.confirm` on the inline edit — because the existing live
+confirmation covers one attended order, not an unattended hourly cadence.
+Switching Paper / Live re-arms it.
 
 **Strategy picker — not Backtest config UI**
 
@@ -192,7 +212,8 @@ frontend/src/
 │   └── trade/
 │       ├── TradeNavBar.tsx         # Exchange / Account filters + Paper / Live toggle
 │       ├── BrokerAccountsTable.tsx # Multi-broker accounts table (Config page)
-│       └── AccountSnapshotPanel.tsx # Live cash + open positions (Apply page)
+│       ├── AccountSnapshotPanel.tsx # Live cash + open positions (Apply page)
+│       └── ScheduleCell.tsx         # Per-deployment cadence, editable in place
 │   StrategyPicker.tsx              # BT.STRATEGY catalog table (Phase 1.6)
 │
 ├── layouts/

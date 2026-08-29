@@ -51,6 +51,18 @@ export interface DataColumnRow {
   display_name: string;
 }
 
+/**
+ * Bar / schedule cadence. `display_name` is nullable only so the UI keeps
+ * working against a database that predates the 1.7.0 refdata migration.
+ */
+export interface TmIntervalRow {
+  tm_interval_id: number;
+  name: string;
+  display_name: string | null;
+  period_length: string;
+  description: string | null;
+}
+
 export interface AppRow {
   app_id: number;
   name: string;

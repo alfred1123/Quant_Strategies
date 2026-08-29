@@ -13,6 +13,11 @@
 #
 # Where each target points is declared in config/db-targets.json, not here.
 #
+# An explicit DB_TARGET is authoritative: if LIQUIBASE_COMMAND_URL is also set and
+# points somewhere else, the run aborts instead of silently following the URL. To
+# aim at a database the config does not describe, set the URL and leave DB_TARGET
+# unset.
+#
 # Order: master (schemas) → per-schema DDL/procs → core_admin grants refresh.
 set -euo pipefail
 
@@ -72,7 +77,26 @@ load_env() {
   db_target_env || die "could not resolve DB_TARGET"
   log "Target ${DB_TARGET} — ${DB_HOST}:${DB_PORT}/${DB_NAME} (sslmode=${DB_SSLMODE})"
 
-  export LIQUIBASE_COMMAND_URL="${_lb_url_override:-$(db_target_jdbc_url)}"
+  local resolved_url
+  resolved_url="$(db_target_jdbc_url)"
+
+  # A stale LIQUIBASE_COMMAND_URL must never quietly outrank the target the
+  # caller named. A leftover prod tunnel URL exported in a shell once turned
+  # DB_TARGET=local into a run against production, and only a closed tunnel
+  # stopped it. So an explicit DB_TARGET wins, and a URL that disagrees with it
+  # is a conflict to report rather than a preference to honour. The URL is still
+  # an escape hatch on its own — set it and leave DB_TARGET unset.
+  if [[ -n "${_db_target_override}" ]]; then
+    if [[ -n "${_lb_url_override}" && "${_lb_url_override}" != "${resolved_url}" ]]; then
+      die "LIQUIBASE_COMMAND_URL=${_lb_url_override} contradicts DB_TARGET=${DB_TARGET} (${resolved_url}). Unset LIQUIBASE_COMMAND_URL, or leave DB_TARGET unset to use the URL as-is."
+    fi
+    export LIQUIBASE_COMMAND_URL="${resolved_url}"
+  else
+    export LIQUIBASE_COMMAND_URL="${_lb_url_override:-${resolved_url}}"
+    if [[ "${LIQUIBASE_COMMAND_URL}" != "${resolved_url}" ]]; then
+      log "NOTE: LIQUIBASE_COMMAND_URL overrides target ${DB_TARGET} (${resolved_url})"
+    fi
+  fi
   export LIQUIBASE_COMMAND_USERNAME="${LIQUIBASE_COMMAND_USERNAME:-${DB_USER:?DB_USER required}}"
   export LIQUIBASE_COMMAND_PASSWORD="${LIQUIBASE_COMMAND_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD required — set QUANTDB_PASSWORD}}"
 }

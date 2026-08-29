@@ -23,5 +23,6 @@
     -->
 
     <include file="releases/1.6.0-log-duration-clock-timestamp.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.7.0-tm-interval-display-name.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { IndicatorRow, SignalTypeRow, AssetTypeRow, ConjunctionRow, DataColumnRow, AppRow, PromotionStateRow, PromotionMetricRow } from '../types/refdata';
+import type { IndicatorRow, SignalTypeRow, AssetTypeRow, ConjunctionRow, DataColumnRow, AppRow, PromotionStateRow, PromotionMetricRow, TmIntervalRow } from '../types/refdata';
 
 async function fetchTable<T>(table: string): Promise<T[]> {
   const { data } = await apiClient.get<T[]>(`/refdata/${table}`);
@@ -62,6 +62,22 @@ export const useApps = () =>
     queryFn: () => fetchTable<AppRow>('app'),
     staleTime: Infinity,
   });
+
+/** Schedule cadences for the per-deployment schedule control. */
+export const useTmIntervals = () =>
+  useQuery({
+    queryKey: ['refdata', 'tm_interval'],
+    queryFn: () => fetchTable<TmIntervalRow>('tm_interval'),
+    staleTime: Infinity,
+  });
+
+/**
+ * Label for a cadence. Falls back to `name` so a database without the 1.7.0
+ * DISPLAY_NAME column shows "DAILY" rather than a blank row.
+ */
+export function intervalLabel(row: TmIntervalRow): string {
+  return row.display_name?.trim() || row.name;
+}
 
 /** Only apps that are brokers/exchanges (IS_EXCHANGE_IND = 'Y'). */
 export const useExchangeApps = () =>

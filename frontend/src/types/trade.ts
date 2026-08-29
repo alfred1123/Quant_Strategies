@@ -36,11 +36,19 @@ export interface CreateDeploymentRequest {
   confirm_live?: boolean;
   enabled?: boolean;
   deployment_status?: DeploymentStatus;
+  /** REFDATA.TM_INTERVAL id; null = manual apply only. */
+  schedule_tm_interval_id?: number | null;
 }
 
 export interface UpdateDeploymentRequest {
   enabled?: boolean;
   deployment_status?: DeploymentStatus;
+  /**
+   * REFDATA.TM_INTERVAL id. Send an explicit null to drop back to manual —
+   * the backend distinguishes that from an omitted field, which leaves the
+   * existing schedule untouched.
+   */
+  schedule_tm_interval_id?: number | null;
 }
 
 export interface DryRunRequest {

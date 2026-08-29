@@ -32,6 +32,7 @@ import AccountSnapshotPanel from '../../components/trade/AccountSnapshotPanel';
 import ApplyConfirmDialog from '../../components/trade/ApplyConfirmDialog';
 import DeploymentDialog, { type DeploymentSelection } from '../../components/trade/DeploymentDialog';
 import DryRunReportDialog from '../../components/trade/DryRunReportDialog';
+import ScheduleCell from '../../components/trade/ScheduleCell';
 import StrategyPicker, { type StrategyPickerSelection } from '../../components/trade/StrategyPicker';
 
 function accountLabel(
@@ -232,6 +233,7 @@ export default function TradeApplyPage() {
                   <TableCell>Strategy</TableCell>
                   <TableCell>Mode</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell>Schedule</TableCell>
                   <TableCell align="right">Qty</TableCell>
                   <TableCell align="center">Actions</TableCell>
                 </TableRow>
@@ -239,7 +241,7 @@ export default function TradeApplyPage() {
               <TableBody>
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8}>
+                    <TableCell colSpan={9}>
                       <Typography variant="body2" color="text.secondary">
                         No deployments yet. Select a strategy above and click Deploy, or use
                         Promotion → Deploy.
@@ -271,6 +273,9 @@ export default function TradeApplyPage() {
                           color={enabled ? 'success' : 'default'}
                           variant={enabled ? 'filled' : 'outlined'}
                         />
+                      </TableCell>
+                      <TableCell>
+                        <ScheduleCell row={row} onError={setActionError} />
                       </TableCell>
                       <TableCell align="right">{row.qty}</TableCell>
                       <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>

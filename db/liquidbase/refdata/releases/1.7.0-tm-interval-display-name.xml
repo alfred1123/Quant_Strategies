@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      REFDATA.TM_INTERVAL — DISPLAY_NAME, so the schedule dropdown has a label to
+      render. Every other dropdown table already carries one; this table did not,
+      because nothing displayed it until the per-deployment schedule control.
+
+      Without it the UI would have to map NAME ('DAILY', '1H') to friendly text in
+      the frontend, which is exactly the hardcoding the REFDATA single-source-of-truth
+      decision forbids. A new interval is then a seed row away from appearing in the
+      dropdown, with no frontend change.
+
+      Same shape as 1.5.0's PERIOD_LENGTH: ADD COLUMN IF NOT EXISTS covers databases
+      built before the baseline declared it, the backfill supplies values for rows
+      seeded earlier, and NOT NULL lands last so a future interval cannot be added
+      without a label.
+
+      No procedure changes. REFDATA.SP_GET_ENUM opens 'SELECT *', so the publisher
+      picks the column up and it reaches Redis and the API untouched.
+    -->
+
+    <changeSet id="1.7.0-001-tm-interval-display-name" author="alfcheun" context="refdata,prod-deploy">
+        <comment>DISPLAY_NAME on TM_INTERVAL — dropdown label for the schedule control</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE REFDATA.TM_INTERVAL ADD COLUMN IF NOT EXISTS DISPLAY_NAME TEXT;
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE REFDATA.TM_INTERVAL DROP COLUMN IF EXISTS DISPLAY_NAME;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.7.0-002-tm-interval-display-name-not-null" author="alfcheun" context="refdata,prod-deploy">
+        <comment>Backfill DISPLAY_NAME on rows seeded before the column existed, then enforce NOT NULL</comment>
+        <sql splitStatements="true" stripComments="true">
+            UPDATE REFDATA.TM_INTERVAL SET DISPLAY_NAME = 'Daily', UPDATED_AT = NOW()
+             WHERE TM_INTERVAL_ID = 1 AND DISPLAY_NAME IS NULL;
+
+            UPDATE REFDATA.TM_INTERVAL SET DISPLAY_NAME = 'Hourly', UPDATED_AT = NOW()
+             WHERE TM_INTERVAL_ID = 2 AND DISPLAY_NAME IS NULL;
+
+            UPDATE REFDATA.TM_INTERVAL SET DISPLAY_NAME = NAME, UPDATED_AT = NOW()
+             WHERE DISPLAY_NAME IS NULL;
+
+            ALTER TABLE REFDATA.TM_INTERVAL
+                ALTER COLUMN DISPLAY_NAME SET NOT NULL;
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE REFDATA.TM_INTERVAL ALTER COLUMN DISPLAY_NAME DROP NOT NULL;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

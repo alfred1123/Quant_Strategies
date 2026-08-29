@@ -11,6 +11,7 @@ import {
   DialogTitle,
   FormControl,
   FormControlLabel,
+  FormHelperText,
   InputLabel,
   MenuItem,
   Select,
@@ -25,10 +26,13 @@ import { useCreateDeployment, useDryRun } from '../../api/trade';
 import { useJob } from '../../api/jobs';
 import { useBrokerAccounts } from '../../api/credentials';
 import { useProductXrefs, useProducts } from '../../api/inst';
-import { useApps } from '../../api/refdata';
+import { intervalLabel, useApps, useTmIntervals } from '../../api/refdata';
 import type { ProductRow } from '../../types/refdata';
 import DryRunReportDialog from './DryRunReportDialog';
 import type { DryRunReport } from '../../types/trade';
+
+/** Sentinel for the manual option — `SCHEDULE_TM_INTERVAL_ID` is null on the wire. */
+const MANUAL_SCHEDULE = 'MANUAL';
 
 /** Strategy + version handed in by the caller (Promotion tab Deploy). */
 export interface DeploymentSelection {
@@ -69,6 +73,7 @@ function DeploymentDialogContent({
 }: DeploymentDialogProps) {
   const { data: accounts = [] } = useBrokerAccounts();
   const { data: apps = [] } = useApps();
+  const { data: intervals = [] } = useTmIntervals();
   const { data: products = [] } = useProducts();
   const create = useCreateDeployment();
   const dryRun = useDryRun();
@@ -81,6 +86,11 @@ function DeploymentDialogContent({
   const [mode, setMode] = useState<'paper' | 'live'>('paper');
   const [enabled, setEnabled] = useState(true);
   const [confirmLive, setConfirmLive] = useState(false);
+  // Manual is a real selection rather than an empty one, so the closed Select
+  // reads "Manual only" instead of blank. Deploying is not the same as opting
+  // into automated trading, so a cadence is always an explicit choice.
+  const [scheduleValue, setScheduleValue] = useState<string>(MANUAL_SCHEDULE);
+  const [confirmSchedule, setConfirmSchedule] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [previewReport, setPreviewReport] = useState<DryRunReport | null>(null);
 
@@ -99,6 +109,11 @@ function DeploymentDialogContent({
     [accounts, credId],
   );
 
+  const sortedIntervals = useMemo(
+    () => [...intervals].sort((a, b) => a.tm_interval_id - b.tm_interval_id),
+    [intervals],
+  );
+
   const { data: xrefs = [] } = useProductXrefs(selectedProduct?.product_id ?? null);
   const vendorSymbol = useMemo(() => {
     if (!selectedAccount) return '';
@@ -106,12 +121,15 @@ function DeploymentDialogContent({
   }, [selectedAccount, xrefs]);
 
   const isLive = mode === 'live';
+  const isScheduled = scheduleValue !== MANUAL_SCHEDULE;
+  const needsScheduleConfirm = isLive && isScheduled;
   const qtyNum = Number(qty);
   const qtyValid = Number.isFinite(qtyNum) && qtyNum > 0;
   const canPreview = Boolean(selection) && Boolean(selectedAccount) && qtyValid && cusip.trim().length > 0;
   const canApply =
     canPreview &&
     (!isLive || confirmLive) &&
+    (!needsScheduleConfirm || confirmSchedule) &&
     !create.isPending;
 
   const strategyLabel = selection
@@ -156,6 +174,10 @@ function DeploymentDialogContent({
       setFormError('Confirm live trading to apply a live deployment.');
       return;
     }
+    if (needsScheduleConfirm && !confirmSchedule) {
+      setFormError('Confirm automatic live trading, or set the schedule to manual.');
+      return;
+    }
     try {
       await create.mutateAsync({
         strategy_id: selection.strategyId,
@@ -168,6 +190,7 @@ function DeploymentDialogContent({
         confirm_live: isLive && confirmLive,
         enabled,
         deployment_status: 'CREATED',
+        schedule_tm_interval_id: isScheduled ? Number(scheduleValue) : null,
       });
       onSuccess?.();
       onClose();
@@ -298,6 +321,31 @@ function DeploymentDialogContent({
               />
             </Stack>
 
+            <FormControl size="small" fullWidth>
+              <InputLabel id="deploy-schedule-label">Schedule</InputLabel>
+              <Select
+                labelId="deploy-schedule-label"
+                label="Schedule"
+                value={scheduleValue}
+                onChange={(e) => {
+                  setScheduleValue(e.target.value);
+                  setConfirmSchedule(false);
+                }}
+              >
+                <MenuItem value={MANUAL_SCHEDULE}>Manual only</MenuItem>
+                {sortedIntervals.map((iv) => (
+                  <MenuItem key={iv.tm_interval_id} value={String(iv.tm_interval_id)}>
+                    {intervalLabel(iv)}
+                  </MenuItem>
+                ))}
+              </Select>
+              <FormHelperText>
+                {isScheduled
+                  ? 'Applies automatically on each closed bar, and keeps this product’s price data up to date.'
+                  : 'Apply button only — no automatic trading, and no scheduled price data.'}
+              </FormHelperText>
+            </FormControl>
+
             <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
               <ToggleButtonGroup
                 size="small"
@@ -307,6 +355,7 @@ function DeploymentDialogContent({
                   if (v) {
                     setMode(v);
                     setConfirmLive(false);
+                    setConfirmSchedule(false);
                   }
                 }}
                 aria-label="Trading mode"
@@ -339,6 +388,26 @@ function DeploymentDialogContent({
                     />
                   }
                   label="I confirm this is a LIVE deployment"
+                />
+              </>
+            )}
+
+            {needsScheduleConfirm && (
+              <>
+                <Alert severity="warning">
+                  This deployment will trade real money unattended, without anyone
+                  pressing Apply. Set the schedule to manual to decide each trade
+                  yourself.
+                </Alert>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      color="warning"
+                      checked={confirmSchedule}
+                      onChange={(e) => setConfirmSchedule(e.target.checked)}
+                    />
+                  }
+                  label="I confirm automatic live trading on this schedule"
                 />
               </>
             )}

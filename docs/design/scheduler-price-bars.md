@@ -109,16 +109,44 @@ Two layers must not be conflated:
 
 - **`NULL` (manual only) stays the create default.** Deploying a strategy is not the same as opting into automated trading. Paper deployments, one-off applies, and dry-run workflows must not silently start placing orders on the hourly tick.
 - **Do not default `schedule_tm_interval_id` in the API** when the client omits the field. The 1.4.0 backfill (`SCHEDULE_TM_INTERVAL_ID = 1` on existing open rows) was migration hygiene, not product policy.
-- **Do not add a separate “enable price sync” control.** `price_bar_sync` derives its instrument list from `SP_GET_SCHEDULED_INSTRUMENTS` — any deployment with a non-null schedule and `IS_ENABLED_IND = 'Y'` is warmed automatically. Manual deployments still fetch bars on each apply via `ensure_fresh`.
+- **Do not add a separate “enable price sync” control** *for a deployment*. `price_bar_sync` derives its instrument list from `SP_GET_SCHEDULED_INSTRUMENTS` — any deployment with a non-null schedule and `IS_ENABLED_IND = 'Y'` is warmed automatically. Manual deployments still fetch bars on each apply via `ensure_fresh`. Capturing bars for an instrument **nobody is trading yet** is a different question, and decision #5 does not serve it — see §3.2.
 - **Do not create per-deployment EventBridge schedules.** One platform tick serves every interval (§6.2).
 
-**Planned UI** (pending — see §9):
+**Shipped UI:**
 
-1. **`DeploymentDialog`** — `REFDATA.TM_INTERVAL` dropdown: *Manual only* (`null`), *Daily* (`1`), *Hourly* (`2`). Default selection: **Manual only**. Helper copy: manual = Apply button only; Daily/Hourly = automatic apply on each closed bar.
-2. **`TradeApplyPage`** — schedule column plus inline edit via existing `PATCH /trade/deployments/{id}` (same dropdown). Show `next_due_at` when scheduled.
-3. **Smart pre-selection (optional, not silent auto-enable):** when launching from Promotion with a backtest job, pre-select the interval that matches the job's bar cadence if known; otherwise stay on Manual. For **live** mode, consider requiring an explicit schedule choice or extra confirmation before enabling non-manual cadence.
+1. **`DeploymentDialog`** — `REFDATA.TM_INTERVAL` dropdown: *Manual only* (`null`), *Daily* (`1`), *Hourly* (`2`). Default selection: **Manual only**. Helper copy states that manual means the Apply button only and no scheduled price data, while a cadence applies on each closed bar and keeps the product's bars current.
+2. **`TradeApplyPage`** — `ScheduleCell` in a Schedule column: the same dropdown, editable in place via `PATCH /trade/deployments/{id}`, with `next_due_at` beneath it when scheduled.
+3. **Live cadence takes its own confirmation.** Automating a live deployment is a second, separate tick-box in the dialog (`I confirm automatic live trading on this schedule`) and a `window.confirm` on the inline edit. One manual live apply is a human watching a single order; an hourly cadence is unattended real money, so the existing live confirmation does not cover it. Switching mode re-arms it.
 
-Until the UI ships, set `schedule_tm_interval_id` via `PATCH /api/v1/trade/deployments/{id}` or include it on `POST /api/v1/trade/deployments`.
+Labels come from `REFDATA.TM_INTERVAL.DISPLAY_NAME` (`1.7.0`). The table had no such column, since nothing displayed an interval until this control; without it the frontend would have to map `NAME` (`DAILY`, `1H`) to friendly text, which the REFDATA single-source-of-truth decision forbids. `intervalLabel()` falls back to `NAME` so a database that predates the migration renders `DAILY` rather than a blank row. `REFDATA.SP_GET_ENUM` opens `SELECT *`, so the column reached Redis and the API with no procedure change.
+
+**Still optional:** smart pre-selection — when launching from Promotion with a backtest job, pre-select the interval matching the job's bar cadence if known, otherwise stay on Manual. Not built; Manual is always the default today.
+
+`schedule_tm_interval_id` remains settable directly via `PATCH /api/v1/trade/deployments/{id}` or on `POST /api/v1/trade/deployments`.
+
+### 3.2 Capturing bars for an instrument nobody trades yet
+
+Decision #5 ties bar population to active deployments, so today the only way to
+accumulate history for a product is to deploy a strategy against it. That does
+not serve a real need: **wanting the data before deciding to trade**, because
+the backtest that informs the decision needs history that does not exist yet.
+
+Two things make the coupling incidental rather than necessary:
+
+- **Bars are public.** `CcxtBarFetcher` builds a *keyless* ccxt client (§7.5), so
+  capture needs no credential, no strategy and no quantity — none of what a
+  `TRADE.DEPLOYMENT` row exists to carry.
+- **The divergence in §7.7 is what capture would fix.** Parameters fitted on
+  provider history are traded against exchange prints, so the same config can
+  produce a different position on the same day. Capturing a venue's bars ahead of
+  time is what would let a strategy be fitted on the series it will actually trade.
+
+A design for this is **pending**. It needs an instrument subscription independent
+of `TRADE.DEPLOYMENT` (the warmer would union it with `SP_GET_SCHEDULED_INSTRUMENTS`),
+`PriceBarService.backfill` exposed — it exists and is reachable from no route or
+CLI — and the backtest read path pointed at `PRICE_BAR`, which §4.6 argues is
+additive but is not wired. Capture alone would accumulate bars that backtest
+still cannot see.
 
 ---
 
@@ -806,6 +834,7 @@ what every downstream "newest closed bar" derives from.
 | `db/liquidbase/market_data/procedures/SP_GET_PRICE_BAR.sql` | Range read |
 | `db/liquidbase/market_data/releases/1.0.0-price-bars.xml` | `PRICE_BAR` table + insert / range-read / coverage SPs |
 | `db/liquidbase/refdata/data/TM_INTERVAL.sql` + `releases/1.5.0-tm-interval.xml` | Seed `DAILY` / `1H` rows + `PERIOD_LENGTH` |
+| `db/liquidbase/refdata/releases/1.7.0-tm-interval-display-name.xml` | `TM_INTERVAL.DISPLAY_NAME` — dropdown label for the schedule control (§3.1) |
 | `db/liquidbase/market_data/market_data-changelog.xml` | Liquibase changelog |
 | `db/liquidbase/trade/procedures/SP_GET_MISSED_DUE_DEPLOYMENTS.sql` | Poller — apply-now rows |
 | `db/liquidbase/trade/procedures/SP_GET_NEXT_DUE_DEPLOYMENTS.sql` | UI / ops — not-yet-due preview |
@@ -859,6 +888,17 @@ what every downstream "newest closed bar" derives from.
 | `aws/lambda/scheduled-task/handler.py` | Task table removed — the path comes from the event, validated as a path rather than a URL |
 | `scripts/sync_schedules.py` | Copies `task` **and** `path` from each YAML into the schedule's target input; a job without a `path` is fatal |
 
+### Frontend (§3.1 UI)
+
+| File | Change |
+|------|--------|
+| `frontend/src/components/trade/ScheduleCell.tsx` | **New** — cadence dropdown per deployment row, editable in place; live cadence confirms first |
+| `frontend/src/api/refdata.ts` | `useTmIntervals()` + `intervalLabel()` (`DISPLAY_NAME`, falling back to `NAME`) |
+| `frontend/src/types/refdata.ts` | `TmIntervalRow` |
+| `frontend/src/types/trade.ts` | `schedule_tm_interval_id` on the create and patch requests |
+| `frontend/src/components/trade/DeploymentDialog.tsx` | Schedule dropdown, manual default, separate confirmation for an automated live deployment |
+| `frontend/src/pages/trade/TradeApplyPage.tsx` | Schedule column wired to `ScheduleCell` |
+
 ---
 
 ## 9. Implementation order
@@ -866,7 +906,7 @@ what every downstream "newest closed bar" derives from.
 1. **DDL** — `REFDATA.TM_INTERVAL` seed; MARKET_DATA schema + tables + SPs; DEPLOYMENT scheduler columns + SP updates. ✅
 2. **Python** — schedule fields in schemas, `PriceBarRepo`, `PriceBarService`, db_repo schedule fields, clock module. ✅
 3. **Integration** — Price bar refresh wired into live apply ✅; scheduled bar warming ✅; scheduler tick ✅.
-4. **UI + Lambda** — EventBridge/Lambda CloudFormation ✅; schedule dropdown per §3.1 (*pending* — `DeploymentDialog` create + `TradeApplyPage` edit, manual default).
+4. **UI + Lambda** — EventBridge/Lambda CloudFormation ✅; schedule dropdown per §3.1 ✅ (`DeploymentDialog` create + `TradeApplyPage` inline edit, manual default, `DISPLAY_NAME` labels from REFDATA).
 5. **Tests** — Unit tests for clock, repos, service, updated schemas. ✅
 
 **Service auth is done** (§6.4). It was the blocker this section used to name
@@ -882,11 +922,15 @@ UTC with a 10s in-process settle.
 per-deployment design was dropped. `POST /api/v1/scheduler/tick` is served and
 `config/scheduler/trade_apply_tick.yml` schedules it at `:05` UTC.
 
-Still open before a deployment can be *put* on a schedule from the product: §3.1
-UI. `SCHEDULE_TM_INTERVAL_ID` is persisted by `SP_INS_DEPLOYMENT` and honoured
-everywhere below it, but `DeploymentDialog` never sets it, so every deployment
-created in the UI today is manual-apply only and the tick finds nothing due.
-Workaround until the dropdown ships: `PATCH /api/v1/trade/deployments/{id}` with
-`schedule_tm_interval_id` (`1` = Daily, `2` = 1H; explicit `null` = manual).
-Platform schedulers (`price_bar_sync`, `trade_apply_tick`) need no separate
-enable step — they are already on and react to scheduled deployments.
+**The §3.1 UI has shipped**, which closes the last gap in this phase: a
+deployment can now be put on a schedule from the product. `DeploymentDialog`
+sets `SCHEDULE_TM_INTERVAL_ID` on create and `ScheduleCell` edits it in place,
+both defaulting to manual, so the tick finds work only where a cadence was
+chosen deliberately. Platform schedulers (`price_bar_sync`, `trade_apply_tick`)
+need no separate enable step — they are already on and react to scheduled
+deployments.
+
+What remains open is **§3.2**: capturing bars for an instrument that has no
+deployment, so a product's history accumulates before anyone decides to trade
+it. That revises decision #5 and needs a subscription concept, `backfill`
+exposed, and the backtest read path pointed at `PRICE_BAR`.
