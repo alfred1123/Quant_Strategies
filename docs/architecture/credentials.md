@@ -13,14 +13,14 @@ gates these routes.
 
 | Layer | File | Responsibility |
 |-------|------|----------------|
-| Router | [`quant/api/credentials/router.py`](../../quant/api/credentials/router.py) | `/api/v1/credentials` routes, `require_user`, rate limits, 404-on-not-owned |
-| Service | [`quant/api/credentials/service.py`](../../quant/api/credentials/service.py) (`CredentialService`) | Orchestrates **encrypt → SP → mask**; the only layer that sees plaintext |
-| Repo | [`quant/api/credentials/repo.py`](../../quant/api/credentials/repo.py) (`ApiCredentialRepo`) | `CALL CORE_ADMIN.SP_*_API_CREDENTIAL`; returns raw rows incl. ciphertext |
-| Crypto | [`quant/shared/secrets_crypto.py`](../../quant/shared/secrets_crypto.py) (`CredentialCrypto`) | Fernet encrypt / decrypt / mask |
-| Schemas | [`quant/api/credentials/schemas.py`](../../quant/api/credentials/schemas.py) | Request/response models — **responses never carry ciphertext** |
+| Router | `quant/api/credentials/router.py` | `/api/v1/credentials` routes, `require_user`, rate limits, 404-on-not-owned |
+| Service | `quant/api/credentials/service.py` (`CredentialService`) | Orchestrates **encrypt → SP → mask**; the only layer that sees plaintext |
+| Repo | `quant/api/credentials/repo.py` (`ApiCredentialRepo`) | `CALL CORE_ADMIN.SP_*_API_CREDENTIAL`; returns raw rows incl. ciphertext |
+| Crypto | `quant/shared/secrets_crypto.py` (`CredentialCrypto`) | Fernet encrypt / decrypt / mask |
+| Schemas | `quant/api/credentials/schemas.py` | Request/response models — **responses never carry ciphertext** |
 
 `CredentialCrypto` and `CredentialService` are built **once** at FastAPI
-startup (`lifespan` in [`quant/api/main.py`](../../quant/api/main.py)) and stored
+startup (`lifespan` in `quant/api/main.py`) and stored
 on `app.state`. The repo is built per-request against `app.state.db_conninfo`.
 
 ---

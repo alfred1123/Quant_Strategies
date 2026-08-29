@@ -1,7 +1,7 @@
 # Deploy build pipeline — issue & fix plan
 
 !!! warning "Archived"
-    ECR deploy is **live**. Current ops: [infrastructure.md § CI/CD](../architecture/infrastructure.md#cicd--github-actions).
+    ECR deploy is **live**. Current ops: [infrastructure.md § CI/CD](../architecture/infrastructure.md#cicd-github-actions).
 
 ## TL;DR
 
@@ -58,9 +58,9 @@ image — only that local tests pass.
 ## Current tactical mitigation (deployed)
 
 Removed the stray `@rolldown/binding-linux-x64-gnu` entry from
-[`frontend/package.json`](../../frontend/package.json) and regenerated
-[`frontend/package-lock.json`](../../frontend/package-lock.json).
-[`docker/nginx/Dockerfile`](../../docker/nginx/Dockerfile) uses normal
+`frontend/package.json` and regenerated
+`frontend/package-lock.json`.
+`docker/nginx/Dockerfile` uses normal
 `npm ci`.
 
 This unblocks deploys but doesn't address the underlying anti-pattern of
@@ -94,9 +94,9 @@ can recur.
 1. **ECR repos via CFN** — new stack `aws/cfn/00-ecr.yml`:
    - `quant-app` and `quant-nginx` private repos.
    - Lifecycle policy: keep last 10 tagged images, expire untagged after 1 day.
-   - Add `[ecr]="00-ecr.yml"` to `STACKS` in [`aws/deploy.sh`](../../aws/deploy.sh).
+   - Add `[ecr]="00-ecr.yml"` to `STACKS` in `aws/deploy.sh`.
 
-2. **EC2 pull permissions** — in [`aws/cfn/03-compute.yml`](../../aws/cfn/03-compute.yml):
+2. **EC2 pull permissions** — in `aws/cfn/03-compute.yml`:
    - Attach `arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly` to
      the EC2 instance role.
 
@@ -115,16 +115,16 @@ can recur.
      ```
 
 4. **Compose wiring** — add `image:` to each service in
-   [`docker-compose.yml`](../../docker-compose.yml):
+   `docker-compose.yml`:
    ```yaml
    api:    { image: ${APP_IMAGE:-quant-app:latest},   build: { dockerfile: Dockerfile } }
    worker: { image: ${APP_IMAGE:-quant-app:latest},   build: { dockerfile: Dockerfile } }
    nginx:  { image: ${NGINX_IMAGE:-quant-nginx:latest}, build: { context: ., dockerfile: docker/nginx/Dockerfile } }
    ```
-   `APP_IMAGE` / `NGINX_IMAGE` set in [`docker-compose.prod.yml`](../../docker-compose.prod.yml)
+   `APP_IMAGE` / `NGINX_IMAGE` set in `docker-compose.prod.yml`
    to the ECR URIs with `:${IMAGE_TAG}` (env var on EC2, written by deploy step).
 
-5. **Workflow rewrite** — in [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml):
+5. **Workflow rewrite** — in `.github/workflows/deploy.yml`:
    - Replace the standalone `build frontend` sanity job with a real
      `build-and-push` job:
      - `docker/setup-qemu-action@v3` + `docker/setup-buildx-action@v3`,

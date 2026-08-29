@@ -7,9 +7,10 @@ See also [System Overview](overview.md) for the full stack (API, worker, Redis, 
 ```mermaid
 flowchart TB
   subgraph HTTP["FastAPI (quant/api)"]
-    BT_R[backtest + jobs]
-    TR_R[deployments + credentials]
+    BT_R[backtest + jobs + promotions]
+    TR_R[deployments + credentials + strategies]
     RD[refdata + inst]
+    SCH[scheduler tick + bar warm + admin]
   end
 
   subgraph Worker["quant.queue.worker_loop"]
@@ -17,13 +18,19 @@ flowchart TB
     SP[subprocess: quant.queue.worker]
   end
 
+  subgraph Lambda["EventBridge Scheduler"]
+    LBD[scheduled-task Lambda]
+  end
+
   REDIS[(Redis)]
   PG[(PostgreSQL)]
 
+  LBD -->|service token| SCH
   BT_R --> PG
   TR_R --> PG
   RD --> REDIS
   RD --> PG
+  SCH --> PG
   CL --> PG
   SP --> PG
   SP --> REDIS
@@ -58,7 +65,7 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
   │                       └─ TechnicalAnalysis (indicators.py): SMA, EMA, RSI, Bollinger Z, Stochastic on the factor column.
   │                          SignalDirection (signals.py): position array {-1, 0, 1} from indicator vs threshold.
   │
-  └─ Fetches daily OHLCV from YahooFinance / AlphaVantage / Glassnode / FutuOpenD
+  └─ Fetches daily OHLCV from YahooFinance / AlphaVantage / Glassnode / NasdaqDataLink / FutuOpenD
 ```
 
 `quant.cli` (entry point: `python -m quant.cli`) orchestrates the full flow.
@@ -73,9 +80,9 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/refdata/bundle.py` | `DataCaches` | Composes `RedisRefData` + `InstrumentCache` + `BacktestCache` so API and worker wire identically. |
 | `quant/data/backtest_cache.py` | `BacktestCache(DbGateway)` | BT schema read/write (`persistent=True`) — split API: `read_payload()` (read-only, raises `CacheMissError` on miss) and `refresh_payload(fetcher=...)` (fetches the full range and inserts a new `API_REQUEST` version; SP write failures propagate). |
 | `quant/data/instruments.py` | `InstrumentCache(DbGateway)` | INST schema cache (`persistent=True`) — products + vendor-symbol xrefs, exposed via `/api/v1/inst/products`. |
-| `quant/data/sources.py` | `YahooFinance`, `AlphaVantage`, `Glassnode`, `FutuOpenD` | Fetch OHLCV data, return normalized DataFrame. |
+| `quant/data/sources.py` | `YahooFinance`, `AlphaVantage`, `Glassnode`, `NasdaqDataLink`, `FutuOpenD` | Fetch OHLCV data, return normalized DataFrame. |
 | `quant/market_data/repo.py` | `PriceBarRepo(DbGateway)` | MARKET_DATA SP wrappers (`persistent=True`) — coverage probe, range read, one-bar insert. |
-| `quant/market_data/fetcher.py` | `CcxtBarFetcher` | Public `fetch_ohlcv` over ccxt, paginated. No API credentials — bars are public data. |
+| `quant/market_data/fetcher.py` | `CcxtBarFetcher` | Paginated public-data fetch (`fetch_bars`) over ccxt's `fetch_ohlcv`. No API credentials — bars are public data. |
 | `quant/market_data/service.py` | `PriceBarService` | Freshness check, gap fill, and `read_bars()` in the same DataFrame shape `fetch_df` produces. `load_window()` composes the two for live apply and fails closed rather than signalling on an incomplete window. `find_gaps()` / `backfill()` repair continuity over an explicit range — the rolling lookback alone leaves permanent holes after a long outage — and report rather than raise. All reads scope to one `source_app_id`. |
 | `quant/trade/bar_source.py` | `PriceBarServiceFactory` | Binds a deployment's `APP_ID` to the venue its bars come from; one service per broker over a shared repo connection. |
 | `quant/shared/intervals.py` | `parse_period`, `floor_to_period`, `last_closed_bar`, `next_run_at`, `ccxt_timeframe` | Interval arithmetic from `REFDATA.TM_INTERVAL.PERIOD_LENGTH`; shared by price bars and the scheduler. Pure — the lookup is `RedisRefData.get_interval_period`. |
@@ -87,8 +94,18 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/strategy/optimizer.py` | `ParametersOptimization` | Grid search (Cartesian or Optuna TPE/Grid sampler). |
 | `quant/strategy/walk_forward.py` | `WalkForward` | IS/OOS split, optimize on IS, evaluate on OOS. |
 | `quant/trade/futu_trader.py` | `FutuTrader` | Paper/live order execution via Futu OpenD (CLI / legacy). |
-| `quant/trade/service.py` | `TradeService` | Deployment create/list — validates then calls `TradeRepo` SPs (Phase 1.2). |
-| `quant/trade/db_repo.py` | `TradeRepo` | `CALL TRADE.SP_INS/GET_DEPLOYMENT` via `DbGateway`. |
+| `quant/trade/service.py` | `TradeService` | Deployment create/list/apply — validates then calls `TradeRepo` SPs. |
+| `quant/trade/db_repo.py` | `TradeRepo` | `CALL TRADE.SP_*` via `DbGateway`. |
+| `quant/trade/live_apply.py` | `LiveApplyOrchestrator` | One live-apply cycle — signal, order, execution diary. |
+| `quant/trade/dry_run.py` | `run_dry_run()` | Preflight without placing orders. |
+| `quant/trade/account.py` | `fetch_account_snapshot()` | Live balances and positions from the exchange. |
+| `quant/trade/registry.py` | `AdapterRegistry` | Resolves `APP_ID` → ccxt/Futu adapter. |
+| `quant/trade/scheduler/sweep.py` | `ScheduleSweeper` | Hourly platform tick — one pass per interval. |
+| `quant/trade/scheduler/tick.py` | `ScheduleTickRunner` | Apply one due deployment per interval pass. |
+| `quant/trade/scheduler/warm.py` | `BarWarmer` | Pre-fetch bars for scheduled instruments. |
+| `quant/strategy/live_service.py` | `bars_loader`, `load_window` | Live signal computation from `MARKET_DATA.PRICE_BAR`. |
+| `quant/promotion/evaluate.py` | promotion gates | HARD/SOFT metric evaluation for auto-promote. |
+| `quant/promotion/repo.py` | `PromotionRepo` | `CALL BT.SP_INS_PROMOTION` via `DbGateway`. |
 | `quant/api/credentials/service.py` | `CredentialService` | Fernet encrypt/decrypt; masks keys in API responses (Phase 1.1). |
 | `quant/api/credentials/repo.py` | `ApiCredentialRepo` | `CALL CORE_ADMIN.SP_*_API_CREDENTIAL` via `DbGateway`. |
 | `quant/shared/secrets_crypto.py` | `CredentialCrypto` | Resolves `EXCHANGE_SECRETS_KEY` (prod fail-fast); Fernet wrapper. |

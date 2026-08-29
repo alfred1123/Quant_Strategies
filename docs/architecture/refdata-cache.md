@@ -34,10 +34,10 @@ flowchart LR
 
 | Component | File | Role |
 |-----------|------|------|
-| Publisher | [`quant/refdata/publisher.py`](../../quant/refdata/publisher.py) (`RefDataPublisher`) | Discovers tables, calls `SP_GET_ENUM`, writes JSON to Redis, bumps version |
-| Reader | [`quant/refdata/reader.py`](../../quant/refdata/reader.py) (`RedisRefData`) | Read-only accessor; version-checked local snapshot |
-| Bundle | [`quant/refdata/bundle.py`](../../quant/refdata/bundle.py) (`DataCaches`) | Wires `RedisRefData` + instrument/backtest caches for handlers |
-| Router | [`quant/api/routers/refdata.py`](../../quant/api/routers/refdata.py) | `GET /api/v1/refdata/{table}` + `POST /api/v1/refdata/refresh` |
+| Publisher | `quant/refdata/publisher.py` (`RefDataPublisher`) | Discovers tables, calls `SP_GET_ENUM`, writes JSON to Redis, bumps version |
+| Reader | `quant/refdata/reader.py` (`RedisRefData`) | Read-only accessor; version-checked local snapshot |
+| Bundle | `quant/refdata/bundle.py` (`DataCaches`) | Wires `RedisRefData` + instrument/backtest caches for handlers |
+| Router | `quant/api/routers/refdata.py` | `GET /api/v1/refdata/{table}` + `POST /api/v1/refdata/refresh` |
 
 ---
 
@@ -67,7 +67,7 @@ flowchart LR
 
 **When it runs:**
 
-- FastAPI **startup** (`lifespan` in [`quant/api/main.py`](../../quant/api/main.py)) — seeds Redis before handlers serve.
+- FastAPI **startup** (`lifespan` in `quant/api/main.py`) — seeds Redis before handlers serve.
 - `POST /api/v1/refdata/refresh` — admin re-publish (any authenticated user today; no admin role yet).
 - CLI: `python -m quant.refdata.publisher` for ad-hoc reseeding.
 
@@ -118,7 +118,7 @@ changes are rare and admin-triggered via the refresh endpoint.
 ## Adding a new REFDATA table
 
 1. Create the table under the `refdata` schema (Liquibase — see the
-   [db-ddl](../../.github/skills/db-ddl/SKILL.md) conventions) and ensure
+   db-ddl (`.github/skills/db-ddl/SKILL.md`) conventions) and ensure
    `REFDATA.SP_GET_ENUM` returns its rows.
 2. Seed rows via a Liquibase `<sql>` changeset.
 3. Nothing else is required for publish — `_discover_tables()` picks it up

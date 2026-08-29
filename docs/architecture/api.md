@@ -1,6 +1,6 @@
 # FastAPI Backend
 
-The `quant/api/` directory contains the FastAPI application for backtest, trade, and shared REFDATA endpoints. All `/api/v1/*` routes (except auth and health) require an authenticated session.
+The `quant/api/` directory contains the FastAPI application for backtest, trade, and shared REFDATA endpoints. All `/api/v1/*` routes (except auth and health) require an authenticated session; the **admin**, **market-data**, and **scheduler** routers additionally accept the scheduler Lambda's service bearer token (`require_user_or_service`).
 
 See [System Overview](overview.md) for the full stack.
 
@@ -17,7 +17,9 @@ See [System Overview](overview.md) for the full stack.
 | **Shared config** | `/api/v1/refdata/*`, `/api/v1/inst/*` | Used by Backtest and Trade UIs |
 | **Trade — deployments** | `/api/v1/trade/deployments/*` | **Done** (Phase 1.2) |
 | **Trade — credentials** | `/api/v1/credentials/*` | **Done** (Phase 1.1) |
-| **Trade — strategies** | `/api/v1/strategies` | Planned (Phase 1.6) |
+| **Trade — strategies** | `/api/v1/strategies` | **Done** (Phase 1.6) — `?versions=best\|all`, `?limit=` |
+| **Backtest — promotions** | `/api/v1/backtest/promotions` | **Done** — promotion history for the Promotion tab |
+| **Admin / scheduler** | `/api/v1/admin/*`, `/api/v1/market-data/*`, `/api/v1/scheduler/*` | Service-token or session — EventBridge Lambda entry points |
 
 UI mode (`/backtest` vs `/trade`) does **not** change these URLs — each page calls the appropriate prefix.
 
@@ -58,6 +60,8 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `POST` | `/api/v1/backtest/jobs/{queue_id}/cancel` | Cancel a queued or running job. |
 | `POST` | `/api/v1/backtest/jobs/{queue_id}/reenqueue` | Re-enqueue from a terminal row. |
 | `GET`  | `/api/v1/backtest/jobs/{queue_id}/events` | SSE stream of job progress events. |
+| `GET`  | `/api/v1/backtest/promotions` | Promotion history rows for the Promotion tab (`?limit=`). |
+| `POST` | `/api/v1/backtest/jobs/strategies/{strategy_id}/promote` | Manual promote/demote a strategy VID. |
 
 ### Trade (Phase 1.2 — deployments)
 
@@ -70,6 +74,10 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `POST` | `/api/v1/trade/deployments/{id}/stop` | Required | Stop a deployment — disables it and sets `STOPPED`. Idempotent. |
 | `POST` | `/api/v1/trade/deployments/{id}/apply` | Required | Run one live-apply cycle now. |
 | `POST` | `/api/v1/trade/deployments/dry-run` | Required | Preflight a deployment without placing orders. |
+| `GET` | `/api/v1/trade/execution-events` | Required | Recent order attempts across the caller's deployments (`?limit=50`, optional `deployment_id`). |
+| `GET` | `/api/v1/trade/transactions` | Required | Recent broker-confirmed fills (`?limit=50`, optional `deployment_id`). |
+| `GET` | `/api/v1/trade/deployments/{id}/events` | Required | Execution diary for one deployment. |
+| `GET` | `/api/v1/trade/deployments/{id}/transactions` | Required | Fill history for one deployment. |
 | `GET` | `/api/v1/trade/accounts/{api_credential_id}/snapshot` | Required | Live balances and open positions for one broker account. Read-only. Query `paper` (default `true`). **404** if the credential is not owned. |
 
 #### Account snapshot
@@ -110,15 +118,15 @@ this endpoint answers what is true now.
 
 Keys are Fernet-encrypted in Python (`quant/shared/secrets_crypto.py`) before `CALL CORE_ADMIN.SP_INS_API_CREDENTIAL`. Responses never include `*_CIPHERTEXT`. Broker is identified by `app_id` (`REFDATA.APP`). Full flow: [Credential Encryption](credentials.md).
 
-See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11--user-secrets) and [Login §6.4](../design/login.md#64-reuse-from-login--jwt-credential-api--phase-11).
+See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11-user-secrets) and [Login §6.4](../design/login.md#64-reuse-from-login-jwt-credential-api-phase-11).
 
-### Strategies (planned — Phase 1.6)
+### Strategies (Phase 1.6 — implemented)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/api/v1/strategies` | Required | List persisted `BT.STRATEGY` rows for the strategy picker (Trade Apply). |
+| `GET` | `/api/v1/strategies` | Required | List caller-owned `BT.STRATEGY` rows for the Trade strategy picker. Query `versions=best` (default — `IS_BEST_IND` rows only) or `all`; `limit` defaults to 200. |
 
-Not the same as REFDATA `signal_type` — see [trade-api §2.1](../design/trade-api.md#21-strategy-catalog--phase-16).
+Not the same as REFDATA `signal_type` — see [trade-api §2.1](../design/trade-api.md#21-strategy-catalog-phase-16).
 
 ### REFDATA / Instruments (shared)
 
@@ -127,10 +135,20 @@ How the cache is published and read: [REFDATA Cache](refdata-cache.md).
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET`  | `/api/v1/refdata/{table_name}` | Fetch a cached REFDATA table (e.g. `indicator`, `signal_type`, `asset_type`, `app`). |
-| `POST` | `/api/v1/refdata/refresh` | Reload all REFDATA tables from the database without restarting the server. Returns 204. |
+| `POST` | `/api/v1/refdata/refresh` | Reload all REFDATA tables from the database without restarting the server. Returns `{"tables": n}`. |
 | `GET`  | `/api/v1/inst/products` | List products (cached `InstrumentCache`). |
 | `GET`  | `/api/v1/inst/products/{id}/xrefs` | Vendor-symbol cross-references for a product. |
 | `POST` | `/api/v1/inst/refresh` | Reload the instrument cache. Returns 204. |
+
+### Admin / scheduler (service token or session)
+
+These routers are mounted with `require_user_or_service` so the EventBridge Lambda can call them with `TRADE_SERVICE_TOKEN`. Human-facing routes on the same routers add `require_user` when needed.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/admin/log-proc-summary/summarize` | Service or session | Aggregate `LOG_PROC_DETAIL` into daily per-procedure summaries. |
+| `POST` | `/api/v1/market-data/price-bars/sync` | Service or session | Pre-fetch bars for every instrument a scheduled deployment will trade (bar warmer). |
+| `POST` | `/api/v1/scheduler/tick` | Service or session | Apply every deployment currently due across all intervals (hourly platform sweep). |
 
 ### Health
 
@@ -185,7 +203,7 @@ At startup the FastAPI lifespan hook also builds `CredentialCrypto` (Fernet key 
 - **`InstrumentCache`** (`quant/data/instruments.py`) — products + xrefs from the INST schema; loaded at startup and refreshable via `POST /api/v1/inst/refresh`.
 - **`BacktestCache`** (`quant/data/backtest_cache.py`) — BT schema read/write used by the optimize/performance services for the dataset cache.
 
-If Postgres or Redis is **unreachable at startup**, the backend fails fast — REFDATA is required for every dropdown.
+If the REFDATA publish fails at startup the server still boots (REFDATA endpoints 503 until `POST /api/v1/refdata/refresh` succeeds); the instrument-cache load and missing prod secrets still fail the boot.
 
 ## Project Structure
 
@@ -193,10 +211,11 @@ If Postgres or Redis is **unreachable at startup**, the backend fails fast — R
 quant/api/
 ├── main.py              # App factory — CORS, lifespan, router registration
 ├── deps.py              # FastAPI dependencies (DataCaches, auth)
+├── exception_handlers.py
 ├── auth/
 │   ├── router.py        # /api/v1/auth/* endpoints
 │   ├── service.py       # AuthService — password verify (Argon2), JWT
-│   ├── dependencies.py  # require_user FastAPI dependency
+│   ├── dependencies.py  # require_user / require_user_or_service
 │   ├── repo.py          # AuthRepo — calls SP_GET_APP_USER_BY_*
 │   └── models.py        # Pydantic models (LoginRequest, etc.)
 ├── credentials/         # Phase 1.1 — exchange API keys
@@ -204,17 +223,29 @@ quant/api/
 │   ├── service.py       # CredentialService — Fernet encrypt, mask responses
 │   ├── repo.py          # ApiCredentialRepo — SP_INS/GET/REVOKE
 │   └── schemas.py       # CreateCredentialRequest, CredentialResponse, …
+├── admin/               # Service-token maintenance (log-proc summary)
+│   ├── router.py
+│   └── repo.py
+├── market_data/         # Bar warmer — POST /market-data/price-bars/sync
+│   └── router.py
+├── scheduler/           # Platform tick — POST /scheduler/tick
+│   └── router.py
 ├── routers/
 │   ├── backtest.py      # /api/v1/backtest/* endpoints
-│   ├── deployments.py   # /api/v1/trade/deployments/* (Phase 1.2)
-│   ├── jobs.py          # /api/v1/backtest/jobs/* endpoints
+│   ├── deployments.py   # /api/v1/trade/deployments/* + execution diary reads
+│   ├── jobs.py          # /api/v1/backtest/jobs/* + manual promote
+│   ├── promotion.py     # /api/v1/backtest/promotions
+│   ├── strategies.py    # /api/v1/strategies (Phase 1.6)
 │   ├── refdata.py       # /api/v1/refdata/* endpoints
 │   └── inst.py          # /api/v1/inst/* endpoints
 ├── schemas/
-│   ├── backtest.py      # Backtest request/response models (also in quant/schemas/)
-│   └── jobs.py          # Job queue models
+│   ├── jobs.py
+│   ├── promotion.py
+│   └── strategies.py
 └── services/
-    └── jobs.py          # Enqueue, list, cancel, SSE broker
+    ├── jobs.py          # Enqueue, list, cancel, SSE broker
+    ├── promotion.py
+    └── strategies.py
 
 quant/shared/config.py              # Settings, env/SSM loading (not under api/)
 quant/shared/secrets_crypto.py      # CredentialCrypto — EXCHANGE_SECRETS_KEY + Fernet
@@ -223,4 +254,4 @@ quant/trade/service.py              # TradeService — deployments (Phase 1.2)
 quant/trade/db_repo.py              # TradeRepo — SP_INS/GET_DEPLOYMENT
 ```
 
-REFDATA, INST, and BT cache classes live under `quant/refdata/` and `quant/data/` (shared between the API and the worker via `quant/refdata/bundle.py::DataCaches`). All Postgres access goes through `quant/shared/db.py::DbGateway` — no other module in `quant/` or `quant/api/` imports `psycopg`.
+REFDATA, INST, and BT cache classes live under `quant/refdata/` and `quant/data/` (shared between the API and the worker via `quant/refdata/bundle.py::DataCaches`). All Postgres access goes through `quant/shared/db.py::DbGateway` — no other module imports `psycopg` (except the `/health/ready` DB ping in `main.py`).

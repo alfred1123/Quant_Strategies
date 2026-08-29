@@ -125,7 +125,7 @@ All application **writes** go through stored procedures — see [Database](datab
 
 Prod **fail-fast** if `EXCHANGE_SECRETS_KEY` is missing at API boot. Dev auto-generates an ephemeral key with a warning.
 
-See [Login design](../design/login.md) and [Plan to Profit §5.5](../design/plan-to-profit.md#55-auth--security-guardrails).
+See [Login design](../design/login.md) and [Plan to Profit §5.5](../design/plan-to-profit.md#55-auth-security-guardrails).
 
 ---
 

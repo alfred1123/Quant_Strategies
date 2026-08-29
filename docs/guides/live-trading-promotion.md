@@ -5,7 +5,7 @@
     production ops, and when to promote Bybit from testnet to mainnet. Applies to
     Phase 1.7 (live apply) and Phase 1.9 (scheduler).
 
-**Related:** [Plan to Profit §1.7](../design/plan-to-profit.md#phase-17--live-apply),
+**Related:** [Plan to Profit §1.7](../design/plan-to-profit.md#phase-17-live-apply),
 [Live Order Execution](../design/live-order-execution.md),
 [Scheduler & Price Bars](../design/scheduler-price-bars.md),
 [Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge-lambda),
@@ -78,7 +78,7 @@ behaving correctly.
 | **Telegram (Phase 2.4)** | Per-user | Same class of errors on *their* deployment |
 | **Healthy steady state** | — | **No messages** (by design) |
 
-See [Plan to Profit §5.3](../design/plan-to-profit.md#53-error-handling--observability).
+See [Plan to Profit §5.3](../design/plan-to-profit.md#53-error-handling-observability).
 
 ### 4.3 How to move
 
@@ -119,13 +119,13 @@ Complete on testnet before any mainnet credential:
 
 - [ ] Dry-run succeeds for this deployment (credentials, `INST.PRODUCT_XREF`, qty).
 - [ ] Manual apply on testnet; verify fill on `testnet.bybit.com` + `TRADE.EXECUTION_EVENT` / `TRANSACTION`.
-- [ ] Kill switch: `PATCH` deployment `enabled=false` stops apply ([Trade API §4](../design/trade-api.md#4-risk--safety)).
+- [ ] Kill switch: `PATCH` deployment `enabled=false` stops apply ([Trade API §4](../design/trade-api.md#4-risk-safety)).
 - [ ] Slack alert tested: failure → alert; success → no alert.
 - [ ] Scheduler: `TRADE_SERVICE_TOKEN` accepted by API — **done**; `log_proc_summary`, `price_bar_sync` and `trade_apply_tick` all reach it on schedule, and `MaximumRetryAttempts = 0` is set by `scripts/sync_schedules.py` for every schedule rather than by application code ([scheduler design §6.2](../design/scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)). Still to verify: one scheduled apply completes end to end — set `schedule_tm_interval_id` on a deployment via `PATCH /trade/deployments/{id}` until the UI dropdown ships ([§3.1](../design/scheduler-price-bars.md#31-product-ux-how-scheduling-is-enabled); manual is the intended create default, not auto-enable on deploy).
-- [ ] Price bars (Phase 1.9): live apply fails closed on stale data — do not trade on unverified bars ([scheduler design §4.8](../design/scheduler-price-bars.md#48-failure-modes-and-error-handling)).
+- [ ] Price bars (Phase 1.9): live apply fails closed on stale data — do not trade on unverified bars ([scheduler design §4.7](../design/scheduler-price-bars.md#47-failure-modes-and-error-handling)).
 
 Remaining Phase 1.7 security items (ownership, dry-run-before-apply enforcement) should
-be done before mainnet — see [Plan to Profit §1.7](../design/plan-to-profit.md#phase-17--live-apply).
+be done before mainnet — see [Plan to Profit §1.7](../design/plan-to-profit.md#phase-17-live-apply).
 
 ### 5.3 How mainnet works in code
 
@@ -150,7 +150,7 @@ Golden harness (testnet lifecycle):
 python scripts/bybit_local_testnet.py --suite
 ```
 
-See [Plan to Profit §1.3](../design/plan-to-profit.md#phase-13--bybit-adapter-dry-run).
+See [Plan to Profit §1.3](../design/plan-to-profit.md#phase-13-bybit-adapter-dry-run).
 
 ### 5.4 Mainnet cutover procedure
 
@@ -176,7 +176,7 @@ Use a **new deployment** — do not flip an existing testnet row to live in plac
     Every apply of a deployment on a ccxt venue — manual **or** scheduled —
     reads `MARKET_DATA.PRICE_BAR`, bars pulled from the exchange it trades on
     (daily when no schedule is attached; the schedule only changes the interval
-    — [design §7.7](../design/scheduler-price-bars.md#77-broker-binding--quanttradebar_sourcepy)).
+    — [design §7.7](../design/scheduler-price-bars.md#77-broker-binding-quanttradebar_sourcepy)).
     Backtest and dry-run keep the provider (Glassnode / Yahoo), and so do
     brokers without a market-data venue (Futu equities).
 

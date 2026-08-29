@@ -204,7 +204,7 @@ DELETE /api/v1/strategies/{id}           → Soft-delete
 
 Create/update remain on the jobs/backtest path until a dedicated editor is needed.
 
-**Ownership:** v1 list may return all strategies (globally readable). Phase **1.7** deployment create must verify `BT.STRATEGY.USER_ID` matches caller — see [User isolation](user-isolation.md) and [plan-to-profit §5.5](plan-to-profit.md#55-auth--security-guardrails).
+**Ownership:** v1 list may return all strategies (globally readable). Phase **1.7** deployment create must verify `BT.STRATEGY.USER_ID` matches caller — see [User isolation](user-isolation.md) and [plan-to-profit §5.5](plan-to-profit.md#55-auth-security-guardrails).
 
 ### 2.2 Deployment (one-click deploy)
 
@@ -234,7 +234,7 @@ PUT    /api/v1/credentials/{id}                → Rotate keys (soft-version bum
 DELETE /api/v1/credentials/{id}                → Revoke credential                        ✅ live
 ```
 
-See [plan-to-profit §1.1](plan-to-profit.md#phase-11--user-secrets) and [login.md §6.4](login.md#64-reuse-from-login--jwt-credential-api--phase-11).
+See [plan-to-profit §1.1](plan-to-profit.md#phase-11-user-secrets) and [login.md §6.4](login.md#64-reuse-from-login-jwt-credential-api-phase-11).
 
 ### 2.4 Execution Log — planned (Phase 1.8)
 
@@ -313,7 +313,7 @@ User clicks "Deploy" in UI
 
 These checks run **before every order** in the Trade API. They are non-negotiable.
 
-**Security / auth:** Server-side enforcement only — the Trade UI Paper/Live toggle and session filter are not authorization boundaries. Live apply requires prior dry-run and explicit confirm (§4.1). Strategy ownership, credential masking, and kill-switch requirements are in [plan-to-profit §5.5](plan-to-profit.md#55-auth--security-guardrails) and Phase [1.7 exit criteria](plan-to-profit.md#phase-17--live-apply).
+**Security / auth:** Server-side enforcement only — the Trade UI Paper/Live toggle and session filter are not authorization boundaries. Live apply requires prior dry-run and explicit confirm (§4.1). Strategy ownership, credential masking, and kill-switch requirements are in [plan-to-profit §5.5](plan-to-profit.md#55-auth-security-guardrails) and Phase [1.7 exit criteria](plan-to-profit.md#phase-17-live-apply).
 
 | Check | Description | Default |
 |-------|-------------|---------|

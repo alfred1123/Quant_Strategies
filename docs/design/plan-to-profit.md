@@ -31,30 +31,30 @@ Work **one subphase at a time** — finish exit criteria before starting the nex
 
 | Subphase | Title | Status |
 |----------|-------|--------|
-| [0.1](#phase-01--strategy-health) | Strategy health | done |
-| [0.2](#phase-02--host-capacity) | Host capacity | done |
-| [0.3](#phase-03--deploy-topology-decision) | Deploy topology decision | done |
-| [1.1](#phase-11--user-secrets) | User secrets | done |
-| [1.2](#phase-12--trade-schema--apply-api) | Trade schema + apply API | done |
-| [1.3](#phase-13--bybit-adapter-dry-run) | Bybit adapter (dry run) | done |
-| [1.4](#phase-14--trade-ui-shell) | Trade UI shell | done |
-| [1.5](#phase-15--exchange-config-ui) | Exchange config UI | done |
-| [1.6](#phase-16--strategy-picker) | Strategy picker | done |
-| [1.7](#phase-17--live-apply) | Live apply | — |
-| [1.8](#phase-18--execution-log) | Execution log | — |
-| [1.9](#phase-19--scheduler--price-bars) | Scheduler + price bars | — |
-| [2.1](#phase-21--reconcile-data-model) | Reconcile data model | — |
-| [2.2](#phase-22--daily-sharpe-job) | Daily Sharpe job | — |
-| [2.3](#phase-23--reconcile-ui) | Reconcile UI | — |
-| [2.4](#phase-24--telegram-error-alerts) | Telegram error alerts | — |
-| [2.5](#phase-25--silent-failure-detection) | Silent failure detection | — |
-| [3.1](#phase-31--top-nav--trade-tab) | Top nav + Trade tab | — |
-| [3.2](#phase-32--strategy-ranking-backend) | Strategy ranking backend | — |
-| [3.3](#phase-33--best-strategy-banner) | Best strategy banner | — |
-| [3.4](#phase-34--backtest-side-nav) | Backtest side nav | — |
-| [3.5](#phase-35--compact-queue-table) | Compact queue table | — |
-| [3.6](#phase-36--job--strategy-detail-drawer) | Job / strategy detail drawer | — |
-| [3.7](#phase-37--separate-trade-host-optional) | Separate TRADE host (optional) | — |
+| [0.1](#phase-01-strategy-health) | Strategy health | done |
+| [0.2](#phase-02-host-capacity) | Host capacity | done |
+| [0.3](#phase-03-deploy-topology-decision) | Deploy topology decision | done |
+| [1.1](#phase-11-user-secrets) | User secrets | done |
+| [1.2](#phase-12-trade-schema-apply-api) | Trade schema + apply API | done |
+| [1.3](#phase-13-bybit-adapter-dry-run) | Bybit adapter (dry run) | done |
+| [1.4](#phase-14-trade-ui-shell) | Trade UI shell | done |
+| [1.5](#phase-15-exchange-config-ui) | Exchange config UI | done |
+| [1.6](#phase-16-strategy-picker) | Strategy picker | done |
+| [1.7](#phase-17-live-apply) | Live apply | — |
+| [1.8](#phase-18-execution-log) | Execution log | — |
+| [1.9](#phase-19-scheduler-price-bars) | Scheduler + price bars | — |
+| [2.1](#phase-21-reconcile-data-model) | Reconcile data model | — |
+| [2.2](#phase-22-daily-sharpe-job) | Daily Sharpe job | — |
+| [2.3](#phase-23-reconcile-ui) | Reconcile UI | — |
+| [2.4](#phase-24-telegram-error-alerts) | Telegram error alerts | — |
+| [2.5](#phase-25-silent-failure-detection) | Silent failure detection | — |
+| [3.1](#phase-31-top-nav-trade-tab) | Top nav + Trade tab | — |
+| [3.2](#phase-32-strategy-ranking-backend) | Strategy ranking backend | — |
+| [3.3](#phase-33-best-strategy-banner) | Best strategy banner | — |
+| [3.4](#phase-34-backtest-side-nav) | Backtest side nav | — |
+| [3.5](#phase-35-compact-queue-table) | Compact queue table | — |
+| [3.6](#phase-36-job-strategy-detail-drawer) | Job / strategy detail drawer | — |
+| [3.7](#phase-37-separate-trade-host-optional) | Separate TRADE host (optional) | — |
 
 ```mermaid
 flowchart TB
@@ -235,7 +235,7 @@ Responses: `api_key_masked`, `app_id`, `label`, `api_credential_id` — never fu
 
 **Application layer — reuse from auth**
 
-Reuse login/JWT **plumbing**, not login **crypto**. Full table: [Login design §6.4](login.md#64-reuse-from-login--jwt-credential-api--phase-11).
+Reuse login/JWT **plumbing**, not login **crypto**. Full table: [Login design §6.4](login.md#64-reuse-from-login-jwt-credential-api-phase-11).
 
 | Reuse | Do not reuse |
 |-------|----------------|
@@ -290,7 +290,7 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 
 Local validation script — **source of truth** for Bybit testnet + dry-run behaviour:
 
-[`scripts/bybit_local_testnet.py`](../../scripts/bybit_local_testnet.py)
+`scripts/bybit_local_testnet.py`
 
 | Command | Purpose |
 |---------|---------|
@@ -307,7 +307,7 @@ Local validation script — **source of truth** for Bybit testnet + dry-run beha
 
 **Prerequisites:** local Postgres (`DB_TARGET=local`), Redis (`./scripts/appctl.sh dev start`), `EXCHANGE_SECRETS_KEY`, `CCXT_ITEST_*` in `.env` (see `.env.example`), Bybit **testnet** keys ([testnet.bybit.com](https://testnet.bybit.com/)), strategy with `BT.RESULT` payload, `btcusdt.crypto → BTCUSDT` xref for `app_id=34`.
 
-**Automated mirror (CI / optional):** [`tests/integration/test_ccxt_dry_run.py`](../../tests/integration/test_ccxt_dry_run.py) — gateway + full dry-run; run after `--suite` passes. Not in default `pytest tests/` (`-m e2e` only).
+**Automated mirror (CI / optional):** `tests/integration/test_ccxt_dry_run.py` — gateway + full dry-run; run after `--suite` passes. Not in default `pytest tests/` (`-m e2e` only).
 
 **Exit criteria:** `--suite` exits 0 for test user against Bybit testnet; dry-run API succeeds (`--api-dry-run` or `--suite --with-api` when dev API is up). **Security:** dry-run never calls `create_order`.
 
@@ -370,7 +370,7 @@ Local validation script — **source of truth** for Bybit testnet + dry-run beha
 
 **Track:** [Trade Deployment Rollout](trade-deployment-rollout.md) — queue-free path; no `BT.QUEUE` / `SP_INS_STRATEGY` changes.
 
-**Scope:** Pick an **existing** `BT.STRATEGY` row for deployment — not build a new backtest config. Do **not** reuse Backtest `ConfigDrawer` / `FactorCard` (those edit REFDATA signal types for optimize requests). See [Trade API §2.1](trade-api.md#21-strategy-catalog--phase-16).
+**Scope:** Pick an **existing** `BT.STRATEGY` row for deployment — not build a new backtest config. Do **not** reuse Backtest `ConfigDrawer` / `FactorCard` (those edit REFDATA signal types for optimize requests). See [Trade API §2.1](trade-api.md#21-strategy-catalog-phase-16).
 
 **Tasks**
 
@@ -390,7 +390,7 @@ Local validation script — **source of truth** for Bybit testnet + dry-run beha
 
 **Exit criteria:** User picks a strategy by name/id in UI; selection passed to apply payload as `strategy_id` + `strategy_vid`.
 
-**Known gap (v1):** `BT.STRATEGY` rows are globally readable to any logged-in user today; ownership enforcement lands in **1.7** deployment create. See [login.md](login.md) and [§5.5](#55-auth--security-guardrails).
+**Known gap (v1):** `BT.STRATEGY` rows are globally readable to any logged-in user today; ownership enforcement lands in **1.7** deployment create. See [login.md](login.md) and [§5.5](#55-auth-security-guardrails).
 
 ---
 
@@ -409,10 +409,10 @@ alerting design for the live order path itself.
 - [ ] UI: Dry-run button → show report; Apply button → confirm live.
 - [ ] Backend: apply uses BT strategy config + deployment record + Bybit live path.
 - [ ] Error responses surfaced in UI (Telegram deferred to 2.4).
-- [ ] Security: server enforces `is_paper_ind` — UI Paper/Live toggle is **not** an auth boundary (see [§5.5](#55-auth--security-guardrails)).
+- [ ] Security: server enforces `is_paper_ind` — UI Paper/Live toggle is **not** an auth boundary (see [§5.5](#55-auth-security-guardrails)).
 - [ ] Security: live apply requires prior dry-run + explicit confirm payload; reject `is_paper_ind='N'` without both.
 - [ ] Security: deployment create validates strategy **ownership** (`BT.STRATEGY` user matches `CurrentUser`).
-- [ ] Security: `PATCH` deployment kill switch (`is_enabled_ind`) before first live apply (see [Trade API §4](trade-api.md#4-risk--safety)).
+- [ ] Security: `PATCH` deployment kill switch (`is_enabled_ind`) before first live apply (see [Trade API §4](trade-api.md#4-risk-safety)).
 
 **Exit criteria:** **M1 — Pipeline** met: one real (or testnet) live apply completes end-to-end for Bollinger strategy. **Security:** backend rejects live apply without dry-run + confirm; paper/live cannot be bypassed via raw API; caller cannot deploy another user's strategy; deployment can be disabled via PATCH without DB access.
 
@@ -471,11 +471,11 @@ See [Scheduler & Price Bars](scheduler-price-bars.md) for the full design.
 - [x] DDL: `TRADE.DEPLOYMENT` schedule column, `DEPLOYMENT_SCHEDULE_STATUS` + `SP_INS_DEPLOYMENT` / `SP_GET_DEPLOYMENT` / `SP_GET_MISSED_DUE_DEPLOYMENTS` — `db/liquidbase/trade/releases/1.4.0-deployment-scheduler.xml`.
 - [x] ~~DDL: `BT.SP_CONSOLIDATE_API_REQUEST`~~ removed — `BacktestCache.refresh_payload` closes the prior VID and inserts the merged range; no scheduled DB purge.
 - [x] Python: `quant/market_data/` — `PriceBarRepo` (SP wrappers), `CcxtBarFetcher` (public `fetch_ohlcv`), `PriceBarService` (freshness check + gap fill + `read_bars`); interval math in `quant/shared/intervals.py` resolved from `REFDATA.TM_INTERVAL` via `RedisRefData`, no hardcoded enum.
-- [x] Integration: price bar refresh wired into live apply — venue-bound deployments (e.g. Bybit) compute signals from `PRICE_BAR` via `PriceBarService.load_window` (daily when unscheduled; schedule sets interval only), provider-only brokers (e.g. Futu) keep the provider path, and a missing bar source is refused rather than silently priced off the daily feed ([§7.6–7.7](scheduler-price-bars.md#76-signal-source-selection--quantstrategylive_servicepy)).
+- [x] Integration: price bar refresh wired into live apply — venue-bound deployments (e.g. Bybit) compute signals from `PRICE_BAR` via `PriceBarService.load_window` (daily when unscheduled; schedule sets interval only), provider-only brokers (e.g. Futu) keep the provider path, and a missing bar source is refused rather than silently priced off the daily feed ([§7.6–7.7](scheduler-price-bars.md#76-signal-source-selection-quantstrategylive_servicepy)).
 - [ ] Integration: expose `POST /api/v1/market-data/price-bars/sync` (calls `PriceBarService.sync`) + the `price_bar_sync` Lambda task, so bars are warmed **once per interval** rather than once per deployment ([§6.2](scheduler-price-bars.md#bar-sync-is-one-schedule-per-interval-not-one-per-deployment)).
 - [ ] UI: Schedule interval dropdown (from `REFDATA.TM_INTERVAL`) in deployment dialog; show `last_run_at` in deployments table (optional computed next run for display).
 - [x] AWS infra: EventBridge schedule group + `quant-scheduled-task` Lambda + IAM (`aws/cfn/04-scheduler.yml`); deploy via `bash aws/deploy.sh scheduler`.
-- [ ] AWS/app: service auth on `/apply` (`TRADE_SERVICE_TOKEN`) + boto3 create/update/delete schedules on deployment lifecycle. Schedule expressions must fire **a minute or two past** the interval boundary, never on it — firing at `:00` races the exchange publishing the bar that just closed and fails the tick closed ([§6.2](scheduler-price-bars.md#required-fire-after-the-boundary-never-on-it)).
+- [x] AWS/app: service auth on `/apply` (`TRADE_SERVICE_TOKEN`) + **one platform tick** instead of per-deployment boto3 schedules. The boundary race (firing at `:00` before the exchange publishes the bar that just closed) is handled by timing, not by avoiding the boundary: bar sync fires on `:00` and sleeps 10 s before reading the clock, the apply tick runs at `:05` ([§6.2](scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)).
 
 **Exit criteria:** A deployment scheduled `DAILY` executes automatically via EventBridge without manual intervention. `MARKET_DATA.PRICE_BAR` contains fresh bars for active products.
 
@@ -596,7 +596,7 @@ See [Scheduler & Price Bars](scheduler-price-bars.md) for the full design.
 
 | | |
 |---|---|
-| **Depends on** | [§3 Prerequisites](#3-prerequisites-data-model--ranking) |
+| **Depends on** | [§3 Prerequisites](#3-prerequisites-data-model-ranking) |
 | **Blocks** | 3.3 |
 
 **Tasks**
@@ -691,7 +691,7 @@ See [Scheduler & Price Bars](scheduler-price-bars.md) for the full design.
 
 **Exit criteria:** **M3 — Product** met when 3.1–3.6 done; 3.7 done only if topology decision requires it.
 
-Align with [Backtest Queue](backtest-queue.md), [Infrastructure CI/CD](../architecture/infrastructure.md#cicd--github-actions).
+Align with [Backtest Queue](backtest-queue.md), [Infrastructure CI/CD](../architecture/infrastructure.md#cicd-github-actions).
 
 ---
 
@@ -1017,7 +1017,7 @@ Recommendation: start with **B** — matches mental model (strategy artifact vs 
 | Writes | `CALL CORE_ADMIN.SP_*` only — no raw DML |
 | Audit | Credential SPs may use `CORE_INS_LOG_PROC`; **no connection entity or connection audit** — trade audit = `TRADE.EXECUTION_EVENT` / `TRANSACTION` |
 | UI | Trade → Config sidebar (1.5); API `/api/v1/credentials` (1.1) |
-| App patterns | Reuse `require_user`, `DbGateway`, secret bootstrap — **not** JWT/Argon2 ([login.md §6.4](login.md#64-reuse-from-login--jwt-credential-api--phase-11)) |
+| App patterns | Reuse `require_user`, `DbGateway`, secret bootstrap — **not** JWT/Argon2 ([login.md §6.4](login.md#64-reuse-from-login-jwt-credential-api-phase-11)) |
 
 Align with [Login design](login.md) (`CORE_ADMIN.APP_USER`) and [Database](../architecture/database.md). See decision #36.
 
@@ -1051,7 +1051,7 @@ Required before first live apply per deployment:
 
 ### 5.5 Auth & security guardrails
 
-Cross-cutting rules from the [login](login.md) / trade security review (2026-05-28). Phase-specific exit criteria in [§1.1](#phase-11--user-secrets) and [§1.7](#phase-17--live-apply).
+Cross-cutting rules from the [login](login.md) / trade security review (2026-05-28). Phase-specific exit criteria in [§1.1](#phase-11-user-secrets) and [§1.7](#phase-17-live-apply).
 
 #### Reuse login plumbing — not login crypto
 
@@ -1059,7 +1059,7 @@ Cross-cutting rules from the [login](login.md) / trade security review (2026-05-
 |-------|----------------|
 | `require_user`, `DbGateway` / repo + `CALL SP_*`, SSM secret bootstrap, never log secrets, ownership scoping (`APP_USER_ID`), Pydantic input strip, **404** for cross-user resource ids | JWT/Argon2/`SESSION_GEN`, decrypted-key cache, timing-attack dummy verify |
 
-Full table: [login.md §6.4](login.md#64-reuse-from-login--jwt-credential-api--phase-11).
+Full table: [login.md §6.4](login.md#64-reuse-from-login-jwt-credential-api-phase-11).
 
 #### Authorization model (v1)
 
@@ -1088,7 +1088,7 @@ Full matrix, phased backlog, and Futu/Bybit split: **[User isolation requirement
 |---------|--------|
 | Rate limit credential writes | `POST`/`PUT` `/api/v1/credentials` — at least login-tier limits |
 | CSRF | `SameSite=Strict` + HTTPS same-origin SPA is sufficient for v1; cross-origin frontend needs CSRF tokens ([login.md §16 Q5](login.md#16-open-questions)) |
-| Kill switch | `PATCH` deployment `is_enabled_ind` — required before 1.7 ([Trade API §4](trade-api.md#4-risk--safety)) |
+| Kill switch | `PATCH` deployment `is_enabled_ind` — required before 1.7 ([Trade API §4](trade-api.md#4-risk-safety)) |
 | Live apply step-up | Align with [Trade API §4.1](trade-api.md#41-confirmation-flow-for-live-trading): dry-run first, explicit confirm; Futu may need trade-unlock password |
 
 #### Frontend reuse (login page)
@@ -1129,7 +1129,7 @@ This section records implementation viewpoints from the latest trade-readiness r
 |-------|--------|
 | **EC2 + Docker** | Measure CPU/mem before adding trade container alongside API + worker + Redis |
 | **ECR step 1** | **Done** — `quant-ecr` stack, repos `quant-app` / `quant-nginx`, EC2 ECR read, CI IAM |
-| **ECR pipeline** | **Done** — compose + CI push/pull + selective deploy; see [infrastructure.md](../architecture/infrastructure.md#cicd--github-actions) |
+| **ECR pipeline** | **Done** — compose + CI push/pull + selective deploy; see [infrastructure.md](../architecture/infrastructure.md#cicd-github-actions) |
 | **Existing stack** | See [Infrastructure](../architecture/infrastructure.md), [Dev vs Prod](../architecture/dev-vs-prod.md) |
 
 ---
@@ -1174,7 +1174,7 @@ Detailed tasks and exit criteria for each row are in [§2 Phased Roadmap](#2-pha
 | 1 | **Backtest side nav taxonomy** | See §4.1 options A/B/C |
 | 2 | **What to store per optimization** | Full equity curve vs summary stats only |
 | 3 | **Sharpe reconcile storage** | Daily snapshot table vs rolling window materialized view |
-| 4 | **ECR cutover for TRADE** | **Resolved (0.3):** **ECR now** — see [infrastructure.md § CI/CD](../architecture/infrastructure.md#cicd--github-actions). |
+| 4 | **ECR cutover for TRADE** | **Resolved (0.3):** **ECR now** — see [infrastructure.md § CI/CD](../architecture/infrastructure.md#cicd-github-actions). |
 | 5 | **Silent failure policy** | Heartbeat table, external uptime, exchange position reconcile |
 | 6 | **Exchange limit detection** | Post-MVP per exchange |
 
@@ -1199,7 +1199,7 @@ Notes mentioned alternative profit paths (e.g. horse racing, Poisson/Bernoulli m
 | [Database](../architecture/database.md) | `BT.*`, planned `TRADE.*` |
 | [Frontend](../architecture/frontend.md) | React SPA structure |
 | [Paper Trading guide](../guides/trading.md) | Existing Futu utility (pattern reference) |
-| [Deploy Build Pipeline](../archive/deploy-build-pipeline.md) | ECR history — **live ops:** [infrastructure.md](../architecture/infrastructure.md#cicd--github-actions) |
+| [Deploy Build Pipeline](../archive/deploy-build-pipeline.md) | ECR history — **live ops:** [infrastructure.md](../architecture/infrastructure.md#cicd-github-actions) |
 | [Scheduler & Price Bars](scheduler-price-bars.md) | EventBridge scheduler, `MARKET_DATA.PRICE_BAR` |
 
 ---

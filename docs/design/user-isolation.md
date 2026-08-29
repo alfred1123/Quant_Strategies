@@ -2,7 +2,7 @@
 
 **Status:** v1 — partial enforcement. Credentials, deployments, and job queue are scoped by owner. Backtest/promotion artifacts remain a **shared pool** (any user can browse others' strategies). **Trade deploy** is owner-only — users may only list and deploy their own `BT.STRATEGY` rows.
 
-Related: [Login §14 Phase 2](login.md#14-phased-plan), [Plan to Profit §5.5](plan-to-profit.md#55-auth--security-guardrails), [Trade API §2.1](trade-api.md#21-strategy-catalog--phase-16), [Futu Trading §13](futu-trading.md#13-broker-strategy--when-to-scale-futu).
+Related: [Login §14 Phase 2](login.md#14-phased-plan), [Plan to Profit §5.5](plan-to-profit.md#55-auth-security-guardrails), [Trade API §2.1](trade-api.md#21-strategy-catalog-phase-16), [Futu Trading §13](futu-trading.md#13-broker-strategy-when-to-scale-futu).
 
 ---
 
@@ -15,7 +15,7 @@ Related: [Login §14 Phase 2](login.md#14-phased-plan), [Plan to Profit §5.5](p
 
 JWT `sub` = `APP_USER_ID`. `require_user` resolves that to `CurrentUser { app_user_id, username }`.
 
-The FastAPI connection pool logs in as Postgres role `quant_app`. The human identity is passed as `IN_APP_USER_ID` / `IN_USER_ID` into stored procedures — not as a separate DB login per user. See [Login §6](login.md#6-database--grants).
+The FastAPI connection pool logs in as Postgres role `quant_app`. The human identity is passed as `IN_APP_USER_ID` / `IN_USER_ID` into stored procedures — not as a separate DB login per user. See [Login §7.2](login.md#72-postgres-roles-vs-application-users-two-identity-layers).
 
 ### Design debt (normalize before hardening)
 
@@ -86,7 +86,7 @@ Implementation: `quant/api/routers/jobs.py`, `quant/api/services/jobs.py`.
 
 Strategies are a shared pool — any authenticated user can deploy any strategy using their own exchange credentials. `USER_ID` on `BT.STRATEGY` is **audit-only** (who created the config). Capital safety comes from credential ownership (user can only trade with their own keys) and the paper-vs-live gate.
 
-**Exit criteria (1.7):** deployment create validates credential ownership (done) + paper/live gate (done — `confirm_live` required); see [plan-to-profit §1.7](plan-to-profit.md#phase-17--live-apply).
+**Exit criteria (1.7):** deployment create validates credential ownership (done) + paper/live gate (done — `confirm_live` required); see [plan-to-profit §1.7](plan-to-profit.md#phase-17-live-apply).
 
 ---
 
@@ -104,7 +104,7 @@ From [Login §14](login.md#14-phased-plan):
 - Per-user result lists in the SPA.
 - Optional `ROLE` column — admin sees all runs.
 
-**Trigger:** a second logged-in user who is **not fully trusted** ([plan-to-profit §5.5](plan-to-profit.md#55-auth--security-guardrails)).
+**Trigger:** a second logged-in user who is **not fully trusted** ([plan-to-profit §5.5](plan-to-profit.md#55-auth-security-guardrails)).
 
 Until then, v1 explicitly allows any authenticated user to browse shared backtest artifacts; mutating paths for credentials, deployments, and jobs are already scoped.
 
@@ -117,7 +117,7 @@ Until then, v1 explicitly allows any authenticated user to browse shared backtes
 | **Bybit** | `API_CREDENTIAL` per `APP_USER_ID` | Normal SaaS — each user their own REST keys |
 | **Futu v1** | **One OpenD / one Futu login** (house account) | Postgres still separates deployments, credentials, and audit by `APP_USER_ID` |
 
-Futu migration does **not** remove DB-level separation — only the **gateway** is shared. See [Futu Trading §13](futu-trading.md#13-broker-strategy--when-to-scale-futu).
+Futu migration does **not** remove DB-level separation — only the **gateway** is shared. See [Futu Trading §13](futu-trading.md#13-broker-strategy-when-to-scale-futu).
 
 Multiple unrelated Futu logins → gateway EC2 + `gateway_id` registry (§12), not ECS. Each credential row still maps to `APP_USER_ID`.
 
@@ -150,7 +150,7 @@ flowchart TD
 | **P1** | Frontend: clear TanStack Query cache on login (prevent stale cross-user data) | Done |
 | **P2** | Filter `BT.RESULT`, sync backtest cache by owner | login Phase 2 |
 | **P2** | `ROLE` + admin bypass | Multi-tenant admin |
-| **P3** | Postgres RLS or `SET LOCAL app.user_id` GUC | Defense in depth — see [Login §6.3](login.md#63-optional-session-guc) |
+| **P3** | Postgres RLS or `SET LOCAL app.user_id` GUC | Defense in depth — see [Login §7.5](login.md#75-optional-postgres-side-audit-context) |
 
 ---
 

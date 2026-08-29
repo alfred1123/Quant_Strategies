@@ -56,7 +56,7 @@ Live deployments will map `internal_cusip` → Futu code via `INST.PRODUCT_XREF`
 
 OpenD requires a login password in its config — that is normal for Futu. On prod we **do not expose port 11111** to the internet; OpenD binds `127.0.0.1` on the same EC2 as the app, with secrets injected from SSM at deploy time. See **[Futu Trading — §10 OpenD security on EC2](../design/futu-trading.md#10-opend-security-on-ec2)** for network diagrams, secret flow, and checklist.
 
-Multi-user and multiple Futu logins (Docker gateway EC2, broker strategy): **[§11–§13](../design/futu-trading.md#11-multi-user--multiple-futu-logins)**.
+Multi-user and multiple Futu logins (Docker gateway EC2, broker strategy): **[§11–§13](../design/futu-trading.md#11-multi-user-multiple-futu-logins)**.
 
 ## Roadmap
 

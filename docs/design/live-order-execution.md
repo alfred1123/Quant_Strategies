@@ -6,7 +6,7 @@
     two account-level blockers (resolved). The retry/alert orchestration described here
     (`quant/trade/live_apply.py`) does not exist yet.
 
-**Related:** [Plan to Profit §1.7](plan-to-profit.md#phase-17--live-apply),
+**Related:** [Plan to Profit §1.7](plan-to-profit.md#phase-17-live-apply),
 [Trade Deployment Rollout](trade-deployment-rollout.md),
 [ccxt Trade & XREF Validation](ccxt-trade-and-xref-validation.md) (dry-run — out of scope there,
 in scope here).
@@ -223,7 +223,7 @@ Env: `SLACK_WEBHOOK_URL` in `.env` (not committed — same convention as other s
 `live_apply.py` logs the alert at `ERROR` level instead of raising — an alerting misconfiguration
 must never block order handling or crash the caller.
 
-**When to point the webhook at a prod ops channel vs test-env:** [Live Trading Promotion](../guides/live-trading-promotion.md#4-slack-test-channel--production-ops).
+**When to point the webhook at a prod ops channel vs test-env:** [Live Trading Promotion](../guides/live-trading-promotion.md#4-slack-test-channel-production-ops).
 
 ### Alert content
 
@@ -235,8 +235,8 @@ go straight to the exchange UI and reconcile without digging through logs first.
 
 ## Data model tie-in
 
-Already fully modeled — see [`db/liquidbase/trade/tables/EXECUTION_EVENT.sql`](../../db/liquidbase/trade/tables/EXECUTION_EVENT.sql)
-and [`TRANSACTION.sql`](../../db/liquidbase/trade/tables/TRANSACTION.sql), with Python wrappers
+Already fully modeled — see `db/liquidbase/trade/tables/EXECUTION_EVENT.sql`
+and `db/liquidbase/trade/tables/TRANSACTION.sql`, with Python wrappers
 already on `TradeRepo` (`sp_ins_execution_event`, `sp_ins_transaction`). Nothing currently calls
 them — that wiring is exactly what `live_apply.py` adds.
 
@@ -271,7 +271,7 @@ preset's settlement currency). This should be resolved during `live_apply.py` im
 
 Manual lifecycle test via `scripts/bybit_local_testnet.py --apply-signal {signal} --confirm`,
 human-verified against `testnet.bybit.com` after each step (see
-[Plan to Profit §1.7](plan-to-profit.md#phase-17--live-apply) for the running log).
+[Plan to Profit §1.7](plan-to-profit.md#phase-17-live-apply) for the running log).
 
 | Step | Result |
 |------|--------|
@@ -330,7 +330,7 @@ authoring.
 
 ## Related docs
 
-- [Plan to Profit §1.7](plan-to-profit.md#phase-17--live-apply) — phase tracking, exit criteria
+- [Plan to Profit §1.7](plan-to-profit.md#phase-17-live-apply) — phase tracking, exit criteria
 - [Trade Deployment Rollout](trade-deployment-rollout.md) — Phase 1.6-1.8 rollout plan, worker options
 - [ccxt Trade & XREF Validation](ccxt-trade-and-xref-validation.md) — dry-run design (Phase 1.3); explicitly out-of-scopes live order placement to this doc
 - [Trade API](trade-api.md) — full API + schema reference

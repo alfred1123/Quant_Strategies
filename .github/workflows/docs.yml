@@ -59,5 +59,10 @@ jobs:
       - name: Install mkdocs-material
         run: pip install mkdocs-material
 
+      # Broken links and anchors fail the build instead of publishing rot.
+      # The tree was brought to zero warnings on 2026-08-29; keep it there.
+      - name: Verify links and anchors
+        run: mkdocs build --strict
+
       - name: Deploy to GitHub Pages
         run: mkdocs gh-deploy --force

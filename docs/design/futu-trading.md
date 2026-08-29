@@ -11,7 +11,7 @@
 | [quincylin1/futubot](https://github.com/quincylin1/futubot) | Modular `Accounts` / `Robot` / `Portfolio` separation; paper vs live; pending-order guard |
 | [GitHub topic: futu-api](https://github.com/topics/futu-api) | Ecosystem patterns (e.g. [billpwchan/futu_algo](https://github.com/billpwchan/futu_algo) for HK quant workflows) |
 | [Trade API](trade-api.md) | `TradeAdapter`, deployment loop, risk checks |
-| [Plan to Profit §1.1–1.7](plan-to-profit.md#phase-1--fastest-profit-pipeline) | Credentials, deployments, dry-run, live apply |
+| [Plan to Profit §1.1–1.7](plan-to-profit.md#phase-1-fastest-profit-pipeline) | Credentials, deployments, dry-run, live apply |
 
 ---
 
@@ -87,7 +87,7 @@ trd_ctx.place_order(..., trd_env=TrdEnv.REAL)
 
 **Behaviours to adopt**
 
-- **Pending-order guard** — futubot skips new signals while orders are pending; map to `Duplicate guard` in [Trade API §4](trade-api.md#4-risk--safety).
+- **Pending-order guard** — futubot skips new signals while orders are pending; map to `Duplicate guard` in [Trade API §4](trade-api.md#4-risk-safety).
 - **Paper order type** — Futu paper often rejects market orders; default paper path to **limit** or `NORMAL` with computed price (document in adapter).
 - **Market hours** — E2E and worker should no-op or defer outside session (configurable per market).
 

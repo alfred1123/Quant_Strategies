@@ -56,7 +56,7 @@ Then: second small EC2 pulling the same ECR images — see §2 in [deploy-build-
 
 ### ECR deploy pipeline (adopted now)
 
-Prod deploy **does not build on EC2**. Full file-by-file checklist: [deploy-build-pipeline.md § ECR implementation checklist](../deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file). **Live ops:** [infrastructure.md § CI/CD](../../architecture/infrastructure.md#cicd--github-actions).
+Prod deploy **does not build on EC2**. Full file-by-file checklist: [deploy-build-pipeline.md § ECR implementation checklist](../deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file). **Live ops:** [infrastructure.md § CI/CD](../../architecture/infrastructure.md#cicd-github-actions).
 
 ---
 
@@ -128,7 +128,7 @@ flowchart LR
 
 | Step | When | Owner |
 |------|------|-------|
-| **ECR CI pipeline** (repos, IAM, workflow, compose `image:`) | **Done** — see [infrastructure.md § CI/CD](../../architecture/infrastructure.md#cicd--github-actions) or [checklist](../deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file) |
+| **ECR CI pipeline** (repos, IAM, workflow, compose `image:`) | **Done** — see [infrastructure.md § CI/CD](../../architecture/infrastructure.md#cicd-github-actions) or [checklist](../deploy-build-pipeline.md#ecr-implementation-checklist-file-by-file) |
 | Upgrade `quant-server` to t4g.medium | **Done** |
 | Build Phase 1 trade compose service on same host | Phase 1.3–1.7 | App |
 | Add reconcile cron on same host | Phase 2.2 | App + ops |

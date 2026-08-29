@@ -1,0 +1,37 @@
+---
+description: The docs/ wiki is the source of truth — consult it first, cite it in answers, keep it strict-clean
+alwaysApply: true
+---
+
+# Docs first
+
+`docs/` (the MkDocs wiki) is the source of truth for how this platform works and
+why. Consult it **before** designing, implementing, or answering questions:
+
+| Question | Look in |
+|---|---|
+| Has this been decided already? | `docs/decisions.md` (numbered log — never re-litigate silently) |
+| How does X work today? | `docs/architecture/` |
+| Why is X shaped this way? What was rejected? | `docs/design/` |
+| How do I run / deploy / test? | `docs/getting-started.md`, `docs/guides/` |
+
+When answering a user, point them at the specific page (and section) that covers
+their question, not just at the code. If the page is wrong or missing, fix it as
+part of the change — a correct answer that leaves a stale doc behind is half done.
+
+## Link hygiene (enforced)
+
+`mkdocs build --strict` runs in the docs workflow before publish and **fails on
+any broken link or missing anchor** (`validation: links: anchors: warn` in
+`mkdocs.yml`). Rules that keep it green:
+
+- Never markdown-link from docs to source files outside `docs/`
+  (e.g. `[x](../../quant/api/main.py)`) — the built site cannot serve them.
+  Write the path as inline code instead: `` `quant/api/main.py` ``.
+- Anchor slugs collapse punctuation runs: a heading like
+  `### 6.4 Service auth (implemented)` becomes `#64-service-auth-implemented`
+  — em dashes and colons vanish and hyphen runs collapse to **one** hyphen.
+  `#64-service-auth--implemented` (double hyphen) never matches anything.
+- Every new page must be added to `nav:` in `mkdocs.yml`.
+- After editing docs, run `mkdocs build --strict` locally and keep it at zero
+  warnings.

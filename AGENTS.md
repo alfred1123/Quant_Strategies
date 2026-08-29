@@ -44,7 +44,7 @@ Keep `V_START_TS TIMESTAMPTZ := CURRENT_TIMESTAMP;` for `TRANSACT_FROM_TS` / `TR
 ### Testing: After any change to `quant/`, review and update the corresponding unit tests in `tests/unit/` and integration tests in `tests/integration/`. New functions or classes must have unit tests. Run `python -m pytest tests/ -v` and confirm all tests pass before considering the change complete.
 - **Secrets**: API keys and env live in `.env` (gitignored) at the project root. Never commit credentials or paste them into source files.
 - **README**: After any change that affects usage, setup, CLI options, directory structure, data sources, or dependencies, review and update `README.md` to keep it accurate.
-- **Wiki**: After any change that affects architecture, API endpoints, database schema, indicators, strategies, or design decisions, review and update the relevant page in `docs/` (MkDocs wiki). Run `mkdocs serve` to preview.
+- **Wiki**: After any change that affects architecture, API endpoints, database schema, indicators, strategies, or design decisions, review and update the relevant page in `docs/` (MkDocs wiki). Run `mkdocs serve` to preview. `mkdocs build --strict` must stay at zero warnings — the docs workflow fails the publish on any broken link or anchor (see `.cursor/rules/docs-first.mdc` for the link-hygiene rules).
 
 ## Logging
 

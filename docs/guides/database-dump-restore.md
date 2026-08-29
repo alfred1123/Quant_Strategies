@@ -1,6 +1,6 @@
 # Database dump & restore
 
-Copy **Aurora (prod)** into a **local Postgres 17** database for offline dev, faster iteration, or safe experimentation. All commands use [`scripts/dbctl.sh`](../../scripts/dbctl.sh).
+Copy **Aurora (prod)** into a **local Postgres 17** database for offline dev, faster iteration, or safe experimentation. All commands use `scripts/dbctl.sh`.
 
 !!! danger "Sensitive data"
     Dumps include **`CORE_ADMIN.APP_USER` password hashes**, **`API_CREDENTIAL` ciphertext**, strategies, and queue history. Files live in `db/dumps/` (**gitignored**). **Never commit** a dump. Share only over a secure channel. Treat restored local DBs as **prod-equivalent secrets**.
@@ -14,7 +14,7 @@ Copy **Aurora (prod)** into a **local Postgres 17** database for offline dev, fa
 | Work **offline** with real REFDATA + users + strategies | **Yes** — set `DB_TARGET=local` after restore |
 | Fresh empty schema only (no prod data) | **No** — use `./scripts/dbctl.sh reset` + `DB_TARGET=local ./scripts/liquibase-deploy.sh` |
 | Prod **backup** / disaster recovery | **No** — Aurora snapshots + `DeletionPolicy: Retain` (see [Infrastructure](../architecture/infrastructure.md)). `dbctl` is for **developer laptops**, not prod ops. |
-| Apply DDL to prod | **No** — use [`liquibase-deploy.sh`](../../scripts/liquibase-deploy.sh) |
+| Apply DDL to prod | **No** — use `scripts/liquibase-deploy.sh` |
 
 ---
 

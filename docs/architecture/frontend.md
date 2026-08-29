@@ -17,7 +17,7 @@ See [System Overview](overview.md) for product surfaces and [Trade UI](#trade-ui
 | Component Library | MUI (Material UI) | 9 |
 | Icons | @mui/icons-material | 9 |
 | Data Fetching | TanStack React Query | 5 |
-| Routing | React Router | 7 |
+| Routing | React Router | 8 |
 | HTTP Client | Axios | 1 |
 | Charting | Plotly.js 3 + react-plotly.js 2 | — |
 | Tests | Vitest 4 + Testing Library + happy-dom | — |
@@ -45,10 +45,10 @@ The Backtest SPA uses a four-tab pipeline. Each tab represents a stage in the st
 |-----|-------|---------|
 | **Backtest** | `/backtest` (tab 0) | Configure params, submit optimization job |
 | **Queue** | `/backtest` (tab 1) | Monitor job status, view results, clone, manual promote |
-| **Promotion** | `/backtest` (tab 2, planned) | Compare VIDs, see gate results, recommended picks, re-backtest to improve, deploy to Trade |
+| **Promotion** | `/backtest` (tab 2) | Compare VIDs, see gate results, recommended picks, re-backtest to improve, deploy to Trade |
 | **Trade** | `/trade/*` | Config (exchange accounts), Apply (deploy strategy, execution log) |
 
-See [Best-VID Promotion §5](../design/best-vid-promotion.md#5-ui--pipeline-tab-model) for the Promotion tab design.
+See [Best-VID Promotion §5](../design/best-vid-promotion.md#5-ui-pipeline-tab-model) for the Promotion tab design.
 
 ## Features
 
@@ -78,7 +78,7 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 | `/trade/config` | `TradeConfigPage` | Register broker accounts — table + compact add form |
 | `/trade/apply` | `TradeApplyPage` | Strategy picker, live account snapshot, deployments table, dry-run / apply buttons |
 
-**Layout:** `TradeLayout` — permanent sidebar (Config \| Trade), **filter toolbar** (`TradeNavBar`), main content (`<Outlet />`), bottom execution-log placeholder.
+**Layout:** `TradeLayout` — permanent sidebar (Config \| Trade), **filter toolbar** (`TradeNavBar`), main content (`<Outlet />`), bottom **`ExecutionLogPanel`** (release 1.8.0 — order attempts + fills via `GET /trade/execution-events` / `/trade/transactions`; placeholder until that release deploys).
 
 **Session state:** `TradeSessionProvider` (`trade/TradeSessionContext.tsx`; the `useTradeSession` / `useTradeSessionFilters` hooks live in `trade/useTradeSession.ts`) holds:
 
@@ -95,8 +95,10 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 | `BrokerAccountsTable` | Exchange · Account · masked key · Status; **Rotate** / **Revoke** dialogs; row click sets account filter |
 | `TradeConfigPage` | Accounts table + add-account form wired to credentials API (create) |
 | `StrategyPicker` | Selectable caller-owned `BT.STRATEGY` catalog via `GET /api/v1/strategies` |
-| `AccountSnapshotPanel` | Live cash + open positions for the selected account via `useAccountSnapshot()`; read-only |
+| `DeploymentDialog` | Create deployment — strategy, account, qty, schedule dropdown, live/paper confirmation |
 | `ScheduleCell` | Cadence per deployment row, editable in place; `useTmIntervals()` + `PATCH /trade/deployments/{id}` |
+| `ExecutionLogPanel` | Recent order attempts and fills across the session's deployments |
+| `AccountSnapshotPanel` | Live cash + open positions for the selected account via `useAccountSnapshot()`; read-only |
 | `TradeApplyPage` | Strategy picker + Deploy button + account snapshot + deployments table; `useDeployments()` |
 
 **Account snapshot panel**
@@ -140,11 +142,14 @@ The Backtest **Strategy** dropdown in `FactorCard` is a REFDATA `signal_type` (m
 
 | Backtest | Trade / Promotion picker |
 |----------|--------------------------|
-| `FactorCard` → REFDATA signal type | `StrategyPicker` → `BT.STRATEGY` catalog (shared pool) |
+| `FactorCard` → REFDATA signal type | `StrategyPicker` → caller-owned `BT.STRATEGY` rows |
 | Creates config for new job | Selects existing strategy for deploy or comparison |
 | `POST /api/v1/backtest/jobs` | `GET /api/v1/strategies` |
 
-Strategies are a **shared pool** — any authenticated user can browse and deploy any strategy using their own credentials (decision #42). See [Best-VID Promotion §6](../design/best-vid-promotion.md#6-shared-strategy-pool).
+The picker lists only the caller's own `BT.STRATEGY` rows (`SP_GET_STRATEGY_LIST`
+filters by `IN_USER_ID`). [Decision #42](../decisions.md) describes a shared pool
+as the long-term intent; the current API and UI are owner-scoped. See
+[Best-VID Promotion §6](../design/best-vid-promotion.md#6-shared-strategy-pool).
 
 Dropdowns use MUI `size="small"` and fixed widths — not full-width form fields.
 
@@ -161,7 +166,9 @@ frontend/src/
 │   ├── backtest.ts       # BacktestConfig, FactorConfig, API request/response types
 │   ├── credentials.ts    # BrokerAccount, TradingMode, filter constants
 │   ├── jobs.ts           # JobRow, JobDetail, JobStatus — queue table types
+│   ├── promotion.ts      # PromotionRow — Promotion tab types
 │   ├── refdata.ts        # IndicatorRow, AssetTypeRow, ProductRow, AppRow, etc.
+│   ├── strategies.ts     # StrategyListRow — strategy picker types
 │   └── trade.ts          # DeploymentRow, create-deployment request (Phase 1.2)
 │
 ├── api/                  # HTTP + data-fetching layer
@@ -171,7 +178,9 @@ frontend/src/
 │   ├── backtest.ts       # runOptimizeStream() (SSE), runPerformance(), runWalkForward()
 │   ├── auth.ts           # useMe(), login(), logout()
 │   ├── jobs.ts           # useJobs(), useEnqueueJob(), useCancelJob(), usePromoteStrategy(), fetchJob()
-│   ├── trade.ts          # useDeployments(), useCreateDeployment() (Phase 1.2)
+│   ├── promotion.ts      # usePromotions() — Promotion tab
+│   ├── strategies.ts     # useStrategies() — strategy picker
+│   ├── trade.ts          # useDeployments(), useCreateDeployment(), useExecutionEvents(), useAccountSnapshot()
 │   └── credentials.ts    # useBrokerAccounts(), useCreateCredential(), useRotateCredential(), useRevokeCredential()
 │
 ├── trade/
@@ -205,6 +214,7 @@ frontend/src/
 │   ├── HeatmapChart.tsx  # Plotly Sharpe heatmap (window × signal)
 │   ├── EquityCurveChart.tsx  # Plotly equity + drawdown chart
 │   ├── JobsTable.tsx     # Queue tab — MUI DataGrid with VID/Best chip, status filters, actions
+│   ├── PromotionTab.tsx  # Promotion tab — VID comparison, gate results, deploy link
 │   ├── UserMenu.tsx      # User avatar + logout
 │   ├── AppModeSwitch.tsx # Backtest | Trade header toggle
 │   ├── BrandMark.tsx     # Gradient app logo — login card + top bars
@@ -212,9 +222,13 @@ frontend/src/
 │   └── trade/
 │       ├── TradeNavBar.tsx         # Exchange / Account filters + Paper / Live toggle
 │       ├── BrokerAccountsTable.tsx # Multi-broker accounts table (Config page)
+│       ├── StrategyPicker.tsx      # BT.STRATEGY catalog table (Phase 1.6)
+│       ├── DeploymentDialog.tsx    # Create deployment + schedule dropdown
+│       ├── ApplyConfirmDialog.tsx  # Live apply confirmation
+│       ├── DryRunReportDialog.tsx  # Dry-run report viewer
 │       ├── AccountSnapshotPanel.tsx # Live cash + open positions (Apply page)
-│       └── ScheduleCell.tsx         # Per-deployment cadence, editable in place
-│   StrategyPicker.tsx              # BT.STRATEGY catalog table (Phase 1.6)
+│       ├── ScheduleCell.tsx         # Per-deployment cadence, editable in place
+│       └── ExecutionLogPanel.tsx    # Recent order attempts and fills
 │
 ├── layouts/
 │   └── TradeLayout.tsx   # Trade shell — sidebar, toolbar, outlet, execution log

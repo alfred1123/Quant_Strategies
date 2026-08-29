@@ -11,7 +11,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `CORE_ADMIN` | App users (`APP_USER`), proc audit log (`LOG_PROC_DETAIL`), exchange API credentials (`API_CREDENTIAL`) |
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `PROMOTION_METRIC`, …) + `SP_GET_ENUM` procedure for cache loading. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `REFDATA.PROMOTION_METRIC` stores auto-promote rules (HARD gates + SOFT comparison metrics). |
 | `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `PROMOTION`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert/get procedures |
-| `TRADE` | Live trading: `DEPLOYMENT`, `EXECUTION_EVENT`, `TRANSACTION` + SPs (no `INTENT` — decision #38) |
+| `TRADE` | Live trading: `DEPLOYMENT`, `DEPLOYMENT_SCHEDULE_STATUS`, `EXECUTION_EVENT`, `TRANSACTION` + SPs (no `INTENT` — decision #38) |
 | `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows) — see [Scheduler & Price Bars](../design/scheduler-price-bars.md) |
 | `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) — `REFDATA.TICKER_MAPPING` has been dropped |
 
@@ -111,6 +111,7 @@ PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, 
 | Table | Role |
 |-------|------|
 | `DEPLOYMENT` | Apply target: pinned strategy, credential, product, qty (soft-versioned via `DEPLOYMENT_VID` + `TRANSACT_FROM/TO`) |
+| `DEPLOYMENT_SCHEDULE_STATUS` | Per-tick schedule cursor — `NEXT_SCHEDULED_TS` advance after each apply pass |
 | `EXECUTION_EVENT` | Append-only submit / error diary; `TRANSACT_AT` = tick time, `CREATED_AT` = audit insert, `POSITION_QTY` = signed broker position the attempt decided against |
 | `TRANSACTION` | Append-only broker-confirmed fills |
 
@@ -121,10 +122,16 @@ PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, 
 | `SP_INS_DEPLOYMENT` | Create or version deployment |
 | `SP_GET_DEPLOYMENT` | Read current or historical deployment (owner-scoped, REFCURSOR) |
 | `SP_GET_DEPLOYMENT_CHECK` | Validation read by deployment_id — no owner filter (caller checks) |
+| `SP_GET_MISSED_DUE_DEPLOYMENTS` | Due deployments for one interval (scheduler poller) |
+| `SP_GET_NEXT_DUE_DEPLOYMENTS` | Not-yet-due preview (UI / ops) |
+| `SP_INS_DEPLOYMENT_SCHEDULE_STATUS` | Append schedule cursor after an apply pass |
+| `SP_GET_SCHEDULED_INSTRUMENTS` | Distinct instruments scheduled deployments will trade (bar warmer) |
 | `SP_INS_EXECUTION_EVENT` | Append execution event, incl. the position it decided against — see [Recording the position an apply saw](#recording-the-position-an-apply-saw) |
+| `SP_GET_EXECUTION_EVENT` | Read execution diary (owner-scoped, REFCURSOR) |
 | `SP_INS_TRANSACTION` | Append fill row |
+| `SP_GET_TRANSACTION` | Read fill history (owner-scoped, REFCURSOR) |
 
-Validation: Python `TradeRepo` before SP calls. See [Plan to Profit §1.2](../design/plan-to-profit.md#phase-12--trade-schema--apply-api).
+Validation: Python `TradeRepo` before SP calls. See [Plan to Profit §1.2](../design/plan-to-profit.md#phase-12-trade-schema-apply-api).
 
 | Procedure | Purpose |
 |-----------|---------|
@@ -133,9 +140,9 @@ Validation: Python `TradeRepo` before SP calls. See [Plan to Profit §1.2](../de
 | `SP_GET_CREDENTIAL_CHECK` | Validation read by credential_id — no owner filter (caller checks ownership + active status) |
 | `SP_UPD_API_CREDENTIAL_REVOKE` | Soft-version revoke |
 
-See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11--user-secrets) and decision #36.
+See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11-user-secrets) and decision #36.
 
-**Application code:** `ApiCredentialRepo` extends `DbGateway` (same as `AuthRepo`); routes use `require_user`; Fernet key separate from `JWT_SECRET` — see [Login §6.4](../design/login.md#64-reuse-from-login--jwt-credential-api--phase-11).
+**Application code:** `ApiCredentialRepo` extends `DbGateway` (same as `AuthRepo`); routes use `require_user`; Fernet key separate from `JWT_SECRET` — see [Login §6.4](../design/login.md#64-reuse-from-login-jwt-credential-api-phase-11).
 
 **SP OUT parameter order:** All write procedures called via `DbGateway._call_write` must return the status triplet `(OUT_SQLSTATE, OUT_SQLMSG, OUT_SQLERRMC)` **first**, then any business OUT params. Credential SPs were corrected in release `1.1.1-credential-sp-out-order` (applied to prod; archived in `releases/`).
 
@@ -158,7 +165,7 @@ Persisted strategies (`BT.STRATEGY`) are created when backtest jobs complete —
 - **HARD** — threshold gates (e.g. Sharpe GT 0, Max DD LTE 40%). Must all pass to be eligible.
 - **SOFT** — comparison metrics evaluated in priority order against the current best VID.
 
-Loaded at runtime via `RedisRefData.get_promotion_metrics()`. See [Best-VID Promotion §2](../design/best-vid-promotion.md#2-promotion-metric-configuration--refdata-driven).
+Loaded at runtime via `RedisRefData.get_promotion_metrics()`. See [Best-VID Promotion §2](../design/best-vid-promotion.md#2-promotion-metric-configuration-refdata-driven).
 
 ## Deployment
 
@@ -278,17 +285,21 @@ A procedure that logs itself declares `V_LOG_START TIMESTAMPTZ := clock_timestam
 | `SP_UPD_API_CREDENTIAL_REVOKE` | `CORE_ADMIN` | Soft-version revoke; status triplet OUT first |
 | `SP_UPD_PROMOTE_STRATEGY` | `BT` | Flip `IS_BEST_IND`: demote current best + promote target VID. `IN_STRATEGY_VID = NULL` = demote-only (no replacement) |
 | `SP_INS_PROMOTION` | `BT` | Persist auto-promote decision (outcome, gate results, decisive metric) — one row per completed backtest |
-| `SP_GET_STRATEGY` | `BT` | Get-one by id/vid; **list by `IN_USER_ID`** when `IN_STRATEGY_ID` is NULL (Phase 1.6). `IN_IS_BEST_IND = 'Y'` fetches the best VID directly. |
+| `SP_GET_STRATEGY` | `BT` | Get-one: `IN_STRATEGY_ID` required; optional `IN_STRATEGY_VID`; `IN_IS_BEST_IND='Y'` fetches best VID; else active row. Listing is `SP_GET_STRATEGY_LIST`. |
+| `SP_GET_STRATEGY_LIST` | `BT` | List catalog for Trade picker — `IN_USER_ID` required; optional `IN_IS_BEST_IND` filter (REFCURSOR) |
 | `SP_INS_DEPLOYMENT` | `TRADE` | Create or version deployment (includes schedule fields) |
 | `SP_GET_DEPLOYMENT` | `TRADE` | Read deployment rows (REFCURSOR) |
 | `SP_GET_MISSED_DUE_DEPLOYMENTS` | `TRADE` | Apply-now rows for `IN_TM_INTERVAL_ID` (poller); includes `NEXT_SCHEDULED_TS` |
 | `SP_GET_NEXT_DUE_DEPLOYMENTS` | `TRADE` | Not-yet-due preview (UI / ops, optional) |
 | `SP_INS_DEPLOYMENT_SCHEDULE_STATUS` | `TRADE` | Append schedule version (poller advance after apply) |
 | `SP_GET_DEPLOYMENT_CHECK` | `TRADE` | Validation read by `DEPLOYMENT_ID` — no owner filter; caller checks ownership |
+| `SP_GET_SCHEDULED_INSTRUMENTS` | `TRADE` | Distinct `(TM_INTERVAL_ID, INTERNAL_CUSIP, APP_ID)` for scheduled deployments (bar warmer) |
 | `SP_INS_EXECUTION_EVENT` | `TRADE` | Append event; diary only, no scheduler side effects. `IN_POSITION_QTY` since `1.7.0` — see [Recording the position an apply saw](#recording-the-position-an-apply-saw) |
+| `SP_GET_EXECUTION_EVENT` | `TRADE` | Read execution diary (owner-scoped, REFCURSOR) |
 | `SP_INS_TRANSACTION` | `TRADE` | Append fill row |
+| `SP_GET_TRANSACTION` | `TRADE` | Read fill history (owner-scoped, REFCURSOR) |
 | `SP_INS_PRICE_BAR` | `MARKET_DATA` | Insert one OHLCV bar (one row per call) |
-| `SP_GET_PRICE_BAR` | `MARKET_DATA` | Range read by `(INTERNAL_CUSIP, TM_INTERVAL_ID, start, end)` |
+| `SP_GET_PRICE_BAR` | `MARKET_DATA` | Range read by `(INTERNAL_CUSIP, TM_INTERVAL_ID, SOURCE_APP_ID, start, end)` |
 | `SP_GET_PRICE_BAR_COVERAGE` | `MARKET_DATA` | `MIN`/`MAX` timestamps via index `LIMIT 1` probes |
 
 ### Reading a result without the queue
@@ -359,8 +370,10 @@ recording that it moved.
     signature change on a procedure owes the same three changesets: alter,
     replace, drop.
 
-Nothing reads the diary yet — there is no `SP_GET_EXECUTION_EVENT`; the UI
-execution panel is Phase 1.8. Until then the column is queryable directly.
+The diary read path ships in release **`1.8.0-execution-log-reads`** (in the working
+tree, not yet deployed to prod): `TRADE.SP_GET_EXECUTION_EVENT` and
+`SP_GET_TRANSACTION`, exposed at `GET /api/v1/trade/execution-events` /
+`/trade/transactions`, rendered by `ExecutionLogPanel` in `TradeLayout`.
 
 !!! info "It is the *account's* position, not the deployment's"
     `fetch_positions([symbol])` reports what the **credential** holds in that

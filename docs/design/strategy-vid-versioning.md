@@ -55,9 +55,9 @@ at `v1`.
 
 Identity is keyed on a **random** `STRATEGY_ID`, not on the strategy name.
 
-- [`quant/api/services/jobs.py`](../../quant/api/services/jobs.py) mints
+- `quant/api/services/jobs.py` mints
   `strategy_id = uuid.uuid4()` on **every** `enqueue()`.
-- [`BT.SP_INS_STRATEGY`](../../db/liquidbase/bt/procedures/SP_INS_STRATEGY.sql)
+- `BT.SP_INS_STRATEGY` (`db/liquidbase/bt/procedures/SP_INS_STRATEGY.sql`)
   computes the next VID as
   `SELECT COALESCE(MAX(STRATEGY_VID),0)+1 WHERE STRATEGY_ID = IN_STRATEGY_ID`.
 
@@ -84,7 +84,7 @@ Identity must capture **both** — not just the trade symbol.
 
 ### Problem — current name builder is too coarse
 
-[`BacktestPage.tsx`](../../frontend/src/pages/BacktestPage.tsx) builds
+`frontend/src/pages/BacktestPage.tsx` builds
 `strategy_nm` from the **trade symbol only** plus indicator/signal labels:
 
 ```typescript
@@ -93,7 +93,7 @@ const strategyNm = `${effectiveSymbol(config)} · ${config.factors
   .join(config.factors.length > 1 ? ` ${config.conjunction} ` : '')}`;
 ```
 
-Per-factor overrides in [`FactorConfig`](../../frontend/src/types/backtest.ts)
+Per-factor overrides in `FactorConfig` (`frontend/src/types/backtest.ts`)
 are **ignored**:
 
 | Field | Meaning |
@@ -196,12 +196,12 @@ team likes; **stability** matters more than punctuation.
 Wire-up:
 
 1. Add `buildStrategyNm()` in `frontend/src/utils/strategyIdentity.ts`.
-2. Replace inline string in [`BacktestPage.tsx`](../../frontend/src/pages/BacktestPage.tsx)
+2. Replace inline string in `frontend/src/pages/BacktestPage.tsx`
    `handleRun` and any clone/re-backtest enqueue paths.
 3. Unit tests in `strategyIdentity.test.ts` covering cross-product factors.
 4. Pass result as `strategy_nm` on `POST /api/v1/backtest/jobs/enqueue` (unchanged API).
 
-[`JobsService.enqueue`](../../quant/api/services/jobs.py) stores the client-supplied
+`JobsService.enqueue` (`quant/api/services/jobs.py`) stores the client-supplied
 name; **Design A** resolves `STRATEGY_ID` from `(USER_ID, STRATEGY_NM)`.
 
 ### Optional Phase 2 — fingerprint column
@@ -361,8 +361,8 @@ The existing Steps 20–30 (close prior active row, insert new active row) stay 
 is but use `V_STRATEGY_ID`. Add an `OUT_STRATEGY_ID UUID` parameter so the caller
 learns the resolved id (it is no longer the value it passed in).
 
-**2. Python change** — [`quant/api/services/jobs.py`](../../quant/api/services/jobs.py)
-and the wrapper in [`quant/queue/repo.py`](../../quant/queue/repo.py):
+**2. Python change** — `quant/api/services/jobs.py`
+and the wrapper in `quant/queue/repo.py`:
 stop minting `strategy_id` per call; pass `NULL` and read back the resolved
 `OUT_STRATEGY_ID` + `OUT_STRATEGY_VID`, then enqueue against that pair.
 
@@ -379,8 +379,8 @@ strategy_id, strategy_vid = self._repo.sp_ins_strategy(
 
 **3. Enqueue call sites** — today there is exactly **one** client path that
 builds a name and enqueues: `handleRun` in
-[`BacktestPage.tsx`](../../frontend/src/pages/BacktestPage.tsx). The existing
-[`reenqueueJob`](../../frontend/src/api/jobs.ts) path is **server-side** and
+`frontend/src/pages/BacktestPage.tsx`. The existing
+`reenqueueJob` (`frontend/src/api/jobs.ts`) path is **server-side** and
 reuses the original queue row's `(STRATEGY_ID, STRATEGY_VID)` — it neither builds
 a name nor mints an id, so it needs no change. Any **future** "Re-backtest" /
 "Clone & edit" UI affordance that enqueues a fresh job must call the same
@@ -438,7 +438,7 @@ flowchart TD
    (or extend an existing `SP_GET_STRATEGY`) returning the latest VID for
    `(USER_ID, STRATEGY_NM)`, exposed via a small `GET` endpoint. **Reads go
    through an SP** (see `AGENTS.md` — no raw `SELECT` in app code).
-2. In `handleRun` ([`BacktestPage.tsx`](../../frontend/src/pages/BacktestPage.tsx)),
+2. In `handleRun` (`frontend/src/pages/BacktestPage.tsx`),
    call the lookup after `buildStrategyNm()`; if a match exists, open a dialog
    showing the current latest version and the three choices above.
 3. On **Submit as next version**, enqueue unchanged — the server (Design A) does
@@ -473,7 +473,7 @@ change must be avoided and strategies are guaranteed never to be renamed.
 !!! note "Where versioning is *surfaced*: the Promotion tab"
     Identity is **decided at enqueue** (server, optionally gated by the Design C
     dialog). VIDs are **consumed and compared** in the Promotion tab
-    ([`PromotionTab.tsx`](../../frontend/src/components/PromotionTab.tsx)), which
+    (`frontend/src/components/PromotionTab.tsx`), which
     groups decisions and renders `v1`, `v2`, … per strategy with soft-metric
     baselines (`COMPARED_VID`). The Promotion tab is **not** where identity is
     established — it reads the lineage the enqueue path created. After this fix
@@ -505,7 +505,7 @@ Trade is **not live** — use a **one-off TRUNCATE** (release `1.10.0-001`), not
 merge/re-key. Wipes all backtest history and deployment rows so duplicate
 `(USER_ID, STRATEGY_NM, VID=1)` rows cannot block `UQ_STRATEGY_USER_NM_VID`.
 
-**Source:** [`db/liquidbase/bt/data/strategy_vid_truncate.sql`](../../db/liquidbase/bt/data/strategy_vid_truncate.sql)
+**Source:** `db/liquidbase/bt/data/strategy_vid_truncate.sql`
 
 ```sql
 TRUNCATE TABLE
@@ -526,7 +526,7 @@ Does **not** truncate `TRADE.*` — trade deployment is a separate track.
 
 !!! danger "Pre-live only"
     Do **not** run this truncate after live trading or when deployment history must
-    be kept. Use the [merge appendix](#cleanup-sql-appendix--merge-post-live-only)
+    be kept. Use the [merge appendix](#cleanup-sql-appendix-merge-post-live-only)
     instead.
 
 The unique constraint ships in the same release (`1.10.0-004`), after truncate + SP fix.
@@ -653,7 +653,7 @@ UPDATE BT.PROMOTION p
 
 #### 2. `BT.STRATEGY.CONFIG_JSON→strategy_id` (optional)
 
-Written by [`strategy_config_to_json()`](../../quant/strategy/signals.py). Not
+Written by `strategy_config_to_json()` (`quant/strategy/signals.py`). Not
 used for DB joins; stale value can confuse “clone & edit” if code ever reads
 config JSON instead of queue/strategy SP columns.
 
@@ -1125,7 +1125,7 @@ owner**, not opaque UUIDs.
 
 ### Promotion tab
 
-[`frontend/src/components/PromotionTab.tsx`](../../frontend/src/components/PromotionTab.tsx)
+`frontend/src/components/PromotionTab.tsx`
 
 - **Group by `(user_id, strategy_nm)`** in the block header (not raw
   `strategy_id`) so two users with the same name stay distinct:
@@ -1142,7 +1142,7 @@ owner**, not opaque UUIDs.
 
 ### Jobs table
 
-[`frontend/src/components/JobsTable.tsx`](../../frontend/src/components/JobsTable.tsx)
+`frontend/src/components/JobsTable.tsx`
 
 - Lead with **Strategy** (`strategy_nm`) and **Owner** (`user_id`); drop visible
   `Queue ID` (keep `queue_id` in row data for actions).
@@ -1150,8 +1150,8 @@ owner**, not opaque UUIDs.
 
 ## Related
 
-- [`BT.STRATEGY` table](../../db/liquidbase/bt/tables/STRATEGY.sql)
-- [`BT.SP_INS_STRATEGY`](../../db/liquidbase/bt/procedures/SP_INS_STRATEGY.sql)
+- `BT.STRATEGY` table (`db/liquidbase/bt/tables/STRATEGY.sql`)
+- `BT.SP_INS_STRATEGY` (`db/liquidbase/bt/procedures/SP_INS_STRATEGY.sql`)
 - [Separate underlying & cache](separate-underlying.md) — trade vs indicator product
 - [Trade Deployment Rollout](trade-deployment-rollout.md) — **parallel track** (no queue changes; deploy pins explicit `(STRATEGY_ID, STRATEGY_VID)`)
 - [Best-VID Promotion](best-vid-promotion.md) — `IS_BEST_IND` semantics (orthogonal to VID increment)

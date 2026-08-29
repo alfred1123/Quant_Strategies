@@ -87,9 +87,9 @@ background worker is involved (see [Worker](#worker-minimal-for-m1)).
 
 | Layer | File | Responsibility |
 |-------|------|----------------|
-| HTTP router | [`quant/api/routers/deployments.py`](../../quant/api/routers/deployments.py) | Auth (`require_user`), request/response models, error → HTTP status mapping |
-| Service | [`quant/trade/service.py`](../../quant/trade/service.py) (`TradeService`) | HTTP-agnostic orchestration; generates `deployment_id` UUID client-side |
-| Repo | [`quant/trade/db_repo.py`](../../quant/trade/db_repo.py) (`TradeRepo`) | Validation reads + `CALL trade.sp_*`; extends `DbGateway` (the Postgres connection) |
+| HTTP router | `quant/api/routers/deployments.py` | Auth (`require_user`), request/response models, error → HTTP status mapping |
+| Service | `quant/trade/service.py` (`TradeService`) | HTTP-agnostic orchestration; generates `deployment_id` UUID client-side |
+| Repo | `quant/trade/db_repo.py` (`TradeRepo`) | Validation reads + `CALL trade.sp_*`; extends `DbGateway` (the Postgres connection) |
 | Stored procedures | `db/liquidbase/trade/` | `trade.sp_ins_deployment`, `trade.sp_get_deployment(_check)` — the only writers of `TRADE.*` |
 
 `TradeRepo` is built **per request** in `get_trade_service()` — it reads the
@@ -146,9 +146,9 @@ shape, but the worker that calls them is **Phase 1.8** — not live yet.
 and `CORE_ADMIN`. There is no separate trade DB.
 
 The connection string is built **once at FastAPI startup** by
-[`quant/shared/config.py`](../../quant/shared/config.py) `_build_db_conninfo()`
+`quant/shared/config.py` `_build_db_conninfo()`
 from `QUANTDB_*` env vars and stored on `app.state.db_conninfo`
-([`quant/api/main.py`](../../quant/api/main.py)). Port depends on where the app runs:
+(`quant/api/main.py`). Port depends on where the app runs:
 
 | Context | Host : Port | Source |
 |---------|-------------|--------|
@@ -179,7 +179,7 @@ One logical deployment = one `DEPLOYMENT_ID` (UUID). Config changes bump
 | `IS_ENABLED_IND` | Kill switch |
 | `DEPLOYMENT_STATUS` | `CREATED` → `ACTIVE` / `PAUSED` / `STOPPED` |
 
-DDL: [`db/liquidbase/trade/tables/DEPLOYMENT.sql`](../../db/liquidbase/trade/tables/DEPLOYMENT.sql)
+DDL: `db/liquidbase/trade/tables/DEPLOYMENT.sql`
 
 ### Execution log (Phase 1.8)
 
@@ -288,7 +288,7 @@ sequenceDiagram
 
 ### Security (server-side — non-negotiable)
 
-From [Plan to Profit §5.5](plan-to-profit.md#55-auth--security-guardrails):
+From [Plan to Profit §5.5](plan-to-profit.md#55-auth-security-guardrails):
 
 1. **Ownership:** `BT.STRATEGY.USER_ID` must match caller (or shared-read policy
    documented) before create.
@@ -304,7 +304,7 @@ writes inside the API request:
 
 - **Promote** = flip `IS_BEST_IND` (`BT.SP_UPD_PROMOTE_STRATEGY`) — already wired.
 - **Deploy** = `POST /trade/deployments` → `TRADE.SP_INS_DEPLOYMENT`
-  ([`quant/trade/service.py`](../../quant/trade/service.py) `create_deployment`).
+  (`quant/trade/service.py` `create_deployment`).
 
 Creating a `TRADE.DEPLOYMENT` row just persists **intent** — nothing runs in the
 background for that to succeed. A worker is only needed to **execute** a

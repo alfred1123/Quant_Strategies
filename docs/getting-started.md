@@ -26,17 +26,17 @@ cp .env.example .env   # fill in keys — ask admin for DB password / AWS access
 
 | Script | Purpose |
 |---|---|
-| [`setup.sh`](../setup.sh) | Create `env/`, install Python + frontend deps |
-| [`scripts/appctl.sh`](../scripts/appctl.sh) | Start/stop **dev** (uvicorn + Vite) or **prod** (Docker Compose) |
-| [`scripts/dbctl.sh`](../scripts/dbctl.sh) | Dump/restore/reset **local** Postgres (`:5432`) |
-| [`scripts/liquibase-deploy.sh`](../scripts/liquibase-deploy.sh) | Apply pending DB migrations |
-| [`scripts/liquibase-verify.sh`](../scripts/liquibase-verify.sh) | Dry-run: validate changelogs, preview SQL (no apply) |
+| `setup.sh` | Create `env/`, install Python + frontend deps |
+| `scripts/appctl.sh` | Start/stop **dev** (uvicorn + Vite) or **prod** (Docker Compose) |
+| `scripts/dbctl.sh` | Dump/restore/reset **local** Postgres (`:5432`) |
+| `scripts/liquibase-deploy.sh` | Apply pending DB migrations |
+| `scripts/liquibase-verify.sh` | Dry-run: validate changelogs, preview SQL (no apply) |
 
 Admin / debug helpers (see [Login](design/login.md)): `scripts/hash_password.py`, `scripts/diag_login.py`.
 
 ## Run the app (dev)
 
-[`appctl.sh`](../scripts/appctl.sh) starts the FastAPI backend and Vite frontend. With `DB_TARGET=local` it also brings up Redis + the queue worker via [`docker-compose.dev.yml`](../docker-compose.dev.yml).
+`scripts/appctl.sh` starts the FastAPI backend and Vite frontend. With `DB_TARGET=local` it also brings up Redis + the queue worker via `docker-compose.dev.yml`.
 
 ### Option A — Shared prod DB (default)
 
