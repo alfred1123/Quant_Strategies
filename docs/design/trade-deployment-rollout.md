@@ -16,15 +16,16 @@ STRATEGY_VID)` from `BT.STRATEGY` and writes to the **`TRADE`** schema.
 | `TRADE.EXECUTION_EVENT` / `TRANSACTION` | **Yes** (1.8) | append-only logs |
 | `BT.SP_GET_STRATEGY` | **Read only** | list + exact VID lookup for picker |
 | `BT.QUEUE` | **No** | frozen — others changing enqueue |
-| `BT.SP_INS_STRATEGY` | **Yes** (1.10.0) | Resolves identity by `(USER_ID, STRATEGY_NM)` — see [Strategy VID Versioning](strategy-vid-versioning.md) |
+| `BT.SP_INS_STRATEGY` | **Yes** (1.10.0) | Resolves identity by `(USER_ID, STRATEGY_NM)` — see [Strategy VID Versioning](../archive/strategy-vid-versioning.md) |
 | `BT.PROMOTION` | **No** | UI already navigates to Trade with `{ strategy_id, strategy_vid }` |
 
-!!! note "Duplicate v1 rows are OK for now"
-    Until [Strategy VID Versioning](strategy-vid-versioning.md) lands, the same
-    `STRATEGY_NM` may appear as multiple `STRATEGY_ID`s each at `VID=1`. The
-    Trade picker must show **`strategy_nm` + `strategy_id` prefix + `vid` + Best
-    chip** so the user picks the exact row they intend to deploy. Deployment
-    stores the explicit pair — no ambiguity at apply time.
+!!! note "Duplicate v1 rows — resolved in `1.10.0`"
+    Before [Strategy VID Versioning](../archive/strategy-vid-versioning.md) landed, the same
+    `STRATEGY_NM` could appear as multiple `STRATEGY_ID`s each at `VID=1`. It now
+    resolves to one `STRATEGY_ID` per `(USER_ID, STRATEGY_NM)` with an
+    incrementing VID. The Trade picker still shows **`strategy_nm` +
+    `strategy_id` prefix + `vid` + Best chip**, and deployment stores the
+    explicit pair — no ambiguity at apply time.
 
 ## Goal
 
@@ -369,16 +370,18 @@ GET /api/v1/trade/deployments/{id}/events?limit=50
 GET /api/v1/trade/deployments/{id}/transactions?limit=50
 ```
 
-**UI:** bottom panel in `TradeLayout` (placeholder today) — poll or SSE.
+**UI:** `ExecutionLogPanel` in the `TradeLayout` bottom panel (release `1.8.0`) —
+Attempts / Fills tabs over the two GET endpoints, polled on refresh.
 
-## What we explicitly defer
+## What this rollout deferred
 
-| Item | Doc | Why defer |
-|------|-----|-----------|
-| VID increment by `strategy_nm` | [strategy-vid-versioning.md](strategy-vid-versioning.md) | Requires `SP_INS_STRATEGY` + enqueue changes |
-| `UNIQUE (USER_ID, STRATEGY_NM, STRATEGY_VID)` | same | Data migration touches queue children |
-| Jobs table UX / shared queue | [strategy-vid-versioning.md](strategy-vid-versioning.md) § UI | Queue owned by others |
-| Live scheduler (EventBridge one-shot) + reconciliation | [plan-to-profit.md](plan-to-profit.md) Phase 2 | After M1 pipeline; M1 is synchronous apply only |
+| Item | Doc | Outcome |
+|------|-----|---------|
+| VID increment by `strategy_nm` | [strategy-vid-versioning.md](../archive/strategy-vid-versioning.md) | **Shipped** in release `1.10.0` |
+| `UNIQUE (USER_ID, STRATEGY_NM, STRATEGY_VID)` | same | **Shipped** in release `1.10.0` |
+| Jobs table UX / shared queue | [Jobs Table Detail UX](jobs-table-detail-ux.md) | Still proposed |
+| Live scheduler (EventBridge one-shot) | [scheduler-price-bars.md](scheduler-price-bars.md) | **Shipped** in Phase 1.9 |
+| Reconciliation | [plan-to-profit.md](plan-to-profit.md) Phase 2 | Still pending |
 
 ## Suggested implementation order
 
@@ -394,5 +397,5 @@ GET /api/v1/trade/deployments/{id}/transactions?limit=50
 - [Trade API](trade-api.md) — full API + schema reference (§7 = DDL truth)
 - [Plan to Profit](plan-to-profit.md) — phases 1.2–1.8, M1 milestone
 - [Best-VID Promotion](best-vid-promotion.md) — where Deploy button comes from
-- [Strategy VID Versioning](strategy-vid-versioning.md) — later queue/BT track
+- [Strategy VID Versioning](../archive/strategy-vid-versioning.md) — queue/BT track, shipped in `1.10.0` (archived)
 - [User isolation](user-isolation.md) — ownership rules for deploy create

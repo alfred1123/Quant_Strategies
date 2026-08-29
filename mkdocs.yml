@@ -100,7 +100,6 @@ nav:
       - Database Dump & Restore: guides/database-dump-restore.md
       - HTTPS via Cloudflare: guides/https-cloudflare.md
   - Design Docs:
-      - Backtest API: design/backtest-api.md
       - Backtest Queue: design/backtest-queue.md
       - Backtest Queue JSON Viewer: design/backtest-queue-json-viewer.md
       - Jobs Table Detail UX: design/jobs-table-detail-ux.md
@@ -119,13 +118,14 @@ nav:
       - Scheduler & Trade Open Questions: design/scheduler-trade-open-questions.md
       - Market Data Capture: design/market-data-capture.md
       - Multi-Strategy Netting: design/multi-strategy-netting.md
-      - Strategy VID Versioning: design/strategy-vid-versioning.md
       - Frontend Code Audit: design/frontend-audit.md
       - Plan to Profit: design/plan-to-profit.md
   - Archive:
       - Overview: archive/README.md
       - TypeScript Migration: archive/ts-migration.md
       - Deploy Build Pipeline: archive/deploy-build-pipeline.md
+      - Backtest API (concepts): archive/backtest-api.md
+      - Strategy VID Versioning: archive/strategy-vid-versioning.md
       - Phase 0 Signoffs: archive/phase-0/phase-0.1-signoff.md
       - Phase 0.2 Capacity Snapshot: archive/phase-0/phase-0.2-capacity.md
       - Phase 0.3 Deploy Topology: archive/phase-0/phase-0.3-topology.md

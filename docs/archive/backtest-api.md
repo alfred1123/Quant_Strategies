@@ -1,7 +1,10 @@
 # Backtest API — Architecture & Concepts
 
-!!! info "Status"
-    **Implemented.** Live behavior is documented in [Architecture → FastAPI Backend](../architecture/api.md). This page is kept as a higher-level architecture / concept reference.
+!!! warning "Archived — superseded"
+    **Implemented.** Live behaviour, routers, and the current endpoint list are
+    documented in [Architecture → FastAPI Backend](../architecture/api.md), which
+    is the source of truth. This page is kept only as the original higher-level
+    concept write-up; endpoint details here may be stale.
 
 ## Overview
 

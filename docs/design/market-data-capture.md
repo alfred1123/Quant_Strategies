@@ -6,7 +6,7 @@ strategy is already deployed against, and the decision that made that true was
 answering a different question.
 
 **Parent:** [Scheduler & Price Bars](scheduler-price-bars.md) §3.2
-**Related:** [Separate Underlying & Cache](separate-underlying.md), [Backtest API](backtest-api.md), [Alternative Data Sources](alt-data-sources.md)
+**Related:** [Separate Underlying & Cache](separate-underlying.md), [Backtest API](../archive/backtest-api.md), [Alternative Data Sources](alt-data-sources.md)
 
 ---
 
