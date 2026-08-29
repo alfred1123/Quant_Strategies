@@ -26,7 +26,11 @@ import uuid
 from datetime import datetime
 from uuid import UUID
 
-from quant.market_data.service import BackfillResult, BarServiceFactory
+from quant.market_data.service import (
+    MAX_BACKFILL_BARS,
+    BackfillResult,
+    BarServiceFactory,
+)
 from quant.shared.db import DbGateway
 
 logger = logging.getLogger(__name__)
@@ -200,6 +204,27 @@ class BarSubscriptionService:
                 "source_app_id": source_app_id,
             }
         )
+
+    def venue_depth(
+        self, *, internal_cusip: str, tm_interval_id: int, source_app_id: int
+    ) -> dict:
+        """What the exchange will serve, and whether one fill could take it.
+
+        The page asks this before offering a date, so the target it defaults to
+        is the venue's own floor rather than a guess. ``bars_available`` is what
+        makes the interval's cost visible: the same six years is ~2,200 daily
+        bars and ~3.4 million 1-minute ones, and only one of those is a fill.
+        """
+        earliest, bars_available = self._bar_service(source_app_id).venue_depth(
+            internal_cusip=internal_cusip,
+            tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
+        )
+        return {
+            "earliest": earliest,
+            "bars_available": bars_available,
+            "max_backfill_bars": MAX_BACKFILL_BARS,
+        }
 
     def backfill(
         self,

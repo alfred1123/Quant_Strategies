@@ -34,6 +34,7 @@ from quant.schemas.market_data import (
     BarSubscriptionRow,
     Coverage,
     SubscribeRequest,
+    VenueDepth,
 )
 from quant.trade.bar_source import DeploymentInstrumentSource
 from quant.trade.db_repo import TradeRepo
@@ -166,6 +167,31 @@ def price_bar_coverage(
     """
     return Coverage(
         **svc.coverage(
+            internal_cusip=internal_cusip,
+            tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
+        )
+    )
+
+
+@router.get("/price-bars/venue-depth", response_model=VenueDepth)
+def price_bar_venue_depth(
+    internal_cusip: str,
+    tm_interval_id: int,
+    source_app_id: int,
+    _user: CurrentUser = Depends(require_user),
+    svc: BarSubscriptionService = Depends(_get_subscriptions),
+) -> VenueDepth:
+    """How far back this venue serves the series, and whether one fill fits.
+
+    Separate from ``/coverage`` because it is a different question with a
+    different cost: coverage reads two index probes, this one asks the exchange.
+    The dialogs call it to default a capture target to the venue's own floor
+    instead of a date the user has to invent — a target older than the listing
+    can never be met, and nothing previously said so.
+    """
+    return VenueDepth(
+        **svc.venue_depth(
             internal_cusip=internal_cusip,
             tm_interval_id=tm_interval_id,
             source_app_id=source_app_id,

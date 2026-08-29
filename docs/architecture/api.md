@@ -220,8 +220,30 @@ exchange rate limit on behalf of a user who did not ask.
 |--------|------|-------------|
 | `GET`  | `/api/v1/market-data/subscriptions` | Every bar subscription with its coverage (first bar, last bar, gap count). |
 | `POST` | `/api/v1/market-data/subscriptions` | Create a subscription, or version one — enable, disable, retarget. |
-| `GET`  | `/api/v1/market-data/price-bars/coverage` | `MIN`/`MAX` stored bar plus gap count for one series. |
-| `POST` | `/api/v1/market-data/price-bars/backfill` | Fill an explicit range, reporting what the venue would not serve. |
+| `GET`  | `/api/v1/market-data/price-bars/coverage` | `MIN`/`MAX` stored bar plus gap count for one series — what is **held**. |
+| `GET`  | `/api/v1/market-data/price-bars/venue-depth` | Oldest bar the venue serves, how many bars that is, and the fill ceiling — what **exists**. |
+| `POST` | `/api/v1/market-data/price-bars/backfill` | Fill from a start to the last closed bar, reporting what the venue would not serve. |
+
+#### Coverage and depth are different questions
+
+`coverage` reads two index probes against `PRICE_BAR`; `venue-depth` asks the
+exchange. That cost difference is why the subscription list carries coverage on
+every row but never depth — a network call per row to draw a table is not worth
+it — and why the dialogs request depth on demand, once product, interval and
+venue together identify one series.
+
+Depth is what lets a capture target be the venue's own floor rather than a date
+someone invented. A target older than the first bar an exchange ever printed can
+never be met, and before this existed the page reported that as an open gap
+([decision #52](../decisions.md)).
+
+Backfill takes **no end date**: it always runs to the last closed bar, since a
+forming bar cannot be stored and nothing beyond it exists to fetch. It does take
+a ceiling — a range spanning more than `MAX_BACKFILL_BARS` boundaries is
+refused **400** before any work starts, because the fill is one synchronous
+blocking request and a range large enough to outlive the proxy would store
+nothing while the caller learned only that the request died. The message names a
+nearer date that fits; each pass keeps what it stored, so repeating is safe.
 
 #### Subscriptions are shared, not caller-scoped
 

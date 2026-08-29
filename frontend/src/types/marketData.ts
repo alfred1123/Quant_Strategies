@@ -42,6 +42,19 @@ export interface SubscribeRequest {
   bar_subscription_id?: string;
 }
 
+/**
+ * How far back a venue will actually serve one series.
+ *
+ * The floor on any capture target. Without it "history wanted from" is a date
+ * the user invents, and one before the pair listed can never be met — the row
+ * then reports a shortfall against history that was never obtainable.
+ */
+export interface VenueDepth {
+  earliest: string | null;
+  bars_available: number | null;
+  max_backfill_bars: number;
+}
+
 export interface BackfillRequest {
   internal_cusip: string;
   tm_interval_id: number;

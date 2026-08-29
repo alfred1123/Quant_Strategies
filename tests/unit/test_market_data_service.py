@@ -7,7 +7,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from quant.market_data.fetcher import OhlcvBar
-from quant.market_data.service import PriceBarService, StaleBarsError
+from quant.market_data.service import (
+    MAX_BACKFILL_BARS,
+    BackfillTooLargeError,
+    PriceBarService,
+    StaleBarsError,
+)
 from quant.shared.db import ProcedureError
 
 CUSIP = "btcusdt.crypto"
@@ -49,6 +54,11 @@ class FakeFetcher:
             {"vendor_symbol": vendor_symbol, "period": period, "since": since, "until": until}
         )
         return [b for b in self.bars if since <= b.bar_timestamp <= until]
+
+    def earliest_bar(self, *, vendor_symbol, period):
+        self.earliest_calls = getattr(self, "earliest_calls", [])
+        self.earliest_calls.append({"vendor_symbol": vendor_symbol, "period": period})
+        return self.bars[0].bar_timestamp if self.bars else None
 
 
 def build_service(*, stored_bars=(), coverage_max=None, exchange_bars=()):
@@ -224,6 +234,114 @@ class TestBackfill:
 
         assert repo.get_bars.call_args.kwargs["source_app_id"] == 35
         assert repo.ins_bar.call_args.kwargs["source_app_id"] == 35
+
+
+class TestVenueDepth:
+    """What the exchange holds, as distinct from what we have stored."""
+
+    def test_reports_the_venue_floor_and_how_many_bars_that_is(self):
+        service, _repo, fetcher = build_service(exchange_bars=[_bar(7), _bar(8)])
+
+        earliest, bars = service.venue_depth(
+            internal_cusip=CUSIP,
+            tm_interval_id=INTERVAL_1H,
+            source_app_id=APP_ID,
+            now=NOW,
+        )
+
+        assert earliest == _ts(7)
+        # 07:00 through 10:00 inclusive, at one bar an hour.
+        assert bars == 4
+        assert fetcher.earliest_calls == [
+            {"vendor_symbol": "BTCUSDT", "period": timedelta(hours=1)}
+        ]
+
+    def test_counts_in_bars_so_the_intervals_cost_is_visible(self):
+        """The same span is a few daily bars or a great many hourly ones."""
+        service, _repo, _fetcher = build_service(exchange_bars=[_bar(0)])
+
+        _, hourly = service.venue_depth(
+            internal_cusip=CUSIP, tm_interval_id=INTERVAL_1H,
+            source_app_id=APP_ID, now=NOW,
+        )
+        _, daily = service.venue_depth(
+            internal_cusip=CUSIP, tm_interval_id=1, source_app_id=APP_ID, now=NOW,
+        )
+
+        assert hourly == 11
+        assert daily == 1
+
+    def test_a_venue_serving_nothing_reports_no_depth(self):
+        service, _repo, _fetcher = build_service(exchange_bars=[])
+
+        assert service.venue_depth(
+            internal_cusip=CUSIP, tm_interval_id=INTERVAL_1H,
+            source_app_id=APP_ID, now=NOW,
+        ) == (None, None)
+
+    def test_an_unmapped_symbol_refuses_rather_than_asking_the_venue(self):
+        service, _repo, _fetcher = build_service(exchange_bars=[_bar(7)])
+        service._instruments.resolve_internal_cusip.return_value = None
+
+        with pytest.raises(StaleBarsError, match="no INST.PRODUCT_XREF mapping"):
+            service.venue_depth(
+                internal_cusip=CUSIP, tm_interval_id=INTERVAL_1H, source_app_id=APP_ID,
+            )
+
+
+class TestBackfillSizeGuard:
+    """A fill too large to finish is refused before it starts."""
+
+    def test_a_range_over_the_ceiling_is_refused(self):
+        service, _repo, fetcher = build_service()
+        start = NOW - timedelta(hours=MAX_BACKFILL_BARS + 100)
+
+        with pytest.raises(BackfillTooLargeError, match="over the"):
+            _backfill(service, start, NOW)
+
+        assert fetcher.calls == []
+
+    def test_refusal_names_a_range_that_would_fit(self):
+        service, _repo, _fetcher = build_service()
+        start = NOW - timedelta(hours=MAX_BACKFILL_BARS + 100)
+
+        with pytest.raises(BackfillTooLargeError) as exc:
+            _backfill(service, start, NOW)
+
+        affordable = start + timedelta(hours=MAX_BACKFILL_BARS - 1)
+        assert str(affordable.date()) in str(exc.value)
+
+    def test_nothing_is_written_by_a_refused_fill(self):
+        """The point of refusing early: a fill killed mid-write leaves a mess."""
+        service, repo, _fetcher = build_service()
+
+        with pytest.raises(BackfillTooLargeError):
+            _backfill(service, NOW - timedelta(hours=MAX_BACKFILL_BARS + 1), NOW)
+
+        repo.ins_bar.assert_not_called()
+
+    def test_a_range_at_the_ceiling_is_allowed(self):
+        """The boundary itself passes — the guard refuses beyond it, not at it."""
+        service, _repo, _fetcher = build_service()
+        start = NOW - timedelta(hours=MAX_BACKFILL_BARS - 1)
+
+        result = _backfill(service, start, NOW)
+
+        assert result.expected <= MAX_BACKFILL_BARS
+
+    def test_the_ceiling_is_counted_in_bars_not_days(self):
+        """A daily fill of the same calendar span stays well inside it."""
+        service, _repo, _fetcher = build_service()
+        span = timedelta(hours=MAX_BACKFILL_BARS + 100)
+
+        with pytest.raises(BackfillTooLargeError):
+            _backfill(service, NOW - span, NOW)
+
+        daily = service.backfill(
+            internal_cusip=CUSIP, tm_interval_id=1, source_app_id=APP_ID,
+            start=NOW - span, end=NOW,
+        )
+        assert daily.expected < MAX_BACKFILL_BARS
 
 
 class TestSourceScoping:

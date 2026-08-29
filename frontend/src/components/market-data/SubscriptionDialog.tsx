@@ -10,10 +10,11 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useMemo, useState } from 'react';
-import { useSubscribe } from '../../api/marketData';
+import { useEffect, useMemo, useState } from 'react';
+import { useSubscribe, useVenueDepth } from '../../api/marketData';
 import { useProducts } from '../../api/inst';
 import { intervalLabel, useExchangeApps, useTmIntervals } from '../../api/refdata';
+import type { VenueDepth } from '../../types/marketData';
 
 interface SubscriptionDialogProps {
   open: boolean;
@@ -43,6 +44,35 @@ export default function SubscriptionDialog({
   return <SubscriptionDialogContent onClose={onClose} onSuccess={onSuccess} />;
 }
 
+/**
+ * What the venue said, in the space where a hint about a typed date used to go.
+ *
+ * Names the number of bars as well as the date because the date alone hides
+ * the cost: the same six years is a couple of thousand daily bars and millions
+ * of minute ones, and only one of those can be filled.
+ */
+function venueDepthHelp(
+  loading: boolean,
+  depth: VenueDepth | undefined,
+  earliest: string,
+): string {
+  if (loading) return 'Asking the venue how far back it goes…';
+  if (!depth) return 'Pick a product, interval and venue to see how far back it goes.';
+  // Unknown, not empty: the venue may simply not publish a listing time, and
+  // claiming it holds nothing would be a stronger statement than we can make.
+  if (!earliest) return 'This venue did not say how far back it goes — pick a date.';
+  const bars = depth.bars_available;
+  if (bars === null) return `This venue serves bars from ${earliest}.`;
+  const fits = bars <= depth.max_backfill_bars;
+  return (
+    `This venue serves bars from ${earliest} — ${bars.toLocaleString()} of them. `
+    + (fits
+      ? 'One backfill covers all of it.'
+      : `More than one backfill can take (${depth.max_backfill_bars.toLocaleString()}), `
+        + 'so filling it all will take several passes.')
+  );
+}
+
 function SubscriptionDialogContent({
   onClose,
   onSuccess,
@@ -61,6 +91,30 @@ function SubscriptionDialogContent({
   const sortedIntervals = useMemo(
     () => [...intervals].sort((a, b) => a.tm_interval_id - b.tm_interval_id),
     [intervals],
+  );
+
+  // Only once all three are chosen is there a series to ask the venue about.
+  const depthQuery = useVenueDepth({
+    internal_cusip: internalCusip || undefined,
+    tm_interval_id: intervalId ? Number(intervalId) : undefined,
+    source_app_id: sourceAppId ? Number(sourceAppId) : undefined,
+  });
+  const depth = depthQuery.data;
+  const venueEarliest = depth?.earliest ? depth.earliest.slice(0, 10) : '';
+
+  // Adopt the venue's floor as the target the moment it is known, so the
+  // default is "everything this exchange has" rather than a date invented by
+  // whoever opened the dialog. Their own edit wins — hence `touched`.
+  const [touched, setTouched] = useState(false);
+  useEffect(() => {
+    if (!touched && venueEarliest) setBackfillFrom(venueEarliest);
+  }, [touched, venueEarliest]);
+
+  // A target the exchange cannot reach is not a gap that backfill will close
+  // later; it is history that does not exist. Say so while it can still be
+  // changed, rather than leaving the row short against it forever.
+  const unreachable = Boolean(
+    venueEarliest && backfillFrom && backfillFrom < venueEarliest,
   );
 
   const canSubmit = internalCusip !== '' && intervalId !== '' && sourceAppId !== '';
@@ -137,11 +191,26 @@ function SubscriptionDialogContent({
             type="date"
             label="History wanted from"
             value={backfillFrom}
-            onChange={e => setBackfillFrom(e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-            helperText="Optional target. Nothing fills automatically — use Backfill on the row."
+            onChange={e => {
+              setTouched(true);
+              setBackfillFrom(e.target.value);
+            }}
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: venueEarliest ? { min: venueEarliest } : undefined,
+            }}
+            helperText={venueDepthHelp(depthQuery.isFetching, depth, venueEarliest)}
+            error={unreachable}
             fullWidth
           />
+
+          {unreachable && (
+            <Alert severity="warning">
+              This venue's earliest bar is {venueEarliest}, so nothing before it
+              can ever be captured — the row would show a shortfall no backfill
+              could close. Use {venueEarliest} to take everything the exchange has.
+            </Alert>
+          )}
 
           <Typography variant="caption" color="text.secondary">
             Subscribing starts the series from now. It does not create history that

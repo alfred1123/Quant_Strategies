@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from quant.market_data.service import BackfillResult
+from quant.market_data.service import BackfillResult, BackfillTooLargeError
 from quant.market_data.subscriptions import SubscriptionError
 
 DAILY = 1
@@ -183,7 +183,75 @@ class TestCoverage:
         assert resp.json()["gaps"] == 3
 
 
+class TestVenueDepth:
+    """The venue's own floor, so a capture target is not a guess."""
+
+    def test_reports_the_earliest_bar_and_the_fill_ceiling(self, client_and_svc):
+        client, svc, _warmer = client_and_svc
+        svc.venue_depth.return_value = {
+            "earliest": FIRST_BAR,
+            "bars_available": 2349,
+            "max_backfill_bars": 10_000,
+        }
+
+        resp = client.get(
+            "/api/v1/market-data/price-bars/venue-depth",
+            params={
+                "internal_cusip": CUSIP,
+                "tm_interval_id": DAILY,
+                "source_app_id": BYBIT,
+            },
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["bars_available"] == 2349
+        assert resp.json()["max_backfill_bars"] == 10_000
+        assert svc.venue_depth.call_args.kwargs == {
+            "internal_cusip": CUSIP,
+            "tm_interval_id": DAILY,
+            "source_app_id": BYBIT,
+        }
+
+    def test_a_venue_serving_nothing_is_a_null_not_an_error(self, client_and_svc):
+        client, svc, _warmer = client_and_svc
+        svc.venue_depth.return_value = {
+            "earliest": None, "bars_available": None, "max_backfill_bars": 10_000,
+        }
+
+        resp = client.get(
+            "/api/v1/market-data/price-bars/venue-depth",
+            params={
+                "internal_cusip": CUSIP,
+                "tm_interval_id": DAILY,
+                "source_app_id": BYBIT,
+            },
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["earliest"] is None
+
+
 class TestBackfill:
+    def test_an_oversized_range_is_refused_as_a_400(self, client_and_svc):
+        """Not a 500: the range is the caller's to narrow, and the message says how."""
+        client, svc, _warmer = client_and_svc
+        svc.backfill.side_effect = BackfillTooLargeError(
+            "56,360 bar(s) ... Fill to 2021-05-16 first"
+        )
+
+        resp = client.post(
+            "/api/v1/market-data/price-bars/backfill",
+            json={
+                "internal_cusip": CUSIP,
+                "tm_interval_id": DAILY,
+                "source_app_id": BYBIT,
+                "start": FIRST_BAR.isoformat(),
+            },
+        )
+
+        assert resp.status_code == 400
+        assert "Fill to 2021-05-16 first" in resp.json()["detail"]
+
     def test_reports_what_was_filled(self, client_and_svc):
         client, svc, _warmer = client_and_svc
         svc.backfill.return_value = BackfillResult(

@@ -245,6 +245,63 @@ exchange cannot reach far enough — which is what #47's wide key already permit
 retroactively create history; it starts a series and lets you fill backward as
 far as the venue will serve.
 
+### 5.1 The venue's floor, not a date somebody typed
+
+The first version asked the user how far back they wanted history, as a free
+date field. That reliably produced targets the venue could never meet — a
+`btcusdt.crypto` subscription asking for 2017-01-01 when Bybit's first daily
+`BTCUSDT` bar is **2020-03-25**. The row then reported a permanent shortfall
+against history that was never obtainable, which is indistinguishable on the
+page from a gap a backfill could close.
+
+The exchange knows the answer, so it is asked: `CcxtBarFetcher.earliest_bar`
+reads the oldest bar a venue still serves, and `PriceBarService.venue_depth`
+pairs it with how many bars that is at the requested interval. Both dialogs
+default to it. `MARKET_DATA.BAR_SUBSCRIPTION.BACKFILL_FROM_TS` still stores a
+target, but it is now the venue's floor unless someone deliberately narrows it.
+
+Reading it takes two steps, and the one-step version silently lies. `since=0`
+does not mean "from the beginning" — it is falsy, so ccxt sends no start and
+Bybit answers with the *newest* page, reporting that a six-year-old series began
+this morning. So the request anchors on the listing time ccxt normalises into
+`market['created']` and lets the venue clamp forward. The listing time is only
+an anchor, never the answer: Bybit lists `BTCUSDT` on 2020-03-15 and prints its
+first daily bar ten days later. Retention also differs per timeframe, so it is
+read per `(symbol, period)` rather than cached per venue.
+
+A venue that publishes no listing time returns **unknown**, and the dialog asks
+for a date as before. The tempting alternative — anchor on some fixed instant
+predating every exchange — was rejected: a guessed floor is worse than an absent
+one, because it arrives wearing the same authority as a real answer, and the
+whole point here is that the date stops being a guess.
+
+### 5.2 There is no "to", and there is a ceiling
+
+Backfill takes no end date. It always ran to the last closed bar — a forming bar
+cannot be stored and nothing beyond it exists to fetch — so the field only
+invented a decision that had one correct answer.
+
+The start is bounded instead, by `MAX_BACKFILL_BARS` (10,000). Backfill is one
+synchronous blocking request that writes a row per bar through
+`SP_INS_PRICE_BAR`, measured at **~200 bar/s** against a local database and
+slower against Aurora. The ceiling is therefore a time budget in disguise:
+roughly 50s locally against the ~100s a proxy allows before abandoning the
+request. Cost scales with the interval, not the calendar — the same Bybit
+history is ~2,300 daily bars, ~56,000 hourly and ~3.4 million 1-minute:
+
+| Interval | Bars in full Bybit `BTCUSDT` history | One pass? |
+|---|---|---|
+| Daily | ~2,300 | yes, with room to spare |
+| Hourly | ~56,000 | no — about six passes |
+| 1-minute | ~3,400,000 | no, and not by this mechanism |
+
+Oversized ranges are refused **before** `find_gaps` materialises one entry per
+boundary, by arithmetic on the span — a guard that exhausts memory reaching its
+own refusal is not a guard. The message names the count and a nearer date that
+would fit, and both dialogs warn from `venue_depth` before the click. Raising
+the ceiling does not make a minute-scale fill work; that needs a background job
+with progress tracking, which [§9](#9-open-questions) deliberately rejects.
+
 ## 6. Coverage — answering "can I backtest this yet?"
 
 The question the UI must answer is not "am I subscribed" but "do I have enough
@@ -334,8 +391,15 @@ diagnosable only when the input is recorded beside the output.
 |---|---|
 | `GET /api/v1/market-data/subscriptions` | Every subscription + coverage (not caller-scoped — §3.2) |
 | `POST /api/v1/market-data/subscriptions` | Create / enable / disable / retarget. **200, not 201** — only one of those creates anything |
-| `POST /api/v1/market-data/price-bars/backfill` | Explicit range fill, returns `BackfillResult` |
-| `GET /api/v1/market-data/price-bars/coverage` | `MIN`/`MAX` + gaps for one series |
+| `POST /api/v1/market-data/price-bars/backfill` | Fill from a start to the last closed bar, returns `BackfillResult` |
+| `GET /api/v1/market-data/price-bars/coverage` | `MIN`/`MAX` + gaps for one series — what we *hold* |
+| `GET /api/v1/market-data/price-bars/venue-depth` | Earliest bar the venue serves + bar count + fill ceiling — what *exists* ([§5.1](#51-the-venues-floor-not-a-date-somebody-typed)) |
+
+`coverage` and `venue-depth` are separate routes because they are different
+questions with different costs: coverage is two index probes, `venue-depth` asks
+the exchange. That is also why the list endpoint carries coverage per row but
+never depth — one network call per row to render a table is not a trade worth
+making. The dialogs ask for depth on demand, once a whole series is identified.
 
 The `market_data` router is gated at **router level** with
 `require_user_or_service` so the Lambda can drive `price-bars/sync`
@@ -366,8 +430,10 @@ display.
 |---|---|
 | Do factors follow the main product's source, or keep their own? | **Closed — their own** (§7). Same-venue-or-nothing stays right for live and stays wrong for a `^VIX`-filtered crypto backtest, so the two paths differ on purpose. A factor inheriting a venue it is not listed on is refused with the instruction to name its own source |
 | Should a subscription cap retention? | **Open, deferred.** `PRICE_BAR` is append-only immutable facts and [§4.3](scheduler-price-bars.md#43-volume-projections) makes volume trivial (~52 MB for 10 products × 5 years), so nothing prunes today |
-| Is `BACKFILL_FROM_TS` worth storing before a filler consumes it? | **Kept.** §6's page needs a target to display, and the backfill dialog defaults its range from it |
+| Is `BACKFILL_FROM_TS` worth storing before a filler consumes it? | **Kept.** §6's page needs a target to display. It is no longer typed, though: [§5.1](#51-the-venues-floor-not-a-date-somebody-typed) defaults it to the venue's own earliest bar |
 | Does anything auto-backfill on subscribe? | **No.** A synchronous fill blocks the request; a background one needs progress tracking this design avoids. Subscribing makes the series eligible for the next warm pass, and nothing more |
+| Should a fill too large for one pass be chunked automatically? | **No** — refused instead ([§5.2](#52-there-is-no-to-and-there-is-a-ceiling)). Chunking is the background filler under another name, and needs the same progress tracking. The refusal names a range that fits, and each pass keeps what it stored, so repeating is safe |
+| How would intraday capture ever work, then? | **Open, deferred — and not by raising `MAX_BACKFILL_BARS`.** A request/response API writing a row per bar is the wrong shape for millions of them at any ceiling. Minute-scale capture is a streaming problem: a pipeline (Kafka for transport, Spark for batch load) rather than a bigger blocking call. Nothing here should be built as a half-step toward it — the current design is honest about serving daily, and the refusal is what keeps that honest |
 | Who may subscribe? | **Any signed-in user**, unbounded. Rate limit is a shared resource and this is a throttling risk that nothing currently caps — revisit if the subscription list grows past a handful. A service token may *not* subscribe (§8) |
 
 ## 10. What this amends
@@ -383,7 +449,7 @@ sanctioned continuity repair.
 
 | Step | State |
 |---|---|
-| 1. **DDL** — `MARKET_DATA.BAR_SUBSCRIPTION` + three procedures | **Done**, staged in `1.3.0-bar-subscription.xml` without `prod-deploy` |
+| 1. **DDL** — `MARKET_DATA.BAR_SUBSCRIPTION` + three procedures | **Done and released** — `1.3.0-bar-subscription.xml`, `context="market_data,prod-deploy"` |
 | 2. **Python** — subscription repo; `InstrumentSource` protocol; warmer union (§4) | **Done** — `quant/market_data/subscriptions.py`, `quant/market_data/warm.py` |
 | 3. **API** — subscription CRUD, backfill and coverage routes, `require_user` | **Done** — `quant/api/market_data/router.py` |
 | 4. **UI** — a Market data page: product / interval / venue pickers from REFDATA and `INST.PRODUCT`, coverage per row, and an explicit backfill action | **Done** — `frontend/src/pages/MarketDataPage.tsx`. This is the part that was looked for and not found |

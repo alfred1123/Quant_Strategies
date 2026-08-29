@@ -42,9 +42,30 @@ _UNIQUE_VIOLATION = "23505"
 #: indicator window, so falling far below it starves the indicator itself.
 _MIN_WINDOW_COVERAGE = 0.8
 
+#: Most bar boundaries one :meth:`PriceBarService.backfill` call may span.
+#:
+#: Backfill is synchronous and blocking, and its cost is set by the interval
+#: rather than the calendar: the history Bybit retains for BTCUSDT is ~2,300
+#: daily bars, ~56,000 hourly and ~3.4 million 1-minute. Storing runs one
+#: ``SP_INS_PRICE_BAR`` round trip per bar, measured at ~200 bar/s against a
+#: local database and slower against Aurora, so the ceiling is a *time* budget
+#: in disguise — roughly 50s here and more in production, against the ~100s a
+#: proxy allows before it abandons the request and the caller learns nothing.
+#:
+#: Set so a full daily history fits in one pass with room to spare, while the
+#: intervals that genuinely cannot be filled this way are refused up front
+#: rather than attempted and killed mid-write. Raising it does not make a
+#: minute-scale fill work; that needs a background job with progress, which
+#: this design deliberately does not have.
+MAX_BACKFILL_BARS = 10_000
+
 
 class StaleBarsError(RuntimeError):
     """The required bar window could not be completed — do not trade on it."""
+
+
+class BackfillTooLargeError(ValueError):
+    """The requested range spans more boundaries than one blocking call may fill."""
 
 
 @dataclass(frozen=True)
@@ -263,6 +284,19 @@ class PriceBarService:
         if start > end:
             raise ValueError(f"start {start} is after end {end}")
 
+        # Counted by arithmetic, before find_gaps builds a list per boundary —
+        # the refusal is pointless if reaching it is what exhausts memory.
+        span = int((end - start) / period) + 1
+        if span > MAX_BACKFILL_BARS:
+            affordable = start + period * (MAX_BACKFILL_BARS - 1)
+            raise BackfillTooLargeError(
+                f"{start.date()} to {end.date()} is {span:,} bar(s) at this "
+                f"interval, over the {MAX_BACKFILL_BARS:,} one fill may span. "
+                f"Backfill is a single blocking request, so a range this size "
+                f"would time out and store nothing. Fill to {affordable.date()} "
+                f"first, or capture this series at a coarser interval"
+            )
+
         missing = self.find_gaps(
             internal_cusip=internal_cusip,
             tm_interval_id=tm_interval_id,
@@ -324,6 +358,35 @@ class PriceBarService:
         if coverage is None:
             return None
         return coverage["min_bar_timestamp"], coverage["max_bar_timestamp"]
+
+    def venue_depth(
+        self,
+        *,
+        internal_cusip: str,
+        tm_interval_id: int,
+        source_app_id: int,
+        now: datetime | None = None,
+    ) -> tuple[datetime | None, int | None]:
+        """``(earliest bar the venue serves, how many bars that is)``.
+
+        The counterpart to :meth:`stored_bounds`, which answers what we hold.
+        Together they say how much of the obtainable history is captured, and
+        they are different questions: a target older than this is not a gap to
+        be filled but history that does not exist to fetch.
+
+        The count is what makes the interval's cost visible before anyone
+        commits to a fill — the same six years is ~2,200 daily bars and ~3.4
+        million 1-minute ones. Costs one network call, so it is asked on demand
+        by the pages that offer a date, never per row while listing.
+        """
+        period = self._refdata.get_interval_period(tm_interval_id)
+        earliest = self._fetcher.earliest_bar(
+            vendor_symbol=self._vendor_symbol(internal_cusip, source_app_id),
+            period=period,
+        )
+        if earliest is None:
+            return None, None
+        return earliest, int(((now or datetime.now(UTC)) - earliest) / period) + 1
 
     def find_gaps(
         self,
@@ -427,15 +490,22 @@ class PriceBarService:
         since: datetime,
         until: datetime,
     ) -> dict[datetime, object]:
+        bars = self._fetcher.fetch_bars(
+            vendor_symbol=self._vendor_symbol(internal_cusip, source_app_id),
+            period=period,
+            since=since,
+            until=until,
+        )
+        return {bar.bar_timestamp: bar for bar in bars}
+
+    def _vendor_symbol(self, internal_cusip: str, source_app_id: int) -> str:
+        """What this venue calls the instrument, or refuse to ask it anything."""
         vendor_symbol = self._instruments.resolve_internal_cusip(internal_cusip, source_app_id)
         if vendor_symbol is None:
             raise StaleBarsError(
                 f"no INST.PRODUCT_XREF mapping for {internal_cusip!r} on app {source_app_id}"
             )
-        bars = self._fetcher.fetch_bars(
-            vendor_symbol=vendor_symbol, period=period, since=since, until=until
-        )
-        return {bar.bar_timestamp: bar for bar in bars}
+        return vendor_symbol
 
     @staticmethod
     def _reject_incomplete(
