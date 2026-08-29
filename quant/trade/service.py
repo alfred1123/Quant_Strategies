@@ -14,6 +14,7 @@ from quant.schemas.deployments import (
     CreateDeploymentRequest,
     DeploymentRow,
     DeploymentStatus,
+    ScheduleOptions,
     UpdateDeploymentRequest,
 )
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
@@ -25,6 +26,7 @@ from quant.trade.dry_run import run_dry_run
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
 from quant.trade.live_apply import LiveApplyOrchestrator
 from quant.trade.registry import AdapterRegistry
+from quant.trade.schedule_policy import require_fitted_interval, schedulable_interval_ids
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +66,9 @@ class TradeService:
         user_id: str,
         req: CreateDeploymentRequest,
     ) -> DeploymentRow:
+        require_fitted_interval(
+            req.schedule_tm_interval_id, refdata=self._data_caches.refdata
+        )
         deployment_id = req.deployment_id or uuid.uuid4()
         row = self._repo.sp_ins_deployment(
             deployment_id=deployment_id,
@@ -82,6 +87,12 @@ class TradeService:
             schedule_tm_interval_id=req.schedule_tm_interval_id,
         )
         return DeploymentRow.model_validate(row)
+
+    def schedule_options(self) -> ScheduleOptions:
+        """Cadences the schedule control may offer."""
+        return ScheduleOptions(
+            tm_interval_ids=schedulable_interval_ids(self._data_caches.refdata)
+        )
 
     def get_deployment(
         self, app_user_id: UUID, deployment_id: UUID
@@ -105,6 +116,13 @@ class TradeService:
         req: UpdateDeploymentRequest,
     ) -> DeploymentRow:
         current = self.get_deployment(app_user_id, deployment_id)
+        # Only what the caller is setting, never the value already stored: a
+        # row whose cadence predates this rule must still be reachable by the
+        # kill switch, and refusing the PATCH would be refusing to disable it.
+        if "schedule_tm_interval_id" in req.model_fields_set:
+            require_fitted_interval(
+                req.schedule_tm_interval_id, refdata=self._data_caches.refdata
+            )
         row = self._repo.write_deployment(
             deployment_id=deployment_id,
             app_user_id=app_user_id,

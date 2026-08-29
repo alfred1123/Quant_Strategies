@@ -51,6 +51,15 @@ export interface UpdateDeploymentRequest {
   schedule_tm_interval_id?: number | null;
 }
 
+/**
+ * Cadences a deployment may be scheduled on — the ones whose bars strategies
+ * are actually fitted on. The schedule decides which bars the live signal is
+ * computed from, so anything else is refused by the API.
+ */
+export interface ScheduleOptions {
+  tm_interval_ids: number[];
+}
+
 export interface DryRunRequest {
   strategy_id: string;
   strategy_vid: number;

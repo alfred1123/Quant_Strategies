@@ -1,7 +1,7 @@
 import { MenuItem, Select, Stack, Typography } from '@mui/material';
 import { useMemo } from 'react';
 import { intervalLabel, useTmIntervals } from '../../api/refdata';
-import { useUpdateDeployment } from '../../api/trade';
+import { useScheduleOptions, useUpdateDeployment } from '../../api/trade';
 import type { DeploymentRow } from '../../types/trade';
 
 interface ScheduleCellProps {
@@ -22,12 +22,18 @@ interface ScheduleCellProps {
  */
 export default function ScheduleCell({ row, onError }: ScheduleCellProps) {
   const { data: intervals = [] } = useTmIntervals();
+  const { data: scheduleOptions } = useScheduleOptions();
   const update = useUpdateDeployment();
 
   const sorted = useMemo(
     () => [...intervals].sort((a, b) => a.tm_interval_id - b.tm_interval_id),
     [intervals],
   );
+
+  // Matches the API guard: a cadence the strategy was not fitted on would
+  // change which bars the signal reads, not just how often it runs.
+  const schedulableIds = scheduleOptions?.tm_interval_ids;
+  const isSchedulable = (id: number) => !schedulableIds || schedulableIds.includes(id);
 
   const currentId = row.schedule_tm_interval_id ?? null;
   const current = sorted.find((iv) => iv.tm_interval_id === currentId) ?? null;
@@ -78,7 +84,11 @@ export default function ScheduleCell({ row, onError }: ScheduleCellProps) {
       >
         <MenuItem value="">Manual</MenuItem>
         {sorted.map((iv) => (
-          <MenuItem key={iv.tm_interval_id} value={String(iv.tm_interval_id)}>
+          <MenuItem
+            key={iv.tm_interval_id}
+            value={String(iv.tm_interval_id)}
+            disabled={!isSchedulable(iv.tm_interval_id)}
+          >
             {intervalLabel(iv)}
           </MenuItem>
         ))}

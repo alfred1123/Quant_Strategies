@@ -2,6 +2,47 @@ import pytest
 import pandas as pd
 import numpy as np
 
+from quant.refdata.reader import RedisRefData
+
+#: Shaped like the Redis snapshot: PERIOD_LENGTH arrives stringified, because
+#: the publisher serialises Postgres intervals with ``json.dumps(default=str)``.
+TM_INTERVAL_ROWS = [
+    {
+        "tm_interval_id": 1,
+        "name": "DAILY",
+        "display_name": "Daily",
+        "period_length": "1 day, 0:00:00",
+    },
+    {
+        "tm_interval_id": 2,
+        "name": "1H",
+        "display_name": "Hourly",
+        "period_length": "1:00:00",
+    },
+]
+
+
+class StubRefData(RedisRefData):
+    """A real reader over a fixed snapshot — no Redis, no stubbed lookups.
+
+    Subclassed rather than mocked so tests exercise the shipped interval
+    resolution, including the string parsing of ``PERIOD_LENGTH``. A
+    ``MagicMock`` would answer every lookup with agreement, which is the
+    opposite of what a guard built on those lookups needs to be tested against.
+    """
+
+    def __init__(self, rows=None) -> None:
+        self._rows = TM_INTERVAL_ROWS if rows is None else rows
+
+    def get(self, table: str) -> list[dict]:
+        assert table == "tm_interval"
+        return self._rows
+
+
+@pytest.fixture
+def refdata_stub():
+    return StubRefData()
+
 
 def _daily_index(n, start="2020-01-01"):
     """Generate a daily DatetimeIndex for n rows."""

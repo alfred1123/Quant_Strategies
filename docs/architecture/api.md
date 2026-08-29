@@ -79,6 +79,26 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `GET` | `/api/v1/trade/deployments/{id}/events` | Required | Execution diary for one deployment. |
 | `GET` | `/api/v1/trade/deployments/{id}/transactions` | Required | Fill history for one deployment. |
 | `GET` | `/api/v1/trade/accounts/{api_credential_id}/snapshot` | Required | Live balances and open positions for one broker account. Read-only. Query `paper` (default `true`). **404** if the credential is not owned. |
+| `GET` | `/api/v1/trade/schedule-options` | Required | `tm_interval_ids` a deployment may be scheduled on — see [the cadence guard](#the-schedule-cadence-must-match-the-fitted-bars) below. |
+
+#### The schedule cadence must match the fitted bars
+
+A schedule decides more than *when* an apply runs. `LiveApplyOrchestrator`
+resolves the deployment's interval into the bar window it loads, so the cadence
+also decides **which bars the signal is computed from**. Every backtest fits on
+daily bars, so an hourly schedule would push hourly bars through daily-fitted
+parameters — which fails silently: the indicator still returns a number and the
+order still places.
+
+`POST /trade/deployments` and `PATCH /trade/deployments/{id}` therefore reject a
+`schedule_tm_interval_id` outside `schedulable_interval_ids()` with **400** and a
+message naming both cadences. `null` (manual) is always accepted. A PATCH is
+checked only on the value it *sets*, so the kill switch still reaches a row
+whose cadence predates the rule.
+
+`GET /trade/schedule-options` publishes the same set, which is how
+`DeploymentDialog` and `ScheduleCell` grey out the cadences the API would refuse
+rather than keeping their own copy of the rule.
 
 #### Broker failures — status says whether to retry
 

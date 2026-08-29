@@ -18,6 +18,7 @@ from quant.schemas.apply import ApplyReport
 from quant.schemas.deployments import (
     CreateDeploymentRequest,
     DeploymentRow,
+    ScheduleOptions,
     UpdateDeploymentRequest,
 )
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
@@ -62,6 +63,20 @@ def dry_run_deployment(
     svc: TradeService = Depends(get_trade_service),
 ) -> DryRunReport:
     return svc.dry_run(user.app_user_id, req)
+
+
+@router.get("/schedule-options", response_model=ScheduleOptions)
+def schedule_options(
+    _user: CurrentUser = Depends(require_user),
+    svc: TradeService = Depends(get_trade_service),
+) -> ScheduleOptions:
+    """Cadences a deployment may be scheduled on.
+
+    Not under ``/deployments`` because it describes the platform rather than
+    any one row — and a literal segment there would have to be declared ahead
+    of ``/deployments/{deployment_id}`` to avoid being read as an id.
+    """
+    return svc.schedule_options()
 
 
 @router.get(
