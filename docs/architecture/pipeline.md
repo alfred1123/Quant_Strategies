@@ -84,7 +84,7 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/market_data/repo.py` | `PriceBarRepo(DbGateway)` | MARKET_DATA SP wrappers (`persistent=True`) — coverage probe, range read, one-bar insert. |
 | `quant/market_data/fetcher.py` | `CcxtBarFetcher` | Paginated public-data fetch (`fetch_bars`) over ccxt's `fetch_ohlcv`. No API credentials — bars are public data. |
 | `quant/market_data/service.py` | `PriceBarService` | Freshness check, gap fill, and `read_bars()` in the same DataFrame shape `fetch_df` produces. `load_window()` composes the two for live apply and fails closed rather than signalling on an incomplete window. `find_gaps()` / `backfill()` repair continuity over an explicit range — the rolling lookback alone leaves permanent holes after a long outage — and report rather than raise. All reads scope to one `source_app_id`. |
-| `quant/trade/bar_source.py` | `PriceBarServiceFactory` | Binds a deployment's `APP_ID` to the venue its bars come from; one service per broker over a shared repo connection. |
+| `quant/trade/bar_source.py` | `PriceBarServiceFactory`, `resolve_signal_source` | Binds a deployment's `APP_ID` to the venue its bars come from; one service per broker over a shared repo connection. `resolve_signal_source` states the venue-decides rule (#45) in one place so the live apply and the dry run cannot disagree about which series a signal came from. |
 | `quant/shared/intervals.py` | `parse_period`, `floor_to_period`, `last_closed_bar`, `next_run_at`, `ccxt_timeframe` | Interval arithmetic from `REFDATA.TM_INTERVAL.PERIOD_LENGTH`; shared by price bars and the scheduler. Pure — the lookup is `RedisRefData.get_interval_period`. |
 | `quant/strategy/indicators.py` | `TechnicalAnalysis` | Calculate indicator values on the `factor` column. |
 | `quant/strategy/signals.py` | `SignalDirection` | Generate position array `{-1, 0, 1}` from indicator vs threshold. |
@@ -102,7 +102,8 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/trade/registry.py` | `AdapterRegistry` | Resolves `APP_ID` → ccxt/Futu adapter. |
 | `quant/trade/scheduler/sweep.py` | `ScheduleSweeper` | Hourly platform tick — one pass per interval. |
 | `quant/trade/scheduler/tick.py` | `ScheduleTickRunner` | Apply one due deployment per interval pass. |
-| `quant/trade/scheduler/warm.py` | `BarWarmer` | Pre-fetch bars for scheduled instruments. |
+| `quant/market_data/warm.py` | `BarWarmer`, `InstrumentSource` | Pre-fetch bars for every series a deployment or a subscription wants. |
+| `quant/market_data/subscriptions.py` | `BarSubscriptionRepo`, `BarSubscriptionService` | Capture requests with no deployment behind them, plus coverage and backfill. |
 | `quant/strategy/live_service.py` | `bars_loader`, `load_window` | Live signal computation from `MARKET_DATA.PRICE_BAR`. |
 | `quant/promotion/evaluate.py` | promotion gates | HARD/SOFT metric evaluation for auto-promote. |
 | `quant/promotion/repo.py` | `PromotionRepo` | `CALL BT.SP_INS_PROMOTION` via `DbGateway`. |

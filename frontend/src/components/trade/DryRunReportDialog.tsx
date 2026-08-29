@@ -34,6 +34,16 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+/**
+ * Name the series the signal came from. The live apply reads the same one, so
+ * this is the line that answers "is this preview actually about the order I am
+ * going to place?" — a question the report could not previously be asked.
+ */
+function barSourceLabel(barSource: string): string {
+  const venue = barSource.startsWith('price_bar:') ? barSource.slice(10) : null;
+  return venue ? `${venue} exchange bars` : 'Market data provider';
+}
+
 export default function DryRunReportDialog({ report, onClose }: Props) {
   if (!report) return null;
   return (
@@ -58,6 +68,7 @@ export default function DryRunReportDialog({ report, onClose }: Props) {
             }
           />
           <Row label="Position qty" value={report.position_qty} />
+          <Row label="Price source" value={barSourceLabel(report.bar_source)} />
           <Row label="Data as of" value={report.data_as_of} />
           {report.notional != null && (
             <Row

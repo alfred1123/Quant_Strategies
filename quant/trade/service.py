@@ -50,6 +50,7 @@ class TradeService:
         self._credential_repo = credential_repo
         self._adapter_registry = adapter_registry
         self._data_caches = data_caches
+        self._price_bars = price_bars
         self._live_apply = LiveApplyOrchestrator(
             repo,
             bt,
@@ -204,6 +205,7 @@ class TradeService:
             credential_repo=self._credential_repo,
             adapter_registry=self._adapter_registry,
             data_caches=self._data_caches,
+            price_bars=self._price_bars,
         )
 
     def account_snapshot(

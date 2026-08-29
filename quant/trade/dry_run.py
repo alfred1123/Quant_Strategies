@@ -12,6 +12,7 @@ from quant.refdata.bundle import DataCaches
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
 from quant.strategy.live_service import LiveEvaluationError, compute_latest_position
 from quant.trade.adapters.base import TradeAdapter
+from quant.trade.bar_source import PriceBarServiceFactory, resolve_signal_source
 from quant.trade.db_repo import TradeRepo
 from quant.trade.errors import AdapterNotFoundError, TradeValidationError
 from quant.trade.registry import AdapterRegistry
@@ -29,8 +30,19 @@ def run_dry_run(
     credential_repo: ApiCredentialRepo,
     adapter_registry: AdapterRegistry,
     data_caches: DataCaches,
+    price_bars: PriceBarServiceFactory | None = None,
 ) -> DryRunReport:
-    """Validate broker + mapping and return intended action without placing orders."""
+    """Validate broker + mapping and return intended action without placing orders.
+
+    Prices off the same series the live apply will use. It did not always: the
+    dry run took the provider path unconditionally, so a preview could report
+    HOLD off one venue's bars while the apply that followed placed a BUY off
+    another's. A dry run whose numbers do not match the thing it previews is
+    worse than none, because it is trusted.
+
+    There is no schedule yet at dry-run time, so ``resolve_signal_source``
+    falls through to daily — the cadence a deployment is allowed to run on.
+    """
     strategy_row = repo.validate_dry_run(
         app_user_id=app_user_id,
         strategy_id=req.strategy_id,
@@ -55,11 +67,19 @@ def run_dry_run(
         )
 
     result_payload = bt.fetch_result_payload(req.strategy_id, req.strategy_vid)
+    bar_loader, bar_source = resolve_signal_source(
+        app_id=req.app_id,
+        schedule_tm_interval_id=None,
+        data_caches=data_caches,
+        price_bars=price_bars,
+        what=f"dry run of strategy {req.strategy_id}",
+    )
     try:
         position, data_as_of = compute_latest_position(
             strategy_row["config_json"],
             result_payload=result_payload,
             caches=data_caches,
+            bar_loader=bar_loader,
         )
     except LiveEvaluationError as exc:
         raise TradeValidationError(str(exc)) from exc
@@ -78,6 +98,7 @@ def run_dry_run(
             strategy_row=strategy_row,
             signal=position,
             data_as_of=data_as_of,
+            bar_source=bar_source,
         )
 
 
@@ -88,6 +109,7 @@ def _broker_report(
     strategy_row: dict,
     signal: float,
     data_as_of: str,
+    bar_source: str,
 ) -> DryRunReport:
     """Build dry-run report; caller must manage adapter lifecycle via context manager."""
     vendor_symbol = adapter.validate_for_dry_run(req.internal_cusip, req.app_id)
@@ -111,4 +133,5 @@ def _broker_report(
         position_qty=position_qty,
         data_as_of=data_as_of,
         notional=notional,
+        bar_source=bar_source,
     )

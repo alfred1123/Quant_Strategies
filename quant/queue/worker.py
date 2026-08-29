@@ -36,6 +36,7 @@ from quant.strategy.backtest_service import run_optimize
 from quant.promotion.repo import PromotionRepo
 from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
+from quant.trade.bar_source import PriceBarServiceFactory
 from quant.shared.util import utc_now_iso
 
 logger = logging.getLogger(__name__)
@@ -104,6 +105,11 @@ class BacktestWorker:
                 refdata,
                 inst_cache=caches.instrument_cache,
                 bt_cache=caches.backtest_cache,
+                # A queued job may name an exchange as its data source, in
+                # which case the series comes from MARKET_DATA.PRICE_BAR. The
+                # API builds this once at startup; a worker process is
+                # single-job and short-lived, so it builds its own.
+                bar_services=PriceBarServiceFactory(self._db_url, caches),
             )
         except Exception:
             err = traceback.format_exc()

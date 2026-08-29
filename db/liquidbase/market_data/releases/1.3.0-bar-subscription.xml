@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      MARKET_DATA.BAR_SUBSCRIPTION — capture bars for a product before deciding
+      to trade it. See docs/design/market-data-capture.md.
+
+      RELEASED: context carries "prod-deploy", so a push to main queues these
+      four changesets for the production migrate job (behind its required
+      reviewer). Blast radius is additive only — one new table and three new
+      procedures in MARKET_DATA. No existing procedure body is replaced.
+    -->
+
+    <changeSet id="1.3.0-001-bar-subscription" author="alfcheun" context="market_data,prod-deploy">
+        <comment>MARKET_DATA.BAR_SUBSCRIPTION — soft-versioned, platform-wide capture requests</comment>
+        <sqlFile path="../tables/BAR_SUBSCRIPTION.sql" relativeToChangelogFile="true"
+                 splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql>DROP TABLE IF EXISTS MARKET_DATA.BAR_SUBSCRIPTION;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.3.0-002-sp-ins-bar-subscription" author="alfcheun" context="market_data,prod-deploy" runOnChange="true">
+        <comment>SP_INS_BAR_SUBSCRIPTION — create, enable, disable, retarget</comment>
+        <sqlFile path="../procedures/SP_INS_BAR_SUBSCRIPTION.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback>
+            <sql>
+                DROP PROCEDURE IF EXISTS MARKET_DATA.SP_INS_BAR_SUBSCRIPTION(
+                    UUID, TEXT, INTEGER, INTEGER, CHAR(1), TIMESTAMPTZ, TEXT,
+                    OUT TEXT, OUT TEXT, OUT TEXT
+                );
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.3.0-003-sp-get-bar-subscription" author="alfcheun" context="market_data,prod-deploy" runOnChange="true">
+        <comment>SP_GET_BAR_SUBSCRIPTION — current rows, for the UI</comment>
+        <sqlFile path="../procedures/SP_GET_BAR_SUBSCRIPTION.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback>
+            <sql>
+                DROP PROCEDURE IF EXISTS MARKET_DATA.SP_GET_BAR_SUBSCRIPTION(
+                    UUID,
+                    OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+                );
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.3.0-004-sp-get-active-bar-subscriptions" author="alfcheun" context="market_data,prod-deploy" runOnChange="true">
+        <comment>SP_GET_ACTIVE_BAR_SUBSCRIPTIONS — enabled series, for the warmer</comment>
+        <sqlFile path="../procedures/SP_GET_ACTIVE_BAR_SUBSCRIPTIONS.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback>
+            <sql>
+                DROP PROCEDURE IF EXISTS MARKET_DATA.SP_GET_ACTIVE_BAR_SUBSCRIPTIONS(
+                    OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+                );
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

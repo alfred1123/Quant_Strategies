@@ -22,6 +22,7 @@ import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Protocol
 
 import pandas as pd
 
@@ -80,6 +81,19 @@ class BackfillResult:
     @property
     def oldest_unfilled(self) -> datetime | None:
         return self.unfilled[0] if self.unfilled else None
+
+
+class BarServiceFactory(Protocol):
+    """Binds a ``REFDATA.APP`` id to the price bars that venue serves.
+
+    Declared here rather than imported so that callers in this package can take
+    the factory without depending on where it is built. It is assembled in
+    ``quant/trade/bar_source.py``, because choosing a venue for an ``app_id``
+    means reading the broker presets, and market data must not learn about
+    brokers to fetch a public candle.
+    """
+
+    def for_app(self, app_id: int) -> PriceBarService: ...
 
 
 class PriceBarService:
@@ -292,6 +306,24 @@ class PriceBarService:
             start=start, end=end, expected=expected,
             missing=len(missing), inserted=inserted, unfilled=unfilled,
         )
+
+    def stored_bounds(
+        self, *, internal_cusip: str, tm_interval_id: int, source_app_id: int
+    ) -> tuple[datetime, datetime] | None:
+        """Oldest and newest stored bar, or ``None`` when nothing is stored.
+
+        Two index probes. What "have I captured enough to backtest this?"
+        starts with — :meth:`find_gaps` over these bounds finishes it, and
+        together they are cheaper than counting rows.
+        """
+        coverage = self._repo.get_coverage(
+            internal_cusip=internal_cusip,
+            tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
+        )
+        if coverage is None:
+            return None
+        return coverage["min_bar_timestamp"], coverage["max_bar_timestamp"]
 
     def find_gaps(
         self,

@@ -84,6 +84,8 @@ export interface DryRunReport {
   position_qty: number;
   data_as_of: string;
   notional: number | null;
+  /** `price_bar:<venue>` or `provider` — the series the signal was computed from. */
+  bar_source: string;
 }
 
 export interface ApplyReport {

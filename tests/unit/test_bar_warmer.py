@@ -1,4 +1,4 @@
-"""Unit tests for :mod:`quant.trade.scheduler.warm` — mocked repo, no DB, no ccxt."""
+"""Unit tests for :mod:`quant.market_data.warm` — mocked sources, no DB, no ccxt."""
 
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from quant.market_data.service import SyncResult
-from quant.trade.scheduler.warm import DEFAULT_SETTLE_S, DEFAULT_WARM_LOOKBACK, BarWarmer
+from quant.market_data.warm import DEFAULT_SETTLE_S, DEFAULT_WARM_LOOKBACK, BarWarmer
 
 FIXED_NOW = datetime(2026, 8, 18, 9, 0, tzinfo=UTC)
 
@@ -24,6 +24,16 @@ def _row(tm_interval_id=DAILY, internal_cusip="btcusdt.crypto", app_id=BYBIT):
     }
 
 
+class _Source:
+    """An ``InstrumentSource`` over a fixed list of rows."""
+
+    def __init__(self, rows):
+        self.rows = list(rows)
+
+    def instruments(self):
+        return self.rows
+
+
 def _sync_result(instruments=1, inserted=1, failures=None):
     return SyncResult(
         instruments=instruments, inserted=inserted, failures=failures or {}
@@ -31,8 +41,8 @@ def _sync_result(instruments=1, inserted=1, failures=None):
 
 
 @pytest.fixture
-def repo():
-    return MagicMock()
+def source():
+    return _Source([])
 
 
 @pytest.fixture
@@ -55,33 +65,71 @@ def factory():
 def no_sleep(monkeypatch):
     """Never actually wait in tests; record the requested delay instead."""
     calls: list[float] = []
-    monkeypatch.setattr(
-        "quant.trade.scheduler.warm.time.sleep", lambda s: calls.append(s)
-    )
+    monkeypatch.setattr("quant.market_data.warm.time.sleep", lambda s: calls.append(s))
     return calls
 
 
-class TestNothingScheduled:
-    def test_empty_report_when_no_rows(self, repo, factory):
-        repo.sp_get_scheduled_instruments.return_value = []
-
-        report = BarWarmer(repo, factory).run(now=FIXED_NOW)
+class TestNothingWanted:
+    def test_empty_report_when_no_rows(self, source, factory):
+        report = BarWarmer([source], factory).run(now=FIXED_NOW)
 
         assert report.results == []
         assert (report.instruments, report.inserted, report.failed) == (0, 0, 0)
         factory.for_app.assert_not_called()
 
+    def test_no_sources_at_all_is_not_an_error(self, factory):
+        assert BarWarmer([], factory).run(now=FIXED_NOW).results == []
+
+
+class TestUnionOfSources:
+    """Deployments and subscriptions are two answers to one question."""
+
+    def test_both_sources_contribute(self, factory):
+        deployments = _Source([_row(DAILY, "btcusdt.crypto", BYBIT)])
+        subscriptions = _Source([_row(HOURLY, "ethusdt.crypto", BYBIT)])
+
+        report = BarWarmer([deployments, subscriptions], factory).run(now=FIXED_NOW)
+
+        assert {(r.tm_interval_id, r.app_id) for r in report.results} == {
+            (DAILY, BYBIT),
+            (HOURLY, BYBIT),
+        }
+
+    def test_a_series_both_want_costs_one_fetch(self, factory):
+        """The overlap is folded by ``sync``, not paid for twice."""
+        rows = [_row(DAILY, "btcusdt.crypto", BYBIT)]
+        warmer = BarWarmer([_Source(rows), _Source(list(rows))], factory)
+
+        warmer.run(now=FIXED_NOW)
+
+        service = factory.services[BYBIT]
+        service.sync.assert_called_once()
+        # Both copies are handed to sync, which dedupes — the warmer does not
+        # try to guess which source's row is the real one.
+        assert service.sync.call_args.kwargs["instruments"] == [
+            ("btcusdt.crypto", BYBIT),
+            ("btcusdt.crypto", BYBIT),
+        ]
+
+    def test_a_failing_source_is_not_swallowed(self, factory):
+        """Unlike a failing venue: an unreadable source is a bug, not weather."""
+        broken = MagicMock()
+        broken.instruments.side_effect = RuntimeError("procedure missing")
+
+        with pytest.raises(RuntimeError, match="procedure missing"):
+            BarWarmer([broken], factory).run(now=FIXED_NOW)
+
 
 class TestGrouping:
-    def test_one_sync_per_interval_and_venue(self, repo, factory):
-        repo.sp_get_scheduled_instruments.return_value = [
+    def test_one_sync_per_interval_and_venue(self, source, factory):
+        source.rows = [
             _row(DAILY, "btcusdt.crypto", BYBIT),
             _row(DAILY, "ethusdt.crypto", BYBIT),
             _row(HOURLY, "btcusdt.crypto", BYBIT),
             _row(DAILY, "btcusdt.crypto", BINANCE),
         ]
 
-        report = BarWarmer(repo, factory).run(now=FIXED_NOW)
+        report = BarWarmer([source], factory).run(now=FIXED_NOW)
 
         # (DAILY, Bybit), (DAILY, Binance), (HOURLY, Bybit) — same instrument on
         # two venues is two groups, because they are separate order books.
@@ -92,13 +140,13 @@ class TestGrouping:
             (HOURLY, BYBIT),
         }
 
-    def test_instruments_of_one_group_go_in_a_single_call(self, repo, factory):
-        repo.sp_get_scheduled_instruments.return_value = [
+    def test_instruments_of_one_group_go_in_a_single_call(self, source, factory):
+        source.rows = [
             _row(DAILY, "btcusdt.crypto", BYBIT),
             _row(DAILY, "ethusdt.crypto", BYBIT),
         ]
 
-        BarWarmer(repo, factory).run(now=FIXED_NOW)
+        BarWarmer([source], factory).run(now=FIXED_NOW)
 
         service = factory.services[BYBIT]
         service.sync.assert_called_once()
@@ -109,19 +157,19 @@ class TestGrouping:
             ("ethusdt.crypto", BYBIT),
         ]
 
-    def test_passes_lookback_and_now_through(self, repo, factory):
-        repo.sp_get_scheduled_instruments.return_value = [_row()]
+    def test_passes_lookback_and_now_through(self, source, factory):
+        source.rows = [_row()]
 
-        BarWarmer(repo, factory, lookback=123).run(now=FIXED_NOW)
+        BarWarmer([source], factory, lookback=123).run(now=FIXED_NOW)
 
         kwargs = factory.services[BYBIT].sync.call_args.kwargs
         assert kwargs["lookback"] == 123
         assert kwargs["now"] == FIXED_NOW
 
-    def test_default_lookback_is_the_live_rule(self, repo, factory):
-        repo.sp_get_scheduled_instruments.return_value = [_row()]
+    def test_default_lookback_is_the_live_rule(self, source, factory):
+        source.rows = [_row()]
 
-        BarWarmer(repo, factory).run(now=FIXED_NOW)
+        BarWarmer([source], factory).run(now=FIXED_NOW)
 
         assert factory.services[BYBIT].sync.call_args.kwargs["lookback"] == (
             DEFAULT_WARM_LOOKBACK
@@ -129,8 +177,8 @@ class TestGrouping:
 
 
 class TestTotals:
-    def test_sums_across_groups(self, repo, factory):
-        repo.sp_get_scheduled_instruments.return_value = [
+    def test_sums_across_groups(self, source, factory):
+        source.rows = [
             _row(DAILY, "btcusdt.crypto", BYBIT),
             _row(HOURLY, "btcusdt.crypto", BYBIT),
         ]
@@ -141,7 +189,7 @@ class TestTotals:
         service = factory.for_app(BYBIT)
         service.sync.side_effect = sync
 
-        report = BarWarmer(repo, factory).run(now=FIXED_NOW)
+        report = BarWarmer([source], factory).run(now=FIXED_NOW)
 
         assert report.instruments == 4
         assert report.inserted == 10
@@ -149,20 +197,18 @@ class TestTotals:
 
 
 class TestFailuresAreAbsorbed:
-    def test_unmapped_venue_is_reported_not_raised(self, repo, factory):
-        repo.sp_get_scheduled_instruments.return_value = [
-            _row(DAILY, "btcusdt.crypto", BINANCE),
-        ]
+    def test_unmapped_venue_is_reported_not_raised(self, source, factory):
+        source.rows = [_row(DAILY, "btcusdt.crypto", BINANCE)]
         factory.for_app.side_effect = RuntimeError("no market data venue")
 
-        report = BarWarmer(repo, factory).run(now=FIXED_NOW)
+        report = BarWarmer([source], factory).run(now=FIXED_NOW)
 
         assert report.inserted == 0
         assert report.failed == 1
         assert "no market data venue" in report.results[0].failures["btcusdt.crypto"]
 
-    def test_one_bad_venue_does_not_stop_the_others(self, repo, factory):
-        repo.sp_get_scheduled_instruments.return_value = [
+    def test_one_bad_venue_does_not_stop_the_others(self, source, factory):
+        source.rows = [
             _row(DAILY, "btcusdt.crypto", BYBIT),
             _row(DAILY, "ethusdt.crypto", BINANCE),
         ]
@@ -176,7 +222,7 @@ class TestFailuresAreAbsorbed:
 
         factory.for_app.side_effect = for_app
 
-        report = BarWarmer(repo, factory).run(now=FIXED_NOW)
+        report = BarWarmer([source], factory).run(now=FIXED_NOW)
 
         assert report.inserted == 7
         assert report.failed == 1
@@ -189,20 +235,20 @@ class TestBoundarySettle:
         assert DEFAULT_SETTLE_S == 10.0
 
     def test_sleeps_then_reads_the_clock_when_now_is_not_given(
-        self, repo, factory, no_sleep
+        self, source, factory, no_sleep
     ):
-        repo.sp_get_scheduled_instruments.return_value = [_row()]
+        source.rows = [_row()]
         before = datetime.now(UTC)
 
-        BarWarmer(repo, factory, settle_s=2.0).run()
+        BarWarmer([source], factory, settle_s=2.0).run()
 
         assert no_sleep == [2.0]
         used = factory.services[BYBIT].sync.call_args.kwargs["now"]
         assert used is not None and used >= before
 
-    def test_injected_now_does_not_wait(self, repo, factory, no_sleep):
-        repo.sp_get_scheduled_instruments.return_value = [_row()]
+    def test_injected_now_does_not_wait(self, source, factory, no_sleep):
+        source.rows = [_row()]
 
-        BarWarmer(repo, factory).run(now=FIXED_NOW)
+        BarWarmer([source], factory).run(now=FIXED_NOW)
 
         assert no_sleep == []

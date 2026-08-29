@@ -12,7 +12,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `PROMOTION_METRIC`, …) + `SP_GET_ENUM` procedure for cache loading. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `REFDATA.PROMOTION_METRIC` stores auto-promote rules (HARD gates + SOFT comparison metrics). |
 | `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `PROMOTION`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert/get procedures |
 | `TRADE` | Live trading: `DEPLOYMENT`, `DEPLOYMENT_SCHEDULE_STATUS`, `EXECUTION_EVENT`, `TRANSACTION` + SPs (no `INTENT` — decision #38) |
-| `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows) — see [Scheduler & Price Bars](../design/scheduler-price-bars.md) |
+| `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows) — see [Scheduler & Price Bars](../design/scheduler-price-bars.md) — plus `BAR_SUBSCRIPTION`, standing capture requests with no deployment behind them ([Market data capture](../design/market-data-capture.md)) |
 | `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) — `REFDATA.TICKER_MAPPING` has been dropped |
 
 ## Conventions
@@ -30,7 +30,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `<TABLE>_ID` | `STRATEGY_ID` | Primary key |
 | `<TABLE>_VID` | `STRATEGY_VID` | Soft-version ID |
 | `<TABLE>_NM` | `STRATEGY_NM` | Name column |
-| `USER_ID` | — | Audit: who created |
+| `USER_ID` | — | Audit: who created. One exception — `MARKET_DATA.BAR_SUBSCRIPTION` omits it, because the procedure logs the caller to `CORE_ADMIN.LOG_PROC_DETAIL` and a row copy would be a second record of the same fact ([decision #50](../decisions.md)) |
 | `CREATED_AT` | — | Audit: when created (`TIMESTAMPTZ`) |
 | `IS_CURRENT_IND` | — | Soft-versioning flag (`CHAR(1)` Y/N) — **deprecated** in `BT.STRATEGY`, replaced by `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` |
 | `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` | — | Transaction-time window (`TIMESTAMPTZ`). Active row: `TRANSACT_TO_TS = '9999-12-31'` |
@@ -301,6 +301,9 @@ A procedure that logs itself declares `V_LOG_START TIMESTAMPTZ := clock_timestam
 | `SP_INS_PRICE_BAR` | `MARKET_DATA` | Insert one OHLCV bar (one row per call) |
 | `SP_GET_PRICE_BAR` | `MARKET_DATA` | Range read by `(INTERNAL_CUSIP, TM_INTERVAL_ID, SOURCE_APP_ID, start, end)` |
 | `SP_GET_PRICE_BAR_COVERAGE` | `MARKET_DATA` | `MIN`/`MAX` timestamps via index `LIMIT 1` probes |
+| `SP_INS_BAR_SUBSCRIPTION` | `MARKET_DATA` | Version a capture request — create, enable, disable, retarget |
+| `SP_GET_BAR_SUBSCRIPTION` | `MARKET_DATA` | Current subscriptions, for the Market data page (not user-scoped — bars are shared) |
+| `SP_GET_ACTIVE_BAR_SUBSCRIPTIONS` | `MARKET_DATA` | Enabled series for the bar warmer, shaped like `TRADE.SP_GET_SCHEDULED_INSTRUMENTS` |
 
 ### Reading a result without the queue
 

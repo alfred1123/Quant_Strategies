@@ -9,6 +9,10 @@
 #   ./scripts/dbctl.sh status            # show local cluster + DB state
 #   ./scripts/dbctl.sh psql              # open psql on local quantdb
 #
+# restore and reset need the local DB to themselves, so both STOP THE DEV STACK
+# (backend, frontend, worker) and evict any remaining sessions first — see
+# claim_local_db. Restart it afterwards with ./scripts/appctl.sh dev start.
+#
 # Prerequisites:
 #   - SSM tunnel running: ./scripts/appctl.sh dev tunnel start
 #   - Local PG17 server running: sudo systemctl start postgresql
@@ -83,6 +87,48 @@ latest_dump() {
   ls -t "$DUMP_DIR"/quantdb_*.dump 2>/dev/null | head -1
 }
 
+local_psql() {
+  PGPASSWORD="$LOCAL_PASSWORD" psql \
+    -h "$LOCAL_HOST" -p "$LOCAL_PORT" -U "$LOCAL_USER" -d "$LOCAL_DB" "$@"
+}
+
+# Sessions on the local DB other than our own. Any failure counts as zero: if
+# the DB does not exist yet (reset) there is nothing to evict.
+local_backends() {
+  local_psql -tAc \
+    "SELECT count(*) FROM pg_stat_activity
+      WHERE datname = '$LOCAL_DB' AND pid <> pg_backend_pid();" 2>/dev/null \
+    | tr -d '[:space:]' || true
+}
+
+# Take the local DB for exclusive use before rewriting it.
+#
+# pg_restore --clean needs ACCESS EXCLUSIVE on every table it drops, and
+# DROP DATABASE needs the database empty of sessions. The dev API holds
+# persistent connections (two cache classes, by design), so one of them sitting
+# idle-in-transaction is enough to make a restore queue behind it **forever** —
+# no error, no output, just a hang that looks like slowness. That cost nine
+# minutes once; clearing the way is part of the job, not a thing to remember.
+claim_local_db() {
+  local n; n=$(local_backends)
+  [[ -z "$n" || "$n" == "0" ]] && return 0
+
+  info "$n other session(s) hold $LOCAL_DB — stopping the dev stack first."
+  # Terminating alone would only open a race: the app reconnects on its next
+  # query and can re-take a lock halfway through the restore. Stop the owners,
+  # then sweep up whatever else is left (stray psql, an editor's connection).
+  DB_TARGET=local "$ROOT_DIR/scripts/appctl.sh" dev stop 2>&1 | sed 's/^/  /' || true
+
+  local_psql -q -c \
+    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+      WHERE datname = '$LOCAL_DB' AND pid <> pg_backend_pid();" >/dev/null 2>&1 || true
+
+  n=$(local_backends)
+  [[ -z "$n" || "$n" == "0" ]] \
+    || error "$n session(s) still hold $LOCAL_DB. Close them and retry — restoring now would hang, not fail."
+  info "$LOCAL_DB is free. Restart the app afterwards with: ./scripts/appctl.sh dev start"
+}
+
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
@@ -107,6 +153,7 @@ cmd_restore() {
   local dumpfile="${1:-$(latest_dump)}"
   [[ -n "$dumpfile" ]] || error "No dump file found in $DUMP_DIR. Run: ./scripts/dbctl.sh dump"
   [[ -f "$dumpfile" ]] || error "File not found: $dumpfile"
+  claim_local_db
 
   info "Restoring $dumpfile → local $LOCAL_DB"
   export PGPASSWORD="$LOCAL_PASSWORD"
@@ -145,6 +192,7 @@ SQL
 
 cmd_reset() {
   require_local_pg
+  claim_local_db
   info "Dropping and recreating local '$LOCAL_DB' owned by '$LOCAL_USER'..."
   sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
 DROP DATABASE IF EXISTS $LOCAL_DB;

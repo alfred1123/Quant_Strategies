@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from quant.market_data.service import StaleBarsError
+from quant.market_data.subscriptions import SubscriptionError
 from quant.shared.db import ProcedureError
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
 
@@ -88,8 +89,26 @@ async def handle_stale_bars(request: Request, exc: StaleBarsError) -> JSONRespon
     )
 
 
+async def handle_subscription_error(
+    request: Request,
+    exc: SubscriptionError,
+) -> JSONResponse:
+    """400 — the series asked for cannot be captured as described.
+
+    An unmapped symbol or a venue this platform cannot read bars from is the
+    caller's to fix, and saying so on write is the whole point of validating
+    here: left to the warmer it would be a silent failure repeated every tick.
+    """
+    _log(request, status.HTTP_400_BAD_REQUEST, exc)
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": str(exc)},
+    )
+
+
 def register(app: FastAPI) -> None:
     app.add_exception_handler(ProcedureError, handle_procedure_error)
     app.add_exception_handler(TradeValidationError, handle_trade_validation_error)
     app.add_exception_handler(DeploymentNotFound, handle_deployment_not_found)
     app.add_exception_handler(StaleBarsError, handle_stale_bars)
+    app.add_exception_handler(SubscriptionError, handle_subscription_error)

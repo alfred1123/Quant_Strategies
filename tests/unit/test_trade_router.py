@@ -388,6 +388,7 @@ class TestDryRunDeployment:
             position_qty=0.0,
             data_as_of="2024-06-01",
             notional=600.0,
+            bar_source="price_bar:bybit",
         )
         svc.dry_run.return_value = report
 

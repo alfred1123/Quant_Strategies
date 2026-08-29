@@ -44,3 +44,8 @@ class DryRunReport(BaseModel):
     position_qty: float
     data_as_of: str
     notional: float | None = None
+    #: Which price series the signal was computed from — ``price_bar:<venue>``
+    #: or ``provider``. Shown in the report because a dry run is only a preview
+    #: of the live apply if both read the same bars, and the reader cannot
+    #: check that unless the source is stated.
+    bar_source: str

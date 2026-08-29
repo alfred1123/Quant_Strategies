@@ -33,6 +33,11 @@ DECL_RE = re.compile(
 def _callers() -> list[Path]:
     """Procedure and function bodies that write an audit log entry.
 
+    Detected by an actual ``CALL``, not by the name appearing anywhere in the
+    file: a table DDL whose comment explains *where* its audit trail is written
+    mentions the procedure without invoking it, and matching prose would demand
+    a ``V_LOG_START`` of a file that has no body to put one in.
+
     Frozen files are excluded: they are superseded bodies that no deploy
     re-applies, so retrofitting the timing fix into them would change nothing
     in the database while breaking the checksum of the archived changeset that
@@ -42,7 +47,7 @@ def _callers() -> list[Path]:
         p
         for p in LB_ROOT.rglob("*.sql")
         if p != LOGGER_SQL
-        and "CORE_INS_LOG_PROC" in p.read_text()
+        and CALL_RE.search(p.read_text())
         and not is_frozen(p)
     )
 

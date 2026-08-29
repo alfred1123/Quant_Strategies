@@ -326,7 +326,7 @@ class TestSignalDataSource:
     """The venue decides the series: exchange bars whenever one exists,
     provider only for brokers without a market-data venue."""
 
-    @patch("quant.trade.live_apply.exchange_id_for_app", return_value=None)
+    @patch("quant.trade.bar_source.exchange_id_for_app", return_value=None)
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
     def test_venue_less_broker_uses_the_provider_path(
         self, mock_signal, _mock_venue, orchestrator
@@ -341,7 +341,7 @@ class TestSignalDataSource:
         assert mock_signal.call_args.kwargs["bar_loader"] is None
         assert source == "provider"
 
-    @patch("quant.trade.live_apply.exchange_id_for_app", return_value="bybit")
+    @patch("quant.trade.bar_source.exchange_id_for_app", return_value="bybit")
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
     def test_manual_deployment_on_a_venue_defaults_to_daily_exchange_bars(
         self, mock_signal, _mock_venue, orchestrator
@@ -368,7 +368,7 @@ class TestSignalDataSource:
             "btcusdt.crypto", 120, tm_interval_id=1, source_app_id=34
         )
 
-    @patch("quant.trade.live_apply.exchange_id_for_app", return_value="bybit")
+    @patch("quant.trade.bar_source.exchange_id_for_app", return_value="bybit")
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
     def test_scheduled_deployment_names_the_venue_it_priced_from(
         self, mock_signal, _mock_venue, orchestrator
@@ -380,7 +380,7 @@ class TestSignalDataSource:
 
         assert source == "price_bar:bybit"
 
-    @patch("quant.trade.live_apply.exchange_id_for_app", return_value="bybit")
+    @patch("quant.trade.bar_source.exchange_id_for_app", return_value="bybit")
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
     def test_scheduled_deployment_binds_its_interval_and_broker(
         self, mock_signal, _mock_venue, orchestrator
@@ -400,7 +400,7 @@ class TestSignalDataSource:
             "btcusdt.crypto", 120, tm_interval_id=2, source_app_id=34
         )
 
-    @patch("quant.trade.live_apply.exchange_id_for_app", return_value="bybit")
+    @patch("quant.trade.bar_source.exchange_id_for_app", return_value="bybit")
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
     def test_venue_without_a_bar_source_refuses(
         self, mock_signal, _mock_venue, orchestrator

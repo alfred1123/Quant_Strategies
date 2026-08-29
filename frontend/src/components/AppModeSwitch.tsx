@@ -1,18 +1,20 @@
 import { Box, ButtonBase } from '@mui/material';
 import { Link as RouterLink } from 'react-router';
 
-export type AppMode = 'backtest' | 'trade';
+export type AppMode = 'backtest' | 'trade' | 'market-data';
 
 interface AppModeSwitchProps {
   mode: AppMode;
 }
 
+// Ordered the way the work runs: capture the bars, fit on them, then trade.
 const SEGMENTS: { mode: AppMode; to: string; label: string }[] = [
+  { mode: 'market-data', to: '/market-data', label: 'Market data' },
   { mode: 'backtest', to: '/backtest', label: 'Backtest' },
   { mode: 'trade', to: '/trade', label: 'Trade' },
 ];
 
-/** Segmented app-mode control — Backtest vs Trade. */
+/** Segmented app-mode control — Market data, Backtest and Trade. */
 export default function AppModeSwitch({ mode }: AppModeSwitchProps) {
   return (
     <Box

@@ -1,9 +1,17 @@
 # Market data capture — bars for products you don't trade
 
-**Status: design for review, not built.** No DDL, Python or UI is committed for
-this. It exists because the platform can only collect bars for instruments a
-strategy is already deployed against, and the decision that made that true was
-answering a different question.
+**Status: built.** All of §11 is committed — `MARKET_DATA.BAR_SUBSCRIPTION` and
+its three procedures, the subscription repo and `InstrumentSource` union, the API
+routes, the Market data page, and the backtest seam (§7) that makes the captured
+bars usable for the decision that motivated capturing them. Recorded as
+[decision #50](../decisions.md) and [#51](../decisions.md).
+
+The DDL is **staged, not released**: `1.3.0-bar-subscription.xml` carries
+`context="market_data"` without `prod-deploy`, so a push to `main` does not
+queue it for the production migrate job.
+
+One decision here was **reversed during implementation**: subscriptions are
+platform-wide rather than per user. §3.2 records both sides and which won.
 
 **Parent:** [Scheduler & Price Bars](scheduler-price-bars.md) §3.2
 **Related:** [Separate Underlying & Cache](separate-underlying.md), [Backtest API](../archive/backtest-api.md), [Alternative Data Sources](alt-data-sources.md)
@@ -60,21 +68,45 @@ subscribing to the other.
 That the triple matches `TRADE.SP_GET_SCHEDULED_INSTRUMENTS`' output shape is what
 makes the union in §4 trivial rather than a translation layer.
 
-### 3.2 Rows are per user; the warm is not
+### 3.2 One row per series — a subscription has no owner
 
-Bars are shared facts — one row per `(cusip, interval, venue, timestamp)` — so two
-users subscribing to the same series must produce **one** fetch, not two. But the
-subscription is a *request*, and requests belong to people:
+**Reversed from the original proposal.** This section first argued for one row
+per user, so that unsubscribing would remove only your own request:
 
 | Model | Consequence |
 |---|---|
-| One platform-wide row, `USER_ID` as audit | User A unsubscribing silently stops User B's capture |
-| **One row per user, warmer reads `DISTINCT`** | Unsubscribing removes only your request; the series stays warm while anyone wants it |
+| ~~One row per user, warmer reads `DISTINCT`~~ | Unsubscribing removes only your request; the series stays warm while anyone wants it |
+| **One platform-wide row, no owner column** | Disabling stops the capture for everyone |
 
-The second, which also matches how every other user-owned entity here behaves
-(deployments are owner-scoped; `APP_USER_ID` isolation is
-[decision #42](../decisions.md)'s baseline). The cost is a `DISTINCT` in one
-read.
+The per-user model was rejected because it answers a question the domain does
+not ask. A bar is a **shared fact** — one row per `(cusip, interval, venue,
+timestamp)`, readable by everybody — so a per-user request row models private
+ownership of something nobody owns. It is not analogous to `DEPLOYMENT`, whose
+`APP_USER_ID` isolation ([decision #42](../decisions.md)) exists because a
+deployment spends *your* money through *your* credential. Capture spends
+neither.
+
+What the per-user model bought was a `DISTINCT` and the ability to withdraw
+privately; what it cost was a second copy of every popular series and a list
+that shows you only your own corner of a shared resource.
+
+So: `UQ_BAR_SUBSCRIPTION_OPEN` allows exactly one open row per series, and
+`SP_GET_ACTIVE_BAR_SUBSCRIPTIONS` needs no `DISTINCT` because the index already
+guarantees it.
+
+The table carries **no `USER_ID`** either, a deliberate exception to the audit
+convention every other table follows. `SP_INS_BAR_SUBSCRIPTION` still takes
+`IN_USER_ID` and hands it to `CORE_ADMIN.CORE_INS_LOG_PROC`, so who enabled,
+disabled or retargeted a series is answerable from `CORE_ADMIN.LOG_PROC_DETAIL`
+against the version window this table already stamps. A copy on the row would be
+a second record of one fact, free to disagree with the log, and nothing in the
+API or UI ever read it.
+
+**The cost is real and accepted.** Disabling a subscription cools the series
+for every user, and the bars missed while it was paused are recoverable only as
+far back as the venue still retains them. That is exactly why the list is
+unscoped and the row is visible to everyone: you cannot reason about whether to
+pause a capture you cannot see. The UI confirms a pause and says who it affects.
 
 ### 3.3 Soft-versioned, like `DEPLOYMENT`
 
@@ -86,11 +118,12 @@ platform was capturing when, which is part of reproducing a backtest.
 
 ### 3.4 DDL sketch
 
+As built (`db/liquidbase/market_data/tables/BAR_SUBSCRIPTION.sql`):
+
 ```sql
 CREATE TABLE MARKET_DATA.BAR_SUBSCRIPTION (
-    BAR_SUBSCRIPTION_ID   UUID          NOT NULL,   -- uuid7, stable across versions
+    BAR_SUBSCRIPTION_ID   UUID          NOT NULL,   -- stable across versions
     BAR_SUBSCRIPTION_VID  INTEGER       NOT NULL,
-    APP_USER_ID           UUID          NOT NULL,   -- who asked
     INTERNAL_CUSIP        TEXT          NOT NULL,   -- INST.PRODUCT
     TM_INTERVAL_ID        INTEGER       NOT NULL,   -- REFDATA.TM_INTERVAL
     SOURCE_APP_ID         INTEGER       NOT NULL,   -- REFDATA.APP, IS_EXCHANGE_IND = 'Y'
@@ -98,11 +131,16 @@ CREATE TABLE MARKET_DATA.BAR_SUBSCRIPTION (
     BACKFILL_FROM_TS      TIMESTAMPTZ,              -- history wanted; NULL = forward only
     TRANSACT_FROM_TS      TIMESTAMPTZ   NOT NULL,
     TRANSACT_TO_TS        TIMESTAMPTZ   NOT NULL,
-    USER_ID               TEXT          NOT NULL,
-    CREATED_AT            TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    CREATED_AT            TIMESTAMPTZ   NOT NULL,
 
     PRIMARY KEY (BAR_SUBSCRIPTION_ID, BAR_SUBSCRIPTION_VID)
 );
+
+-- One live subscription per series. This is what makes the warmer's read a
+-- plain scan rather than a DISTINCT: the index is the uniqueness.
+CREATE UNIQUE INDEX UQ_BAR_SUBSCRIPTION_OPEN
+    ON MARKET_DATA.BAR_SUBSCRIPTION (TM_INTERVAL_ID, INTERNAL_CUSIP, SOURCE_APP_ID)
+    WHERE TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00';
 ```
 
 `BACKFILL_FROM_TS` is **intent, not progress** — how far back the user wants
@@ -115,8 +153,13 @@ Procedures, mirroring the TRADE side:
 | Procedure | Purpose |
 |---|---|
 | `MARKET_DATA.SP_INS_BAR_SUBSCRIPTION` | Append a version — create, enable, disable, retarget |
-| `MARKET_DATA.SP_GET_BAR_SUBSCRIPTION` | One user's current rows, for the UI |
-| `MARKET_DATA.SP_GET_ACTIVE_BAR_SUBSCRIPTIONS` | `DISTINCT (TM_INTERVAL_ID, INTERNAL_CUSIP, SOURCE_APP_ID)` across all users, for the warmer |
+| `MARKET_DATA.SP_GET_BAR_SUBSCRIPTION` | Current rows, for the UI. Disabled rows included — their absence would read as "deleted" |
+| `MARKET_DATA.SP_GET_ACTIVE_BAR_SUBSCRIPTIONS` | Enabled `(TM_INTERVAL_ID, INTERNAL_CUSIP, APP_ID)`, for the warmer. No `DISTINCT` — the unique index already guarantees it, unlike the deployment-side read where a dozen deployments can name one instrument |
+
+Coverage is deliberately **not** joined into the list read: it is a
+`MARKET_DATA.PRICE_BAR` question, answered per row by
+`SP_GET_PRICE_BAR_COVERAGE` (two index probes), and folding an aggregate over
+the bar table into the list would turn a cheap read into a scan.
 
 ### 3.5 Subscriptions are not implied by deployments
 
@@ -133,7 +176,7 @@ The warmer's instrument list becomes `deployments ∪ subscriptions`. Both sides
 already produce the same triple, so the union is a concatenation and a `DISTINCT`.
 The real question is *which package owns the loop*.
 
-[§7.8](scheduler-price-bars.md#78-scheduled-bar-warming-quanttradeschedulerwarmpy)
+[§7.8](scheduler-price-bars.md#78-scheduled-bar-warming-quantmarket_datawarmpy)
 puts `BarWarmer` in `quant/trade/` with an explicit justification: *"the question
 it answers — which instruments matter — is a deployment question."* **This feature
 is what stops that being true.** After it, that question is a market-data question
@@ -142,21 +185,34 @@ with a trading input.
 | Option | Shape | Trade-off |
 |---|---|---|
 | **A — minimal** | `BarWarmer` stays in `quant/trade/scheduler/warm.py`, gains a subscription repo | Smallest diff; but a research feature's warm loop lives in the trading package, and `quant/trade/` acquires a reason to exist for users who never trade |
-| **B — invert (recommended)** | `BarWarmer` moves to `quant/market_data/warm.py` and takes a list of `InstrumentSource`; `quant/trade/` supplies the deployment-derived one | Ownership matches the domain, and the one-way rule gets *stronger* — `quant/market_data/` still knows nothing about deployments, only a protocol |
+| **B — invert (taken)** | `BarWarmer` moves to `quant/market_data/warm.py` and takes a list of `InstrumentSource`; `quant/trade/` supplies the deployment-derived one | Ownership matches the domain, and the one-way rule gets *stronger* — `quant/market_data/` still knows nothing about deployments, only a protocol |
 
 ```python
 class InstrumentSource(Protocol):
-    """Rows of (tm_interval_id, internal_cusip, source_app_id)."""
+    """Rows of (tm_interval_id, internal_cusip, app_id)."""
     def instruments(self) -> list[dict]: ...
 ```
 
-B is a **move, not a rewrite**: the grouping, the settle, the per-group `except`
-and `WarmResult` are unchanged; only where the rows come from moves behind the
-protocol. `DeploymentInstrumentSource` wraps `TradeRepo`,
-`SubscriptionInstrumentSource` wraps the new repo, and the FastAPI lifespan wires
-both — the composition root already builds `app.state.price_bars`. The route stays
-`POST /api/v1/market-data/price-bars/sync`, which is *already* under `market-data`
-despite the handler living in `quant/trade/` — a mismatch this resolves.
+B was a **move, not a rewrite**: the grouping, the settle, the per-group
+`except` and `WarmResult` are unchanged; only where the rows come from moved
+behind the protocol. `DeploymentInstrumentSource` (in `quant/trade/bar_source.py`,
+the module that already composes trade and market data) wraps `TradeRepo`;
+`SubscriptionInstrumentSource` wraps the new repo; the route handler wires both.
+The route stays `POST /api/v1/market-data/price-bars/sync`, which was *already*
+under `market-data` despite the handler living in `quant/trade/` — a mismatch
+this resolves.
+
+Two details the move forced, both small and both in the same direction:
+
+- **The factory is a protocol too.** `BarWarmer` used to take
+  `PriceBarServiceFactory`, which lives in `quant/trade/`. Importing it from
+  `quant/market_data/warm.py` would have re-created the dependency the move
+  removed, so `BarServiceFactory` is declared as a `Protocol` beside
+  `PriceBarService` — the same trick `BarFetcher` already uses.
+- **A failing source is not absorbed.** The broad `except` covers a failing
+  *venue*, which is weather. A source that cannot be read is a missing procedure
+  or a broken connection — a bug, and warming a partial estate while reporting
+  success would hide it.
 
 One schedule still serves everything. `price_bar_sync` sweeps whatever intervals
 the rows mention, so a subscription on `1H` for research while trading `DAILY`
@@ -198,50 +254,86 @@ continuous history". Two reads already exist:
 subscription is what turns capture from an act of faith into something checkable
 before a backtest is trusted.
 
-## 7. The backtest seam
+## 7. The backtest seam (built)
 
-Backtest reads the provider, not `PRICE_BAR`. `_build_data_dict` calls
-`fetch_df(symbol, start, end, data_source, …)` per symbol, where `data_source`
-names a `REFDATA.APP` row and `class_name` selects the vendor client.
+Backtest used to read the provider and only the provider. `_build_data_dict`
+calls `fetch_df(symbol, start, end, data_source, …)` per symbol, where
+`data_source` names a `REFDATA.APP` row and `class_name` selects the vendor
+client — and for an exchange row there is no such class, so choosing Bybit in
+the dropdown raised `AttributeError: module 'quant.data.sources' has no
+attribute 'Bybit'`. The venue you traded on was the one venue you could not fit
+on.
 
-The seam is already there, and it is `data_source`. **Bybit is an app in
-`REFDATA.APP`** with `IS_EXCHANGE_IND = 'Y'`. So when `data_source` names an
-exchange that ccxt can serve — resolvable via `registry.exchange_id_for_app` —
-route that symbol through `PriceBarService.read_bars` instead of a vendor client.
-No parallel switch, no new request field to choose a "mode": picking Bybit as the
-data source *is* pinning `SOURCE_APP_ID`, which is what #47 requires of a
-reproducible backtest.
+The seam was already there, and it is `data_source`. **Bybit is an app in
+`REFDATA.APP`** with `IS_EXCHANGE_IND = 'Y'`, so `fetch_df` now branches on that
+flag and reads `PriceBarService.read_bars` instead of instantiating a vendor
+client. No parallel switch and no new request field to choose a "mode": picking
+Bybit as the data source *is* pinning `SOURCE_APP_ID`, which is what #47
+requires of a reproducible backtest.
 
-Two consequences worth stating:
+`read_bars` returns the exact DataFrame shape the pipeline consumes (index,
+`price`, `factor`, `Open/High/Low/Close/Volume`), so `Performance` and the
+indicator math needed no changes at all.
 
-- **An interval becomes explicit.** `read_bars` needs `tm_interval_id`;
-  `BacktestCache.DEFAULT_TM_INTERVAL_ID = 1` hardcodes daily by convention today.
-  An optional interval on the backtest request, defaulting to daily, preserves
-  every existing run and opens the intraday backtests
-  [§4.6](scheduler-price-bars.md#46-backtest-compatibility-same-dataframe-contract)
-  anticipated.
+Four things follow, and each is a decision rather than a detail:
+
+- **The bar cache is bypassed on this path.** `PRICE_BAR` *is* the store.
+  Copying it into `BT.API_REQUEST` would create a second version of the same
+  fact, free to diverge from the first.
+- **It refuses rather than substitutes.** A range the store cannot cover is an
+  error naming the range it *can* — never a shorter series quietly returned
+  under the requested label. Nor does a backtest trigger a fetch: capture is a
+  standing decision made on the Market data page (§5), not a side effect of
+  pressing Run, so a five-year request never becomes a five-year exchange crawl
+  on someone's behalf.
+- **The daily interval is resolved, not hardcoded.** `read_bars` needs a
+  `tm_interval_id`, and `backtest_service.BACKTEST_BAR_PERIOD` states the period
+  while REFDATA supplies the id — the rule the schedule-cadence guard follows.
+  Intraday backtests
+  ([§4.6](scheduler-price-bars.md#46-backtest-compatibility-same-dataframe-contract))
+  now need only an optional interval on the request.
 - **`_enforce_date_sync` becomes load-bearing.** It already refuses when products
   and factors do not share coverage. Against a rolling-window table with possible
   holes that guard is doing more work than it was written for, and it is the right
   place for it — complemented by `is_continuous` before trusting a range.
 
-`read_bars` returns the exact DataFrame shape the pipeline consumes
-(index, `price`, `factor`, `Open/High/Low/Close/Volume`), so `Performance` and the
-indicator math need no changes.
+**Factors keep their own source** — the §9 question, now closed. `_build_data_dict`
+already reads `f.data_source or req.data_source`, so a factor may name a provider
+while the traded product names a venue. Only the *traded* product has to follow
+the venue it executes on; a `^VIX` filter on a crypto strategy is a legitimate
+research question and no exchange serves `^VIX`. Inheriting an exchange source is
+therefore allowed but explained: a factor with no `INST.PRODUCT_XREF` row on that
+venue is refused with the instruction to give it its own source, rather than the
+bare "not captured" the traded product gets.
 
-**Factors are the sharp edge.** `bars_loader` on the live path routes *every*
-symbol to the exchange, including factors naming their own `data_source`, because
-mixing an exchange series with a provider series aligns bars never observed on the
-same clock. Backtest is more permissive by nature — a crypto strategy filtered on
-`^VIX` is a legitimate research question and no exchange serves `^VIX`. This
-design does **not** resolve that; see §9.
+This is deliberately *looser* than live, where `bar_loader` routes every symbol to
+the exchange. The asymmetry is intentional: mixing series is a research choice
+worth making knowingly, and a fatal one to make silently with capital at risk.
+
+### 7.1 Dry run reads what the apply reads
+
+Same class of bug, opposite corner. The dry run called
+`compute_latest_position` **without** a `bar_loader` while the live apply passed
+one, so the preview a user checked before going live was computed from the
+provider and the order that followed was computed from the exchange. Near a band
+edge that is a preview reporting HOLD and an apply placing a BUY, with neither
+malfunctioning and nothing in either output to show why.
+
+`LiveApplyOrchestrator._resolve_signal_source` was the only place the venue rule
+lived, so it moved to `bar_source.resolve_signal_source` and both callers use it.
+A dry run predates its schedule, so it passes `schedule_tm_interval_id=None` and
+falls through to daily — the only cadence a deployment may run on anyway.
+
+`DryRunReport.bar_source` carries the label to the UI, next to `ApplyReport`'s,
+for the same reason: two sources are two sets of numbers, and a divergence is
+diagnosable only when the input is recorded beside the output.
 
 ## 8. API and auth
 
 | Route | Purpose |
 |---|---|
-| `GET /api/v1/market-data/subscriptions` | Caller's subscriptions + coverage |
-| `POST /api/v1/market-data/subscriptions` | Create / enable / disable / retarget |
+| `GET /api/v1/market-data/subscriptions` | Every subscription + coverage (not caller-scoped — §3.2) |
+| `POST /api/v1/market-data/subscriptions` | Create / enable / disable / retarget. **200, not 201** — only one of those creates anything |
 | `POST /api/v1/market-data/price-bars/backfill` | Explicit range fill, returns `BackfillResult` |
 | `GET /api/v1/market-data/price-bars/coverage` | `MIN`/`MAX` + gaps for one series |
 
@@ -257,39 +349,48 @@ limit on behalf of a user who did not ask.
 warmable if the product exists in `INST.PRODUCT`, an `INST.PRODUCT_XREF` row maps
 it to a vendor symbol for that app, and the app resolves to a ccxt venue.
 Checking on write turns three silent per-tick failures into one immediate error.
+`SubscriptionError` carries that to **400** and is logged server-side like every
+other handled error.
+
+Two failure modes are deliberately *not* symmetric. Subscribing to a series that
+already exists is a 400 that names the series, because the unique index caught
+it and the caller should edit that row — which, subscriptions being shared, may
+be somebody else's. But a venue that cannot answer a **coverage** read degrades
+one row instead of failing the list: a page showing ten series must still render
+when one exchange is away, so the row reports `coverage.error` and the rest
+display.
 
 ## 9. Open questions
 
-| Question | Why it decides something |
+| Question | Status |
 |---|---|
-| Do factors follow the main product's source, or keep their own? | §7's sharp edge. Same-venue-or-nothing is right for live, wrong for a `^VIX`-filtered crypto backtest |
-| Should a subscription cap retention? | `PRICE_BAR` is append-only immutable facts and [§4.3](scheduler-price-bars.md#43-volume-projections) makes volume trivial (~52 MB for 10 products × 5 years), so probably not — but nothing prunes today |
-| Is `BACKFILL_FROM_TS` worth storing before a filler consumes it? | It is intent with no reader in v1; the counter-argument is §6's UI needs a target to display |
-| Does anything auto-backfill on subscribe? | A synchronous fill blocks the request; a background one needs progress tracking this design avoids |
-| Who may subscribe? | Rate limit is a shared resource. Unbounded per-user subscriptions are a cost and a throttling risk |
+| Do factors follow the main product's source, or keep their own? | **Closed — their own** (§7). Same-venue-or-nothing stays right for live and stays wrong for a `^VIX`-filtered crypto backtest, so the two paths differ on purpose. A factor inheriting a venue it is not listed on is refused with the instruction to name its own source |
+| Should a subscription cap retention? | **Open, deferred.** `PRICE_BAR` is append-only immutable facts and [§4.3](scheduler-price-bars.md#43-volume-projections) makes volume trivial (~52 MB for 10 products × 5 years), so nothing prunes today |
+| Is `BACKFILL_FROM_TS` worth storing before a filler consumes it? | **Kept.** §6's page needs a target to display, and the backfill dialog defaults its range from it |
+| Does anything auto-backfill on subscribe? | **No.** A synchronous fill blocks the request; a background one needs progress tracking this design avoids. Subscribing makes the series eligible for the next warm pass, and nothing more |
+| Who may subscribe? | **Any signed-in user**, unbounded. Rate limit is a shared resource and this is a throttling risk that nothing currently caps — revisit if the subscription list grows past a handful. A service token may *not* subscribe (§8) |
 
 ## 10. What this amends
 
-Nothing is added to the [decisions log](../decisions.md) yet — the decision is not
-made. When agreed, it amends **decision #5** (bar population follows deployments)
-and extends **#44** (`market_data/` owns MARKET_DATA end-to-end) to cover the warm
-loop if §4 option B is taken. It leaves **#47** and **#48** intact and leans on
-both: the per-venue key is what lets a subscription mean one series, and explicit
-backfill is already the sanctioned continuity repair.
+Recorded as [decision #50](../decisions.md). It amends **decision #5** (bar
+population follows deployments) and extends **#44** (`market_data/` owns
+MARKET_DATA end-to-end) to cover the warm loop, §4 option B having been taken.
+It leaves **#47** and **#48** intact and leans on both: the per-venue key is what
+lets a subscription mean one series, and explicit backfill is already the
+sanctioned continuity repair.
 
 ## 11. Implementation order
 
-1. **DDL** — `MARKET_DATA.BAR_SUBSCRIPTION` + three procedures.
-2. **Python** — subscription repo; `InstrumentSource` protocol; warmer union (§4).
-3. **API** — subscription CRUD, backfill and coverage routes, `require_user`.
-4. **UI** — a Market data page: product / interval / venue pickers from REFDATA
-   and `INST.PRODUCT`, coverage per row, and an explicit backfill action. This is
-   the part that was looked for and not found.
-5. **Backtest seam** — exchange `data_source` → `read_bars`, optional interval on
-   the request.
-6. **Tests** — repo, warmer union, backfill reporting, and a backtest run pinned
-   to a `SOURCE_APP_ID`.
+| Step | State |
+|---|---|
+| 1. **DDL** — `MARKET_DATA.BAR_SUBSCRIPTION` + three procedures | **Done**, staged in `1.3.0-bar-subscription.xml` without `prod-deploy` |
+| 2. **Python** — subscription repo; `InstrumentSource` protocol; warmer union (§4) | **Done** — `quant/market_data/subscriptions.py`, `quant/market_data/warm.py` |
+| 3. **API** — subscription CRUD, backfill and coverage routes, `require_user` | **Done** — `quant/api/market_data/router.py` |
+| 4. **UI** — a Market data page: product / interval / venue pickers from REFDATA and `INST.PRODUCT`, coverage per row, and an explicit backfill action | **Done** — `frontend/src/pages/MarketDataPage.tsx`. This is the part that was looked for and not found |
+| 5. **Backtest seam** — exchange `data_source` → `read_bars` | **Done** — `fetch_df` branches on `IS_EXCHANGE_IND`; §9's factor question closed. An optional interval on the request is still open, and daily is resolved from REFDATA meanwhile |
+| 6. **Tests** — repo, warmer union, backfill reporting, and a backtest run pinned to a `SOURCE_APP_ID` | **Done** — `tests/unit/test_backtest_exchange_source.py` covers the pinned run and the four refusals |
 
 Steps 1–4 deliver capture on their own. Step 5 is what makes the captured bars
-usable for the decision that motivated capturing them, and until it lands the
-bars accumulate correctly but backtest still reads the provider.
+usable for the decision that motivated capturing them: a strategy can now be
+fitted on the series it will be traded on, and §7.1 makes the dry run preview
+that same series.

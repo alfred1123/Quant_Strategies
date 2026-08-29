@@ -1,5 +1,6 @@
 """Unit tests for deployment dry-run orchestration."""
 
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -49,6 +50,8 @@ def deps():
     adapter_registry.has_adapter.return_value = True
     adapter_registry.create.return_value = adapter
     data_caches = MagicMock()
+    data_caches.refdata.resolve_interval_id.return_value = 1
+    price_bars = MagicMock()
     return {
         "app_user_id": app_user_id,
         "repo": repo,
@@ -57,8 +60,16 @@ def deps():
         "credential_repo": credential_repo,
         "adapter_registry": adapter_registry,
         "data_caches": data_caches,
+        "price_bars": price_bars,
         "adapter": adapter,
     }
+
+
+@pytest.fixture(autouse=True)
+def _venue():
+    """Every dry run in this module prices off a venue that serves bars."""
+    with patch("quant.trade.bar_source.exchange_id_for_app", return_value="bybit"):
+        yield
 
 
 class TestRunDryRun:
@@ -73,6 +84,7 @@ class TestRunDryRun:
             credential_repo=deps["credential_repo"],
             adapter_registry=deps["adapter_registry"],
             data_caches=deps["data_caches"],
+            price_bars=deps["price_bars"],
         )
 
         assert report.vendor_symbol == "BTCUSDT"
@@ -100,6 +112,7 @@ class TestRunDryRun:
                 credential_repo=deps["credential_repo"],
                 adapter_registry=deps["adapter_registry"],
                 data_caches=deps["data_caches"],
+                price_bars=deps["price_bars"],
             )
 
         deps["adapter"].__exit__.assert_called_once()
@@ -117,6 +130,7 @@ class TestRunDryRun:
                 credential_repo=deps["credential_repo"],
                 adapter_registry=deps["adapter_registry"],
                 data_caches=deps["data_caches"],
+                price_bars=deps["price_bars"],
             )
 
     def test_missing_credential(self, deps):
@@ -132,6 +146,7 @@ class TestRunDryRun:
                 credential_repo=deps["credential_repo"],
                 adapter_registry=deps["adapter_registry"],
                 data_caches=deps["data_caches"],
+                price_bars=deps["price_bars"],
             )
 
     @patch("quant.trade.dry_run.compute_latest_position", return_value=(1.0, "2024-06-01"))
@@ -146,8 +161,80 @@ class TestRunDryRun:
             credential_repo=deps["credential_repo"],
             adapter_registry=deps["adapter_registry"],
             data_caches=deps["data_caches"],
+            price_bars=deps["price_bars"],
         )
         assert report.notional is None
+
+
+class TestPreviewReadsWhatTheApplyWillRead:
+    """A dry run is only a preview if it prices off the live series.
+
+    It used to price off the provider unconditionally while the apply that
+    followed priced off the exchange, so the two could disagree on the signal
+    with neither being wrong — the failure this class exists to catch.
+    """
+
+    @patch("quant.trade.dry_run.compute_latest_position", return_value=(1.0, "2024-06-01"))
+    def test_signal_comes_from_the_venue_the_order_would_hit(self, mock_signal, deps):
+        report = run_dry_run(
+            app_user_id=deps["app_user_id"],
+            req=_dry_run_request(app_id=34),
+            repo=deps["repo"],
+            bt=deps["bt"],
+            credential_service=deps["credential_service"],
+            credential_repo=deps["credential_repo"],
+            adapter_registry=deps["adapter_registry"],
+            data_caches=deps["data_caches"],
+            price_bars=deps["price_bars"],
+        )
+
+        assert report.bar_source == "price_bar:bybit"
+        loader = mock_signal.call_args.kwargs["bar_loader"]
+        assert loader is not None
+        loader("btcusdt.crypto", 120)
+        deps["price_bars"].for_app.return_value.load_window.assert_called_once_with(
+            "btcusdt.crypto", 120, tm_interval_id=1, source_app_id=34
+        )
+
+    @patch("quant.trade.dry_run.compute_latest_position", return_value=(1.0, "2024-06-01"))
+    def test_no_schedule_yet_means_daily(self, _signal, deps):
+        """A dry run predates the schedule, and daily is the only cadence a
+        deployment may run on."""
+        run_dry_run(
+            app_user_id=deps["app_user_id"],
+            req=_dry_run_request(),
+            repo=deps["repo"],
+            bt=deps["bt"],
+            credential_service=deps["credential_service"],
+            credential_repo=deps["credential_repo"],
+            adapter_registry=deps["adapter_registry"],
+            data_caches=deps["data_caches"],
+            price_bars=deps["price_bars"],
+        )
+
+        deps["data_caches"].refdata.resolve_interval_id.assert_called_once_with(
+            timedelta(days=1)
+        )
+
+    @patch("quant.trade.dry_run.compute_latest_position", return_value=(1.0, "2024-06-01"))
+    def test_venue_less_broker_still_previews_off_the_provider(self, mock_signal, deps):
+        """Futu equities have no market-data venue, so the provider series is
+        the only one either side can read — and both still agree."""
+        with patch("quant.trade.bar_source.exchange_id_for_app", return_value=None):
+            report = run_dry_run(
+                app_user_id=deps["app_user_id"],
+                req=_dry_run_request(app_id=99),
+                repo=deps["repo"],
+                bt=deps["bt"],
+                credential_service=deps["credential_service"],
+                credential_repo=deps["credential_repo"],
+                adapter_registry=deps["adapter_registry"],
+                data_caches=deps["data_caches"],
+                price_bars=deps["price_bars"],
+            )
+
+        assert report.bar_source == "provider"
+        assert mock_signal.call_args.kwargs["bar_loader"] is None
 
 
 class TestDryRunReportNotional:
@@ -168,6 +255,7 @@ class TestDryRunReportNotional:
             position_qty=0.0,
             data_as_of="2024-06-01",
             notional=notional,
+            bar_source="price_bar:bybit",
         )
 
     def test_notional_present(self):

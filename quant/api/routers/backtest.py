@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from quant.api.deps import get_data_caches
@@ -37,6 +37,7 @@ def _http_error(exc: Exception) -> HTTPException:
 @router.post("/optimize", response_model=OptimizeResponse)
 def optimize(
     req: OptimizeRequest,
+    request: Request,
     caches: DataCaches = Depends(get_data_caches),
 ):
     try:
@@ -45,6 +46,7 @@ def optimize(
             caches.refdata,
             inst_cache=caches.instrument_cache,
             bt_cache=caches.backtest_cache,
+            bar_services=request.app.state.price_bars,
         )
     except Exception as exc:
         logger.exception("Optimization failed")
@@ -54,6 +56,7 @@ def optimize(
 @router.post("/optimize/stream")
 async def optimize_stream(
     req: OptimizeRequest,
+    request: Request,
     caches: DataCaches = Depends(get_data_caches),
 ):
     """SSE endpoint streaming per-trial progress during optimization."""
@@ -63,6 +66,7 @@ async def optimize_stream(
             caches.refdata,
             inst_cache=caches.instrument_cache,
             bt_cache=caches.backtest_cache,
+            bar_services=request.app.state.price_bars,
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
@@ -72,6 +76,7 @@ async def optimize_stream(
 @router.post("/performance", response_model=PerformanceResponse)
 def performance(
     req: PerformanceRequest,
+    request: Request,
     caches: DataCaches = Depends(get_data_caches),
 ):
     try:
@@ -80,6 +85,7 @@ def performance(
             caches.refdata,
             inst_cache=caches.instrument_cache,
             bt_cache=caches.backtest_cache,
+            bar_services=request.app.state.price_bars,
         )
     except Exception as exc:
         logger.exception("Performance calculation failed")
@@ -89,6 +95,7 @@ def performance(
 @router.post("/walk-forward", response_model=WalkForwardResponse)
 def walk_forward(
     req: WalkForwardRequest,
+    request: Request,
     caches: DataCaches = Depends(get_data_caches),
 ):
     try:
@@ -97,6 +104,7 @@ def walk_forward(
             caches.refdata,
             inst_cache=caches.instrument_cache,
             bt_cache=caches.backtest_cache,
+            bar_services=request.app.state.price_bars,
         )
     except Exception as exc:
         logger.exception("Walk-forward test failed")

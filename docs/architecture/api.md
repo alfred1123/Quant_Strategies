@@ -100,6 +100,21 @@ whose cadence predates the rule.
 `DeploymentDialog` and `ScheduleCell` grey out the cadences the API would refuse
 rather than keeping their own copy of the rule.
 
+#### A dry run previews the apply's own price series
+
+`POST /trade/deployments/dry-run` computes its signal from the series the live
+apply would read, resolved by the same `bar_source.resolve_signal_source` — the
+venue's bars where the venue serves market data (#45), the provider only for a
+broker that has none. It did not always: the dry run passed no `bar_loader` and
+so priced off the provider while the apply priced off the exchange, which near a
+band edge is a preview reporting `HOLD` and an order going out as `BUY`, with
+neither computation wrong.
+
+`DryRunReport.bar_source` names the series (`price_bar:<venue>` or `provider`),
+matching `ApplyReport.bar_source`, and the report dialog shows it as **Price
+source**. Two sources are two sets of numbers, so a divergence is only
+diagnosable when the input is recorded next to the output.
+
 #### Broker failures — status says whether to retry
 
 Anything that reaches an exchange (`dry-run`, `apply`, the account snapshot) can
@@ -192,8 +207,45 @@ These routers are mounted with `require_user_or_service` so the EventBridge Lamb
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/v1/admin/log-proc-summary/summarize` | Service or session | Aggregate `LOG_PROC_DETAIL` into daily per-procedure summaries. |
-| `POST` | `/api/v1/market-data/price-bars/sync` | Service or session | Pre-fetch bars for every instrument a scheduled deployment will trade (bar warmer). |
+| `POST` | `/api/v1/market-data/price-bars/sync` | Service or session | Pre-fetch bars for every series a scheduled deployment or a subscription wants (bar warmer). |
 | `POST` | `/api/v1/scheduler/tick` | Service or session | Apply every deployment currently due across all intervals (hourly platform sweep). |
+
+### Market data capture (session only)
+
+On the same router, but each adds `require_user` — the router gate is a floor,
+not a ceiling. A service token must **not** subscribe or backfill: both spend
+exchange rate limit on behalf of a user who did not ask.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/api/v1/market-data/subscriptions` | Every bar subscription with its coverage (first bar, last bar, gap count). |
+| `POST` | `/api/v1/market-data/subscriptions` | Create a subscription, or version one — enable, disable, retarget. |
+| `GET`  | `/api/v1/market-data/price-bars/coverage` | `MIN`/`MAX` stored bar plus gap count for one series. |
+| `POST` | `/api/v1/market-data/price-bars/backfill` | Fill an explicit range, reporting what the venue would not serve. |
+
+#### Subscriptions are shared, not caller-scoped
+
+Unlike deployments, these reads and writes are **not** filtered by
+`APP_USER_ID`. A bar is a shared fact — one row per `(cusip, interval, venue,
+timestamp)` — so a subscription is a platform-wide request that any signed-in
+user can see and edit, including disable, which cools the series for everybody
+([decision #50](../decisions.md)). Being signed in is what these routes check;
+ownership is not something a bar series has.
+
+Two error shapes worth knowing:
+
+- **400 on subscribe** when the product has no `INST.PRODUCT_XREF` row for that
+  venue, or the app is not an exchange this platform reads bars from. Validated
+  on write precisely so three silent per-tick warm failures become one message
+  the caller can act on.
+- **`coverage.error` rather than a failed response** when a venue cannot be
+  reached during a list read. A page showing ten series must still render when
+  one exchange is away.
+
+Backfill returns 200 with `is_continuous: false` rather than raising on a hole.
+That inverts the live path's fail-closed rule deliberately: during a repair a
+hole is ordinary — pre-listing history, or past what the venue retains — and
+aborting would discard the bars that *were* recoverable.
 
 ### Health
 
@@ -271,7 +323,7 @@ quant/api/
 ├── admin/               # Service-token maintenance (log-proc summary)
 │   ├── router.py
 │   └── repo.py
-├── market_data/         # Bar warmer — POST /market-data/price-bars/sync
+├── market_data/         # Bar warmer + capture subscriptions, coverage, backfill
 │   └── router.py
 ├── scheduler/           # Platform tick — POST /scheduler/tick
 │   └── router.py

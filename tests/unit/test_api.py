@@ -44,6 +44,9 @@ def client():
         app.state.instrument_cache = inst
         app.state.backtest_cache = bt
         app.state.db_conninfo = "postgresql://stub"
+        # Backtests may name an exchange as their data source, in which case
+        # bars come from MARKET_DATA.PRICE_BAR rather than a vendor client.
+        app.state.price_bars = MagicMock()
 
         ref.get.side_effect = lambda table: {
             "indicator": [

@@ -1,9 +1,16 @@
-"""Pre-fetch the bars scheduled deployments are about to be priced on.
+"""Pre-fetch the bars somebody is going to want, before they ask for them.
 
-Deployments are scheduled individually, so a dozen trading the same instrument
-each reach the same conclusion at the same boundary — that the newest bar is
-missing — and race to insert it. All but one lose on the primary key. Running
-this once per boundary collapses that to a single fetch per instrument.
+Two kinds of caller want a series kept current: a scheduled deployment about to
+be priced on it, and a user capturing history for a product they are still
+deciding whether to trade. Both are answers to the same question — *which
+instruments matter* — so both feed one loop here, and each contributes rows
+through :class:`InstrumentSource` rather than being read directly.
+
+That indirection is what lets this live in ``quant/market_data/`` at all. The
+loop used to sit in ``quant/trade/`` because the only answer came from
+``TRADE.DEPLOYMENT``; now that a subscription is an equally good answer, warming
+is a market-data job with a trading input, and this module still knows nothing
+about deployments.
 
 **Nothing downstream depends on it.** Every apply still calls
 ``PriceBarService.ensure_fresh`` and still fails closed on an incomplete window,
@@ -24,10 +31,10 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Protocol
 
+from quant.market_data.service import BarServiceFactory
 from quant.strategy.performance import live_lookback_bars
-from quant.trade.bar_source import PriceBarServiceFactory
-from quant.trade.db_repo import TradeRepo
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +50,22 @@ DEFAULT_WARM_LOOKBACK = live_lookback_bars(110)
 #: the warm can land before `trade_apply_tick` at `:05`. Sleeping *before*
 #: reading the clock clears two edges — see :meth:`BarWarmer.run`.
 DEFAULT_SETTLE_S = 10.0
+
+
+class InstrumentSource(Protocol):
+    """Somewhere that says which bar series are worth keeping current.
+
+    Rows are dicts carrying ``tm_interval_id``, ``internal_cusip`` and
+    ``app_id`` — the ``MARKET_DATA.PRICE_BAR`` key minus the timestamp. Both
+    implementations already read that shape out of their own procedure, which
+    is why combining them is a concatenation rather than a translation.
+
+    Duplicates across sources are expected and are not the source's problem: a
+    deployment trading a series a user also subscribes to should cost one fetch,
+    and :meth:`PriceBarService.sync` folds the repeats.
+    """
+
+    def instruments(self) -> list[dict]: ...
 
 
 @dataclass(frozen=True)
@@ -79,27 +102,27 @@ class WarmReport:
 
 
 class BarWarmer:
-    """Warms every instrument scheduled deployments will trade, all intervals."""
+    """Warms every series any source asks for, across all intervals and venues."""
 
     def __init__(
         self,
-        repo: TradeRepo,
-        bar_services: PriceBarServiceFactory,
+        sources: list[InstrumentSource],
+        bar_services: BarServiceFactory,
         *,
         lookback: int = DEFAULT_WARM_LOOKBACK,
         settle_s: float = DEFAULT_SETTLE_S,
     ) -> None:
-        self._repo = repo
+        self._sources = sources
         self._bar_services = bar_services
         self._lookback = lookback
         self._settle_s = settle_s
 
     def run(self, *, now: datetime | None = None) -> WarmReport:
-        """One warm pass over every scheduled instrument.
+        """One warm pass over every instrument any source named.
 
-        Sweeping all intervals beats tracking which ones have deployments: an
-        empty interval contributes no rows to the read, which is cheaper than
-        keeping a subscription list correct across create, pause and reschedule.
+        Sweeping all intervals beats tracking which ones are in use: an empty
+        interval contributes no rows to the read, which is cheaper than keeping
+        a list correct across create, pause, reschedule and unsubscribe.
         """
         if now is None:
             # Firing on the boundary is what makes the warm useful, and it also
@@ -115,9 +138,9 @@ class BarWarmer:
 
         # One instant for the whole sweep: a slow pass must not compute a
         # different "newest bar" for the groups it reaches after a boundary.
-        rows = self._repo.sp_get_scheduled_instruments()
+        rows = [row for source in self._sources for row in source.instruments()]
         if not rows:
-            logger.info("bar warm: no scheduled deployments — nothing to warm")
+            logger.info("bar warm: nothing scheduled or subscribed — nothing to warm")
             return WarmReport(results=[])
 
         grouped: dict[tuple[int, int], list[str]] = defaultdict(list)
@@ -163,8 +186,8 @@ class BarWarmer:
                 failures={cusip: str(exc) for cusip in set(cusips)},
             )
 
-        # sync() folds duplicates itself, so the same instrument appearing once
-        # per deployment costs one fetch.
+        # sync() folds duplicates itself, so an instrument named by several
+        # deployments and a subscription still costs one fetch.
         outcome = service.sync(
             instruments=[(cusip, app_id) for cusip in cusips],
             tm_interval_id=tm_interval_id,

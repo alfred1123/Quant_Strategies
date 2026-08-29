@@ -10,6 +10,7 @@ import logging
 import math
 import queue
 import threading
+from datetime import timedelta
 
 import numpy as np
 import pandas as pd
@@ -43,15 +44,125 @@ class BacktestError(Exception):
 
 # ── Data fetching ────────────────────────────────────────────────────────────
 
-def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_cache=None, bt_cache=None, refresh: bool = False) -> pd.DataFrame:
-    """Fetch prices using the data source class registered in REFDATA.APP.
+#: Every backtest is fitted on daily bars. Stated as a period and resolved
+#: through REFDATA (never a hardcoded id) so a renumbered TM_INTERVAL moves with
+#: it — the same rule the schedule-cadence guard follows.
+BACKTEST_BAR_PERIOD = timedelta(days=1)
+
+
+def _fetch_exchange_df(
+    internal_cusip: str,
+    start: str,
+    end: str,
+    *,
+    app: dict,
+    refdata,
+    bar_services,
+    vendor_symbol: str | None,
+) -> pd.DataFrame:
+    """Bars a venue actually printed, from ``MARKET_DATA.PRICE_BAR``.
+
+    Reads only. A backtest asking for five years must not become a five-year
+    exchange crawl on someone's behalf — capture is a standing decision made on
+    the Market data page, per the explicit-backfill rule — so a range the store
+    cannot cover is an error naming what *is* covered, never a short series
+    quietly returned. A backtest run over a narrower window than requested is
+    exactly the silent substitution this branch exists to end.
+    """
+    if bar_services is None:
+        raise BacktestError(
+            f"{app['name']} is an exchange, so its bars come from "
+            f"MARKET_DATA.PRICE_BAR, but no price bar source is configured"
+        )
+    if vendor_symbol is None:
+        # Reached by a factor inheriting the traded product's venue: only the
+        # product being traded has to follow the execution venue, and a filter
+        # like ^VIX has no reason to exist on a crypto exchange.
+        raise BacktestError(
+            f"{internal_cusip} is not listed on {app['name']} — no "
+            f"INST.PRODUCT_XREF row maps it there, so that venue has no bars "
+            f"for it. Give this factor its own data source; only the traded "
+            f"product has to follow the venue it executes on"
+        )
+
+    app_id = int(app["app_id"])
+    tm_interval_id = refdata.resolve_interval_id(BACKTEST_BAR_PERIOD)
+    if tm_interval_id is None:
+        raise BacktestError("REFDATA.TM_INTERVAL has no daily interval")
+
+    range_start = pd.Timestamp(start, tz="UTC").to_pydatetime()
+    range_end = pd.Timestamp(end, tz="UTC").to_pydatetime()
+
+    try:
+        service = bar_services.for_app(app_id)
+    except Exception as exc:
+        raise BacktestError(
+            f"{app['name']} does not resolve to a venue this platform can read "
+            f"bars from: {exc}"
+        ) from exc
+
+    bounds = service.stored_bounds(
+        internal_cusip=internal_cusip,
+        tm_interval_id=tm_interval_id,
+        source_app_id=app_id,
+    )
+    if bounds is None:
+        raise BacktestError(
+            f"no {app['name']} bars captured for {internal_cusip} — subscribe to "
+            f"the series on the Market data page and backfill it, then re-run"
+        )
+
+    first_bar, last_bar = bounds
+    if first_bar > range_start or last_bar < range_end:
+        raise BacktestError(
+            f"{app['name']} bars for {internal_cusip} cover "
+            f"{first_bar.date()} to {last_bar.date()}, which does not span the "
+            f"requested {range_start.date()} to {range_end.date()} — backfill "
+            f"the missing history on the Market data page, or narrow the range. "
+            f"A venue cannot serve history from before the pair listed there"
+        )
+
+    df = service.read_bars(
+        internal_cusip=internal_cusip,
+        tm_interval_id=tm_interval_id,
+        source_app_id=app_id,
+        start=range_start,
+        end=range_end,
+    )
+    if df.empty:
+        raise BacktestError(
+            f"no {app['name']} bars for {internal_cusip} between "
+            f"{range_start.date()} and {range_end.date()}"
+        )
+    logger.info(
+        "backtest series: %s %s bars from %s (%d rows, %s → %s)",
+        internal_cusip, app["name"], "MARKET_DATA.PRICE_BAR",
+        len(df), df.index[0].date(), df.index[-1].date(),
+    )
+    return df
+
+
+def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_cache=None, bt_cache=None, refresh: bool = False, bar_services=None) -> pd.DataFrame:
+    """Fetch prices using the data source registered in REFDATA.APP.
 
     If *symbol* is an internal_cusip registered in INST.PRODUCT, the vendor
     symbol for the chosen data source is resolved automatically via
     ``InstrumentCache``.  Falls back to using *symbol* as-is when no
     instrument mapping exists (e.g. user typed a raw ticker).
 
-    When ``bt_cache`` is provided, delegates to
+    Two stores, chosen by what the source *is*. An **exchange**
+    (``IS_EXCHANGE_IND = 'Y'``) serves its own prints, which live in
+    ``MARKET_DATA.PRICE_BAR`` — read them, and skip the vendor class and the
+    ``BT.API_REQUEST`` cache entirely, because the bar table already is the
+    cache and copying it would create a second version of the same fact. Every
+    other source is a **provider** and keeps the path it always had.
+
+    That branch is what lets a strategy be fitted on the series it will trade:
+    before it existed, a crypto backtest could only read a provider's
+    ``BTC-USD`` while the deployment executed against an exchange's
+    ``BTCUSDT``, and nothing reported the substitution.
+
+    When ``bt_cache`` is provided (provider path only), delegates to
     ``BacktestCache.read_payload`` (when ``refresh=False`` — cache-only,
     raises ``CacheMissError`` translated to HTTP 400 by the caller if the
     cache cannot satisfy the request) or ``BacktestCache.refresh_payload``
@@ -68,10 +179,17 @@ def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_ca
 
     # Resolve internal_cusip → vendor_symbol via instrument cache
     ticker = symbol
+    vendor_symbol = None
     if inst_cache is not None:
-        vs = inst_cache.resolve_internal_cusip(symbol, app["app_id"])
-        if vs:
-            ticker = vs
+        vendor_symbol = inst_cache.resolve_internal_cusip(symbol, app["app_id"])
+        if vendor_symbol:
+            ticker = vendor_symbol
+
+    if app.get("is_exchange_ind") == "Y":
+        return _fetch_exchange_df(
+            symbol, start, end, app=app, refdata=cache,
+            bar_services=bar_services, vendor_symbol=vendor_symbol,
+        )
 
     cls = getattr(_data_module, app["class_name"])
     src = cls()
@@ -190,7 +308,7 @@ def _build_param_ranges(req):
 # ── Inline result builders (shared by stream_optimize and standalone endpoints) ──
 
 
-def _build_data_dict(req, cache, inst_cache=None, bt_cache=None) -> dict[str, pd.DataFrame]:
+def _build_data_dict(req, cache, inst_cache=None, bt_cache=None, bar_services=None) -> dict[str, pd.DataFrame]:
     """Fetch the main product and any cross-product factor data.
 
     Honours ``req.refresh_dataset``: when True, every product + factor is
@@ -209,7 +327,10 @@ def _build_data_dict(req, cache, inst_cache=None, bt_cache=None) -> dict[str, pd
 
     def _fetch(sym: str, ds: str) -> pd.DataFrame:
         try:
-            return fetch_df(sym, req.start, req.end, ds, cache, inst_cache, bt_cache, refresh=refresh)
+            return fetch_df(
+                sym, req.start, req.end, ds, cache, inst_cache, bt_cache,
+                refresh=refresh, bar_services=bar_services,
+            )
         except BacktestCache.CacheMissError as exc:
             raise BacktestError(str(exc)) from exc
 
@@ -369,8 +490,8 @@ def _build_wf_response(data_dict, config, window_list, signal_list,
 
 # ── Optimize ─────────────────────────────────────────────────────────────────
 
-def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None, bt_cache=None) -> OptimizeResponse:
-    data_dict = _build_data_dict(req, cache, inst_cache, bt_cache)
+def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None, bt_cache=None, bar_services=None) -> OptimizeResponse:
+    data_dict = _build_data_dict(req, cache, inst_cache, bt_cache, bar_services)
     callbacks = [callback] if callback else []
     config = build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
@@ -423,7 +544,7 @@ def _sse_event(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-async def stream_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache=None):
+async def stream_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache=None, bar_services=None):
     """Async generator yielding SSE events for optimization progress.
 
     Events:
@@ -437,7 +558,7 @@ async def stream_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache
 
     def _run():
         try:
-            data_dict = _build_data_dict(req, cache, inst_cache, bt_cache)
+            data_dict = _build_data_dict(req, cache, inst_cache, bt_cache, bar_services)
             config = build_config(req, cache)
             window_list, signal_list = _build_param_ranges(req)
 
@@ -508,8 +629,8 @@ async def stream_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache
 
 # ── Performance ───────────────────────────────────────────────────────────────
 
-def run_performance(req: PerformanceRequest, cache, inst_cache=None, bt_cache=None) -> PerformanceResponse:
-    data_dict = _build_data_dict(req, cache, inst_cache, bt_cache)
+def run_performance(req: PerformanceRequest, cache, inst_cache=None, bt_cache=None, bar_services=None) -> PerformanceResponse:
+    data_dict = _build_data_dict(req, cache, inst_cache, bt_cache, bar_services)
     config = build_config(req, cache)
 
     if len(req.factors) != len(req.windows) or len(req.factors) != len(req.signals):
@@ -530,8 +651,8 @@ def run_performance(req: PerformanceRequest, cache, inst_cache=None, bt_cache=No
 
 # ── Walk-Forward ──────────────────────────────────────────────────────────────
 
-def run_walk_forward(req: WalkForwardRequest, cache, inst_cache=None, bt_cache=None) -> WalkForwardResponse:
-    data_dict = _build_data_dict(req, cache, inst_cache, bt_cache)
+def run_walk_forward(req: WalkForwardRequest, cache, inst_cache=None, bt_cache=None, bar_services=None) -> WalkForwardResponse:
+    data_dict = _build_data_dict(req, cache, inst_cache, bt_cache, bar_services)
     config = build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
 

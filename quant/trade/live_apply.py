@@ -20,9 +20,8 @@ from quant.strategy.live_service import (
     LiveEvaluationError,
     compute_latest_position,
 )
-from quant.trade.bar_source import PriceBarServiceFactory
+from quant.trade.bar_source import PriceBarServiceFactory, resolve_signal_source
 from quant.trade.errors import AdapterNotFoundError, TradeValidationError
-from quant.trade.registry import exchange_id_for_app
 from quant.trade.models.order import IntendedAction, OrderResult
 from quant.trade.db_repo import TradeRepo
 from quant.trade.order_policy import OrderRetryExecutor, OrderRetryResult
@@ -160,42 +159,19 @@ class LiveApplyOrchestrator:
     def _resolve_signal_source(
         self, deployment: DeploymentRow
     ) -> tuple[BarLoader | None, str]:
-        """Pick the price series for this deployment, and name it.
+        """Pick the price series for this deployment — see ``resolve_signal_source``.
 
-        The rule is by venue, not by schedule: a live signal reads the bars of
-        the exchange it executes on whenever that exchange serves market data.
-        The schedule only sets the bar interval — without one the apply is
-        assumed daily. The provider path survives solely for brokers with no
-        market-data venue (e.g. Futu equities), where the provider series is
-        the only series that exists.
-
-        The label travels onto :class:`ApplyReport` because the two sources are
-        not the same numbers — parameters fitted on provider history are being
-        traded against exchange prints — and a divergence is only diagnosable
-        if the input is recorded alongside the output.
+        The rule lives in ``quant/trade/bar_source.py`` so the dry run resolves
+        it identically; a preview computed from a different series than the
+        order that follows is worse than no preview.
         """
-        venue = exchange_id_for_app(
-            deployment.app_id, refdata=self._data_caches.refdata
+        return resolve_signal_source(
+            app_id=deployment.app_id,
+            schedule_tm_interval_id=deployment.schedule_tm_interval_id,
+            data_caches=self._data_caches,
+            price_bars=self._price_bars,
+            what=f"deployment {deployment.deployment_id}",
         )
-        interval_id = deployment.schedule_tm_interval_id
-        if interval_id is None:
-            if venue is None:
-                return None, "provider"
-            interval_id = self._data_caches.refdata.resolve_interval_id(
-                timedelta(days=1)
-            )
-        if self._price_bars is None:
-            raise TradeValidationError(
-                f"deployment {deployment.deployment_id} needs exchange bars on "
-                f"interval {interval_id} but no price bar source is configured"
-            )
-        # for_app refuses venue-less apps, so a loader implies a named venue.
-        loader = functools.partial(
-            self._price_bars.for_app(deployment.app_id).load_window,
-            tm_interval_id=interval_id,
-            source_app_id=deployment.app_id,
-        )
-        return loader, f"price_bar:{venue}"
 
     def _report(
         self,

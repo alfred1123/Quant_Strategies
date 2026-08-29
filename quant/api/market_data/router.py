@@ -1,8 +1,16 @@
 """Market data router — /api/v1/market-data.
 
-Scheduled maintenance of ``MARKET_DATA.PRICE_BAR``. Driven by the scheduler
-Lambda (``price_bar_sync``), so its gate admits the service token as well as a
-signed-in user.
+Two kinds of caller. ``price-bars/sync`` is scheduled maintenance driven by the
+``price_bar_sync`` Lambda, so the router-level gate admits the service token as
+well as a signed-in user. Everything else here is a human action, and each one
+adds ``require_user`` on top: a service token must not be able to subscribe or
+backfill, because both spend exchange rate limit on behalf of somebody who did
+not ask. The router gate is a floor, not a ceiling.
+
+Subscriptions are not scoped to the caller. Bars are shared facts, so a
+subscription is a platform-wide request that any signed-in user can see and
+edit — including disable, which cools the series for everyone. Being signed in
+is what these routes check; ownership is not a thing a bar series has.
 """
 
 from __future__ import annotations
@@ -11,23 +19,60 @@ import logging
 
 from fastapi import APIRouter, Depends, Request
 
-from quant.api.auth.dependencies import require_user_or_service
+from quant.api.auth.dependencies import require_user, require_user_or_service
+from quant.api.auth.models import CurrentUser
+from quant.market_data.subscriptions import (
+    BarSubscriptionRepo,
+    BarSubscriptionService,
+    SubscriptionInstrumentSource,
+)
+from quant.market_data.warm import BarWarmer
 from quant.queue.repo import BtQueueRepo
+from quant.schemas.market_data import (
+    BackfillReport,
+    BackfillRequest,
+    BarSubscriptionRow,
+    Coverage,
+    SubscribeRequest,
+)
+from quant.trade.bar_source import DeploymentInstrumentSource
 from quant.trade.db_repo import TradeRepo
-from quant.trade.scheduler.warm import BarWarmer
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/market-data", tags=["market-data"])
 
 
+def _subscription_repo(request: Request) -> BarSubscriptionRepo:
+    return BarSubscriptionRepo(request.app.state.db_conninfo, user_id="system")
+
+
 def _get_bar_warmer(request: Request) -> BarWarmer:
+    """The warmer over both answers to "which instruments matter".
+
+    Deployments and subscriptions are unioned rather than kept in step, so a
+    series stays warm while either side wants it and cools when neither does.
+    """
     conninfo = request.app.state.db_conninfo
     bt = BtQueueRepo(conninfo, user_id="system")
-    repo = TradeRepo(conninfo, bt=bt, user_id="system")
-    # Application-scoped: the factory holds a long-lived bar repo connection and
-    # a ccxt client per venue, so it must not be rebuilt per request.
-    return BarWarmer(repo, request.app.state.price_bars)
+    trade = TradeRepo(conninfo, bt=bt, user_id="system")
+    return BarWarmer(
+        [
+            DeploymentInstrumentSource(trade),
+            SubscriptionInstrumentSource(_subscription_repo(request)),
+        ],
+        # Application-scoped: the factory holds a long-lived bar repo connection
+        # and a ccxt client per venue, so it must not be rebuilt per request.
+        request.app.state.price_bars,
+    )
+
+
+def _get_subscriptions(request: Request) -> BarSubscriptionService:
+    return BarSubscriptionService(
+        _subscription_repo(request),
+        request.app.state.data_caches.instrument_cache,
+        request.app.state.price_bars,
+    )
 
 
 @router.post("/price-bars/sync")
@@ -35,7 +80,7 @@ def sync_price_bars(
     caller: str = Depends(require_user_or_service),
     warmer: BarWarmer = Depends(_get_bar_warmer),
 ) -> dict:
-    """Pre-fetch bars for every instrument a scheduled deployment will trade.
+    """Pre-fetch bars for every series a deployment or a subscription wants.
 
     Always 200, even when individual instruments fail: this is a best-effort
     warm-up and the apply path re-checks and fails closed on its own. Reporting
@@ -62,3 +107,103 @@ def sync_price_bars(
             for r in report.results
         ],
     }
+
+
+@router.get("/subscriptions", response_model=list[BarSubscriptionRow])
+def list_subscriptions(
+    _user: CurrentUser = Depends(require_user),
+    svc: BarSubscriptionService = Depends(_get_subscriptions),
+) -> list[BarSubscriptionRow]:
+    """Every subscription, each with what has been captured so far."""
+    return [BarSubscriptionRow(**row) for row in svc.list_subscriptions()]
+
+
+@router.post("/subscriptions", response_model=BarSubscriptionRow)
+def subscribe(
+    req: SubscribeRequest,
+    _user: CurrentUser = Depends(require_user),
+    svc: BarSubscriptionService = Depends(_get_subscriptions),
+) -> BarSubscriptionRow:
+    """Create a subscription, or version one that already exists.
+
+    Not 201: the same route enables, disables and retargets, and only one of
+    those creates anything. Subscribing does not fetch — it makes the series
+    eligible for the next warm pass, and history comes from backfill.
+    """
+    row = svc.subscribe(
+        internal_cusip=req.internal_cusip,
+        tm_interval_id=req.tm_interval_id,
+        source_app_id=req.source_app_id,
+        is_enabled_ind=req.is_enabled_ind,
+        backfill_from_ts=req.backfill_from_ts,
+        bar_subscription_id=req.bar_subscription_id,
+    )
+    return BarSubscriptionRow(
+        **row,
+        coverage=Coverage(
+            **svc.coverage(
+                internal_cusip=req.internal_cusip,
+                tm_interval_id=req.tm_interval_id,
+                source_app_id=req.source_app_id,
+            )
+        ),
+    )
+
+
+@router.get("/price-bars/coverage", response_model=Coverage)
+def price_bar_coverage(
+    internal_cusip: str,
+    tm_interval_id: int,
+    source_app_id: int,
+    _user: CurrentUser = Depends(require_user),
+    svc: BarSubscriptionService = Depends(_get_subscriptions),
+) -> Coverage:
+    """First bar, last bar and gap count for one series.
+
+    Not scoped to a subscription — coverage is a property of the stored bars,
+    which are shared facts, so it answers for a series you have not subscribed
+    to as readily as one you have.
+    """
+    return Coverage(
+        **svc.coverage(
+            internal_cusip=internal_cusip,
+            tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
+        )
+    )
+
+
+@router.post("/price-bars/backfill", response_model=BackfillReport)
+def backfill_price_bars(
+    req: BackfillRequest,
+    user: CurrentUser = Depends(require_user),
+    svc: BarSubscriptionService = Depends(_get_subscriptions),
+) -> BackfillReport:
+    """Fill an explicit range, reporting what the venue would not serve.
+
+    Synchronous, and it can be slow: a long range is many paginated exchange
+    calls. That is the deliberate shape — a background filler would need
+    progress tracking, and the honest alternative is a caller who waits and is
+    told exactly what arrived.
+    """
+    result = svc.backfill(
+        internal_cusip=req.internal_cusip,
+        tm_interval_id=req.tm_interval_id,
+        source_app_id=req.source_app_id,
+        start=req.start,
+        end=req.end,
+    )
+    logger.info(
+        "price-bars/backfill %s interval=%s app=%s: %d inserted, %d unfilled, caller=%s",
+        req.internal_cusip, req.tm_interval_id, req.source_app_id,
+        result.inserted, len(result.unfilled), user.app_user_id,
+    )
+    return BackfillReport(
+        start=result.start,
+        end=result.end,
+        expected=result.expected,
+        missing=result.missing,
+        inserted=result.inserted,
+        unfilled=list(result.unfilled),
+        is_continuous=result.is_continuous,
+    )

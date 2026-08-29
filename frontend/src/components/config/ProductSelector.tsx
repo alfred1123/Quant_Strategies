@@ -104,7 +104,20 @@ export default function ProductSelector({
           onChange={e => onChange({ dataSource: e.target.value || undefined })}
         >
           {apps.map(a => (
-            <MenuItem key={a.app_id} value={a.name}>{a.display_name}</MenuItem>
+            <MenuItem key={a.app_id} value={a.name}>
+              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
+                {a.display_name}
+                {a.is_exchange_ind === 'Y' && (
+                  // An exchange serves its own prints out of MARKET_DATA.PRICE_BAR
+                  // — the same series a deployment on that venue trades against.
+                  // Worth naming, because picking it is what makes a backtest
+                  // and its live apply agree.
+                  <Typography variant="caption" color="text.secondary">
+                    captured bars
+                  </Typography>
+                )}
+              </Box>
+            </MenuItem>
           ))}
         </Select>
       </FormControl>

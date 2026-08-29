@@ -817,22 +817,29 @@ class PriceBarRepo(DbGateway):
 
 `CcxtBarFetcher` paginates `fetch_ohlcv` across the requested window and drops anything past the last closed boundary. It builds a **keyless** ccxt client rather than reusing `CcxtTradeGateway`: bars are public data, and market data must not depend on a user's API credentials or on a trading session being up. `PriceBarService` depends on the `BarFetcher` protocol, not on ccxt.
 
-### 7.8 Scheduled bar warming — `quant/trade/scheduler/warm.py`
+### 7.8 Scheduled bar warming — `quant/market_data/warm.py`
 
-`BarWarmer` is the `price_bar_sync` task: it reads every instrument a scheduled
-deployment will trade and pre-fetches its bars, so the applies find them stored.
+`BarWarmer` is the `price_bar_sync` task: it pre-fetches the bars somebody is
+about to want, so the applies find them stored.
 
-It lives in `quant/trade/` rather than `quant/market_data/` because the question
-it answers — *which* instruments matter — is a deployment question. Composition
-runs one way only: `quant/market_data/` still knows nothing about deployments.
+**It moved here from `quant/trade/scheduler/warm.py`.** The original
+justification for the trade package was that the question it answers — *which*
+instruments matter — is a deployment question. [Market data
+capture](market-data-capture.md) is what stopped that being true: a subscription
+is an equally good answer, so warming became a market-data job with a trading
+input. The warmer now takes `InstrumentSource` implementations and unions them,
+and composition still runs one way only — `quant/market_data/` knows a protocol,
+not deployments ([decision #50](../decisions.md)).
 
-**The read is new.** Neither existing query fits, which is why
-`TRADE.SP_GET_SCHEDULED_INSTRUMENTS` exists: `SP_GET_MISSED_DUE_DEPLOYMENTS`
-returns only rows already *due*, and warming has to happen before a deployment
-comes due; `SP_GET_DEPLOYMENT` requires `IN_APP_USER_ID` and so cannot see the
-whole estate. It returns `DISTINCT (TM_INTERVAL_ID, INTERNAL_CUSIP, APP_ID)` for
-every interval in one read — the warmer sweeps all of them, and an interval with
-no deployments simply contributes no rows.
+**The reads.** `TRADE.SP_GET_SCHEDULED_INSTRUMENTS` exists because neither
+existing deployment query fits: `SP_GET_MISSED_DUE_DEPLOYMENTS` returns only
+rows already *due*, and warming has to happen before a deployment comes due;
+`SP_GET_DEPLOYMENT` requires `IN_APP_USER_ID` and so cannot see the whole
+estate. It returns `DISTINCT (TM_INTERVAL_ID, INTERNAL_CUSIP, APP_ID)` for every
+interval in one read. `MARKET_DATA.SP_GET_ACTIVE_BAR_SUBSCRIPTIONS` returns the
+same three columns under the same names, which is what makes the union a
+concatenation rather than a translation. The warmer sweeps all intervals, and
+one nobody uses simply contributes no rows.
 
 Rows are grouped by `(interval, venue)` and each group becomes one
 `PriceBarService.sync` call. Venue is part of the key because a `PriceBarService`
@@ -845,6 +852,11 @@ trade. That is what licenses the broad `except` per group: one unreachable venue
 must not stop the rest of the estate. It is also why a partial failure still
 returns 200 — reporting it as an error would make the Lambda log a pass that did
 most of its work as failed.
+
+The tolerance stops at the sources. A venue that will not answer is weather; a
+source that cannot be *read* is a missing procedure or a dead connection, and
+warming a partial estate while reporting success would hide it — so that one
+raises.
 
 **Lookback is fixed**, sized by the same `live_lookback_bars` rule the live path
 uses. The warmer cannot know each deployment's indicator windows without reading
@@ -909,7 +921,8 @@ what every downstream "newest closed bar" derives from.
 | `quant/trade/scheduler/tick.py` | `ScheduleTickRunner` — due rows → apply → advance, with a cross-pass attempt budget. One interval per call |
 | `quant/trade/scheduler/sweep.py` | `ScheduleSweeper` — one tick per interval, plus the boundary settle. Shared by the endpoint and the poller (§6.2) |
 | `quant/trade/scheduler/poller.py` | `SchedulePoller` — dev asyncio loop supplying wakeups, with a startup catch-up drain |
-| `quant/trade/scheduler/warm.py` | `BarWarmer` — the `price_bar_sync` task: scheduled instruments → grouped `PriceBarService.sync` (§7.8) |
+| `quant/market_data/warm.py` | `BarWarmer` — the `price_bar_sync` task: scheduled instruments ∪ subscriptions → grouped `PriceBarService.sync` (§7.8) |
+| `quant/market_data/subscriptions.py` | `BarSubscriptionRepo` / `BarSubscriptionService` — capture requests with no deployment behind them ([market-data-capture.md](market-data-capture.md)) |
 | `quant/api/market_data/router.py` | `POST /api/v1/market-data/price-bars/sync` — service-token gated |
 | `quant/api/scheduler/router.py` | `POST /api/v1/scheduler/tick` — service-token gated; the platform's own wakeup |
 | `config/scheduler/price_bar_sync.yml` | Hourly warm schedule, on the boundary |
