@@ -565,3 +565,45 @@ class TradeRepo(DbGateway):
             "NULL::refcursor, NULL::text, NULL::text, NULL::text)",
             (),
         )
+
+    def sp_get_execution_event(
+        self,
+        *,
+        app_user_id: UUID,
+        deployment_id: UUID | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Recent execution diary rows for one user."""
+        _require(app_user_id, "app_user_id")
+        clamped = max(1, min(int(limit), 200))
+        return self._call_get(
+            "CALL trade.sp_get_execution_event("
+            "%s::uuid, %s::uuid, %s::integer,"
+            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (
+                str(app_user_id),
+                str(deployment_id) if deployment_id else None,
+                clamped,
+            ),
+        )
+
+    def sp_get_transaction(
+        self,
+        *,
+        app_user_id: UUID,
+        deployment_id: UUID | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Recent broker-confirmed fills for one user."""
+        _require(app_user_id, "app_user_id")
+        clamped = max(1, min(int(limit), 200))
+        return self._call_get(
+            "CALL trade.sp_get_transaction("
+            "%s::uuid, %s::uuid, %s::integer,"
+            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (
+                str(app_user_id),
+                str(deployment_id) if deployment_id else None,
+                clamped,
+            ),
+        )

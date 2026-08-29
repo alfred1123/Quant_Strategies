@@ -21,6 +21,8 @@ vi.mock('../api/auth', () => ({
 
 vi.mock('../api/trade', () => ({
   DEPLOYMENTS_QUERY_KEY: ['trade', 'deployments'],
+  EXECUTION_EVENTS_QUERY_KEY: ['trade', 'execution-events'],
+  TRANSACTIONS_QUERY_KEY: ['trade', 'transactions'],
   useDeployments: vi.fn(),
   useCreateDeployment: () => ({ mutate: vi.fn(), isPending: false }),
   useDryRun: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -28,6 +30,8 @@ vi.mock('../api/trade', () => ({
   useUpdateDeployment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useStopDeployment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useAccountSnapshot: () => ({ data: undefined, isLoading: false, isFetching: false }),
+  useExecutionEvents: () => ({ data: [], isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
+  useTransactions: () => ({ data: [], isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
 }));
 
 vi.mock('../api/credentials', () => ({

@@ -16,6 +16,7 @@ from quant.schemas.account import AccountSnapshot, BalanceRow, PositionRow
 from quant.schemas.apply import ApplyReport
 from quant.schemas.deployments import DeploymentRow
 from quant.schemas.dry_run import DryRunReport
+from quant.schemas.execution import ExecutionEventRow, TransactionRow
 from quant.trade.errors import TradeValidationError
 from quant.trade.errors import DeploymentNotFound
 from quant.trade.models.order import IntendedAction
@@ -472,3 +473,90 @@ class TestAccountSnapshot:
 
         assert resp.status_code == 200
         assert resp.json()["positions"] == []
+
+
+class TestExecutionLog:
+    def _event_row(self, user_id) -> ExecutionEventRow:
+        return ExecutionEventRow(
+            execution_event_id=uuid.uuid4(),
+            deployment_id=uuid.uuid4(),
+            deployment_vid=1,
+            internal_cusip="btcusdt.crypto",
+            api_credential_id=1,
+            app_id=10,
+            is_paper_ind="Y",
+            signal_value=Decimal("1.25"),
+            position_qty=Decimal("0"),
+            buy_sell_cd="BUY",
+            quantity=Decimal("0.01"),
+            vendor_order_id="ord-123",
+            is_success_ind="Y",
+            transact_at=datetime(2026, 8, 29, 10, 0, tzinfo=timezone.utc),
+        )
+
+    def test_list_execution_events(self, client_and_svc):
+        client, svc, user = client_and_svc
+        row = self._event_row(user.app_user_id)
+        svc.list_execution_events.return_value = [row]
+
+        resp = client.get("/api/v1/trade/execution-events?limit=20")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["buy_sell_cd"] == "BUY"
+        svc.list_execution_events.assert_called_once_with(
+            user.app_user_id,
+            deployment_id=None,
+            limit=20,
+        )
+
+    def test_list_deployment_events(self, client_and_svc):
+        client, svc, user = client_and_svc
+        dep_id = uuid.uuid4()
+        svc.list_execution_events.return_value = []
+
+        resp = client.get(f"/api/v1/trade/deployments/{dep_id}/events?limit=5")
+
+        assert resp.status_code == 200
+        svc.list_execution_events.assert_called_once_with(
+            user.app_user_id,
+            deployment_id=dep_id,
+            limit=5,
+        )
+
+    def test_list_transactions(self, client_and_svc):
+        client, svc, user = client_and_svc
+        row = TransactionRow(
+            transaction_id=uuid.uuid4(),
+            deployment_id=uuid.uuid4(),
+            deployment_vid=1,
+            internal_cusip="btcusdt.crypto",
+            api_credential_id=1,
+            app_id=10,
+            is_paper_ind="Y",
+            vendor_symbol="BTCUSDT",
+            buy_sell_cd="BUY",
+            quantity=Decimal("0.01"),
+            price=Decimal("60000"),
+            notional_amt=Decimal("600"),
+            fee_amt=Decimal("0.1"),
+            vendor_order_id="ord-456",
+            trans_ccy_cd="USDT",
+            filled_at=datetime(2026, 8, 29, 10, 1, tzinfo=timezone.utc),
+        )
+        svc.list_transactions.return_value = [row]
+
+        resp = client.get("/api/v1/trade/transactions")
+
+        assert resp.status_code == 200
+        assert resp.json()[0]["vendor_symbol"] == "BTCUSDT"
+        svc.list_transactions.assert_called_once()
+
+    def test_deployment_not_found_returns_404(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        dep_id = uuid.uuid4()
+        svc.list_execution_events.side_effect = DeploymentNotFound(str(dep_id))
+
+        resp = client.get(f"/api/v1/trade/deployments/{dep_id}/events")
+        assert resp.status_code == 404

@@ -7,12 +7,18 @@ import type {
   DeploymentRow,
   DryRunReport,
   DryRunRequest,
+  ExecutionEventRow,
+  TransactionRow,
   UpdateDeploymentRequest,
 } from '../types/trade';
 
 export const DEPLOYMENTS_QUERY_KEY = ['trade', 'deployments'] as const;
 
 export const ACCOUNT_SNAPSHOT_QUERY_KEY = ['trade', 'account-snapshot'] as const;
+
+export const EXECUTION_EVENTS_QUERY_KEY = ['trade', 'execution-events'] as const;
+
+export const TRANSACTIONS_QUERY_KEY = ['trade', 'transactions'] as const;
 
 async function listDeployments(): Promise<DeploymentRow[]> {
   const { data } = await apiClient.get<DeploymentRow[]>('/trade/deployments');
@@ -70,6 +76,20 @@ async function fetchAccountSnapshot(
   return data;
 }
 
+async function listExecutionEvents(limit = 50): Promise<ExecutionEventRow[]> {
+  const { data } = await apiClient.get<ExecutionEventRow[]>('/trade/execution-events', {
+    params: { limit },
+  });
+  return data;
+}
+
+async function listTransactions(limit = 50): Promise<TransactionRow[]> {
+  const { data } = await apiClient.get<TransactionRow[]>('/trade/transactions', {
+    params: { limit },
+  });
+  return data;
+}
+
 /** Current user's open deployment rows (Phase 1.2). */
 export function useDeployments() {
   return useQuery({
@@ -84,6 +104,8 @@ export function useCreateDeployment() {
     mutationFn: createDeployment,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: DEPLOYMENTS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: EXECUTION_EVENTS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: TRANSACTIONS_QUERY_KEY });
     },
   });
 }
@@ -98,6 +120,8 @@ export function useApplyDeployment() {
     mutationFn: applyDeployment,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: DEPLOYMENTS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: EXECUTION_EVENTS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: TRANSACTIONS_QUERY_KEY });
     },
   });
 }
@@ -140,6 +164,26 @@ export function useAccountSnapshot(
     enabled: apiCredentialId !== null,
     staleTime: 30_000,
     retry: false,
+  });
+}
+
+/** Recent order attempts — respects toolbar filters client-side. */
+export function useExecutionEvents(limit = 50) {
+  return useQuery({
+    queryKey: [...EXECUTION_EVENTS_QUERY_KEY, limit],
+    queryFn: () => listExecutionEvents(limit),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+}
+
+/** Recent broker-confirmed fills — respects toolbar filters client-side. */
+export function useTransactions(limit = 50) {
+  return useQuery({
+    queryKey: [...TRANSACTIONS_QUERY_KEY, limit],
+    queryFn: () => listTransactions(limit),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
   });
 }
 

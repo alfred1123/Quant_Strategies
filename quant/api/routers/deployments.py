@@ -21,6 +21,7 @@ from quant.schemas.deployments import (
     UpdateDeploymentRequest,
 )
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
+from quant.schemas.execution import ExecutionEventRow, TransactionRow
 from quant.trade.db_repo import TradeRepo
 from quant.trade.service import TradeService
 
@@ -145,3 +146,67 @@ def apply_deployment(
     svc: TradeService = Depends(get_trade_service),
 ) -> ApplyReport:
     return svc.apply_deployment(user.app_user_id, deployment_id)
+
+
+@router.get("/execution-events", response_model=list[ExecutionEventRow])
+def list_execution_events(
+    limit: int = 50,
+    deployment_id: UUID | None = None,
+    user: CurrentUser = Depends(require_user),
+    svc: TradeService = Depends(get_trade_service),
+) -> list[ExecutionEventRow]:
+    """Recent order attempts across the caller's deployments."""
+    return svc.list_execution_events(
+        user.app_user_id,
+        deployment_id=deployment_id,
+        limit=limit,
+    )
+
+
+@router.get("/transactions", response_model=list[TransactionRow])
+def list_transactions(
+    limit: int = 50,
+    deployment_id: UUID | None = None,
+    user: CurrentUser = Depends(require_user),
+    svc: TradeService = Depends(get_trade_service),
+) -> list[TransactionRow]:
+    """Recent broker-confirmed fills across the caller's deployments."""
+    return svc.list_transactions(
+        user.app_user_id,
+        deployment_id=deployment_id,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/deployments/{deployment_id}/events",
+    response_model=list[ExecutionEventRow],
+)
+def list_deployment_events(
+    deployment_id: UUID,
+    limit: int = 50,
+    user: CurrentUser = Depends(require_user),
+    svc: TradeService = Depends(get_trade_service),
+) -> list[ExecutionEventRow]:
+    return svc.list_execution_events(
+        user.app_user_id,
+        deployment_id=deployment_id,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/deployments/{deployment_id}/transactions",
+    response_model=list[TransactionRow],
+)
+def list_deployment_transactions(
+    deployment_id: UUID,
+    limit: int = 50,
+    user: CurrentUser = Depends(require_user),
+    svc: TradeService = Depends(get_trade_service),
+) -> list[TransactionRow]:
+    return svc.list_transactions(
+        user.app_user_id,
+        deployment_id=deployment_id,
+        limit=limit,
+    )

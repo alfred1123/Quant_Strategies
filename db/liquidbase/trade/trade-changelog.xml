@@ -24,5 +24,6 @@
     <include file="releases/1.5.0-log-duration-clock-timestamp.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.6.0-scheduled-instruments.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.7.0-execution-event-position.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.8.0-execution-log-reads.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

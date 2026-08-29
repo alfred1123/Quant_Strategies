@@ -15,6 +15,7 @@ import AppModeSwitch from '../components/AppModeSwitch';
 import BrandMark from '../components/BrandMark';
 import { APP_NAME } from '../constants/brand';
 import TradeNavBar from '../components/trade/TradeNavBar';
+import ExecutionLogPanel from '../components/trade/ExecutionLogPanel';
 import { useMe } from '../api/auth';
 import { TradeSessionProvider } from '../trade/TradeSessionContext';
 
@@ -25,7 +26,7 @@ const NAV_ITEMS = [
   { to: '/trade/apply', label: 'Trade' },
 ] as const;
 
-/** Phase 1.4 — Trade tab shell: sidebar, filters, main content, execution log placeholder. */
+/** Phase 1.4+ — Trade tab shell: sidebar, filters, main content, execution log. */
 export default function TradeLayout() {
   const { data: currentUser } = useMe();
   const location = useLocation();
@@ -110,17 +111,14 @@ export default function TradeLayout() {
                 mt: 0,
                 p: 2,
                 minHeight: 120,
+                maxHeight: 360,
+                overflow: 'auto',
                 bgcolor: 'background.paper',
                 border: '1px solid',
                 borderColor: 'divider',
               }}
             >
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Execution log
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                Recent orders and fills will appear here (Phase 1.8).
-              </Typography>
+              <ExecutionLogPanel />
             </Paper>
           </Box>
         </Box>

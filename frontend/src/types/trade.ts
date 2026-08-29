@@ -128,3 +128,41 @@ export interface AccountSnapshot {
   balances: BalanceRow[];
   positions: PositionRow[];
 }
+
+/** One TRADE.EXECUTION_EVENT row — order attempt / HOLD diary entry. */
+export interface ExecutionEventRow {
+  execution_event_id: string;
+  deployment_id: string;
+  deployment_vid: number;
+  internal_cusip: string;
+  api_credential_id: number;
+  app_id: number;
+  is_paper_ind: 'Y' | 'N';
+  signal_value: string | null;
+  position_qty: string | null;
+  buy_sell_cd: string;
+  quantity: string | null;
+  vendor_order_id: string | null;
+  is_success_ind: 'Y' | 'N';
+  transact_at: string;
+}
+
+/** One TRADE.TRANSACTION row — broker-confirmed fill. */
+export interface TransactionRow {
+  transaction_id: string;
+  deployment_id: string;
+  deployment_vid: number;
+  internal_cusip: string;
+  api_credential_id: number;
+  app_id: number;
+  is_paper_ind: 'Y' | 'N';
+  vendor_symbol: string | null;
+  buy_sell_cd: string;
+  quantity: string | null;
+  price: string | null;
+  notional_amt: string | null;
+  fee_amt: string | null;
+  vendor_order_id: string | null;
+  trans_ccy_cd: string;
+  filled_at: string;
+}

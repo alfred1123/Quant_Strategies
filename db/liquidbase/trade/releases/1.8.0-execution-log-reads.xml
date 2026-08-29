@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Phase 1.8 — read paths for the Trade execution log panel.
+    -->
+
+    <changeSet id="1.8.0-001-sp-get-execution-event" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_GET_EXECUTION_EVENT — user-scoped execution diary read</comment>
+        <sqlFile path="../procedures/SP_GET_EXECUTION_EVENT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback>
+            DROP PROCEDURE IF EXISTS TRADE.SP_GET_EXECUTION_EVENT(
+                UUID, UUID, INTEGER,
+                OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+            );
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.8.0-002-sp-get-transaction" author="alfcheun" context="trade,prod-deploy" runOnChange="true">
+        <comment>SP_GET_TRANSACTION — user-scoped fill history read</comment>
+        <sqlFile path="../procedures/SP_GET_TRANSACTION.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback>
+            DROP PROCEDURE IF EXISTS TRADE.SP_GET_TRANSACTION(
+                UUID, UUID, INTEGER,
+                OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+            );
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

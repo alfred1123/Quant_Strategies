@@ -17,6 +17,7 @@ from quant.schemas.deployments import (
     UpdateDeploymentRequest,
 )
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
+from quant.schemas.execution import ExecutionEventRow, TransactionRow
 from quant.trade.account import fetch_account_snapshot
 from quant.trade.bar_source import PriceBarServiceFactory
 from quant.trade.db_repo import TradeRepo
@@ -204,3 +205,35 @@ class TradeService:
             adapter_registry=self._adapter_registry,
             data_caches=self._data_caches,
         )
+
+    def list_execution_events(
+        self,
+        app_user_id: UUID,
+        *,
+        deployment_id: UUID | None = None,
+        limit: int = 50,
+    ) -> list[ExecutionEventRow]:
+        if deployment_id is not None:
+            self.get_deployment(app_user_id, deployment_id)
+        rows = self._repo.sp_get_execution_event(
+            app_user_id=app_user_id,
+            deployment_id=deployment_id,
+            limit=limit,
+        )
+        return [ExecutionEventRow.model_validate(r) for r in rows]
+
+    def list_transactions(
+        self,
+        app_user_id: UUID,
+        *,
+        deployment_id: UUID | None = None,
+        limit: int = 50,
+    ) -> list[TransactionRow]:
+        if deployment_id is not None:
+            self.get_deployment(app_user_id, deployment_id)
+        rows = self._repo.sp_get_transaction(
+            app_user_id=app_user_id,
+            deployment_id=deployment_id,
+            limit=limit,
+        )
+        return [TransactionRow.model_validate(r) for r in rows]

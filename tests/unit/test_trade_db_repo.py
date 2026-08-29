@@ -384,3 +384,24 @@ class TestCallMatchesProcedureDdl:
         assert _call_arg_count(sql) == _ddl_param_count(
             "SP_GET_SCHEDULED_INSTRUMENTS.sql"
         )
+
+    @patch.object(TradeRepo, "_call_get", return_value=[])
+    def test_get_execution_event(self, mock_get, repo):
+        uid = uuid4()
+        repo.sp_get_execution_event(app_user_id=uid, limit=25)
+        sql = mock_get.call_args.args[0]
+        assert _call_arg_count(sql) == _ddl_param_count(
+            "SP_GET_EXECUTION_EVENT.sql"
+        )
+        assert mock_get.call_args.args[1][2] == 25
+
+    @patch.object(TradeRepo, "_call_get", return_value=[])
+    def test_get_execution_event_clamps_limit(self, mock_get, repo):
+        repo.sp_get_execution_event(app_user_id=uuid4(), limit=999)
+        assert mock_get.call_args.args[1][2] == 200
+
+    @patch.object(TradeRepo, "_call_get", return_value=[])
+    def test_get_transaction(self, mock_get, repo):
+        repo.sp_get_transaction(app_user_id=uuid4(), deployment_id=uuid4(), limit=10)
+        sql = mock_get.call_args.args[0]
+        assert _call_arg_count(sql) == _ddl_param_count("SP_GET_TRANSACTION.sql")
