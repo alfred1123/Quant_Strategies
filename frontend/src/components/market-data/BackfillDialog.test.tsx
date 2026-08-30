@@ -21,6 +21,7 @@ function subscription(overrides: Partial<BarSubscriptionRow> = {}): BarSubscript
     bar_subscription_id: 'a1b2c3d4-0000-4000-8000-000000000001',
     bar_subscription_vid: 1,
     internal_cusip: 'btcusdt.crypto',
+    vendor_symbol: 'BTCUSDT',
     tm_interval_id: 1,
     source_app_id: 34,
     is_enabled_ind: 'Y',
