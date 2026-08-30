@@ -27,8 +27,7 @@ function isoDate(value: string | null | undefined): string {
 }
 
 /** What one click will do, in the units the user is looking at. */
-function passSummary(plan: BackfillPlan | undefined): string {
-  if (!plan) return 'Working out what is left to fetch…';
+function passSummary(plan: BackfillPlan): string {
   if (!plan.start || !plan.end) {
     return 'Nothing older to fetch — this series already reaches the target.';
   }
@@ -141,9 +140,35 @@ function BackfillDialogContent({
             fullWidth
           />
 
-          <Alert severity={nothingLeft ? 'success' : 'info'}>
-            {passSummary(plan)}
-          </Alert>
+          {/*
+            Three states, not two. An unanswered plan and a failed one both
+            leave `plan` undefined, and collapsing them renders a dead dialog:
+            "working out what is left to fetch" forever, next to a disabled
+            button, with the actual cause — an expired session, a backend
+            without the route — never shown. Waiting has to be distinguishable
+            from broken, and broken has to be retryable.
+          */}
+          {planQuery.isError ? (
+            <Alert
+              severity="error"
+              action={
+                <Button size="small" onClick={() => void planQuery.refetch()}>
+                  Retry
+                </Button>
+              }
+            >
+              Could not work out what is left to fetch:{' '}
+              {planQuery.error instanceof Error
+                ? planQuery.error.message
+                : 'the request failed'}
+            </Alert>
+          ) : plan ? (
+            <Alert severity={nothingLeft ? 'success' : 'info'}>
+              {passSummary(plan)}
+            </Alert>
+          ) : (
+            <Alert severity="info">Working out what is left to fetch…</Alert>
+          )}
 
           {plan && plan.passes_remaining > 1 && (
             <Typography variant="caption" color="text.secondary">
