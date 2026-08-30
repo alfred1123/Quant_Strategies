@@ -358,6 +358,26 @@ back as the venue still retains them.
 The paused section is hidden entirely when nothing is paused, so the common case
 is one list.
 
+### 6.1a "Continuous" is not "finished"
+
+The green *continuous* chip means only that there are no holes **inside** what is
+stored. It says nothing about reaching the target, and the two are easy to
+confuse when they sit in adjacent columns: a daily series complete back to the
+venue's first bar and an hourly series one year into a six-year target both
+rendered the same green, and the only colour on either row said success.
+
+So a row short of its target now says by how much, in days. Days rather than
+bars because a bar count needs the interval's period, and fetching that per row
+to label a table is a cost the backfill dialog already pays once — where it can
+also say how many passes remain, which is the more useful form of the same fact.
+
+A target the venue can never meet is a different failure and is prevented at the
+source ([§5.1](#51-the-venues-floor-not-a-date-somebody-typed)): rows created
+before that defaulted to whatever was typed, and one asking for 2017-01-01 on a
+pair listed in 2020 would now show a permanent shortfall against history that
+never existed. Such rows are retargeted to the venue floor rather than being
+special-cased in the display.
+
 ### 6.2 The vendor symbol belongs on the row
 
 Each row carries the ticker the **venue** prints — `BTCUSDT` — beside the

@@ -40,6 +40,43 @@ function formatDay(value: string | null): string {
   return value ? value.slice(0, 10) : '—';
 }
 
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * How far the capture still is from what was asked for.
+ *
+ * "Continuous" only means there are no holes *inside* what is stored, so a
+ * series one month into a six-year target renders exactly as green as one that
+ * is finished. The two columns sat side by side and left the reader to work out
+ * the distance between them, while the only colour on the row said success.
+ *
+ * Measured in days rather than bars on purpose: bars need the interval's
+ * period, and fetching that per row to label a table is a cost the backfill
+ * dialog already pays once, where it can also say how many passes remain.
+ */
+function shortfallDays(target: string | null, firstBar: string | null): number {
+  if (!target || !firstBar) return 0;
+  const gap = Date.parse(firstBar) - Date.parse(target);
+  return gap > 0 ? Math.floor(gap / MS_PER_DAY) : 0;
+}
+
+function WantedFromCell({ row }: { row: BarSubscriptionRow }) {
+  const short = shortfallDays(row.backfill_from_ts, row.coverage.first_bar);
+  return (
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+      <Typography variant="body2">{formatDay(row.backfill_from_ts)}</Typography>
+      {short > 0 && (
+        <Chip
+          size="small"
+          color="warning"
+          variant="outlined"
+          label={`${short.toLocaleString()} days short`}
+        />
+      )}
+    </Stack>
+  );
+}
+
 /**
  * Coverage is the column the page exists for.
  *
@@ -162,7 +199,7 @@ function SubscriptionTable({
                 <TableCell>
                   <CoverageCell coverage={row.coverage} />
                 </TableCell>
-                <TableCell>{formatDay(row.backfill_from_ts)}</TableCell>
+                <TableCell><WantedFromCell row={row} /></TableCell>
                 <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
                   <Tooltip title="Backfill history">
                     <IconButton size="small" onClick={() => onBackfill(row)}>
