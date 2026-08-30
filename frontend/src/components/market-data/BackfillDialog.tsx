@@ -10,11 +10,11 @@ import {
   Typography,
 } from '@mui/material';
 import { useState } from 'react';
-import { useBackfill, useVenueDepth } from '../../api/marketData';
+import { useBackfill, useBackfillPlan, useVenueDepth } from '../../api/marketData';
 import type {
+  BackfillPlan,
   BackfillReport,
   BarSubscriptionRow,
-  VenueDepth,
 } from '../../types/marketData';
 
 interface BackfillDialogProps {
@@ -26,31 +26,40 @@ function isoDate(value: string | null | undefined): string {
   return value ? value.slice(0, 10) : '';
 }
 
-/**
- * Whether the venue holds more than one pass can store.
- *
- * Warned about before the click rather than after the refusal, so the cost of
- * a minute-scale series is visible while it is still a choice.
- */
-function tooLarge(depth: VenueDepth | undefined, start: string): boolean {
-  if (!depth?.bars_available || !depth.earliest || !start) return false;
-  return start <= isoDate(depth.earliest)
-    && depth.bars_available > depth.max_backfill_bars;
+/** What one click will do, in the units the user is looking at. */
+function passSummary(plan: BackfillPlan | undefined): string {
+  if (!plan) return 'Working out what is left to fetch…';
+  if (!plan.start || !plan.end) {
+    return 'Nothing older to fetch — this series already reaches the target.';
+  }
+  const window = `${isoDate(plan.start)} to ${isoDate(plan.end)}`;
+  const bars = `${plan.bars.toLocaleString()} bar(s)`;
+  return plan.passes_remaining > 1
+    ? `This pass fetches ${window} — ${bars}. `
+      + `${plan.passes_remaining} passes to reach ${isoDate(plan.target)}.`
+    : `This pass fetches ${window} — ${bars}, reaching ${isoDate(plan.target)}.`;
 }
 
 /**
- * Fill history for one series, back to wherever the venue's records start.
+ * Fill history for one series, one pass at a time.
  *
- * There is no "to" field. The end was always implied — the last closed bar,
- * since a forming bar cannot be stored and nothing beyond it exists — so
- * asking for it only invented a decision. The start is likewise defaulted
- * rather than asked: the venue knows its own earliest bar, so "everything
- * available" is the offer, and narrowing it is the deliberate act.
+ * There is still no "to" field, because the *target* is the decision and the
+ * window is arithmetic. What changed is which window a pass covers. Every fill
+ * used to run to the last closed bar, which made deep intraday history
+ * unreachable: an hourly series already holding a year has no start that both
+ * reaches further back and stays under the ceiling, since the nearer the start
+ * the more of the span is bars already stored. So the advice to "fill a nearer
+ * date first and repeat" could not work, however many times it was followed.
  *
- * Deliberately manual and deliberately blocking. A long range is many
- * paginated exchange calls, and the alternative — a background filler — would
- * need progress tracking that nothing here keeps. So the user waits and is
- * told exactly what arrived, including what the venue would not serve.
+ * Each pass now ends where coverage begins, spanning only what is absent, and
+ * the next resumes from the ground the last one gained. The user sets how far
+ * back they want once and clicks until it arrives, with the remaining count
+ * visible so the commitment is known before the first one.
+ *
+ * Deliberately manual and deliberately blocking. Chunking on the caller's
+ * behalf would be the background filler this design declined, needing progress
+ * tracking nothing here keeps — so a pass is a click, and each one reports
+ * exactly what arrived, including what the venue would not serve.
  */
 export default function BackfillDialog({ row, onClose }: BackfillDialogProps) {
   if (!row) return null;
@@ -65,25 +74,30 @@ function BackfillDialogContent({
   onClose: () => void;
 }) {
   const fill = useBackfill();
-  const depthQuery = useVenueDepth({
+  const series = {
     internal_cusip: row.internal_cusip,
     tm_interval_id: row.tm_interval_id,
     source_app_id: row.source_app_id,
-  });
-  const depth = depthQuery.data;
-  const venueEarliest = isoDate(depth?.earliest);
+  };
+  const depthQuery = useVenueDepth(series);
+  const venueEarliest = isoDate(depthQuery.data?.earliest);
 
   // Reach for everything the venue holds. The subscription's own target is
   // only a floor when the user set one deeper than the venue can serve, which
   // the subscribe dialog now prevents but older rows may still carry.
   const [override, setOverride] = useState<string | null>(null);
-  const start = override
+  const target = override
     ?? (venueEarliest || isoDate(row.backfill_from_ts ?? row.coverage.first_bar));
+
+  const planQuery = useBackfillPlan(series, target || null);
+  const plan = planQuery.data;
+  const nothingLeft = plan != null && plan.start === null;
 
   const [report, setReport] = useState<BackfillReport | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
+    if (!plan?.start) return;
     setError(null);
     setReport(null);
     try {
@@ -92,9 +106,10 @@ function BackfillDialogContent({
           internal_cusip: row.internal_cusip,
           tm_interval_id: row.tm_interval_id,
           source_app_id: row.source_app_id,
-          start: new Date(start).toISOString(),
-          // Always the last closed bar. There is nothing later to fetch.
-          end: null,
+          start: plan.start,
+          // Bounded, unlike the old fill-to-now: this pass covers only the
+          // stretch below what is already stored.
+          end: plan.end,
         }),
       );
     } catch (e: unknown) {
@@ -109,8 +124,8 @@ function BackfillDialogContent({
         <Stack spacing={2} sx={{ pt: 1 }}>
           <TextField
             type="date"
-            label="From"
-            value={start}
+            label="History wanted from"
+            value={target}
             onChange={e => setOverride(e.target.value)}
             slotProps={{
               inputLabel: { shrink: true },
@@ -120,21 +135,22 @@ function BackfillDialogContent({
               depthQuery.isFetching
                 ? 'Asking the venue how far back it goes…'
                 : venueEarliest
-                  ? `Runs to the most recent closed bar. ${venueEarliest} is as far `
-                    + 'back as this venue goes.'
-                  : 'Runs to the most recent closed bar.'
+                  ? `${venueEarliest} is as far back as this venue goes.`
+                  : 'The venue did not say how far back it goes.'
             }
             fullWidth
           />
 
-          {tooLarge(depth, start) && (
-            <Alert severity="info">
-              This venue holds {depth?.bars_available?.toLocaleString()} bars at this
-              interval — more than the {depth?.max_backfill_bars.toLocaleString()} one
-              pass can store, because backfill holds the connection open while it
-              writes. Fill a nearer date first and repeat; each pass keeps what it
-              stored.
-            </Alert>
+          <Alert severity={nothingLeft ? 'success' : 'info'}>
+            {passSummary(plan)}
+          </Alert>
+
+          {plan && plan.passes_remaining > 1 && (
+            <Typography variant="caption" color="text.secondary">
+              A fill holds the connection open while it writes, so one pass is
+              capped. Click Backfill again after each one — the next pass picks up
+              where this leaves off, and nothing already stored is refetched.
+            </Typography>
           )}
 
           <Typography variant="caption" color="text.secondary">
@@ -165,7 +181,7 @@ function BackfillDialogContent({
         <Button
           variant="contained"
           onClick={handleSubmit}
-          disabled={!start || fill.isPending}
+          disabled={!plan?.start || fill.isPending}
         >
           {fill.isPending ? 'Filling…' : 'Backfill'}
         </Button>

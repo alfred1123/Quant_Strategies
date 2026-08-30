@@ -366,6 +366,42 @@ class TestVendorSymbolOnEveryRow:
         assert rows[0]["vendor_symbol"] is None
 
 
+class TestBackfillPlan:
+    """Routed to the venue's bar service, and costing no exchange call."""
+
+    def test_the_plan_comes_from_the_series_own_venue(self):
+        service, _repo, factory, bar_service = build_service()
+
+        service.plan_backfill(
+            internal_cusip=CUSIP,
+            tm_interval_id=DAILY,
+            source_app_id=BYBIT,
+            target=FIRST_BAR,
+        )
+
+        factory.for_app.assert_called_once_with(BYBIT)
+        assert bar_service.plan_backfill.call_args.kwargs == {
+            "internal_cusip": CUSIP,
+            "tm_interval_id": DAILY,
+            "source_app_id": BYBIT,
+            "target": FIRST_BAR,
+        }
+
+    def test_it_does_not_ask_the_venue_how_deep_it_goes(self):
+        """Depth is an exchange call; a plan is stored bars and arithmetic, so
+        the dialog can re-ask after every fill."""
+        service, _repo, _factory, bar_service = build_service()
+
+        service.plan_backfill(
+            internal_cusip=CUSIP,
+            tm_interval_id=DAILY,
+            source_app_id=BYBIT,
+            target=FIRST_BAR,
+        )
+
+        bar_service.venue_depth.assert_not_called()
+
+
 class TestVenueDepth:
     """Passes the venue's floor through, with the ceiling one fill may span."""
 

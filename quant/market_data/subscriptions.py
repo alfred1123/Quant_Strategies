@@ -28,6 +28,7 @@ from uuid import UUID
 
 from quant.market_data.service import (
     MAX_BACKFILL_BARS,
+    BackfillPlan,
     BackfillResult,
     BarServiceFactory,
 )
@@ -249,6 +250,27 @@ class BarSubscriptionService:
             "bars_available": bars_available,
             "max_backfill_bars": MAX_BACKFILL_BARS,
         }
+
+    def plan_backfill(
+        self,
+        *,
+        internal_cusip: str,
+        tm_interval_id: int,
+        source_app_id: int,
+        target: datetime,
+    ) -> BackfillPlan:
+        """The next pass toward ``target``, so deep history can be filled in stages.
+
+        Separate from ``venue_depth`` because it costs no exchange call: depth
+        asks the venue what it retains, this reads what is stored and does
+        arithmetic, so the dialog can re-ask after every fill.
+        """
+        return self._bar_service(source_app_id).plan_backfill(
+            internal_cusip=internal_cusip,
+            tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
+            target=target,
+        )
 
     def backfill(
         self,

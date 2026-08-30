@@ -231,7 +231,8 @@ exchange rate limit on behalf of a user who did not ask.
 | `POST` | `/api/v1/market-data/subscriptions` | Create a subscription, or version one — enable, disable, retarget. |
 | `GET`  | `/api/v1/market-data/price-bars/coverage` | `MIN`/`MAX` stored bar plus gap count for one series — what is **held**. |
 | `GET`  | `/api/v1/market-data/price-bars/venue-depth` | Oldest bar the venue serves, how many bars that is, and the fill ceiling — what **exists**. |
-| `POST` | `/api/v1/market-data/price-bars/backfill` | Fill from a start to the last closed bar, reporting what the venue would not serve. |
+| `GET`  | `/api/v1/market-data/price-bars/backfill-plan` | The next pass toward a `target`: window, bar count, passes remaining. |
+| `POST` | `/api/v1/market-data/price-bars/backfill` | Fill an explicit range, reporting what the venue would not serve. `end` defaults to the last closed bar. |
 
 #### Coverage and depth are different questions
 
@@ -246,13 +247,38 @@ someone invented. A target older than the first bar an exchange ever printed can
 never be met, and before this existed the page reported that as an open gap
 ([decision #52](../decisions.md)).
 
-Backfill takes **no end date**: it always runs to the last closed bar, since a
-forming bar cannot be stored and nothing beyond it exists to fetch. It does take
-a ceiling — a range spanning more than `MAX_BACKFILL_BARS` boundaries is
-refused **400** before any work starts, because the fill is one synchronous
-blocking request and a range large enough to outlive the proxy would store
-nothing while the caller learned only that the request died. The message names a
-nearer date that fits; each pass keeps what it stored, so repeating is safe.
+Backfill takes a ceiling: a range spanning more than `MAX_BACKFILL_BARS`
+boundaries is refused **400** before any work starts, because the fill is one
+synchronous blocking request and a range large enough to outlive the proxy
+would store nothing while the caller learned only that the request died.
+
+#### Deep history is filled in passes
+
+The ceiling alone made deep intraday history unreachable rather than merely
+slow. Backfill used to run to the last closed bar always, so for a series
+already holding a year of hourly bars **no start** both reached further back and
+stayed under the ceiling: the nearer the start, the more of the span was bars
+already stored, and the span is counted either way. The advice the refusal gave
+— fill a nearer date and repeat — could not work however many times it was
+followed.
+
+`GET /price-bars/backfill-plan` answers what one pass should cover. Given a
+`target`, it returns the window ending where coverage currently begins, the bar
+count, and how many passes remain. Each pass therefore spans only bars that are
+absent, and the next resumes from the ground the last one gained. A series with
+nothing stored anchors on the last closed bar instead, so the first pass yields
+bars a strategy can already use rather than history nobody can trade on.
+
+The plan costs two index probes and arithmetic — no exchange call — so the
+dialog re-asks after every fill, which is the point: the answer moves as
+coverage grows. `target` is supplied by the caller rather than read from the
+subscription, because the page has already chosen between the row's own target
+and the venue floor, and re-deriving it server-side would mean an exchange call
+for a question answerable from stored bars.
+
+Chunking is still not done on the caller's behalf. A pass is a click, because
+looping server-side would be the background filler this design declined —
+needing the progress tracking nothing here keeps ([decision #52](../decisions.md)).
 
 `vendor_symbol` is resolved by the service through the same `InstrumentCache`
 the fetcher uses, not selected by `SP_GET_BAR_SUBSCRIPTION` — so the list cannot

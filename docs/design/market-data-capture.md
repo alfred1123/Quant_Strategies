@@ -297,10 +297,44 @@ history is ~2,300 daily bars, ~56,000 hourly and ~3.4 million 1-minute:
 
 Oversized ranges are refused **before** `find_gaps` materialises one entry per
 boundary, by arithmetic on the span — a guard that exhausts memory reaching its
-own refusal is not a guard. The message names the count and a nearer date that
-would fit, and both dialogs warn from `venue_depth` before the click. Raising
-the ceiling does not make a minute-scale fill work; that needs a background job
-with progress tracking, which [§9](#9-open-questions) deliberately rejects.
+own refusal is not a guard. Raising the ceiling does not make a minute-scale
+fill work; that needs a background job with progress tracking, which
+[§9](#9-open-questions) deliberately rejects.
+
+### 5.3 A pass ends where coverage begins
+
+The "about six passes" in the table above was, for a while, a fiction. The
+refusal told you to fill a nearer date and repeat, and repeating could not work:
+**every fill ran to the last closed bar**, so the range always included whatever
+was already stored. An hourly series holding a year has no start that both
+reaches further back and stays under 10,000 — 2020 is ~56,000 bars, and even a
+start six months back is ~12,000, most of them bars already held. The span is
+counted either way. Deep intraday history was not slow; it was unreachable, and
+the message pointed at a door that was not there.
+
+The fix is direction. A pass now ends at **the bar before coverage begins**
+rather than at the last close, so it spans only bars that are absent, and the
+next pass resumes from the ground the last one gained:
+
+```
+target                    coverage
+  ▼                          ▼
+  ├─── pass 3 ─┼─ pass 2 ─┼─ pass 1 ─┤████████ stored ████████┤
+                                      ▲
+                                 first stored bar
+```
+
+`PriceBarService.plan_backfill` computes that window — two index probes and
+arithmetic, no exchange call — and reports the bar count and passes remaining,
+so the commitment is visible before the first click. A series with nothing
+stored anchors on the last closed bar rather than on the target, so the first
+pass returns bars a strategy can already use; walking forward from history
+instead would leave the series worthless until the final pass.
+
+The looping is still the user's. Doing it server-side would be the background
+filler under another name — the same progress tracking, just hidden inside a
+request — so a pass is a click, and each one reports exactly what arrived. What
+the ceiling now bounds is *one pass*, not the history obtainable.
 
 ## 6. Coverage — answering "can I backtest this yet?"
 

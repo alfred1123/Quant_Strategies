@@ -16,6 +16,7 @@ is what these routes check; ownership is not a thing a bar series has.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Request
 
@@ -29,6 +30,7 @@ from quant.market_data.subscriptions import (
 from quant.market_data.warm import BarWarmer
 from quant.queue.repo import BtQueueRepo
 from quant.schemas.market_data import (
+    BackfillPlan,
     BackfillReport,
     BackfillRequest,
     BarSubscriptionRow,
@@ -198,6 +200,35 @@ def price_bar_venue_depth(
             internal_cusip=internal_cusip,
             tm_interval_id=tm_interval_id,
             source_app_id=source_app_id,
+        )
+    )
+
+
+@router.get("/price-bars/backfill-plan", response_model=BackfillPlan)
+def price_bar_backfill_plan(
+    internal_cusip: str,
+    tm_interval_id: int,
+    source_app_id: int,
+    target: datetime,
+    _user: CurrentUser = Depends(require_user),
+    svc: BarSubscriptionService = Depends(_get_subscriptions),
+) -> BackfillPlan:
+    """The next fill toward ``target``, so deep history can be filled in stages.
+
+    ``target`` is supplied by the caller rather than read from the
+    subscription: the page already knows it, having chosen between the row's
+    own target and the venue floor, and re-deriving it here would mean a
+    second exchange call for a question this endpoint answers from stored
+    bars alone.
+    """
+    return BackfillPlan(
+        **vars(
+            svc.plan_backfill(
+                internal_cusip=internal_cusip,
+                tm_interval_id=tm_interval_id,
+                source_app_id=source_app_id,
+                target=target,
+            )
         )
     )
 

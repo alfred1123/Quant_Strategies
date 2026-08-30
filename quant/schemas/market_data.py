@@ -83,6 +83,26 @@ class VenueDepth(BaseModel):
     max_backfill_bars: int
 
 
+class BackfillPlan(BaseModel):
+    """The next fill toward a target, and how many more it would take.
+
+    Deep intraday history exceeds ``max_backfill_bars`` in one call, and a
+    nearer start does not help: every fill runs to the last closed bar, so the
+    span keeps counting the bars already stored. Each pass here instead ends
+    where coverage begins, spanning only what is absent, and the next resumes
+    from what the last one gained.
+    """
+
+    #: ``None`` when the target is already reached — there is nothing to run.
+    start: datetime | None = None
+    end: datetime | None = None
+    #: Bars this pass would span. At or below ``max_backfill_bars``.
+    bars: int
+    #: Passes still needed to reach ``target``, counting this one.
+    passes_remaining: int
+    target: datetime
+
+
 class BackfillRequest(BaseModel):
     """Fill one series over an explicit range. ``end`` defaults to the last close."""
 

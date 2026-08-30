@@ -11,6 +11,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from quant.market_data.service import (
+    BackfillPlan as BackfillPlanResult,
+)
 from quant.market_data.service import BackfillResult, BackfillTooLargeError
 from quant.market_data.subscriptions import SubscriptionError
 
@@ -257,7 +260,92 @@ class TestVenueDepth:
         assert resp.json()["earliest"] is None
 
 
+class TestBackfillPlan:
+    """What one pass would fetch, so deep history can be filled in stages."""
+
+    def _get(self, client, target="2020-03-25T00:00:00+00:00"):
+        return client.get(
+            "/api/v1/market-data/price-bars/backfill-plan",
+            params={
+                "internal_cusip": CUSIP,
+                "tm_interval_id": DAILY,
+                "source_app_id": BYBIT,
+                "target": target,
+            },
+        )
+
+    def test_reports_the_window_and_what_is_left(self, client_and_svc):
+        client, svc, _warmer = client_and_svc
+        svc.plan_backfill.return_value = BackfillPlanResult(
+            start=datetime(2024, 8, 11, tzinfo=UTC),
+            end=datetime(2025, 9, 30, tzinfo=UTC),
+            bars=10_000,
+            passes_remaining=5,
+            target=datetime(2020, 3, 25, tzinfo=UTC),
+        )
+
+        resp = self._get(client)
+
+        assert resp.status_code == 200
+        assert resp.json()["bars"] == 10_000
+        assert resp.json()["passes_remaining"] == 5
+
+    def test_the_target_comes_from_the_caller(self, client_and_svc):
+        """The page already chose between the row's target and the venue floor;
+        re-deriving it here would cost a second exchange call."""
+        client, svc, _warmer = client_and_svc
+        svc.plan_backfill.return_value = BackfillPlanResult(
+            start=None, end=None, bars=0, passes_remaining=0,
+            target=datetime(2020, 3, 25, tzinfo=UTC),
+        )
+
+        self._get(client)
+
+        assert svc.plan_backfill.call_args.kwargs == {
+            "internal_cusip": CUSIP,
+            "tm_interval_id": DAILY,
+            "source_app_id": BYBIT,
+            "target": datetime(2020, 3, 25, tzinfo=UTC),
+        }
+
+    def test_a_finished_series_reports_no_window(self, client_and_svc):
+        client, svc, _warmer = client_and_svc
+        svc.plan_backfill.return_value = BackfillPlanResult(
+            start=None, end=None, bars=0, passes_remaining=0,
+            target=datetime(2020, 3, 25, tzinfo=UTC),
+        )
+
+        resp = self._get(client)
+
+        assert resp.status_code == 200
+        assert resp.json()["start"] is None
+        assert resp.json()["passes_remaining"] == 0
+
+
 class TestBackfill:
+    def test_a_bounded_pass_sends_both_ends(self, client_and_svc):
+        """A backward pass must stop where coverage begins, not run to now."""
+        client, svc, _warmer = client_and_svc
+        svc.backfill.return_value = BackfillResult(
+            start=datetime(2024, 8, 11, tzinfo=UTC),
+            end=datetime(2025, 9, 30, tzinfo=UTC),
+            expected=10_000, missing=10_000, inserted=10_000, unfilled=(),
+        )
+
+        resp = client.post(
+            "/api/v1/market-data/price-bars/backfill",
+            json={
+                "internal_cusip": CUSIP,
+                "tm_interval_id": DAILY,
+                "source_app_id": BYBIT,
+                "start": "2024-08-11T00:00:00+00:00",
+                "end": "2025-09-30T00:00:00+00:00",
+            },
+        )
+
+        assert resp.status_code == 200
+        assert svc.backfill.call_args.kwargs["end"] == datetime(2025, 9, 30, tzinfo=UTC)
+
     def test_an_oversized_range_is_refused_as_a_400(self, client_and_svc):
         """Not a 500: the range is the caller's to narrow, and the message says how."""
         client, svc, _warmer = client_and_svc
