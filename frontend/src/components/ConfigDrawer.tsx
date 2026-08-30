@@ -6,13 +6,17 @@ import {
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
+import { useEffect, useRef } from 'react';
 import {
   useIndicators, useSignalTypes, useAssetTypes, useConjunctions, useDataColumns, useApps,
+  useTmIntervals,
 } from '../api/refdata';
 import { useProducts } from '../api/inst';
+import { useStoredCoverage } from '../api/marketData';
 import type { AssetTypeRow } from '../types/refdata';
 import { countSteps } from '../utils/grid';
 import { validateBacktestConfig } from '../utils/validate';
+import { capturedRange, rangeFits } from '../utils/capturedRange';
 import type { BacktestConfig, FactorConfig } from '../types/backtest';
 import ProductSelector from './config/ProductSelector';
 import FactorCard from './config/FactorCard';
@@ -40,6 +44,50 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   const { data: dataColumns = [] } = useDataColumns();
   const { data: apps = [] } = useApps();
   const { data: products = [] } = useProducts();
+  const { data: tmIntervals = [] } = useTmIntervals();
+
+  // ── the range the traded series can actually be run over ──
+  //
+  // Only exchange sources have one. A provider keeps the path it always had:
+  // `Refresh dataset` refetches any window on demand, so a floor read from
+  // the cache would describe what happens to be stored, not what is
+  // obtainable, and would talk a user out of a range they could have had.
+  const tradedApp = apps.find(a => a.name === config.dataSource);
+  const isExchangeSource = tradedApp?.is_exchange_ind === 'Y';
+  // A backtest is daily (`BACKTEST_BAR_PERIOD`); the id comes from REFDATA.
+  const dailyIntervalId = tmIntervals.find(i => i.name === 'DAILY')?.tm_interval_id;
+  const tradedSeries = isExchangeSource && config.symbol && tradedApp && dailyIntervalId
+    ? {
+      internal_cusip: config.symbol,
+      tm_interval_id: dailyIntervalId,
+      source_app_id: tradedApp.app_id,
+    }
+    : {};
+  const { data: coverage } = useStoredCoverage(tradedSeries);
+  const captured = capturedRange(coverage);
+  const seriesId = isExchangeSource && config.symbol && tradedApp
+    ? `${config.symbol}|${tradedApp.app_id}`
+    : null;
+
+  /**
+   * Snap the dates to what is captured, once per series.
+   *
+   * Selecting a venue already rewrites other fields — picking a product sets
+   * the asset type and trading period — so a selection deciding the range it
+   * can be run over is the established behaviour, not a surprise. Guarded by
+   * the series it last ran for, so a date edited afterwards stays edited and
+   * only choosing a different series moves them again.
+   */
+  const snappedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!seriesId || !captured) return;
+    if (snappedFor.current === seriesId) return;
+    snappedFor.current = seriesId;
+    onChange(prev => ({ ...prev, start: captured.first, end: captured.last }));
+  }, [seriesId, captured, onChange]);
+
+  const rangeOutsideCapture = captured !== null
+    && !rangeFits(captured, config.start, config.end);
 
   /**
    * Patch helper.
@@ -196,6 +244,32 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
           </Box>
         )}
       </Box>
+
+      {isExchangeSource && captured && !rangeOutsideCapture && (
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+          {tradedApp?.display_name} has {captured.first} to {captured.last} captured
+          for {config.symbol} — the run reads those bars, not a provider.
+        </Typography>
+      )}
+
+      {captured && rangeOutsideCapture && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 2 }}
+          action={
+            <Button
+              size="small"
+              onClick={() => set({ start: captured.first, end: captured.last })}
+            >
+              Use captured range
+            </Button>
+          }
+        >
+          Only {captured.first} to {captured.last} is captured for {config.symbol} on{' '}
+          {tradedApp?.display_name}, so this run will be refused rather than quietly
+          shortened. Backfill more history on the Market data page, or narrow the range.
+        </Alert>
+      )}
 
       {config.factors.some(f => !f.symbol && !f.vendor_symbol) && (
         <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>

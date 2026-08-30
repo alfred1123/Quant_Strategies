@@ -6,8 +6,9 @@ import { renderWithProviders } from '../test/wrapper';
 import type { BacktestConfig } from '../types/backtest';
 import type {
   AppRow, AssetTypeRow, ConjunctionRow, DataColumnRow, IndicatorRow,
-  ProductRow, SignalTypeRow,
+  ProductRow, SignalTypeRow, TmIntervalRow,
 } from '../types/refdata';
+import type { Coverage } from '../types/marketData';
 
 // ── REFDATA + product hook mocks ──────────────────────────────────────────
 // We stub the data hooks at module boundary so the drawer renders with a
@@ -26,9 +27,15 @@ const conjunctions: ConjunctionRow[] = [{ name: 'AND', display_name: 'AND' }];
 const dataColumns: DataColumnRow[] = [{ column_name: 'price', display_name: 'Price' }];
 const apps: AppRow[] = [
   { app_id: 1, name: 'yahoo', display_name: 'Yahoo Finance', class_name: 'YahooFinance', is_exchange_ind: 'N', description: null },
+  { app_id: 34, name: 'bybit', display_name: 'Bybit', class_name: 'Bybit', is_exchange_ind: 'Y', description: null },
+];
+const tmIntervals: TmIntervalRow[] = [
+  { tm_interval_id: 1, name: 'DAILY', display_name: 'Daily', period_length: '1 day', description: null },
+  { tm_interval_id: 2, name: '1H', display_name: 'Hourly', period_length: '01:00:00', description: null },
 ];
 const products: ProductRow[] = [
   { product_id: 10, product_vid: 1, internal_cusip: '00434.hkex', display_nm: 'Boyaa Interactive', asset_type_id: 2, exchange: 'HKEX', ccy: 'HKD', description: null },
+  { product_id: 11, product_vid: 1, internal_cusip: 'btcusdt.crypto', display_nm: 'Bitcoin / Tether', asset_type_id: 1, exchange: null, ccy: 'USDT', description: null },
 ];
 
 vi.mock('../api/refdata', () => ({
@@ -38,12 +45,31 @@ vi.mock('../api/refdata', () => ({
   useConjunctions: () => ({ data: conjunctions }),
   useDataColumns: () => ({ data: dataColumns }),
   useApps: () => ({ data: apps }),
+  useTmIntervals: () => ({ data: tmIntervals }),
 }));
 
 vi.mock('../api/inst', () => ({
   useProducts: () => ({ data: products }),
   useProductXrefs: () => ({ data: [] }),
 }));
+
+/** What the coverage endpoint answers, and who it was asked about. */
+let storedCoverage: Coverage | undefined;
+const coverageAsked = vi.fn();
+
+vi.mock('../api/marketData', () => ({
+  useStoredCoverage: (key: Record<string, unknown>) => {
+    coverageAsked(key);
+    return { data: storedCoverage };
+  },
+}));
+
+const BYBIT_COVERAGE: Coverage = {
+  first_bar: '2020-03-25T00:00:00Z',
+  last_bar: '2026-08-29T00:00:00Z',
+  gaps: 0,
+  error: null,
+};
 
 const baseCfg: BacktestConfig = {
   symbol: '',
@@ -95,7 +121,10 @@ function Host({ initial, observer }: { initial: BacktestConfig; observer: (c: Ba
   );
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  storedCoverage = undefined;
+});
 
 describe('ConfigDrawer — product pick updates symbol AND asset type atomically', () => {
   it('regression: picking a product after typing a vendor symbol updates BOTH symbol and assetType', () => {
@@ -139,5 +168,139 @@ describe('ConfigDrawer — product pick updates symbol AND asset type atomically
     // Asset type should remain — the user only changed vendor symbol.
     expect(last.assetType).toBe('Equity HK');
     expect(last.tradingPeriod).toBe(252);
+  });
+});
+
+/**
+ * The dates a run can use come from what is captured.
+ *
+ * A user picked Bybit and left the default 2016-01-01 start, which predates
+ * Bybit's first BTCUSDT bar by four years, and the end defaulted to today —
+ * a bar that had not closed. Both were refused, and nothing on the form said
+ * what would have worked.
+ */
+const bybitCfg: BacktestConfig = {
+  ...baseCfg,
+  dataSource: 'bybit',
+  symbol: 'btcusdt.crypto',
+  assetType: 'Crypto',
+  start: '2016-01-01',
+  end: '2026-08-30',
+};
+
+describe('ConfigDrawer — the captured range decides the dates', () => {
+  it('snaps the dates to what the venue has captured', () => {
+    storedCoverage = BYBIT_COVERAGE;
+    const observer = vi.fn();
+    renderWithProviders(<Host initial={bybitCfg} observer={observer} />);
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.start).toBe('2020-03-25');
+    expect(last.end).toBe('2026-08-29');
+  });
+
+  it('asks about the traded series, at the daily interval', () => {
+    storedCoverage = BYBIT_COVERAGE;
+    renderWithProviders(<Host initial={bybitCfg} observer={vi.fn()} />);
+
+    expect(coverageAsked).toHaveBeenCalledWith({
+      internal_cusip: 'btcusdt.crypto',
+      tm_interval_id: 1,
+      source_app_id: 34,
+    });
+  });
+
+  it('leaves a provider source alone', () => {
+    // Yahoo refetches any window on `Refresh dataset`, so what happens to be
+    // cached is not a floor and must not be presented as one.
+    storedCoverage = BYBIT_COVERAGE;
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host initial={{ ...baseCfg, symbol: 'btcusdt.crypto', start: '2016-01-01' }} observer={observer} />,
+    );
+
+    expect(coverageAsked).toHaveBeenCalledWith({});
+    expect(observer).not.toHaveBeenCalled();
+  });
+
+  it('says what is captured once the range fits', () => {
+    storedCoverage = BYBIT_COVERAGE;
+    renderWithProviders(
+      <Host initial={{ ...bybitCfg, start: '2021-01-01', end: '2026-01-01' }} observer={vi.fn()} />,
+    );
+
+    expect(screen.getByText(/Bybit has 2020-03-25 to 2026-08-29 captured/)).toBeTruthy();
+  });
+
+  it('does not move dates the user edited afterwards', () => {
+    storedCoverage = BYBIT_COVERAGE;
+    const observer = vi.fn();
+    renderWithProviders(<Host initial={bybitCfg} observer={observer} />);
+
+    const startInput = screen.getByLabelText('Start');
+    fireEvent.change(startInput, { target: { value: '2022-06-01' } });
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.start).toBe('2022-06-01');
+  });
+
+  it('does nothing while coverage has not answered', () => {
+    storedCoverage = undefined;
+    const observer = vi.fn();
+    renderWithProviders(<Host initial={bybitCfg} observer={observer} />);
+
+    expect(observer).not.toHaveBeenCalled();
+  });
+
+  it('does not snap a series with nothing captured', () => {
+    storedCoverage = { first_bar: null, last_bar: null, gaps: null, error: null };
+    const observer = vi.fn();
+    renderWithProviders(<Host initial={bybitCfg} observer={observer} />);
+
+    expect(observer).not.toHaveBeenCalled();
+  });
+});
+
+describe('ConfigDrawer — a range outside the capture is flagged, not silently run', () => {
+  it('warns when a hand-typed start reaches behind the first bar', () => {
+    // The snap already fitted the range on selection, so this is the case
+    // that remains: the user overriding it with a date the store cannot meet.
+    storedCoverage = BYBIT_COVERAGE;
+    renderWithProviders(<Host initial={bybitCfg} observer={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2016-01-01' } });
+
+    expect(screen.getByText(/will be refused rather than quietly shortened/)).toBeTruthy();
+  });
+
+  it('warns when a hand-typed end reaches past the last close', () => {
+    storedCoverage = BYBIT_COVERAGE;
+    renderWithProviders(<Host initial={bybitCfg} observer={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: '2027-01-01' } });
+
+    expect(screen.getByText(/will be refused rather than quietly shortened/)).toBeTruthy();
+  });
+
+  it('offers the captured range as a one-click fix', () => {
+    storedCoverage = BYBIT_COVERAGE;
+    const observer = vi.fn();
+    renderWithProviders(<Host initial={bybitCfg} observer={observer} />);
+
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2016-01-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Use captured range' }));
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.start).toBe('2020-03-25');
+    expect(last.end).toBe('2026-08-29');
+  });
+
+  it('does not warn about an end of today, whose bar has not closed', () => {
+    storedCoverage = BYBIT_COVERAGE;
+    renderWithProviders(
+      <Host initial={{ ...bybitCfg, start: '2021-01-01', end: '2026-08-30' }} observer={vi.fn()} />,
+    );
+
+    expect(screen.queryByText(/will be refused/)).toBeNull();
   });
 });
