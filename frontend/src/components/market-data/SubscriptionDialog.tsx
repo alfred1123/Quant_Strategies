@@ -1,5 +1,7 @@
 import {
   Alert,
+  Autocomplete,
+  Box,
   Button,
   Dialog,
   DialogActions,
@@ -10,11 +12,12 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSubscribe, useVenueDepth } from '../../api/marketData';
 import { useProducts } from '../../api/inst';
 import { intervalLabel, useExchangeApps, useTmIntervals } from '../../api/refdata';
 import type { VenueDepth } from '../../types/marketData';
+import type { ProductRow } from '../../types/refdata';
 
 interface SubscriptionDialogProps {
   open: boolean;
@@ -85,12 +88,19 @@ function SubscriptionDialogContent({
   const [internalCusip, setInternalCusip] = useState('');
   const [intervalId, setIntervalId] = useState('');
   const [sourceAppId, setSourceAppId] = useState('');
-  const [backfillFrom, setBackfillFrom] = useState('');
+  /** `null` until the user picks a date; the venue's floor stands in. */
+  const [chosenTarget, setChosenTarget] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const sortedIntervals = useMemo(
     () => [...intervals].sort((a, b) => a.tm_interval_id - b.tm_interval_id),
     [intervals],
+  );
+
+  // Autocomplete holds the option, not the id the form submits.
+  const selectedProduct = useMemo(
+    () => products.find(p => p.internal_cusip === internalCusip) ?? null,
+    [products, internalCusip],
   );
 
   // Only once all three are chosen is there a series to ask the venue about.
@@ -102,13 +112,12 @@ function SubscriptionDialogContent({
   const depth = depthQuery.data;
   const venueEarliest = depth?.earliest ? depth.earliest.slice(0, 10) : '';
 
-  // Adopt the venue's floor as the target the moment it is known, so the
-  // default is "everything this exchange has" rather than a date invented by
-  // whoever opened the dialog. Their own edit wins — hence `touched`.
-  const [touched, setTouched] = useState(false);
-  useEffect(() => {
-    if (!touched && venueEarliest) setBackfillFrom(venueEarliest);
-  }, [touched, venueEarliest]);
+  // Adopt the venue's floor as the target, so the default is "everything this
+  // exchange has" rather than a date invented by whoever opened the dialog.
+  // Derived rather than copied into state by an effect: `null` means the user
+  // has not chosen, so the answer tracks the venue as the series changes, and
+  // anything they type — including clearing it — wins from then on.
+  const backfillFrom = chosenTarget ?? venueEarliest;
 
   // A target the exchange cannot reach is not a gap that backfill will close
   // later; it is history that does not exist. Say so while it can still be
@@ -144,19 +153,43 @@ function SubscriptionDialogContent({
       <DialogTitle>Capture a price series</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2} sx={{ pt: 1 }}>
-          <TextField
-            select
-            label="Product"
-            value={internalCusip}
-            onChange={e => setInternalCusip(e.target.value)}
+          {/*
+            A search box, not a dropdown: the product list is the whole
+            instrument universe, and scrolling it to find one ticker does not
+            scale. Not `freeSolo`, unlike the backtest config's selector — a
+            subscription must name a product that exists, since capture resolves
+            it against `INST.PRODUCT_XREF` to reach the venue at all.
+
+            The label carries both the name and the CUSIP, so MUI's default
+            filter matches either without a custom `filterOptions`.
+          */}
+          <Autocomplete<ProductRow>
+            options={products}
+            value={selectedProduct}
+            onChange={(_, val) => setInternalCusip(val?.internal_cusip ?? '')}
+            getOptionLabel={opt => `${opt.display_nm} (${opt.internal_cusip})`}
+            isOptionEqualToValue={(opt, val) =>
+              opt.internal_cusip === val.internal_cusip}
+            slotProps={{ listbox: { sx: { maxHeight: 320 } } }}
+            renderInput={params => (
+              <TextField
+                {...params}
+                label="Product"
+                placeholder="Search by name or CUSIP…"
+              />
+            )}
+            renderOption={(props, opt) => (
+              <li {...props} key={opt.internal_cusip}>
+                <Box>
+                  <Typography variant="body2">{opt.display_nm}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {opt.internal_cusip}
+                  </Typography>
+                </Box>
+              </li>
+            )}
             fullWidth
-          >
-            {products.map(p => (
-              <MenuItem key={p.internal_cusip} value={p.internal_cusip}>
-                {p.display_nm} ({p.internal_cusip})
-              </MenuItem>
-            ))}
-          </TextField>
+          />
 
           <TextField
             select
@@ -191,10 +224,7 @@ function SubscriptionDialogContent({
             type="date"
             label="History wanted from"
             value={backfillFrom}
-            onChange={e => {
-              setTouched(true);
-              setBackfillFrom(e.target.value);
-            }}
+            onChange={e => setChosenTarget(e.target.value)}
             slotProps={{
               inputLabel: { shrink: true },
               htmlInput: venueEarliest ? { min: venueEarliest } : undefined,
