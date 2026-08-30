@@ -218,7 +218,7 @@ exchange rate limit on behalf of a user who did not ask.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET`  | `/api/v1/market-data/subscriptions` | Every bar subscription with its coverage (first bar, last bar, gap count). |
+| `GET`  | `/api/v1/market-data/subscriptions` | Every bar subscription with its coverage (first bar, last bar, gap count) and the venue's own `vendor_symbol`. |
 | `POST` | `/api/v1/market-data/subscriptions` | Create a subscription, or version one — enable, disable, retarget. |
 | `GET`  | `/api/v1/market-data/price-bars/coverage` | `MIN`/`MAX` stored bar plus gap count for one series — what is **held**. |
 | `GET`  | `/api/v1/market-data/price-bars/venue-depth` | Oldest bar the venue serves, how many bars that is, and the fill ceiling — what **exists**. |
@@ -244,6 +244,13 @@ refused **400** before any work starts, because the fill is one synchronous
 blocking request and a range large enough to outlive the proxy would store
 nothing while the caller learned only that the request died. The message names a
 nearer date that fits; each pass keeps what it stored, so repeating is safe.
+
+`vendor_symbol` is resolved by the service through the same `InstrumentCache`
+the fetcher uses, not selected by `SP_GET_BAR_SUBSCRIPTION` — so the list cannot
+disagree with what actually gets requested, and adding it needed no migration.
+It is `null` when the `INST.PRODUCT_XREF` row has been withdrawn since
+subscribing, which breaks capture and is worth surfacing rather than hiding
+behind an internal identifier nobody can look up on an exchange.
 
 #### Subscriptions are shared, not caller-scoped
 

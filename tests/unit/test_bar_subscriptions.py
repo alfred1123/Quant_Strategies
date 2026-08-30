@@ -330,6 +330,42 @@ class TestListing:
         assert repo.sp_get_bar_subscription.call_args.kwargs == {}
 
 
+class TestVendorSymbolOnEveryRow:
+    """The page shows what the venue calls a product, not only our identifier."""
+
+    def test_each_row_carries_the_symbol_the_venue_prints(self):
+        service, repo, _factory, _bar = build_service(vendor_symbol="BTCUSDT")
+        repo.sp_get_bar_subscription.return_value = [
+            {"internal_cusip": CUSIP, "tm_interval_id": DAILY, "source_app_id": BYBIT}
+        ]
+
+        rows = service.list_subscriptions()
+
+        assert rows[0]["vendor_symbol"] == "BTCUSDT"
+
+    def test_resolution_is_scoped_to_the_row_s_own_venue(self):
+        """The same product is a different ticker on a different exchange."""
+        service, repo, _factory, _bar = build_service()
+        repo.sp_get_bar_subscription.return_value = [
+            {"internal_cusip": CUSIP, "tm_interval_id": DAILY, "source_app_id": BYBIT}
+        ]
+
+        service.list_subscriptions()
+
+        service._instruments.resolve_internal_cusip.assert_any_call(CUSIP, BYBIT)
+
+    def test_a_withdrawn_xref_is_none_rather_than_a_broken_list(self):
+        """Capture is broken, and the list is exactly where you would see why."""
+        service, repo, _factory, _bar = build_service(vendor_symbol=None)
+        repo.sp_get_bar_subscription.return_value = [
+            {"internal_cusip": CUSIP, "tm_interval_id": DAILY, "source_app_id": BYBIT}
+        ]
+
+        rows = service.list_subscriptions()
+
+        assert rows[0]["vendor_symbol"] is None
+
+
 class TestVenueDepth:
     """Passes the venue's floor through, with the ceiling one fill may span."""
 

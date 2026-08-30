@@ -30,6 +30,11 @@ class BarSubscriptionRow(BaseModel):
     bar_subscription_id: UUID
     bar_subscription_vid: int
     internal_cusip: str
+    #: The ticker the venue itself prints, e.g. ``BTCUSDT`` for
+    #: ``btcusdt.crypto`` on Bybit. ``None`` when the ``INST.PRODUCT_XREF`` row
+    #: has been withdrawn since subscribing — which breaks capture, and is worth
+    #: showing rather than hiding behind an internal identifier.
+    vendor_symbol: str | None = None
     tm_interval_id: int
     source_app_id: int
     is_enabled_ind: Literal["Y", "N"]

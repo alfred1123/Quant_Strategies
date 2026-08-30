@@ -19,6 +19,8 @@ export interface BarSubscriptionRow {
   bar_subscription_id: string;
   bar_subscription_vid: number;
   internal_cusip: string;
+  /** What the venue itself prints, e.g. `BTCUSDT`. Null if the xref is gone. */
+  vendor_symbol: string | null;
   tm_interval_id: number;
   source_app_id: number;
   is_enabled_ind: 'Y' | 'N';
