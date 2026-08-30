@@ -78,6 +78,34 @@ class SyncResult:
 
 
 @dataclass(frozen=True)
+class BackfillPlan:
+    """The next pass toward ``target``, and how many more it would take.
+
+    ``MAX_BACKFILL_BARS`` makes deep intraday history unreachable in one call,
+    and the advice that replaced it — fill a nearer date and repeat — does not
+    work, because every fill runs to the last closed bar. For an hourly series
+    already holding a year, *no* start both reaches further back and stays
+    under the ceiling: the nearer the start, the more of the range is bars
+    already stored, and the span is counted either way.
+
+    Working backwards fixes that. Each pass ends where coverage currently
+    begins, so it spans only bars that are actually absent, and the next pass
+    starts from the ground the last one gained. ``start``/``end`` are ``None``
+    when the target is already reached — the caller has nothing to do.
+    """
+
+    start: datetime | None
+    end: datetime | None
+    bars: int
+    passes_remaining: int
+    target: datetime
+
+    @property
+    def is_complete(self) -> bool:
+        return self.start is None
+
+
+@dataclass(frozen=True)
 class BackfillResult:
     """Outcome of a continuity repair over an explicit range.
 
@@ -339,6 +367,57 @@ class PriceBarService:
         return BackfillResult(
             start=start, end=end, expected=expected,
             missing=len(missing), inserted=inserted, unfilled=unfilled,
+        )
+
+    def plan_backfill(
+        self,
+        *,
+        internal_cusip: str,
+        tm_interval_id: int,
+        source_app_id: int,
+        target: datetime,
+        now: datetime | None = None,
+    ) -> BackfillPlan:
+        """The next pass that moves this series toward ``target``.
+
+        Two index probes and arithmetic — no exchange call, so a dialog may
+        ask on every open and again after each fill.
+
+        Always works backwards from the newest edge. A series with nothing
+        stored anchors on the last closed bar rather than on ``target``, so
+        the first pass yields bars a strategy can already use; anchoring at
+        the target instead would walk forward from history nobody can trade
+        on and leave the series worthless until the final pass.
+        """
+        period = self._refdata.get_interval_period(tm_interval_id)
+        last_closed = last_closed_bar(now or datetime.now(UTC), period)
+        nothing_to_do = BackfillPlan(
+            start=None, end=None, bars=0, passes_remaining=0, target=target,
+        )
+        if target > last_closed:
+            return nothing_to_do
+
+        bounds = self.stored_bounds(
+            internal_cusip=internal_cusip,
+            tm_interval_id=tm_interval_id,
+            source_app_id=source_app_id,
+        )
+        if bounds is None:
+            end = last_closed
+        else:
+            first_bar, _ = bounds
+            if first_bar <= target:
+                return nothing_to_do
+            # The bar before coverage begins: the pass spans only what is
+            # absent, instead of re-counting bars already stored.
+            end = first_bar - period
+
+        start = max(target, end - period * (MAX_BACKFILL_BARS - 1))
+        bars = int((end - start) / period) + 1
+        outstanding = int((end - target) / period) + 1
+        passes = -(-outstanding // MAX_BACKFILL_BARS)  # ceil, without float
+        return BackfillPlan(
+            start=start, end=end, bars=bars, passes_remaining=passes, target=target,
         )
 
     def stored_bounds(

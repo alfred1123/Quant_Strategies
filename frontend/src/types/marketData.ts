@@ -57,6 +57,24 @@ export interface VenueDepth {
   max_backfill_bars: number;
 }
 
+/**
+ * The next fill toward a target, and how many more it would take.
+ *
+ * Deep intraday history cannot be fetched in one call, and a nearer start does
+ * not help: every fill runs to the last closed bar, so the span keeps counting
+ * bars already stored. Each pass here ends where coverage begins instead, and
+ * the next resumes from what the last one gained.
+ */
+export interface BackfillPlan {
+  /** Null once the target is reached — there is nothing left to run. */
+  start: string | null;
+  end: string | null;
+  bars: number;
+  /** Counting this one. */
+  passes_remaining: number;
+  target: string;
+}
+
 export interface BackfillRequest {
   internal_cusip: string;
   tm_interval_id: number;

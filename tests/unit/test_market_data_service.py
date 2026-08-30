@@ -61,10 +61,10 @@ class FakeFetcher:
         return self.bars[0].bar_timestamp if self.bars else None
 
 
-def build_service(*, stored_bars=(), coverage_max=None, exchange_bars=()):
+def build_service(*, stored_bars=(), coverage_max=None, coverage_min=None, exchange_bars=()):
     repo = MagicMock()
     repo.get_coverage.return_value = (
-        {"min_bar_timestamp": _ts(0), "max_bar_timestamp": coverage_max}
+        {"min_bar_timestamp": coverage_min or _ts(0), "max_bar_timestamp": coverage_max}
         if coverage_max
         else None
     )
@@ -287,6 +287,126 @@ class TestVenueDepth:
             service.venue_depth(
                 internal_cusip=CUSIP, tm_interval_id=INTERVAL_1H, source_app_id=APP_ID,
             )
+
+
+def _plan(service, target, **kwargs):
+    return service.plan_backfill(
+        internal_cusip=CUSIP,
+        tm_interval_id=INTERVAL_1H,
+        source_app_id=APP_ID,
+        target=target,
+        now=NOW,
+        **kwargs,
+    )
+
+
+#: 10:37 is still forming, so 09:00 is the newest closed hourly bar.
+LAST_CLOSED = datetime(2026, 8, 1, 9, 0, tzinfo=UTC)
+
+
+class TestBackfillPlan:
+    """Deep history is reached in stages, each pass ending where coverage begins.
+
+    The ceiling alone made intraday history unreachable rather than slow: every
+    fill ran to the last closed bar, so for a series already holding a year no
+    start both reached further back and stayed under the limit.
+    """
+
+    def test_an_empty_series_anchors_on_the_newest_closed_bar(self):
+        """Not on the target — the first pass should yield tradeable bars."""
+        service, _repo, _fetcher = build_service()
+
+        plan = _plan(service, LAST_CLOSED - timedelta(hours=25_000))
+
+        assert plan.end == LAST_CLOSED
+        assert plan.start == LAST_CLOSED - timedelta(hours=MAX_BACKFILL_BARS - 1)
+        assert plan.bars == MAX_BACKFILL_BARS
+
+    def test_a_pass_stops_where_coverage_begins(self):
+        """The span counts only absent bars, never ones already stored."""
+        first_stored = _ts(0)
+        service, _repo, _fetcher = build_service(
+            coverage_max=LAST_CLOSED, coverage_min=first_stored,
+        )
+
+        plan = _plan(service, first_stored - timedelta(hours=500))
+
+        assert plan.end == first_stored - timedelta(hours=1)
+        assert plan.bars == 500
+
+    def test_a_reachable_target_is_one_pass(self):
+        first_stored = _ts(0)
+        service, _repo, _fetcher = build_service(
+            coverage_max=LAST_CLOSED, coverage_min=first_stored,
+        )
+        target = first_stored - timedelta(hours=500)
+
+        plan = _plan(service, target)
+
+        assert plan.start == target
+        assert plan.passes_remaining == 1
+
+    def test_it_says_how_many_passes_remain(self):
+        service, _repo, _fetcher = build_service()
+
+        plan = _plan(service, LAST_CLOSED - timedelta(hours=25_000))
+
+        # 25,001 outstanding boundaries over a 10,000 ceiling.
+        assert plan.passes_remaining == 3
+
+    def test_a_target_already_reached_has_nothing_to_run(self):
+        first_stored = _ts(0)
+        service, _repo, _fetcher = build_service(
+            coverage_max=LAST_CLOSED, coverage_min=first_stored,
+        )
+
+        plan = _plan(service, first_stored)
+
+        assert plan.is_complete
+        assert plan.start is None
+        assert plan.passes_remaining == 0
+
+    def test_a_target_in_the_future_has_nothing_to_run(self):
+        service, _repo, _fetcher = build_service()
+
+        plan = _plan(service, LAST_CLOSED + timedelta(days=7))
+
+        assert plan.is_complete
+
+    def test_planning_costs_no_exchange_call(self):
+        """A dialog re-asks after every fill, so this must stay cheap."""
+        service, _repo, fetcher = build_service()
+
+        _plan(service, LAST_CLOSED - timedelta(hours=25_000))
+
+        assert fetcher.calls == []
+        assert not hasattr(fetcher, "earliest_calls")
+
+    def test_a_planned_pass_is_never_refused_by_the_guard(self):
+        """The plan exists to produce fills the guard accepts."""
+        service, _repo, _fetcher = build_service()
+
+        plan = _plan(service, LAST_CLOSED - timedelta(hours=25_000))
+
+        assert plan.bars <= MAX_BACKFILL_BARS
+
+    def test_successive_passes_walk_backwards(self):
+        """The second pass resumes exactly where the first stopped."""
+        service, repo, _fetcher = build_service(
+            coverage_max=LAST_CLOSED, coverage_min=_ts(0),
+        )
+        target = _ts(0) - timedelta(hours=25_000)
+
+        first = _plan(service, target)
+        # What the store looks like once that pass has been applied.
+        repo.get_coverage.return_value = {
+            "min_bar_timestamp": first.start,
+            "max_bar_timestamp": LAST_CLOSED,
+        }
+        second = _plan(service, target)
+
+        assert second.end == first.start - timedelta(hours=1)
+        assert second.passes_remaining == first.passes_remaining - 1
 
 
 class TestBackfillSizeGuard:

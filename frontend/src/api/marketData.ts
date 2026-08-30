@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 import type {
+  BackfillPlan,
   BackfillReport,
   BackfillRequest,
   BarSubscriptionRow,
@@ -129,11 +130,42 @@ export function useStoredCoverage(key: Partial<SeriesKey>) {
   });
 }
 
+export const BACKFILL_PLAN_QUERY_KEY = ['market-data', 'backfill-plan'] as const;
+
+/**
+ * The next fill toward `target`, and how many more it would take.
+ *
+ * Costs stored-bar probes and arithmetic rather than an exchange call, so it
+ * is re-asked after every fill: the whole point is that the answer moves as
+ * coverage grows.
+ */
+export function useBackfillPlan(key: Partial<SeriesKey>, target: string | null) {
+  const complete =
+    key.internal_cusip !== undefined
+    && key.tm_interval_id !== undefined
+    && key.source_app_id !== undefined
+    && !!target;
+  return useQuery({
+    queryKey: [...BACKFILL_PLAN_QUERY_KEY, key, target] as const,
+    enabled: complete,
+    retry: false,
+    queryFn: async (): Promise<BackfillPlan> => {
+      const { data } = await apiClient.get<BackfillPlan>(
+        '/market-data/price-bars/backfill-plan',
+        { params: { ...key, target } },
+      );
+      return data;
+    },
+  });
+}
+
 /**
  * Fill toward the venue's floor.
  *
  * Invalidates the list because a fill is exactly what changes coverage, and
- * the number the user came to move is on that table.
+ * the number the user came to move is on that table. Invalidates the plan for
+ * the same reason: a pass that succeeded has moved where the next one starts,
+ * and a stale plan would re-run the range just filled.
  */
 export function useBackfill() {
   const qc = useQueryClient();
@@ -141,6 +173,7 @@ export function useBackfill() {
     mutationFn: backfill,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: SUBSCRIPTIONS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: BACKFILL_PLAN_QUERY_KEY });
     },
   });
 }
