@@ -74,9 +74,17 @@ describe('buildOptimizeRequest', () => {
     expect(req.split_ratio).toBe(0.6);
   });
 
-  it('omits dataSource as undefined when empty', () => {
+  it('sends the chosen venue through verbatim', () => {
+    const req = buildOptimizeRequest(baseCfg({ dataSource: 'bybit' }));
+    expect(req.data_source).toBe('bybit');
+  });
+
+  it('forwards an empty venue rather than dropping it', () => {
+    // Dropping it let the backend default to Yahoo, so a run the user
+    // never configured got fitted on provider prints. Sent empty, it is
+    // rejected — and validateBacktestConfig blocks it before that.
     const req = buildOptimizeRequest(baseCfg({ dataSource: '' }));
-    expect(req.data_source).toBeUndefined();
+    expect(req.data_source).toBe('');
   });
 });
 

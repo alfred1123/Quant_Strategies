@@ -318,6 +318,20 @@ Each `FactorConfig` carries:
 
 For `/performance`, the caller passes `windows: list[int]` and `signals: list[float]` — one value per factor, in the same order.
 
+### The traded venue is required, and the name says which one
+
+Request-level `data_source` — the venue the **trade asset** is priced from — is mandatory on `OptimizeRequest`, `PerformanceRequest`, and `WalkForwardRequest`. It has no default and rejects the empty string, so omitting it is **422**, not a Yahoo run.
+
+It used to default to `"yahoo"`, and the client dropped the field when the box was blank. The two combined to produce a run nobody configured: a strategy stored in production carried `"data_source": "yahoo"` while its `STRATEGY_NM` read `... on bybit:price`, because the name was assembled only from factor recipes and a factor had been set to Bybit. Setting the source on a factor does not move the traded series — the traded leg is fetched with the request-level value, and only factors fall back to it (`f.data_source or req.data_source`).
+
+The canonical name therefore carries the traded venue as `TRADE@VENUE ← …`:
+
+```
+btcusdt.crypto@bybit ← btcusdt.crypto/get_bollinger_band/momentum on bybit:price
+```
+
+Since `STRATEGY_NM` is the identity key, the same recipe fitted on Yahoo prints and on Bybit prints are now two strategies rather than one grouped pair. Names minted before this change have no `@venue` segment; re-running such a config produces a new name, and therefore a new identity, which is intended — the old name could not distinguish the two.
+
 ## SSE Streaming (`/optimize/stream`)
 
 The streaming endpoint uses `StreamingResponse` with Server-Sent Events:

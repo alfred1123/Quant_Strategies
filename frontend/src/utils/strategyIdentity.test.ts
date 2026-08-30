@@ -14,7 +14,7 @@ const baseFactor = (overrides: Partial<FactorConfig> = {}): FactorConfig => ({
 const baseConfig = (overrides: Partial<BacktestConfig> = {}): BacktestConfig => ({
   symbol: 'btcusdt.crypto',
   vendorSymbol: '',
-  dataSource: '',
+  dataSource: 'yahoo',
   assetType: 'crypto',
   start: '2020-01-01',
   end: '2024-01-01',
@@ -29,9 +29,9 @@ const baseConfig = (overrides: Partial<BacktestConfig> = {}): BacktestConfig => 
 });
 
 describe('buildStrategyNm', () => {
-  it('includes trade product and factor metric', () => {
+  it('includes trade product, its venue, and factor metric', () => {
     expect(buildStrategyNm(baseConfig())).toBe(
-      'btcusdt.crypto ← btcusdt.crypto/get_bollinger_band/momentum_band_signal on c',
+      'btcusdt.crypto@yahoo ← btcusdt.crypto/get_bollinger_band/momentum_band_signal on c',
     );
   });
 
@@ -43,8 +43,26 @@ describe('buildStrategyNm', () => {
       ],
     });
     expect(buildStrategyNm(cfg)).toBe(
-      'ethusdt.crypto ← vix.equity_us/get_rsi/momentum_band_signal on c',
+      'ethusdt.crypto@yahoo ← vix.equity_us/get_rsi/momentum_band_signal on c',
     );
+  });
+
+  it('treats the same recipe on two venues as two strategies', () => {
+    const onYahoo = buildStrategyNm(baseConfig({ dataSource: 'yahoo' }));
+    const onBybit = buildStrategyNm(baseConfig({ dataSource: 'bybit' }));
+    expect(onYahoo).not.toBe(onBybit);
+  });
+
+  it('names the traded venue even when a factor reads from another', () => {
+    // The failure this guards: the name said "on bybit:price" because a
+    // factor was set to Bybit, while the traded series stayed on Yahoo.
+    const cfg = baseConfig({
+      dataSource: 'yahoo',
+      factors: [baseFactor({ data_source: 'bybit', data_column: 'price' })],
+    });
+    const nm = buildStrategyNm(cfg);
+    expect(nm).toContain('btcusdt.crypto@yahoo ←');
+    expect(nm).toContain('on bybit:price');
   });
 
   it('treats different metrics as distinct strategies', () => {

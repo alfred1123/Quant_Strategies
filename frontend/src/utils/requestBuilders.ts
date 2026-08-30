@@ -18,7 +18,7 @@ export function effectiveSymbol(cfg: BacktestConfig): string {
  * payload to match the backend schema (``conjunction: str | None``).
  */
 export function buildOptimizeRequest(cfg: BacktestConfig): OptimizeRequest {
-  const ds = cfg.dataSource || undefined;
+  const ds = cfg.dataSource;
   return {
     symbol: effectiveSymbol(cfg),
     start: cfg.start,
@@ -43,7 +43,7 @@ export function buildOptimizeRequest(cfg: BacktestConfig): OptimizeRequest {
  * payload.
  */
 export function buildPerformanceRequest(cfg: BacktestConfig, row: Top10Row): PerformanceRequest {
-  const ds = cfg.dataSource || undefined;
+  const ds = cfg.dataSource;
   let windows: number[];
   let signals: number[];
   if (isSingleFactorRow(row)) {

@@ -58,7 +58,13 @@ class OptimizeRequest(BaseModel):
     end: str
     trading_period: int
     fee_bps: float = 5.0
-    data_source: str = "yahoo"  # REFDATA.APP.NAME
+    # REFDATA.APP.NAME of the venue the *trade* asset is priced from —
+    # required, never defaulted. A default here is silent substitution:
+    # an omitted source became Yahoo, the run was fitted on Yahoo prints,
+    # and nothing downstream said so. Rejecting the request is the only
+    # honest answer, because there is no source a caller can be assumed
+    # to have meant. Empty is rejected too — a blank box is not a choice.
+    data_source: str = Field(min_length=1)
     # Cache control — when True, refetch every product+factor from the
     # provider and insert a new BT.API_REQUEST version. When False
     # (default), serve from cache only and 400 on miss.
@@ -81,7 +87,8 @@ class PerformanceRequest(BaseModel):
     end: str
     trading_period: int
     fee_bps: float = 5.0
-    data_source: str = "yahoo"  # REFDATA.APP.NAME
+    # Required for the same reason as OptimizeRequest.data_source.
+    data_source: str = Field(min_length=1)
     # See OptimizeRequest.refresh_dataset.
     refresh_dataset: bool = False
     factors: list[FactorConfig] = Field(min_length=1)

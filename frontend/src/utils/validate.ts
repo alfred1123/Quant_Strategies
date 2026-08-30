@@ -17,6 +17,9 @@ export function validateBacktestConfig(cfg: BacktestConfig): string[] {
   if (!cfg.assetType) {
     missing.push('Asset Type');
   }
+  if (!cfg.dataSource.trim()) {
+    missing.push('Data Source');
+  }
   if (cfg.factors.length === 0) {
     missing.push('At least one Factor');
   }

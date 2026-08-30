@@ -69,6 +69,16 @@ describe('validateBacktestConfig', () => {
     expect(missing).toContain('Factor 2 Strategy');
   });
 
+  it('flags a missing data source', () => {
+    const cfg = { ...baseCfg, dataSource: '' };
+    expect(validateBacktestConfig(cfg)).toContain('Data Source');
+  });
+
+  it('flags a whitespace-only data source', () => {
+    const cfg = { ...baseCfg, dataSource: '  ' };
+    expect(validateBacktestConfig(cfg)).toContain('Data Source');
+  });
+
   it('flags zero-factor config', () => {
     const cfg = { ...baseCfg, factors: [] };
     expect(validateBacktestConfig(cfg)).toContain('At least one Factor');
