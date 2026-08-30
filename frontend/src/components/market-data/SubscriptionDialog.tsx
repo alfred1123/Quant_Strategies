@@ -14,10 +14,10 @@ import {
 } from '@mui/material';
 import { useMemo, useState } from 'react';
 import { useSubscribe, useVenueDepth } from '../../api/marketData';
-import { useProducts } from '../../api/inst';
+import { useAppProducts } from '../../api/inst';
 import { intervalLabel, useExchangeApps, useTmIntervals } from '../../api/refdata';
 import type { VenueDepth } from '../../types/marketData';
-import type { ProductRow } from '../../types/refdata';
+import type { ListedProduct } from '../../types/refdata';
 
 interface SubscriptionDialogProps {
   open: boolean;
@@ -76,11 +76,30 @@ function venueDepthHelp(
   );
 }
 
+/**
+ * Why the product box is empty, when it is.
+ *
+ * Naming the count matters: a venue listing eight products is a different
+ * thing to search than one listing eight hundred, and "no options" after
+ * typing reads as a broken search unless the size was visible beforehand.
+ */
+function productHelp(
+  venue: string,
+  loading: boolean,
+  count: number,
+): string {
+  if (!venue) return 'Pick a venue first — it decides which products exist here.';
+  if (loading) return 'Loading what this venue lists…';
+  if (count === 0) {
+    return 'This venue lists nothing yet. Add an INST.PRODUCT_XREF row for it.';
+  }
+  return `${count.toLocaleString()} products listed on this venue.`;
+}
+
 function SubscriptionDialogContent({
   onClose,
   onSuccess,
 }: Omit<SubscriptionDialogProps, 'open'>) {
-  const { data: products = [] } = useProducts();
   const { data: intervals = [] } = useTmIntervals();
   const { data: exchanges = [] } = useExchangeApps();
   const create = useSubscribe();
@@ -88,6 +107,11 @@ function SubscriptionDialogContent({
   const [internalCusip, setInternalCusip] = useState('');
   const [intervalId, setIntervalId] = useState('');
   const [sourceAppId, setSourceAppId] = useState('');
+
+  // Scoped to the venue, so the options are things this exchange can actually
+  // serve rather than every instrument the platform knows.
+  const productsQuery = useAppProducts(sourceAppId ? Number(sourceAppId) : null);
+  const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
   /** `null` until the user picks a date; the venue's floor stands in. */
   const [chosenTarget, setChosenTarget] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -154,28 +178,60 @@ function SubscriptionDialogContent({
       <DialogContent dividers>
         <Stack spacing={2} sx={{ pt: 1 }}>
           {/*
-            A search box, not a dropdown: the product list is the whole
-            instrument universe, and scrolling it to find one ticker does not
-            scale. Not `freeSolo`, unlike the backtest config's selector — a
-            subscription must name a product that exists, since capture resolves
-            it against `INST.PRODUCT_XREF` to reach the venue at all.
-
-            The label carries both the name and the CUSIP, so MUI's default
-            filter matches either without a custom `filterOptions`.
+            Venue comes first because it is what makes the product question
+            answerable. Asked the other way round, the list is every instrument
+            the platform knows — mostly things the chosen exchange has never
+            listed, which is not a set anyone can usefully scroll or search.
           */}
-          <Autocomplete<ProductRow>
+          <TextField
+            select
+            label="Venue"
+            value={sourceAppId}
+            onChange={e => {
+              setSourceAppId(e.target.value);
+              // A product listed here may not be listed there.
+              setInternalCusip('');
+            }}
+            helperText="Bars are a fact from one exchange — this picks which order book you capture."
+            fullWidth
+          >
+            {exchanges.map(a => (
+              <MenuItem key={a.app_id} value={String(a.app_id)}>
+                {a.display_name}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          {/*
+            A search box over what this venue lists, not a dropdown over
+            everything. Not `freeSolo`, unlike the backtest config's selector —
+            a subscription must name a product the venue carries, since capture
+            resolves it through `INST.PRODUCT_XREF` to reach the venue at all.
+
+            The label carries name, CUSIP and vendor symbol, so MUI's default
+            filter matches any of the three without a custom `filterOptions`.
+          */}
+          <Autocomplete<ListedProduct>
             options={products}
             value={selectedProduct}
             onChange={(_, val) => setInternalCusip(val?.internal_cusip ?? '')}
-            getOptionLabel={opt => `${opt.display_nm} (${opt.internal_cusip})`}
+            getOptionLabel={opt =>
+              `${opt.display_nm} (${opt.internal_cusip}) ${opt.vendor_symbol}`}
             isOptionEqualToValue={(opt, val) =>
               opt.internal_cusip === val.internal_cusip}
+            disabled={!sourceAppId}
+            loading={productsQuery.isFetching}
             slotProps={{ listbox: { sx: { maxHeight: 320 } } }}
             renderInput={params => (
               <TextField
                 {...params}
                 label="Product"
-                placeholder="Search by name or CUSIP…"
+                placeholder="Search by name, CUSIP or venue symbol…"
+                helperText={productHelp(
+                  sourceAppId,
+                  productsQuery.isFetching,
+                  products.length,
+                )}
               />
             )}
             renderOption={(props, opt) => (
@@ -183,7 +239,7 @@ function SubscriptionDialogContent({
                 <Box>
                   <Typography variant="body2">{opt.display_nm}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {opt.internal_cusip}
+                    {opt.internal_cusip} · {opt.vendor_symbol}
                   </Typography>
                 </Box>
               </li>
@@ -201,21 +257,6 @@ function SubscriptionDialogContent({
             {sortedIntervals.map(iv => (
               <MenuItem key={iv.tm_interval_id} value={String(iv.tm_interval_id)}>
                 {intervalLabel(iv)}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <TextField
-            select
-            label="Venue"
-            value={sourceAppId}
-            onChange={e => setSourceAppId(e.target.value)}
-            helperText="Bars are a fact from one exchange — this picks which order book you capture."
-            fullWidth
-          >
-            {exchanges.map(a => (
-              <MenuItem key={a.app_id} value={String(a.app_id)}>
-                {a.display_name}
               </MenuItem>
             ))}
           </TextField>

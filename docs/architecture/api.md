@@ -198,6 +198,15 @@ How the cache is published and read: [REFDATA Cache](refdata-cache.md).
 | `POST` | `/api/v1/refdata/refresh` | Reload all REFDATA tables from the database without restarting the server. Returns `{"tables": n}`. |
 | `GET`  | `/api/v1/inst/products` | List products (cached `InstrumentCache`). |
 | `GET`  | `/api/v1/inst/products/{id}/xrefs` | Vendor-symbol cross-references for a product. |
+| `GET`  | `/api/v1/inst/apps/{app_id}/products` | Only the products that app lists, each with the `vendor_symbol` it prints. |
+
+`/inst/products` is every instrument the platform knows, which is the wrong
+list to offer once a venue is chosen — a Nasdaq ETF has no Bybit xref, so
+picking it could only produce a subscription that never captures a bar.
+Listing is exactly what `INST.PRODUCT_XREF` records, so the xrefs for one app
+*are* the venue's catalogue. Served from `InstrumentCache` in memory, no query.
+An app that lists nothing returns `[]`, unlike `/products/{id}/xrefs`, where a
+missing product is a 404 — listing nothing is a real answer, not an error.
 | `POST` | `/api/v1/inst/refresh` | Reload the instrument cache. Returns 204. |
 
 ### Admin / scheduler (service token or session)

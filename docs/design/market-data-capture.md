@@ -343,6 +343,32 @@ why.
 Search filters on **either** identifier, because nobody reliably remembers which
 of the two they know.
 
+### 6.3 The venue chooses the products, not the other way round
+
+The capture dialog asked for a product first, from a dropdown holding every
+instrument the platform knows. With Bybit as the venue that list is mostly
+Nasdaq and NYSE Arca tickers — `ibit.nasdaq`, `fbtc.cboebzx` — none of which
+Bybit has ever listed. Picking one could only produce a subscription that never
+captures a bar, because capture resolves the product through
+`INST.PRODUCT_XREF` to reach the venue at all.
+
+Making it a search box helped and did not fix it: a set that large is still not
+one anyone should have to filter, and typing `btc` still surfaces a dozen ETFs
+before the perpetual. The list was simply the wrong list.
+
+So **venue is now the first field**, and the product options are what that venue
+lists — served by `GET /api/v1/inst/apps/{app_id}/products` from the in-memory
+`InstrumentCache`, since listing is precisely what `PRODUCT_XREF` records.
+Bybit's handful of pairs needs no scrolling at all, and the search became a
+convenience rather than a necessity. Changing venue clears the chosen product,
+because the same product is not listed everywhere.
+
+Each option carries the vendor symbol as well as the CUSIP, and the search
+matches any of the three, so the ticker from the exchange's own screen is a
+valid way in. The field is disabled until a venue is chosen and says how many
+products that venue lists, so "no options" after typing reads as a search miss
+rather than a broken form.
+
 ## 7. The backtest seam (built)
 
 Backtest used to read the provider and only the provider. `_build_data_dict`
