@@ -83,6 +83,11 @@ export interface ProductRow {
   description: string | null;
 }
 
+/** A product as one venue lists it: the product, plus the ticker it prints. */
+export interface ListedProduct extends ProductRow {
+  vendor_symbol: string;
+}
+
 export interface XrefRow {
   product_xref_id: number;
   product_xref_vid: number;

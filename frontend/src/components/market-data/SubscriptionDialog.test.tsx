@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SubscriptionDialog from './SubscriptionDialog';
 import { useSubscribe, useVenueDepth } from '../../api/marketData';
-import { useProducts } from '../../api/inst';
+import { useAppProducts } from '../../api/inst';
 import { useExchangeApps, useTmIntervals } from '../../api/refdata';
 import type { VenueDepth } from '../../types/marketData';
 
@@ -11,7 +11,7 @@ vi.mock('../../api/marketData', () => ({
   useSubscribe: vi.fn(),
   useVenueDepth: vi.fn(),
 }));
-vi.mock('../../api/inst', () => ({ useProducts: vi.fn() }));
+vi.mock('../../api/inst', () => ({ useAppProducts: vi.fn() }));
 // Real intervalLabel — only the data hooks are stubbed.
 vi.mock('../../api/refdata', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/refdata')>()),
@@ -29,10 +29,23 @@ let subscribeMutate: ReturnType<typeof vi.fn>;
 
 // `null` means the venue gave no answer. Not `undefined`, which a default
 // parameter would quietly replace with the happy-path fixture.
+const LISTED = [
+  { internal_cusip: 'btcusdt.crypto', display_nm: 'Bitcoin', vendor_symbol: 'BTCUSDT' },
+  { internal_cusip: 'ethusdt.crypto', display_nm: 'Ethereum', vendor_symbol: 'ETHUSDT' },
+  { internal_cusip: 'solusdt.crypto', display_nm: 'Solana', vendor_symbol: 'SOLUSDT' },
+];
+
 function setup({
   depth = BYBIT_DAILY,
   isFetching = false,
-}: { depth?: VenueDepth | null; isFetching?: boolean } = {}) {
+  listed = LISTED,
+  productsFetching = false,
+}: {
+  depth?: VenueDepth | null;
+  isFetching?: boolean;
+  listed?: typeof LISTED;
+  productsFetching?: boolean;
+} = {}) {
   subscribeMutate = vi.fn().mockResolvedValue({});
   vi.mocked(useSubscribe).mockReturnValue({
     mutateAsync: subscribeMutate,
@@ -42,13 +55,10 @@ function setup({
     data: depth ?? undefined,
     isFetching,
   } as unknown as ReturnType<typeof useVenueDepth>);
-  vi.mocked(useProducts).mockReturnValue({
-    data: [
-      { internal_cusip: 'btcusdt.crypto', display_nm: 'Bitcoin' },
-      { internal_cusip: 'ethusdt.crypto', display_nm: 'Ethereum' },
-      { internal_cusip: 'solusdt.crypto', display_nm: 'Solana' },
-    ],
-  } as unknown as ReturnType<typeof useProducts>);
+  vi.mocked(useAppProducts).mockReturnValue({
+    data: listed,
+    isFetching: productsFetching,
+  } as unknown as ReturnType<typeof useAppProducts>);
   vi.mocked(useTmIntervals).mockReturnValue({
     data: [
       {
@@ -61,7 +71,10 @@ function setup({
     ],
   } as unknown as ReturnType<typeof useTmIntervals>);
   vi.mocked(useExchangeApps).mockReturnValue({
-    data: [{ app_id: 34, display_name: 'Bybit' }],
+    data: [
+      { app_id: 34, display_name: 'Bybit' },
+      { app_id: 35, display_name: 'Binance' },
+    ],
   } as unknown as ReturnType<typeof useExchangeApps>);
 
   render(<SubscriptionDialog open onClose={vi.fn()} onSuccess={vi.fn()} />);
@@ -74,28 +87,84 @@ function targetInput(): HTMLInputElement {
 
 const productBox = () => screen.getByRole('combobox', { name: 'Product' });
 
-/** Choose product, interval and venue — the three that identify a series. */
+/** Pick from one of the two plain dropdowns. */
+async function pick(label: string, option: string) {
+  await userEvent.click(screen.getByRole('combobox', { name: label }));
+  await userEvent.click(await screen.findByRole('option', { name: option }));
+}
+
+/** The venue gates the product list, so it has to be chosen first. */
+const chooseVenue = () => pick('Venue', 'Bybit');
+
+/** Choose venue, product and interval — the three that identify a series. */
 async function chooseSeries() {
+  await chooseVenue();
   // Product is a search box; the other two are short enough to stay dropdowns.
   await userEvent.click(productBox());
   await userEvent.click(await screen.findByRole('option', { name: /Bitcoin/ }));
-
-  for (const [label, option] of [
-    ['Bar interval', 'Daily'],
-    ['Venue', 'Bybit'],
-  ]) {
-    await userEvent.click(screen.getByRole('combobox', { name: label }));
-    await userEvent.click(await screen.findByRole('option', { name: option }));
-  }
+  await pick('Bar interval', 'Daily');
 }
+
+describe('SubscriptionDialog product scoping', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('will not offer products before a venue narrows them', async () => {
+    // The unscoped list is every instrument the platform knows, most of which
+    // the chosen exchange has never listed. That is not a searchable set.
+    setup();
+
+    expect(productBox()).toBeDisabled();
+    expect(
+      screen.getByText(/Pick a venue first — it decides which products exist here/),
+    ).toBeInTheDocument();
+  });
+
+  it('asks only for the products the chosen venue lists', async () => {
+    setup();
+
+    await chooseVenue();
+
+    expect(vi.mocked(useAppProducts)).toHaveBeenLastCalledWith(34);
+  });
+
+  it('says how many the venue lists, so the search has a known size', async () => {
+    setup();
+
+    await chooseVenue();
+
+    expect(
+      await screen.findByText('3 products listed on this venue.'),
+    ).toBeInTheDocument();
+  });
+
+  it('names the fix when a venue lists nothing at all', async () => {
+    setup({ listed: [] });
+
+    await chooseVenue();
+
+    expect(await screen.findByText(/INST.PRODUCT_XREF/)).toBeInTheDocument();
+  });
+
+  it('drops the chosen product when the venue changes under it', async () => {
+    // The same product is not listed everywhere; keeping it would submit a
+    // pair that has no xref.
+    setup();
+    await chooseSeries();
+    expect(productBox()).toHaveValue('Bitcoin (btcusdt.crypto) BTCUSDT');
+
+    await pick('Venue', 'Binance');
+
+    expect(productBox()).toHaveValue('');
+    expect(vi.mocked(useAppProducts)).toHaveBeenLastCalledWith(35);
+  });
+});
 
 describe('SubscriptionDialog product search', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('narrows the list as you type, rather than making you scroll it', async () => {
-    // The options are the whole instrument universe; a plain dropdown does not
-    // scale past the first screenful.
     setup();
+    await chooseVenue();
 
     await userEvent.type(productBox(), 'ether');
 
@@ -105,6 +174,7 @@ describe('SubscriptionDialog product search', () => {
 
   it('searches on the cusip too, not just the display name', async () => {
     setup();
+    await chooseVenue();
 
     await userEvent.type(productBox(), 'solusdt');
 
@@ -112,16 +182,29 @@ describe('SubscriptionDialog product search', () => {
     expect(screen.queryByText('Bitcoin')).not.toBeInTheDocument();
   });
 
-  it('shows the cusip beside the name, since the name alone is ambiguous', async () => {
+  it('searches on the symbol the venue prints', async () => {
+    // The ticker on the exchange screen is often the only one to hand.
     setup();
+    await chooseVenue();
+
+    await userEvent.type(productBox(), 'ETHUSDT');
+
+    expect(await screen.findByText('Ethereum')).toBeInTheDocument();
+    expect(screen.queryByText('Bitcoin')).not.toBeInTheDocument();
+  });
+
+  it('shows the cusip and venue symbol beside the name', async () => {
+    setup();
+    await chooseVenue();
 
     await userEvent.click(productBox());
 
-    expect(await screen.findByText('btcusdt.crypto')).toBeInTheDocument();
+    expect(await screen.findByText('btcusdt.crypto · BTCUSDT')).toBeInTheDocument();
   });
 
   it('says so when nothing matches instead of showing an empty list', async () => {
     setup();
+    await chooseVenue();
 
     await userEvent.type(productBox(), 'nonesuch');
 
