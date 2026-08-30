@@ -43,7 +43,11 @@ function setup({
     isFetching,
   } as unknown as ReturnType<typeof useVenueDepth>);
   vi.mocked(useProducts).mockReturnValue({
-    data: [{ internal_cusip: 'btcusdt.crypto', display_nm: 'Bitcoin' }],
+    data: [
+      { internal_cusip: 'btcusdt.crypto', display_nm: 'Bitcoin' },
+      { internal_cusip: 'ethusdt.crypto', display_nm: 'Ethereum' },
+      { internal_cusip: 'solusdt.crypto', display_nm: 'Solana' },
+    ],
   } as unknown as ReturnType<typeof useProducts>);
   vi.mocked(useTmIntervals).mockReturnValue({
     data: [
@@ -68,10 +72,15 @@ function targetInput(): HTMLInputElement {
   return document.querySelector('input[type="date"]') as HTMLInputElement;
 }
 
+const productBox = () => screen.getByRole('combobox', { name: 'Product' });
+
 /** Choose product, interval and venue — the three that identify a series. */
 async function chooseSeries() {
+  // Product is a search box; the other two are short enough to stay dropdowns.
+  await userEvent.click(productBox());
+  await userEvent.click(await screen.findByRole('option', { name: /Bitcoin/ }));
+
   for (const [label, option] of [
-    ['Product', 'Bitcoin (btcusdt.crypto)'],
     ['Bar interval', 'Daily'],
     ['Venue', 'Bybit'],
   ]) {
@@ -79,6 +88,56 @@ async function chooseSeries() {
     await userEvent.click(await screen.findByRole('option', { name: option }));
   }
 }
+
+describe('SubscriptionDialog product search', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('narrows the list as you type, rather than making you scroll it', async () => {
+    // The options are the whole instrument universe; a plain dropdown does not
+    // scale past the first screenful.
+    setup();
+
+    await userEvent.type(productBox(), 'ether');
+
+    expect(await screen.findByText('Ethereum')).toBeInTheDocument();
+    expect(screen.queryByText('Bitcoin')).not.toBeInTheDocument();
+  });
+
+  it('searches on the cusip too, not just the display name', async () => {
+    setup();
+
+    await userEvent.type(productBox(), 'solusdt');
+
+    expect(await screen.findByText('Solana')).toBeInTheDocument();
+    expect(screen.queryByText('Bitcoin')).not.toBeInTheDocument();
+  });
+
+  it('shows the cusip beside the name, since the name alone is ambiguous', async () => {
+    setup();
+
+    await userEvent.click(productBox());
+
+    expect(await screen.findByText('btcusdt.crypto')).toBeInTheDocument();
+  });
+
+  it('says so when nothing matches instead of showing an empty list', async () => {
+    setup();
+
+    await userEvent.type(productBox(), 'nonesuch');
+
+    expect(await screen.findByText('No options')).toBeInTheDocument();
+  });
+
+  it('submits the cusip of the product picked from the search', async () => {
+    setup();
+    await chooseSeries();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
+
+    await waitFor(() => expect(subscribeMutate).toHaveBeenCalled());
+    expect(subscribeMutate.mock.calls[0][0].internal_cusip).toBe('btcusdt.crypto');
+  });
+});
 
 describe('SubscriptionDialog capture target', () => {
   beforeEach(() => vi.clearAllMocks());

@@ -76,6 +76,11 @@ jobs:
       - name: Audit dependencies
         run: npm audit --audit-level=high
 
+      # Neither the build nor the tests catch a lint error: a cascading-render
+      # effect type-checks and passes its tests while still being wrong.
+      - name: Lint
+        run: npm run lint
+
       - name: Type-check and build
         run: npm run build
 
