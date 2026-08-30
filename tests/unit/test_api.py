@@ -140,6 +140,7 @@ class TestOptimizeEndpoint:
             "symbol": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
+            "data_source": "yahoo",
             "trading_period": 365,
             "factors": [
                 {
@@ -161,6 +162,7 @@ class TestOptimizeEndpoint:
             "symbol": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
+            "data_source": "yahoo",
             "trading_period": 365,
             "factors": [
                 {
@@ -173,6 +175,32 @@ class TestOptimizeEndpoint:
             ],
         })
         assert resp.status_code == 400
+
+    def test_a_run_without_a_source_is_refused_not_assumed(self, client):
+        """No data_source must 422, never quietly become Yahoo.
+
+        A default here fitted runs on provider prints while the venue the
+        user had picked sat on a factor, and nothing surfaced it.
+        """
+        resp = client.post("/api/v1/backtest/optimize", json={
+            "symbol": "btc-usd",
+            "start": "2024-01-01",
+            "end": "2024-12-31",
+            "trading_period": 365,
+            "factors": [
+                {
+                    "indicator": "get_sma",
+                    "strategy": "momentum",
+                    "data_column": "price",
+                    "window_range": {"min": 10, "max": 20, "step": 10},
+                    "signal_range": {"min": 0.01, "max": 0.02, "step": 0.01},
+                },
+            ],
+        })
+        assert resp.status_code == 422
+        assert any(
+            err["loc"][-1] == "data_source" for err in resp.json()["detail"]
+        )
 
 
 # ── /api/v1/backtest/optimize/stream (SSE) ──────────────────────────
@@ -226,6 +254,7 @@ class TestOptimizeStreamEndpoint:
 
         with client.stream("POST", "/api/v1/backtest/optimize/stream", json={
             "symbol": "btc-usd", "start": "2024-01-01", "end": "2024-12-31",
+            "data_source": "yahoo",
             "trading_period": 365,
             "factors": [
                 {
@@ -307,6 +336,7 @@ class TestPerformanceEndpoint:
             "symbol": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
+            "data_source": "yahoo",
             "trading_period": 365,
             "factors": [
                 {
@@ -365,6 +395,7 @@ class TestWalkForwardEndpoint:
             "symbol": "btc-usd",
             "start": "2024-01-01",
             "end": "2024-12-31",
+            "data_source": "yahoo",
             "trading_period": 365,
             "split_ratio": 0.5,
             "factors": [

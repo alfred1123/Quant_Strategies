@@ -12,12 +12,21 @@ function factorRecipe(f: FactorConfig, trade: string): string {
   return `${src}/${f.indicator}/${f.strategy} on ${metric}`;
 }
 
-/** Canonical STRATEGY_NM — used for DB identity lookup and UI display. */
+/**
+ * Canonical STRATEGY_NM — used for DB identity lookup and UI display.
+ *
+ * The traded leg carries its venue (`TRADE@VENUE`) because the same
+ * recipe fitted on Yahoo prints and on Bybit prints is two different
+ * strategies, not one. Naming only the factors let a Yahoo-traded run
+ * read `... on bybit:price` — the label named the factor's venue while
+ * the series being traded came from somewhere else — and collapsed both
+ * venues onto a single identity, so their results grouped together.
+ */
 export function buildStrategyNm(cfg: BacktestConfig): string {
   const trade = effectiveSymbol(cfg);
   const parts = cfg.factors.map((f) => factorRecipe(f, trade));
   const factors = parts.join(cfg.factors.length > 1 ? ` ${cfg.conjunction} ` : '');
-  return `${trade} ← ${factors}`;
+  return `${trade}@${cfg.dataSource} ← ${factors}`;
 }
 
 /** Stable group key for promotion / jobs UI (owner + canonical name). */

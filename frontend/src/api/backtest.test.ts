@@ -28,7 +28,7 @@ describe('runOptimize', () => {
 
     const result = await runOptimize({
       symbol: 'BTC-USD', start: '2020-01-01', end: '2024-01-01',
-      trading_period: 365, fee_bps: 5, factors: [FACTOR],
+      trading_period: 365, fee_bps: 5, data_source: 'yahoo', factors: [FACTOR],
     });
 
     expect(mockedPost).toHaveBeenCalledWith('/backtest/optimize', expect.objectContaining({ symbol: 'BTC-USD' }));
@@ -43,7 +43,7 @@ describe('runPerformance', () => {
 
     const result = await runPerformance({
       symbol: 'AAPL', start: '2020-01-01', end: '2024-01-01',
-      trading_period: 252, fee_bps: 5,
+      trading_period: 252, fee_bps: 5, data_source: 'yahoo',
       factors: [FACTOR], windows: [20], signals: [1],
     });
 
@@ -59,7 +59,7 @@ describe('runWalkForward', () => {
 
     const result = await runWalkForward({
       symbol: 'BTC-USD', start: '2020-01-01', end: '2024-01-01',
-      trading_period: 365, fee_bps: 5, split_ratio: 0.5,
+      trading_period: 365, fee_bps: 5, split_ratio: 0.5, data_source: 'yahoo',
       factors: [FACTOR],
     });
 
@@ -101,7 +101,7 @@ describe('runOptimizeStream', () => {
     const res = await runOptimizeStream(
       {
         symbol: 'BTC-USD', start: '2020-01-01', end: '2024-01-01',
-        trading_period: 365, fee_bps: 5, factors: [FACTOR],
+        trading_period: 365, fee_bps: 5, data_source: 'yahoo', factors: [FACTOR],
       },
       onProgress,
     );
@@ -124,7 +124,7 @@ describe('runOptimizeStream', () => {
 
     await expect(
       runOptimizeStream(
-        { symbol: 'X', start: '', end: '', trading_period: 365, fee_bps: 0, factors: [FACTOR] },
+        { symbol: 'X', start: '', end: '', trading_period: 365, fee_bps: 0, data_source: 'yahoo', factors: [FACTOR] },
         vi.fn(),
       ),
     ).rejects.toThrow('boom');
@@ -141,7 +141,7 @@ describe('runOptimizeStream', () => {
 
     await expect(
       runOptimizeStream(
-        { symbol: 'X', start: '', end: '', trading_period: 365, fee_bps: 0, factors: [FACTOR] },
+        { symbol: 'X', start: '', end: '', trading_period: 365, fee_bps: 0, data_source: 'yahoo', factors: [FACTOR] },
         vi.fn(),
       ),
     ).rejects.toThrow('Validation error');
@@ -154,7 +154,7 @@ describe('runOptimizeStream', () => {
 
     await expect(
       runOptimizeStream(
-        { symbol: 'X', start: '', end: '', trading_period: 365, fee_bps: 0, factors: [FACTOR] },
+        { symbol: 'X', start: '', end: '', trading_period: 365, fee_bps: 0, data_source: 'yahoo', factors: [FACTOR] },
         vi.fn(),
       ),
     ).rejects.toThrow('Stream response has no body');
@@ -174,7 +174,7 @@ describe('runOptimizeStream', () => {
 
     await expect(
       runOptimizeStream(
-        { symbol: 'X', start: '', end: '', trading_period: 365, fee_bps: 0, factors: [FACTOR] },
+        { symbol: 'X', start: '', end: '', trading_period: 365, fee_bps: 0, data_source: 'yahoo', factors: [FACTOR] },
         vi.fn(),
       ),
     ).rejects.toThrow(/Malformed SSE payload/);
@@ -194,7 +194,7 @@ describe('runOptimizeStream', () => {
 
     await expect(
       runOptimizeStream(
-        { symbol: 'X', start: '', end: '', trading_period: 365, fee_bps: 0, factors: [FACTOR] },
+        { symbol: 'X', start: '', end: '', trading_period: 365, fee_bps: 0, data_source: 'yahoo', factors: [FACTOR] },
         vi.fn(),
       ),
     ).rejects.toThrow('Invalid SSE result payload');
@@ -218,7 +218,7 @@ describe('runOptimizeStream', () => {
 
     const ctrl = new AbortController();
     await runOptimizeStream(
-      { symbol: 'X', start: '', end: '', trading_period: 365, fee_bps: 0, factors: [FACTOR] },
+      { symbol: 'X', start: '', end: '', trading_period: 365, fee_bps: 0, data_source: 'yahoo', factors: [FACTOR] },
       vi.fn(),
       ctrl.signal,
     );

@@ -66,7 +66,9 @@ export interface BacktestConfig {
 export interface OptimizeRequest {
   // ── trading product ──
   symbol: string;
-  data_source?: string;
+  /** Venue the trade asset is priced from. Required — the backend
+   *  rejects a request without one rather than assuming a provider. */
+  data_source: string;
 
   // ── shared (product + factors) ──
   start: string;
@@ -88,7 +90,8 @@ export interface OptimizeRequest {
 export interface PerformanceRequest {
   // ── trading product ──
   symbol: string;
-  data_source?: string;
+  /** See OptimizeRequest.data_source. */
+  data_source: string;
 
   // ── shared ──
   start: string;
