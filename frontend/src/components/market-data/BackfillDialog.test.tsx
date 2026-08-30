@@ -67,13 +67,17 @@ let fillMutate: ReturnType<typeof vi.fn>;
 
 // `null` means the venue gave no answer. Not `undefined`, which a default
 // parameter would quietly replace with the happy-path fixture.
+let planRefetch: ReturnType<typeof vi.fn>;
+
 function setup({
   depth = BYBIT_DAILY,
   plan = ONE_PASS,
+  planError = null,
   row = subscription(),
 }: {
   depth?: VenueDepth | null;
   plan?: BackfillPlan | null;
+  planError?: Error | null;
   row?: BarSubscriptionRow;
 } = {}) {
   fillMutate = vi.fn().mockResolvedValue({
@@ -93,9 +97,13 @@ function setup({
     data: depth ?? undefined,
     isFetching: false,
   } as unknown as ReturnType<typeof useVenueDepth>);
+  planRefetch = vi.fn();
   vi.mocked(useBackfillPlan).mockReturnValue({
-    data: plan ?? undefined,
+    data: planError ? undefined : plan ?? undefined,
+    isError: planError != null,
+    error: planError ?? null,
     isFetching: false,
+    refetch: planRefetch,
   } as unknown as ReturnType<typeof useBackfillPlan>);
 
   render(<BackfillDialog row={row} onClose={vi.fn()} />);
@@ -213,6 +221,24 @@ describe('BackfillDialog — history arrives one pass at a time', () => {
 
     expect(screen.getByRole('button', { name: 'Backfill' })).toBeDisabled();
     expect(screen.getByText(/Working out what is left/)).toBeInTheDocument();
+  });
+
+  it('shows why the plan failed instead of waiting forever', () => {
+    // Both an unanswered plan and a failed one leave the data undefined.
+    // Collapsing them renders a dead dialog: a permanent "working out" beside
+    // a disabled button, with the cause never shown.
+    setup({ planError: new Error('Request failed with status code 401') });
+
+    expect(screen.getByText(/status code 401/)).toBeInTheDocument();
+    expect(screen.queryByText(/Working out what is left/)).not.toBeInTheDocument();
+  });
+
+  it('offers a retry when the plan failed', async () => {
+    setup({ planError: new Error('Network Error') });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(planRefetch).toHaveBeenCalled();
   });
 
   it('plans against the target the user chose, not the row default', async () => {
