@@ -157,6 +157,16 @@ class TestItRefusesRatherThanSubstitute:
                 refdata, inst_cache, bar_services=bar_services,
             )
 
+    def test_a_tail_beyond_one_bar_is_still_a_hole(
+        self, refdata, inst_cache, bar_services
+    ):
+        """The slack the forming bar gets must not excuse real absence."""
+        with pytest.raises(BacktestError, match=r"cover 2020-03-25 to 2026-08-29"):
+            fetch_df(
+                "btcusdt.crypto", "2020-04-01", "2026-09-30", "bybit",
+                refdata, inst_cache, bar_services=bar_services,
+            )
+
     def test_an_unlisted_factor_is_told_to_pick_its_own_source(
         self, refdata, inst_cache, bar_services
     ):
@@ -177,4 +187,42 @@ class TestItRefusesRatherThanSubstitute:
             fetch_df(
                 "btcusdt.crypto", "2020-04-01", "2020-04-05", "bybit",
                 refdata, inst_cache, bar_services=None,
+            )
+
+
+class TestTheFormingBarIsNotMissingHistory:
+    """The end date defaults to today and today's daily bar has not closed.
+
+    Requiring the store to reach it refused every run made before the daily
+    close — the store held 2026-08-29, the request said 2026-08-30, and the
+    error talked about backfilling history that was never absent.
+    """
+
+    def test_an_end_one_bar_past_the_last_close_is_served(
+        self, refdata, inst_cache, bar_services
+    ):
+        df = fetch_df(
+            "btcusdt.crypto", "2020-04-01", "2026-08-30", "bybit",
+            refdata, inst_cache, bar_services=bar_services,
+        )
+
+        assert not df.empty
+        bar_services.for_app.return_value.read_bars.assert_called_once()
+
+    def test_an_end_on_the_last_close_is_served(
+        self, refdata, inst_cache, bar_services
+    ):
+        df = fetch_df(
+            "btcusdt.crypto", "2020-04-01", "2026-08-29", "bybit",
+            refdata, inst_cache, bar_services=bar_services,
+        )
+
+        assert not df.empty
+
+    def test_the_head_gets_no_such_slack(self, refdata, inst_cache, bar_services):
+        """A day before the first bar is absence, not a bar still forming."""
+        with pytest.raises(BacktestError, match=r"cover 2020-03-25 to 2026-08-29"):
+            fetch_df(
+                "btcusdt.crypto", "2020-03-24", "2026-08-29", "bybit",
+                refdata, inst_cache, bar_services=bar_services,
             )

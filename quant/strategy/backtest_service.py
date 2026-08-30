@@ -113,7 +113,14 @@ def _fetch_exchange_df(
         )
 
     first_bar, last_bar = bounds
-    if first_bar > range_start or last_bar < range_end:
+    # The tail gets one bar of slack, the head gets none. An end of "today"
+    # is the normal request and the bar covering today has not closed, so
+    # demanding the store reach it refuses every run made before the daily
+    # close — a bar that cannot exist yet is not missing history. Slack of
+    # exactly one period keeps that from excusing a real hole: ask for a
+    # month past the last close and it still refuses.
+    tail_limit = last_bar + BACKTEST_BAR_PERIOD
+    if first_bar > range_start or tail_limit < range_end:
         raise BacktestError(
             f"{app['name']} bars for {internal_cusip} cover "
             f"{first_bar.date()} to {last_bar.date()}, which does not span the "

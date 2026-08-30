@@ -332,6 +332,12 @@ btcusdt.crypto@bybit ← btcusdt.crypto/get_bollinger_band/momentum on bybit:pri
 
 Since `STRATEGY_NM` is the identity key, the same recipe fitted on Yahoo prints and on Bybit prints are now two strategies rather than one grouped pair. Names minted before this change have no `@venue` segment; re-running such a config produces a new name, and therefore a new identity, which is intended — the old name could not distinguish the two.
 
+### The range comes from what is captured
+
+An exchange backtest reads `MARKET_DATA.PRICE_BAR`, so the stored bars bound it. `_fetch_exchange_df` refuses a range the store cannot cover rather than returning a shorter series under the requested label, and the config drawer reads `GET /price-bars/coverage` for the traded series so the refusal is avoidable rather than a surprise: choosing an exchange series snaps Start and End to the captured range, and a date typed outside it is flagged with the range offered as a one-click fix. Provider sources are left alone — `Refresh dataset` refetches any window on demand, so what happens to be cached is not a floor.
+
+**The tail gets one bar of slack, the head gets none.** The End field defaults to today and today's daily bar has not closed, so demanding the store reach it refused every run made before the daily close. A bar that cannot exist yet is not missing history, so a requested end up to one `BACKTEST_BAR_PERIOD` past the last stored bar is served. Slack of exactly one period keeps that from excusing a real hole — an end a month past the last close is still refused — and the head gets none, because a day before the first bar is absence rather than a bar still forming.
+
 ## SSE Streaming (`/optimize/stream`)
 
 The streaming endpoint uses `StreamingResponse` with Server-Sent Events:
