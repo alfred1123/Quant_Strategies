@@ -26,6 +26,9 @@ def _subscription_row(**overrides) -> dict:
         "bar_subscription_id": str(uuid.uuid4()),
         "bar_subscription_vid": 1,
         "internal_cusip": CUSIP,
+        # Resolved by the service, not selected by the procedure: an internal
+        # CUSIP cannot be looked up on an exchange, so the row carries both.
+        "vendor_symbol": "BTCUSDT",
         "tm_interval_id": DAILY,
         "source_app_id": BYBIT,
         "is_enabled_ind": "Y",
@@ -85,6 +88,26 @@ class TestListSubscriptions:
         assert row["internal_cusip"] == CUSIP
         assert row["coverage"]["gaps"] == 0
 
+    def test_carries_the_symbol_the_venue_prints(self, client_and_svc):
+        """`btcusdt.crypto` is not something you can look up on an exchange."""
+        client, svc, _warmer = client_and_svc
+        svc.list_subscriptions.return_value = [_subscription_row()]
+
+        assert client.get(
+            "/api/v1/market-data/subscriptions"
+        ).json()[0]["vendor_symbol"] == "BTCUSDT"
+
+    def test_a_withdrawn_xref_is_null_rather_than_a_failed_list(self, client_and_svc):
+        client, svc, _warmer = client_and_svc
+        svc.list_subscriptions.return_value = [
+            _subscription_row(vendor_symbol=None)
+        ]
+
+        resp = client.get("/api/v1/market-data/subscriptions")
+
+        assert resp.status_code == 200
+        assert resp.json()[0]["vendor_symbol"] is None
+
     def test_is_not_scoped_to_the_caller(self, client_and_svc):
         """Bars are shared facts — everyone sees the same capture list."""
         client, svc, _warmer = client_and_svc
@@ -107,10 +130,12 @@ class TestSubscribe:
     def test_creates_and_returns_coverage(self, client_and_svc):
         client, svc, _warmer = client_and_svc
         row = _subscription_row()
+        # Neither is on the procedure's row — the service resolves both.
         svc.subscribe.return_value = {
-            k: v for k, v in row.items() if k != "coverage"
+            k: v for k, v in row.items() if k not in ("coverage", "vendor_symbol")
         }
         svc.coverage.return_value = row["coverage"]
+        svc.vendor_symbol.return_value = "BTCUSDT"
 
         resp = client.post(
             "/api/v1/market-data/subscriptions",
@@ -123,6 +148,7 @@ class TestSubscribe:
 
         assert resp.status_code == 200
         assert resp.json()["is_enabled_ind"] == "Y"
+        assert resp.json()["vendor_symbol"] == "BTCUSDT"
 
     def test_an_unwarmable_series_is_a_400_naming_the_reason(self, client_and_svc):
         """The whole point of validating on write is that the caller can act."""

@@ -189,9 +189,33 @@ class BarSubscriptionService:
         The question the page has to answer is not "am I subscribed" but "do I
         have enough continuous history to backtest this", so every row carries
         its coverage. Coverage is two index probes per row, not a scan.
+
+        Each row also carries the **vendor symbol**, resolved the same way the
+        fetcher resolves it. An internal CUSIP alone cannot be checked against
+        anything: `btcusdt.crypto` on Bybit is `BTCUSDT`, and the ticker a venue
+        actually prints is the one worth reading beside a venue name.
         """
         rows = self._repo.sp_get_bar_subscription()
-        return [row | {"coverage": self._coverage(row)} for row in rows]
+        return [
+            row | {
+                "coverage": self._coverage(row),
+                "vendor_symbol": self.vendor_symbol(
+                    internal_cusip=row["internal_cusip"],
+                    source_app_id=int(row["source_app_id"]),
+                ),
+            }
+            for row in rows
+        ]
+
+    def vendor_symbol(self, *, internal_cusip: str, source_app_id: int) -> str | None:
+        """What the venue calls this product, or ``None`` if it no longer maps.
+
+        A cache lookup, not a query — the same `InstrumentCache` the fetcher
+        uses, so the page cannot disagree with what gets requested. ``None``
+        rather than an error: an xref withdrawn after subscribing breaks capture
+        but must not blank the list that shows you why.
+        """
+        return self._instruments.resolve_internal_cusip(internal_cusip, source_app_id)
 
     def coverage(
         self, *, internal_cusip: str, tm_interval_id: int, source_app_id: int

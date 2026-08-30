@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MarketDataPage from './MarketDataPage';
 import { renderWithProviders } from '../test/wrapper';
@@ -26,6 +26,7 @@ const ROW: BarSubscriptionRow = {
   bar_subscription_id: 'e6f1c0d2-0000-4000-8000-000000000001',
   bar_subscription_vid: 1,
   internal_cusip: 'btcusdt.crypto',
+  vendor_symbol: 'BTCUSDT',
   tm_interval_id: 1,
   source_app_id: 34,
   is_enabled_ind: 'Y',
@@ -37,6 +38,14 @@ const ROW: BarSubscriptionRow = {
     gaps: 0,
     error: null,
   },
+};
+
+const PAUSED: BarSubscriptionRow = {
+  ...ROW,
+  bar_subscription_id: 'e6f1c0d2-0000-4000-8000-000000000002',
+  internal_cusip: 'ethusdt.crypto',
+  vendor_symbol: 'ETHUSDT',
+  is_enabled_ind: 'N',
 };
 
 const mutateAsync = vi.fn();
@@ -58,6 +67,10 @@ function setup(rows: BarSubscriptionRow[] = [ROW]) {
   } as never);
   return renderWithProviders(<MarketDataPage />);
 }
+
+const capturingTable = () => screen.getByRole('table', { name: 'Capturing series' });
+const pausedTable = () => screen.getByRole('table', { name: 'Paused series' });
+const searchBox = () => screen.getByPlaceholderText(/Search by product/);
 
 describe('MarketDataPage', () => {
   beforeEach(() => {
@@ -138,5 +151,109 @@ describe('MarketDataPage', () => {
   it('tells the user why the list is empty rather than showing a bare table', () => {
     setup([]);
     expect(screen.getByText(/Nothing is being captured/i)).toBeInTheDocument();
+  });
+});
+
+describe('MarketDataPage paused series', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mutateAsync.mockResolvedValue(ROW);
+  });
+
+  it('keeps paused series out of the capturing list', () => {
+    // "What is accruing right now" is the operational question, and a status
+    // column makes the reader filter by eye on every visit.
+    setup([ROW, PAUSED]);
+
+    const capturing = capturingTable();
+    expect(within(capturing).getByText('btcusdt.crypto')).toBeInTheDocument();
+    expect(within(capturing).queryByText('ethusdt.crypto')).not.toBeInTheDocument();
+    expect(screen.getByText('Capturing (1)')).toBeInTheDocument();
+  });
+
+  it('lists paused series separately, with their own count', () => {
+    setup([ROW, PAUSED]);
+
+    expect(within(pausedTable()).getByText('ethusdt.crypto')).toBeInTheDocument();
+    expect(screen.getByText('Paused (1)')).toBeInTheDocument();
+  });
+
+  it('hides the paused section entirely when nothing is paused', () => {
+    setup([ROW]);
+
+    expect(screen.queryByRole('table', { name: 'Paused series' })).not.toBeInTheDocument();
+  });
+
+  it('says what being paused costs, since the gap is not recoverable later', () => {
+    setup([ROW, PAUSED]);
+
+    expect(screen.getByText(/only recoverable as far/i)).toBeInTheDocument();
+  });
+});
+
+describe('MarketDataPage product identity', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mutateAsync.mockResolvedValue(ROW);
+  });
+
+  it('shows the ticker the venue prints beside our identifier', () => {
+    // `btcusdt.crypto` cannot be looked up on an exchange, so on its own it is
+    // unverifiable by the person deciding whether the right series is captured.
+    setup();
+
+    expect(screen.getByText('btcusdt.crypto')).toBeInTheDocument();
+    expect(screen.getByText('BTCUSDT')).toBeInTheDocument();
+  });
+
+  it('flags a product the venue no longer maps', () => {
+    // Capture is broken, and the list is where somebody would look to find out.
+    setup([{ ...ROW, vendor_symbol: null }]);
+
+    expect(screen.getByText('not listed on this venue')).toBeInTheDocument();
+  });
+});
+
+describe('MarketDataPage search', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mutateAsync.mockResolvedValue(ROW);
+  });
+
+  it('filters on the internal cusip', async () => {
+    setup([ROW, PAUSED]);
+
+    await userEvent.type(searchBox(), 'ethusdt');
+
+    expect(screen.queryByText('btcusdt.crypto')).not.toBeInTheDocument();
+    expect(screen.getByText('ethusdt.crypto')).toBeInTheDocument();
+  });
+
+  it('filters on the vendor symbol too', async () => {
+    // Nobody reliably remembers which of the two identifiers they know.
+    setup([ROW, PAUSED]);
+
+    await userEvent.type(searchBox(), 'ETHUSDT');
+
+    expect(screen.queryByText('btcusdt.crypto')).not.toBeInTheDocument();
+    expect(screen.getByText('ethusdt.crypto')).toBeInTheDocument();
+  });
+
+  it('says how many rows the search is hiding', async () => {
+    setup([ROW, PAUSED]);
+
+    await userEvent.type(searchBox(), 'ethusdt');
+
+    expect(screen.getByText('1 series hidden by the search.')).toBeInTheDocument();
+  });
+
+  it('says so when a search matches nothing rather than looking empty', async () => {
+    setup([ROW]);
+
+    await userEvent.type(searchBox(), 'zzz');
+
+    expect(
+      screen.getByText('No capturing series matches that search.'),
+    ).toBeInTheDocument();
   });
 });

@@ -141,6 +141,9 @@ def subscribe(
     )
     return BarSubscriptionRow(
         **row,
+        vendor_symbol=svc.vendor_symbol(
+            internal_cusip=req.internal_cusip, source_app_id=req.source_app_id
+        ),
         coverage=Coverage(
             **svc.coverage(
                 internal_cusip=req.internal_cusip,

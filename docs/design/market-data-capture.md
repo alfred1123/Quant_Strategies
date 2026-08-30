@@ -311,6 +311,38 @@ continuous history". Two reads already exist:
 subscription is what turns capture from an act of faith into something checkable
 before a backtest is trusted.
 
+### 6.1 Two lists, not one list with a status column
+
+Paused series are listed **separately** from capturing ones rather than sharing
+a table with a status chip. "What is accruing right now" is the operational
+question the page exists to answer, and a mixed table dilutes it — the reader
+filters by eye on every visit, and a paused row looks identical to an active one
+until you read the chip. Splitting also gives the dormant set somewhere to say
+what being dormant costs: bars missed while paused are recoverable only as far
+back as the venue still retains them.
+
+The paused section is hidden entirely when nothing is paused, so the common case
+is one list.
+
+### 6.2 The vendor symbol belongs on the row
+
+Each row carries the ticker the **venue** prints — `BTCUSDT` — beside the
+internal CUSIP it is stored under. An internal identifier cannot be checked
+against anything: you cannot look up `btcusdt.crypto` on an exchange, so a row
+showing only that is unverifiable by the person who has to decide whether the
+right series is being captured. This is the same complaint that opened #51,
+where a deployment dialog showed a Yahoo symbol beside a Bybit account.
+
+It is resolved through the same `InstrumentCache` the fetcher uses, so the page
+cannot disagree with what actually gets requested — a lookup, not a query, and
+no change to `SP_GET_BAR_SUBSCRIPTION`. A withdrawn `INST.PRODUCT_XREF` row
+renders as **not listed on this venue** rather than blanking: capture is broken
+at that point, and the list is exactly where somebody would look to find out
+why.
+
+Search filters on **either** identifier, because nobody reliably remembers which
+of the two they know.
+
 ## 7. The backtest seam (built)
 
 Backtest used to read the provider and only the provider. `_build_data_dict`
