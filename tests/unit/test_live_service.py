@@ -114,6 +114,7 @@ class TestComputeLatestPosition:
             "end": "2024-01-01",
             "trading_period": 365,
             "data_source": "glassnode",
+            "tm_interval_id": 1,
             "factors": [
                 {
                     "indicator": "get_bollinger_band",
@@ -204,6 +205,7 @@ class TestCrossProductSymbols:
             "end": "2024-01-01",
             "trading_period": 365,
             "data_source": "glassnode",
+            "tm_interval_id": 1,
             "factors": [
                 {
                     "indicator": "get_bollinger_band",

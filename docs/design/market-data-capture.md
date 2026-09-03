@@ -455,12 +455,16 @@ Four things follow, and each is a decision rather than a detail:
   standing decision made on the Market data page (§5), not a side effect of
   pressing Run, so a five-year request never becomes a five-year exchange crawl
   on someone's behalf.
-- **The daily interval is resolved, not hardcoded.** `read_bars` needs a
-  `tm_interval_id`, and `backtest_service.BACKTEST_BAR_PERIOD` states the period
-  while REFDATA supplies the id — the rule the schedule-cadence guard follows.
-  Intraday backtests
+- **The interval comes from the request, not from this module.** `read_bars`
+  needs a `tm_interval_id` and `OptimizeRequest.tm_interval_id` supplies it,
+  required for the same reason `data_source` is: it names an input series, and
+  a default picks one on the caller's behalf silently. It was briefly a
+  `BACKTEST_BAR_PERIOD` constant resolved through REFDATA on every run, which
+  made intraday backtests
   ([§4.6](scheduler-price-bars.md#46-backtest-compatibility-same-dataframe-contract))
-  now need only an optional interval on the request.
+  impossible and left captured hourly bars unreachable. The forming-bar slack
+  is now one bar *of that interval* — as a fixed day it would have excused a
+  24-bar hole at the tail of an hourly series.
 - **`_enforce_date_sync` becomes load-bearing.** It already refuses when products
   and factors do not share coverage. Against a rolling-window table with possible
   holes that guard is doing more work than it was written for, and it is the right

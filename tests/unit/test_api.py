@@ -141,6 +141,7 @@ class TestOptimizeEndpoint:
             "start": "2024-01-01",
             "end": "2024-12-31",
             "data_source": "yahoo",
+            "tm_interval_id": 1,
             "trading_period": 365,
             "factors": [
                 {
@@ -163,6 +164,7 @@ class TestOptimizeEndpoint:
             "start": "2024-01-01",
             "end": "2024-12-31",
             "data_source": "yahoo",
+            "tm_interval_id": 1,
             "trading_period": 365,
             "factors": [
                 {
@@ -255,6 +257,7 @@ class TestOptimizeStreamEndpoint:
         with client.stream("POST", "/api/v1/backtest/optimize/stream", json={
             "symbol": "btc-usd", "start": "2024-01-01", "end": "2024-12-31",
             "data_source": "yahoo",
+            "tm_interval_id": 1,
             "trading_period": 365,
             "factors": [
                 {
@@ -337,6 +340,7 @@ class TestPerformanceEndpoint:
             "start": "2024-01-01",
             "end": "2024-12-31",
             "data_source": "yahoo",
+            "tm_interval_id": 1,
             "trading_period": 365,
             "factors": [
                 {
@@ -396,6 +400,7 @@ class TestWalkForwardEndpoint:
             "start": "2024-01-01",
             "end": "2024-12-31",
             "data_source": "yahoo",
+            "tm_interval_id": 1,
             "trading_period": 365,
             "split_ratio": 0.5,
             "factors": [

@@ -6,7 +6,7 @@ function baseCfg(overrides: Partial<BacktestConfig> = {}): BacktestConfig {
   return {
     symbol: 'btcusdt.crypto', vendorSymbol: '', dataSource: 'yahoo',
     start: '2020-01-01', end: '2024-01-01', assetType: 'Crypto',
-    tradingPeriod: 365, feeBps: 5,
+    tmIntervalId: 1, tradingPeriod: 365, feeBps: 5,
     conjunction: 'AND', refreshDataset: false,
     walkForward: false, splitRatio: 0.5,
     factors: [{

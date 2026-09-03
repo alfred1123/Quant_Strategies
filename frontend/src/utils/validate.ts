@@ -20,6 +20,9 @@ export function validateBacktestConfig(cfg: BacktestConfig): string[] {
   if (!cfg.dataSource.trim()) {
     missing.push('Data Source');
   }
+  if (cfg.tmIntervalId === null) {
+    missing.push('Bar Interval');
+  }
   if (cfg.factors.length === 0) {
     missing.push('At least one Factor');
   }

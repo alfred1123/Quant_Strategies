@@ -37,6 +37,9 @@ const DEFAULT_CONFIG: BacktestConfig = {
   start: '2016-01-01',
   end: new Date().toISOString().slice(0, 10),
   assetType: '',
+  // Interval ids live in REFDATA, so none can be named here. ConfigDrawer
+  // seeds the control with DAILY once the table loads.
+  tmIntervalId: null,
   tradingPeriod: 365,
   feeBps: 5.0,
   conjunction: 'AND',

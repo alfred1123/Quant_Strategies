@@ -44,10 +44,32 @@ class BacktestError(Exception):
 
 # ── Data fetching ────────────────────────────────────────────────────────────
 
-#: Every backtest is fitted on daily bars. Stated as a period and resolved
-#: through REFDATA (never a hardcoded id) so a renumbered TM_INTERVAL moves with
-#: it — the same rule the schedule-cadence guard follows.
-BACKTEST_BAR_PERIOD = timedelta(days=1)
+#: One day, as a unit. Only a threshold for "is this cadence intraday" and the
+#: numerator of bars-per-day — deliberately *not* a statement about what a
+#: backtest runs on, which is now `OptimizeRequest.tm_interval_id` and nothing
+#: else. The two were one constant briefly, and that conflation would have made
+#: changing the default silently disarm the provider check below.
+_ONE_DAY = timedelta(days=1)
+
+
+def _interval_period(refdata, tm_interval_id: int) -> timedelta:
+    """How long one bar of *tm_interval_id* lasts, per REFDATA."""
+    try:
+        return refdata.get_interval_period(tm_interval_id)
+    except Exception as exc:
+        raise BacktestError(
+            f"REFDATA.TM_INTERVAL has no interval {tm_interval_id}"
+        ) from exc
+
+
+def _stamp(ts, period: timedelta) -> str:
+    """A timestamp at the granularity the interval makes meaningful.
+
+    A date alone is a useless bound on an intraday series: "covers 2020-03-25
+    to 2026-09-03" tells an hourly caller nothing about which bar the range
+    actually stops at, which is the shape of error #54 was written to end.
+    """
+    return ts.strftime("%Y-%m-%d" if period >= _ONE_DAY else "%Y-%m-%d %H:%M")
 
 
 def _fetch_exchange_df(
@@ -59,6 +81,7 @@ def _fetch_exchange_df(
     refdata,
     bar_services,
     vendor_symbol: str | None,
+    tm_interval_id: int,
 ) -> pd.DataFrame:
     """Bars a venue actually printed, from ``MARKET_DATA.PRICE_BAR``.
 
@@ -86,9 +109,7 @@ def _fetch_exchange_df(
         )
 
     app_id = int(app["app_id"])
-    tm_interval_id = refdata.resolve_interval_id(BACKTEST_BAR_PERIOD)
-    if tm_interval_id is None:
-        raise BacktestError("REFDATA.TM_INTERVAL has no daily interval")
+    period = _interval_period(refdata, tm_interval_id)
 
     range_start = pd.Timestamp(start, tz="UTC").to_pydatetime()
     range_end = pd.Timestamp(end, tz="UTC").to_pydatetime()
@@ -108,8 +129,9 @@ def _fetch_exchange_df(
     )
     if bounds is None:
         raise BacktestError(
-            f"no {app['name']} bars captured for {internal_cusip} — subscribe to "
-            f"the series on the Market data page and backfill it, then re-run"
+            f"no {app['name']} bars captured for {internal_cusip} at interval "
+            f"{tm_interval_id} — subscribe to the series on the Market data page "
+            f"and backfill it, then re-run"
         )
 
     first_bar, last_bar = bounds
@@ -119,14 +141,15 @@ def _fetch_exchange_df(
     # close — a bar that cannot exist yet is not missing history. Slack of
     # exactly one period keeps that from excusing a real hole: ask for a
     # month past the last close and it still refuses.
-    tail_limit = last_bar + BACKTEST_BAR_PERIOD
+    tail_limit = last_bar + period
     if first_bar > range_start or tail_limit < range_end:
         raise BacktestError(
             f"{app['name']} bars for {internal_cusip} cover "
-            f"{first_bar.date()} to {last_bar.date()}, which does not span the "
-            f"requested {range_start.date()} to {range_end.date()} — backfill "
-            f"the missing history on the Market data page, or narrow the range. "
-            f"A venue cannot serve history from before the pair listed there"
+            f"{_stamp(first_bar, period)} to {_stamp(last_bar, period)}, which "
+            f"does not span the requested {_stamp(range_start, period)} to "
+            f"{_stamp(range_end, period)} — backfill the missing history on the "
+            f"Market data page, or narrow the range. A venue cannot serve "
+            f"history from before the pair listed there"
         )
 
     df = service.read_bars(
@@ -139,17 +162,17 @@ def _fetch_exchange_df(
     if df.empty:
         raise BacktestError(
             f"no {app['name']} bars for {internal_cusip} between "
-            f"{range_start.date()} and {range_end.date()}"
+            f"{_stamp(range_start, period)} and {_stamp(range_end, period)}"
         )
     logger.info(
-        "backtest series: %s %s bars from %s (%d rows, %s → %s)",
-        internal_cusip, app["name"], "MARKET_DATA.PRICE_BAR",
-        len(df), df.index[0].date(), df.index[-1].date(),
+        "backtest series: %s %s bars from %s interval=%s (%d rows, %s → %s)",
+        internal_cusip, app["name"], "MARKET_DATA.PRICE_BAR", tm_interval_id,
+        len(df), _stamp(df.index[0], period), _stamp(df.index[-1], period),
     )
     return df
 
 
-def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_cache=None, bt_cache=None, refresh: bool = False, bar_services=None) -> pd.DataFrame:
+def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_cache=None, bt_cache=None, refresh: bool = False, bar_services=None, tm_interval_id: int | None = None) -> pd.DataFrame:
     """Fetch prices using the data source registered in REFDATA.APP.
 
     If *symbol* is an internal_cusip registered in INST.PRODUCT, the vendor
@@ -193,9 +216,26 @@ def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_ca
             ticker = vendor_symbol
 
     if app.get("is_exchange_ind") == "Y":
+        if tm_interval_id is None:
+            raise BacktestError(
+                f"{app['name']} is an exchange, so a bar interval is required to "
+                f"say which captured series to read"
+            )
         return _fetch_exchange_df(
             symbol, start, end, app=app, refdata=cache,
             bar_services=bar_services, vendor_symbol=vendor_symbol,
+            tm_interval_id=tm_interval_id,
+        )
+
+    # A provider has no intraday endpoint here — ``get_historical_price``
+    # returns daily bars whatever is asked of it, and would return them under
+    # the requested label. That silent substitution is the whole reason the
+    # exchange branch above exists, so it is refused rather than served.
+    if tm_interval_id is not None and _interval_period(cache, tm_interval_id) < _ONE_DAY:
+        raise BacktestError(
+            f"{app['name']} is a data provider and only serves daily bars, so it "
+            f"cannot run a backtest on interval {tm_interval_id}. Pick the "
+            f"exchange that prints the series at this cadence, or run daily"
         )
 
     cls = getattr(_data_module, app["class_name"])
@@ -337,6 +377,7 @@ def _build_data_dict(req, cache, inst_cache=None, bt_cache=None, bar_services=No
             return fetch_df(
                 sym, req.start, req.end, ds, cache, inst_cache, bt_cache,
                 refresh=refresh, bar_services=bar_services,
+                tm_interval_id=req.tm_interval_id,
             )
         except BacktestCache.CacheMissError as exc:
             raise BacktestError(str(exc)) from exc

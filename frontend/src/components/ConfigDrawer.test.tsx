@@ -46,6 +46,7 @@ vi.mock('../api/refdata', () => ({
   useDataColumns: () => ({ data: dataColumns }),
   useApps: () => ({ data: apps }),
   useTmIntervals: () => ({ data: tmIntervals }),
+  intervalLabel: (row: TmIntervalRow) => row.display_name?.trim() || row.name,
 }));
 
 vi.mock('../api/inst', () => ({
@@ -78,6 +79,7 @@ const baseCfg: BacktestConfig = {
   start: '2020-01-01',
   end: '2024-01-01',
   assetType: '',
+  tmIntervalId: 1,
   tradingPeriod: 365,
   feeBps: 5,
   conjunction: 'AND',
@@ -199,7 +201,7 @@ describe('ConfigDrawer — the captured range decides the dates', () => {
     expect(last.end).toBe('2026-08-29');
   });
 
-  it('asks about the traded series, at the daily interval', () => {
+  it('asks about the traded series, at the selected interval', () => {
     storedCoverage = BYBIT_COVERAGE;
     renderWithProviders(<Host initial={bybitCfg} observer={vi.fn()} />);
 
@@ -302,5 +304,84 @@ describe('ConfigDrawer — a range outside the capture is flagged, not silently 
     );
 
     expect(screen.queryByText(/will be refused/)).toBeNull();
+  });
+});
+
+/**
+ * The cadence is chosen, not assumed.
+ *
+ * Every backtest read daily bars because the interval was a constant in
+ * `backtest_service`, so the hourly series the capture page had been filling
+ * for weeks could not be fitted on at all.
+ */
+describe('ConfigDrawer — the bar interval', () => {
+  function pickHourly() {
+    fireEvent.mouseDown(screen.getByLabelText('Bar Interval'));
+    fireEvent.click(screen.getByRole('option', { name: 'Hourly' }));
+  }
+
+  it('asks coverage about the interval that is selected', () => {
+    storedCoverage = BYBIT_COVERAGE;
+    renderWithProviders(
+      <Host initial={{ ...bybitCfg, tmIntervalId: 2 }} observer={vi.fn()} />,
+    );
+
+    expect(coverageAsked).toHaveBeenCalledWith({
+      internal_cusip: 'btcusdt.crypto',
+      tm_interval_id: 2,
+      source_app_id: 34,
+    });
+  });
+
+  it('rescales the annualisation when the cadence changes', () => {
+    // 365 daily periods a year become 8,760 hourly ones. Left at 365, Sharpe
+    // and annualised return come out ~5x and ~24x too low — a believable
+    // number on the wrong scale, which discards a strategy quietly.
+    const observer = vi.fn();
+    renderWithProviders(<Host initial={{ ...bybitCfg }} observer={observer} />);
+
+    pickHourly();
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.tmIntervalId).toBe(2);
+    expect(last.tradingPeriod).toBe(8_760);
+  });
+
+  it('keeps the asset type as the base when rescaling, not the scaled value', () => {
+    // Switching hourly → daily must land back on 365, not 8,760 × 24.
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host initial={{ ...bybitCfg, tmIntervalId: 2, tradingPeriod: 8_760 }} observer={observer} />,
+    );
+
+    fireEvent.mouseDown(screen.getByLabelText('Bar Interval'));
+    fireEvent.click(screen.getByRole('option', { name: 'Daily' }));
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.tradingPeriod).toBe(365);
+  });
+
+  it('seeds daily once REFDATA loads, because no id can be written in a default', () => {
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host initial={{ ...baseCfg, tmIntervalId: null }} observer={observer} />,
+    );
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.tmIntervalId).toBe(1);
+  });
+
+  it('re-snaps the dates when the cadence changes, since each is its own series', () => {
+    storedCoverage = BYBIT_COVERAGE;
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host initial={{ ...bybitCfg, start: '2016-01-01' }} observer={observer} />,
+    );
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2016-01-01' } });
+
+    pickHourly();
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.start).toBe('2020-03-25');
   });
 });

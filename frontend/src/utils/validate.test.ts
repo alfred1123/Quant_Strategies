@@ -9,6 +9,7 @@ const baseCfg: BacktestConfig = {
   start: '2020-01-01',
   end: '2024-01-01',
   assetType: 'Crypto',
+  tmIntervalId: 1,
   tradingPeriod: 365,
   feeBps: 5,
   conjunction: 'AND',

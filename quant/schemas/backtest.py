@@ -65,6 +65,12 @@ class OptimizeRequest(BaseModel):
     # honest answer, because there is no source a caller can be assumed
     # to have meant. Empty is rejected too — a blank box is not a choice.
     data_source: str = Field(min_length=1)
+    # REFDATA.TM_INTERVAL id of the bars to fit on. Required for the same
+    # reason as data_source: it names an input series, and a default would
+    # pick one on the caller's behalf without saying so. Only an exchange
+    # source can serve anything but daily — a provider request below daily is
+    # refused rather than served daily bars under an intraday label.
+    tm_interval_id: int
     # Cache control — when True, refetch every product+factor from the
     # provider and insert a new BT.API_REQUEST version. When False
     # (default), serve from cache only and 400 on miss.
@@ -89,6 +95,9 @@ class PerformanceRequest(BaseModel):
     fee_bps: float = 5.0
     # Required for the same reason as OptimizeRequest.data_source.
     data_source: str = Field(min_length=1)
+    # See OptimizeRequest.tm_interval_id. Must match the interval the params
+    # being priced were optimized on, or the run reports a different series.
+    tm_interval_id: int
     # See OptimizeRequest.refresh_dataset.
     refresh_dataset: bool = False
     factors: list[FactorConfig] = Field(min_length=1)

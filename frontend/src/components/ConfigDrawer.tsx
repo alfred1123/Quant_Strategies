@@ -6,15 +6,16 @@ import {
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   useIndicators, useSignalTypes, useAssetTypes, useConjunctions, useDataColumns, useApps,
-  useTmIntervals,
+  useTmIntervals, intervalLabel,
 } from '../api/refdata';
 import { useProducts } from '../api/inst';
 import { useStoredCoverage } from '../api/marketData';
 import type { AssetTypeRow } from '../types/refdata';
 import { countSteps } from '../utils/grid';
+import { barsPerDay } from '../utils/interval';
 import { validateBacktestConfig } from '../utils/validate';
 import { capturedRange, rangeFits } from '../utils/capturedRange';
 import type { BacktestConfig, FactorConfig } from '../types/backtest';
@@ -54,19 +55,23 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   // obtainable, and would talk a user out of a range they could have had.
   const tradedApp = apps.find(a => a.name === config.dataSource);
   const isExchangeSource = tradedApp?.is_exchange_ind === 'Y';
-  // A backtest is daily (`BACKTEST_BAR_PERIOD`); the id comes from REFDATA.
-  const dailyIntervalId = tmIntervals.find(i => i.name === 'DAILY')?.tm_interval_id;
-  const tradedSeries = isExchangeSource && config.symbol && tradedApp && dailyIntervalId
+  const sortedIntervals = useMemo(
+    () => [...tmIntervals].sort((a, b) => a.tm_interval_id - b.tm_interval_id),
+    [tmIntervals],
+  );
+  const tradedSeries = isExchangeSource && config.symbol && tradedApp && config.tmIntervalId
     ? {
       internal_cusip: config.symbol,
-      tm_interval_id: dailyIntervalId,
+      tm_interval_id: config.tmIntervalId,
       source_app_id: tradedApp.app_id,
     }
     : {};
   const { data: coverage } = useStoredCoverage(tradedSeries);
   const captured = capturedRange(coverage);
+  // Cadence is part of the identity: daily and hourly are separately captured
+  // series with their own coverage, so switching interval must re-snap.
   const seriesId = isExchangeSource && config.symbol && tradedApp
-    ? `${config.symbol}|${tradedApp.app_id}`
+    ? `${config.symbol}|${tradedApp.app_id}|${config.tmIntervalId}`
     : null;
 
   /**
@@ -85,6 +90,34 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
     snappedFor.current = seriesId;
     onChange(prev => ({ ...prev, start: captured.first, end: captured.last }));
   }, [seriesId, captured, onChange]);
+
+  /**
+   * Seed the cadence once REFDATA arrives.
+   *
+   * `DEFAULT_CONFIG` cannot name one: interval ids live in the database, and
+   * a run without one is refused rather than defaulted server-side. Daily is
+   * the opening selection because every strategy on the platform so far is
+   * daily — visible in the control, and one click from being changed.
+   */
+  const dailyIntervalId = tmIntervals.find(i => i.name === 'DAILY')?.tm_interval_id;
+  useEffect(() => {
+    if (config.tmIntervalId !== null || dailyIntervalId === undefined) return;
+    onChange(prev => ({ ...prev, tmIntervalId: dailyIntervalId }));
+  }, [dailyIntervalId, config.tmIntervalId, onChange]);
+
+  /**
+   * Periods per year for a cadence, from the asset type's daily figure.
+   *
+   * `REFDATA.ASSET_TYPE.TRADING_PERIOD` counts daily bars. Annualised return
+   * scales by this number and Sharpe by its square root, so an hourly run
+   * left on 365 reports both roughly 24x and 5x too low — a plausible number
+   * on the wrong scale, which loses a strategy quietly.
+   */
+  const annualization = (dailyTradingPeriod: number, intervalId: number | null) => {
+    const row = tmIntervals.find(i => i.tm_interval_id === intervalId);
+    const perDay = row ? barsPerDay(row.period_length) : null;
+    return perDay ? Math.round(dailyTradingPeriod * perDay) : dailyTradingPeriod;
+  };
 
   const rangeOutsideCapture = captured !== null
     && !rangeFits(captured, config.start, config.end);
@@ -177,11 +210,37 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
           }}
           onProductPicked={(product) => {
             const at = assetTypes.find(a => a.asset_type_id === product.asset_type_id);
-            if (at) set({ assetType: at.display_name, tradingPeriod: at.trading_period });
+            if (at) set({
+              assetType: at.display_name,
+              tradingPeriod: annualization(at.trading_period, config.tmIntervalId),
+            });
           }}
           products={products}
           apps={apps}
         />
+        <FormControl size="small" sx={{ width: 130 }}>
+          <InputLabel id="bar-interval-label">Bar Interval</InputLabel>
+          <Select
+            labelId="bar-interval-label"
+            label="Bar Interval"
+            value={config.tmIntervalId === null ? '' : String(config.tmIntervalId)}
+            onChange={e => {
+              const id = Number(e.target.value);
+              set({
+                tmIntervalId: id,
+                ...(selectedAssetType
+                  ? { tradingPeriod: annualization(selectedAssetType.trading_period, id) }
+                  : {}),
+              });
+            }}
+          >
+            {sortedIntervals.map(iv => (
+              <MenuItem key={iv.tm_interval_id} value={String(iv.tm_interval_id)}>
+                {intervalLabel(iv)}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <TextField
           label="Start" size="small" type="date" value={config.start} sx={{ width: 155 }}
           onChange={e => set({ start: e.target.value })}
@@ -200,7 +259,10 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
           isOptionEqualToValue={(opt, val) => opt.display_name === val.display_name}
           onChange={(_, val) => {
             if (!val) set({ assetType: '', tradingPeriod: 365 });
-            else set({ assetType: val.display_name, tradingPeriod: val.trading_period });
+            else set({
+              assetType: val.display_name,
+              tradingPeriod: annualization(val.trading_period, config.tmIntervalId),
+            });
           }}
           renderInput={(params) => <TextField {...params} label="Asset Type" />}
         />
