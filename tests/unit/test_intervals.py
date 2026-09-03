@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from quant.shared.intervals import (
+    as_utc,
     bar_starts,
     ccxt_timeframe,
     floor_to_period,
@@ -66,6 +67,15 @@ class TestBoundaries:
     def test_naive_timestamp_rejected(self):
         with pytest.raises(ValueError, match="timezone-aware"):
             floor_to_period(datetime(2026, 8, 1, 10, 0), HOUR)
+
+    def test_as_utc_treats_naive_as_utc(self):
+        naive = datetime(2020, 3, 25)
+        assert as_utc(naive) == datetime(2020, 3, 25, tzinfo=UTC)
+
+    def test_as_utc_converts_other_zones(self):
+        from datetime import timezone
+        eastern = datetime(2020, 3, 25, 0, 0, tzinfo=timezone(timedelta(hours=-4)))
+        assert as_utc(eastern) == datetime(2020, 3, 25, 4, 0, tzinfo=UTC)
 
     def test_last_closed_bar_excludes_the_forming_one(self):
         """The bar covering `now` is still open, so 10:00 is not usable at 10:37."""

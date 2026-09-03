@@ -29,7 +29,7 @@ import pandas as pd
 from quant.market_data.fetcher import BarFetcher
 from quant.market_data.repo import PriceBarRepo
 from quant.shared.db import ProcedureError
-from quant.shared.intervals import bar_starts, last_closed_bar
+from quant.shared.intervals import as_utc, bar_starts, last_closed_bar
 
 logger = logging.getLogger(__name__)
 
@@ -308,6 +308,8 @@ class PriceBarService:
         *were* recoverable. What could not be filled is reported instead.
         """
         period = self._refdata.get_interval_period(tm_interval_id)
+        start = as_utc(start)
+        end = as_utc(end) if end is not None else None
         end = end or last_closed_bar(now or datetime.now(UTC), period)
         if start > end:
             raise ValueError(f"start {start} is after end {end}")
@@ -390,6 +392,7 @@ class PriceBarService:
         on and leave the series worthless until the final pass.
         """
         period = self._refdata.get_interval_period(tm_interval_id)
+        target = as_utc(target)
         last_closed = last_closed_bar(now or datetime.now(UTC), period)
         nothing_to_do = BackfillPlan(
             start=None, end=None, bars=0, passes_remaining=0, target=target,

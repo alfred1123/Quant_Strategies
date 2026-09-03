@@ -408,6 +408,18 @@ class TestBackfillPlan:
         assert second.end == first.start - timedelta(hours=1)
         assert second.passes_remaining == first.passes_remaining - 1
 
+    def test_a_date_only_target_is_treated_as_utc(self):
+        """API query params such as ``target=2020-03-25`` arrive without a zone."""
+        first_stored = datetime(2025, 10, 1, 0, 0, tzinfo=UTC)
+        service, _repo, _fetcher = build_service(
+            coverage_max=LAST_CLOSED, coverage_min=first_stored,
+        )
+
+        plan = _plan(service, datetime(2020, 3, 25))
+
+        assert plan.start is not None
+        assert plan.end == first_stored - timedelta(hours=1)
+
 
 class TestBackfillSizeGuard:
     """A fill too large to finish is refused before it starts."""

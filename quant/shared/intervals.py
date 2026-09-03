@@ -112,6 +112,18 @@ def ccxt_timeframe(period: timedelta) -> str:
     raise ValueError(f"no ccxt timeframe for period {period}")
 
 
+def as_utc(ts: datetime) -> datetime:
+    """Coerce a timestamp to timezone-aware UTC.
+
+    Naive values are treated as UTC. Bar boundaries are always UTC, and API
+    query params such as ``target=2020-03-25`` arrive without a zone — there
+    is no other timezone they could mean.
+    """
+    if ts.tzinfo is None:
+        return ts.replace(tzinfo=UTC)
+    return ts.astimezone(UTC)
+
+
 def _require_utc(ts: datetime) -> None:
     if ts.tzinfo is None:
         raise ValueError(f"timestamp must be timezone-aware UTC, got naive {ts!r}")
