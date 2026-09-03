@@ -257,3 +257,68 @@ describe('MarketDataPage search', () => {
     ).toBeInTheDocument();
   });
 });
+
+/**
+ * "Continuous" only speaks about holes inside what is stored, so a series a
+ * month into a six-year target rendered exactly as green as a finished one.
+ */
+describe('MarketDataPage distance from the target', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mutateAsync.mockResolvedValue(ROW);
+  });
+
+  it('says how far short of the target the capture still is', () => {
+    setup([
+      {
+        ...ROW,
+        backfill_from_ts: '2020-03-25T00:00:00Z',
+        coverage: { ...ROW.coverage, first_bar: '2025-10-01T00:00:00Z' },
+      },
+    ]);
+
+    expect(screen.getByText('2,016 days short')).toBeInTheDocument();
+  });
+
+  it('stays quiet once the target is reached', () => {
+    setup([
+      {
+        ...ROW,
+        backfill_from_ts: '2020-03-25T00:00:00Z',
+        coverage: { ...ROW.coverage, first_bar: '2020-03-25T00:00:00Z' },
+      },
+    ]);
+
+    expect(screen.queryByText(/days short/)).not.toBeInTheDocument();
+  });
+
+  it('does not call a capture reaching further back than asked a shortfall', () => {
+    setup([
+      {
+        ...ROW,
+        backfill_from_ts: '2024-01-01T00:00:00Z',
+        coverage: { ...ROW.coverage, first_bar: '2020-03-25T00:00:00Z' },
+      },
+    ]);
+
+    expect(screen.queryByText(/days short/)).not.toBeInTheDocument();
+  });
+
+  it('says nothing when no target was ever set', () => {
+    setup([{ ...ROW, backfill_from_ts: null }]);
+
+    expect(screen.queryByText(/days short/)).not.toBeInTheDocument();
+  });
+
+  it('says nothing when there is no capture to measure against', () => {
+    setup([
+      {
+        ...ROW,
+        backfill_from_ts: '2020-03-25T00:00:00Z',
+        coverage: { first_bar: null, last_bar: null, gaps: null, error: null },
+      },
+    ]);
+
+    expect(screen.queryByText(/days short/)).not.toBeInTheDocument();
+  });
+});
