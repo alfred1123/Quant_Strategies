@@ -7,7 +7,13 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Cold-cache builds on the arm64 runner hit PyPI for every wheel. Upgrading
+# pip and installing numpy first avoids a flaky resolver pass where pandas
+# metadata downloads and the numpy index fetch then times out with
+# "No matching distribution found for numpy".
+RUN pip install --upgrade pip && \
+    pip install --retries 5 --timeout 120 --no-cache-dir numpy && \
+    pip install --retries 5 --timeout 120 --no-cache-dir -r requirements.txt
 
 COPY quant/ quant/
 # Read at startup by quant/shared/config.py to resolve DB_TARGET. The app does
