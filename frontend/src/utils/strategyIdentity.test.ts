@@ -16,6 +16,7 @@ const baseConfig = (overrides: Partial<BacktestConfig> = {}): BacktestConfig => 
   vendorSymbol: '',
   dataSource: 'yahoo',
   assetType: 'crypto',
+  tmIntervalId: 1,
   start: '2020-01-01',
   end: '2024-01-01',
   tradingPeriod: 1,

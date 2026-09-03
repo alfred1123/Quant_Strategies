@@ -39,10 +39,15 @@ export interface BacktestConfig {
   vendorSymbol: string; // direct vendor symbol override (e.g. BTC-USD)
   dataSource: string;
   assetType: string;
+  /** REFDATA.TM_INTERVAL id of the bars to fit on. `null` until REFDATA
+   *  loads — ids live in the database, so no default can be written here. */
+  tmIntervalId: number | null;
 
   // ── shared controls (apply to product + every factor) ──
   start: string;
   end: string;
+  /** Periods per year, already scaled for `tmIntervalId` — 365 on daily
+   *  crypto, 8,760 on hourly. See `utils/interval.barsPerDay`. */
   tradingPeriod: number;
   feeBps: number;
   /** When true, refetch all product+factor data from the provider and
@@ -69,6 +74,10 @@ export interface OptimizeRequest {
   /** Venue the trade asset is priced from. Required — the backend
    *  rejects a request without one rather than assuming a provider. */
   data_source: string;
+  /** Bars to fit on. Required for the same reason as `data_source`: it names
+   *  an input series. Forwarded even when null, so the backend rejects it
+   *  rather than the UI quietly picking a cadence. */
+  tm_interval_id: number | null;
 
   // ── shared (product + factors) ──
   start: string;
@@ -92,6 +101,8 @@ export interface PerformanceRequest {
   symbol: string;
   /** See OptimizeRequest.data_source. */
   data_source: string;
+  /** See OptimizeRequest.tm_interval_id. */
+  tm_interval_id: number | null;
 
   // ── shared ──
   start: string;

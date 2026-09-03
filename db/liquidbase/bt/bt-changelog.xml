@@ -24,5 +24,6 @@
     <!-- 1.13 before 1.12: RESULT.STRATEGY_ID/STRATEGY_VID must exist before SP_GET_STRATEGY_LIST -->
     <include file="releases/1.16.0-log-duration-clock-timestamp.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.17.0-result-by-strategy.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.18.0-strategy-config-bar-interval.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

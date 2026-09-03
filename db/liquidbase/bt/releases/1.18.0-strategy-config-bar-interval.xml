@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      A backtest now names the cadence it is fitted on. `TM_INTERVAL_ID` is a
+      required field on OptimizeRequest for the same reason DATA_SOURCE is:
+      it selects an input series, and a server-side default picks one on the
+      caller's behalf without saying so.
+
+      BT.STRATEGY.CONFIG_JSON stores that request verbatim and `live_service`
+      replays it through `OptimizeRequest.model_validate`, so every row written
+      before the field existed fails validation until it carries one. Daily is
+      not a guess here — it is what those runs were, because daily was the only
+      cadence the backtest path could read.
+
+      Backfilled in place rather than as new soft-versioned rows: this records
+      what the existing version always was, and a new STRATEGY_VID would assert
+      that someone changed the strategy on this date. Nothing about the fitted
+      parameters changes.
+
+      The interval id is read from REFDATA rather than written as a literal —
+      renumbering DAILY must move this with it.
+    -->
+
+    <changeSet id="1.18.0-001-strategy-config-bar-interval" author="alfcheun" context="bt">
+        <comment>Backfill CONFIG_JSON.tm_interval_id = DAILY on pre-interval strategies</comment>
+        <sql>
+            UPDATE BT.STRATEGY
+               SET CONFIG_JSON = JSONB_SET(
+                       CONFIG_JSON,
+                       '{tm_interval_id}',
+                       TO_JSONB((SELECT TM_INTERVAL_ID
+                                   FROM REFDATA.TM_INTERVAL
+                                  WHERE NAME = 'DAILY'))
+                   )
+             WHERE NOT CONFIG_JSON ? 'tm_interval_id';
+        </sql>
+        <rollback>
+            UPDATE BT.STRATEGY
+               SET CONFIG_JSON = CONFIG_JSON - 'tm_interval_id'
+             WHERE CONFIG_JSON ? 'tm_interval_id';
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
