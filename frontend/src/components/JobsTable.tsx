@@ -5,7 +5,8 @@ import {
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import { fetchJob, useCancelJob, useJobs, useReenqueueJob, usePromoteStrategy } from '../api/jobs';
-import type { JobRow, JobStatus } from '../types/jobs';
+import type { JobDetail, JobRow, JobStatus } from '../types/jobs';
+import StrategyConfigDialog from './StrategyConfigDialog';
 
 const STATUS_COLOR: Record<
   JobStatus,
@@ -40,6 +41,26 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
   const promote = usePromoteStrategy();
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'ALL'>('ALL');
   const [cloneLoading, setCloneLoading] = useState<string | null>(null);
+  const [configLoading, setConfigLoading] = useState<string | null>(null);
+  const [configDialogData, setConfigDialogData] = useState<{
+    open: boolean;
+    config: Record<string, unknown> | null;
+    strategyNm: string | null;
+  }>({ open: false, config: null, strategyNm: null });
+
+  const handleViewConfig = async (row: JobRow) => {
+    setConfigLoading(row.queue_id);
+    try {
+      const detail: JobDetail = await fetchJob(row.queue_id);
+      setConfigDialogData({
+        open: true,
+        config: detail.config_json,
+        strategyNm: row.strategy_nm,
+      });
+    } finally {
+      setConfigLoading(null);
+    }
+  };
 
   const rows = useMemo(() => {
     const all = jobs.data ?? [];
@@ -144,22 +165,35 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
           if (REENQUEUE_STATES.has(p.row.queue_status)) {
             const pending =
               reenqueue.isPending && reenqueue.variables === p.row.queue_id;
+            const isLoadingConfig = configLoading === p.row.queue_id;
             return (
-              <Button
-                size="small"
-                color="primary"
-                variant="outlined"
-                disabled={pending}
-                onClick={() => reenqueue.mutate(p.row.queue_id)}
-              >
-                {pending ? '\u2026' : 'Re-run'}
-              </Button>
+              <Stack direction="row" spacing={0.5}>
+                <Button
+                  size="small"
+                  color="info"
+                  variant="outlined"
+                  disabled={isLoadingConfig}
+                  onClick={() => handleViewConfig(p.row)}
+                >
+                  {isLoadingConfig ? '\u2026' : 'Config'}
+                </Button>
+                <Button
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                  disabled={pending}
+                  onClick={() => reenqueue.mutate(p.row.queue_id)}
+                >
+                  {pending ? '\u2026' : 'Re-run'}
+                </Button>
+              </Stack>
             );
           }
           if (p.row.queue_status === 'COMPLETED') {
             const promPending = promote.isPending
               && promote.variables?.strategyId === p.row.strategy_id;
             const isCloning = cloneLoading === p.row.queue_id;
+            const isLoadingConfig = configLoading === p.row.queue_id;
             return (
               <Stack direction="row" spacing={0.5}>
                 {onView && (
@@ -168,6 +202,11 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
                     View
                   </Button>
                 )}
+                <Button size="small" color="info" variant="outlined"
+                  disabled={isLoadingConfig}
+                  onClick={() => handleViewConfig(p.row)}>
+                  {isLoadingConfig ? '\u2026' : 'Config'}
+                </Button>
                 {onCloneEdit && (
                   <Button size="small" color="secondary" variant="outlined"
                     disabled={isCloning}
@@ -206,7 +245,7 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
         },
       },
     ],
-    [cancel, reenqueue, promote, onView, onCloneEdit, cloneLoading],
+    [cancel, reenqueue, promote, onView, onCloneEdit, cloneLoading, configLoading, handleViewConfig],
   );
 
   return (
@@ -271,6 +310,13 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
           pageSizeOptions={[10, 25, 50]}
         />
       </Box>
+
+      <StrategyConfigDialog
+        open={configDialogData.open}
+        onClose={() => setConfigDialogData({ open: false, config: null, strategyNm: null })}
+        config={configDialogData.config}
+        strategyNm={configDialogData.strategyNm}
+      />
     </Box>
   );
 }
