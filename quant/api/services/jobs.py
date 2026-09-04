@@ -178,8 +178,10 @@ class JobsService:
             user_id=user_id,
             error_text=None,
         )
-        # Wake the loop so it notices QUEUED→CANCELLED disappearance and
-        # re-tests the queue head.
+        # Wake the loop: for a QUEUED job so it re-tests the head, and for a
+        # RUNNING one so `_enforce_cancels` stops the child now rather than at
+        # the next 30s poll. Without an observer this wake did nothing for the
+        # RUNNING case and the row sat in CANCEL_REQUESTED until the timeout.
         publish_wake(self._redis)
 
         return self._repo.get_active(queue_id, user_id=user_id) or row

@@ -84,23 +84,27 @@ class WorkerLoopRepo(BtQueueRepo):
         )
         return row
 
-    def mark_failed(
+    def mark_terminal(
         self,
-        queue_id,
-        strategy_id,
-        strategy_vid: int,
-        priority: int,
-        user_id: str,
-        failed_status_id: int,
-        error_text: str,
+        row: dict,
+        status_id: int,
+        error_text: str | None = None,
     ) -> None:
+        """Write a terminal row for a job the loop is ending on its behalf.
+
+        The loop owns this transition whenever the subprocess cannot write its
+        own — killed for exceeding the timeout, cancelled, or orphaned by a
+        loop that died. Takes the queue row rather than five positional
+        fields, because every caller has one and unpacking it at each site is
+        where a mismatched strategy_vid would come from.
+        """
         self.sp_ins_queue(
-            queue_id=queue_id,
-            strategy_id=strategy_id,
-            strategy_vid=int(strategy_vid),
-            status_id=failed_status_id,
-            priority=int(priority),
-            user_id=user_id,
+            queue_id=row["queue_id"],
+            strategy_id=row["strategy_id"],
+            strategy_vid=int(row["strategy_vid"]),
+            status_id=status_id,
+            priority=int(row["priority"]),
+            user_id=row["user_id"],
             error_text=error_text,
         )
 
@@ -120,6 +124,7 @@ class WorkerLoop:
 
     BLPOP_TIMEOUT_S = 30
     DRAIN_TIMEOUT_S = 30
+    CANCEL_GRACE_S = 10
     DEFAULT_JOB_TIMEOUT_S = 6000  # 100 min hard cap per backtest job — presented as FAILED.
     # Headroom so the socket read outlives the BLPOP park rather than racing it.
     WAKE_SOCKET_MARGIN_S = 5
@@ -176,14 +181,8 @@ class WorkerLoop:
         failed_id = self._refdata.resolve_queue_status_id("FAILED")
         rows = self._repo.list_by_status(running_id)
         for row in rows:
-            self._repo.mark_failed(
-                row["queue_id"],
-                row["strategy_id"],
-                row["strategy_vid"],
-                row["priority"],
-                row["user_id"],
-                failed_id,
-                "worker_loop restarted while job was running",
+            self._repo.mark_terminal(
+                row, failed_id, "worker_loop restarted while job was running"
             )
             logger.warning("recovered orphan RUNNING job %s -> FAILED", row["queue_id"])
         return len(rows)
@@ -225,16 +224,62 @@ class WorkerLoop:
                 logger.error("worker %s did not exit after SIGKILL", qid)
             if failed_id is None:
                 failed_id = self._refdata.resolve_queue_status_id("FAILED")
-            self._repo.mark_failed(
-                row["queue_id"],
-                row["strategy_id"],
-                row["strategy_vid"],
-                row["priority"],
-                row["user_id"],
-                failed_id,
-                f"job exceeded {self.JOB_TIMEOUT_S}s timeout",
+            self._repo.mark_terminal(
+                row, failed_id, f"job exceeded {self.JOB_TIMEOUT_S}s timeout"
             )
             self._active.pop(qid, None)
+
+    def _enforce_cancels(self) -> None:
+        """Honour ``CANCEL_REQUESTED``: stop the child, then write ``CANCELLED``.
+
+        This was the missing half of the queue. ``JobsService.cancel`` writes
+        ``CANCEL_REQUESTED`` for a RUNNING job and nothing observed it, so the
+        row sat in that state until the 100-minute timeout reclassified it as
+        FAILED — and if the loop restarted first, forever, because
+        :meth:`recover_stale` only scans RUNNING. Cancelling did nothing
+        visible and the job kept the single worker slot the whole time, so the
+        queue behind it stalled too.
+
+        Ported from the coordinator contract in §9.5 of the queue design,
+        which the Python loop replaced without carrying this across: SIGTERM,
+        a grace period, then SIGKILL. The worker holds no signal handler, so
+        SIGTERM already ends it promptly; the grace is for the pathological
+        case, not the normal one.
+
+        A requested row with no live child is cancelled outright. That is what
+        clears one orphaned by a dead loop, and it means a restart now drains
+        these rather than stranding them.
+        """
+        requested_id = self._refdata.resolve_queue_status_id("CANCEL_REQUESTED")
+        rows = self._repo.list_by_status(requested_id)
+        if not rows:
+            return
+        cancelled_id = self._refdata.resolve_queue_status_id("CANCELLED")
+        for row in rows:
+            qid = uuid.UUID(str(row["queue_id"]))
+            entry = self._active.pop(qid, None)
+            if entry is not None:
+                self._stop_child(qid, entry[0])
+            # Written after the child is gone: a worker killed mid-flight must
+            # not land its own FAILED row on top of the cancel.
+            self._repo.mark_terminal(row, cancelled_id)
+            logger.info("cancelled job %s", qid)
+
+    def _stop_child(self, qid: uuid.UUID, proc: subprocess.Popen) -> None:
+        """SIGTERM, then SIGKILL if it outlives the grace period."""
+        proc.terminate()
+        try:
+            proc.wait(timeout=self.CANCEL_GRACE_S)
+            return
+        except subprocess.TimeoutExpired:
+            logger.warning(
+                "worker %s ignored SIGTERM after %ds — killing", qid, self.CANCEL_GRACE_S,
+            )
+        proc.kill()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            logger.error("worker %s did not exit after SIGKILL", qid)
 
     def _try_claim_and_spawn(self) -> bool:
         """Claim one job and spawn its worker. Returns True iff a job was spawned."""
@@ -250,8 +295,13 @@ class WorkerLoop:
         return True
 
     def tick(self) -> None:
-        """One iteration: reap finished children, enforce timeouts, fill capacity."""
+        """One iteration: reap, honour cancels, enforce timeouts, fill capacity.
+
+        Cancels are handled before capacity is filled so the slot a cancelled
+        job was holding is free on this pass rather than the next.
+        """
         self._reap_children()
+        self._enforce_cancels()
         self._enforce_timeouts()
         while self._running and len(self._active) < self.max_concurrent:
             if not self._try_claim_and_spawn():
