@@ -1,4 +1,4 @@
-"""Backtest worker — Slice C minimum (no progress, no cancel, no timeout).
+"""Backtest worker — one job per process (no progress reporting).
 
 Invocation:
     python -m quant.queue.worker <queue_id>
@@ -15,7 +15,10 @@ implementation covers steps 1-4 + 7 + 9 + 11-12 only:
    11. On any uncaught error → SP_INS_QUEUE → FAILED with traceback.
    12. Emit `terminal` JSON, exit 0.
 
-Slice D adds: per-trial progress, signal-based cancel, deadline.
+Cancel and the deadline are enforced by the supervising ``worker_loop``, which
+stops this process and writes the terminal row on its behalf — there is no
+per-trial poll here. Per-trial progress is still outstanding (§ open
+follow-ups).
 
 Exit codes (per §10.1):
     0 — terminal state written to DB (COMPLETED, FAILED, or CANCELLED).

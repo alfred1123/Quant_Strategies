@@ -283,9 +283,21 @@ Used by `coordinator/src/queue/repo.ts — queryTerminal()` / `claimNext()` and 
 | Coordinator HTTP route `POST /jobs/:id/cancel` (queued) | Cancel directly | `CANCELLED` (6) |
 | Worker — success | Terminal | `COMPLETED` (4) |
 | Worker — exception | Terminal | `FAILED` (5) |
-| Worker — observed cancel | Terminal | `CANCELLED` (6) |
+| Worker loop — observed cancel | Terminal | `CANCELLED` (6) |
 | Worker loop — boot recovery | Terminal | `FAILED` (5) |
 | Worker loop — exceeded `JOB_TIMEOUT_S` (600s) | Terminal | `FAILED` (5) with `ERROR_TEXT="job exceeded 600s timeout"` |
+
+!!! warning "`CANCEL_REQUESTED` is observed by the **loop**, not the worker"
+    The v5 row above read *"Worker — observed cancel"*, describing a per-trial
+    poll inside `worker.py` that Slice D never delivered. When the queue moved
+    into Python (#32) the observer moved with the supervision, not the trial
+    loop: `WorkerLoop._enforce_cancels` reads `CANCEL_REQUESTED` rows each
+    tick, stops the child (SIGTERM → `CANCEL_GRACE_S` → SIGKILL), then writes
+    `CANCELLED`. Terminal row after the child is gone, so a worker killed
+    mid-flight cannot land its own `FAILED` on top of the cancel. A requested
+    row with no live child is cancelled outright, which is what drains one
+    orphaned by a loop that died — `recover_stale` scans only `RUNNING` and
+    would otherwise strand it permanently. See decision #61.
 | FastAPI `POST /jobs/:id/reenqueue` | New submission (same `STRATEGY_ID/VID/PRIORITY`, fresh `QUEUE_ID`) | `QUEUED` (1) |
 
 ---

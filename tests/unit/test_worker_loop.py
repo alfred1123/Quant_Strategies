@@ -1,5 +1,6 @@
 """Unit tests for ``quant.queue.worker_loop`` — Phase A v6 daemon."""
 
+import subprocess
 import time
 import uuid
 from unittest.mock import MagicMock
@@ -15,7 +16,10 @@ from quant.queue.worker_loop import WorkerLoop
 class FakeRefData:
     """Stub for ``RedisRefData.resolve_queue_status_id`` only."""
 
-    _IDS = {"QUEUED": 1, "RUNNING": 2, "COMPLETED": 3, "FAILED": 4, "CANCELLED": 5}
+    _IDS = {
+        "QUEUED": 1, "RUNNING": 2, "COMPLETED": 3, "FAILED": 4, "CANCELLED": 5,
+        "CANCEL_REQUESTED": 6,
+    }
 
     def resolve_queue_status_id(self, name: str) -> int:
         return self._IDS[name]
@@ -30,6 +34,7 @@ class FakeProc:
         self.pid = pid
         self.killed = False
         self.waited = False
+        self.terminated = False
 
     def poll(self):
         return self._returncode
@@ -39,11 +44,21 @@ class FakeProc:
         self.returncode = code
 
     def wait(self, timeout=None):
+        """Raises like Popen does when the process is still running."""
         self.waited = True
+        if self._returncode is None:
+            raise subprocess.TimeoutExpired(cmd="worker", timeout=timeout)
         return self.returncode
+
+    def terminate(self):
+        # A worker holds no SIGTERM handler, so the default disposition ends
+        # it. Tests that need the pathological case override this with a noop.
+        self.terminated = True
+        self.finish(-15)
 
     def kill(self):
         self.killed = True
+        self.finish(-9)
 
 
 def _row(queue_id=None, *, priority=0, sid=None, vid=1, user="u1"):
@@ -88,12 +103,12 @@ class TestRecoverStale:
 
         assert n == 3
         repo.list_by_status.assert_called_once_with(2)  # RUNNING id
-        assert repo.mark_failed.call_count == 3
-        for call, row in zip(repo.mark_failed.call_args_list, rows):
+        assert repo.mark_terminal.call_count == 3
+        for call, row in zip(repo.mark_terminal.call_args_list, rows):
             args = call.args
-            assert args[0] == row["queue_id"]
-            assert args[5] == 4  # FAILED id
-            assert "worker_loop restarted" in args[6]
+            assert args[0] == row
+            assert args[1] == 4  # FAILED id
+            assert "worker_loop restarted" in args[2]
 
     def test_zero_running_returns_zero(self):
         repo = MagicMock()
@@ -101,7 +116,7 @@ class TestRecoverStale:
         loop = _make_loop(repo=repo)
 
         assert loop.recover_stale() == 0
-        repo.mark_failed.assert_not_called()
+        repo.mark_terminal.assert_not_called()
 
 
 # ── _try_claim_and_spawn ───────────────────────────────────────────────
@@ -219,10 +234,11 @@ class TestEnforceTimeouts:
 
         assert proc.killed
         assert qid not in loop._active
-        repo.mark_failed.assert_called_once()
-        args = repo.mark_failed.call_args.args
-        assert args[5] == 4  # FAILED status id
-        assert "timeout" in args[6].lower()
+        repo.mark_terminal.assert_called_once()
+        args = repo.mark_terminal.call_args.args
+        assert args[0] == row
+        assert args[1] == 4  # FAILED status id
+        assert "timeout" in args[2].lower()
 
     def test_leaves_young_children_alone(self):
         repo = MagicMock()
@@ -237,7 +253,93 @@ class TestEnforceTimeouts:
 
         assert not proc.killed
         assert qid in loop._active
-        repo.mark_failed.assert_not_called()
+        repo.mark_terminal.assert_not_called()
+
+
+# ── _enforce_cancels ────────────────────────────────────────────────────
+
+
+class TestEnforceCancels:
+    """The prod incident: CANCEL_REQUESTED had no observer at all.
+
+    `JobsService.cancel` wrote the row for a RUNNING job and nothing acted on
+    it, so the job kept the only worker slot until the 100-minute timeout
+    reclassified it as FAILED, stalling every job queued behind it.
+    """
+
+    @staticmethod
+    def _repo_with_requested(rows):
+        repo = MagicMock()
+        # list_by_status is called with the CANCEL_REQUESTED id (6).
+        repo.list_by_status.side_effect = lambda sid, **kw: rows if sid == 6 else []
+        return repo
+
+    def test_stops_the_child_and_writes_cancelled(self):
+        row = _row()
+        qid = uuid.UUID(str(row["queue_id"]))
+        repo = self._repo_with_requested([row])
+        loop = _make_loop(repo=repo)
+        proc = FakeProc(returncode=None)
+        loop._active[qid] = (proc, time.monotonic(), row)
+
+        loop._enforce_cancels()
+
+        assert proc.terminated
+        assert qid not in loop._active  # slot freed for the next job
+        repo.mark_terminal.assert_called_once_with(row, 5)  # CANCELLED id
+
+    def test_escalates_to_sigkill_when_sigterm_is_ignored(self):
+        row = _row()
+        qid = uuid.UUID(str(row["queue_id"]))
+        repo = self._repo_with_requested([row])
+        loop = _make_loop(repo=repo)
+        proc = FakeProc(returncode=None)
+        proc.terminate = lambda: None  # swallow SIGTERM, never exits
+        loop._active[qid] = (proc, time.monotonic(), row)
+
+        loop._enforce_cancels()
+
+        assert proc.killed
+        repo.mark_terminal.assert_called_once_with(row, 5)
+
+    def test_cancels_a_row_with_no_live_child(self):
+        """What clears a row orphaned by a loop that died mid-job.
+
+        `recover_stale` only scans RUNNING, so before this a CANCEL_REQUESTED
+        row survived a restart with nothing left to observe it — stuck for
+        good rather than merely until the timeout.
+        """
+        row = _row()
+        repo = self._repo_with_requested([row])
+        loop = _make_loop(repo=repo)
+
+        loop._enforce_cancels()
+
+        repo.mark_terminal.assert_called_once_with(row, 5)
+
+    def test_does_nothing_when_none_requested(self):
+        repo = self._repo_with_requested([])
+        loop = _make_loop(repo=repo)
+
+        loop._enforce_cancels()
+
+        repo.mark_terminal.assert_not_called()
+
+    def test_tick_frees_the_slot_for_the_next_job(self):
+        """End to end: a cancelled job must not keep the queue behind it waiting."""
+        cancelled = _row()
+        qid = uuid.UUID(str(cancelled["queue_id"]))
+        nxt = _row()
+        repo = self._repo_with_requested([cancelled])
+        repo.claim_next.side_effect = [nxt, None]
+        loop = _make_loop(repo=repo, max_concurrent=1)
+        loop._running = True
+        loop._active[qid] = (FakeProc(returncode=None), time.monotonic(), cancelled)
+
+        loop.tick()
+
+        assert qid not in loop._active
+        assert uuid.UUID(str(nxt["queue_id"])) in loop._active
 
 
 # ── _drain ──────────────────────────────────────────────────────────────
