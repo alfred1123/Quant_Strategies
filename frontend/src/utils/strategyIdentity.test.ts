@@ -30,9 +30,9 @@ const baseConfig = (overrides: Partial<BacktestConfig> = {}): BacktestConfig => 
 });
 
 describe('buildStrategyNm', () => {
-  it('includes trade product, its venue, and factor metric', () => {
-    expect(buildStrategyNm(baseConfig())).toBe(
-      'btcusdt.crypto@yahoo ← btcusdt.crypto/get_bollinger_band/momentum_band_signal on c',
+  it('includes trade product, its venue, its cadence, and factor metric', () => {
+    expect(buildStrategyNm(baseConfig(), 'DAILY')).toBe(
+      'btcusdt.crypto@yahoo:DAILY ← btcusdt.crypto/get_bollinger_band/momentum_band_signal on c',
     );
   });
 
@@ -43,15 +43,25 @@ describe('buildStrategyNm', () => {
         baseFactor({ symbol: 'vix.equity_us', indicator: 'get_rsi', strategy: 'momentum_band_signal' }),
       ],
     });
-    expect(buildStrategyNm(cfg)).toBe(
-      'ethusdt.crypto@yahoo ← vix.equity_us/get_rsi/momentum_band_signal on c',
+    expect(buildStrategyNm(cfg, 'DAILY')).toBe(
+      'ethusdt.crypto@yahoo:DAILY ← vix.equity_us/get_rsi/momentum_band_signal on c',
     );
   });
 
   it('treats the same recipe on two venues as two strategies', () => {
-    const onYahoo = buildStrategyNm(baseConfig({ dataSource: 'yahoo' }));
-    const onBybit = buildStrategyNm(baseConfig({ dataSource: 'bybit' }));
+    const onYahoo = buildStrategyNm(baseConfig({ dataSource: 'yahoo' }), 'DAILY');
+    const onBybit = buildStrategyNm(baseConfig({ dataSource: 'bybit' }), 'DAILY');
     expect(onYahoo).not.toBe(onBybit);
+  });
+
+  it('treats the same recipe on two cadences as two strategies', () => {
+    // The failure this guards: an hourly run of a daily recipe became v3 of
+    // the daily lineage, where promotion would compare a Sharpe annualised
+    // over 8760 periods against one annualised over 365.
+    const daily = buildStrategyNm(baseConfig({ dataSource: 'bybit' }), 'DAILY');
+    const hourly = buildStrategyNm(baseConfig({ dataSource: 'bybit' }), '1H');
+    expect(daily).not.toBe(hourly);
+    expect(hourly).toContain('btcusdt.crypto@bybit:1H ←');
   });
 
   it('names the traded venue even when a factor reads from another', () => {
@@ -61,14 +71,16 @@ describe('buildStrategyNm', () => {
       dataSource: 'yahoo',
       factors: [baseFactor({ data_source: 'bybit', data_column: 'price' })],
     });
-    const nm = buildStrategyNm(cfg);
-    expect(nm).toContain('btcusdt.crypto@yahoo ←');
+    const nm = buildStrategyNm(cfg, 'DAILY');
+    expect(nm).toContain('btcusdt.crypto@yahoo:DAILY ←');
     expect(nm).toContain('on bybit:price');
   });
 
   it('treats different metrics as distinct strategies', () => {
-    const price = buildStrategyNm(baseConfig());
-    const volume = buildStrategyNm(baseConfig({ factors: [baseFactor({ data_column: 'v' })] }));
+    const price = buildStrategyNm(baseConfig(), 'DAILY');
+    const volume = buildStrategyNm(
+      baseConfig({ factors: [baseFactor({ data_column: 'v' })] }), 'DAILY',
+    );
     expect(price).not.toBe(volume);
     expect(volume).toContain(' on v');
   });
@@ -80,15 +92,15 @@ describe('buildStrategyNm', () => {
         baseFactor({ indicator: 'get_rsi', strategy: 'reversion_band_signal' }),
       ],
     });
-    expect(buildStrategyNm(cfg)).toContain(' AND ');
-    expect(buildStrategyNm(cfg).split(' AND ')).toHaveLength(2);
+    expect(buildStrategyNm(cfg, 'DAILY')).toContain(' AND ');
+    expect(buildStrategyNm(cfg, 'DAILY').split(' AND ')).toHaveLength(2);
   });
 
   it('prefers vendor_symbol over symbol for factor source', () => {
     const cfg = baseConfig({
       factors: [baseFactor({ symbol: 'vix.equity_us', vendor_symbol: '^VIX' })],
     });
-    expect(buildStrategyNm(cfg)).toContain('^VIX/get_bollinger_band/');
+    expect(buildStrategyNm(cfg, 'DAILY')).toContain('^VIX/get_bollinger_band/');
   });
 });
 

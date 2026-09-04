@@ -133,18 +133,33 @@ claim_local_db() {
 # Commands
 # ---------------------------------------------------------------------------
 
+# Nothing is excluded from the dump, deliberately.
+#
+# CORE_ADMIN.LOG_PROC_DETAIL is the obvious candidate — 33 MB of 53, and the
+# SSM tunnel drops with a broken pipe on long transfers, so leaving it out cut
+# a run from 7.6 MB/102s to 4.6 MB/60s and halved the window in which that can
+# happen. It is still copied: the timings are the only record of how production
+# actually behaves under load, and a local mirror missing them cannot be used
+# to go looking for a problem that has not been named yet. Pay the transfer.
 cmd_dump() {
   require_tunnel
   load_rds_password
   export PGSSLMODE=require
   mkdir -p "$DUMP_DIR"
   local outfile="$DUMP_DIR/quantdb_$(date +%Y%m%d_%H%M%S).dump"
+
   info "Dumping Aurora quantdb → $outfile"
-  "$PG_DUMP_BIN" \
+  # A dump that died leaves a 0-byte file behind, and `restore` with no
+  # argument takes the *latest* — which would then be the empty one, silently
+  # preferred over the last good dump. Remove it on the way out instead.
+  if ! "$PG_DUMP_BIN" \
     -h "$RDS_HOST" -p "$RDS_PORT" \
     -U "$RDS_USER" -d "$RDS_DB" \
     -Fc -Z 6 -v \
-    -f "$outfile"
+    -f "$outfile"; then
+    rm -f "$outfile"
+    error "pg_dump failed (the tunnel drops on long transfers — retry). Removed $outfile"
+  fi
   info "Done. $(du -sh "$outfile" | cut -f1) written to $outfile"
 }
 

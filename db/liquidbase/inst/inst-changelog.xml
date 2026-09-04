@@ -18,8 +18,13 @@
       2. Create releases/X.Y.Z-name.xml
       3. Uncomment/add:
            <include file="releases/X.Y.Z-name.xml" relativeToChangelogFile="true"/>
+
+      EDITING AN EXISTING PROCEDURE COUNTS AS A NEW MIGRATION.
+      Applied releases are archived, so no runOnChange changeset is standing by to
+      re-apply a body you edit. Write the changeset that deploys it, or the edit
+      stays in git and prod keeps the old definition.
     -->
 
-    <include file="releases/1.3.0-log-duration-clock-timestamp.xml" relativeToChangelogFile="true"/>
+    <!-- Nothing pending. -->
 
 </databaseChangeLog>

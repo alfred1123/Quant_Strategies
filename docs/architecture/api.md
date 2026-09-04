@@ -350,13 +350,31 @@ Request-level `data_source` — the venue the **trade asset** is priced from —
 
 It used to default to `"yahoo"`, and the client dropped the field when the box was blank. The two combined to produce a run nobody configured: a strategy stored in production carried `"data_source": "yahoo"` while its `STRATEGY_NM` read `... on bybit:price`, because the name was assembled only from factor recipes and a factor had been set to Bybit. Setting the source on a factor does not move the traded series — the traded leg is fetched with the request-level value, and only factors fall back to it (`f.data_source or req.data_source`).
 
-The canonical name therefore carries the traded venue as `TRADE@VENUE ← …`:
+The canonical name therefore carries the traded venue **and the cadence** as `TRADE@VENUE:CADENCE ← …`:
 
 ```
-btcusdt.crypto@bybit ← btcusdt.crypto/get_bollinger_band/momentum on bybit:price
+btcusdt.crypto@bybit:DAILY ← btcusdt.crypto/get_bollinger_band/momentum on bybit:price
+btcusdt.crypto@bybit:1H    ← btcusdt.crypto/get_bollinger_band/momentum on bybit:price
 ```
 
-Since `STRATEGY_NM` is the identity key, the same recipe fitted on Yahoo prints and on Bybit prints are now two strategies rather than one grouped pair. Names minted before this change have no `@venue` segment; re-running such a config produces a new name, and therefore a new identity, which is intended — the old name could not distinguish the two.
+Since `STRATEGY_NM` is the identity key, the same recipe fitted on Yahoo prints and on Bybit prints are now two strategies rather than one grouped pair. Names minted before the venue segment existed have none; re-running such a config produces a new name, and therefore a new identity, which is intended — the old name could not distinguish the two.
+
+Cadence joined the key for the same reason and one worse consequence. `tm_interval_id` was added to the request ([below](#the-cadence-is-chosen-not-assumed)) but not to the name, so an hourly run of a daily recipe resolved to the daily lineage and was stored as its next `STRATEGY_VID`. A shared `STRATEGY_ID` is the claim that two runs are versions of one thing, which is also the instruction to compare their metrics: `_evaluate_soft` ranks a candidate against the current best VID by Sharpe, and hourly Sharpe is annualised over 8,760 periods against daily's 365. The candidate died on a range error before producing a number, and nothing else would have stopped it taking `IS_BEST_IND` on units alone — a winner `schedule_policy` would then refuse to deploy, since it only allows the cadence a strategy was fitted on. `buildStrategyNm` takes the cadence as `REFDATA.TM_INTERVAL.NAME`, never the id, so renumbering the table cannot fork every lineage.
+
+### What counts as a new version, and what counts as a new strategy
+
+`STRATEGY_VID` counts re-optimisations of one strategy. A new `STRATEGY_ID` is a different question being asked. The line falls where the metrics stop being comparable:
+
+| Same lineage — new `STRATEGY_VID` | New lineage — `STRATEGY_VID` 1 |
+|---|---|
+| Grid bounds (`window_range`, `signal_range`) | Traded product |
+| Date range | Venue / `data_source` |
+| `fee_bps`, `split_ratio`, `walk_forward` | `tm_interval_id` |
+| The fitted `window` / `signal` the optimizer returns | A factor's signal source, indicator, or signal type |
+| | `data_column` — the metric read |
+| | Factor count, conjunction |
+
+Everything on the right names *what series goes in*; everything on the left names *how hard the optimizer searched, given that series*. Date range is the loosest item on the left — two runs over different periods are not strictly comparable either — but they are at least on one scale, which cadence is not.
 
 ### The range comes from what is captured
 
@@ -364,11 +382,13 @@ An exchange backtest reads `MARKET_DATA.PRICE_BAR`, so the stored bars bound it.
 
 **The tail gets one bar of slack, the head gets none.** The End field defaults to today and today's bar has not closed, so demanding the store reach it refused every run made before the close. A bar that cannot exist yet is not missing history, so a requested end up to one bar past the last stored bar is served. Slack of exactly one period keeps that from excusing a real hole — an end a month past the last close is still refused — and the head gets none, because a day before the first bar is absence rather than a bar still forming. The period is the requested interval's, not a fixed day: as a constant it would have let an hourly run skip 24 missing bars at the tail.
 
+**The snapped head rounds up, because a date input cannot say 10:00.** A date field expresses midnight, and truncating an intraday bound to its date moves it *backwards*. Bybit's first hourly `BTCUSDT` bar is `2020-03-25 10:00`, so snapping produced a start of `2020-03-25` — ten hours of history that has never existed, against a head with no slack. The drawer said the range fitted, because it compared the same truncated strings, and the worker refused the job: one FAILED run whose only fault was that the two sides reasoned in different units. `capturedRange` now rounds the head to the next whole day whenever the earliest bar is intraday, costing at most one day at the front of the series, and gives the tail its extra day only when the last bar sits on midnight. Daily series are unchanged — their bars are already at midnight.
+
 ### The cadence is chosen, not assumed
 
 `OptimizeRequest.tm_interval_id` names the bars a run is fitted on, and it is **required** for the same reason `data_source` is — it selects an input series, and a server-side default chooses one without saying so. Only an exchange source can serve anything but daily, because only captured bars exist at other cadences; a provider asked for an intraday interval is refused rather than handed daily bars under an intraday label, since `get_historical_price` returns daily bars whatever it is asked for.
 
-Two things follow for callers. `BT.STRATEGY.CONFIG_JSON` stores the request verbatim and `live_service` replays it through `OptimizeRequest.model_validate`, so rows written before the field existed were backfilled to DAILY — what they always were. And `trading_period` is the annualisation scalar (365 daily, 8,760 hourly): the config drawer scales `REFDATA.ASSET_TYPE.TRADING_PERIOD` by the interval's bars-per-day, because annualised return scales by that number and Sharpe by its square root, so a daily figure left on an hourly run understates both.
+Three things follow for callers. `BT.STRATEGY.CONFIG_JSON` stores the request verbatim and `live_service` replays it through `OptimizeRequest.model_validate`, so rows written before the field existed were backfilled to DAILY — what they always were. `trading_period` is the annualisation scalar (365 daily, 8,760 hourly): the config drawer scales `REFDATA.ASSET_TYPE.TRADING_PERIOD` by the interval's bars-per-day, because annualised return scales by that number and Sharpe by its square root, so a daily figure left on an hourly run understates both. And because that scalar moves, the cadence is part of the [strategy's identity](#the-traded-venue-is-required-and-the-name-says-which-one) — two runs whose Sharpe is annualised differently must not share a `STRATEGY_ID`, where promotion would compare them bare.
 
 ## SSE Streaming (`/optimize/stream`)
 

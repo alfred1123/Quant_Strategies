@@ -255,7 +255,7 @@ CREATE INDEX IX_PRICE_BAR_LATEST
 |-----------|---------|
 | `MARKET_DATA.SP_GET_PRICE_BAR_COVERAGE` | `MIN`/`MAX` bar timestamps via `ORDER BY … LIMIT 1` (two index probes) — freshness uses `MAX` |
 | `MARKET_DATA.SP_GET_PRICE_BAR` | OHLCV range read for signal computation |
-| `MARKET_DATA.SP_INS_PRICE_BAR` | Insert **one bar** per call; plain `INSERT` |
+| `MARKET_DATA.SP_INS_PRICE_BAR` | Insert **one bar** per call; plain `INSERT`. Writes no `LOG_PROC_DETAIL` row — one audit row per bar ([decision #59](../decisions.md)) |
 
 **Division of labour:** the DB stores and reads bars; the **app** decides what window it needs, compares `SP_GET_PRICE_BAR_COVERAGE` to required range, fetches missing bars from the exchange, inserts gaps via `SP_INS_PRICE_BAR`. Single source of truth — no sync table.
 

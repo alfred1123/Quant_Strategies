@@ -21,6 +21,7 @@ import { APP_NAME } from '../constants/brand';
 import { runPerformance } from '../api/backtest';
 import { fetchJob, useEnqueueJob, useJobCompletionEffects } from '../api/jobs';
 import { useMe } from '../api/auth';
+import { useTmIntervals } from '../api/refdata';
 import type {
   BacktestConfig, OptimizeResponse, PerformanceResponse, Top10Row,
   WalkForwardResponse, OptimizeProgress,
@@ -66,6 +67,7 @@ function isAbortError(err: unknown): boolean {
 
 export default function BacktestPage() {
   const { data: currentUser } = useMe();
+  const { data: tmIntervals } = useTmIntervals();
   const enqueue = useEnqueueJob();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [config, setConfig] = useState<BacktestConfig>(DEFAULT_CONFIG);
@@ -202,6 +204,17 @@ export default function BacktestPage() {
       setError(validationError);
       return;
     }
+    // The cadence is part of the strategy's identity, so a name cannot be
+    // built without it. Refuse rather than fall back to a cadence label the
+    // run was not fitted on — that is what puts an hourly run into a daily
+    // lineage, where promotion compares the two on different scales.
+    const cadence = tmIntervals?.find(
+      (iv) => iv.tm_interval_id === config.tmIntervalId,
+    )?.name;
+    if (!cadence) {
+      setError('Bar interval has not loaded yet — reopen the config and pick one.');
+      return;
+    }
     // Cancel any previous perf request — backtest now runs server-side
     // via BT.QUEUE, so there's no client-side SSE to abort.
     perfAbort.current?.abort();
@@ -211,7 +224,7 @@ export default function BacktestPage() {
     setDrawerOpen(false);
     try {
       const req = buildOptimizeRequest(config);
-      const strategyNm = buildStrategyNm(config);
+      const strategyNm = buildStrategyNm(config, cadence);
       const result = await enqueue.mutateAsync({
         strategy_nm: strategyNm,
         config_json: req,

@@ -1,3 +1,10 @@
+-- Deliberately writes no CORE_ADMIN.LOG_PROC_DETAIL row, unlike its neighbours.
+-- The worker polls this procedure to claim the next job, at a steady ~2,870
+-- calls a day whether or not a job is ever queued, which made it 177,274 rows
+-- of a 236,000-row audit table — three quarters of it, recording that an idle
+-- queue was found empty again. A poll that finds nothing is not an event worth
+-- keeping for 30 days. This does also drop the procedure from LOG_PROC_SUMMARY,
+-- which is the price of not writing the detail rows it aggregates.
 CREATE OR REPLACE PROCEDURE BT.SP_GET_QUEUE(
     IN  IN_QUEUE_ID          UUID,
     IN  IN_STRATEGY_ID       UUID,
@@ -13,10 +20,9 @@ LANGUAGE plpgsql
 SET plan_cache_mode = 'force_custom_plan'
 AS $$
 DECLARE
-    V_LOG_START  TIMESTAMPTZ := clock_timestamp();
+    -- V_OTHER_TEXT survives the removal of the audit call: the exception
+    -- handler still names the parameters in its RAISE WARNING.
     V_OTHER_TEXT TEXT;
-    V_LOG_STATE  TEXT;
-    V_LOG_MSG    TEXT;
     V_SQL        TEXT;
     V_LIMIT      INTEGER;
 BEGIN
@@ -86,10 +92,6 @@ BEGIN
     V_SQL := V_SQL || format(' LIMIT %s', V_LIMIT);
 
     OPEN OUT_RESULT FOR EXECUTE V_SQL;
-
-    -- Step 20: Audit log
-    OUT_SQLMSG := '20';
-    CALL CORE_ADMIN.CORE_INS_LOG_PROC('BT', 'SP_GET_QUEUE', V_LOG_START, NULL, V_OTHER_TEXT, NULL, V_LOG_STATE, V_LOG_MSG);
 
 EXCEPTION
     WHEN OTHERS THEN

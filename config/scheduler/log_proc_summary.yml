@@ -25,5 +25,11 @@ schedule:
   # :15 rather than the hour: deployments and the hourly jobs both cluster on
   # the boundary, and FlexibleTimeWindow is OFF, so a tick that collides with a
   # container restart is simply lost — MaximumRetryAttempts is 0.
-  expression: "cron(15 23 ? * SAT *)"
+  #
+  # Daily, not the Saturday it used to run. The procedure both aggregates and
+  # purges, so a weekly tick let the detail table run to the retention window
+  # plus another six days, and a single missed tick — which costs nothing here,
+  # since the next run picks up every unsummarized day — doubled that. Running
+  # it daily makes a lost tick invisible instead of a fortnight of growth.
+  expression: "cron(15 23 * * ? *)"
   timezone: UTC

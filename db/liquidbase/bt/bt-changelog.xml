@@ -19,11 +19,16 @@
       2. Create releases/X.Y.Z-name.xml — procedures need splitStatements="false".
       3. Uncomment/add:
            <include file="releases/X.Y.Z-name.xml" relativeToChangelogFile="true"/>
+
+      EDITING AN EXISTING PROCEDURE COUNTS AS A NEW MIGRATION.
+      Applied releases are archived, so no runOnChange changeset is standing by to
+      re-apply a body you edit. Write the changeset that deploys it, or the edit
+      stays in git and prod keeps the old definition.
     -->
 
-    <!-- 1.13 before 1.12: RESULT.STRATEGY_ID/STRATEGY_VID must exist before SP_GET_STRATEGY_LIST -->
-    <include file="releases/1.16.0-log-duration-clock-timestamp.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.17.0-result-by-strategy.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.18.0-strategy-config-bar-interval.xml" relativeToChangelogFile="true"/>
+    <!-- 1.19 reads CONFIG_JSON.tm_interval_id, which 1.18 is what backfills -->
+    <include file="releases/1.19.0-strategy-nm-cadence.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.20.0-queue-poll-no-audit.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

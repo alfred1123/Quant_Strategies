@@ -72,6 +72,14 @@ const BYBIT_COVERAGE: Coverage = {
   error: null,
 };
 
+/** The same pair hourly: the first bar is 10:00, not midnight. */
+const BYBIT_HOURLY_COVERAGE: Coverage = {
+  first_bar: '2020-03-25T10:00:00+00:00',
+  last_bar: '2026-09-03T14:00:00+00:00',
+  gaps: 0,
+  error: null,
+};
+
 const baseCfg: BacktestConfig = {
   symbol: '',
   vendorSymbol: '',
@@ -199,6 +207,22 @@ describe('ConfigDrawer — the captured range decides the dates', () => {
     const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
     expect(last.start).toBe('2020-03-25');
     expect(last.end).toBe('2026-08-29');
+  });
+
+  it('snaps an intraday head to a day the store can serve in full', () => {
+    // A real FAILED run: the first hourly bar is 10:00, the snap offered
+    // 2020-03-25, and the worker refused a window reaching ten hours before
+    // any bar existed. A date input cannot say 10:00, so it must round up.
+    storedCoverage = BYBIT_HOURLY_COVERAGE;
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host initial={{ ...bybitCfg, tmIntervalId: 2 }} observer={observer} />,
+    );
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.start).toBe('2020-03-26');
+    expect(last.end).toBe('2026-09-03');
+    expect(screen.queryByText(/will be refused/)).toBeNull();
   });
 
   it('asks about the traded series, at the selected interval', () => {
