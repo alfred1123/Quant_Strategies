@@ -122,6 +122,9 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   const rangeOutsideCapture = captured !== null
     && !rangeFits(captured, config.start, config.end);
 
+  // A datetime control needs the room a date one does not.
+  const dateFieldWidth = captured?.intraday ? 210 : 155;
+
   /**
    * Patch helper.
    *
@@ -241,13 +244,23 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
             ))}
           </Select>
         </FormControl>
+        {/*
+          A date field for a daily series, a datetime field for an intraday
+          one. The control has to be able to hold the bound it is given: an
+          hourly series whose first bar is 10:00 cannot be expressed as a
+          date, and the run is refused for the ten bars that never existed.
+        */}
         <TextField
-          label="Start" size="small" type="date" value={config.start} sx={{ width: 155 }}
+          label="Start" size="small" sx={{ width: dateFieldWidth }}
+          type={captured?.intraday ? 'datetime-local' : 'date'}
+          value={config.start}
           onChange={e => set({ start: e.target.value })}
           slotProps={{ inputLabel: { shrink: true } }}
         />
         <TextField
-          label="End" size="small" type="date" value={config.end} sx={{ width: 155 }}
+          label="End" size="small" sx={{ width: dateFieldWidth }}
+          type={captured?.intraday ? 'datetime-local' : 'date'}
+          value={config.end}
           onChange={e => set({ end: e.target.value })}
           slotProps={{ inputLabel: { shrink: true } }}
         />

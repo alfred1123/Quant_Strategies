@@ -16,6 +16,7 @@ describe('capturedRange', () => {
       first: '2020-03-25',
       last: '2026-08-29',
       latestEnd: '2026-08-30',
+      intraday: false,
     });
   });
 
@@ -30,11 +31,18 @@ describe('capturedRange', () => {
   // The bug this guards, from a real FAILED run: Bybit's first hourly
   // BTCUSDT bar is 2020-03-25 10:00, the drawer snapped the start to
   // 2020-03-25, and the server refused a window reaching ten hours before
-  // any bar existed. A date input cannot say 10:00, so the head rounds up.
-  it('rounds an intraday head up to the first whole day it can serve', () => {
+  // any bar existed. The head is now reported at the minute it happened.
+  it('keeps the time of day on an intraday head', () => {
     expect(
       capturedRange(coverage({ first_bar: '2020-03-25T10:00:00+00:00' }))?.first,
-    ).toBe('2020-03-26');
+    ).toBe('2020-03-25T10:00');
+  });
+
+  it('marks an intraday series so the inputs can hold a time', () => {
+    expect(
+      capturedRange(coverage({ first_bar: '2020-03-25T10:00:00+00:00' }))?.intraday,
+    ).toBe(true);
+    expect(capturedRange(coverage())?.intraday).toBe(false);
   });
 
   it('leaves a head already on midnight alone', () => {
@@ -42,17 +50,19 @@ describe('capturedRange', () => {
   });
 
   it('gives an intraday tail no extra day', () => {
-    // Today's date already covers an unclosed hourly bar; a whole day past
-    // it is a window the server refuses.
+    // The server allows one bar of slack past the last close, so the stored
+    // bar itself is inside what it accepts. A whole day past it is not.
     expect(
       capturedRange(coverage({ last_bar: '2026-09-03T14:00:00+00:00' }))?.latestEnd,
-    ).toBe('2026-09-03');
+    ).toBe('2026-09-03T14:00');
   });
 
-  it('rolls the head over a month end', () => {
+  it('loses no history at a month end', () => {
+    // Rounding up used to move this head to 2020-04-01, discarding a day
+    // of bars to work around a field that could not hold a time.
     expect(
       capturedRange(coverage({ first_bar: '2020-03-31T10:00:00+00:00' }))?.first,
-    ).toBe('2020-04-01');
+    ).toBe('2020-03-31T10:00');
   });
 });
 
@@ -77,7 +87,9 @@ describe('nextDay', () => {
 });
 
 describe('rangeFits', () => {
-  const captured = { first: '2020-03-25', last: '2026-08-29', latestEnd: '2026-08-30' };
+  const captured = {
+    first: '2020-03-25', last: '2026-08-29', latestEnd: '2026-08-30', intraday: false,
+  };
 
   it('accepts a window inside the captured bounds', () => {
     expect(rangeFits(captured, '2021-01-01', '2026-01-01')).toBe(true);
@@ -106,8 +118,8 @@ describe('rangeFits', () => {
   });
 
   it('agrees with what the drawer snapped for an intraday series', () => {
-    // The whole point of the head rounding: what the snap offers must be a
-    // window this predicate — and therefore the server — accepts.
+    // What the snap offers must be a window this predicate — and therefore
+    // the server — accepts, with the full history and not a day less.
     const hourly = capturedRange({
       first_bar: '2020-03-25T10:00:00+00:00',
       last_bar: '2026-09-03T14:00:00+00:00',
@@ -115,6 +127,7 @@ describe('rangeFits', () => {
       error: null,
     })!;
     expect(rangeFits(hourly, hourly.first, hourly.last)).toBe(true);
+    // Midnight on the first day is still refused: those ten bars never existed.
     expect(rangeFits(hourly, '2020-03-25', hourly.last)).toBe(false);
   });
 });

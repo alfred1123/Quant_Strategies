@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from quant.api.schemas.jobs import EnqueueRequest
-from quant.api.services.jobs import JobsService
+from quant.api.services.jobs import JobsService, StrategyNameMismatch
 
 
 @pytest.fixture
@@ -16,6 +16,7 @@ def svc() -> JobsService:
     repo.queued_position.return_value = 1
     refdata = MagicMock()
     refdata.resolve_queue_status_id.return_value = 10
+    refdata.interval_name.return_value = "DAILY"
     redis_client = MagicMock()
     return JobsService(repo=repo, refdata=refdata, redis_client=redis_client)
 
@@ -25,8 +26,11 @@ def test_enqueue_resolves_strategy_from_name(svc: JobsService) -> None:
     svc._repo.sp_ins_strategy.return_value = (sid, 2)
 
     req = EnqueueRequest(
-        strategy_nm="btcusdt.crypto ← btcusdt.crypto/get_bollinger_band/momentum_band_signal on c",
-        config_json={"symbol": "btcusdt.crypto", "factors": []},
+        strategy_nm=(
+            "btcusdt.crypto@bybit:DAILY ← "
+            "btcusdt.crypto/get_bollinger_band/momentum_band_signal on c"
+        ),
+        config_json={"symbol": "btcusdt.crypto", "factors": [], "tm_interval_id": 1},
     )
     resp = svc.enqueue("user-uuid", req)
 
@@ -40,3 +44,50 @@ def test_enqueue_resolves_strategy_from_name(svc: JobsService) -> None:
     assert queue_kwargs["strategy_id"] == sid
     assert queue_kwargs["strategy_vid"] == 2
     assert resp.queue_pos == 1
+
+
+def test_enqueue_refuses_a_name_that_omits_its_cadence(svc: JobsService) -> None:
+    """The real incident: a cached bundle forked a lineage after the rename.
+
+    `btcusdt.crypto@bybit ← …` was enqueued once 1.19.0 had already renamed
+    every stored row to carry `:DAILY`, so it created a second STRATEGY_ID
+    for a strategy that already had one. Repair is blocked by the
+    (USER_ID, STRATEGY_NM, STRATEGY_VID) unique constraint, so the write is
+    refused instead.
+    """
+    req = EnqueueRequest(
+        strategy_nm="btcusdt.crypto@bybit ← btcusdt.crypto/get_bollinger_band/momentum on c",
+        config_json={"symbol": "btcusdt.crypto", "factors": [], "tm_interval_id": 1},
+    )
+
+    with pytest.raises(StrategyNameMismatch, match="DAILY"):
+        svc.enqueue("user-uuid", req)
+
+    svc._repo.sp_ins_strategy.assert_not_called()
+
+
+def test_enqueue_refuses_a_name_naming_the_wrong_cadence(svc: JobsService) -> None:
+    """An hourly config under a daily name is the identity collapse #58 fixed."""
+    svc._refdata.interval_name.return_value = "1H"
+    req = EnqueueRequest(
+        strategy_nm="btcusdt.crypto@bybit:DAILY ← btcusdt.crypto/get_bollinger_band/momentum on c",
+        config_json={"symbol": "btcusdt.crypto", "factors": [], "tm_interval_id": 2},
+    )
+
+    with pytest.raises(StrategyNameMismatch, match="1H"):
+        svc.enqueue("user-uuid", req)
+
+    svc._repo.sp_ins_strategy.assert_not_called()
+
+
+def test_enqueue_refuses_a_config_with_no_cadence(svc: JobsService) -> None:
+    """Required since #57 — a run with no interval selects no input series."""
+    req = EnqueueRequest(
+        strategy_nm="btcusdt.crypto@bybit:DAILY ← btcusdt.crypto/get_bollinger_band/momentum on c",
+        config_json={"symbol": "btcusdt.crypto", "factors": []},
+    )
+
+    with pytest.raises(StrategyNameMismatch, match="tm_interval_id"):
+        svc.enqueue("user-uuid", req)
+
+    svc._repo.sp_ins_strategy.assert_not_called()

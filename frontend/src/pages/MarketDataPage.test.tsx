@@ -90,6 +90,34 @@ describe('MarketDataPage', () => {
     expect(screen.getByText('2026-01-01 → 2026-08-01')).toBeInTheDocument();
   });
 
+  it('separates a finished capture from a merely hole-free one', () => {
+    // The bybit hourly series: the target is the venue's floor at 10:00, and
+    // the store has reached it. Ten bars sit between midnight and that floor
+    // and never existed, so there is nothing left to fetch — "continuous"
+    // reads as a backfill somebody forgot to run.
+    setup([
+      {
+        ...ROW,
+        backfill_from_ts: '2020-03-25T10:00:00Z',
+        coverage: { ...ROW.coverage, first_bar: '2020-03-25T10:00:00Z' },
+      },
+    ]);
+    expect(screen.getByText('completed')).toBeInTheDocument();
+    expect(screen.queryByText('continuous')).not.toBeInTheDocument();
+  });
+
+  it('still says continuous while a capture is short of its target', () => {
+    setup([
+      {
+        ...ROW,
+        backfill_from_ts: '2020-03-25T10:00:00Z',
+        coverage: { ...ROW.coverage, first_bar: '2026-01-01T00:00:00Z' },
+      },
+    ]);
+    expect(screen.getByText('continuous')).toBeInTheDocument();
+    expect(screen.queryByText('completed')).not.toBeInTheDocument();
+  });
+
   it('flags a series with holes, because a backtest over it is not reproducible', () => {
     setup([{ ...ROW, coverage: { ...ROW.coverage, gaps: 4 } }]);
     expect(screen.getByText('4 gaps')).toBeInTheDocument();
