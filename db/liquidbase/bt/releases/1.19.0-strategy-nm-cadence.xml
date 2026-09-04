@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      STRATEGY_NM now carries the cadence the run was fitted on
+      (`TRADE@VENUE:CADENCE ← ...`), because `(USER_ID, STRATEGY_NM)` is the
+      identity SP_INS_STRATEGY_VID_BY_NM resolves and a shared STRATEGY_ID is
+      the instruction to compare two runs' metrics.
+
+      #57 made TM_INTERVAL_ID required on OptimizeRequest for the reason #53
+      made DATA_SOURCE required — it selects an input series — but the name
+      builder never learned it, so an hourly run of a daily recipe resolved to
+      the daily lineage and landed as v3. Cadence also moves TRADING_PERIOD
+      from 365 to 8760: Sharpe annualises by a factor of ~4.9 and annualised
+      return by 24, and `_evaluate_soft` compares those bare against the
+      current best. That candidate failed on a data-range error before it
+      could produce a number; nothing else would have stopped it taking
+      IS_BEST_IND on units alone, and schedule_policy (#49) would then have
+      refused to deploy the winner.
+
+      Two steps, because two different things are wrong in the stored rows:
+      the names understate what they are, and one row is in the wrong lineage.
+
+      Runs after 1.18.0-001, which is what guarantees every CONFIG_JSON
+      carries `tm_interval_id`. That changeset is still pending in prod — 9 of
+      10 BT.STRATEGY rows have no such key today — so the two must deploy
+      together, in changelog order.
+
+      Both changesets are splitStatements="false". Liquibase's splitter cuts on
+      `;` without understanding dollar quotes, so it chopped the guard's
+      `DO $$ ... $$` in half and Postgres rejected an unterminated dollar quote.
+      Sending each changeset whole is also what makes the re-lineage atomic: the
+      temp tables are ON COMMIT DROP and the post-flight assertions must be able
+      to abort the same transaction that moved the keys.
+    -->
+
+    <changeSet id="1.19.0-001-strategy-nm-cadence" author="alfcheun" context="bt,prod-deploy">
+        <comment>Name every strategy for the cadence it was fitted on</comment>
+        <sql splitStatements="false"><![CDATA[
+            -- 1.18.0-001 is the precondition. Fail loud rather than skip rows.
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM BT.STRATEGY
+                     WHERE NOT JSONB_EXISTS(CONFIG_JSON, 'tm_interval_id')
+                ) THEN
+                    RAISE EXCEPTION
+                        'BT.STRATEGY rows without CONFIG_JSON.tm_interval_id — run 1.18.0-001 first';
+                END IF;
+            END $$;
+
+            -- Insert `:CADENCE` ahead of the arrow, recording what these runs
+            -- always were. Scoped to names already in the `TRADE@VENUE` shape:
+            -- rows predating that change are a lineage nothing enqueues into
+            -- any more, and rewriting them would assert a history they do not
+            -- have. Idempotent — a name already carrying a cadence is skipped.
+            UPDATE BT.STRATEGY s
+               SET STRATEGY_NM = OVERLAY(
+                       s.STRATEGY_NM PLACING ':' || ti.NAME
+                       FROM POSITION(' ← ' IN s.STRATEGY_NM) FOR 0
+                   )
+              FROM REFDATA.TM_INTERVAL ti
+             WHERE ti.TM_INTERVAL_ID = (s.CONFIG_JSON->>'tm_interval_id')::INTEGER
+               AND POSITION(' ← ' IN s.STRATEGY_NM) > 0
+               AND POSITION('@' IN SUBSTRING(s.STRATEGY_NM
+                       FROM 1 FOR POSITION(' ← ' IN s.STRATEGY_NM))) > 0
+               AND POSITION(':' IN SUBSTRING(s.STRATEGY_NM
+                       FROM 1 FOR POSITION(' ← ' IN s.STRATEGY_NM))) = 0;
+        ]]></sql>
+        <rollback><![CDATA[
+            UPDATE BT.STRATEGY
+               SET STRATEGY_NM = REGEXP_REPLACE(STRATEGY_NM, '^([^ ]+@[^:]+):[^ ]+ ← ', '\1 ← ')
+             WHERE STRATEGY_NM ~ '^[^ ]+@[^:]+:[^ ]+ ← ';
+        ]]></rollback>
+    </changeSet>
+
+    <changeSet id="1.19.0-002-relineage-foreign-cadence" author="alfcheun" context="bt,prod-deploy">
+        <comment>Move rows fitted on a cadence their lineage does not own into their own STRATEGY_ID</comment>
+        <sql splitStatements="false"><![CDATA[
+                   -- Cadence per stored version.
+            CREATE TEMP TABLE strategy_cadence ON COMMIT DROP AS
+            SELECT s.STRATEGY_ID, s.STRATEGY_VID, s.IS_BEST_IND, ti.NAME AS CADENCE
+              FROM BT.STRATEGY s
+              JOIN REFDATA.TM_INTERVAL ti
+                ON ti.TM_INTERVAL_ID = (s.CONFIG_JSON->>'tm_interval_id')::INTEGER;
+
+            -- The cadence a lineage owns is the one its first version was
+            -- fitted on. Every other cadence under that STRATEGY_ID arrived
+            -- through the identity gap and is a separate strategy.
+            CREATE TEMP TABLE lineage_cadence ON COMMIT DROP AS
+            SELECT DISTINCT ON (STRATEGY_ID) STRATEGY_ID, CADENCE
+              FROM strategy_cadence
+             ORDER BY STRATEGY_ID, STRATEGY_VID;
+
+            CREATE TEMP TABLE relineage ON COMMIT DROP AS
+            SELECT g.STRATEGY_ID AS OLD_ID, g.CADENCE, GEN_RANDOM_UUID() AS NEW_ID
+              FROM (SELECT DISTINCT STRATEGY_ID, CADENCE FROM strategy_cadence) g
+              JOIN lineage_cadence lc ON lc.STRATEGY_ID = g.STRATEGY_ID
+             WHERE g.CADENCE IS DISTINCT FROM lc.CADENCE;
+
+            -- Row-level map. VIDs restart at 1 in the new lineage: a version
+            -- number counts re-optimisations of one strategy, and these runs
+            -- are the first of theirs.
+            CREATE TEMP TABLE vid_map ON COMMIT DROP AS
+            SELECT sc.STRATEGY_ID AS OLD_ID,
+                   sc.STRATEGY_VID AS OLD_VID,
+                   r.NEW_ID,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY sc.STRATEGY_ID, sc.CADENCE ORDER BY sc.STRATEGY_VID
+                   )::INTEGER AS NEW_VID
+              FROM strategy_cadence sc
+              JOIN relineage r
+                ON r.OLD_ID = sc.STRATEGY_ID AND r.CADENCE = sc.CADENCE;
+
+            -- Which version held IS_BEST_IND before anything moved.
+            CREATE TEMP TABLE best_before ON COMMIT DROP AS
+            SELECT sc.STRATEGY_ID AS OLD_ID, sc.STRATEGY_VID AS OLD_VID
+              FROM strategy_cadence sc
+             WHERE sc.IS_BEST_IND = 'Y'
+               AND sc.STRATEGY_ID IN (SELECT OLD_ID FROM relineage);
+
+            CREATE TEMP TABLE affected_lineage ON COMMIT DROP AS
+            SELECT DISTINCT OLD_ID AS STRATEGY_ID FROM relineage
+            UNION
+            SELECT DISTINCT NEW_ID FROM relineage;
+
+            -- A soft baseline that did not travel with its decision is not a
+            -- baseline any more — the VID it names belongs to another
+            -- strategy now. Cleared before the keys move, while it still
+            -- reads against the old lineage.
+            UPDATE BT.PROMOTION p
+               SET COMPARED_VID = NULL
+              FROM vid_map m
+             WHERE p.STRATEGY_ID = m.OLD_ID
+               AND p.STRATEGY_VID = m.OLD_VID
+               AND p.COMPARED_VID IS NOT NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM vid_map b
+                    WHERE b.OLD_ID = p.STRATEGY_ID
+                      AND b.OLD_VID = p.COMPARED_VID
+                      AND b.NEW_ID = m.NEW_ID
+               );
+
+            UPDATE BT.PROMOTION p
+               SET COMPARED_VID = b.NEW_VID
+              FROM vid_map m
+              JOIN vid_map b ON b.OLD_ID = m.OLD_ID AND b.NEW_ID = m.NEW_ID
+             WHERE p.STRATEGY_ID = m.OLD_ID
+               AND p.STRATEGY_VID = m.OLD_VID
+               AND p.COMPARED_VID = b.OLD_VID;
+
+            -- Repoint children before BT.STRATEGY's key moves.
+            UPDATE BT.QUEUE q
+               SET STRATEGY_ID = m.NEW_ID, STRATEGY_VID = m.NEW_VID
+              FROM vid_map m
+             WHERE q.STRATEGY_ID = m.OLD_ID AND q.STRATEGY_VID = m.OLD_VID;
+
+            UPDATE BT.RESULT r
+               SET STRATEGY_ID = m.NEW_ID, STRATEGY_VID = m.NEW_VID
+              FROM vid_map m
+             WHERE r.STRATEGY_ID = m.OLD_ID AND r.STRATEGY_VID = m.OLD_VID;
+
+            UPDATE BT.PROMOTION p
+               SET STRATEGY_ID = m.NEW_ID, STRATEGY_VID = m.NEW_VID
+              FROM vid_map m
+             WHERE p.STRATEGY_ID = m.OLD_ID AND p.STRATEGY_VID = m.OLD_VID;
+
+            UPDATE TRADE.DEPLOYMENT d
+               SET STRATEGY_ID = m.NEW_ID, STRATEGY_VID = m.NEW_VID
+              FROM vid_map m
+             WHERE d.STRATEGY_ID = m.OLD_ID AND d.STRATEGY_VID = m.OLD_VID;
+
+            -- No two-phase bump needed: NEW_ID is freshly generated, so the
+            -- target (STRATEGY_ID, STRATEGY_VID) cannot already exist.
+            UPDATE BT.STRATEGY s
+               SET STRATEGY_ID = m.NEW_ID, STRATEGY_VID = m.NEW_VID
+              FROM vid_map m
+             WHERE s.STRATEGY_ID = m.OLD_ID AND s.STRATEGY_VID = m.OLD_VID;
+
+            -- Exactly one open row per lineage, on both sides of the split.
+            WITH ordered AS (
+                SELECT s.STRATEGY_ID,
+                       s.STRATEGY_VID,
+                       LEAD(s.CREATED_AT) OVER (
+                           PARTITION BY s.STRATEGY_ID ORDER BY s.STRATEGY_VID
+                       ) AS NEXT_CREATED_AT
+                  FROM BT.STRATEGY s
+                  JOIN affected_lineage a ON a.STRATEGY_ID = s.STRATEGY_ID
+            )
+            UPDATE BT.STRATEGY s
+               SET TRANSACT_TO_TS = COALESCE(
+                       o.NEXT_CREATED_AT, TIMESTAMPTZ '9999-12-31 00:00:00+00'
+                   )
+              FROM ordered o
+             WHERE s.STRATEGY_ID = o.STRATEGY_ID AND s.STRATEGY_VID = o.STRATEGY_VID;
+
+            -- Exactly one IS_BEST_IND per lineage: the row that held it if it
+            -- is still here, otherwise VID 1 — the default best a lineage
+            -- starts with (SP_INS_STRATEGY, and the demote-only fallback in
+            -- SP_UPD_PROMOTE_STRATEGY).
+            UPDATE BT.STRATEGY s
+               SET IS_BEST_IND = 'N'
+              FROM affected_lineage a
+             WHERE s.STRATEGY_ID = a.STRATEGY_ID;
+
+            WITH candidate AS (
+                SELECT COALESCE(m.NEW_ID, b.OLD_ID)   AS STRATEGY_ID,
+                       COALESCE(m.NEW_VID, b.OLD_VID) AS STRATEGY_VID,
+                       0                              AS PREFERENCE
+                  FROM best_before b
+                  LEFT JOIN vid_map m
+                         ON m.OLD_ID = b.OLD_ID AND m.OLD_VID = b.OLD_VID
+                 UNION ALL
+                SELECT s.STRATEGY_ID, MIN(s.STRATEGY_VID), 1
+                  FROM BT.STRATEGY s
+                  JOIN affected_lineage a ON a.STRATEGY_ID = s.STRATEGY_ID
+                 GROUP BY s.STRATEGY_ID
+            ),
+            best_pick AS (
+                SELECT DISTINCT ON (STRATEGY_ID) STRATEGY_ID, STRATEGY_VID
+                  FROM candidate
+                 ORDER BY STRATEGY_ID, PREFERENCE
+            )
+            UPDATE BT.STRATEGY s
+               SET IS_BEST_IND = 'Y'
+              FROM best_pick b
+             WHERE s.STRATEGY_ID = b.STRATEGY_ID AND s.STRATEGY_VID = b.STRATEGY_VID;
+
+            -- Post-flight, inside the same transaction: a split that left a
+            -- lineage with no best or two open rows must not commit.
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                      FROM BT.STRATEGY s
+                      JOIN affected_lineage a ON a.STRATEGY_ID = s.STRATEGY_ID
+                     GROUP BY s.STRATEGY_ID
+                    HAVING COUNT(*) FILTER (WHERE s.IS_BEST_IND = 'Y') <> 1
+                ) THEN
+                    RAISE EXCEPTION 'Re-lineage left a strategy without exactly one IS_BEST_IND';
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1
+                      FROM BT.STRATEGY s
+                      JOIN affected_lineage a ON a.STRATEGY_ID = s.STRATEGY_ID
+                     GROUP BY s.STRATEGY_ID
+                    HAVING COUNT(*) FILTER (
+                        WHERE s.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
+                    ) <> 1
+                ) THEN
+                    RAISE EXCEPTION 'Re-lineage left a strategy without exactly one open row';
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1 FROM BT.QUEUE q
+                      LEFT JOIN BT.STRATEGY s
+                             ON s.STRATEGY_ID = q.STRATEGY_ID
+                            AND s.STRATEGY_VID = q.STRATEGY_VID
+                     WHERE s.STRATEGY_ID IS NULL
+                ) THEN
+                    RAISE EXCEPTION 'Re-lineage orphaned a BT.QUEUE row';
+                END IF;
+            END $$;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DO $$
+                BEGIN
+                    RAISE EXCEPTION
+                        'Irreversible — the pre-split STRATEGY_IDs are not recorded. Restore from backup.';
+                END $$;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

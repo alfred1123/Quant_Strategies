@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      SP_GET_QUEUE stops writing CORE_ADMIN.LOG_PROC_DETAIL.
+
+      The worker polls this procedure to claim the next job at a steady ~2,870
+      calls a day whether or not anything is queued, and every call logged a
+      row: 177,274 of a 236,000-row audit table, three quarters of it recording
+      that an idle queue was found empty again. A poll that finds nothing is not
+      an event worth keeping for 30 days.
+
+      The cost is that SP_GET_QUEUE also leaves LOG_PROC_SUMMARY, which
+      aggregates the detail rows it no longer writes.
+
+      The parameter list is unchanged, so CREATE OR REPLACE applies in place —
+      this is not the return-type hazard that stopped the 2026-08-16 deploy.
+    -->
+
+    <changeSet id="1.20.0-001-sp-get-queue-no-audit" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_QUEUE — drop the per-poll audit row</comment>
+        <sqlFile path="../procedures/SP_GET_QUEUE.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

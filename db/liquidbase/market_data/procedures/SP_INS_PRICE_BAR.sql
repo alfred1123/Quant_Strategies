@@ -2,6 +2,16 @@
 --
 -- Caller inserts only missing bars (one CALL per bar). Plain INSERT;
 -- duplicate PK raises unique_violation. Batch backfill loops in the app.
+--
+-- Deliberately writes no CORE_ADMIN.LOG_PROC_DETAIL row, unlike its neighbours.
+-- One CALL per bar means one audit row per bar, so a single 10,000-bar backfill
+-- pass logged 10,000 of them and this procedure alone held 59,229 rows of a
+-- 236,000-row table — half of that table's bytes being the parameter string
+-- repeated once per bar. Timing a procedure this small per call measures the
+-- round trip, which is the app's to observe; the backfill already reports how
+-- many bars a pass wrote. This does also drop the procedure from
+-- LOG_PROC_SUMMARY, which is the price of not writing the detail rows it
+-- aggregates. Batching the insert would remove the reason for both.
 CREATE OR REPLACE PROCEDURE MARKET_DATA.SP_INS_PRICE_BAR(
     IN  IN_INTERNAL_CUSIP   TEXT,
     IN  IN_TM_INTERVAL_ID   INTEGER,
@@ -21,10 +31,9 @@ LANGUAGE plpgsql
 SET plan_cache_mode = 'force_generic_plan'
 AS $$
 DECLARE
-    V_LOG_START  TIMESTAMPTZ := clock_timestamp();
+    -- V_OTHER_TEXT survives the removal of the audit call: the exception
+    -- handler still names the parameters in its RAISE WARNING.
     V_OTHER_TEXT TEXT;
-    V_LOG_STATE  TEXT;
-    V_LOG_MSG    TEXT;
     V_NOW        TIMESTAMPTZ := NOW();
 BEGIN
     OUT_SQLSTATE := '00000';
@@ -61,12 +70,6 @@ BEGIN
         IN_SOURCE_APP_ID,
         IN_USER_ID,
         V_NOW
-    );
-
-    OUT_SQLMSG := '20';
-    CALL CORE_ADMIN.CORE_INS_LOG_PROC(
-        'MARKET_DATA', 'SP_INS_PRICE_BAR', V_LOG_START, NULL, V_OTHER_TEXT,
-        IN_USER_ID, V_LOG_STATE, V_LOG_MSG
     );
 
 EXCEPTION

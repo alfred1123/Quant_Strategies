@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      SP_INS_PRICE_BAR stops writing CORE_ADMIN.LOG_PROC_DETAIL.
+
+      The caller issues one CALL per bar, so one audit row per bar: a single
+      10,000-bar backfill pass logged 10,000 of them, and this procedure alone
+      held 59,229 rows of a 236,000-row table — half that table's bytes being
+      the same parameter string repeated once per bar. Timing a procedure this
+      small per call measures the round trip, which is the app's to observe, and
+      the backfill already reports how many bars a pass wrote.
+
+      The cost is that SP_INS_PRICE_BAR also leaves LOG_PROC_SUMMARY, which
+      aggregates the detail rows it no longer writes. Batching the insert would
+      remove the reason for both.
+
+      The parameter list is unchanged, so CREATE OR REPLACE applies in place.
+    -->
+
+    <changeSet id="1.4.0-001-sp-ins-price-bar-no-audit" author="alfcheun" context="market_data,prod-deploy" runOnChange="true">
+        <comment>SP_INS_PRICE_BAR — drop the per-bar audit row</comment>
+        <sqlFile path="../procedures/SP_INS_PRICE_BAR.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

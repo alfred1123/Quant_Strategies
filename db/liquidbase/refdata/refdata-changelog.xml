@@ -20,9 +20,13 @@
       3. Uncomment/add:
            <include file="releases/X.Y.Z-name.xml" relativeToChangelogFile="true"/>
       4. After deploy, refresh Redis REFDATA: POST /api/v1/refdata/refresh
+
+      EDITING AN EXISTING PROCEDURE COUNTS AS A NEW MIGRATION.
+      Applied releases are archived, so no runOnChange changeset is standing by to
+      re-apply a body you edit. Write the changeset that deploys it, or the edit
+      stays in git and prod keeps the old definition.
     -->
 
-    <include file="releases/1.6.0-log-duration-clock-timestamp.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.7.0-tm-interval-display-name.xml" relativeToChangelogFile="true"/>
+    <!-- Nothing pending. -->
 
 </databaseChangeLog>

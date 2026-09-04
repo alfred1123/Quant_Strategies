@@ -24,9 +24,15 @@
 
       The interval id is read from REFDATA rather than written as a literal —
       renumbering DAILY must move this with it.
+
+      Key existence is tested with JSONB_EXISTS(), never the `?` operator.
+      Liquibase hands the SQL to pgjdbc as a prepared statement, and pgjdbc
+      reads a bare `?` as a bind placeholder: `CONFIG_JSON ? 'tm_interval_id'`
+      arrived at Postgres as `CONFIG_JSON $1 'tm_interval_id'` and aborted the
+      changeset with a syntax error. JSONB_EXISTS is the same operator by name.
     -->
 
-    <changeSet id="1.18.0-001-strategy-config-bar-interval" author="alfcheun" context="bt">
+    <changeSet id="1.18.0-001-strategy-config-bar-interval" author="alfcheun" context="bt,prod-deploy">
         <comment>Backfill CONFIG_JSON.tm_interval_id = DAILY on pre-interval strategies</comment>
         <sql>
             UPDATE BT.STRATEGY
@@ -37,12 +43,12 @@
                                    FROM REFDATA.TM_INTERVAL
                                   WHERE NAME = 'DAILY'))
                    )
-             WHERE NOT CONFIG_JSON ? 'tm_interval_id';
+             WHERE NOT JSONB_EXISTS(CONFIG_JSON, 'tm_interval_id');
         </sql>
         <rollback>
             UPDATE BT.STRATEGY
                SET CONFIG_JSON = CONFIG_JSON - 'tm_interval_id'
-             WHERE CONFIG_JSON ? 'tm_interval_id';
+             WHERE JSONB_EXISTS(CONFIG_JSON, 'tm_interval_id');
         </rollback>
     </changeSet>
 

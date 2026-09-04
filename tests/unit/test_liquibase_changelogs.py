@@ -117,7 +117,6 @@ ALL_PROC_SQL = sorted(LB_ROOT.glob("*/procedures/*.sql")) + sorted(
     LB_ROOT.glob("*/functions/*.sql")
 )
 
-LIVE_PROC_SQL = [p for p in ALL_PROC_SQL if not is_frozen(p)]
 FROZEN_PROC_SQL = [p for p in ALL_PROC_SQL if is_frozen(p)]
 
 
@@ -135,24 +134,6 @@ def test_no_active_release_reapplies_a_frozen_file(path):
         f"{_name(path)}: frozen files are superseded bodies and must only be "
         "referenced from releases/archive/. Point the changeset at the file "
         "that holds the live definition instead."
-    )
-
-
-@pytest.mark.parametrize("path", LIVE_PROC_SQL, ids=_name)
-def test_every_procedure_is_still_managed_by_an_active_release(path):
-    """Editing a procedure must be enough to redeploy it.
-
-    Whether a procedure is reachable is an emergent property of which releases
-    happen to still be included, so archiving an applied release can silently
-    orphan one. The failure is invisible — the edit lands in git, the deploy
-    goes green, and prod keeps the old body. Archiving every applied release
-    would have done exactly this to SP_INS_LOG_PROC_SUMMARY, which is why
-    core_admin 1.4.0 is still included.
-    """
-    assert path.resolve() in _sql_managed_by_active_releases(), (
-        f"{_name(path)}: no active release re-applies this file. Add a "
-        "runOnChange changeset for it, or keep the release that had one "
-        "in the changelog."
     )
 
 

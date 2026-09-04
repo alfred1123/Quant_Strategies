@@ -249,9 +249,15 @@ Each schema root (`*-changelog.xml`) includes **forward-only** release files und
 
 Active changelogs are short manifests — see XML comments in each `db/liquidbase/*/*-changelog.xml`. Archive baselines live under `releases/archive/baseline-1.0.0.xml` (reference only, never included on prod).
 
-**Release lifecycle:** once a release is applied to prod, drop its `<include>` and `git mv` the file into `releases/archive/`, bumping the `<sqlFile path="...">` prefix from `../` to `../../` so it still resolves from one level deeper. `releases/` then holds exactly what is pending, and `git log` still has the history. Applied status comes from each schema's `DATABASECHANGELOG`, not from age — a release that looks old may simply never have run.
+**Release lifecycle:** once a release is applied to prod, drop its `<include>` and `git mv` the file into `releases/archive/`. Archived files are outside the include graph — neither `liquibase validate` nor the tests resolve their `<sqlFile path="...">` — so **do not edit them on the way in**; the move is the whole operation and the file stays as it shipped. `git log` has the history. Applied status comes from each schema's `DATABASECHANGELOG`, not from age: a release that looks old may simply never have run.
 
-**Archiving can silently orphan a procedure.** Whether a procedure is still deployable is an emergent property of which releases happen to remain included: a `runOnChange` changeset is what re-applies a body after you edit the `.sql`. Archive the last release that referenced one and the file goes quiet — the edit lands in git, the deploy goes green, and prod keeps the old body. This is why `core_admin` 1.4.0 stays included even though it is fully applied: its changeset is the only one re-applying `SP_INS_LOG_PROC_SUMMARY`. `test_liquibase_changelogs.py::test_every_procedure_is_still_managed_by_an_active_release` fails the build rather than letting it happen.
+`releases/` therefore holds what is pending: `bt` 1.18.0, 1.19.0 and 1.20.0, `market_data` 1.4.0, and `core_admin` 1.3.0 — the last being `runAlways`, so it never leaves.
+
+**Editing a procedure body is a migration you have to write.** A `runOnChange` changeset re-applies a body when the `.sql` changes, but only while its release is still included — and releases get archived as soon as they are applied. There is no standing changeset waiting to pick up an edit. Change `SP_GET_QUEUE.sql` without adding a changeset that deploys it and the edit lands in git, the deploy goes green, and prod keeps the old definition.
+
+This is deliberate, and it is a reversal ([decision #60](../decisions.md)). The tree previously kept twelve fully-applied releases included purely so that editing any procedure would redeploy it, with `test_every_procedure_is_still_managed_by_an_active_release` failing the build if one lost its carrier. Automatic re-apply is not a safety property: whether a body *should* go to prod is a decision, and inferring it from a file's mtime hides that decision from review — which is how a sweeping "re-apply every procedure" release got written and [took the 2026-08-16 deploy down](#stored-procedures). Each procedure deploy is now its own changeset, visible in the diff and countable in the release.
+
+**`runAlways` is the one thing that pins a release.** It means "re-run on every deploy", so archiving it does not preserve the work — it stops it. `core_admin` 1.3.0 is fully applied and references no procedure, which makes it look like the easiest archive in the tree; its single changeset re-applies `sql/GRANTS.sql` every deploy, and moving it would quietly freeze grants at whatever they were that day. `test_archive_holds_no_run_always_changeset` guards it.
 
 **Frozen files are the mirror-image hazard.** A few `.sql` files are superseded bodies kept only so an archived changeset still resolves; their header says `FROZEN at release <version> — do not edit`. `bt/procedures/SP_INS_STRATEGY.sql` is the one that exists today: it declares four OUT parameters, while the `BT.SP_INS_STRATEGY` prod actually runs has five and comes from `SP_INS_STRATEGY_VID_BY_NM.sql`. A procedure's OUT list *is* its return type, so `CREATE OR REPLACE` cannot change it in place — re-applying a frozen body aborts with `cannot change return type of existing function`. That is exactly how the 2026-08-16 deploy failed: the 1.16.0 timing release swept every procedure in the tree into a `runOnChange` changeset, frozen file included, and Liquibase stopped 15 changesets into `BT`. When a sweeping release touches every file, point the changeset at the file holding the live definition and skip the frozen one; `test_no_active_release_reapplies_a_frozen_file` now enforces that.
 
@@ -265,13 +271,21 @@ A procedure that logs itself declares `V_LOG_START TIMESTAMPTZ := clock_timestam
 
 `V_START_TS` remains `CURRENT_TIMESTAMP` in the seven procedures that also stamp `TRANSACT_FROM_TS` / `TRANSACT_TO_TS`. Transaction time is correct there: the closed row's end and the new row's start must be the same instant, leaving no gap in the version window. Those procedures declare both variables. `tests/unit/test_proc_log_timing.py` enforces the split.
 
+### Two procedures deliberately do not log
+
+`BT.SP_GET_QUEUE` and `MARKET_DATA.SP_INS_PRICE_BAR` write no `LOG_PROC_DETAIL` row. Both are called in a tight loop, and between them they held **236,000 of the table's rows** — the queue reader 177,274 at a flat ~2,870 calls a day whether or not a job was ever queued, the bar insert 59,229 at one `CALL` per bar. Every other procedure in every schema combined came to under 2,500. A row per call was recording how often the loop ran, which is not a fact the audit log is for; see [decision #59](../decisions.md).
+
+The cost is real and worth knowing before you go looking for their timings: `LOG_PROC_SUMMARY` aggregates the detail rows, so these two leave the summary as well. Their duration history ends at the change. What replaces it is app-side logging, which reports how many bars a backfill pass wrote but not how long it took.
+
+Neither the retention window nor the dump was touched to achieve this. `LOG_PROC_DETAIL` is a **30-day rolling window**, purged by `SP_INS_LOG_PROC_SUMMARY` on each run — it is a retention period, not a size cap, so the table holds whatever the platform generates in a month, and a large table is not by itself evidence that the cleanup is broken. That summariser runs **daily**, not weekly: it aggregates and purges in the same call, so a weekly tick let the detail table run to retention plus another six days. `pg_dump` copies the table in full, deliberately — a local mirror without production's timings cannot be used to investigate something that has not been named yet.
+
 | Procedure | Schema | Type |
 |-----------|--------|------|
-| `CORE_INS_LOG_PROC` | `CORE_ADMIN` | Central logging for all SPs — measures with `clock_timestamp()` |
+| `CORE_INS_LOG_PROC` | `CORE_ADMIN` | Central logging — measures with `clock_timestamp()`. Called by every SP except the two loop-called ones above |
 | `SP_GET_ENUM` | `REFDATA` | Generic REFCURSOR select for any REFDATA table |
 | `SP_INS_STRATEGY` | `BT` | Resolves `STRATEGY_ID` from `(USER_ID, STRATEGY_NM)`; bumps VID; returns `OUT_STRATEGY_ID` + `OUT_STRATEGY_VID`. Advisory lock per identity. See [strategy-vid-versioning.md](../archive/strategy-vid-versioning.md). |
 | `SP_INS_QUEUE` | `BT` | **Unified queue state machine**: `IN_ACTION` = **`ENQUEUE`**, **`CLAIM_NEXT`**, **`TERMINAL`**, **`CANCEL`** — all **`BT.QUEUE`** transitions |
-| `SP_GET_QUEUE` | `BT` | Flexible queue reader (REFCURSOR); FastAPI jobs list/detail |
+| `SP_GET_QUEUE` | `BT` | Flexible queue reader (REFCURSOR); FastAPI jobs list/detail + the worker's claim poll. **Writes no audit row** — the poll ran ~2,870×/day into `LOG_PROC_DETAIL` |
 | `SP_GET_QUEUE_FOR_TERMINAL` | `BT` | Active rows + strategy metadata (REFCURSOR) |
 | `FN_GET_QUEUE_FOR_TERMINAL` | `BT` | **Function** — UI terminal lookup (`RETURNS TABLE`); worker uses `SP_GET_QUEUE_LATEST` |
 | `SP_GET_QUEUE_LATEST` | `BT` | **Queue worker**: active row for one **`QUEUE_ID`** + frozen **`CONFIG_JSON`** (`QUEUE` ⋈ **`STRATEGY`** on **`STRATEGY_VID`**) |
@@ -298,7 +312,7 @@ A procedure that logs itself declares `V_LOG_START TIMESTAMPTZ := clock_timestam
 | `SP_GET_EXECUTION_EVENT` | `TRADE` | Read execution diary (owner-scoped, REFCURSOR) |
 | `SP_INS_TRANSACTION` | `TRADE` | Append fill row |
 | `SP_GET_TRANSACTION` | `TRADE` | Read fill history (owner-scoped, REFCURSOR) |
-| `SP_INS_PRICE_BAR` | `MARKET_DATA` | Insert one OHLCV bar (one row per call) |
+| `SP_INS_PRICE_BAR` | `MARKET_DATA` | Insert one OHLCV bar (one row per call). **Writes no audit row** — a 10,000-bar backfill pass logged 10,000 of them |
 | `SP_GET_PRICE_BAR` | `MARKET_DATA` | Range read by `(INTERNAL_CUSIP, TM_INTERVAL_ID, SOURCE_APP_ID, start, end)` |
 | `SP_GET_PRICE_BAR_COVERAGE` | `MARKET_DATA` | `MIN`/`MAX` timestamps via index `LIMIT 1` probes |
 | `SP_INS_BAR_SUBSCRIPTION` | `MARKET_DATA` | Version a capture request — create, enable, disable, retarget |
