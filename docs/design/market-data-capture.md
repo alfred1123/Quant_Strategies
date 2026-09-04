@@ -378,6 +378,21 @@ pair listed in 2020 would now show a permanent shortfall against history that
 never existed. Such rows are retargeted to the venue floor rather than being
 special-cased in the display.
 
+So the chip has three states rather than two. A series whose first bar has
+reached its target is **completed** — the target is the venue's floor, so
+reaching it means there is nothing older to fetch and the capture is finished,
+not merely hole-free. Short of the target it stays *continuous*, which is the
+honest reading: no holes inside what is stored, and still accruing. A row with
+no target at all stays *continuous* too, since absent intent must not be read
+as success.
+
+Both facts are already on the row — `BACKFILL_FROM_TS` and
+`coverage.first_bar` — so this is a comparison the page makes, not a field the
+API gained. That matters for the case that prompted it: Bybit's first hourly
+`BTCUSDT` bar is `2020-03-25 10:00`, ten bars after midnight, and those ten
+will never arrive. Reading that series as unfinished invites a backfill that
+can only fail.
+
 ### 6.2 The vendor symbol belongs on the row
 
 Each row carries the ticker the **venue** prints — `BTCUSDT` — beside the

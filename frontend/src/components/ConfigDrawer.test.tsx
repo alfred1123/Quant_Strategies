@@ -209,10 +209,11 @@ describe('ConfigDrawer — the captured range decides the dates', () => {
     expect(last.end).toBe('2026-08-29');
   });
 
-  it('snaps an intraday head to a day the store can serve in full', () => {
+  it('snaps an intraday head to the exact first bar, keeping its time', () => {
     // A real FAILED run: the first hourly bar is 10:00, the snap offered
     // 2020-03-25, and the worker refused a window reaching ten hours before
-    // any bar existed. A date input cannot say 10:00, so it must round up.
+    // any bar existed. The bound is now carried to the minute rather than
+    // rounded to a day the field could hold.
     storedCoverage = BYBIT_HOURLY_COVERAGE;
     const observer = vi.fn();
     renderWithProviders(
@@ -220,9 +221,30 @@ describe('ConfigDrawer — the captured range decides the dates', () => {
     );
 
     const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
-    expect(last.start).toBe('2020-03-26');
-    expect(last.end).toBe('2026-09-03');
+    expect(last.start).toBe('2020-03-25T10:00');
+    expect(last.end).toBe('2026-09-03T14:00');
     expect(screen.queryByText(/will be refused/)).toBeNull();
+  });
+
+  it('gives an intraday series inputs that can hold a time', () => {
+    // A date control silently drops 10:00, which is what produced the
+    // refused run in the first place.
+    storedCoverage = BYBIT_HOURLY_COVERAGE;
+    renderWithProviders(
+      <Host initial={{ ...bybitCfg, tmIntervalId: 2 }} observer={vi.fn()} />,
+    );
+
+    expect(screen.getByLabelText('Start')).toHaveAttribute('type', 'datetime-local');
+    expect(screen.getByLabelText('End')).toHaveAttribute('type', 'datetime-local');
+  });
+
+  it('leaves a daily series on plain date inputs', () => {
+    // Daily bars sit on midnight, so there is no time of day to lose and
+    // no reason to make the reader look at one.
+    storedCoverage = BYBIT_COVERAGE;
+    renderWithProviders(<Host initial={bybitCfg} observer={vi.fn()} />);
+
+    expect(screen.getByLabelText('Start')).toHaveAttribute('type', 'date');
   });
 
   it('asks about the traded series, at the selected interval', () => {

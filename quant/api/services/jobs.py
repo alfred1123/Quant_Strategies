@@ -49,6 +49,10 @@ class ReenqueueNotAllowed(Exception):
     """Only FAILED / CANCELLED jobs may be re-enqueued — router maps to HTTP 409."""
 
 
+class StrategyNameMismatch(Exception):
+    """``STRATEGY_NM`` disagrees with the config it names — router maps to 400."""
+
+
 class JobsService:
     """Business logic for /backtest/jobs — HTTP-agnostic."""
 
@@ -69,9 +73,44 @@ class JobsService:
     def _status(self, name: str) -> int:
         return self._refdata.resolve_queue_status_id(name)
 
+    def _assert_cadence_in_name(self, req: EnqueueRequest) -> None:
+        """Refuse a ``STRATEGY_NM`` that does not name the cadence it was fitted on.
+
+        ``STRATEGY_NM`` is the lineage key ``SP_INS_STRATEGY`` resolves, and
+        until now the server stored whatever the client sent. That makes
+        identity a client-side construction: one browser holding a cached
+        bundle from before the name carried a cadence enqueued
+        ``btcusdt.crypto@bybit ← …`` after the rename migration had already
+        run, forking a second lineage beside the ``:DAILY`` one it belonged
+        to. No amount of fixing the frontend prevents that recurring, because
+        the guarantee has to hold where the row is written.
+
+        Checked against ``CONFIG_JSON.tm_interval_id`` — required since #57 —
+        so the two halves of one request cannot describe different series.
+        Repairing it afterwards is not an option worth relying on: the
+        ``(USER_ID, STRATEGY_NM, STRATEGY_VID)`` unique constraint means
+        renaming a forked lineage onto the real one collides at VID 1.
+        """
+        tm_interval_id = req.config_json.get("tm_interval_id")
+        if tm_interval_id is None:
+            raise StrategyNameMismatch(
+                "config_json.tm_interval_id is required — it selects the bars "
+                "the run is fitted on, and the strategy name is built from it"
+            )
+        cadence = self._refdata.interval_name(int(tm_interval_id))
+        traded = req.strategy_nm.split(" ← ", 1)[0]
+        if not traded.endswith(f":{cadence}"):
+            raise StrategyNameMismatch(
+                f"strategy_nm {req.strategy_nm!r} does not name its cadence "
+                f"{cadence!r} — expected the traded leg to end ':{cadence}'. "
+                f"A name and a config describing different series would fork "
+                f"the lineage. Reload the page to pick up the current client"
+            )
+
     # ── enqueue ─────────────────────────────────────────────────────────
 
     def enqueue(self, user_id: str, req: EnqueueRequest) -> EnqueueResponse:
+        self._assert_cadence_in_name(req)
         queued_id = self._status("QUEUED")
 
         if self._repo.sp_get_queued_count(user_id, queued_id) >= MAX_QUEUED_PER_USER:

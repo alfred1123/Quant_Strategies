@@ -162,6 +162,19 @@ class RedisRefData:
                 return str(r.get("display_name") or r.get("name") or tm_interval_id)
         return str(tm_interval_id)
 
+    def interval_name(self, tm_interval_id: int) -> str:
+        """``NAME`` for a ``TM_INTERVAL_ID`` — the token identity is built from.
+
+        Distinct from :meth:`interval_label`, which returns ``DISPLAY_NAME``
+        for prose and degrades to the id rather than raise. This one feeds
+        ``STRATEGY_NM`` (``TRADE@VENUE:CADENCE``), where a fallback would put
+        an id into a lineage key, so a missing row raises instead.
+        """
+        for r in self.get("tm_interval"):
+            if int(r["tm_interval_id"]) == int(tm_interval_id):
+                return str(r["name"])
+        raise RuntimeError(f"REFDATA.TM_INTERVAL missing TM_INTERVAL_ID={tm_interval_id}")
+
     def interval_ids(self) -> list[int]:
         """Every ``TM_INTERVAL_ID``, shortest period first.
 

@@ -60,6 +60,19 @@ function shortfallDays(target: string | null, firstBar: string | null): number {
   return gap > 0 ? Math.floor(gap / MS_PER_DAY) : 0;
 }
 
+/**
+ * Whether the capture has reached as far back as it was asked to go.
+ *
+ * The target defaults to the venue's floor, so reaching it means the venue has
+ * nothing older — a series that is finished rather than merely hole-free. A row
+ * with no target has nothing to have reached, so it stays "continuous": absent
+ * intent must not be read as success.
+ */
+function reachedTarget(target: string | null, firstBar: string | null): boolean {
+  if (!target || !firstBar) return false;
+  return Date.parse(firstBar) <= Date.parse(target);
+}
+
 function WantedFromCell({ row }: { row: BarSubscriptionRow }) {
   const short = shortfallDays(row.backfill_from_ts, row.coverage.first_bar);
   return (
@@ -83,8 +96,15 @@ function WantedFromCell({ row }: { row: BarSubscriptionRow }) {
  * Being subscribed says a series *will* accrue; only stored bars say whether
  * there is enough to backtest. A gap count above zero is the interesting case —
  * the window is not continuous, so a run over it is not reproducible.
+ *
+ * Three states, not two. "Continuous" only ever meant there are no holes
+ * *inside* what is stored, which a series one month into a six-year target
+ * satisfies just as well as a finished one — the complaint §6.1a opens with.
+ * A series whose first bar has reached its target is **completed**: nothing
+ * more exists to fetch, and the distinction is what stops the reader treating
+ * a permanent shortfall as a backfill they forgot to run.
  */
-function CoverageCell({ coverage }: { coverage: Coverage }) {
+function CoverageCell({ coverage, target }: { coverage: Coverage; target: string | null }) {
   if (coverage.error) {
     return (
       <Tooltip title={coverage.error}>
@@ -106,8 +126,14 @@ function CoverageCell({ coverage }: { coverage: Coverage }) {
       </Typography>
       {coverage.gaps ? (
         <Chip size="small" label={`${coverage.gaps} gaps`} color="warning" />
+      ) : reachedTarget(target, coverage.first_bar) ? (
+        <Tooltip title="Back to the venue's first bar — there is nothing older to fetch">
+          <Chip size="small" label="completed" color="success" />
+        </Tooltip>
       ) : (
-        <Chip size="small" label="continuous" color="success" variant="outlined" />
+        <Tooltip title="No holes in what is stored, but it has not reached the capture target yet">
+          <Chip size="small" label="continuous" color="success" variant="outlined" />
+        </Tooltip>
       )}
     </Stack>
   );
@@ -197,7 +223,7 @@ function SubscriptionTable({
                   {appNameById.get(row.source_app_id) ?? `App ${row.source_app_id}`}
                 </TableCell>
                 <TableCell>
-                  <CoverageCell coverage={row.coverage} />
+                  <CoverageCell coverage={row.coverage} target={row.backfill_from_ts} />
                 </TableCell>
                 <TableCell><WantedFromCell row={row} /></TableCell>
                 <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>

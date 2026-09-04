@@ -11,17 +11,27 @@ import type { Coverage } from '../types/marketData';
  * guess the number that would have worked.
  */
 export interface CapturedRange {
-  /** Earliest date the store serves in full — safe to put in a date input. */
+  /** The first stored bar, exactly — a whole day, or an instant if intraday. */
   first: string;
-  /** Date of the last stored bar. */
+  /** The last stored bar, same form as `first`. */
   last: string;
-  /** Latest end date the server accepts: `last` plus one bar of slack. */
+  /** Latest end the server accepts: `last` plus one bar of slack. */
   latestEnd: string;
+  /**
+   * Whether these bounds carry a time of day, so the inputs know which
+   * control to render. An intraday series cannot be expressed by a date.
+   */
+  intraday: boolean;
 }
 
 /** Trim an API timestamp to the `YYYY-MM-DD` the date inputs use. */
 export function isoDate(ts: string): string {
   return ts.slice(0, 10);
+}
+
+/** Trim an API timestamp to the `YYYY-MM-DDTHH:mm` a datetime input uses. */
+export function isoMinute(ts: string): string {
+  return ts.slice(0, 16);
 }
 
 /** One day on, in UTC. */
@@ -46,28 +56,41 @@ function onWholeDay(ts: string): boolean {
 /**
  * What is stored for a series, or null while unknown or empty.
  *
- * `first` rounds **up** to the next whole day whenever the earliest bar is
- * intraday. A date input can only express midnight, and truncating an
- * intraday bound moves it backwards: Bybit's first hourly `BTCUSDT` bar is
- * 2020-03-25 10:00, so a start of `2020-03-25` asks for ten hours that have
- * never existed. `_fetch_exchange_df` gives the head no slack, so that start
- * is refused every time — and it was, on a run this snapping had produced.
- * A daily series is unaffected: its bars already sit on midnight. The cost is
- * at most one day at the front of an intraday series.
+ * The bounds are reported **as stored**, to the minute when the series is
+ * intraday. Rounding either way is what broke this: Bybit's first hourly
+ * `BTCUSDT` bar is 2020-03-25 10:00, and a date can only say 2020-03-25 —
+ * ten hours that never existed, which `_fetch_exchange_df` refuses because
+ * the head gets no slack. Rounding *up* to 2020-03-26 was accepted but threw
+ * away a day of history to work around a field that could not hold a time.
+ * So the field holds a time instead, and the bound stays the true one.
+ *
+ * A daily series still reads as plain dates: its bars sit on midnight, so
+ * there is no time of day to lose and no reason to show one.
  */
 export function capturedRange(coverage: Coverage | undefined): CapturedRange | null {
   if (!coverage?.first_bar || !coverage.last_bar) return null;
-  const firstDay = isoDate(coverage.first_bar);
-  const lastDay = isoDate(coverage.last_bar);
+  const intraday =
+    !onWholeDay(coverage.first_bar) || !onWholeDay(coverage.last_bar);
+  if (!intraday) {
+    const lastDay = isoDate(coverage.last_bar);
+    return {
+      first: isoDate(coverage.first_bar),
+      last: lastDay,
+      // One *bar* of slack: an end of today is the ordinary request and
+      // today's bar has not closed, so demanding the store reach it would
+      // flag every run made before the close.
+      latestEnd: nextDay(lastDay),
+      intraday: false,
+    };
+  }
   return {
-    first: onWholeDay(coverage.first_bar) ? firstDay : nextDay(firstDay),
-    last: lastDay,
-    // One *bar* of slack, not one day: an end of today is the ordinary
-    // request and today's bar has not closed, so demanding the store reach
-    // it would flag every run made before the close. On an intraday series
-    // that unclosed bar is an hour, and today's date already covers it — a
-    // whole day of slack there is a window the server will refuse.
-    latestEnd: onWholeDay(coverage.last_bar) ? nextDay(lastDay) : lastDay,
+    first: isoMinute(coverage.first_bar),
+    last: isoMinute(coverage.last_bar),
+    // The stored last bar itself, not a day on. The server allows one bar of
+    // slack past it, so this is inside what it accepts whatever the period —
+    // which a whole day would not be for an hourly series.
+    latestEnd: isoMinute(coverage.last_bar),
+    intraday: true,
   };
 }
 

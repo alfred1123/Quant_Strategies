@@ -24,6 +24,7 @@ from quant.api.services.jobs import (
     JobsService,
     RateLimitError,
     ReenqueueNotAllowed,
+    StrategyNameMismatch,
     StrategyNotFound,
 )
 from quant.promotion.repo import PromotionRepo
@@ -73,6 +74,8 @@ def enqueue(
 ) -> EnqueueResponse:
     try:
         return svc.enqueue(str(user.app_user_id), req)
+    except StrategyNameMismatch as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except RateLimitError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
 
