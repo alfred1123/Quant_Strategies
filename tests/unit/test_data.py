@@ -881,6 +881,92 @@ class TestInstrumentCacheWrites:
             cache.create_instrument(**self.CREATE_KWARGS)
 
 
+class _MemRedis:
+    """The stamp the two workers in these tests share."""
+
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+
+    def get(self, key: str) -> str | None:
+        return self.store.get(key)
+
+    def set(self, key: str, value: object, nx: bool = False) -> bool:
+        if nx and key in self.store:
+            return False
+        self.store[key] = str(value)
+        return True
+
+    def incr(self, key: str) -> int:
+        self.store[key] = str(int(self.store.get(key, 0)) + 1)
+        return int(self.store[key])
+
+
+class TestInstrumentCacheAcrossWorkers:
+    """A write on one uvicorn worker must be visible on the next read of the other.
+
+    Prod runs ``--workers 2``. Creating ethusdt.crypto refreshed only the
+    worker that handled the POST; subscribe hit the other one and 400'd
+    with "no INST.PRODUCT_XREF row" while venue-depth on the first worker
+    had just succeeded. The version stamp is what closes that gap.
+    """
+
+    BTC_PRODUCTS = [
+        {"product_id": 43, "internal_cusip": "btcusdt.crypto", "display_nm": "Bitcoin"},
+    ]
+    BTC_XREFS = [
+        {"product_id": 43, "app_id": 34, "vendor_symbol": "BTCUSDT"},
+    ]
+    BOTH_PRODUCTS = BTC_PRODUCTS + [
+        {"product_id": 44, "internal_cusip": "ethusdt.crypto", "display_nm": "Ethereum"},
+    ]
+    BOTH_XREFS = BTC_XREFS + [
+        {"product_id": 44, "app_id": 34, "vendor_symbol": "ETHUSDT"},
+    ]
+
+    def _worker(self, redis_client, rows):
+        products, xrefs = rows
+        with patch("quant.shared.db.psycopg.connect", return_value=MagicMock()):
+            cache = InstrumentCache("dummy", redis_client=redis_client)
+        cache._call_get = MagicMock(side_effect=[products, xrefs])
+        cache.load_all()
+        return cache
+
+    def test_the_other_worker_resolves_the_symbol_the_first_one_just_wrote(self):
+        shared = _MemRedis()
+        writer = self._worker(shared, (self.BTC_PRODUCTS, self.BTC_XREFS))
+        reader = self._worker(shared, (self.BTC_PRODUCTS, self.BTC_XREFS))
+
+        assert reader.resolve_internal_cusip("ethusdt.crypto", 34) is None
+
+        writer._call_get = MagicMock(side_effect=[self.BOTH_PRODUCTS, self.BOTH_XREFS])
+        writer.refresh()
+
+        reader._call_get = MagicMock(side_effect=[self.BOTH_PRODUCTS, self.BOTH_XREFS])
+        assert reader.resolve_internal_cusip("ethusdt.crypto", 34) == "ETHUSDT"
+
+    def test_a_read_that_is_already_current_does_not_reload(self):
+        """The stamp is a no-op on the writer, so create is not two loads."""
+        shared = _MemRedis()
+        cache = self._worker(shared, (self.BTC_PRODUCTS, self.BTC_XREFS))
+        cache._call_get.reset_mock()
+
+        cache.resolve_internal_cusip("btcusdt.crypto", 34)
+
+        cache._call_get.assert_not_called()
+
+    def test_without_redis_the_other_process_stays_on_what_it_loaded(self):
+        """No stamp is "this process is the only one", which is how the tests run."""
+        writer = self._worker(None, (self.BTC_PRODUCTS, self.BTC_XREFS))
+        reader = self._worker(None, (self.BTC_PRODUCTS, self.BTC_XREFS))
+
+        writer._call_get = MagicMock(side_effect=[self.BOTH_PRODUCTS, self.BOTH_XREFS])
+        writer.refresh()
+
+        reader._call_get = MagicMock(side_effect=[self.BOTH_PRODUCTS, self.BOTH_XREFS])
+        assert reader.resolve_internal_cusip("ethusdt.crypto", 34) is None
+        reader._call_get.assert_not_called()
+
+
 class TestBacktestCacheGetOrFetch:
     """Split cache API: read_payload (read-only) and refresh_payload (fetch+insert)."""
 

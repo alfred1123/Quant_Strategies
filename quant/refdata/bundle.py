@@ -22,7 +22,7 @@ class DataCaches:
     def __init__(self, conninfo: str, redis_url: str) -> None:
         self._conninfo = conninfo
         self.refdata = RedisRefData(redis_url)
-        self.instrument_cache = InstrumentCache(conninfo)
+        self.instrument_cache = InstrumentCache(conninfo, redis_url=redis_url)
         self.backtest_cache = BacktestCache(conninfo, refdata=self.refdata)
 
     @property
