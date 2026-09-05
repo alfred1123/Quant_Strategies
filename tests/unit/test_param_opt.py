@@ -60,6 +60,16 @@ class TestParametersOptimization:
         result = opt.optimize((5, 10, 15, 20), (0.5, 1.0, 1.5), n_trials=3)
         assert len(result.grid_df) == 3
 
+    def test_starved_window_scores_nan(self, sample_ohlc_df):
+        """A window that leaves < 60 bars after warmup is not a Sharpe."""
+        opt = self._make_optimizer(sample_ohlc_df)
+        # 100 bars, window 50 → 50 remaining < MIN_METRIC_OBS
+        result = opt.optimize((5, 50), (0.5,))
+        starved = result.grid_df[result.grid_df["window"] == 50]
+        assert starved["sharpe"].isna().all()
+        ok = result.grid_df[result.grid_df["window"] == 5]
+        assert ok["sharpe"].notna().all()
+
 
 class TestParametersOptimizationWithConfig:
     def test_config_stored(self, sample_ohlc_df):

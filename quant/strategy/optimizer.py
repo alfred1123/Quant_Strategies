@@ -17,7 +17,7 @@ import optuna
 import pandas as pd
 from optuna.samplers import GridSampler, TPESampler
 
-from quant.strategy.performance import Performance
+from quant.strategy.performance import Performance, MIN_METRIC_OBS, _max_window
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +116,13 @@ class ParametersOptimization:
         self.config = config
         self.fee_bps = fee_bps
 
+    def _n_bars(self) -> int:
+        return len(self.data[self.config.internal_cusip])
+
+    def _window_starved(self, window) -> bool:
+        """True when warmup would leave fewer than MIN_METRIC_OBS bars."""
+        return self._n_bars() - _max_window(window) < MIN_METRIC_OBS
+
     def optimize(self, window_values, signal_values, *, n_trials=None,
                  callbacks=None):
         """Optimize window × signal via optuna.
@@ -159,6 +166,8 @@ class ParametersOptimization:
         def objective(trial):
             window = trial.suggest_categorical("window", search_space["window"])
             signal = trial.suggest_categorical("signal", search_space["signal"])
+            if self._window_starved(window):
+                return float("-inf")
             try:
                 perf = Performance(
                     self.data, self.config,
@@ -274,6 +283,8 @@ class ParametersOptimization:
                 windows.append(w)
                 signals.append(s)
 
+            if self._window_starved(tuple(windows)):
+                return float("-inf")
             try:
                 perf = Performance(
                     self.data, self.config,

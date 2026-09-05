@@ -184,8 +184,8 @@ def evaluate_promotion(
 - `evaluate_promotion` — wraps both and returns a `PromotionDecision` dataclass:
   - `outcome`: `PROMOTED` | `KEPT` | `DEMOTED` | `REJECTED`
   - `gate_results`: list of `GateResult(name, metric_key, passed, value, threshold)`
-  - `compared_vid`, `decisive_metric`, `new_value`, `best_value` — the soft comparison that decided
-- Handles NaN / missing gracefully (don't promote if new metric is NaN)
+  - `compared_vid` — the soft-comparison opponent (`NULL` when the candidate *is* the current best / VID 1, or when there is no baseline)
+  - Handles NaN / missing gracefully (don't promote if new metric is NaN)
 
 ### 3b. Worker completion (`quant/queue/worker.py`)
 
@@ -255,7 +255,7 @@ Content:
 
 - **Recommended strategy banner** — the overall best strategy across all `strategy_id`s (highest Sharpe among rows with `IS_BEST_IND = 'Y'`)
 - **Strategy list** — accordions grouped by `strategy_id`, showing all VIDs with their promotion outcome chip (PROMOTED / KEPT / DEMOTED / REJECTED, label from `REFDATA.PROMOTION_STATE`), Sharpe/Calmar, and a "Best" chip on the current best VID
-- **VID comparison panel** — click a VID to see hard gate results (pass/fail per gate with value + threshold from the `GATE_RESULTS` snapshot) and a soft-metric comparison vs the `COMPARED_VID` baseline; the first decisive soft metric (walked in `REFDATA.PROMOTION_METRIC` priority order) is highlighted
+- **VID comparison panel** — click a VID to see hard gate results (pass/fail per gate with value + threshold from the `GATE_RESULTS` snapshot) and a soft-metric comparison vs the `COMPARED_VID` baseline; the first decisive soft metric (walked in `REFDATA.PROMOTION_METRIC` priority order) is highlighted. **VID 1 and any current-best re-run write `compared_vid = NULL`** — they have no opponent, and the panel says “Baseline VID — no other version to compare” rather than mirroring this row against itself. Legacy rows that stored `compared_vid` equal to this VID are treated the same.
 - **Promotion rules card** — read-only display of `REFDATA.PROMOTION_METRIC` (hard gates with thresholds, then soft metrics in priority order)
 - **"Re-backtest" button** — fetches the decision's frozen `config_json` via its `QUEUE_ID`, prefills the Backtest drawer, and switches to the Backtest tab
 - **"Deploy" button** — navigates to the Trade tab (`/trade/apply`) carrying `strategyId` + `strategyVid` in router state, ready for the Phase 1.7 apply form

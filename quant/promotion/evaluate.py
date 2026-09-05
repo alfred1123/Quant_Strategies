@@ -119,7 +119,12 @@ def evaluate_promotion(
     best_vid: int | None = None,
     strategy_vid: int | None = None,
 ) -> PromotionDecision:
-    """Merge HARD + SOFT into one decision."""
+    """Merge HARD + SOFT into one decision.
+
+    ``compared_vid`` is the opponent VID. It is ``None`` when the candidate
+    is already the current best (VID 1 baseline or a re-run of the best),
+    or when there is no baseline to rank against.
+    """
     if not promotion_metrics:
         logger.warning("No REFDATA.PROMOTION_METRIC rows — rejecting")
         return PromotionDecision(outcome=REJECTED, compared_vid=best_vid)
@@ -129,13 +134,11 @@ def evaluate_promotion(
     all_passed = all(g.passed for g in gates)
 
     if is_current_best:
-        # VID 1 is the default best — keep IS_BEST_IND='Y' even when hard gates fail.
+        # Candidate *is* the current best — there is no opponent. VID 1 stays
+        # IS_BEST_IND='Y' even when hard gates fail. compared_vid stays None
+        # so the UI does not draw a mirror table of this row against itself.
         if strategy_vid == 1:
-            return PromotionDecision(
-                outcome=KEPT,
-                gate_results=gates,
-                compared_vid=best_vid,
-            )
+            return PromotionDecision(outcome=KEPT, gate_results=gates)
         return PromotionDecision(
             outcome=KEPT if all_passed else DEMOTED,
             gate_results=gates,

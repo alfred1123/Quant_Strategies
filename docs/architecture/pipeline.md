@@ -124,5 +124,5 @@ For multi-factor backtests, the pipeline computes each factor independently, the
 2. Call `combine_positions(positions, conjunction)`:
      - **AND** — position taken only when all factors agree; strength-based tiebreak via `np.searchsorted` percentile rank
      - **OR** — position taken when any factor signals; strongest signal wins
-     - **FILTER** — factor 1 is a gate (must be non-zero); factor 2 provides direction
+     - **FILTER** — factor 1 is the **Gate** (must be non-zero); factor 2 is the **Signal** (direction). The drawer labels the cards Gate / Signal; adding a second factor under FILTER inserts it as the gate.
 3. Compute PnL from the combined `FinalPosition` column

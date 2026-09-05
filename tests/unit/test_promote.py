@@ -101,8 +101,10 @@ class TestPassesHardGates:
         assert passes_hard_gates(bad_result, _metrics()) is False
         d = evaluate_promotion(
             bad_result, None, _metrics(), is_current_best=True, strategy_vid=1,
+            best_vid=1,
         )
         assert d.outcome == KEPT
+        assert d.compared_vid is None
 
 
 class TestEdgeCases:
@@ -156,9 +158,10 @@ class TestEvaluatePromotion:
         """VID 1 stays best (IS_BEST_IND='Y') even when hard gates fail."""
         d = evaluate_promotion(
             _payload(sharpe=-1.0), None, _metrics(),
-            is_current_best=True, strategy_vid=1,
+            is_current_best=True, strategy_vid=1, best_vid=1,
         )
         assert d.outcome == KEPT
+        assert d.compared_vid is None
 
     def test_demoted_current_best_fails(self):
         d = evaluate_promotion(
@@ -166,12 +169,14 @@ class TestEvaluatePromotion:
             is_current_best=True, strategy_vid=2,
         )
         assert d.outcome == DEMOTED
+        assert d.compared_vid is None
 
     def test_kept_current_best_passes(self):
         d = evaluate_promotion(
-            _payload(), None, _metrics(), is_current_best=True,
+            _payload(), None, _metrics(), is_current_best=True, best_vid=3,
         )
         assert d.outcome == KEPT
+        assert d.compared_vid is None
 
     def test_gate_results_populated(self):
         d = evaluate_promotion(_payload(), None, _metrics())

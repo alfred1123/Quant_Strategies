@@ -319,7 +319,10 @@ function ComparisonPanel({
 
   // The "best" the candidate was compared against — its metrics are carried by
   // the decision row whose VID matches compared_vid within the same strategy.
-  const bestRow = row.compared_vid == null
+  // VID 1 / current-best writes compared_vid=null; legacy rows that stored
+  // compared_vid === this VID are the same mirror and must not render as a table.
+  const selfCompare = row.compared_vid != null && row.compared_vid === row.strategy_vid;
+  const bestRow = row.compared_vid == null || selfCompare
     ? null
     : rows.find((r) => r.strategy_id === row.strategy_id && r.strategy_vid === row.compared_vid) ?? null;
 
@@ -347,7 +350,7 @@ function ComparisonPanel({
           {row.strategy_nm ?? row.strategy_id.slice(0, 8)} · v{row.strategy_vid}
         </Typography>
         <Chip size="small" label={outcomeLabel(row.outcome)} color={OUTCOME_COLOR[row.outcome] ?? 'default'} />
-        {row.compared_vid != null && (
+        {bestRow != null && row.compared_vid != null && (
           <Typography variant="caption" color="text.secondary">vs v{row.compared_vid}</Typography>
         )}
       </Stack>
@@ -425,7 +428,7 @@ function ComparisonPanel({
         </TableContainer>
       ) : (
         <Typography variant="body2" color="text.secondary">
-          No baseline to compare — first qualifying VID for this strategy.
+          Baseline VID — no other version to compare.
         </Typography>
       )}
 

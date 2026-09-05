@@ -470,6 +470,7 @@ def _build_perf_response(data_dict, config, best, fee_bps) -> PerformanceRespons
     perf = evaluate_performance(data_dict, config, window, signal, fee_bps=fee_bps)
 
     strat_metrics = perf.get_strategy_performance().replace({np.nan: None}).to_dict()
+    strat_metrics["n_obs"] = perf.get_metric_n_obs()
     bh_metrics = perf.get_buy_hold_performance().replace({np.nan: None}).to_dict()
 
     chart_df = perf.data.dropna(subset=["cumu"])

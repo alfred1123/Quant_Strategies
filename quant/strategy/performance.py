@@ -19,6 +19,10 @@ from quant.strategy.signals import StrategyConfig, combine_positions
 
 logger = logging.getLogger(__name__)
 
+# Sharpe / annualized return need a real sample. Below this many finite PnL
+# bars the annualizer turns a lucky week into a 5-handle Sharpe (decision #63).
+MIN_METRIC_OBS = 60
+
 
 def _max_window(window) -> int:
     """Largest indicator window in a scalar or per-substrategy collection."""
@@ -248,6 +252,19 @@ class Performance:
                                     - self.data['buy_hold_cumu'])
 
 
+    def _metric_col(self, col: str) -> pd.Series:
+        """PnL / buy-hold slice after indicator warmup."""
+        return self.data.iloc[self._metric_window:][col]
+
+    def get_metric_n_obs(self) -> int:
+        """Finite strategy-PnL observations in the metric window."""
+        if "pnl" not in self.data.columns:
+            return 0
+        return int(self._metric_col("pnl").notna().sum())
+
+    def _enough_obs(self, series: pd.Series) -> bool:
+        return int(series.notna().sum()) >= MIN_METRIC_OBS
+
     # take account that nan leading zeros
     def get_total_return(self):
         total_return = self.data['cumu'].iloc[-1]
@@ -255,17 +272,24 @@ class Performance:
 
     # take account that nan leading zeros
     def get_annualized_return(self):
-        annualized_return = self.data.iloc[self._metric_window:]['pnl'].mean() * self.trading_period
-        return annualized_return
+        pnl = self._metric_col("pnl")
+        if not self._enough_obs(pnl):
+            logger.debug("Annualized return undefined (%d finite pnl bars, need %d)",
+                         int(pnl.notna().sum()), MIN_METRIC_OBS)
+            return np.nan
+        return pnl.mean() * self.trading_period
 
     def get_sharpe_ratio(self):
-        pnl = self.data.iloc[self._metric_window:]['pnl']
+        pnl = self._metric_col("pnl")
+        if not self._enough_obs(pnl):
+            logger.debug("Sharpe ratio undefined (%d finite pnl bars, need %d)",
+                         int(pnl.notna().sum()), MIN_METRIC_OBS)
+            return np.nan
         std = pnl.std()
         if std == 0 or np.isnan(std):
             logger.debug("Sharpe ratio undefined (zero or NaN std for pnl)")
             return np.nan
-        sharpe_ratio = pnl.mean() / std * np.sqrt(self.trading_period)
-        return sharpe_ratio
+        return pnl.mean() / std * np.sqrt(self.trading_period)
 
     def get_max_drawdown(self):
         max_drawdown = self.data['dd'].max()
@@ -284,17 +308,24 @@ class Performance:
         return total_return
 
     def get_buy_hold_annualized_return(self):
-        annualized_return = self.data.iloc[self._metric_window:]['buy_hold'].mean() * self.trading_period
-        return annualized_return
+        bh = self._metric_col("buy_hold")
+        if not self._enough_obs(bh):
+            logger.debug("Buy-hold annualized return undefined (%d finite bars, need %d)",
+                         int(bh.notna().sum()), MIN_METRIC_OBS)
+            return np.nan
+        return bh.mean() * self.trading_period
 
     def get_buy_hold_sharpe_ratio(self):
-        bh = self.data.iloc[self._metric_window:]['buy_hold']
+        bh = self._metric_col("buy_hold")
+        if not self._enough_obs(bh):
+            logger.debug("Buy-hold Sharpe undefined (%d finite bars, need %d)",
+                         int(bh.notna().sum()), MIN_METRIC_OBS)
+            return np.nan
         std = bh.std()
         if std == 0 or np.isnan(std):
             logger.debug("Buy-hold Sharpe ratio undefined (zero or NaN std)")
             return np.nan
-        sharpe_ratio = bh.mean() / std * np.sqrt(self.trading_period)
-        return sharpe_ratio
+        return bh.mean() / std * np.sqrt(self.trading_period)
 
     def get_buy_hold_max_drawdown(self):
         max_drawdown = self.data['buy_hold_dd'].max()

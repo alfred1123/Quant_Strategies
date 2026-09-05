@@ -13,6 +13,7 @@ import { countSteps } from '../../utils/grid';
 interface Props {
   index: number;
   total: number;
+  conjunction?: string;
   factor: FactorConfig;
   onChange: (patch: Partial<FactorConfig>) => void;
   onRemove: () => void;
@@ -28,8 +29,16 @@ interface Props {
  * indicator, strategy, and the two RangeFields blocks. Picking an
  * indicator auto-populates window/signal ranges from REFDATA defaults.
  */
+function factorRoleLabel(index: number, total: number, conjunction: string): string {
+  if (conjunction === 'FILTER' && total > 1) {
+    return index === 0 ? 'Gate (on/off)' : 'Signal (direction)';
+  }
+  return `Factor ${index + 1}`;
+}
+
+/** One factor card. Under FILTER, index 0 is the gate and index 1 the signal. */
 export default function FactorCard({
-  index, total, factor, onChange, onRemove,
+  index, total, conjunction = 'AND', factor, onChange, onRemove,
   indicators, signalTypes, dataColumns, products, apps,
 }: Props) {
   const trials = countSteps(factor.window_range) * countSteps(factor.signal_range);
@@ -53,7 +62,7 @@ export default function FactorCard({
     <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2, bgcolor: 'background.paper' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
         <Typography variant="caption" sx={{ fontWeight: 600 }}>
-          Factor {index + 1}
+          {factorRoleLabel(index, total, conjunction)}
           <Typography component="span" variant="caption" color="text.secondary" sx={{ fontWeight: 400 }}>
             {' '}— {trials.toLocaleString()} grid pts
           </Typography>
