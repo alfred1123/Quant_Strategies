@@ -90,7 +90,7 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/strategy/signals.py` | `SignalDirection` | Generate position array `{-1, 0, 1}` from indicator vs threshold. |
 | `quant/strategy/signals.py` | `StrategyConfig`, `SubStrategy` | Immutable config carrying strategy identity. |
 | `quant/strategy/signals.py` | `combine_positions()` | AND / OR / FILTER conjunction logic with strength-based tiebreak. |
-| `quant/strategy/performance.py` | `Performance` | PnL engine — single or multi-factor, with transaction costs. |
+| `quant/strategy/performance.py` | `Performance` | PnL engine — single or multi-factor, with transaction costs. Owns Sharpe sample size (`get_metric_n_obs`). |
 | `quant/strategy/optimizer.py` | `ParametersOptimization` | Grid search (Cartesian or Optuna TPE/Grid sampler). |
 | `quant/strategy/walk_forward.py` | `WalkForward` | IS/OOS split, optimize on IS, evaluate on OOS. |
 | `quant/trade/futu_trader.py` | `FutuTrader` | Paper/live order execution via Futu OpenD (CLI / legacy). |

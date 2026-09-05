@@ -19,10 +19,6 @@ from quant.strategy.signals import StrategyConfig, combine_positions
 
 logger = logging.getLogger(__name__)
 
-# Sharpe / annualized return need a real sample. Below this many finite PnL
-# bars the annualizer turns a lucky week into a 5-handle Sharpe (decision #63).
-MIN_METRIC_OBS = 60
-
 
 def _max_window(window) -> int:
     """Largest indicator window in a scalar or per-substrategy collection."""
@@ -70,8 +66,10 @@ def _latest_final_position(final_position: pd.Series) -> tuple[float, str]:
 
 class Performance:
 
-
     DEFAULT_FEE_BPS = 5.0  # 5 bps (0.05%) transaction cost per unit of turnover
+    # Below this many finite PnL bars, mean * period is a lucky week, not a Sharpe
+    # (decision #63). Owned here — optimizer maps non-finite Sharpe to -inf.
+    MIN_METRIC_OBS = 60
 
     def __init__(self, data, config, window=None, signal=None, *, fee_bps=None) -> None:
         self.config = config
@@ -257,13 +255,10 @@ class Performance:
         return self.data.iloc[self._metric_window:][col]
 
     def get_metric_n_obs(self) -> int:
-        """Finite strategy-PnL observations in the metric window."""
+        """Finite strategy-PnL observations after indicator warmup."""
         if "pnl" not in self.data.columns:
             return 0
         return int(self._metric_col("pnl").notna().sum())
-
-    def _enough_obs(self, series: pd.Series) -> bool:
-        return int(series.notna().sum()) >= MIN_METRIC_OBS
 
     # take account that nan leading zeros
     def get_total_return(self):
@@ -272,19 +267,20 @@ class Performance:
 
     # take account that nan leading zeros
     def get_annualized_return(self):
-        pnl = self._metric_col("pnl")
-        if not self._enough_obs(pnl):
+        n = self.get_metric_n_obs()
+        if n < self.MIN_METRIC_OBS:
             logger.debug("Annualized return undefined (%d finite pnl bars, need %d)",
-                         int(pnl.notna().sum()), MIN_METRIC_OBS)
+                         n, self.MIN_METRIC_OBS)
             return np.nan
-        return pnl.mean() * self.trading_period
+        return self._metric_col("pnl").mean() * self.trading_period
 
     def get_sharpe_ratio(self):
-        pnl = self._metric_col("pnl")
-        if not self._enough_obs(pnl):
+        n = self.get_metric_n_obs()
+        if n < self.MIN_METRIC_OBS:
             logger.debug("Sharpe ratio undefined (%d finite pnl bars, need %d)",
-                         int(pnl.notna().sum()), MIN_METRIC_OBS)
+                         n, self.MIN_METRIC_OBS)
             return np.nan
+        pnl = self._metric_col("pnl")
         std = pnl.std()
         if std == 0 or np.isnan(std):
             logger.debug("Sharpe ratio undefined (zero or NaN std for pnl)")
@@ -308,19 +304,20 @@ class Performance:
         return total_return
 
     def get_buy_hold_annualized_return(self):
-        bh = self._metric_col("buy_hold")
-        if not self._enough_obs(bh):
-            logger.debug("Buy-hold annualized return undefined (%d finite bars, need %d)",
-                         int(bh.notna().sum()), MIN_METRIC_OBS)
+        n = self.get_metric_n_obs()
+        if n < self.MIN_METRIC_OBS:
+            logger.debug("Buy-hold annualized return undefined (%d finite pnl bars, need %d)",
+                         n, self.MIN_METRIC_OBS)
             return np.nan
-        return bh.mean() * self.trading_period
+        return self._metric_col("buy_hold").mean() * self.trading_period
 
     def get_buy_hold_sharpe_ratio(self):
-        bh = self._metric_col("buy_hold")
-        if not self._enough_obs(bh):
-            logger.debug("Buy-hold Sharpe undefined (%d finite bars, need %d)",
-                         int(bh.notna().sum()), MIN_METRIC_OBS)
+        n = self.get_metric_n_obs()
+        if n < self.MIN_METRIC_OBS:
+            logger.debug("Buy-hold Sharpe undefined (%d finite pnl bars, need %d)",
+                         n, self.MIN_METRIC_OBS)
             return np.nan
+        bh = self._metric_col("buy_hold")
         std = bh.std()
         if std == 0 or np.isnan(std):
             logger.debug("Buy-hold Sharpe ratio undefined (zero or NaN std)")
