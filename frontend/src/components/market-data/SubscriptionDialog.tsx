@@ -91,7 +91,7 @@ function productHelp(
   if (!venue) return 'Pick a venue first — it decides which products exist here.';
   if (loading) return 'Loading what this venue lists…';
   if (count === 0) {
-    return 'This venue lists nothing yet. Add an INST.PRODUCT_XREF row for it.';
+    return 'This venue lists nothing yet — use "Add an instrument" to map one to it.';
   }
   return `${count.toLocaleString()} products listed on this venue.`;
 }

@@ -7,11 +7,43 @@ that predicate would eventually disagree.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 LB_ROOT = Path(__file__).resolve().parents[2] / "db" / "liquidbase"
 
 FROZEN_MARKER = "FROZEN at release"
+
+_SIGNATURE_RE = re.compile(
+    r"CREATE OR REPLACE PROCEDURE\s+[\w.]+\s*\((.*?)\)\s*LANGUAGE", re.S | re.I
+)
+_PARAM_RE = re.compile(r"\s*(IN|OUT)\s+\w+")
+
+
+def procedure_param_count(schema: str, proc_file: str) -> int:
+    """How many IN/OUT parameters a procedure's DDL declares.
+
+    Paired with :func:`call_arg_count` to pin a Python ``CALL`` string to the
+    procedure it targets. Postgres treats a changed parameter list as a *new
+    overload* rather than an error, so a stale CALL keeps resolving to the old
+    signature and the mismatch surfaces as missing data instead of a failure —
+    which is why the count is asserted rather than trusted.
+    """
+    path = LB_ROOT / schema / "procedures" / proc_file
+    signature = _SIGNATURE_RE.search(path.read_text())
+    assert signature, f"could not parse a signature out of {schema}/{proc_file}"
+    return len(
+        [ln for ln in signature.group(1).splitlines() if _PARAM_RE.match(ln)]
+    )
+
+
+def call_arg_count(sql: str) -> int:
+    """How many arguments a Python ``CALL`` string supplies.
+
+    ``%s`` for the values psycopg binds, plus the ``NULL::`` placeholders that
+    stand in for OUT columns.
+    """
+    return sql.count("%s") + sql.count("NULL::")
 
 
 def is_frozen(path: Path) -> bool:

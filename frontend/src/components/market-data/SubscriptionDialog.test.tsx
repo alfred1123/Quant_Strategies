@@ -137,12 +137,14 @@ describe('SubscriptionDialog product scoping', () => {
     ).toBeInTheDocument();
   });
 
-  it('names the fix when a venue lists nothing at all', async () => {
+  it('points at the button that fixes a venue listing nothing at all', async () => {
+    // The empty state used to name an INST.PRODUCT_XREF row, which asked the
+    // user to go and edit the database. The page now has a dialog for it.
     setup({ listed: [] });
 
     await chooseVenue();
 
-    expect(await screen.findByText(/INST.PRODUCT_XREF/)).toBeInTheDocument();
+    expect(await screen.findByText(/"Add an instrument"/)).toBeInTheDocument();
   });
 
   it('drops the chosen product when the venue changes under it', async () => {

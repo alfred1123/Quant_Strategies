@@ -32,6 +32,7 @@ import AppModeSwitch from '../components/AppModeSwitch';
 import BrandMark from '../components/BrandMark';
 import UserMenu from '../components/UserMenu';
 import BackfillDialog from '../components/market-data/BackfillDialog';
+import CreateInstrumentDialog from '../components/market-data/CreateInstrumentDialog';
 import SubscriptionDialog from '../components/market-data/SubscriptionDialog';
 import { APP_NAME } from '../constants/brand';
 import type { BarSubscriptionRow, Coverage } from '../types/marketData';
@@ -286,6 +287,7 @@ export default function MarketDataPage() {
   const toggle = useSubscribe();
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [createInstrumentOpen, setCreateInstrumentOpen] = useState(false);
   const [backfillTarget, setBackfillTarget] = useState<BarSubscriptionRow | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -375,9 +377,19 @@ export default function MarketDataPage() {
                 strategy can be fitted on the series it will actually trade.
               </Typography>
             </Box>
-            <Button variant="contained" onClick={() => setCreateOpen(true)}>
-              Capture a series
-            </Button>
+            {/*
+              Capturing stays the page's primary action — adding an instrument
+              is what you do first only on the rare visit where the product
+              does not exist yet, so it sits beside it at lower emphasis.
+            */}
+            <Stack direction="row" spacing={1}>
+              <Button variant="outlined" onClick={() => setCreateInstrumentOpen(true)}>
+                Add an instrument
+              </Button>
+              <Button variant="contained" onClick={() => setCreateOpen(true)}>
+                Capture a series
+              </Button>
+            </Stack>
           </Stack>
 
           {isLoading && (
@@ -474,6 +486,12 @@ export default function MarketDataPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onSuccess={() => setCreateOpen(false)}
+      />
+
+      <CreateInstrumentDialog
+        open={createInstrumentOpen}
+        onClose={() => setCreateInstrumentOpen(false)}
+        onSuccess={() => setCreateInstrumentOpen(false)}
       />
 
       <BackfillDialog row={backfillTarget} onClose={() => setBackfillTarget(null)} />

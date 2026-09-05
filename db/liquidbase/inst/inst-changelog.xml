@@ -25,6 +25,6 @@
       stays in git and prod keeps the old definition.
     -->
 
-    <!-- Nothing pending. -->
+    <include file="releases/1.4.0-product-insert-allocates-id.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

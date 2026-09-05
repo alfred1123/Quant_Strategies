@@ -3,6 +3,10 @@ import pandas as pd
 import pytest
 from unittest.mock import patch, MagicMock
 
+from quant.data.instruments import InstrumentCache
+from quant.shared.db import ProcedureError
+from tests.unit.liquibase_sources import call_arg_count, procedure_param_count
+
 
 class TestGlassnode:
     @patch.dict("os.environ", {"GLASSNODE_API_KEY": "test_key"})
@@ -647,6 +651,234 @@ class TestInstrumentCache:
         assert len(c.get_products()) == 2
         assert len(c.get_xrefs()) == 3
         assert mock_call_get.call_count == 2
+
+
+class TestInstrumentCacheWrites:
+    """Creating an instrument — the product and the venue that lists it."""
+
+    NEW_PRODUCT = {
+        "product_id": 7, "product_vid": 1, "is_current_ind": "Y",
+        "internal_cusip": "solusdt.crypto", "display_nm": "Solana",
+        "asset_type_id": 1, "exchange": None, "ccy": "USDT",
+        "description": None,
+    }
+
+    CREATE_KWARGS = {
+        "internal_cusip": "solusdt.crypto",
+        "display_nm": "Solana",
+        "asset_type_id": 1,
+        "ccy": "USDT",
+        "app_id": 34,
+        "vendor_symbol": "SOLUSDT",
+    }
+
+    @pytest.fixture()
+    def cache(self):
+        from quant.data.instruments import InstrumentCache
+        c = InstrumentCache.__new__(InstrumentCache)
+        c._conninfo = "dummy"
+        c.user_id = "tester"
+        c._products = []
+        c._xrefs = []
+        c._by_cusip = {}
+        c._by_product_id = {}
+        c._xref_index = {}
+        return c
+
+    # ── the CALL must track the procedure it targets ─────────────────────
+
+    @patch.object(InstrumentCache, "_call_write", return_value=(7, 1))
+    def test_product_call_matches_the_procedure_ddl(self, mock_write, cache):
+        """A stale CALL resolves to the old overload rather than failing.
+
+        These two procedures just grew OUT columns, which is exactly the change
+        Postgres treats as a new overload instead of an error — so the count is
+        pinned to the DDL rather than trusted.
+        """
+        cache.sp_ins_product(internal_cusip="solusdt.crypto", display_nm="Solana")
+
+        sql = mock_write.call_args.args[0]
+        assert call_arg_count(sql) == procedure_param_count(
+            "inst", "SP_INS_PRODUCT.sql"
+        )
+
+    @patch.object(InstrumentCache, "_call_write", return_value=(3, 1))
+    def test_xref_call_matches_the_procedure_ddl(self, mock_write, cache):
+        cache.sp_ins_product_xref(product_id=7, app_id=34, vendor_symbol="SOLUSDT")
+
+        sql = mock_write.call_args.args[0]
+        assert call_arg_count(sql) == procedure_param_count(
+            "inst", "SP_INS_PRODUCT_XREF.sql"
+        )
+
+    # ── id allocation belongs to the procedure ───────────────────────────
+
+    @patch.object(InstrumentCache, "_call_write", return_value=(7, 1))
+    def test_a_new_product_sends_no_id_and_reads_back_the_allocated_one(
+        self, mock_write, cache
+    ):
+        """Python cannot know the next id — no sequence, and no raw SELECT.
+
+        Passing NULL is what tells the procedure to allocate, and the OUT
+        columns are the only way the caller learns what it got.
+        """
+        assert cache.sp_ins_product(
+            internal_cusip="solusdt.crypto", display_nm="Solana"
+        ) == (7, 1)
+
+        assert mock_write.call_args.args[1][0] is None
+
+    @patch.object(InstrumentCache, "_call_write", return_value=(4, 2))
+    def test_an_explicit_id_amends_that_product(self, mock_write, cache):
+        cache.sp_ins_product(
+            product_id=4, internal_cusip="solusdt.crypto", display_nm="Solana"
+        )
+
+        assert mock_write.call_args.args[1][0] == 4
+
+    @patch.object(InstrumentCache, "_call_write", return_value=(7, 1))
+    def test_the_row_is_stamped_with_the_gateway_identity_not_a_caller(
+        self, mock_write, cache
+    ):
+        """USER_ID is audit. An instrument has no owner to scope anything to."""
+        cache.sp_ins_product(internal_cusip="solusdt.crypto", display_nm="Solana")
+
+        assert mock_write.call_args.args[1][-1] == "tester"
+
+    def test_user_id_defaults_to_system(self):
+        from quant.data.instruments import InstrumentCache
+        with patch("quant.shared.db.psycopg.connect", return_value=MagicMock()):
+            assert InstrumentCache("dummy").user_id == "system"
+
+    # ── product + xref are one instrument ────────────────────────────────
+
+    @patch.object(InstrumentCache, "load_all")
+    @patch.object(InstrumentCache, "_call_write")
+    def test_creating_an_instrument_writes_both_halves(
+        self, mock_write, mock_load, cache
+    ):
+        """A product with no xref is invisible to every venue-scoped read."""
+        mock_write.side_effect = [(7, 1), (3, 1)]
+        mock_load.side_effect = lambda: cache._by_product_id.update(
+            {7: self.NEW_PRODUCT}
+        )
+
+        cache.create_instrument(**self.CREATE_KWARGS)
+
+        procs = [call.args[0] for call in mock_write.call_args_list]
+        assert "INST.SP_INS_PRODUCT(" in procs[0]
+        assert "INST.SP_INS_PRODUCT_XREF(" in procs[1]
+
+    @patch.object(InstrumentCache, "load_all")
+    @patch.object(InstrumentCache, "_call_write")
+    def test_the_xref_is_written_against_the_id_the_procedure_allocated(
+        self, mock_write, mock_load, cache
+    ):
+        mock_write.side_effect = [(7, 1), (3, 1)]
+        mock_load.side_effect = lambda: cache._by_product_id.update(
+            {7: self.NEW_PRODUCT}
+        )
+
+        cache.create_instrument(**self.CREATE_KWARGS)
+
+        xref_params = mock_write.call_args_list[1].args[1]
+        assert xref_params[1] == 7
+
+    @patch.object(InstrumentCache, "load_all")
+    @patch.object(InstrumentCache, "_call_write")
+    def test_the_cache_is_reloaded_so_the_dropdowns_see_it(
+        self, mock_write, mock_load, cache
+    ):
+        """Every product list is served from memory, so nothing else would."""
+        mock_write.side_effect = [(7, 1), (3, 1)]
+        mock_load.side_effect = lambda: cache._by_product_id.update(
+            {7: self.NEW_PRODUCT}
+        )
+
+        cache.create_instrument(**self.CREATE_KWARGS)
+
+        mock_load.assert_called_once()
+
+    @patch.object(InstrumentCache, "load_all")
+    @patch.object(InstrumentCache, "_call_write")
+    def test_returns_the_stored_product_with_its_venue_symbol(
+        self, mock_write, mock_load, cache
+    ):
+        """Read back, not echoed: the caller could not have known the id."""
+        mock_write.side_effect = [(7, 1), (3, 1)]
+        mock_load.side_effect = lambda: cache._by_product_id.update(
+            {7: self.NEW_PRODUCT}
+        )
+
+        created = cache.create_instrument(**self.CREATE_KWARGS)
+
+        assert created["product_id"] == 7
+        assert created["product_vid"] == 1
+        assert created["internal_cusip"] == "solusdt.crypto"
+        assert created["app_id"] == 34
+        assert created["vendor_symbol"] == "SOLUSDT"
+        assert created["product_xref_id"] == 3
+        assert created["product_xref_vid"] == 1
+
+    @patch.object(InstrumentCache, "load_all")
+    @patch.object(InstrumentCache, "_call_write")
+    def test_a_rejected_product_never_reaches_the_xref(
+        self, mock_write, mock_load, cache
+    ):
+        """The xref would point at nothing, so the first write has to succeed."""
+        mock_write.side_effect = ProcedureError(
+            proc="INST.SP_INS_PRODUCT",
+            sqlstate="23505",
+            message=(
+                "duplicate key value violates unique constraint "
+                '"uq_product_cusip_current"'
+            ),
+        )
+
+        with pytest.raises(ProcedureError, match="uq_product_cusip_current"):
+            cache.create_instrument(**self.CREATE_KWARGS)
+
+        assert mock_write.call_count == 1
+        mock_load.assert_not_called()
+
+    @patch.object(InstrumentCache, "load_all")
+    @patch.object(InstrumentCache, "_call_write")
+    def test_a_rejected_xref_re_raises_so_the_status_code_still_fits(
+        self, mock_write, mock_load, cache
+    ):
+        """ProcedureError already carries the sqlstate the handler maps on.
+
+        ``UQ_PRODUCT_XREF_CURRENT`` raises 23505 for a pair this venue already
+        lists, and ``quant.api.exception_handlers`` turns that into a 409, so
+        wrapping it in a bespoke exception would only lose that.
+        """
+        mock_write.side_effect = [
+            (7, 1),
+            ProcedureError(
+                proc="INST.SP_INS_PRODUCT_XREF",
+                sqlstate="23505",
+                message=(
+                    "duplicate key value violates unique constraint "
+                    '"uq_product_xref_current"'
+                ),
+            ),
+        ]
+
+        with pytest.raises(ProcedureError) as exc:
+            cache.create_instrument(**self.CREATE_KWARGS)
+
+        assert exc.value.sqlstate == "23505"
+        mock_load.assert_not_called()
+
+    @patch.object(InstrumentCache, "load_all")
+    @patch.object(InstrumentCache, "_call_write")
+    def test_a_product_the_reload_cannot_find_is_a_bug_not_an_empty_result(
+        self, mock_write, _mock_load, cache
+    ):
+        mock_write.side_effect = [(7, 1), (3, 1)]
+
+        with pytest.raises(RuntimeError, match="does not return it"):
+            cache.create_instrument(**self.CREATE_KWARGS)
 
 
 class TestBacktestCacheGetOrFetch:

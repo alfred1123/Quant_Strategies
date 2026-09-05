@@ -173,6 +173,93 @@ class TestEarliestBar:
         assert fetcher.earliest_bar(vendor_symbol="BTCUSDT", period=HOUR) is None
 
 
+def _market(
+    raw: str, symbol: str, mtype: str, base: str, quote: str, *, active: bool = True
+) -> dict:
+    return {
+        "id": raw,
+        "symbol": symbol,
+        "type": mtype,
+        "base": base,
+        "quote": quote,
+        "active": active,
+    }
+
+
+class TestVenueSymbols:
+    """The set a new instrument's vendor symbol can be chosen from."""
+
+    def test_reports_the_raw_id_the_xref_has_to_store(self, fetcher, exchange):
+        # ccxt keys its table by the unified symbol, but BTC/USDT:USDT is not
+        # what INST.PRODUCT_XREF holds and not what the venue would accept.
+        exchange.load_markets.return_value = {
+            "BTC/USDT:USDT": _market("BTCUSDT", "BTC/USDT:USDT", "swap", "BTC", "USDT"),
+        }
+
+        listed = fetcher.venue_symbols()
+
+        assert [m.vendor_symbol for m in listed] == ["BTCUSDT"]
+        assert (listed[0].base, listed[0].quote) == ("BTC", "USDT")
+
+    def test_one_id_meaning_two_markets_reports_both(self, fetcher, exchange):
+        """Bybit prints BTCUSDT for the spot pair and the perpetual alike.
+
+        The xref stores one string for both, so which was meant cannot be
+        recorded — collapsing to whichever ccxt listed first would hide a
+        genuine ambiguity behind an arbitrary choice.
+        """
+        exchange.load_markets.return_value = {
+            "BTC/USDT": _market("BTCUSDT", "BTC/USDT", "spot", "BTC", "USDT"),
+            "BTC/USDT:USDT": _market("BTCUSDT", "BTC/USDT:USDT", "swap", "BTC", "USDT"),
+        }
+
+        listed = fetcher.venue_symbols()
+
+        assert len(listed) == 1
+        assert listed[0].market_types == ("spot", "swap")
+
+    def test_options_are_left_out(self, fetcher, exchange):
+        # Bybit lists 2,212 of them against 1,425 of everything else, and a
+        # strike-and-expiry contract is not an instrument the platform names.
+        exchange.load_markets.return_value = {
+            "BTC/USDT": _market("BTCUSDT", "BTC/USDT", "spot", "BTC", "USDT"),
+            "BTC/USDC:USDC-260925-60000-C": _market(
+                "BTC-26SEP26-60000-C", "BTC/USDC:USDC-260925-60000-C",
+                "option", "BTC", "USDC",
+            ),
+        }
+
+        assert [m.vendor_symbol for m in fetcher.venue_symbols()] == ["BTCUSDT"]
+
+    def test_delisted_markets_are_left_out(self, fetcher, exchange):
+        """Offering one could only create a series that ends before it starts."""
+        exchange.load_markets.return_value = {
+            "BTC/USDT": _market("BTCUSDT", "BTC/USDT", "spot", "BTC", "USDT"),
+            "LUNA/USDT": _market(
+                "LUNAUSDT", "LUNA/USDT", "spot", "LUNA", "USDT", active=False
+            ),
+        }
+
+        assert [m.vendor_symbol for m in fetcher.venue_symbols()] == ["BTCUSDT"]
+
+    def test_sorted_so_the_list_is_predictable(self, fetcher, exchange):
+        exchange.load_markets.return_value = {
+            "SOL/USDT": _market("SOLUSDT", "SOL/USDT", "spot", "SOL", "USDT"),
+            "BTC/USDT": _market("BTCUSDT", "BTC/USDT", "spot", "BTC", "USDT"),
+            "ETH/USDT": _market("ETHUSDT", "ETH/USDT", "spot", "ETH", "USDT"),
+        }
+
+        assert [m.vendor_symbol for m in fetcher.venue_symbols()] == [
+            "BTCUSDT", "ETHUSDT", "SOLUSDT",
+        ]
+
+    def test_an_unreachable_venue_is_wrapped(self, fetcher, exchange):
+        exchange.load_markets.side_effect = ccxt.NetworkError("timeout")
+
+        with pytest.raises(BarFetchError, match="could not list markets"):
+            fetcher.venue_symbols()
+
+
 class TestErrors:
     def test_bad_symbol_is_wrapped(self, fetcher, exchange):
         exchange.fetch_ohlcv.side_effect = ccxt.BadSymbol("nope")

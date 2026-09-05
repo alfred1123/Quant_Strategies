@@ -76,7 +76,8 @@ Current operating model:
 
 - `PRODUCT_XREF` is the authoritative vendor-symbol mapping table.
 - The target design is semi-automatic vendor import with approval before insert.
-- Until the approval workflow is built, admin/bootstrap population may be done directly in the database.
+- A new instrument is created through the API — `POST /api/v1/inst/products` — **not** by hand in the database. One request writes the `PRODUCT` row and its first `PRODUCT_XREF` row together, because a product with no xref is invisible to every venue-scoped read. See [Creating an instrument](#creating-an-instrument) below and decision #62.
+- Bulk vendor import is still unbuilt, so seeding a whole venue's catalogue remains a Liquibase seed changeset.
 
 ### INST Versioning
 
@@ -86,6 +87,54 @@ Current operating model:
 | `PRODUCT_XREF` | **Yes** — `PRODUCT_XREF_VID` + `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` | Vendor symbols can change; current row is the open-ended transaction-time record |
 | `PRODUCT_GRP` | **No** — uses `UPDATED_AT` | Hierarchy versioning is impractical; rare admin-only edits |
 | `PRODUCT_GRP_MEMBER` | **No** — add/remove only | Junction table; `CREATED_AT` audit is sufficient |
+
+### Creating an instrument
+
+Neither table has a sequence, and application code is barred from raw `SELECT`
+on application tables — so "what is the next `PRODUCT_ID`" is a question only a
+procedure can answer. Since INST release `1.4.0`, both insert procedures answer
+it themselves and report the result back:
+
+| Procedure | `IN_..._ID` NULL means | Reports back |
+|---|---|---|
+| `SP_INS_PRODUCT` | New instrument: `MAX(PRODUCT_ID)+1`, `PRODUCT_VID = 1` | `OUT_PRODUCT_ID`, `OUT_PRODUCT_VID` |
+| `SP_INS_PRODUCT_XREF` | New mapping: `MAX(PRODUCT_XREF_ID)+1`, `PRODUCT_XREF_VID = 1` | `OUT_PRODUCT_XREF_ID`, `OUT_PRODUCT_XREF_VID` |
+
+Passing a non-NULL id amends that row instead, appending a version. Allocating
+the id is the *only* thing these procedures gained; the soft-versioning above it
+is unchanged, and correcting a mistyped vendor symbol means naming the
+`PRODUCT_XREF_ID` to version.
+
+**The DDL is the validation.** Neither procedure checks its input, by design —
+a required-field or duplicate check written in plpgsql is a second copy of a
+rule the schema already states, and keeping the two in step is work that buys
+nothing. The enforcement is:
+
+| Rule | Enforced by |
+|---|---|
+| Required fields present | `NOT NULL` on the columns, and `CreateInstrumentRequest` before the call |
+| One current row per cusip | `UQ_PRODUCT_CUSIP_CURRENT` (partial, `IS_CURRENT_IND = 'Y'`) |
+| One open mapping per `(PRODUCT_ID, APP_ID)` | `UQ_PRODUCT_XREF_CURRENT` (partial, on the open `TRANSACT_TO_TS`) |
+
+A violation therefore reaches the caller as Postgres' own message, which names
+the index rather than the row that already holds the value.
+`InstrumentCache.create_instrument` composes the two writes and reloads the
+cache, and `quant/api/exception_handlers.py` maps the `SQLSTATE` through: `23*`
+to 409.
+
+Two things are consequently *not* checked on write, and both are deliberate.
+There is no FK from `PRODUCT_XREF.PRODUCT_ID` to `PRODUCT`, so a mapping onto a
+missing product is accepted and simply omitted by every venue-scoped read. And
+`VENDOR_SYMBOL` has no unique index, so two products may claim the same symbol
+on one venue.
+
+`MAX+1` races under concurrent inserts. The composite primary key rejects the
+loser rather than merging two instruments, and this is an admin action measured
+in rows per month, so it is not worth a sequence.
+
+The two writes are **not one transaction** — each `CALL` commits — so a product
+whose xref is rejected exists and is listed nowhere. It is logged, and the next
+attempt under the same cusip is a 409 from `UQ_PRODUCT_CUSIP_CURRENT`.
 
 ### CORE_ADMIN — exchange API credentials (Phase 1.1)
 
@@ -251,7 +300,7 @@ Active changelogs are short manifests — see XML comments in each `db/liquidbas
 
 **Release lifecycle:** once a release is applied to prod, drop its `<include>` and `git mv` the file into `releases/archive/`. Archived files are outside the include graph — neither `liquibase validate` nor the tests resolve their `<sqlFile path="...">` — so **do not edit them on the way in**; the move is the whole operation and the file stays as it shipped. `git log` has the history. Applied status comes from each schema's `DATABASECHANGELOG`, not from age: a release that looks old may simply never have run.
 
-`releases/` therefore holds what is pending: `bt` 1.18.0, 1.19.0 and 1.20.0, `market_data` 1.4.0, and `core_admin` 1.3.0 — the last being `runAlways`, so it never leaves.
+`releases/` therefore holds what is pending: `bt` 1.18.0, 1.19.0 and 1.20.0, `inst` 1.4.0, `market_data` 1.4.0, and `core_admin` 1.3.0 — the last being `runAlways`, so it never leaves.
 
 **Editing a procedure body is a migration you have to write.** A `runOnChange` changeset re-applies a body when the `.sql` changes, but only while its release is still included — and releases get archived as soon as they are applied. There is no standing changeset waiting to pick up an edit. Change `SP_GET_QUEUE.sql` without adding a changeset that deploys it and the edit lands in git, the deploy goes green, and prod keeps the old definition.
 

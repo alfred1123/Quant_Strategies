@@ -438,6 +438,16 @@ valid way in. The field is disabled until a venue is chosen and says how many
 products that venue lists, so "no options" after typing reads as a search miss
 rather than a broken form.
 
+Scoping the list to the venue left one dead end, which is now closed. A venue
+with no xrefs lists nothing, and the empty state said *"add an `INST.PRODUCT_XREF`
+row for it"* — an instruction to open a SQL client against production, from
+inside the page whose whole point was that capture no longer required one. The
+Market data page now has an **Add an instrument** action beside *Capture a
+series*, and the empty state points at it. It writes the `INST.PRODUCT` row and
+its first `INST.PRODUCT_XREF` row in one submit, because a product without an
+xref is invisible to this very dropdown — see decision #62 and
+[Creating an instrument](../architecture/database.md#creating-an-instrument).
+
 ## 7. The backtest seam (built)
 
 Backtest used to read the provider and only the provider. `_build_data_dict`
