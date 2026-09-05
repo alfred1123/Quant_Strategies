@@ -52,7 +52,7 @@ The `trading_period` parameter controls Sharpe ratio annualization:
 - **Crypto**: `365` — markets trade 24/7/365
 - **Equity**: `252` — NYSE/NASDAQ trading days per year
 
-Sharpe and annualized return are **undefined** (`NaN`) when fewer than 60 finite PnL bars remain after indicator warmup. The optimizer skips those trials rather than ranking a lucky week.
+Sharpe and annualized return are **undefined** (`NaN`) when `Performance.get_metric_n_obs()` is below 60 finite PnL bars after indicator warmup. The optimizer does not re-count bars; it already maps a non-finite Sharpe to `-inf`, so a short sample cannot win the grid.
 
 ## Transaction Costs
 
