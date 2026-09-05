@@ -38,4 +38,12 @@ describe('MetricsCards', () => {
     );
     expect(screen.getByText('—')).toBeInTheDocument();
   });
+
+  it('formats n_obs as an integer', () => {
+    render(
+      <MetricsCards result={makeResult({ strategy_metrics: { n_obs: 94 } })} />,
+    );
+    expect(screen.getByText('n_obs')).toBeInTheDocument();
+    expect(screen.getByText('94')).toBeInTheDocument();
+  });
 });

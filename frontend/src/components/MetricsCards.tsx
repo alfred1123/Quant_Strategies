@@ -3,8 +3,13 @@ import type { PerformanceResponse } from '../types/backtest';
 import { formatDecimal, formatPercent } from '../utils/format';
 
 const PERCENT_KEYS = new Set(['Total Return', 'Annualized Return', 'Max Drawdown']);
+const INTEGER_KEYS = new Set(['n_obs']);
 
 function fmt(key: string, v: unknown): string {
+  if (INTEGER_KEYS.has(key)) {
+    const n = typeof v === 'number' && Number.isFinite(v) ? v : Number(v);
+    return Number.isFinite(n) ? String(Math.round(n)) : '—';
+  }
   if (PERCENT_KEYS.has(key)) {
     const s = formatPercent(v);
     return s === 'N/A' ? '—' : s;

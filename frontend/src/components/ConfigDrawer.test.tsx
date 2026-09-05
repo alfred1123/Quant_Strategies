@@ -23,8 +23,15 @@ const assetTypes: AssetTypeRow[] = [
   { asset_type_id: 1, name: 'crypto', display_name: 'Crypto', trading_period: 365 },
   { asset_type_id: 2, name: 'equity_hk', display_name: 'Equity HK', trading_period: 252 },
 ];
-const conjunctions: ConjunctionRow[] = [{ name: 'AND', display_name: 'AND' }];
-const dataColumns: DataColumnRow[] = [{ column_name: 'price', display_name: 'Price' }];
+const conjunctions: ConjunctionRow[] = [
+  { name: 'AND', display_name: 'AND' },
+  { name: 'OR', display_name: 'OR' },
+  { name: 'FILTER', display_name: 'FILTER' },
+];
+const dataColumns: DataColumnRow[] = [
+  { column_name: 'price', display_name: 'Price' },
+  { column_name: 'Volume', display_name: 'Volume' },
+];
 const apps: AppRow[] = [
   { app_id: 1, name: 'yahoo', display_name: 'Yahoo Finance', class_name: 'YahooFinance', is_exchange_ind: 'N', description: null },
   { app_id: 34, name: 'bybit', display_name: 'Bybit', class_name: 'Bybit', is_exchange_ind: 'Y', description: null },
@@ -431,3 +438,68 @@ describe('ConfigDrawer — the bar interval', () => {
     expect(last.start).toBe('2020-03-25');
   });
 });
+
+const priceFactor = {
+  indicator: 'sma',
+  strategy: 'momentum',
+  data_column: 'price',
+  window_range: { min: 5, max: 100, step: 5 },
+  signal_range: { min: 0.25, max: 2.5, step: 0.25 },
+};
+
+describe('ConfigDrawer — FILTER gate vs signal', () => {
+  it('labels the cards Gate and Signal when conjunction is FILTER', () => {
+    renderWithProviders(
+      <Host
+        initial={{
+          ...baseCfg,
+          conjunction: 'FILTER',
+          factors: [priceFactor, { ...priceFactor, data_column: 'Volume' }],
+        }}
+        observer={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/Gate \(on\/off\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Signal \(direction\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Gate must be non-zero/)).toBeInTheDocument();
+  });
+
+  it('moves the added factor to the gate slot when FILTER is selected', () => {
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host
+        initial={{
+          ...baseCfg,
+          conjunction: 'AND',
+          factors: [priceFactor, { ...priceFactor, data_column: 'Volume' }],
+        }}
+        observer={observer}
+      />,
+    );
+
+    fireEvent.mouseDown(screen.getByLabelText('Conjunction'));
+    fireEvent.click(screen.getByRole('option', { name: 'FILTER' }));
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.conjunction).toBe('FILTER');
+    expect(last.factors[0].data_column).toBe('Volume');
+    expect(last.factors[1].data_column).toBe('price');
+  });
+
+  it('inserts Add Factor as the gate when conjunction is already FILTER', () => {
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host
+        initial={{ ...baseCfg, conjunction: 'FILTER', factors: [priceFactor] }}
+        observer={observer}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Add Factor/ }));
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.factors).toHaveLength(2);
+    expect(last.factors[1].data_column).toBe('price');
+    expect(last.factors[0].indicator).toBe('sma');
+  });
+});
+

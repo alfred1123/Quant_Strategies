@@ -51,7 +51,7 @@ Each backtest needs at least one factor. Fill in:
 
 If you are new, leave the ranges at their default values.
 
-You can optionally add a second factor by clicking **+ Add Factor** and choosing a **Conjunction** (AND, OR, or FILTER) to combine them.
+You can optionally add a second factor by clicking **+ Add Factor** and choosing a **Conjunction** (AND, OR, or FILTER) to combine them. FILTER treats the first card as the **Gate** (on/off) and the second as the **Signal** (direction); picking FILTER after adding a factor moves the new card into the gate slot.
 
 ## 6) Other Options (Optional)
 

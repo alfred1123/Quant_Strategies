@@ -43,7 +43,7 @@ When combining multiple factors:
 |------|-----------|
 | **AND** | Position taken only when all factors agree on direction. Ties broken by percentile-rank strength. |
 | **OR** | Position taken when any factor signals. Strongest signal wins (percentile-rank tiebreak). |
-| **FILTER** | Factor 1 acts as a gate (must be non-zero); factor 2 provides the directional signal. |
+| **FILTER** | Factor 1 is the **Gate** (must be non-zero to allow a trade); factor 2 is the **Signal** (supplies direction). The UI labels the cards Gate / Signal. Adding a factor while FILTER is selected inserts it as the gate so the original recipe stays the signal. |
 
 ## Trading Period
 
@@ -51,6 +51,8 @@ The `trading_period` parameter controls Sharpe ratio annualization:
 
 - **Crypto**: `365` — markets trade 24/7/365
 - **Equity**: `252` — NYSE/NASDAQ trading days per year
+
+Sharpe and annualized return are **undefined** (`NaN`) when fewer than 60 finite PnL bars remain after indicator warmup. The optimizer skips those trials rather than ranking a lucky week.
 
 ## Transaction Costs
 

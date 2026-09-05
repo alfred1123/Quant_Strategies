@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, SignalDirection
-from quant.strategy.performance import Performance, live_lookback_days
+from quant.strategy.performance import Performance, live_lookback_days, MIN_METRIC_OBS
 
 
 _BOLLINGER_CONFIG = StrategyConfig("test", "get_bollinger_band",
@@ -196,6 +196,19 @@ class TestStrategyMetrics:
         assert len(result) == 5
         expected_index = ["Total Return", "Annualized Return", "Sharpe Ratio", "Max Drawdown", "Calmar Ratio"]
         assert list(result.index) == expected_index
+
+    def test_sharpe_nan_when_fewer_than_min_obs(self, sample_ohlc_df):
+        short = sample_ohlc_df.iloc[:40]
+        perf = _make_performance(short, window=5)
+        assert np.isnan(perf.get_sharpe_ratio())
+        assert np.isnan(perf.get_annualized_return())
+        assert perf.get_metric_n_obs() < MIN_METRIC_OBS
+
+    def test_buy_hold_sharpe_nan_when_fewer_than_min_obs(self, sample_ohlc_df):
+        short = sample_ohlc_df.iloc[:40]
+        perf = _make_performance(short, window=5)
+        assert np.isnan(perf.get_buy_hold_sharpe_ratio())
+        assert np.isnan(perf.get_buy_hold_annualized_return())
 
 
 class TestBuyHoldMetrics:

@@ -156,7 +156,11 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
       vendor_symbol: config.vendorSymbol || undefined,
       data_source: config.dataSource || undefined,
     };
-    set({ factors: [...config.factors, newFactor] });
+    set({
+      factors: config.conjunction === 'FILTER'
+        ? [newFactor, ...config.factors]
+        : [...config.factors, newFactor],
+    });
   };
 
   const removeFactor = (i: number) =>
@@ -366,9 +370,26 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Divider sx={{ flex: 1 }} />
                 <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Conjunction</InputLabel>
-                  <Select value={config.conjunction} label="Conjunction"
-                    onChange={e => set({ conjunction: e.target.value })}>
+                  <InputLabel id="conjunction-label">Conjunction</InputLabel>
+                  <Select
+                    labelId="conjunction-label"
+                    value={config.conjunction}
+                    label="Conjunction"
+                    onChange={e => {
+                      const next = String(e.target.value);
+                      if (
+                        next === 'FILTER'
+                        && config.conjunction !== 'FILTER'
+                        && config.factors.length === 2
+                      ) {
+                        set({
+                          conjunction: next,
+                          factors: [config.factors[1], config.factors[0]],
+                        });
+                      } else {
+                        set({ conjunction: next });
+                      }
+                    }}>
                     {conjunctions.map(c => (
                       <MenuItem key={c.name} value={c.name}>{c.display_name}</MenuItem>
                     ))}
@@ -377,9 +398,15 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
                 <Divider sx={{ flex: 1 }} />
               </Box>
             )}
+            {i === 1 && config.conjunction === 'FILTER' && (
+              <Typography variant="caption" color="text.secondary">
+                Gate must be non-zero; Signal supplies the trade direction.
+              </Typography>
+            )}
             <FactorCard
               index={i}
               total={config.factors.length}
+              conjunction={config.conjunction}
               factor={factor}
               onChange={patch => updateFactor(i, patch)}
               onRemove={() => removeFactor(i)}
