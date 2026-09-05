@@ -21,6 +21,14 @@ logger = logging.getLogger(__name__)
 # ccxt caps a single OHLCV response; ask for a full page and paginate.
 _PAGE_LIMIT = 1000
 
+#: Market types left out of :meth:`CcxtBarFetcher.venue_symbols`.
+#:
+#: Bybit lists 2,212 options against 1,425 of everything else, so including
+#: them makes the venue's own tickers the minority of any list built from it.
+#: They are also not what an instrument row names: a strike-and-expiry contract
+#: expires, and the platform's identity for one would be stale within weeks.
+_UNLISTABLE_MARKET_TYPES = frozenset({"option"})
+
 
 class BarFetchError(RuntimeError):
     """The exchange could not be reached, or returned unusable bars."""
@@ -36,6 +44,26 @@ class OhlcvBar:
     low_px: float
     close_px: float
     volume: float
+
+
+@dataclass(frozen=True)
+class VenueMarket:
+    """One ticker a venue prints, spelled the way an xref has to store it.
+
+    Keyed on the raw exchange id rather than ccxt's unified symbol because
+    ``INST.PRODUCT_XREF.VENDOR_SYMBOL`` holds the raw form — ``BTCUSDT``, not
+    ``BTC/USDT:USDT`` — and that is the only string capture and execution can
+    send to the venue.
+    """
+
+    vendor_symbol: str
+    base: str | None
+    quote: str | None
+    #: Every market the venue serves under this one id. Usually one, but Bybit
+    #: prints ``BTCUSDT`` for both the spot pair and the perpetual, and the
+    #: xref cannot tell them apart — so the ambiguity is reported rather than
+    #: resolved by picking one.
+    market_types: tuple[str, ...]
 
 
 class BarFetcher(Protocol):
@@ -54,6 +82,8 @@ class BarFetcher(Protocol):
         self, *, vendor_symbol: str, period: timedelta
     ) -> datetime | None: ...
 
+    def venue_symbols(self) -> list[VenueMarket]: ...
+
 
 class CcxtBarFetcher:
     """Public OHLCV reads over ccxt, paginated across the requested window."""
@@ -70,6 +100,60 @@ class CcxtBarFetcher:
                 raise BarFetchError(f"ccxt has no exchange class {self._exchange_id!r}")
             self._exchange = exchange_cls({"enableRateLimit": True})
         return self._exchange
+
+    def venue_symbols(self) -> list[VenueMarket]:
+        """Every ticker this venue currently prints, so a form can offer them.
+
+        Answering from the venue matters because a vendor symbol is the one
+        field on an instrument nothing else can check. The cusip has a shape to
+        validate and the venue comes from a dropdown, but the symbol is free
+        text that only the exchange can confirm, and a typo in it produces a
+        product that looks created and captures no bar — the xref exists, so
+        every venue-scoped list shows it, and the failure surfaces later as a
+        ``BadSymbol`` from a warmer nobody is watching.
+
+        Delisted markets are dropped. They are still in ``load_markets`` and
+        still tradable in history, but offering one for a *new* instrument
+        could only produce a series that ends before it starts.
+
+        Costs one ``load_markets`` per venue per process — ccxt caches the
+        symbol table on the client, which is the same table
+        :meth:`_listing_ms` already needs, so a venue asked for depth has
+        paid for this and vice versa.
+        """
+        try:
+            markets = self.exchange.load_markets()
+        except ccxt.BaseError as exc:
+            raise BarFetchError(
+                f"could not list markets on {self._exchange_id}: {exc}"
+            ) from exc
+
+        by_id: dict[str, list[dict]] = {}
+        for market in markets.values():
+            if not market.get("active"):
+                continue
+            if market.get("type") in _UNLISTABLE_MARKET_TYPES:
+                continue
+            raw = market.get("id")
+            if raw:
+                by_id.setdefault(raw, []).append(market)
+
+        listed = [
+            VenueMarket(
+                vendor_symbol=raw,
+                base=group[0].get("base"),
+                quote=group[0].get("quote"),
+                market_types=tuple(
+                    sorted({m["type"] for m in group if m.get("type")})
+                ),
+            )
+            for raw, group in sorted(by_id.items())
+        ]
+        logger.info(
+            "%s lists %d symbol(s) across %d market(s)",
+            self._exchange_id, len(listed), len(markets),
+        )
+        return listed
 
     def fetch_bars(
         self,

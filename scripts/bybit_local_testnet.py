@@ -190,33 +190,36 @@ def _env_int(name: str) -> int:
 
 
 def ensure_bybit_xref(conninfo: str) -> None:
-    """Insert btcusdt.crypto → BTCUSDT for Bybit if missing."""
-    import psycopg
+    """Insert btcusdt.crypto → BTCUSDT for Bybit if missing.
 
-    with psycopg.connect(conninfo) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT 1 FROM inst.product_xref px
-                JOIN inst.product p ON p.product_id = px.product_id
-                WHERE p.internal_cusip = 'btcusdt.crypto'
-                  AND px.app_id = %s
-                  AND px.transact_to_ts > now()
-                """,
-                (BYBIT_APP_ID,),
-            )
-            if cur.fetchone():
-                print("[xref] btcusdt.crypto → Bybit already mapped")
-                return
-            cur.execute("SELECT COALESCE(MAX(product_xref_id), 0) + 1 FROM inst.product_xref")
-            xref_id = cur.fetchone()[0]
-            cur.execute(
-                "CALL inst.sp_ins_product_xref(%s, %s, %s, %s, 'bybit_local_testnet', NULL, NULL, NULL)",
-                (xref_id, BTCUSDT_PRODUCT_ID, BYBIT_APP_ID, BYBIT_VENDOR_SYMBOL),
-            )
-        conn.commit()
+    Both the "is it mapped" probe and the id allocation used to be raw SELECTs
+    here. Neither is needed now: the cache answers the first from memory, and
+    ``SP_INS_PRODUCT_XREF`` allocates its own id — so a harness that reached
+    around the stored procedures no longer has to.
+    """
+    from quant.data.instruments import InstrumentCache
+
+    cache = InstrumentCache(conninfo, user_id="bybit_local_testnet")
+    try:
+        cache.load_all()
+        if cache.resolve_vendor_symbol(BTCUSDT_PRODUCT_ID, BYBIT_APP_ID) == (
+            BYBIT_VENDOR_SYMBOL
+        ):
+            print("[xref] btcusdt.crypto → Bybit already mapped")
+            return
+        # No id passed: the procedure resolves the open row for this
+        # (product, app) pair when there is one, so a mapping that points
+        # somewhere else is repointed rather than colliding with
+        # UQ_PRODUCT_XREF_CURRENT.
+        xref_id, xref_vid = cache.sp_ins_product_xref(
+            product_id=BTCUSDT_PRODUCT_ID,
+            app_id=BYBIT_APP_ID,
+            vendor_symbol=BYBIT_VENDOR_SYMBOL,
+        )
+    finally:
+        cache.close()
     print(
-        f"[xref] inserted product_xref_id={xref_id} "
+        f"[xref] wrote product_xref_id={xref_id} v{xref_vid} "
         f"btcusdt.crypto → {BYBIT_VENDOR_SYMBOL} (app_id={BYBIT_APP_ID})"
     )
 

@@ -1,12 +1,29 @@
+-- Map a product to the symbol one venue prints for it (soft-versioned).
+--
+-- IN_PRODUCT_XREF_ID NULL => new mapping: the SP assigns the next
+--                            PRODUCT_XREF_ID (MAX+1), and the VID resolves to 1.
+-- IN_PRODUCT_XREF_ID set  => version that mapping: close the current row and
+--                            insert VID+1.
+--
+-- Allocating the id is here for the same reason as SP_INS_PRODUCT: application
+-- code cannot raw-SELECT to find the next one.
+--
+-- Input validation is deliberately absent. NOT NULL on the columns and
+-- UQ_PRODUCT_XREF_CURRENT already reject bad input -- a second mapping of the
+-- same (PRODUCT_ID, APP_ID) raises 23505 rather than quietly forking, which is
+-- the answer an insert wants -- and the handler below reports whatever SQLSTATE
+-- they raise.
 CREATE OR REPLACE PROCEDURE INST.SP_INS_PRODUCT_XREF(
-    IN  IN_PRODUCT_XREF_ID INTEGER,
-    IN  IN_PRODUCT_ID      INTEGER,
-    IN  IN_APP_ID          INTEGER,
-    IN  IN_VENDOR_SYMBOL   TEXT,
-    IN  IN_USER_ID         TEXT,
-    OUT OUT_SQLSTATE        TEXT,
-    OUT OUT_SQLMSG          TEXT,
-    OUT OUT_SQLERRMC        TEXT
+    IN  IN_PRODUCT_XREF_ID   INTEGER,
+    IN  IN_PRODUCT_ID        INTEGER,
+    IN  IN_APP_ID            INTEGER,
+    IN  IN_VENDOR_SYMBOL     TEXT,
+    IN  IN_USER_ID           TEXT,
+    OUT OUT_SQLSTATE         TEXT,
+    OUT OUT_SQLMSG           TEXT,
+    OUT OUT_SQLERRMC         TEXT,
+    OUT OUT_PRODUCT_XREF_ID  INTEGER,
+    OUT OUT_PRODUCT_XREF_VID INTEGER
 )
 LANGUAGE plpgsql
 SET plan_cache_mode = 'force_generic_plan'
@@ -21,26 +38,37 @@ DECLARE
     V_LOG_STATE  TEXT;
     V_LOG_MSG    TEXT;
 BEGIN
-    OUT_SQLSTATE := '00000';
-    OUT_SQLMSG   := '0';
-    OUT_SQLERRMC := 'Stored Procedure completed successfully';
+    OUT_SQLSTATE         := '00000';
+    OUT_SQLMSG           := '0';
+    OUT_SQLERRMC         := 'Stored Procedure completed successfully';
+    OUT_PRODUCT_XREF_ID  := IN_PRODUCT_XREF_ID;
+    OUT_PRODUCT_XREF_VID := NULL;
 
     V_OTHER_TEXT := 'IN_PRODUCT_XREF_ID=' || COALESCE(IN_PRODUCT_XREF_ID::TEXT, '')
                  || ', IN_PRODUCT_ID=' || COALESCE(IN_PRODUCT_ID::TEXT, '')
                  || ', IN_VENDOR_SYMBOL=' || COALESCE(IN_VENDOR_SYMBOL, '');
+
+    -- Step 05: A new mapping arrives without an id — take the next one.
+    OUT_SQLMSG := '05';
+    IF OUT_PRODUCT_XREF_ID IS NULL THEN
+        SELECT COALESCE(MAX(PRODUCT_XREF_ID), 0) + 1
+          INTO OUT_PRODUCT_XREF_ID
+          FROM INST.PRODUCT_XREF;
+    END IF;
 
     -- Step 10: Resolve VID — get current max, or start at 1
     OUT_SQLMSG := '10';
     SELECT COALESCE(MAX(PRODUCT_XREF_VID), 0) + 1
       INTO V_VID
       FROM INST.PRODUCT_XREF
-     WHERE PRODUCT_XREF_ID = IN_PRODUCT_XREF_ID;
+     WHERE PRODUCT_XREF_ID = OUT_PRODUCT_XREF_ID;
+    OUT_PRODUCT_XREF_VID := V_VID;
 
     -- Step 20: Close old current row — set TRANSACT_TO_TS
     OUT_SQLMSG := '20';
     UPDATE INST.PRODUCT_XREF
        SET TRANSACT_TO_TS = V_START_TS
-     WHERE PRODUCT_XREF_ID = IN_PRODUCT_XREF_ID
+     WHERE PRODUCT_XREF_ID = OUT_PRODUCT_XREF_ID
        AND TRANSACT_TO_TS  = TIMESTAMPTZ '9999-12-31 00:00:00+00';
 
     -- Step 30: Insert new version as current
@@ -56,7 +84,7 @@ BEGIN
         USER_ID,
         CREATED_AT
     ) VALUES (
-        IN_PRODUCT_XREF_ID,
+        OUT_PRODUCT_XREF_ID,
         V_VID,
         V_START_TS,
         TIMESTAMPTZ '9999-12-31 00:00:00+00',

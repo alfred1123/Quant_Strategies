@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      SP_INS_PRODUCT and SP_INS_PRODUCT_XREF allocate their own ids and report
+      them back, so an instrument can be created from the API.
+
+      Neither table has a sequence, so both procedures required the caller to
+      supply the key. Application code is barred from raw SELECT on application
+      tables, which left "what is the next PRODUCT_ID" a question nothing above
+      the database could answer — and creating an instrument therefore stayed a
+      hand-written INSERT against prod. A NULL id now means "new", the
+      procedure takes MAX+1 the way SP_INS_API_CREDENTIAL already does, and the
+      allocated (id, vid) come back as OUT columns so the caller can write the
+      xref against the product it just created.
+
+      Allocating the id is all either procedure gained. Soft-versioning above
+      it is unchanged, and neither carries any input validation: NOT NULL plus
+      UQ_PRODUCT_CUSIP_CURRENT / UQ_PRODUCT_XREF_CURRENT are the enforcement,
+      and the WHEN OTHERS handler reports whatever SQLSTATE they raise.
+
+      WHY A DROP IS NEEDED
+      A procedure's OUT list is part of its signature, so adding OUT_PRODUCT_ID
+      / OUT_PRODUCT_VID cannot be done by CREATE OR REPLACE — it aborts with
+      "cannot change return type of existing function". The old signature is
+      dropped first, exactly as bt 1.10.0 did for SP_INS_STRATEGY. Nothing else
+      calls either procedure, so there is no window to protect.
+    -->
+
+    <changeSet id="1.4.0-001-drop-sp-ins-product-old-signature" author="alfcheun" context="inst,prod-deploy" runOnChange="false">
+        <comment>Drop pre-1.4 SP_INS_PRODUCT before the id-allocating signature</comment>
+        <sql splitStatements="true" stripComments="true">
+            DROP PROCEDURE IF EXISTS INST.SP_INS_PRODUCT(INTEGER, TEXT, TEXT, INTEGER, TEXT, TEXT, TEXT, TEXT, OUT TEXT, OUT TEXT, OUT TEXT);
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.4.0-002-drop-sp-ins-product-xref-old-signature" author="alfcheun" context="inst,prod-deploy" runOnChange="false">
+        <comment>Drop pre-1.4 SP_INS_PRODUCT_XREF before the id-allocating signature</comment>
+        <sql splitStatements="true" stripComments="true">
+            DROP PROCEDURE IF EXISTS INST.SP_INS_PRODUCT_XREF(INTEGER, INTEGER, INTEGER, TEXT, TEXT, OUT TEXT, OUT TEXT, OUT TEXT);
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.4.0-003-sp-ins-product-allocates-id" author="alfcheun" context="inst,prod-deploy" runOnChange="true">
+        <comment>SP_INS_PRODUCT: NULL id allocates MAX+1; OUT_PRODUCT_ID + OUT_PRODUCT_VID</comment>
+        <sqlFile path="../procedures/SP_INS_PRODUCT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.4.0-004-sp-ins-product-xref-allocates-id" author="alfcheun" context="inst,prod-deploy" runOnChange="true">
+        <comment>SP_INS_PRODUCT_XREF: NULL id allocates MAX+1; OUT_PRODUCT_XREF_ID + OUT_PRODUCT_XREF_VID</comment>
+        <sqlFile path="../procedures/SP_INS_PRODUCT_XREF.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

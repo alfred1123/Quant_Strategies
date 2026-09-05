@@ -1,9 +1,7 @@
 """Unit tests for :mod:`quant.market_data.subscriptions` — no DB, no ccxt."""
 
-import re
 import uuid
 from datetime import UTC, datetime
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -16,14 +14,7 @@ from quant.market_data.subscriptions import (
     SubscriptionError,
 )
 from quant.shared.db import ProcedureError
-
-PROC_DIR = (
-    Path(__file__).resolve().parents[2]
-    / "db"
-    / "liquidbase"
-    / "market_data"
-    / "procedures"
-)
+from tests.unit.liquibase_sources import call_arg_count, procedure_param_count
 
 DAILY = 1
 BYBIT = 34
@@ -40,21 +31,7 @@ def repo():
 
 
 def _ddl_param_count(proc_file: str) -> int:
-    """Number of IN/OUT parameters declared by a procedure's DDL."""
-    txt = (PROC_DIR / proc_file).read_text()
-    sig = re.search(
-        r"CREATE OR REPLACE PROCEDURE\s+[\w.]+\s*\((.*?)\)\s*LANGUAGE",
-        txt,
-        re.S | re.I,
-    )
-    assert sig, f"could not parse a signature out of {proc_file}"
-    return len(
-        [ln for ln in sig.group(1).splitlines() if re.match(r"\s*(IN|OUT)\s+\w+", ln)]
-    )
-
-
-def _call_arg_count(sql: str) -> int:
-    return sql.count("%s") + sql.count("NULL::")
+    return procedure_param_count("market_data", proc_file)
 
 
 def _ins_kwargs(**overrides):
@@ -82,19 +59,19 @@ class TestCallMatchesProcedureDdl:
     def test_ins(self, mock_write, _get, repo):
         repo.sp_ins_bar_subscription(**_ins_kwargs())
         sql = mock_write.call_args.args[0]
-        assert _call_arg_count(sql) == _ddl_param_count("SP_INS_BAR_SUBSCRIPTION.sql")
+        assert call_arg_count(sql) == _ddl_param_count("SP_INS_BAR_SUBSCRIPTION.sql")
 
     @patch.object(BarSubscriptionRepo, "_call_get", return_value=[])
     def test_get(self, mock_get, repo):
         repo.sp_get_bar_subscription()
         sql = mock_get.call_args.args[0]
-        assert _call_arg_count(sql) == _ddl_param_count("SP_GET_BAR_SUBSCRIPTION.sql")
+        assert call_arg_count(sql) == _ddl_param_count("SP_GET_BAR_SUBSCRIPTION.sql")
 
     @patch.object(BarSubscriptionRepo, "_call_get", return_value=[])
     def test_get_active(self, mock_get, repo):
         repo.sp_get_active_bar_subscriptions()
         sql = mock_get.call_args.args[0]
-        assert _call_arg_count(sql) == _ddl_param_count(
+        assert call_arg_count(sql) == _ddl_param_count(
             "SP_GET_ACTIVE_BAR_SUBSCRIPTIONS.sql"
         )
 

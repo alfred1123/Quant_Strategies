@@ -126,7 +126,7 @@ things a caller can do about it:
 | Broker rejected the credentials (`BrokerAuthError`) | **400** | Fix the key — retrying is pointless |
 | Broker unreachable or erroring (`BrokerConnectionError`) | **503** | Come back on the next tick |
 | Bars incomplete (`StaleBarsError`) | **503** | Come back on the next tick |
-| Unknown product / no xref (`SymbolMappingError`) | **400** | Fix the request or seed `INST.PRODUCT_XREF` |
+| Unknown product / no xref (`SymbolMappingError`) | **400** | Fix the request, or map the product to that venue — see [Creating an instrument](#creating-an-instrument) |
 
 A rejected key used to answer **502**, which put a wrong API key in the same
 bucket as a platform outage. That is worth stating because the response body
@@ -139,6 +139,26 @@ Every handled error is also logged once by `quant/api/exception_handlers.py`
 (`METHOD /path -> status: detail`), at `WARNING` for 4xx and `ERROR` for 5xx.
 Handling an exception consumes it, so before that a failed request left no
 server-side trace at all and could only be reconstructed from the client.
+
+#### Unhandled is worse than wrong — the two catch-alls
+
+An exception with no handler reaches Starlette and becomes a **500 whose body is
+the string `Internal Server Error`**. There is no `detail` in it, so the axios
+interceptor in `frontend/src/api/client.ts` falls back to axios's own message
+and the user is shown *"Request failed with status code 500"* — a sentence that
+names no cause and suggests no fix. Two classes of failure used to land there:
+
+| Raised by | Handler | Status |
+|---|---|---|
+| `psycopg.Error` — the call never reached the procedure's `OUT` row | `handle_database_error` | `_procedure_status_code(sqlstate)`, so `23*` → **409**, `22*` → **400**, otherwise **502** |
+| `BarFetchError` — ccxt could not be reached, or refused | `handle_bar_fetch_error` | **502** |
+
+`ProcedureError` covers a procedure that ran and reported a SQLSTATE; a dropped
+connection or a signature Python calls that this database does not have raises
+from the driver instead. Both now send `{"sqlstate", "message"}` and share one
+mapping, so `42883` — the procedure is absent, meaning this environment is
+behind on a migration — arrives as a 502 saying exactly that rather than as a
+blank 500.
 
 #### Account snapshot
 
@@ -199,6 +219,7 @@ How the cache is published and read: [REFDATA Cache](refdata-cache.md).
 | `GET`  | `/api/v1/inst/products` | List products (cached `InstrumentCache`). |
 | `GET`  | `/api/v1/inst/products/{id}/xrefs` | Vendor-symbol cross-references for a product. |
 | `GET`  | `/api/v1/inst/apps/{app_id}/products` | Only the products that app lists, each with the `vendor_symbol` it prints. |
+| `GET`  | `/api/v1/inst/apps/{app_id}/venue-symbols` | Tickers the **exchange** currently prints, read live via ccxt. |
 
 `/inst/products` is every instrument the platform knows, which is the wrong
 list to offer once a venue is chosen — a Nasdaq ETF has no Bybit xref, so
@@ -207,7 +228,89 @@ Listing is exactly what `INST.PRODUCT_XREF` records, so the xrefs for one app
 *are* the venue's catalogue. Served from `InstrumentCache` in memory, no query.
 An app that lists nothing returns `[]`, unlike `/products/{id}/xrefs`, where a
 missing product is a 404 — listing nothing is a real answer, not an error.
+
+`/venue-symbols` is the one route in this router that leaves the process, and
+it answers the opposite question: not what the platform has mapped, but what it
+*could* map. Creating an instrument means naming a ticker no cache has ever
+held, so the candidate set only exists at the exchange. Keyed on the raw
+exchange id, because that is what `VENDOR_SYMBOL` stores — `BTCUSDT`, not ccxt's
+unified `BTC/USDT:USDT`. One id can be several markets: Bybit prints `BTCUSDT`
+for both the spot pair and the perpetual, so `market_types` reports `["spot",
+"swap"]` rather than the route picking one. Options and delisted markets are
+excluded — Bybit alone lists 2,212 options, and a strike-and-expiry contract is
+not an instrument the platform names. A venue with no ccxt preset returns `[]`,
+matching `/apps/{app_id}/products`; an unreachable one is a 502 carrying the
+exchange's message, so the form knows to stop waiting and accept free text.
+Costs one `load_markets` per venue per process — the client is the same one
+`PriceBarServiceFactory` holds, so ccxt caches the table across both this and
+`/market-data/price-bars/venue-depth`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/inst/products` | Create a product **and** the first venue that lists it. Returns 201. |
 | `POST` | `/api/v1/inst/refresh` | Reload the instrument cache. Returns 204. |
+
+#### Creating an instrument
+
+An instrument is two rows: identity on `INST.PRODUCT` under an
+`INTERNAL_CUSIP`, and the symbol one venue prints on `INST.PRODUCT_XREF`. One
+request carries both, so the body is a product plus a single
+`(app_id, vendor_symbol)` pair:
+
+```json
+{
+  "internal_cusip": "solusdt.crypto",
+  "display_nm": "Solana / USDT",
+  "asset_type_id": 1,
+  "exchange": null,
+  "ccy": "USDT",
+  "description": null,
+  "app_id": 34,
+  "vendor_symbol": "SOLUSDT"
+}
+```
+
+The venue half is **required**, not optional. `/inst/apps/{app_id}/products` is
+built *from* the xrefs, so a product with no mapping is invisible to every
+venue-scoped read — it cannot be subscribed to, backtested or deployed, and
+creating one on its own would look like a failure. Listing the same instrument
+elsewhere later is a second xref, never a second product.
+
+There is **no owner field**. A product is a shared platform fact in the same
+way a bar subscription is (see [Market data capture](#market-data-capture-session-only)):
+everyone sees the same instrument list, so there is nothing for an owner to
+scope. `USER_ID` on the row is audit only and is never read back. Being signed
+in is the whole check on the write.
+
+`internal_cusip` is normalised to lowercase and must be `{symbol}.{suffix}`
+with no whitespace — the rule decision #21 sets, enforced here because
+`UQ_PRODUCT_CUSIP_CURRENT` is case-sensitive and `SOLUSDT.crypto` would
+otherwise be accepted as a second, unrelated instrument. Blank `exchange`,
+`ccy` and `description` are stored as `NULL`; `EXCHANGE` is for an equity's
+listing venue and stays `NULL` on `.crypto` spot, since the broker belongs in
+the xref.
+
+The response is read back from the reloaded cache rather than echoed, because
+the `PRODUCT_ID` and both `VID`s are chosen by the procedure — see
+[Creating an instrument](database.md#creating-an-instrument) for how the ids are
+allocated. The cache reload is what makes the new instrument appear in every
+dropdown without a separate `POST /inst/refresh`.
+
+201 because this route only ever creates, unlike `POST /market-data/subscriptions`,
+which also enables and retargets. Repeating it for the same cusip is a 409, not
+a second instrument.
+
+Neither procedure validates its input. `CreateInstrumentRequest` is the only
+thing that checks a field is present and well-formed, and the DDL is the only
+thing that checks uniqueness — `NOT NULL` on the columns,
+`UQ_PRODUCT_CUSIP_CURRENT` on the cusip and `UQ_PRODUCT_XREF_CURRENT` on
+`(PRODUCT_ID, APP_ID)`. A conflict therefore arrives as Postgres' own
+unique-violation naming the index, not as prose naming the row.
+
+| Failure | Status | Meaning |
+|---|---|---|
+| Cusip not lowercase `{symbol}.{suffix}`, or a required field missing | **422** | Rejected by the request model, before any write |
+| Cusip already names a current instrument, or this venue already lists this product (`23*`) | **409** | `UQ_PRODUCT_CUSIP_CURRENT` / `UQ_PRODUCT_XREF_CURRENT` violated |
 
 ### Admin / scheduler (service token or session)
 
@@ -301,7 +404,9 @@ Two error shapes worth knowing:
 - **400 on subscribe** when the product has no `INST.PRODUCT_XREF` row for that
   venue, or the app is not an exchange this platform reads bars from. Validated
   on write precisely so three silent per-tick warm failures become one message
-  the caller can act on.
+  the caller can act on. The fix for the first case is
+  [Creating an instrument](#creating-an-instrument) — the venue mapping is a
+  write, not a database chore.
 - **`coverage.error` rather than a failed response** when a venue cannot be
   reached during a list read. A page showing ten series must still render when
   one exchange is away.

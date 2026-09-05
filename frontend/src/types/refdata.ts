@@ -79,7 +79,8 @@ export interface ProductRow {
   display_nm: string;
   asset_type_id: number;
   exchange: string | null;
-  ccy: string;
+  /** Nullable on the column, and nothing guaranteed it before the create form. */
+  ccy: string | null;
   description: string | null;
 }
 
@@ -88,10 +89,62 @@ export interface ListedProduct extends ProductRow {
   vendor_symbol: string;
 }
 
+/**
+ * A ticker a venue currently prints, read live from the exchange via ccxt.
+ *
+ * Not a platform row: this is what *could* be mapped, which is exactly the set
+ * `ProductRow` and `XrefRow` cannot answer for a new instrument.
+ */
+export interface VenueSymbol {
+  /** Exactly what goes in `vendor_symbol` — the raw ticker, not `BTC/USDT`. */
+  vendor_symbol: string;
+  base: string | null;
+  quote: string | null;
+  /** `['spot', 'swap']` where one ticker means both, as Bybit's majors do. */
+  market_types: string[];
+}
+
 export interface XrefRow {
   product_xref_id: number;
   product_xref_vid: number;
   product_id: number;
   app_id: number;
   vendor_symbol: string;
+}
+
+/**
+ * One new instrument: the product's identity plus the first venue that lists
+ * it. `app_id` and `vendor_symbol` describe the `INST.PRODUCT_XREF` row rather
+ * than the product — a product with no xref is invisible to every venue-scoped
+ * list, so the two are created together.
+ */
+export interface CreateInstrumentRequest {
+  /** Lowercase `{symbol}.{suffix}`, one per logical instrument (decision #21). */
+  internal_cusip: string;
+  display_nm: string;
+  asset_type_id: number;
+  /** Listing/clearing venue — equities only, `null` on `.crypto` spot. */
+  exchange: string | null;
+  /** Quote currency of the pair traded, e.g. `USDT`. */
+  ccy: string | null;
+  description: string | null;
+  app_id: number;
+  vendor_symbol: string;
+}
+
+/** The product and xref rows the insert created, each with its first version. */
+export interface CreatedInstrument {
+  product_id: number;
+  product_vid: number;
+  internal_cusip: string;
+  display_nm: string;
+  /** Required on the request, so anything this route creates has one. */
+  asset_type_id: number;
+  exchange: string | null;
+  ccy: string | null;
+  description: string | null;
+  app_id: number;
+  vendor_symbol: string;
+  product_xref_id: number;
+  product_xref_vid: number;
 }

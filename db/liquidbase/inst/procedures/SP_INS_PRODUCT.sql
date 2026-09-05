@@ -1,3 +1,20 @@
+-- Insert a new product, or version an existing one (soft-versioned).
+--
+-- IN_PRODUCT_ID NULL => new instrument: the SP assigns the next PRODUCT_ID
+--                       (MAX+1 globally), and the VID resolves to 1.
+-- IN_PRODUCT_ID set  => amend: flip the current row to 'N', insert VID+1.
+--
+-- Allocating the id is here because it is the one part the caller cannot do:
+-- application code is barred from raw SELECT on application tables, so "what is
+-- the next PRODUCT_ID" is a question only the procedure can answer -- the same
+-- reason SP_INS_API_CREDENTIAL allocates its own. MAX+1 races under concurrent
+-- inserts, but the composite primary key rejects the loser rather than merging
+-- two instruments, and this is an admin action measured in rows per month.
+--
+-- Input validation is deliberately absent. NOT NULL on the columns and
+-- UQ_PRODUCT_CUSIP_CURRENT already reject bad input, and the handler below
+-- reports whatever SQLSTATE they raise; restating those rules in plpgsql would
+-- be a second copy to keep in step with the DDL.
 CREATE OR REPLACE PROCEDURE INST.SP_INS_PRODUCT(
     IN  IN_PRODUCT_ID     INTEGER,
     IN  IN_INTERNAL_CUSIP TEXT,
@@ -9,7 +26,9 @@ CREATE OR REPLACE PROCEDURE INST.SP_INS_PRODUCT(
     IN  IN_USER_ID        TEXT,
     OUT OUT_SQLSTATE      TEXT,
     OUT OUT_SQLMSG        TEXT,
-    OUT OUT_SQLERRMC      TEXT
+    OUT OUT_SQLERRMC      TEXT,
+    OUT OUT_PRODUCT_ID    INTEGER,
+    OUT OUT_PRODUCT_VID   INTEGER
 )
 LANGUAGE plpgsql
 SET plan_cache_mode = 'force_generic_plan'
@@ -21,26 +40,37 @@ DECLARE
     V_LOG_STATE  TEXT;
     V_LOG_MSG    TEXT;
 BEGIN
-    OUT_SQLSTATE := '00000';
-    OUT_SQLMSG   := '0';
-    OUT_SQLERRMC := 'Stored Procedure completed successfully';
+    OUT_SQLSTATE    := '00000';
+    OUT_SQLMSG      := '0';
+    OUT_SQLERRMC    := 'Stored Procedure completed successfully';
+    OUT_PRODUCT_ID  := IN_PRODUCT_ID;
+    OUT_PRODUCT_VID := NULL;
 
     V_OTHER_TEXT := 'IN_PRODUCT_ID=' || COALESCE(IN_PRODUCT_ID::TEXT, '')
                  || ', IN_INTERNAL_CUSIP=' || COALESCE(IN_INTERNAL_CUSIP, '')
                  || ', IN_DISPLAY_NM=' || COALESCE(IN_DISPLAY_NM, '');
+
+    -- Step 05: A new instrument arrives without an id — take the next one.
+    OUT_SQLMSG := '05';
+    IF OUT_PRODUCT_ID IS NULL THEN
+        SELECT COALESCE(MAX(PRODUCT_ID), 0) + 1
+          INTO OUT_PRODUCT_ID
+          FROM INST.PRODUCT;
+    END IF;
 
     -- Step 10: Resolve VID — get current max, or start at 1
     OUT_SQLMSG := '10';
     SELECT COALESCE(MAX(PRODUCT_VID), 0) + 1
       INTO V_VID
       FROM INST.PRODUCT
-     WHERE PRODUCT_ID = IN_PRODUCT_ID;
+     WHERE PRODUCT_ID = OUT_PRODUCT_ID;
+    OUT_PRODUCT_VID := V_VID;
 
     -- Step 20: Flip old current row(s) to 'N'
     OUT_SQLMSG := '20';
     UPDATE INST.PRODUCT
        SET IS_CURRENT_IND = 'N'
-     WHERE PRODUCT_ID     = IN_PRODUCT_ID
+     WHERE PRODUCT_ID     = OUT_PRODUCT_ID
        AND IS_CURRENT_IND = 'Y';
 
     -- Step 30: Insert new version as current
@@ -58,7 +88,7 @@ BEGIN
         USER_ID,
         CREATED_AT
     ) VALUES (
-        IN_PRODUCT_ID,
+        OUT_PRODUCT_ID,
         V_VID,
         'Y',
         IN_INTERNAL_CUSIP,

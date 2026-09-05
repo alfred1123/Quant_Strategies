@@ -26,7 +26,7 @@ from typing import Protocol
 
 import pandas as pd
 
-from quant.market_data.fetcher import BarFetcher
+from quant.market_data.fetcher import BarFetcher, VenueMarket
 from quant.market_data.repo import PriceBarRepo
 from quant.shared.db import ProcedureError
 from quant.shared.intervals import as_utc, bar_starts, last_closed_bar
@@ -469,6 +469,17 @@ class PriceBarService:
         if earliest is None:
             return None, None
         return earliest, int(((now or datetime.now(UTC)) - earliest) / period) + 1
+
+    def venue_symbols(self) -> list[VenueMarket]:
+        """Every ticker the venue behind this service prints.
+
+        Not about bars, and here anyway: this service is what owns a keyless
+        ccxt client per venue, and the symbol table it would load for
+        :meth:`venue_depth` is the same one being read. Reaching the exchange
+        through a second client to ask a second question would pay for the
+        table twice and let the two answers drift apart.
+        """
+        return self._fetcher.venue_symbols()
 
     def find_gaps(
         self,
