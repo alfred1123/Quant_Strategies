@@ -270,7 +270,14 @@ class TestPerformanceWithConfig:
     def test_fee_bps(self, sample_ohlc_df):
         config = StrategyConfig("test", "get_bollinger_band",
                                 Strategy.momentum_band_signal, 252)
-        perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5, fee_bps=10.0)
+        perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5, fee_bps=5.5)
+        assert perf.fee_bps == 5.5
+
+    def test_default_fee_is_spot_taker(self, sample_ohlc_df):
+        config = StrategyConfig("test", "get_bollinger_band",
+                                Strategy.momentum_band_signal, 252)
+        perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5)
+        assert perf.fee_bps == Performance.DEFAULT_FEE_BPS
         assert perf.fee_bps == 10.0
 
     def test_different_indicator(self, sample_ohlc_df):

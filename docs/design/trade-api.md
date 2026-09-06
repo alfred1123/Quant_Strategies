@@ -138,7 +138,7 @@ DDL: `db/liquidbase/trade/tables/DEPLOYMENT.sql` (soft-versioned).
   "run_at": "2026-04-05T12:00:00Z",
   "data_range": {"start": "2016-01-01", "end": "2026-04-01"},
   "ticker_backtested": "BTC-USD",
-  "fee_bps": 5.0,
+  "fee_bps": 10.0,
   "metrics": {
     "total_return": 1.45,
     "annualized_return": 0.12,

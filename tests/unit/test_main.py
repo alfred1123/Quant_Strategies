@@ -22,7 +22,7 @@ class TestParseArgsDefaults:
         assert args.sig_max == 2.50
         assert args.sig_step == 0.25
         assert args.outdir == "../results"
-        assert args.fee == 5.0
+        assert args.fee == 10.0
 
     def test_custom_symbol(self):
         args = parse_args(["--symbol", "AAPL"])
@@ -71,8 +71,8 @@ class TestParseArgsDefaults:
         assert args.sig_step == pytest.approx(0.5)
 
     def test_custom_fee(self):
-        args = parse_args(["--fee", "10.0"])
-        assert args.fee == pytest.approx(10.0)
+        args = parse_args(["--fee", "5.5"])
+        assert args.fee == pytest.approx(5.5)
 
     def test_verbose_flag(self):
         args = parse_args(["-v"])

@@ -42,7 +42,7 @@ const DEFAULT_CONFIG: BacktestConfig = {
   // seeds the control with DAILY once the table loads.
   tmIntervalId: null,
   tradingPeriod: 365,
-  feeBps: 5.0,
+  feeBps: 10.0,
   conjunction: 'AND',
   factors: [
     {

@@ -134,7 +134,7 @@ def parse_args(argv=None):
                    help='Enable DEBUG-level logging')
 
     # Costs
-    p.add_argument('--fee', type=float, default=5.0,
+    p.add_argument('--fee', type=float, default=10.0,
                    help='Transaction fee in basis points (default: %(default)s)')
 
     # Walk-forward

@@ -139,7 +139,7 @@ Add a **Config** button that opens a **read-only dialog** showing:
 │  │ Data Source    yahoo                               │  │
 │  │ Date Range     2016-01-01 → 2026-07-26             │  │
 │  │ Asset Type     crypto                              │  │
-│  │ Fee (bps)      5.0                                 │  │
+│  │ Fee (bps)      10.0                                │  │
 │  │ Walk-Forward   ✓ (50% train)                       │  │
 │  └────────────────────────────────────────────────────┘  │
 │                                                          │

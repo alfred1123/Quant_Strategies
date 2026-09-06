@@ -29,8 +29,8 @@ python -m quant.cli --walk-forward --split 0.7
 # Verbose / DEBUG logging
 python -m quant.cli -v
 
-# Custom transaction fee (basis points)
-python -m quant.cli --fee 10
+# Perp taker fee (basis points); default is 10 (Bybit spot)
+python -m quant.cli --fee 5.5
 
 # Custom output directory
 python -m quant.cli --outdir /tmp/results
@@ -50,7 +50,7 @@ Run `python -m quant.cli --help` for the full list.
 | `--strategy` | `momentum` | One of: `momentum`, `reversion` |
 | `--window` | `20` | Indicator window for single backtest |
 | `--signal` | `1.0` | Signal threshold for single backtest |
-| `--fee` | `5.0` | Transaction fee in basis points |
+| `--fee` | `10.0` | Transaction fee in basis points (Bybit VIP-0 spot taker). Use `5.5` for USDT perp taker. |
 | `--no-grid` | `false` | Skip parameter optimization |
 | `--win-min/max/step` | `5/100/5` | Grid search window range |
 | `--sig-min/max/step` | `0.25/2.50/0.25` | Grid search signal range |

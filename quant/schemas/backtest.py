@@ -57,7 +57,7 @@ class OptimizeRequest(BaseModel):
     start: str
     end: str
     trading_period: int
-    fee_bps: float = 5.0
+    fee_bps: float = 10.0
     # REFDATA.APP.NAME of the venue the *trade* asset is priced from —
     # required, never defaulted. A default here is silent substitution:
     # an omitted source became Yahoo, the run was fitted on Yahoo prints,
@@ -92,7 +92,7 @@ class PerformanceRequest(BaseModel):
     start: str
     end: str
     trading_period: int
-    fee_bps: float = 5.0
+    fee_bps: float = 10.0
     # Required for the same reason as OptimizeRequest.data_source.
     data_source: str = Field(min_length=1)
     # See OptimizeRequest.tm_interval_id. Must match the interval the params

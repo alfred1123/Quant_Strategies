@@ -66,7 +66,7 @@ def _latest_final_position(final_position: pd.Series) -> tuple[float, str]:
 
 class Performance:
 
-    DEFAULT_FEE_BPS = 5.0  # 5 bps (0.05%) transaction cost per unit of turnover
+    DEFAULT_FEE_BPS = 10.0  # Bybit VIP-0 spot taker; per unit of turnover
     # Below this many finite PnL bars, mean * period is a lucky week, not a Sharpe
     # (decision #63). Owned here — optimizer maps non-finite Sharpe to -inf.
     MIN_METRIC_OBS = 60

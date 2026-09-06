@@ -56,7 +56,31 @@ Sharpe and annualized return are **undefined** (`NaN`) when `Performance.get_met
 
 ## Transaction Costs
 
-`quant/strategy/performance.py` applies **5 bps (0.05%) fee per unit of turnover** by default (`DEFAULT_FEE_BPS = 5.0`). Override via `--fee` in the CLI or the **Fee (bps)** input in the dashboard.
+`quant/strategy/performance.py` applies **10 bps (0.10%) per unit of turnover** by default (`DEFAULT_FEE_BPS = 10.0`). That is Bybit VIP-0 **spot taker** — the research product is `*.crypto` spot (decision #21) and live apply is a market order (decision #38), so the haircut is taker, not maker.
+
+The PnL line is `position_{t-1} × return_t − |Δposition| × fee`. A flat → long costs **1×**; a long → short costs **2×** (close + reverse). A round-trip long is **20 bps** at the default. `Objective._sharpe` uses the same formula.
+
+Override via `--fee` in the CLI or **Fee (bps)** in the drawer. Stored `BT.STRATEGY` rows keep the `fee_bps` that was in `CONFIG_JSON` when they ran — this default is for new requests only.
+
+### Venue rates that are not applied automatically
+
+Documented so a perp or limit-order run can set `--fee` honestly. The engine still takes one scalar.
+
+| Venue / product | Maker | Taker | Use when |
+|---|---|---|---|
+| Bybit spot, crypto-crypto, VIP 0 | 10.0 bps | **10.0 bps** | Default. `*.crypto` + market apply |
+| Bybit USDT / USDC perpetual, VIP 0 | 2.0 bps | **5.5 bps** | Linear perp (`default_type="linear"`). Set **5.5** — do not leave 10 |
+| Bybit fiat-crypto spot | 15–25 bps | 15–25 bps | Regional; check the account fee page |
+| VIP / MNT discount | lower | lower | Only if the live account actually has it |
+
+Official schedule: [Bybit Trading Fees](https://www.bybit.com/en-GB/announcement-info/fee-rate/).
+
+**Not modelled** (named so Phase 2 reconcile does not treat them as edge decay):
+
+- **Funding** on perps (typically every 8 hours). Daily bars hide most of it; hourly hold-through-funding does not.
+- **Slippage** and partial fills — backtest assumes the close.
+- **Maker / taker split** — one `fee_bps`, and apply is taker.
+- Live Bybit wiring is still `default_type="linear"` (perp) while the fitted cusip is spot. That product mismatch is separate from the fee default; a perp backtest needs both a perp product (#21) and `fee_bps=5.5`.
 
 ## Data Source Behaviour
 
