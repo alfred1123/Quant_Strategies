@@ -1,0 +1,3235 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/design/live-order-execution/">
+      
+      
+        <link rel="prev" href="../ccxt-trade-and-xref-validation/">
+      
+      
+        <link rel="next" href="../scheduler-price-bars/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Live Order Execution - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#design-live-order-execution-fill-confirmation-retry-alerting" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Live Order Execution
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../backtest-queue/" class="md-tabs__link">
+          
+  
+  
+  Design Docs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../archive/" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best-vid-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layering-mechanics-vs-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layering (mechanics vs policy)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Layering (mechanics vs policy)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisite-tradeadaptercancel_order-signature-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisite: TradeAdapter.cancel_order signature fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fill-confirmation-mechanics-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fill confirmation (mechanics layer)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fill confirmation (mechanics layer)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#poll-fetch_order-not-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Poll fetch_order, not position
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bounded-backoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounded backoff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#terminal-outcomes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Terminal outcomes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#orderresult-extension-needed-for-tradetransaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OrderResult extension (needed for TRADE.TRANSACTION)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#retry-cancel-policy-live_applypy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retry &amp; cancel policy (live_apply.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Retry &amp; cancel policy (live_apply.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#loop-retryable-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loop (retryable path)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alerting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alerting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Alerting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#relation-to-the-existing-telegram-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relation to the existing Telegram decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alert-content" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alert content
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-model-tie-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data model tie-in
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data model tie-in">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#known-gaps-in-the-current-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known gaps in the current schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-status-golden-harness-bybit-testnet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing status (golden harness, Bybit testnet)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-items-not-yet-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open items (not yet implemented)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related docs
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-data-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plan-to-profit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layering-mechanics-vs-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layering (mechanics vs policy)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Layering (mechanics vs policy)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisite-tradeadaptercancel_order-signature-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisite: TradeAdapter.cancel_order signature fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fill-confirmation-mechanics-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fill confirmation (mechanics layer)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fill confirmation (mechanics layer)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#poll-fetch_order-not-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Poll fetch_order, not position
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bounded-backoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounded backoff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#terminal-outcomes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Terminal outcomes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#orderresult-extension-needed-for-tradetransaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OrderResult extension (needed for TRADE.TRANSACTION)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#retry-cancel-policy-live_applypy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retry &amp; cancel policy (live_apply.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Retry &amp; cancel policy (live_apply.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#loop-retryable-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loop (retryable path)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alerting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alerting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Alerting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#relation-to-the-existing-telegram-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relation to the existing Telegram decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alert-content" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alert content
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-model-tie-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data model tie-in
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data model tie-in">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#known-gaps-in-the-current-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known gaps in the current schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-status-golden-harness-bybit-testnet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing status (golden harness, Bybit testnet)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-items-not-yet-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open items (not yet implemented)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related docs
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="design-live-order-execution-fill-confirmation-retry-alerting">Design: Live Order Execution — Fill Confirmation, Retry, Alerting<a class="headerlink" href="#design-live-order-execution-fill-confirmation-retry-alerting" title="Permanent link">&para;</a></h1>
+<div class="admonition info">
+<p class="admonition-title">Status</p>
+<p><strong>Implemented.</strong> Golden-harness manual testing against Bybit testnet validated order
+submission. <code>quant/trade/live_apply.py</code> (<code>LiveApplyOrchestrator</code>) orchestrates signal
+computation, order retry, execution diary writes, and Slack alerting via
+<code>quant/shared/notify.py</code>.</p>
+</div>
+<p><strong>Related:</strong> <a href="../plan-to-profit/#phase-17-live-apply">Plan to Profit §1.7</a>,
+<a href="../trade-deployment-rollout/">Trade Deployment Rollout</a>,
+<a href="../ccxt-trade-and-xref-validation/">ccxt Trade &amp; XREF Validation</a> (dry-run — out of scope there,
+in scope here).</p>
+<hr />
+<h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
+<p>Phase 1.7 needs to actually place orders, not just validate (dry-run, Phase 1.3). Live testnet
+testing surfaced why "just call <code>create_order</code>" is not enough:</p>
+<ol>
+<li><strong>ccxt's immediate response from <code>create_order</code> is not authoritative.</strong> In our first live test,
+   the response had <code>status=None</code> even though the order filled seconds later — Bybit's initial ack
+   does not always carry terminal fill state.</li>
+<li><strong>Bybit's position endpoint (<code>fetch_positions</code>) briefly lags a market fill.</strong> Polling <em>position</em>
+   as a proxy for "did the order fill" is unreliable and gives no failure signal if an order never
+   fills.</li>
+<li><strong>Orders can end up in a genuinely ambiguous state</strong> (still <code>open</code>, <code>OrderNotFound</code> right after
+   submission, network blip mid-poll) that must not block a caller (HTTP request or, later, a
+   worker loop cycling through many deployments) indefinitely.</li>
+<li><strong>Some order failures are permanent, others are transient</strong> — retrying a permission error 5
+   times wastes time; retrying a timeout/unconfirmed fill is exactly when retrying helps.</li>
+</ol>
+<p><strong>Principle:</strong> Confirm fills against the <strong>order itself</strong> (the authoritative source), not an
+indirect signal like aggregate position. Bound every wait. Never silently drop a <code>vendor_order_id</code>,
+even on failure — it is the only way to manually reconcile a stuck order later.</p>
+<hr />
+<h2 id="layering-mechanics-vs-policy">Layering (mechanics vs policy)<a class="headerlink" href="#layering-mechanics-vs-policy" title="Permanent link">&para;</a></h2>
+<p>Per repo convention: lower layers stay policy-agnostic; a single higher layer composes them.</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Module</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mechanics — submit</td>
+<td><code>CcxtTradeGateway.create_market_order</code></td>
+<td>One market order, one ccxt call</td>
+</tr>
+<tr>
+<td>Mechanics — confirm</td>
+<td><code>CcxtTradeGateway.fetch_order</code> (new)</td>
+<td>Read one order's terminal status</td>
+</tr>
+<tr>
+<td>Mechanics — cancel</td>
+<td><code>CcxtTradeGateway.cancel_order</code></td>
+<td>Cancel one order</td>
+</tr>
+<tr>
+<td>Mechanics — submit+confirm</td>
+<td><code>CcxtTradeAdapter.place_order</code></td>
+<td>Submit <strong>one</strong> order, poll to a bounded terminal outcome, return <code>OrderResult</code></td>
+</tr>
+<tr>
+<td>Policy — retry/cancel/alert</td>
+<td><code>quant/trade/live_apply.py</code> (new)</td>
+<td>Wrap one <code>apply_signal()</code> call in the retry/cancel/alert loop; persist <code>EXECUTION_EVENT</code>/<code>TRANSACTION</code></td>
+</tr>
+<tr>
+<td>Policy — notify</td>
+<td><code>quant/shared/notify.py</code> (new)</td>
+<td><code>Notifier</code> interface; <code>SlackNotifier</code> implementation</td>
+</tr>
+</tbody>
+</table>
+<p><code>CcxtTradeAdapter.place_order</code> never retries — it submits once and confirms once (bounded). All
+retry/cancel/alert decisions belong in <code>live_apply.py</code>, which is broker-agnostic (works the same
+for ccxt or Futu adapters).</p>
+<h3 id="prerequisite-tradeadaptercancel_order-signature-fix">Prerequisite: <code>TradeAdapter.cancel_order</code> signature fix<a class="headerlink" href="#prerequisite-tradeadaptercancel_order-signature-fix" title="Permanent link">&para;</a></h3>
+<p>The ABC currently declares <code>cancel_order(self, vendor_order_id: str)</code> (one arg), but ccxt's
+exchange API needs the symbol too — and the ccxt adapter already takes a second arg
+<code>vendor_symbol: str | None = None</code>. The retry loop calls
+<code>adapter.cancel_order(vendor_order_id, vendor_symbol)</code>, which would break if caller code is
+typed against the ABC. <strong>Before implementation:</strong> update <code>TradeAdapter.cancel_order</code> to
+<code>cancel_order(self, vendor_order_id: str, vendor_symbol: str | None = None)</code> and update
+Futu's override to accept and ignore the extra arg.</p>
+<hr />
+<h2 id="fill-confirmation-mechanics-layer">Fill confirmation (mechanics layer)<a class="headerlink" href="#fill-confirmation-mechanics-layer" title="Permanent link">&para;</a></h2>
+<h3 id="poll-fetch_order-not-position">Poll <code>fetch_order</code>, not position<a class="headerlink" href="#poll-fetch_order-not-position" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># CcxtTradeGateway (new)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">fetch_order</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vendor_order_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">vendor_symbol</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="c1"># Bybit via ccxt requires params={"acknowledged": True} or raises:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="c1"># "fetchOrder() can only access an order if it is in last 500 orders..."</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">exchange</span><span class="o">.</span><span class="n">fetch_order</span><span class="p">(</span><span class="n">vendor_order_id</span><span class="p">,</span> <span class="n">vendor_symbol</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"acknowledged"</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+</code></pre></div>
+<h3 id="bounded-backoff">Bounded backoff<a class="headerlink" href="#bounded-backoff" title="Permanent link">&para;</a></h3>
+<p>Total budget <strong>~8-10s</strong>, not indefinite — a synchronous broker call must never hang a caller.</p>
+<table>
+<thead>
+<tr>
+<th>Attempt</th>
+<th>Delay before poll</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>0.3s</td>
+</tr>
+<tr>
+<td>2</td>
+<td>0.6s</td>
+</tr>
+<tr>
+<td>3</td>
+<td>1.2s</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2.4s</td>
+</tr>
+<tr>
+<td>5</td>
+<td>3.5s</td>
+</tr>
+</tbody>
+</table>
+<p><code>OrderNotFound</code> on the first 1-2 polls is <strong>not</strong> a failure — Bybit's own indexing can lag a few
+hundred ms after <code>create_order</code> returns. Treat it as non-terminal and keep polling within budget.
+A transient network/rate-limit error on the <code>fetch_order</code> call itself should also retry within the
+same budget, not abort immediately.</p>
+<h3 id="terminal-outcomes">Terminal outcomes<a class="headerlink" href="#terminal-outcomes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Outcome</th>
+<th>Condition</th>
+<th><code>OrderResult</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Confirmed filled</strong></td>
+<td><code>status='closed'</code>, or <code>status</code> ∈ <code>{canceled, expired}</code> with <code>filled &gt; 0</code> (Bybit market orders behave IOC — a partial-then-auto-canceled remainder is still a real, terminal fill)</td>
+<td><code>success=True</code>; <code>filled_qty</code>, <code>avg_price</code>, <code>fee</code> populated from the order</td>
+</tr>
+<tr>
+<td><strong>Confirmed rejected</strong></td>
+<td><code>status='rejected'</code>, or <code>filled=0</code> and <code>canceled</code>/<code>expired</code></td>
+<td><code>success=False</code>; clear rejection message</td>
+</tr>
+<tr>
+<td><strong>Unconfirmed (timeout)</strong></td>
+<td>still <code>open</code> / <code>None</code> / <code>OrderNotFound</code> after the full backoff budget</td>
+<td><code>success=False</code>; message tagged distinctly, e.g. <code>"fill unconfirmed after 8s — vendor_order_id=X requires manual reconciliation"</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>vendor_order_id</code> is always populated in the result if <code>create_order</code> returned an id — regardless
+of which of the three outcomes above applies. This is the one piece of data that must never be
+lost, since it is what lets a human look the order up on the exchange later.</p>
+<h3 id="orderresult-extension-needed-for-tradetransaction"><code>OrderResult</code> extension (needed for <code>TRADE.TRANSACTION</code>)<a class="headerlink" href="#orderresult-extension-needed-for-tradetransaction" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">OrderResult</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">success</span><span class="p">:</span> <span class="nb">bool</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">vendor_order_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">message</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">raw_status</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">filled_qty</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>   <span class="c1"># new</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">avg_price</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>    <span class="c1"># new</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">fee</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>          <span class="c1"># new</span>
+</code></pre></div>
+<p>Pulled from the confirmed <code>fetch_order</code> response's <code>filled</code> / <code>average</code> / <code>fee</code> fields — this is
+exactly the data <code>TRADE.TRANSACTION.QUANTITY</code> / <code>PRICE</code> / <code>FEE_AMT</code> need (see
+<a href="#data-model-tie-in">Data model tie-in</a> below). Confirming the fill and capturing transaction
+economics is the same call — no separate mechanism needed.</p>
+<div class="admonition warning">
+<p class="admonition-title">ccxt <code>fee</code> is a dict, not a float</p>
+<p>ccxt's unified order structure returns <code>fee</code> as <code>{"cost": 0.05, "currency": "USDT"}</code>, not
+a bare float. The implementation must extract <code>order["fee"]["cost"]</code> (with a <code>None</code> guard)
+when populating <code>OrderResult.fee</code>.</p>
+</div>
+<hr />
+<h2 id="retry-cancel-policy-live_applypy">Retry &amp; cancel policy (<code>live_apply.py</code>)<a class="headerlink" href="#retry-cancel-policy-live_applypy" title="Permanent link">&para;</a></h2>
+<p>Wraps a single <code>adapter.apply_signal(...)</code> attempt in a bounded retry loop. <strong>Not all failures earn
+the same number of retries:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Error class</th>
+<th>Examples (from real testnet testing)</th>
+<th>Retry budget</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Permanent / non-retryable</strong></td>
+<td><code>10005 permission denied</code> (API key missing trade permission), <code>10024 regulatory/KYC block</code>, invalid symbol, invalid order params</td>
+<td><strong>1 attempt</strong> — fail fast, then alert immediately. Identical retries will fail identically and just burn ~10s × N and rate-limit budget for nothing.</td>
+</tr>
+<tr>
+<td><strong>Retryable</strong></td>
+<td>Unconfirmed/timeout fills, transient network errors, rate limits</td>
+<td><strong>Up to 5 attempts</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="loop-retryable-path">Loop (retryable path)<a class="headerlink" href="#loop-retryable-path" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Recompute live position + intended action fresh on every attempt</strong> — do not reuse stale
+   numbers across retries. If a prior attempt partially filled, the qty needed on retry has
+   changed. This is inherently handled by calling <code>adapter.apply_signal(...)</code> (not raw
+   <code>place_order</code>) which re-reads position and re-derives the intended action internally on
+   each invocation.</li>
+<li>Call <code>adapter.apply_signal(...)</code> (single-attempt, bounded per the confirmation policy above).</li>
+<li><strong>Confirmed success</strong> → stop, return success.</li>
+<li><strong>Confirmed permanent rejection</strong> → stop after 1 attempt, go to alert.</li>
+<li><strong>Unconfirmed (timeout)</strong> → <code>adapter.cancel_order(vendor_order_id, vendor_symbol)</code> first (a
+   stuck/resting order must not be left to fill later while we've moved on — that would create an
+   untracked, unexpected position change), short backoff (~2s), then retry.</li>
+<li>After the attempt budget is exhausted without a confirmed fill → <strong>alert</strong> (see below) and
+   still write one <code>TRADE.EXECUTION_EVENT</code> row per attempt (<code>is_success_ind='N'</code>) so there is a full
+   DB audit trail even if the alert channel itself is down.</li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Why the loop calls <code>apply_signal</code>, not <code>place_order</code></p>
+<p>A cancel-before-retry can race the fill — the exchange may ack the cancel but the fill
+arrived first. If so, the live position on the next iteration has shifted (e.g. we went
+from flat to partially long). Calling <code>apply_signal</code> (which includes a fresh position
+read + <code>intended_side</code> derivation) instead of replaying the same <code>OrderRequest</code> naturally
+adapts the next order's side and qty to whatever position state actually exists.</p>
+</div>
+<p>Worst case for the retryable path: <strong>5 attempts × ~10s ≈ 50s</strong> before alerting. Acceptable for a
+synchronous per-deployment apply call today; revisit if/when this runs inside a scheduled worker
+looping over many deployments (Phase 2, per
+<a href="../trade-deployment-rollout/#worker-minimal-for-m1">Trade Deployment Rollout §Worker</a>) — may want a
+tighter cap (e.g. 3 attempts, ~30s) there so one stuck deployment cannot starve the batch.</p>
+<pre class="mermaid"><code>flowchart TD
+  A[apply_signal attempt] --&gt; B{Outcome?}
+  B --&gt;|Confirmed filled| DONE[Return success]
+  B --&gt;|Permanent rejection| ALERT[Alert + EXECUTION_EVENT rows]
+  B --&gt;|Unconfirmed / timeout| C[cancel_order]
+  C --&gt; D{Attempts &lt; 5?}
+  D --&gt;|Yes| E[backoff ~2s] --&gt; A
+  D --&gt;|No| ALERT</code></pre>
+<hr />
+<h2 id="alerting">Alerting<a class="headerlink" href="#alerting" title="Permanent link">&para;</a></h2>
+<h3 id="relation-to-the-existing-telegram-decision">Relation to the existing Telegram decision<a class="headerlink" href="#relation-to-the-existing-telegram-decision" title="Permanent link">&para;</a></h3>
+<p><a href="../plan-to-profit/#56-review-outcomes-2026-06-20">Plan to Profit §5.6</a> already
+established: <em>"Keep Telegram in 2.4 as the first target; implement a notifier interface so Slack
+can be added without rewiring trade logic."</em> That decision is about <strong>user-facing</strong> alerts (a
+per-user Telegram chat id, notified on their own deployment's apply failures) — Phase 2.4, not
+built yet.</p>
+<p>The alert described here is a <strong>different audience</strong>: an <strong>internal/ops</strong> signal that a live order
+is stuck in an unconfirmed state after exhausting retries and needs manual reconciliation against
+the exchange. It is not per-user and does not wait for Phase 2.4.</p>
+<p><strong>Resolution:</strong> build the notifier interface now, starting with Slack (the immediate need) instead
+of Telegram (the original 2.4 target) — satisfies the existing decision's intent ("notifier
+interface so Slack can be added without rewiring trade logic") while unblocking today's need. When
+Phase 2.4 lands, <code>TelegramNotifier</code> implements the same interface for the user-facing case.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># quant/shared/notify.py (new)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">Notifier</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">send</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">SlackNotifier</span><span class="p">:</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="sd">"""Best-effort — a notification failure must never crash the trading pipeline."""</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">webhook_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">send</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>            <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_webhook_url</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">"text"</span><span class="p">:</span> <span class="n">message</span><span class="p">},</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">"Slack alert failed to send"</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<p>Env: <code>SLACK_WEBHOOK_URL</code> in <code>.env</code> (not committed — same convention as other secrets). If unset,
+<code>live_apply.py</code> logs the alert at <code>ERROR</code> level instead of raising — an alerting misconfiguration
+must never block order handling or crash the caller.</p>
+<p><strong>When to point the webhook at a prod ops channel vs test-env:</strong> <a href="../../guides/live-trading-promotion/#4-slack-test-channel-production-ops">Live Trading Promotion</a>.</p>
+<h3 id="alert-content">Alert content<a class="headerlink" href="#alert-content" title="Permanent link">&para;</a></h3>
+<p>Deployment id, strategy id/vid, symbol, signal, side + qty attempted, every <code>vendor_order_id</code>
+attempted (even unconfirmed ones), the last error message, and a timestamp — enough for a human to
+go straight to the exchange UI and reconcile without digging through logs first.</p>
+<hr />
+<h2 id="data-model-tie-in">Data model tie-in<a class="headerlink" href="#data-model-tie-in" title="Permanent link">&para;</a></h2>
+<p>Already fully modeled — see <code>db/liquidbase/trade/tables/EXECUTION_EVENT.sql</code>
+and <code>db/liquidbase/trade/tables/TRANSACTION.sql</code>, with Python wrappers
+already on <code>TradeRepo</code> (<code>sp_ins_execution_event</code>, <code>sp_ins_transaction</code>). Nothing currently calls
+them — that wiring is exactly what <code>live_apply.py</code> adds.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Written when</th>
+<th>Key fields</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TRADE.EXECUTION_EVENT</code></td>
+<td><strong>Every</strong> attempt (success, permanent rejection, or unconfirmed timeout)</td>
+<td><code>SIGNAL_VALUE</code>, <code>BUY_SELL_CD</code>, <code>QUANTITY</code> (requested), <code>VENDOR_ORDER_ID</code>, <code>IS_SUCCESS_IND</code></td>
+</tr>
+<tr>
+<td><code>TRADE.TRANSACTION</code></td>
+<td><strong>Only</strong> on a confirmed fill</td>
+<td><code>QUANTITY</code> (filled), <code>PRICE</code> (avg fill), <code>NOTIONAL_AMT</code>, <code>FEE_AMT</code>, <code>VENDOR_ORDER_ID</code>, <code>TRANS_CCY_CD</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="known-gaps-in-the-current-schema">Known gaps in the current schema<a class="headerlink" href="#known-gaps-in-the-current-schema" title="Permanent link">&para;</a></h3>
+<p><strong><code>EXECUTION_EVENT</code> has no error message column.</strong> When <code>IS_SUCCESS_IND='N'</code>, the <em>reason</em>
+(e.g. <code>10005 permission denied</code>) is not stored — only the fact of failure plus the
+<code>VENDOR_ORDER_ID</code> (if any). Error details are recoverable from application logs but not from
+the DB alone. A future <code>MESSAGE TEXT</code> nullable column could close this gap; not blocking for M1
+since the Slack alert captures the message in real time.</p>
+<p><strong><code>EXECUTION_EVENT</code> has no <code>INTENDED_SIDE</code> column.</strong> The table stores <code>BUY_SELL_CD</code> (the raw
+exchange order side — <code>BUY</code> or <code>SELL</code>) but not the richer 5-way action
+(<code>BUY</code>/<code>SELL</code>/<code>HOLD</code>/<code>OPEN_SHORT</code>/<code>CLOSE_SHORT</code>). This is intentional: <code>HOLD</code> means no order
+was attempted, so no event row is written. For the other four, the combination of <code>BUY_SELL_CD</code>
++ <code>SIGNAL_VALUE</code> + the position at the time is sufficient to reconstruct the action. A
+dedicated column may be useful for simpler UI queries later but is not required.</p>
+<p><strong><code>TRANSACTION</code> requires <code>TRANS_CCY_CD TEXT NOT NULL</code>.</strong> This column is not optional — for
+USDT perpetuals it will always be <code>"USDT"</code>. The implementation must populate it from the
+deployment's exchange context (e.g. derived from <code>INTERNAL_CUSIP</code> suffix or the exchange
+preset's settlement currency). This should be resolved during <code>live_apply.py</code> implementation.</p>
+<hr />
+<h2 id="testing-status-golden-harness-bybit-testnet">Testing status (golden harness, Bybit testnet)<a class="headerlink" href="#testing-status-golden-harness-bybit-testnet" title="Permanent link">&para;</a></h2>
+<p>Manual lifecycle test via <code>scripts/bybit_local_testnet.py --apply-signal {signal} --confirm</code>,
+human-verified against <code>testnet.bybit.com</code> after each step (see
+<a href="../plan-to-profit/#phase-17-live-apply">Plan to Profit §1.7</a> for the running log).</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Account funding check</td>
+<td>Found <code>usdt_nav=None</code> — UNIFIED account had <code>totalEquity=0</code>. Resolved by user funding via testnet faucet.</td>
+</tr>
+<tr>
+<td>BUY (signal=+1, flat→long)</td>
+<td>First 2 attempts failed on account-level blockers, not code: <code>10005 permission denied</code> (API key lacked trade permission — fixed via Bybit key settings) then <code>10024</code> regulatory/KYC risk-disclosure gate (fixed by accepting the one-time disclosure via Bybit's UI). Third attempt: <strong>filled</strong> — confirmed directly via raw <code>fetch_positions</code> (<code>size=0.001</code>, <code>side=Buy</code>, <code>entryPrice=62788</code>).</td>
+</tr>
+<tr>
+<td>Bug found: <code>fetch_position_qty</code> symbol mismatch</td>
+<td>Gateway compared <code>pos.get("symbol")</code> (ccxt unified, e.g. <code>BTC/USDT:USDT</code>) against <code>vendor_symbol</code> (raw exchange symbol, e.g. <code>BTCUSDT</code>) — always fell through to <code>0.0</code>. Masked previously because no test had an open position. <strong>Fixed</strong> — now checks unified symbol, raw symbol, and <code>info.symbol</code>. 3 regression tests added.</td>
+</tr>
+<tr>
+<td>HOLD (signal=+1, already long)</td>
+<td>Confirmed — no order sent, position unchanged.</td>
+</tr>
+<tr>
+<td>SELL (signal=0, long→flat)</td>
+<td><strong>Filled</strong> — <code>position_before=0.001 → action=SELL qty=0.001</code>, <code>position_after=0.0</code>.</td>
+</tr>
+<tr>
+<td>HOLD (signal=0, already flat)</td>
+<td>Confirmed — no order sent.</td>
+</tr>
+<tr>
+<td>OPEN_SHORT (signal=-1, flat→short)</td>
+<td><strong>Filled</strong> — <code>position_after=-0.001</code>; cross-checked directly against raw <code>fetch_positions</code>: <code>side=Sell, size=0.001, avgPrice=62766.6</code>.</td>
+</tr>
+<tr>
+<td>CLOSE_SHORT (signal=0, short→flat)</td>
+<td><strong>Filled</strong> — <code>position_before=-0.001 → action=CLOSE_SHORT qty=0.001</code>, <code>position_after=0.0</code>.</td>
+</tr>
+<tr>
+<td>Final suite re-run</td>
+<td><code>--suite</code>: <strong>12 passed, 0 failed, 1 skipped</strong>. Account flat (<code>position_qty=0.0</code>), <code>usdt_nav=4999.88</code> (down ~$0.12 from the initial 5000 USDT — consistent with trading fees across 4 real fills).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>All 6 lifecycle actions (<code>BUY</code>, <code>HOLD</code>×2, <code>SELL</code>, <code>OPEN_SHORT</code>, <code>CLOSE_SHORT</code>) have now been
+exercised and human-verified against live Bybit testnet.</strong> Live order submission mechanics
+(<code>create_market_order</code> → <code>place_order</code> → <code>apply_signal</code>) are proven correct; the fire-and-forget
+confirmation (immediate response + harness-level position poll) worked for all 4 real fills in
+this test run, but the poll-to-confirm-via-<code>fetch_order</code> design above is still needed for
+production robustness (a fire-and-forget approach has no way to distinguish "still processing"
+from "rejected" if position doesn't change as expected).</p>
+<p>Unit suite: <code>tests/unit/test_bybit_adapter.py</code> (34 tests, includes new <code>place_order</code>/<code>apply_signal</code>/
+<code>fetch_position_qty</code> coverage) + <code>test_trade*.py</code> (72 tests) — all green as of this design's
+authoring.</p>
+<hr />
+<h2 id="open-items-not-yet-implemented">Open items (not yet implemented)<a class="headerlink" href="#open-items-not-yet-implemented" title="Permanent link">&para;</a></h2>
+<p><strong>Prerequisite fixes:</strong></p>
+<ul>
+<li>[x] Update <code>TradeAdapter.cancel_order</code> ABC signature to <code>(self, vendor_order_id: str, vendor_symbol: str | None = None)</code> — done; <code>FutuTrader</code> is standalone (not a <code>TradeAdapter</code> subclass), so no override needed</li>
+<li>[ ] Resolve <code>TRANS_CCY_CD</code> population strategy for <code>TRADE.TRANSACTION</code> (hardcode <code>"USDT"</code> per preset, or derive from cusip/exchange config)</li>
+</ul>
+<p><strong>Core implementation:</strong></p>
+<ul>
+<li>[ ] <code>CcxtTradeGateway.fetch_order</code> (poll-to-confirm mechanics, Bybit <code>acknowledged=True</code> param)</li>
+<li>[ ] Extend <code>OrderResult</code> with <code>filled_qty</code> / <code>avg_price</code> / <code>fee</code> (extract <code>fee["cost"]</code> from ccxt's dict structure)</li>
+<li>[ ] <code>CcxtTradeAdapter.place_order</code> — replace fire-and-forget with bounded poll-to-confirm</li>
+<li>[ ] <code>quant/trade/live_apply.py</code> — retry/cancel policy loop + <code>EXECUTION_EVENT</code>/<code>TRANSACTION</code> writes</li>
+<li>[ ] <code>quant/shared/notify.py</code> — <code>Notifier</code> interface + <code>SlackNotifier</code></li>
+<li>[ ] <code>SLACK_WEBHOOK_URL</code> in <code>.env.example</code></li>
+</ul>
+<p><strong>Testing:</strong></p>
+<ul>
+<li>[ ] Unit tests: retry loop (permanent vs retryable branching, attempt cap, cancel-before-retry), <code>Notifier</code>/<code>SlackNotifier</code></li>
+<li>[x] Complete manual lifecycle test on testnet: BUY, HOLD, SELL, HOLD, OPEN_SHORT, CLOSE_SHORT — all 6 confirmed, see <a href="#testing-status-golden-harness-bybit-testnet">Testing status</a></li>
+</ul>
+<p><strong>Deferred:</strong></p>
+<ul>
+<li>[ ] Slack notifier (<code>quant/shared/notify.py</code>, <code>SlackNotifier</code>, <code>SLACK_WEBHOOK_URL</code>) — explicitly deferred; user will provide further detail before implementation</li>
+<li>[ ] Decide worker-context retry budget (Phase 2) — likely tighter than the synchronous-apply budget above</li>
+<li>[ ] Optional: add <code>MESSAGE TEXT</code> column to <code>EXECUTION_EVENT</code> for DB-queryable error diagnostics</li>
+</ul>
+<hr />
+<h2 id="related-docs">Related docs<a class="headerlink" href="#related-docs" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../plan-to-profit/#phase-17-live-apply">Plan to Profit §1.7</a> — phase tracking, exit criteria</li>
+<li><a href="../trade-deployment-rollout/">Trade Deployment Rollout</a> — Phase 1.6-1.8 rollout plan, worker options</li>
+<li><a href="../ccxt-trade-and-xref-validation/">ccxt Trade &amp; XREF Validation</a> — dry-run design (Phase 1.3); explicitly out-of-scopes live order placement to this doc</li>
+<li><a href="../trade-api/">Trade API</a> — full API + schema reference</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>

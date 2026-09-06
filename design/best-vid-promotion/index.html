@@ -1,0 +1,3520 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/design/best-vid-promotion/">
+      
+      
+        <link rel="prev" href="../user-isolation/">
+      
+      
+        <link rel="next" href="../trade-deployment-rollout/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Best-VID Promotion - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#best-vid-promotion-model" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Best-VID Promotion
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../backtest-queue/" class="md-tabs__link">
+          
+  
+  
+  Design Docs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../archive/" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-is_best_ind-column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design — IS_BEST_IND column
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Design — IS_BEST_IND column">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key semantics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-database-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Database Changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Database Changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1a-add-column-to-btstrategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1a. Add column to BT.STRATEGY
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1b-modify-sp_ins_strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1b. Modify SP_INS_STRATEGY
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1c-sp_upd_promote_strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1c. SP_UPD_PROMOTE_STRATEGY
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1d-update-sp_get_strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1d. Update SP_GET_STRATEGY
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1e-terminal-procs-fnsp_get_queue_for_terminal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1e. Terminal procs (FN/SP_GET_QUEUE_FOR_TERMINAL)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1f-liquibase-changesets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1f. Liquibase changesets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-promotion-metric-configuration-refdata-driven" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Promotion Metric Configuration — REFDATA-driven
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Promotion Metric Configuration — REFDATA-driven">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#refdatapromotion_metric-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        REFDATA.PROMOTION_METRIC table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#evaluation-logic-quantqueuepromotepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluation logic (quant/queue/promote.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#liquibase-changeset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Liquibase changeset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#default-seed-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default seed data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-python-auto-promote-in-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Python — Auto-Promote in Worker
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Python — Auto-Promote in Worker">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#3a-promotion-helper-quantqueuepromotepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3a. Promotion helper (quant/queue/promote.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3b-worker-completion-quantqueueworkerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3b. Worker completion (quant/queue/worker.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3c-btqueuerepo-wrapper-quantqueuerepopy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3c. BtQueueRepo wrapper (quant/queue/repo.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-manual-promote-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Manual Promote API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Manual Promote API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#4a-new-endpoint-in-quantapiroutersjobspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4a. New endpoint in quant/api/routers/jobs.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-ui-pipeline-tab-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. UI — Pipeline Tab Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. UI — Pipeline Tab Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#5a-queue-tab-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5a. Queue tab (implemented)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5b-promotion-tab-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5b. Promotion tab (implemented)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5c-design-principle-progressive-disclosure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5c. Design principle — progressive disclosure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5d-logical-delete-retiring-a-strategy-that-should-not-be-used" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5d. Logical delete — retiring a strategy that should not be used
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-shared-strategy-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Shared Strategy Pool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-promotion-outcome-persistence-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Promotion Outcome Persistence — Implemented
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resolved-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolved Questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-order-execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-data-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plan-to-profit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-is_best_ind-column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design — IS_BEST_IND column
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Design — IS_BEST_IND column">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key semantics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-database-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Database Changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Database Changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1a-add-column-to-btstrategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1a. Add column to BT.STRATEGY
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1b-modify-sp_ins_strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1b. Modify SP_INS_STRATEGY
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1c-sp_upd_promote_strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1c. SP_UPD_PROMOTE_STRATEGY
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1d-update-sp_get_strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1d. Update SP_GET_STRATEGY
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1e-terminal-procs-fnsp_get_queue_for_terminal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1e. Terminal procs (FN/SP_GET_QUEUE_FOR_TERMINAL)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1f-liquibase-changesets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1f. Liquibase changesets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-promotion-metric-configuration-refdata-driven" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Promotion Metric Configuration — REFDATA-driven
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Promotion Metric Configuration — REFDATA-driven">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#refdatapromotion_metric-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        REFDATA.PROMOTION_METRIC table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#evaluation-logic-quantqueuepromotepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluation logic (quant/queue/promote.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#liquibase-changeset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Liquibase changeset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#default-seed-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default seed data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-python-auto-promote-in-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Python — Auto-Promote in Worker
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Python — Auto-Promote in Worker">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#3a-promotion-helper-quantqueuepromotepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3a. Promotion helper (quant/queue/promote.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3b-worker-completion-quantqueueworkerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3b. Worker completion (quant/queue/worker.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3c-btqueuerepo-wrapper-quantqueuerepopy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3c. BtQueueRepo wrapper (quant/queue/repo.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-manual-promote-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Manual Promote API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Manual Promote API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#4a-new-endpoint-in-quantapiroutersjobspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4a. New endpoint in quant/api/routers/jobs.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-ui-pipeline-tab-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. UI — Pipeline Tab Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. UI — Pipeline Tab Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#5a-queue-tab-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5a. Queue tab (implemented)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5b-promotion-tab-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5b. Promotion tab (implemented)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5c-design-principle-progressive-disclosure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5c. Design principle — progressive disclosure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5d-logical-delete-retiring-a-strategy-that-should-not-be-used" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5d. Logical delete — retiring a strategy that should not be used
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-shared-strategy-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Shared Strategy Pool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-promotion-outcome-persistence-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Promotion Outcome Persistence — Implemented
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resolved-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolved Questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="best-vid-promotion-model">Best-VID Promotion Model<a class="headerlink" href="#best-vid-promotion-model" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Implemented (DB + Python + API + UI + outcome persistence + Promotion tab). Deployed to prod.</p>
+<h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
+<p><code>SP_INS_STRATEGY</code> always makes the newest VID active (<code>TRANSACT_TO_TS = 9999-12-31</code>) and closes the previous one — even if the new VID performs worse. There is no way to distinguish "latest version" from "best version".</p>
+<div class="admonition note">
+<p class="admonition-title">Same name, duplicate VID=1 rows</p>
+<p>A separate bug causes every enqueue to mint a <strong>new</strong> <code>STRATEGY_ID</code>, so the
+same <code>STRATEGY_NM</code> never increments VID. That breaks the Promotion UI (two
+cards both at <code>v1</code>). See <a href="../../archive/strategy-vid-versioning/">Strategy VID Versioning by Name</a>
+for the fix, data cleanup, and <code>UNIQUE (USER_ID, STRATEGY_NM, STRATEGY_VID)</code>.</p>
+</div>
+<h2 id="design-is_best_ind-column">Design — <code>IS_BEST_IND</code> column<a class="headerlink" href="#design-is_best_ind-column" title="Permanent link">&para;</a></h2>
+<p>Separate two concerns:
+- <strong><code>TRANSACT_TO_TS</code></strong> = temporal versioning (which version is the latest/current) — unchanged
+- <strong><code>IS_BEST_IND</code></strong> = quality flag (which version performed best) — new column</p>
+<pre class="mermaid"><code>flowchart TD
+    subgraph insert [Strategy Insert]
+        A["SP_INS_STRATEGY"] --&gt; B{First VID?}
+        B --&gt;|Yes| C["IS_BEST_IND = 'Y'\nNo baseline to compare"]
+        B --&gt;|No| D["IS_BEST_IND = 'N'\nAwaits backtest result"]
+    end
+    subgraph promote [After Backtest]
+        E["Worker completes backtest"] --&gt; F{"passes_hard_gates?"}
+        F --&gt;|No| F2{"Is current best?"}
+        F2 --&gt;|Yes, VID 1| F4["KEEP\nVID 1 stays default best"]
+        F2 --&gt;|Yes, VID &gt; 1| F3["DEMOTE\nrestore VID 1 as best"]
+        F2 --&gt;|No| F4b["REJECT\nLog decision"]
+        F --&gt;|Yes| G{"Current best\nhas a RESULT?"}
+        G --&gt;|No| H["PROMOTE"]
+        G --&gt;|Yes| I{"should_promote?\n(soft comparison)"}
+        I --&gt;|Yes| H
+        I --&gt;|No| J["KEEP current best\nLog decision"]
+        H --&gt; K["SP_UPD_PROMOTE_STRATEGY\nFlip IS_BEST_IND"]
+    end
+    subgraph manual [Manual Override]
+        L["POST /strategies/{id}/promote"] --&gt; K
+    end</code></pre>
+<h3 id="key-semantics">Key semantics<a class="headerlink" href="#key-semantics" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>TRANSACT_TO_TS = 9999-12-31</code> = <strong>latest version</strong> (temporal, unchanged behavior)</li>
+<li><code>IS_BEST_IND = 'Y'</code> = <strong>best-performing version</strong> (exactly one per <code>STRATEGY_ID</code>)</li>
+<li>VID 1 starts as <code>IS_BEST_IND = 'Y'</code> and <strong>remains</strong> the default best even when its backtest fails hard gates</li>
+<li>VID 2+ starts as <code>IS_BEST_IND = 'N'</code> — promoted only after beating the current best</li>
+<li>Comparison only ever compares the new VID vs the one row with <code>IS_BEST_IND = 'Y'</code></li>
+<li><strong>Demotion</strong>: if a promoted VID (&gt;1) fails hard gates while it is best, it is demoted and <strong>VID 1 is restored</strong> as the default best (<code>SP_UPD_PROMOTE_STRATEGY</code> demote-only fallback)</li>
+</ul>
+<h2 id="1-database-changes">1. Database Changes<a class="headerlink" href="#1-database-changes" title="Permanent link">&para;</a></h2>
+<h3 id="1a-add-column-to-btstrategy">1a. Add column to <code>BT.STRATEGY</code><a class="headerlink" href="#1a-add-column-to-btstrategy" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">IS_BEST_IND</span><span class="w">  </span><span class="nb">CHAR</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span>
+</code></pre></div>
+<p>No <code>DEFAULT</code> — value is always set explicitly by <code>SP_INS_STRATEGY</code>. Backfill (Liquibase 1.6.0-001): set <code>IS_BEST_IND = 'Y'</code> for every row where <code>TRANSACT_TO_TS = 9999-12-31</code> (current active row = presumed best since no comparison data exists yet), <code>'N'</code> for the rest.</p>
+<h3 id="1b-modify-sp_ins_strategy">1b. Modify <code>SP_INS_STRATEGY</code><a class="headerlink" href="#1b-modify-sp_ins_strategy" title="Permanent link">&para;</a></h3>
+<p>Insert column added. No change to the <code>TRANSACT_TO_TS</code> close-and-insert logic.</p>
+<ul>
+<li><strong>VID 1</strong>: <code>IS_BEST_IND = 'Y'</code></li>
+<li><strong>VID 2+</strong>: <code>IS_BEST_IND = 'N'</code></li>
+</ul>
+<h3 id="1c-sp_upd_promote_strategy">1c. <code>SP_UPD_PROMOTE_STRATEGY</code><a class="headerlink" href="#1c-sp_upd_promote_strategy" title="Permanent link">&para;</a></h3>
+<p>Signature:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>IN  IN_STRATEGY_ID   UUID
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>IN  IN_STRATEGY_VID  INTEGER   -- the VID to promote (NULL = demote-only)
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>IN  IN_USER_ID       TEXT      -- audit
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>OUT status triplet
+</code></pre></div></p>
+<p>Logic:
+1. Demote current best: <code>UPDATE BT.STRATEGY SET IS_BEST_IND = 'N' WHERE STRATEGY_ID = IN_STRATEGY_ID AND IS_BEST_IND = 'Y'</code>
+2. If <code>IN_STRATEGY_VID IS NULL</code> → <strong>demote-only</strong>, then restore <strong>VID 1</strong> as <code>IS_BEST_IND='Y'</code> when no best remains
+3. Promote target: <code>UPDATE BT.STRATEGY SET IS_BEST_IND = 'Y' WHERE STRATEGY_ID = IN_STRATEGY_ID AND STRATEGY_VID = IN_STRATEGY_VID</code></p>
+<h3 id="1d-update-sp_get_strategy">1d. Update <code>SP_GET_STRATEGY</code><a class="headerlink" href="#1d-update-sp_get_strategy" title="Permanent link">&para;</a></h3>
+<p>Add <code>IS_BEST_IND</code> to all cursor SELECT lists. New parameter <code>IN_IS_BEST_IND</code> enables fetching the best VID directly (<code>SP_GET_STRATEGY(strategy_id, is_best_ind='Y')</code>).</p>
+<h3 id="1e-terminal-procs-fnsp_get_queue_for_terminal">1e. Terminal procs (<code>FN/SP_GET_QUEUE_FOR_TERMINAL</code>)<a class="headerlink" href="#1e-terminal-procs-fnsp_get_queue_for_terminal" title="Permanent link">&para;</a></h3>
+<p>Updated to derive <code>STRAT_CURRENT_IND</code> from <code>TRANSACT_TO_TS</code> (instead of the dropped <code>IS_CURRENT_IND</code>) and include <code>IS_BEST_IND</code> in the result set. The function required <code>DROP FUNCTION</code> before <code>CREATE OR REPLACE</code> because the return type changed.</p>
+<h3 id="1f-liquibase-changesets">1f. Liquibase changesets<a class="headerlink" href="#1f-liquibase-changesets" title="Permanent link">&para;</a></h3>
+<p><strong><code>1.6.0-promote-strategy.xml</code></strong> (deployed):</p>
+<ul>
+<li>001: <code>ALTER TABLE BT.STRATEGY ADD COLUMN IS_BEST_IND</code> + backfill</li>
+<li>002: <code>SP_INS_STRATEGY</code> (add IS_BEST_IND to INSERT)</li>
+<li>003: <code>SP_UPD_PROMOTE_STRATEGY</code> (new)</li>
+<li>004: <code>SP_GET_STRATEGY</code> (add IS_BEST_IND to cursors)</li>
+</ul>
+<p><strong><code>1.7.0-auto-promote-terminal-fix.xml</code></strong> (deployed):</p>
+<ul>
+<li>001: <code>SP_GET_STRATEGY</code> — add <code>IN_IS_BEST_IND</code> parameter (3 fetch modes: exact VID, best, active)</li>
+<li>002: <code>SP_GET_QUEUE_FOR_TERMINAL</code> — derive <code>STRAT_CURRENT_IND</code> from <code>TRANSACT_TO_TS</code></li>
+<li>003a: <code>DROP FUNCTION FN_GET_QUEUE_FOR_TERMINAL</code> (return type changed)</li>
+<li>003: <code>FN_GET_QUEUE_FOR_TERMINAL</code> — recreate with <code>IS_BEST_IND</code> output</li>
+</ul>
+<h2 id="2-promotion-metric-configuration-refdata-driven">2. Promotion Metric Configuration — REFDATA-driven<a class="headerlink" href="#2-promotion-metric-configuration-refdata-driven" title="Permanent link">&para;</a></h2>
+<p>Promotion criteria are <strong>not hardcoded</strong> in Python. They are stored in <code>REFDATA.PROMOTION_METRIC</code> and loaded at runtime via <code>RedisRefData.get_promotion_metrics()</code>.</p>
+<h3 id="refdatapromotion_metric-table">REFDATA.PROMOTION_METRIC table<a class="headerlink" href="#refdatapromotion_metric-table" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NAME</td>
+<td>TEXT</td>
+<td>Unique key (e.g. <code>sharpe_gate</code>)</td>
+</tr>
+<tr>
+<td>DISPLAY_NAME</td>
+<td>TEXT</td>
+<td>UI label</td>
+</tr>
+<tr>
+<td>METRIC_KEY</td>
+<td>TEXT</td>
+<td>Matches <code>performance.strategy_metrics</code> key in PAYLOAD_JSON</td>
+</tr>
+<tr>
+<td>DIRECTION</td>
+<td>TEXT</td>
+<td><code>higher_is_better</code> or <code>lower_is_better</code></td>
+</tr>
+<tr>
+<td>REQUIREMENT_TYPE</td>
+<td>TEXT</td>
+<td><code>HARD</code> = threshold gate, <code>SOFT</code> = comparison metric</td>
+</tr>
+<tr>
+<td>PRIORITY</td>
+<td>INTEGER</td>
+<td>Evaluation order (1 = first)</td>
+</tr>
+<tr>
+<td>THRESHOLD</td>
+<td>NUMERIC</td>
+<td>Required value for HARD gates (NULL for SOFT)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="evaluation-logic-quantqueuepromotepy">Evaluation logic (<code>quant/queue/promote.py</code>)<a class="headerlink" href="#evaluation-logic-quantqueuepromotepy" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Phase 1 — Hard gates</strong>: All HARD metrics must pass their threshold. Any failure → skip promote.</li>
+<li><strong>Phase 2 — Soft comparison</strong>: Compared in priority order against the current best VID. First decisive win/loss decides. All ties → no promote (conservative).</li>
+</ol>
+<h3 id="liquibase-changeset">Liquibase changeset<a class="headerlink" href="#liquibase-changeset" title="Permanent link">&para;</a></h3>
+<p><strong><code>refdata/releases/1.3.0-promotion-metric.xml</code></strong> (deployed):</p>
+<ul>
+<li>001: Create <code>REFDATA.PROMOTION_METRIC</code> table</li>
+<li>002: Seed default metrics (wrapped in <code>CDATA</code> — display names contain GT/LTE)</li>
+<li>003: Fix display names (avoid <code>&gt;</code> / <code>&lt;=</code> in XML: <code>Sharpe GT 0</code>, <code>Max DD LTE 40%</code>)</li>
+</ul>
+<h3 id="default-seed-data">Default seed data<a class="headerlink" href="#default-seed-data" title="Permanent link">&para;</a></h3>
+<p>Priority follows the same convention as <code>BT.QUEUE</code>: <strong>lower number = higher priority</strong> (evaluated first).</p>
+<table>
+<thead>
+<tr>
+<th>NAME</th>
+<th>DISPLAY_NAME</th>
+<th>TYPE</th>
+<th>PRIORITY</th>
+<th>THRESHOLD</th>
+<th>METRIC_KEY</th>
+<th>DIRECTION</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sharpe_gate</td>
+<td>Sharpe GT 0</td>
+<td>HARD</td>
+<td>0</td>
+<td>0</td>
+<td>Sharpe Ratio</td>
+<td>higher_is_better</td>
+</tr>
+<tr>
+<td>max_dd_gate</td>
+<td>Max DD LTE 40%</td>
+<td>HARD</td>
+<td>10</td>
+<td>0.40</td>
+<td>Max Drawdown</td>
+<td>lower_is_better</td>
+</tr>
+<tr>
+<td>sharpe_compare</td>
+<td>Sharpe Ratio</td>
+<td>SOFT</td>
+<td>0</td>
+<td>—</td>
+<td>Sharpe Ratio</td>
+<td>higher_is_better</td>
+</tr>
+<tr>
+<td>calmar_compare</td>
+<td>Calmar Ratio</td>
+<td>SOFT</td>
+<td>20</td>
+<td>—</td>
+<td>Calmar Ratio</td>
+<td>higher_is_better</td>
+</tr>
+<tr>
+<td>total_return</td>
+<td>Total Return</td>
+<td>SOFT</td>
+<td>40</td>
+<td>—</td>
+<td>Total Return</td>
+<td>higher_is_better</td>
+</tr>
+<tr>
+<td>annualized_return</td>
+<td>Annualized Return</td>
+<td>SOFT</td>
+<td>60</td>
+<td>—</td>
+<td>Annualized Return</td>
+<td>higher_is_better</td>
+</tr>
+<tr>
+<td>max_drawdown</td>
+<td>Max Drawdown</td>
+<td>SOFT</td>
+<td>80</td>
+<td>—</td>
+<td>Max Drawdown</td>
+<td>lower_is_better</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-python-auto-promote-in-worker">3. Python — Auto-Promote in Worker<a class="headerlink" href="#3-python-auto-promote-in-worker" title="Permanent link">&para;</a></h2>
+<h3 id="3a-promotion-helper-quantqueuepromotepy">3a. Promotion helper (<code>quant/queue/promote.py</code>)<a class="headerlink" href="#3a-promotion-helper-quantqueuepromotepy" title="Permanent link">&para;</a></h3>
+<p>Three public functions:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">passes_hard_gates</span><span class="p">(</span><span class="n">payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">promotion_metrics</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="sd">"""Return True if payload passes every HARD-type gate."""</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">should_promote</span><span class="p">(</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">new_payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">best_payload</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">promotion_metrics</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="sd">"""Full promotion check: hard gates then soft comparison."""</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_promotion</span><span class="p">(</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="n">new_payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="n">best_payload</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">promotion_metrics</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    <span class="n">is_current_best</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>    <span class="n">best_vid</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PromotionDecision</span><span class="p">:</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span><span class="sd">"""Structured evaluation — returns outcome + gate results + decisive metric."""</span>
+</code></pre></div>
+<ul>
+<li>Receives metric config from REFDATA (no hardcoded sets)</li>
+<li><code>passes_hard_gates</code> / <code>should_promote</code> — original bool helpers (still used by tests)</li>
+<li><code>evaluate_promotion</code> — wraps both and returns a <code>PromotionDecision</code> dataclass:</li>
+<li><code>outcome</code>: <code>PROMOTED</code> | <code>KEPT</code> | <code>DEMOTED</code> | <code>REJECTED</code></li>
+<li><code>gate_results</code>: list of <code>GateResult(name, metric_key, passed, value, threshold)</code></li>
+<li><code>compared_vid</code> — the soft-comparison opponent (<code>NULL</code> when the candidate <em>is</em> the current best / VID 1, or when there is no baseline)</li>
+<li>Handles NaN / missing gracefully (don't promote if new metric is NaN)</li>
+</ul>
+<h3 id="3b-worker-completion-quantqueueworkerpy">3b. Worker completion (<code>quant/queue/worker.py</code>)<a class="headerlink" href="#3b-worker-completion-quantqueueworkerpy" title="Permanent link">&para;</a></h3>
+<p>After writing <code>BT.RESULT</code> and before marking COMPLETED:</p>
+<ol>
+<li>Load <code>promotion_metrics</code> from <code>RefData.get_promotion_metrics()</code></li>
+<li>Find current best VID for this <code>strategy_id</code> via <code>SP_GET_STRATEGY(is_best_ind='Y')</code></li>
+<li>If not the current best, fetch the best VID's <code>BT.RESULT</code> payload for comparison</li>
+<li>Call <code>evaluate_promotion(payload, best_payload, promotion_metrics, ...)</code></li>
+<li>Act on the outcome: <code>DEMOTED</code> → <code>SP_UPD_PROMOTE_STRATEGY(vid=NULL)</code>, <code>PROMOTED</code> → <code>SP_UPD_PROMOTE_STRATEGY(vid=new_vid)</code></li>
+<li><strong>Persist</strong> the decision via <code>SP_INS_PROMOTION</code> with gate results and decisive metric detail</li>
+</ol>
+<h3 id="3c-btqueuerepo-wrapper-quantqueuerepopy">3c. <code>BtQueueRepo</code> wrapper (<code>quant/queue/repo.py</code>)<a class="headerlink" href="#3c-btqueuerepo-wrapper-quantqueuerepopy" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>sp_upd_promote_strategy(strategy_id, strategy_vid, user_id)</code> — <code>strategy_vid=None</code> triggers demote-only mode</li>
+<li><code>sp_get_strategy(strategy_id, is_best_ind='Y')</code> — fetches the current best VID for comparison</li>
+<li><code>sp_ins_promotion(...)</code> — persists the structured promotion decision to <code>BT.PROMOTION</code></li>
+</ul>
+<h2 id="4-manual-promote-api">4. Manual Promote API<a class="headerlink" href="#4-manual-promote-api" title="Permanent link">&para;</a></h2>
+<h3 id="4a-new-endpoint-in-quantapiroutersjobspy">4a. New endpoint in <code>quant/api/routers/jobs.py</code><a class="headerlink" href="#4a-new-endpoint-in-quantapiroutersjobspy" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>POST /api/v1/backtest/strategies/{strategy_id}/promote
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>Body: { "strategy_vid": 3 }
+</code></pre></div>
+<ul>
+<li>Validates user owns the strategy (via <code>get_for_user</code>)</li>
+<li>Calls <code>SP_UPD_PROMOTE_STRATEGY</code></li>
+<li>Refreshes cache</li>
+<li>Returns new active VID</li>
+</ul>
+<h2 id="5-ui-pipeline-tab-model">5. UI — Pipeline Tab Model<a class="headerlink" href="#5-ui-pipeline-tab-model" title="Permanent link">&para;</a></h2>
+<p>The SPA uses a four-tab pipeline, where each tab represents a stage in the strategy lifecycle:</p>
+<pre class="mermaid"><code>flowchart LR
+    A["Backtest\n(Create &amp; Run)"] --&gt; B["Queue\n(Monitor Jobs)"] --&gt; C["Promotion\n(Compare &amp; Improve)"] --&gt; D["Trade\n(Deploy &amp; Execute)"]</code></pre>
+<table>
+<thead>
+<tr>
+<th>Tab</th>
+<th>User question</th>
+<th>What they do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Backtest</strong></td>
+<td>"What strategy should I test?"</td>
+<td>Configure params, submit job</td>
+</tr>
+<tr>
+<td><strong>Queue</strong></td>
+<td>"How are my jobs doing?"</td>
+<td>Monitor status, view results, clone</td>
+</tr>
+<tr>
+<td><strong>Promotion</strong></td>
+<td>"Which VID is best? How do I improve?"</td>
+<td>Compare VIDs, see gate results, tweak metrics, re-backtest, deploy to Trade</td>
+</tr>
+<tr>
+<td><strong>Trade</strong></td>
+<td>"What's live? How is it performing?"</td>
+<td>See deployed strategies, execution events, P&amp;L</td>
+</tr>
+</tbody>
+</table>
+<p>The Promotion tab is the <strong>strategy improvement loop</strong> — users iterate there until satisfied, then deploy to Trade.</p>
+<h3 id="5a-queue-tab-implemented">5a. Queue tab (implemented)<a class="headerlink" href="#5a-queue-tab-implemented" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>VID column</strong> in <code>JobsTable</code>: displays <code>v{strategy_vid}</code> with a green "Best" chip when <code>is_best_ind === 'Y'</code></li>
+<li><strong>Actions column</strong>: "View" (load result), "Clone" (opens enqueue form pre-filled with config), "Promote" (calls <code>POST /strategies/{id}/promote</code>)</li>
+<li><code>EnqueueRequest</code> does <strong>not</strong> include <code>strategy_id</code> — clone always creates a new strategy (new <code>strategy_id</code>, VID 1)</li>
+</ul>
+<h3 id="5b-promotion-tab-implemented">5b. Promotion tab (implemented)<a class="headerlink" href="#5b-promotion-tab-implemented" title="Permanent link">&para;</a></h3>
+<p>Third tab in <code>BacktestPage</code> (<code>frontend/src/components/PromotionTab.tsx</code>), fed by
+<code>GET /api/v1/backtest/promotions</code> (polled every 10s). <code>BT.SP_GET_PROMOTION</code> is
+enriched with a <code>LEFT JOIN LATERAL</code> on <code>BT.RESULT</code> (candidate's shredded metrics)
+and <code>BT.STRATEGY</code> (live <code>IS_BEST_IND</code>), so the whole tab renders from one query
+with no N+1 round-trips.</p>
+<p>Content:</p>
+<ul>
+<li><strong>Recommended strategy banner</strong> — the overall best strategy across all <code>strategy_id</code>s (highest Sharpe among rows with <code>IS_BEST_IND = 'Y'</code> and <code>LOGICAL_DELETE_IND &lt;&gt; 'Y'</code>)</li>
+<li><strong>Strategy list</strong> — accordions grouped by <code>strategy_id</code>, showing all VIDs with their promotion outcome chip (PROMOTED / KEPT / DEMOTED / REJECTED, label from <code>REFDATA.PROMOTION_STATE</code>), Sharpe/Calmar, a "Best" chip on the current best VID, and a "Removed" chip when <code>LOGICAL_DELETE_IND = 'Y'</code></li>
+<li><strong>VID comparison panel</strong> — click a VID to see hard gate results (pass/fail per gate with value + threshold from the <code>GATE_RESULTS</code> snapshot) and a soft-metric comparison vs the <code>COMPARED_VID</code> baseline; the first decisive soft metric (walked in <code>REFDATA.PROMOTION_METRIC</code> priority order) is highlighted. <strong>VID 1 and any current-best re-run write <code>compared_vid = NULL</code></strong> — they have no opponent, and the panel says “Baseline VID — no other version to compare” rather than mirroring this row against itself. Legacy rows that stored <code>compared_vid</code> equal to this VID are treated the same.</li>
+<li><strong>Promotion rules card</strong> — read-only display of <code>REFDATA.PROMOTION_METRIC</code> (hard gates with thresholds, then soft metrics in priority order)</li>
+<li><strong>"Re-backtest" button</strong> — fetches the decision's frozen <code>config_json</code> via its <code>QUEUE_ID</code>, maps that wire payload (<code>data_source</code>, <code>tm_interval_id</code>, <code>trading_period</code>, …) back onto drawer state, fills Asset Type from <code>INST.PRODUCT</code> (it is not on the JSON), prefills the Backtest drawer, and switches to the Backtest tab. Spreading the JSON onto <code>BacktestConfig</code> is wrong — the keys do not match, and the form fell back to Yahoo / daily / 365.</li>
+<li><strong>"Deploy" button</strong> — navigates to the Trade tab (<code>/trade/apply</code>) carrying <code>strategyId</code> + <code>strategyVid</code> in router state, ready for the Phase 1.7 apply form</li>
+<li><strong>"Remove" / "Restore"</strong> — flips <code>LOGICAL_DELETE_IND</code> on the lineage (<code>POST /backtest/jobs/strategies/{id}/logical-delete</code>). Remove drops the card from Recommended and the Trade picker; Restore puts it back. The decision log still lists it.</li>
+</ul>
+<p>The soft-comparison baseline reuses the decision row whose <code>strategy_vid</code> equals
+<code>compared_vid</code> within the same strategy group — each row already carries that VID's
+shredded metrics, so no extra fetch is needed.</p>
+<h3 id="5c-design-principle-progressive-disclosure">5c. Design principle — progressive disclosure<a class="headerlink" href="#5c-design-principle-progressive-disclosure" title="Permanent link">&para;</a></h3>
+<p>Each tab answers a different question at a different stage. Adding a tab is justified when the <strong>mental model</strong> changes, not just when there is more data. The Promotion tab is a genuinely different task (strategy improvement) from Queue (job monitoring).</p>
+<h3 id="5d-logical-delete-retiring-a-strategy-that-should-not-be-used">5d. Logical delete — retiring a strategy that should not be used<a class="headerlink" href="#5d-logical-delete-retiring-a-strategy-that-should-not-be-used" title="Permanent link">&para;</a></h3>
+<p><code>IS_BEST_IND</code> answers "which VID is best". It cannot answer "this lineage should not be used": VID 1 is always the default best, and demote-only restores it. A buggy VID-1 result (decision #63's toy-sample Sharpe) therefore stayed on the Recommended banner.</p>
+<p><code>LOGICAL_DELETE_IND</code> is the third flag, orthogonal to temporal versioning and quality:</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TRANSACT_TO_TS = 9999-12-31</code></td>
+<td>Latest version</td>
+</tr>
+<tr>
+<td><code>IS_BEST_IND = 'Y'</code></td>
+<td>Best-performing VID</td>
+</tr>
+<tr>
+<td><code>LOGICAL_DELETE_IND = 'Y'</code></td>
+<td>Retired from the pool — not recommended, not pickable, not newly deployable</td>
+</tr>
+</tbody>
+</table>
+<p>Flipped in place by <code>SP_UPD_STRATEGY_LOGICAL_DELETE</code> (one VID, or the whole <code>STRATEGY_ID</code> when VID is omitted). <code>UPDATED_AT</code> stamps the write; GET procedures do not return it. New inserts are <code>'N'</code>. <code>SP_GET_STRATEGY_LIST</code> omits <code>'Y'</code> rows so the Trade picker cannot offer them. <code>SP_GET_PROMOTION</code> still returns them so the tab can show history and Restore.</p>
+<h2 id="6-shared-strategy-pool">6. Shared Strategy Pool<a class="headerlink" href="#6-shared-strategy-pool" title="Permanent link">&para;</a></h2>
+<p>Strategies are a <strong>shared pool</strong> — any authenticated user can read, browse, and deploy any strategy (decision #42). <code>USER_ID</code> on <code>BT.STRATEGY</code> is audit-only. Capital safety comes from credential ownership.</p>
+<ul>
+<li>The Promotion tab shows all strategies across all users</li>
+<li>The Trade tab filters to the caller's deployments (scoped by <code>APP_USER_ID</code>)</li>
+</ul>
+<h2 id="7-promotion-outcome-persistence-implemented">7. Promotion Outcome Persistence — Implemented<a class="headerlink" href="#7-promotion-outcome-persistence-implemented" title="Permanent link">&para;</a></h2>
+<p><code>BT.PROMOTION</code> — append-only log, no temporal versioning (each decision is immutable):</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PROMOTION_ID</td>
+<td>UUID PK</td>
+<td>Client-generated UUID</td>
+</tr>
+<tr>
+<td>QUEUE_ID</td>
+<td>UUID</td>
+<td>The completed backtest</td>
+</tr>
+<tr>
+<td>STRATEGY_ID</td>
+<td>UUID</td>
+<td>Strategy being evaluated</td>
+</tr>
+<tr>
+<td>STRATEGY_VID</td>
+<td>INTEGER</td>
+<td>VID being evaluated</td>
+</tr>
+<tr>
+<td>OUTCOME</td>
+<td>TEXT</td>
+<td><code>PROMOTED</code> / <code>KEPT</code> / <code>DEMOTED</code> / <code>REJECTED</code></td>
+</tr>
+<tr>
+<td>COMPARED_VID</td>
+<td>INTEGER</td>
+<td>Best VID compared against (NULL if no baseline)</td>
+</tr>
+<tr>
+<td>GATE_RESULTS</td>
+<td>JSONB</td>
+<td>Point-in-time snapshot <code>[{name, passed, value, threshold}]</code></td>
+</tr>
+<tr>
+<td>USER_ID</td>
+<td>TEXT</td>
+<td>Audit</td>
+</tr>
+<tr>
+<td>CREATED_AT</td>
+<td>TIMESTAMPTZ</td>
+<td>When decision was made</td>
+</tr>
+</tbody>
+</table>
+<p>Metric values (Sharpe, Calmar, etc.) are <strong>not duplicated</strong> here — they live as shredded columns on <code>BT.RESULT</code> (<code>SHARPE_RATIO</code>, <code>MAX_DRAWDOWN</code>, <code>CALMAR_RATIO</code>, <code>TOTAL_RETURN</code>, <code>ANNUALIZED_RETURN</code>). The UI derives the decisive soft metric by joining both results (candidate via <code>QUEUE_ID</code>, best via <code>COMPARED_VID</code>'s queue) and walking <code>REFDATA.PROMOTION_METRIC</code> in priority order. <code>GATE_RESULTS</code> is a snapshot because REFDATA thresholds may change after the decision.</p>
+<ul>
+<li><strong>SP:</strong> <code>BT.SP_INS_PROMOTION</code> — simple insert + audit log</li>
+<li><strong>Liquibase:</strong> <code>bt/releases/1.8.0-promotion.xml</code></li>
+<li><strong>Worker:</strong> persists one row per completed backtest, immediately after the promote/demote decision</li>
+</ul>
+<h2 id="resolved-questions">Resolved Questions<a class="headerlink" href="#resolved-questions" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Calmar / Max Drawdown</strong>: Fixed in <code>quant/strategy/performance.py</code>. <code>cumu = cumsum()</code> was kept; only Calmar Ratio formula corrected.</li>
+<li><strong>Re-versioning flow</strong>: <code>EnqueueRequest</code> does not include <code>strategy_id</code>. Clone always creates a new strategy. Re-versioning (VID 2+ under same strategy) deferred.</li>
+<li><strong>VID 1 fails hard gates</strong>: Fine to set <code>IS_BEST_IND='Y'</code> at insert. Worker demotes via <code>SP_UPD_PROMOTE_STRATEGY(vid=NULL)</code> if hard gates fail.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>

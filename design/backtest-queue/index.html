@@ -1,0 +1,5815 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/design/backtest-queue/">
+      
+      
+        <link rel="prev" href="../../guides/https-cloudflare/">
+      
+      
+        <link rel="next" href="../backtest-queue-json-viewer/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Backtest Queue - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#design-queued-background-backtests" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Backtest Queue
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Design Docs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../archive/" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#0-v6-migration-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0. v6 Migration — Done
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0. v6 Migration — Done">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#open-follow-ups-not-blocking-v6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open follow-ups (not blocking v6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Goals">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#functional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UX
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#technical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Non-Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-module-placement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Module Placement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-process-topology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Process topology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-why-this-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Why this split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-why-process-per-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Why process-per-job
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-why-typescript-for-the-coordinator-not-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Why TypeScript for the coordinator (not Python)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-submit-flow-separation-of-concerns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Submit flow (separation of concerns)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-data-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Data Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Data Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-btqueue-implemented-v4b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 BT.QUEUE (implemented — v4b)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-refdataqueue_status-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 REFDATA.QUEUE_STATUS (implemented)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-btstrategy-updated-temporal-versioning-is_best_ind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 BT.STRATEGY (updated — temporal versioning + IS_BEST_IND)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-btresult-existing-unchanged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 BT.RESULT (existing — unchanged)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-state-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 State transitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-stored-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Stored Procedures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Stored Procedures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-btsp_ins_queue-see-bt-002-procedures-in-dbliquidbasebtbt-changelogxml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 BT.SP_INS_QUEUE (see bt-002-procedures in db/liquidbase/bt/bt-changelog.xml)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-btsp_get_queue-refcursor-bt-002-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 BT.SP_GET_QUEUE (REFCURSOR — bt-002-procedures)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-btfn_get_queue_for_terminal-see-bt-003-fn-terminal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 BT.FN_GET_QUEUE_FOR_TERMINAL (see bt-003-fn-terminal)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-state-transition-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 State transition reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-coordinator-http-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Coordinator HTTP API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Coordinator HTTP API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-enqueue-request-zod-schema-in-coordinatorsrctypesqueuets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Enqueue request (zod schema in coordinator/src/types/queue.ts)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-queue-row-response" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Queue row response
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-sse-event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 SSE event types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-coordinator-typescript" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Coordinator (TypeScript)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Coordinator (TypeScript)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-file-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 File layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-startup-sequence-indexts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Startup sequence (index.ts)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-manager-wakeup-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Manager — wakeup queue
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-claim-_claimnext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.4 Claim (_claimNext)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#95-supervisor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.5 Supervisor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#96-sse-fanout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.6 SSE fanout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-worker-process-quantqueueworkerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Worker process — quant/queue/worker.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Worker process — quant/queue/worker.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-invocation-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 Invocation contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-environment-passed-by-coordinator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 Environment (passed by coordinator)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-stdout-json-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 stdout JSON protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#104-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.4 Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#105-per-trial-callback-throttled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.5 Per-trial callback (throttled)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#106-signal-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.6 Signal handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#107-why-the-worker-is-the-only-writer-of-its-own-success" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.7 Why the worker is the only writer of its own success
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Frontend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Frontend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#111-state-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.1 State split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#112-type-sharing-with-coordinator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.2 Type sharing with coordinator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#113-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.3 Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#114-queue-table-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.4 Queue table columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#115-editable-ui-while-jobs-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.5 Editable UI while jobs run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#116-sse-reconnection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.6 SSE reconnection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#117-vite-dev-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.7 Vite dev proxy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-failure-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Failure handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-test-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Test strategy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Performance considerations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Security
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16-phased-implementation-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Phased implementation plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="16. Phased implementation plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#slice-a-schema-procedures-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice A — Schema + procedures ✅ Done
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-b-coordinator-skeleton-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice B — Coordinator skeleton ✅ Done
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-c-submit-claim-spawn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice C — Submit + claim + spawn
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-d-worker-progress-cancel-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice D — Worker progress + cancel + timeout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-e-sse-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice E — SSE + frontend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-f-authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice F — Authentication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-quality-of-life" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — Quality of life
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-scale-out-only-if-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 — Scale-out (only if needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#worker-resource-envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worker resource envelope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18-recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18. Recommendation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#19-why-this-architecture-ts-coordinator-python-worker-postgres" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19. Why this architecture (TS coordinator + Python worker + Postgres)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="19. Why this architecture (TS coordinator + Python worker + Postgres)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#191-what-we-actually-need" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.1 What we actually need
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#192-why-typescript-for-the-coordinator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.2 Why TypeScript for the coordinator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#193-why-python-for-the-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.3 Why Python for the worker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#194-why-postgres-as-the-only-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.4 Why Postgres as the only contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#195-why-not-pure-python-fastapi-multiprocessing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.5 Why not pure Python (FastAPI + multiprocessing)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#196-why-not-kafka-or-redis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.6 Why not Kafka or Redis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#197-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.7 Decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#20-future-migration-candidates-beyond-the-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20. Future migration candidates (beyond the queue)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="20. Future migration candidates (beyond the queue)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#201-fastapi-router-by-router-assessment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20.1 FastAPI router-by-router assessment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#202-migration-order-strangler-fig-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20.2 Migration order — strangler-fig pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#203-things-that-explicitly-stay-in-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20.3 Things that explicitly stay in Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#204-components-beyond-the-api-to-consider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20.4 Components beyond the API to consider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#205-what-this-enables-long-term" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20.5 What this enables long-term
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#206-non-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20.6 Non-decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best-vid-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-order-execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-data-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plan-to-profit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#0-v6-migration-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0. v6 Migration — Done
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0. v6 Migration — Done">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#open-follow-ups-not-blocking-v6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open follow-ups (not blocking v6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Goals">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#functional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UX
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#technical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Non-Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-module-placement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Module Placement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-process-topology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Process topology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-why-this-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Why this split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-why-process-per-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Why process-per-job
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-why-typescript-for-the-coordinator-not-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Why TypeScript for the coordinator (not Python)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-submit-flow-separation-of-concerns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Submit flow (separation of concerns)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-data-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Data Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Data Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-btqueue-implemented-v4b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 BT.QUEUE (implemented — v4b)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-refdataqueue_status-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 REFDATA.QUEUE_STATUS (implemented)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-btstrategy-updated-temporal-versioning-is_best_ind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 BT.STRATEGY (updated — temporal versioning + IS_BEST_IND)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-btresult-existing-unchanged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 BT.RESULT (existing — unchanged)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-state-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 State transitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-stored-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Stored Procedures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Stored Procedures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-btsp_ins_queue-see-bt-002-procedures-in-dbliquidbasebtbt-changelogxml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 BT.SP_INS_QUEUE (see bt-002-procedures in db/liquidbase/bt/bt-changelog.xml)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-btsp_get_queue-refcursor-bt-002-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 BT.SP_GET_QUEUE (REFCURSOR — bt-002-procedures)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-btfn_get_queue_for_terminal-see-bt-003-fn-terminal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 BT.FN_GET_QUEUE_FOR_TERMINAL (see bt-003-fn-terminal)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-state-transition-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 State transition reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-coordinator-http-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Coordinator HTTP API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Coordinator HTTP API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-enqueue-request-zod-schema-in-coordinatorsrctypesqueuets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Enqueue request (zod schema in coordinator/src/types/queue.ts)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-queue-row-response" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Queue row response
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-sse-event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 SSE event types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-coordinator-typescript" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Coordinator (TypeScript)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Coordinator (TypeScript)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-file-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 File layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-startup-sequence-indexts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Startup sequence (index.ts)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-manager-wakeup-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Manager — wakeup queue
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-claim-_claimnext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.4 Claim (_claimNext)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#95-supervisor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.5 Supervisor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#96-sse-fanout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.6 SSE fanout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-worker-process-quantqueueworkerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Worker process — quant/queue/worker.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Worker process — quant/queue/worker.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-invocation-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 Invocation contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-environment-passed-by-coordinator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 Environment (passed by coordinator)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-stdout-json-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 stdout JSON protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#104-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.4 Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#105-per-trial-callback-throttled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.5 Per-trial callback (throttled)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#106-signal-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.6 Signal handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#107-why-the-worker-is-the-only-writer-of-its-own-success" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.7 Why the worker is the only writer of its own success
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Frontend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Frontend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#111-state-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.1 State split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#112-type-sharing-with-coordinator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.2 Type sharing with coordinator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#113-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.3 Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#114-queue-table-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.4 Queue table columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#115-editable-ui-while-jobs-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.5 Editable UI while jobs run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#116-sse-reconnection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.6 SSE reconnection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#117-vite-dev-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.7 Vite dev proxy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-failure-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Failure handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-test-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Test strategy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Performance considerations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Security
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16-phased-implementation-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Phased implementation plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="16. Phased implementation plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#slice-a-schema-procedures-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice A — Schema + procedures ✅ Done
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-b-coordinator-skeleton-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice B — Coordinator skeleton ✅ Done
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-c-submit-claim-spawn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice C — Submit + claim + spawn
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-d-worker-progress-cancel-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice D — Worker progress + cancel + timeout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-e-sse-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice E — SSE + frontend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slice-f-authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slice F — Authentication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-quality-of-life" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — Quality of life
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-scale-out-only-if-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 — Scale-out (only if needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#worker-resource-envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worker resource envelope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18-recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18. Recommendation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#19-why-this-architecture-ts-coordinator-python-worker-postgres" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19. Why this architecture (TS coordinator + Python worker + Postgres)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="19. Why this architecture (TS coordinator + Python worker + Postgres)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#191-what-we-actually-need" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.1 What we actually need
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#192-why-typescript-for-the-coordinator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.2 Why TypeScript for the coordinator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#193-why-python-for-the-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.3 Why Python for the worker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#194-why-postgres-as-the-only-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.4 Why Postgres as the only contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#195-why-not-pure-python-fastapi-multiprocessing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.5 Why not pure Python (FastAPI + multiprocessing)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#196-why-not-kafka-or-redis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.6 Why not Kafka or Redis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#197-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.7 Decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#20-future-migration-candidates-beyond-the-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20. Future migration candidates (beyond the queue)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="20. Future migration candidates (beyond the queue)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#201-fastapi-router-by-router-assessment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20.1 FastAPI router-by-router assessment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#202-migration-order-strangler-fig-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20.2 Migration order — strangler-fig pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#203-things-that-explicitly-stay-in-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20.3 Things that explicitly stay in Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#204-components-beyond-the-api-to-consider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20.4 Components beyond the API to consider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#205-what-this-enables-long-term" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20.5 What this enables long-term
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#206-non-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20.6 Non-decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="design-queued-background-backtests">Design: Queued Background Backtests<a class="headerlink" href="#design-queued-background-backtests" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> v6 — implemented. The TypeScript coordinator (<code>coordinator/</code>, Bun + Hono) was deleted; FastAPI now owns <code>/api/v1/backtest/jobs/*</code> and a long-lived <code>quant.queue.worker_loop</code> daemon supervises per-job worker subprocesses. The Postgres schema, <code>BT.SP_INS_QUEUE</code> / <code>BT.SP_GET_QUEUE_LATEST</code> contract, and the <code>BT.RESULT</code> write path are unchanged from v5 — only the runtime owner changed. See decision #32.</p>
+<p><strong>Date:</strong> 2026-05-03 (v5) · 2026-05-16 (v6 cutover)
+<strong>Scope (current):</strong> <code>quant/api/routers/jobs.py</code>, <code>quant/api/services/jobs.py</code>, <code>quant/api/schemas/jobs.py</code>, <code>quant/queue/worker.py</code>, <code>quant/queue/worker_loop.py</code>, <code>quant/queue/wake.py</code>, <code>frontend/src/features/queue/</code>, <code>db/liquidbase/bt/</code>.</p>
+<blockquote>
+<p><strong>Reading guide.</strong> Sections describing TypeScript / Bun / Hono / <code>coordinator/src/...</code> paths below are <strong>historical (v5)</strong> unless this banner says otherwise. The Python equivalents are: <code>coordinator/src/http/server.ts</code> → <code>quant/api/routers/jobs.py</code>; <code>coordinator/src/queue/repo.ts</code> → <code>quant/api/services/jobs.py</code>; <code>coordinator/src/queue/{manager,spawn}.ts</code> → <code>quant/queue/worker_loop.py</code>; <code>coordinator/src/refdata/cache.ts</code> → <code>quant/refdata/publisher.py</code>. §19 ("Why TypeScript") is retained as decision history — superseded by #32.</p>
+</blockquote>
+<hr />
+<h2 id="0-v6-migration-done">0. v6 Migration — Done<a class="headerlink" href="#0-v6-migration-done" title="Permanent link">&para;</a></h2>
+<p>The four-phase migration completed 2026-05-16:</p>
+<ul>
+<li><strong>Phase A</strong> — <code>quant/queue/worker_loop.py</code> daemon with stale-job recovery + <code>tests/unit/test_worker_loop.py</code>.</li>
+<li><strong>Phase B</strong> — <code>quant/api/routers/jobs.py</code> + <code>quant/api/services/jobs.py</code> + <code>quant/api/schemas/jobs.py</code> exposing all 5 endpoints under <code>Depends(require_user)</code>, with <code>tests/unit/test_jobs_router.py</code>.</li>
+<li><strong>Phase C</strong> — Compose service <code>worker</code> (reuses the FastAPI image, command <code>python -m quant.queue.worker_loop</code>); <code>scripts/appctl.sh</code> brings Redis up before the backend and the worker after, so REFDATA is in Redis before the worker boots.</li>
+<li><strong>Phase D</strong> — <code>coordinator/</code> deleted; <code>.env.example</code>, <code>README.md</code>, <code>docs/architecture/dev-vs-prod.md</code> cleaned.</li>
+</ul>
+<h3 id="open-follow-ups-not-blocking-v6">Open follow-ups (not blocking v6)<a class="headerlink" href="#open-follow-ups-not-blocking-v6" title="Permanent link">&para;</a></h3>
+<div class="admonition note">
+<p class="admonition-title">UI follow-up</p>
+<p>Proposed jobs-table UX: hover preview <strong>plus</strong> right-hand detail drawer (shared payload, deep-link <code>?job=</code>). See <a href="../jobs-table-detail-ux/">Jobs Table Detail UX</a>.</p>
+</div>
+<ol>
+<li><strong><code>SP_CLAIM_NEXT</code> stored procedure</strong> (atomic <code>SELECT … FOR UPDATE SKIP LOCKED</code> + <code>SP_INS_QUEUE RUNNING</code>). Required before running &gt; 1 <code>worker_loop</code> replica safely. v6 ships single-replica.</li>
+<li><strong>Per-trial progress (<code>Slice D</code>)</strong> — worker emits <code>{"event":"progress","trial":N,"total":M,...}</code> JSON to stdout <em>and</em> <code>PUBLISH bt:progress:{queue_id}</code> on Redis. SSE handler in <code>quant/api/routers/jobs.py</code> swaps the 1s DB poll for a Redis subscription. Worker_loop is unaffected.</li>
+<li><strong><code>pg_notify</code> from <code>SP_INS_QUEUE</code></strong> — replaces the Redis BLPOP wake when ready. Already noted in §6.</li>
+</ol>
+<hr />
+<h2 id="1-problem">1. Problem<a class="headerlink" href="#1-problem" title="Permanent link">&para;</a></h2>
+<p>Large backtests and parameter optimizations are CPU-heavy. A run with 20,000 iterations can take long enough that the current single-run UI becomes limiting:</p>
+<ol>
+<li>The user can only focus on one optimization at a time.</li>
+<li>There is no persistent queue of pending jobs.</li>
+<li>There is no backend-managed notion of <code>QUEUED</code>, <code>RUNNING</code>, <code>COMPLETED</code>, <code>FAILED</code>, or <code>CANCELLED</code>.</li>
+<li>The UI cannot continue editing or queueing strategies while one run is in progress.</li>
+</ol>
+<p>Implementation constraints:</p>
+<ol>
+<li>Python threads do not give CPU parallelism for pandas/numpy workloads (GIL).</li>
+<li>CPython processes have heavy cold-start; coordination work (event loops, SSE fan-out, LISTEN/NOTIFY consumption) is better served by a runtime built for it.</li>
+<li>We want a polyglot boundary that lets us swap or add languages later without rewriting the queue contract.</li>
+</ol>
+<hr />
+<h2 id="2-goals">2. Goals<a class="headerlink" href="#2-goals" title="Permanent link">&para;</a></h2>
+<h3 id="functional">Functional<a class="headerlink" href="#functional" title="Permanent link">&para;</a></h3>
+<ol>
+<li>The backend accepts multiple backtest jobs and runs them one at a time in queue order.</li>
+<li>The UI shows a queue panel with <code>QUEUED</code>, <code>RUNNING</code>, <code>COMPLETED</code>, <code>FAILED</code>, <code>CANCELLED</code> jobs.</li>
+<li>The running job shows progress as iterations completed vs total.</li>
+<li>The user can add more jobs while another job is running.</li>
+<li>The user can cancel any job (queued <strong>or</strong> running) from the UI.</li>
+<li>The running job automatically advances to the next queued job when complete.</li>
+<li>Completed jobs retain summary and result references.</li>
+</ol>
+<h3 id="ux">UX<a class="headerlink" href="#ux" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Editing the current strategy config never mutates submitted jobs.</li>
+<li>The queue updates live without manual refresh.</li>
+<li>The user can inspect any job (running or historical) separately from the editable draft form.</li>
+</ol>
+<h3 id="technical">Technical<a class="headerlink" href="#technical" title="Permanent link">&para;</a></h3>
+<ol>
+<li>CPU-bound work runs in a separate Python process per job (no GIL contention with the coordinator).</li>
+<li>Queue state persists in PostgreSQL — survives restarts of any process.</li>
+<li>Coordinator process owns: HTTP for <code>/jobs/*</code>, SSE fan-out, child-process supervision, <code>LISTEN/NOTIFY</code> consumption.</li>
+<li>Worker process owns: DB read of strategy config, optimization compute, <code>INSERT INTO BT.RESULT</code>, queue terminal transition via <code>BT.SP_INS_QUEUE</code>.</li>
+<li>Coordinator and worker communicate <strong>only</strong> through PostgreSQL + process spawn + stdout JSON lines + exit code. Neither imports the other.</li>
+<li>FastAPI is untouched in this slice — <code>/optimize</code>, <code>/refdata</code>, <code>/auth</code>, <code>/inst</code> all stay where they are. Only <code>/api/v1/backtest/jobs/*</code> is owned by the new coordinator.</li>
+</ol>
+<hr />
+<h2 id="3-non-goals">3. Non-Goals<a class="headerlink" href="#3-non-goals" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Multi-worker concurrency in v1 (design supports it; default slot count is 1).</li>
+<li>Replacing FastAPI wholesale — that's a future phase, tracked separately.</li>
+<li>Replacing the existing optimization pipeline.</li>
+<li>Introducing Celery, Redis, or Kafka.</li>
+<li>Auto-retry of failed jobs (manual retry only).</li>
+<li>Rewriting any pandas/numpy code in TypeScript.</li>
+</ol>
+<hr />
+<h2 id="4-module-placement">4. Module Placement<a class="headerlink" href="#4-module-placement" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Runtime</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Coordinator entrypoint</td>
+<td><code>coordinator/src/index.ts</code></td>
+<td>Bun (or Node 22 LTS)</td>
+<td>Boots HTTP server, manager, LISTEN consumer.</td>
+</tr>
+<tr>
+<td>HTTP routes (<code>/api/v1/backtest/jobs/*</code>)</td>
+<td><code>coordinator/src/http/routes/</code></td>
+<td>Bun</td>
+<td>Hono framework.</td>
+</tr>
+<tr>
+<td>SSE fan-out</td>
+<td><code>coordinator/src/queue/sse.ts</code></td>
+<td>Bun</td>
+<td><code>Set&lt;ReadableStreamDefaultController&gt;</code>.</td>
+</tr>
+<tr>
+<td>Job manager (event loop, watchdog, claim)</td>
+<td><code>coordinator/src/queue/manager.ts</code></td>
+<td>Bun</td>
+<td>Owns the wakeup loop.</td>
+</tr>
+<tr>
+<td>Process supervisor (spawn, parse stdout, signal)</td>
+<td><code>coordinator/src/queue/supervisor.ts</code></td>
+<td>Bun</td>
+<td><code>child_process.spawn</code>.</td>
+</tr>
+<tr>
+<td>DB repo (typed SQL)</td>
+<td><code>coordinator/src/queue/repo.ts</code></td>
+<td>Bun</td>
+<td>Uses <code>postgres</code> (porsager).</td>
+</tr>
+<tr>
+<td>LISTEN consumer (autocommit conn)</td>
+<td><code>coordinator/src/queue/notify.ts</code></td>
+<td>Bun</td>
+<td>Future: when <code>pg_notify</code> is added to <code>SP_INS_QUEUE</code>.</td>
+</tr>
+<tr>
+<td>Shared zod schemas</td>
+<td><code>coordinator/src/types/queue.ts</code></td>
+<td>Bun + frontend</td>
+<td>Re-exported by frontend for type-safe fetch.</td>
+</tr>
+<tr>
+<td>Python worker entrypoint</td>
+<td><code>quant/queue/worker.py</code></td>
+<td>CPython</td>
+<td><code>python -m quant.queue.worker &lt;queue_id&gt;</code>.</td>
+</tr>
+<tr>
+<td>Python DB repo (used by worker self-writes)</td>
+<td><code>src/jobs.py</code></td>
+<td>CPython</td>
+<td>Existing <code>BacktestJobRepo</code>.</td>
+</tr>
+<tr>
+<td>Frontend queue panel</td>
+<td><code>frontend/src/features/queue/</code></td>
+<td>Browser</td>
+<td>TanStack Query + EventSource.</td>
+</tr>
+<tr>
+<td>FastAPI <code>/optimize</code>, <code>/refdata</code>, <code>/auth</code>, <code>/inst</code></td>
+<td><code>quant/api/</code></td>
+<td>CPython</td>
+<td><strong>Unchanged.</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The CLI (<code>quant/cli.py</code>) is <strong>not</strong> modified — it runs synchronously with no use for the queue.</p>
+<p><code>api/queue/</code> (the previous Python coordinator) is removed.</p>
+<hr />
+<h2 id="5-architecture">5. Architecture<a class="headerlink" href="#5-architecture" title="Permanent link">&para;</a></h2>
+<h3 id="51-process-topology">5.1 Process topology<a class="headerlink" href="#51-process-topology" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+    UI[React SPA] --&gt;|/api/v1/backtest/jobs/*| Coord[coordinator&lt;br/&gt;Bun + Hono&lt;br/&gt;:3001]
+    UI --&gt;|everything else| FA[FastAPI&lt;br/&gt;uvicorn :8000]
+    Coord --&gt;|SP_INS_QUEUE QUEUED&lt;br/&gt;SP_INS_QUEUE RUNNING| DB[(PostgreSQL&lt;br/&gt;BT.QUEUE)]
+    Coord --&gt;|spawn child process| Worker[python -m quant.queue.worker&lt;br/&gt;queue_id]
+    Worker --&gt;|stdout JSON lines| Coord
+    Worker --&gt;|INSERT BT.RESULT&lt;br/&gt;SP_INS_QUEUE TERMINAL| DB
+    FA --&gt;|reads only| DB
+    Coord --&gt;|SSE| UI</code></pre>
+<p><strong>Key invariants:</strong></p>
+<ol>
+<li>Coordinator and FastAPI share <strong>only</strong> PostgreSQL. They never make HTTP calls to each other.</li>
+<li>Coordinator and worker share <strong>only</strong> PostgreSQL + stdout pipe + exit code. Worker never imports coordinator code, coordinator never imports Python.</li>
+<li>Worker is the only writer of its own COMPLETED/CANCELLED row. Coordinator writes FAILED only as recovery when the worker died without writing terminal state.</li>
+</ol>
+<h3 id="52-why-this-split">5.2 Why this split<a class="headerlink" href="#52-why-this-split" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Owner</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HTTP fan-out, SSE to many clients</td>
+<td>Coordinator (TS)</td>
+<td>Node/Bun event loop handles 10k+ idle SSE connections per process trivially. CPython + uvicorn fights the GIL the moment any sync code sneaks in.</td>
+</tr>
+<tr>
+<td>Heavy compute (pandas/numpy/optimization)</td>
+<td>Worker (Python)</td>
+<td>Library ecosystem. Rewriting in TS would lose <code>Decimal</code>, NaN/NA semantics, timezone handling, and <code>pandas</code>/<code>numpy</code>/<code>scipy</code>.</td>
+</tr>
+<tr>
+<td>Queue durability + ordering</td>
+<td>PostgreSQL</td>
+<td>Already operated. <code>SELECT ... FOR UPDATE SKIP LOCKED</code> + <code>LISTEN/NOTIFY</code> give us everything for free.</td>
+</tr>
+<tr>
+<td>Type safety end-to-end</td>
+<td>zod schemas in <code>coordinator/src/types/</code> shared with frontend</td>
+<td>Eliminates API contract drift.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="53-why-process-per-job">5.3 Why process-per-job<a class="headerlink" href="#53-why-process-per-job" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Avoids GIL contention.</li>
+<li>Clean failure boundary — a worker crash doesn't take down the coordinator.</li>
+<li>Easy cancellation via <code>SIGTERM</code>.</li>
+<li>Hard timeout enforcement via <code>SIGKILL</code> after grace period.</li>
+<li>Trivial horizontal scale later: coordinator with <code>MAX_WORKERS=N</code> spawns up to N children.</li>
+</ol>
+<h3 id="54-why-typescript-for-the-coordinator-not-python">5.4 Why TypeScript for the coordinator (not Python)<a class="headerlink" href="#54-why-typescript-for-the-coordinator-not-python" title="Permanent link">&para;</a></h3>
+<p>Documented in §19. Short version: the coordinator is 100% I/O — HTTP, SSE, child-process supervision, LISTEN/NOTIFY. That's the workload Node/Bun is built for. CPython is wrong-tool for this slice.</p>
+<h3 id="55-submit-flow-separation-of-concerns">5.5 Submit flow (separation of concerns)<a class="headerlink" href="#55-submit-flow-separation-of-concerns" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Location</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>coordinator/src/http/routes/jobs.ts</code></td>
+<td>HTTP boundary: parse + zod-validate, auth check, call <code>repo.submit()</code>, notify manager, return 202.</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>coordinator/src/db/repo.ts — submit()</code></td>
+<td>Generate <code>queue_id</code>, resolve <code>QUEUED</code> status ID from REFDATA cache, <code>CALL BT.SP_INS_QUEUE(...)</code>.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>coordinator/src/manager/manager.ts</code></td>
+<td>Wakeup → claim loop: <code>SELECT</code> next QUEUED row + <code>SP_INS_QUEUE RUNNING</code> + <code>supervisor.spawn(queue_id)</code>.</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>coordinator/src/manager/supervisor.ts</code></td>
+<td><code>child_process.spawn('python', ['-m', 'quant.queue.worker', queue_id], {env: {DB_URL: ...}})</code>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-data-model">6. Data Model<a class="headerlink" href="#6-data-model" title="Permanent link">&para;</a></h2>
+<h3 id="61-btqueue-implemented-v4b">6.1 <code>BT.QUEUE</code> (implemented — v4b)<a class="headerlink" href="#61-btqueue-implemented-v4b" title="Permanent link">&para;</a></h3>
+<p>Soft-versioned queue table. <strong>One row per state transition</strong> — old rows are closed by setting <code>TRANSACT_TO_TS = now()</code>; new rows are inserted with <code>TRANSACT_TO_TS = '9999-12-31'</code>. <code>QUEUE_ID</code> is stable across transitions; <code>QUEUE_VID</code> increments on each transition.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>QUEUE_ID</code></td>
+<td><code>UUID</code></td>
+<td>Stable job identity. Generated by the coordinator before enqueue.</td>
+</tr>
+<tr>
+<td><code>QUEUE_VID</code></td>
+<td><code>INTEGER</code></td>
+<td>Increments on each state transition. <code>(QUEUE_ID, QUEUE_VID)</code> is PK.</td>
+</tr>
+<tr>
+<td><code>STRATEGY_ID</code></td>
+<td><code>UUID</code></td>
+<td>FK → <code>BT.STRATEGY</code>. The exact version submitted — never updated mid-queue.</td>
+</tr>
+<tr>
+<td><code>STRATEGY_VID</code></td>
+<td><code>INTEGER</code></td>
+<td>Exact strategy version submitted. Join on <code>(STRATEGY_ID, STRATEGY_VID)</code>.</td>
+</tr>
+<tr>
+<td><code>TRANSACT_FROM_TS</code></td>
+<td><code>TIMESTAMPTZ</code></td>
+<td>Row effective from.</td>
+</tr>
+<tr>
+<td><code>TRANSACT_TO_TS</code></td>
+<td><code>TIMESTAMPTZ</code></td>
+<td><code>'9999-12-31'</code> = active row. Set to <code>now()</code> on transition.</td>
+</tr>
+<tr>
+<td><code>QUEUE_STATUS_ID</code></td>
+<td><code>INTEGER</code></td>
+<td>FK → <code>REFDATA.QUEUE_STATUS</code>.</td>
+</tr>
+<tr>
+<td><code>PRIORITY</code></td>
+<td><code>INTEGER</code></td>
+<td>Default <code>100</code>. Lower = higher priority. <code>0</code> = "Run Now". Dequeue order: <code>(PRIORITY ASC, CREATED_AT ASC)</code>.</td>
+</tr>
+<tr>
+<td><code>ERROR_TEXT</code></td>
+<td><code>TEXT</code></td>
+<td>Error message on FAILED / CANCELLED.</td>
+</tr>
+<tr>
+<td><code>USER_ID</code></td>
+<td><code>TEXT</code></td>
+<td>Submitting user.</td>
+</tr>
+<tr>
+<td><code>CREATED_AT</code></td>
+<td><code>TIMESTAMPTZ</code></td>
+<td>Row insert time.</td>
+</tr>
+</tbody>
+</table>
+<p>Active rows: <code>WHERE TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31'</code>.</p>
+<h3 id="62-refdataqueue_status-implemented">6.2 <code>REFDATA.QUEUE_STATUS</code> (implemented)<a class="headerlink" href="#62-refdataqueue_status-implemented" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th><code>QUEUE_STATUS_ID</code></th>
+<th><code>NAME</code></th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>QUEUED</code></td>
+<td>Waiting to be claimed</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>RUNNING</code></td>
+<td>Claimed by coordinator, worker spawned</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>CANCEL_REQUESTED</code></td>
+<td>User requested cancel; worker observes at next checkpoint</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>COMPLETED</code></td>
+<td>Worker finished successfully</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>FAILED</code></td>
+<td>Worker error or coordinator crash recovery</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>CANCELLED</code></td>
+<td>Worker observed cancel request and exited cleanly</td>
+</tr>
+</tbody>
+</table>
+<p>IDs are assigned by <code>IDENTITY</code> at seed time. <code>FN_GET_QUEUE_FOR_TERMINAL</code> uses <code>QUEUE_STATUS_ID IN (1,2,3)</code> (active states) — hardcoded to match these seed values.</p>
+<h3 id="63-btstrategy-updated-temporal-versioning-is_best_ind">6.3 <code>BT.STRATEGY</code> (updated — temporal versioning + <code>IS_BEST_IND</code>)<a class="headerlink" href="#63-btstrategy-updated-temporal-versioning-is_best_ind" title="Permanent link">&para;</a></h3>
+<p>Queue rows store <code>(STRATEGY_ID, STRATEGY_VID)</code> at submission time. The worker joins on this exact pair so queue rows remain valid even if the user updates the strategy mid-queue. <code>STRAT_CURRENT_IND</code> is derived from <code>TRANSACT_TO_TS</code> (<code>'9999-12-31'</code> = current) in <code>FN_GET_QUEUE_FOR_TERMINAL</code> for UI display only. <code>IS_BEST_IND</code> marks the best-performing VID — see <a href="../best-vid-promotion/">Best-VID Promotion</a>.</p>
+<h3 id="64-btresult-existing-unchanged">6.4 <code>BT.RESULT</code> (existing — unchanged)<a class="headerlink" href="#64-btresult-existing-unchanged" title="Permanent link">&para;</a></h3>
+<p>Worker inserts via <code>CALL BT.SP_INS_RESULT(...)</code> with a client-generated <code>RESULT_ID</code> (UUID) + <code>PAYLOAD_JSON</code>.</p>
+<h3 id="65-state-transitions">6.5 State transitions<a class="headerlink" href="#65-state-transitions" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>              ┌──────────┐
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>              │  QUEUED  │
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>              └────┬─────┘
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>       ┌───────────┴─────────────┐
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>       ▼                         ▼
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>┌───────────┐            ┌─────────────────┐
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│  RUNNING  │            │   FAILED (*)    │
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>└─────┬─────┘            └─────────────────┘
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>      │
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>      ├── coordinator marks FAILED on worker crash
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>      │
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>      ├──→ CANCEL_REQUESTED ──→ CANCELLED
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>      │
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>      ├──→ COMPLETED
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>      │
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>      └──→ FAILED
+</code></pre></div>
+<p><code>(*)</code> Coordinator also transitions QUEUED→FAILED on stale-job recovery (coordinator restart with orphaned RUNNING rows). Terminal states are immutable — every change is a new row with closed <code>TRANSACT_TO_TS</code>.</p>
+<hr />
+<h2 id="7-stored-procedures">7. Stored Procedures<a class="headerlink" href="#7-stored-procedures" title="Permanent link">&para;</a></h2>
+<p>All queue writes go through <code>BT.SP_INS_QUEUE</code>. Reads use the two GET procedures or plain <code>SELECT</code>. <code>BT.RESULT</code> rows are <code>INSERT</code>ed directly by the worker (no procedure).</p>
+<h3 id="71-btsp_ins_queue-see-bt-002-procedures-in-dbliquidbasebtbt-changelogxml">7.1 <code>BT.SP_INS_QUEUE</code> (see <code>bt-002-procedures</code> in <code>db/liquidbase/bt/bt-changelog.xml</code>)<a class="headerlink" href="#71-btsp_ins_queue-see-bt-002-procedures-in-dbliquidbasebtbt-changelogxml" title="Permanent link">&para;</a></h3>
+<p>Signature: <code>IN_QUEUE_ID UUID, IN_STRATEGY_ID UUID, IN_STRATEGY_VID INTEGER, IN_QUEUE_STATUS_ID INTEGER, IN_PRIORITY INTEGER, IN_ERROR_TEXT TEXT, IN_USER_ID TEXT</code> + 3 OUT params (<code>OUT_SQLSTATE</code>, <code>OUT_SQLMSG</code>, <code>OUT_SQLERRMC</code>).</p>
+<p>Temporal versioning steps:
+1. <code>MAX(QUEUE_VID) + 1</code> for the new VID.
+2. Close current row: <code>UPDATE SET TRANSACT_TO_TS = now() WHERE TRANSACT_TO_TS = '9999-12-31'</code>.
+3. Insert new row with <code>TRANSACT_TO_TS = '9999-12-31'</code>.</p>
+<p>Called for every state transition: QUEUED → RUNNING → COMPLETED/FAILED/CANCELLED. Callable from both TypeScript (<code>postgres</code> driver) and Python (<code>psycopg</code>) — pure SQL.</p>
+<div class="admonition note">
+<p class="admonition-title">SP_CLAIM_NEXT — future</p>
+<p>An atomic <code>SP_CLAIM_NEXT</code> (<code>SELECT ... FOR UPDATE SKIP LOCKED</code> + <code>SP_INS_QUEUE RUNNING</code> in one transaction) will replace the current two-statement SELECT + call pattern. Required before multi-coordinator deployment.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">pg_notify — future</p>
+<p><code>SP_INS_QUEUE</code> will emit <code>pg_notify('job_enqueued', queue_id::text)</code> on QUEUED inserts and <code>pg_notify('job_cancel_requested', queue_id::text)</code> on CANCEL_REQUESTED inserts. The coordinator's <code>db/notify.ts</code> consumes these. Until that's added, the HTTP route calls <code>manager.notifyEnqueued()</code> directly in-process.</p>
+</div>
+<h3 id="72-btsp_get_queue-refcursor-bt-002-procedures">7.2 <code>BT.SP_GET_QUEUE</code> (REFCURSOR — <code>bt-002-procedures</code>)<a class="headerlink" href="#72-btsp_get_queue-refcursor-bt-002-procedures" title="Permanent link">&para;</a></h3>
+<p>Coordinator <code>queryQueue()</code> uses <code>CALL bt.sp_get_queue(...)</code> + <code>FETCH</code> on the OUT refcursor (not a table function).</p>
+<ul>
+<li>If <code>IN_QUEUE_ID</code> provided → returns all VIDs for that job (full history).</li>
+<li>Otherwise → active rows only (<code>TRANSACT_TO_TS</code> sentinel); other params are optional filters.</li>
+</ul>
+<p><code>BT.FN_GET_QUEUE</code> is not deployed; any prior function with that name is dropped by <code>bt-000-precleanup</code>.</p>
+<h3 id="73-btfn_get_queue_for_terminal-see-bt-003-fn-terminal">7.3 <code>BT.FN_GET_QUEUE_FOR_TERMINAL</code> (see <code>bt-003-fn-terminal</code>)<a class="headerlink" href="#73-btfn_get_queue_for_terminal-see-bt-003-fn-terminal" title="Permanent link">&para;</a></h3>
+<p><code>FUNCTION RETURNS TABLE</code> — <code>SELECT * FROM bt.fn_get_queue_for_terminal(IN_USER_ID, IN_QUEUE_STATUS_ID)</code> (both nullable).</p>
+<p>Active rows with <code>QUEUE_STATUS_ID IN (1,2,3)</code>, joined to <code>BT.STRATEGY</code> on exact <code>(STRATEGY_ID, STRATEGY_VID)</code>.</p>
+<p>Returns: <code>QUEUE_ID, STRATEGY_ID, STRATEGY_VID, STRATEGY_NM, STRAT_CURRENT_IND, TRANSACT_FROM_TS, QUEUE_STATUS, PRIORITY, USER_ID, CONFIG_JSON, ERROR_TEXT</code>.</p>
+<p>Used by <code>coordinator/src/queue/repo.ts — queryTerminal()</code> / <code>claimNext()</code> and (if present) <code>BacktestJobRepo.query_queue_for_terminal()</code> in <code>src/jobs.py</code>.</p>
+<p><code>SP_GET_QUEUE_FOR_TERMINAL</code> (REFCURSOR) is also deployed for clients that use the stored-procedure + cursor pattern.</p>
+<h3 id="74-state-transition-reference">7.4 State transition reference<a class="headerlink" href="#74-state-transition-reference" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Caller</th>
+<th>Action</th>
+<th><code>IN_QUEUE_STATUS_ID</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Coordinator HTTP route <code>POST /jobs</code></td>
+<td>Enqueue</td>
+<td><code>QUEUED</code> (1)</td>
+</tr>
+<tr>
+<td>Coordinator manager <code>_claimNext()</code></td>
+<td>Claim</td>
+<td><code>RUNNING</code> (2)</td>
+</tr>
+<tr>
+<td>Coordinator HTTP route <code>POST /jobs/:id/cancel</code> (running)</td>
+<td>Request cancel</td>
+<td><code>CANCEL_REQUESTED</code> (3)</td>
+</tr>
+<tr>
+<td>Coordinator HTTP route <code>POST /jobs/:id/cancel</code> (queued)</td>
+<td>Cancel directly</td>
+<td><code>CANCELLED</code> (6)</td>
+</tr>
+<tr>
+<td>Worker — success</td>
+<td>Terminal</td>
+<td><code>COMPLETED</code> (4)</td>
+</tr>
+<tr>
+<td>Worker — exception</td>
+<td>Terminal</td>
+<td><code>FAILED</code> (5)</td>
+</tr>
+<tr>
+<td>Worker loop — observed cancel</td>
+<td>Terminal</td>
+<td><code>CANCELLED</code> (6)</td>
+</tr>
+<tr>
+<td>Worker loop — boot recovery</td>
+<td>Terminal</td>
+<td><code>FAILED</code> (5)</td>
+</tr>
+<tr>
+<td>Worker loop — exceeded <code>JOB_TIMEOUT_S</code> (600s)</td>
+<td>Terminal</td>
+<td><code>FAILED</code> (5) with <code>ERROR_TEXT="job exceeded 600s timeout"</code></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title"><code>CANCEL_REQUESTED</code> is observed by the <strong>loop</strong>, not the worker</p>
+<p>The v5 row above read <em>"Worker — observed cancel"</em>, describing a per-trial
+poll inside <code>worker.py</code> that Slice D never delivered. When the queue moved
+into Python (#32) the observer moved with the supervision, not the trial
+loop: <code>WorkerLoop._enforce_cancels</code> reads <code>CANCEL_REQUESTED</code> rows each
+tick, stops the child (SIGTERM → <code>CANCEL_GRACE_S</code> → SIGKILL), then writes
+<code>CANCELLED</code>. Terminal row after the child is gone, so a worker killed
+mid-flight cannot land its own <code>FAILED</code> on top of the cancel. A requested
+row with no live child is cancelled outright, which is what drains one
+orphaned by a loop that died — <code>recover_stale</code> scans only <code>RUNNING</code> and
+would otherwise strand it permanently. See decision #61.</p>
+</div>
+<p>| FastAPI <code>POST /jobs/:id/reenqueue</code> | New submission (same <code>STRATEGY_ID/VID/PRIORITY</code>, fresh <code>QUEUE_ID</code>) | <code>QUEUED</code> (1) |</p>
+<hr />
+<h2 id="8-coordinator-http-api">8. Coordinator HTTP API<a class="headerlink" href="#8-coordinator-http-api" title="Permanent link">&para;</a></h2>
+<p>All endpoints under <code>/api/v1/backtest/jobs/*</code> are served by the coordinator. Auth: validates the existing <code>qs_token</code> JWT cookie (HS256, secret from <code>JWT_SECRET</code> env shared with FastAPI) — no separate session table read needed.</p>
+<h3 id="81-endpoints">8.1 Endpoints<a class="headerlink" href="#81-endpoints" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/backtest/jobs</code></td>
+<td>Enqueue. Returns <code>{ queue_id, queue_pos }</code>. <strong>Rate limit:</strong> caller may have at most 20 <code>QUEUED</code> jobs → <code>429</code>.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/backtest/jobs</code></td>
+<td>Active queue + recent history (last 50 terminal). <code>?status=RUNNING</code> etc. filter.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/backtest/jobs/:id</code></td>
+<td>Full history (all VIDs) of one job.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/backtest/jobs/:id/result</code></td>
+<td>Resolves <code>STRATEGY_VID</code> + <code>RESULT_ID</code> → returns same payload shape as today's FastAPI <code>POST /backtest/optimize</code> response. Existing analysis components reuse unchanged.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/backtest/jobs/:id/cancel</code></td>
+<td>Cancels QUEUED or RUNNING job. Idempotent.</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/backtest/jobs/:id/reenqueue</code></td>
+<td>Re-submits a <strong>FAILED</strong> or <strong>CANCELLED</strong> job: same <code>(STRATEGY_ID, STRATEGY_VID, PRIORITY)</code>, fresh <code>QUEUE_ID</code> with <code>VID=1</code>. Returns <code>{ queue_id, queue_pos }</code> (HTTP 202). Returns 409 if the source job is not terminal-failed/cancelled, 429 if the per-user QUEUED cap is exceeded, 404 if the source job is not visible to the caller. No <code>PARENT_QUEUE_ID</code> link — join by <code>STRATEGY_ID</code> (see <code>IX_QUEUE_STRATEGY</code>).</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/v1/backtest/jobs/:id</code></td>
+<td>Hard delete a terminal job from history. <code>409</code> if not terminal.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/backtest/jobs/stream</code></td>
+<td>SSE stream of queue events.</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/health</code></td>
+<td>Coordinator liveness — returns 200 if process up + DB reachable.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="82-enqueue-request-zod-schema-in-coordinatorsrctypesqueuets">8.2 Enqueue request (zod schema in <code>coordinator/src/types/queue.ts</code>)<a class="headerlink" href="#82-enqueue-request-zod-schema-in-coordinatorsrctypesqueuets" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nx">z</span><span class="p">.</span><span class="nx">object</span><span class="p">({</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nx">strategy_id</span><span class="o">:</span><span class="w"> </span><span class="kt">z.string</span><span class="p">().</span><span class="nx">uuid</span><span class="p">(),</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nx">strategy_vid</span><span class="o">:</span><span class="w"> </span><span class="kt">z.number</span><span class="p">().</span><span class="kr">int</span><span class="p">().</span><span class="nx">positive</span><span class="p">(),</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nx">priority</span><span class="o">:</span><span class="w"> </span><span class="kt">z.enum</span><span class="p">([</span><span class="s1">'normal'</span><span class="p">,</span><span class="w"> </span><span class="s1">'high'</span><span class="p">]).</span><span class="k">default</span><span class="p">(</span><span class="s1">'normal'</span><span class="p">),</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">})</span>
+</code></pre></div>
+<p>The strategy and its <code>CONFIG_JSON</code> are persisted by the existing FastAPI <code>POST /backtest/optimize</code> flow (which writes <code>BT.STRATEGY</code>). The job submit endpoint only references that strategy by <code>(STRATEGY_ID, STRATEGY_VID)</code>. <strong>The optimization request payload is no longer duplicated into the queue table.</strong></p>
+<p><code>priority</code> is <code>"normal"</code> (→ DB priority <code>100</code>) or <code>"high"</code> (→ DB priority <code>0</code>, jumps the queue). The frontend's "Add to Queue" sends <code>normal</code>; "Run Now" sends <code>high</code>.</p>
+<h3 id="83-queue-row-response">8.3 Queue row response<a class="headerlink" href="#83-queue-row-response" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">"queue_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"uuid"</span><span class="p">,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">"queue_vid"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">"strategy_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"uuid"</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">"strategy_vid"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">"strategy_nm"</span><span class="p">:</span><span class="w"> </span><span class="s2">"BTC Bollinger 2016-now"</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"RUNNING"</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nt">"priority"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="nt">"transact_from_ts"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-04-25T12:00:03Z"</span><span class="p">,</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span><span class="nt">"user_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"alfred"</span><span class="p">,</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">  </span><span class="nt">"progress"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="nt">"trial"</span><span class="p">:</span><span class="w"> </span><span class="mi">734</span><span class="p">,</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">    </span><span class="nt">"total"</span><span class="p">:</span><span class="w"> </span><span class="mi">20000</span><span class="p">,</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span><span class="nt">"best_sharpe"</span><span class="p">:</span><span class="w"> </span><span class="mf">1.4321</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="p">}</span>
+</code></pre></div>
+<p><code>progress</code> is in-memory in the coordinator (last value forwarded from the worker's stdout JSON line). It is <strong>not</strong> persisted to the DB.</p>
+<h3 id="84-sse-event-types">8.4 SSE event types<a class="headerlink" href="#84-sse-event-types" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>When</th>
+<th>Payload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>snapshot</code></td>
+<td>On connect</td>
+<td><code>{ active: QueueRow[], recent: QueueRow[] }</code></td>
+</tr>
+<tr>
+<td><code>enqueued</code></td>
+<td>After <code>SP_INS_QUEUE QUEUED</code></td>
+<td>Full row</td>
+</tr>
+<tr>
+<td><code>claimed</code></td>
+<td>After <code>SP_INS_QUEUE RUNNING</code></td>
+<td>Full row</td>
+</tr>
+<tr>
+<td><code>progress</code></td>
+<td>Throttled by worker (≤ 1 Hz)</td>
+<td><code>{ queue_id, trial, total, best_sharpe }</code></td>
+</tr>
+<tr>
+<td><code>terminal</code></td>
+<td>COMPLETED / FAILED / CANCELLED</td>
+<td>Full row + <code>status</code></td>
+</tr>
+<tr>
+<td><code>cancel_requested</code></td>
+<td>After <code>SP_INS_QUEUE CANCEL_REQUESTED</code></td>
+<td><code>{ queue_id }</code></td>
+</tr>
+</tbody>
+</table>
+<p>SSE event IDs use <code>(queue_id, queue_vid)</code> so reconnects can detect missed transitions and refetch.</p>
+<hr />
+<h2 id="9-coordinator-typescript">9. Coordinator (TypeScript)<a class="headerlink" href="#9-coordinator-typescript" title="Permanent link">&para;</a></h2>
+<p><code>coordinator/</code> is a Bun project. Hono for HTTP, <code>postgres</code> (porsager) for DB.</p>
+<h3 id="91-file-layout">9.1 File layout<a class="headerlink" href="#91-file-layout" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>coordinator/
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>├── package.json
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>├── tsconfig.json
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>├── Dockerfile
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>├── src/
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>│   ├── index.ts                  # boot: load REFDATA cache, start queue, start HTTP
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>│   ├── config.ts                 # env: DB_URL, MAX_WORKERS=1, PYTHON_BIN, JWT_SECRET, LOG_LEVEL
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>│   ├── db/
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>│   │   └── client.ts             # postgres.js singleton (shared connection pool only)
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>│   ├── queue/                    # all job-queue logic — the coordinator's core domain
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>│   │   ├── repo.ts               # submit, claimNext, markTerminal, queryQueue, queryTerminal
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>│   │   ├── manager.ts            # wakeup queue, event loop, watchdog, stale recovery
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>│   │   ├── supervisor.ts         # spawn child process, parse stdout, signal on cancel
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>│   │   ├── sse.ts                # subscriber set + broadcast
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>│   │   └── notify.ts             # LISTEN job_enqueued / job_cancel_requested
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>│   ├── http/
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>│   │   ├── server.ts             # Hono app + auth middleware (verify qs_token JWT)
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>│   │   └── routes/
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>│   │       ├── jobs.ts
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>│   │       └── stream.ts
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>│   ├── refdata/
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>│   │   ├── repo.ts               # raw SQL for REFDATA tables
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>│   │   └── cache.ts              # in-process REFDATA dict (loaded at startup, refresh endpoint)
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>│   └── types/
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>│       └── queue.ts              # zod schemas — exported for frontend consumption
+<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>└── tests/
+<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>    └── queue.test.ts             # bun:test
+</code></pre></div>
+<blockquote>
+<p><strong>Layout rationale:</strong> <code>src/db/</code> holds only the shared connection pool — infrastructure with no domain knowledge. All queue-specific logic (SQL, event loop, process supervision, SSE, LISTEN) lives under <code>src/queue/</code> — the coordinator's core domain. Future domains (<code>src/refdata/</code>, <code>src/inst/</code>) follow the same pattern: each owns its own repo + cache alongside its domain logic.</p>
+</blockquote>
+<h3 id="92-startup-sequence-indexts">9.2 Startup sequence (<code>index.ts</code>)<a class="headerlink" href="#92-startup-sequence-indexts" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Load env (<code>config.ts</code>). Fail fast if <code>DB_URL</code> or <code>JWT_SECRET</code> missing.</li>
+<li>Open Postgres pool. Ping. Fail fast on error.</li>
+<li>Load REFDATA cache (<code>QUEUE_STATUS</code>, etc.) — coordinator needs <code>QUEUED</code> / <code>RUNNING</code> IDs.</li>
+<li><strong>Stale-job recovery</strong>: any active row with <code>QUEUE_STATUS_ID = 2 (RUNNING)</code> and no live child process → call <code>SP_INS_QUEUE FAILED</code> with <code>error_text = "coordinator restarted while job was running"</code>. Never auto-requeue.</li>
+<li>Start <code>manager</code> (event loop + 30 s watchdog).</li>
+<li>(Future) Start <code>notify</code> consumer with autocommit conn + <code>LISTEN job_enqueued</code>.</li>
+<li>Try one initial claim (in case work queued while coordinator was down).</li>
+<li>Start Hono HTTP server on port 3001.</li>
+<li>Install SIGTERM handler: stop accepting new HTTP, drain in-flight, send SIGTERM to active worker, wait <code>SHUTDOWN_GRACE_SECONDS</code> then exit.</li>
+</ol>
+<h3 id="93-manager-wakeup-queue">9.3 Manager — wakeup queue<a class="headerlink" href="#93-manager-wakeup-queue" title="Permanent link">&para;</a></h3>
+<p>A single in-process channel: <code>private wakeup = new Set&lt;string&gt;()</code> plus a resolved <code>Promise</code> chain. Wakeup sources:</p>
+<ul>
+<li>HTTP <code>POST /jobs</code> → <code>manager.notifyEnqueued()</code></li>
+<li><code>notify.ts</code> (future) → <code>manager.notifyEnqueued()</code> from LISTEN payload</li>
+<li><code>supervisor</code> → <code>manager.notifyWorkerExit()</code> when child exits</li>
+<li><code>watchdog</code> → every 30 s</li>
+</ul>
+<p>On every wakeup the loop runs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">tick</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="k">await</span><span class="w"> </span><span class="nx">supervisor</span><span class="p">.</span><span class="nx">reapDead</span><span class="p">();</span><span class="w">          </span><span class="c1">// mark FAILED if worker exited without terminal write</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="k">await</span><span class="w"> </span><span class="nx">manager</span><span class="p">.</span><span class="nx">recoverStale</span><span class="p">();</span><span class="w">         </span><span class="c1">// optional, only inside watchdog ticks</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="k">await</span><span class="w"> </span><span class="nx">manager</span><span class="p">.</span><span class="nx">maybeClaimAndSpawn</span><span class="p">();</span><span class="w">   </span><span class="c1">// claim next QUEUED if a slot is free</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="94-claim-_claimnext">9.4 Claim (<code>_claimNext</code>)<a class="headerlink" href="#94-claim-_claimnext" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1">-- Phase 1: two-statement, single coordinator (safe)</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">SELECT</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">queue_id</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">strategy_id</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">strategy_vid</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">priority</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">user_id</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="n">bt</span><span class="p">.</span><span class="n">queue</span><span class="w"> </span><span class="n">q</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="k">JOIN</span><span class="w"> </span><span class="n">refdata</span><span class="p">.</span><span class="n">queue_status</span><span class="w"> </span><span class="n">rs</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">queue_status_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rs</span><span class="p">.</span><span class="n">queue_status_id</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">rs</span><span class="p">.</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'QUEUED'</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">transact_to_ts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TIMESTAMPTZ</span><span class="w"> </span><span class="s1">'9999-12-31'</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w"> </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">priority</span><span class="w"> </span><span class="k">ASC</span><span class="p">,</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="n">created_at</span><span class="w"> </span><span class="k">ASC</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w"> </span><span class="k">LIMIT</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="k">CALL</span><span class="w"> </span><span class="n">bt</span><span class="p">.</span><span class="n">sp_ins_queue</span><span class="p">(:</span><span class="n">queue_id</span><span class="p">,</span><span class="w"> </span><span class="p">:</span><span class="n">strategy_id</span><span class="p">,</span><span class="w"> </span><span class="p">:</span><span class="n">strategy_vid</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="cm">/* RUNNING */</span><span class="p">,</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">                     </span><span class="p">:</span><span class="n">priority</span><span class="p">,</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w"> </span><span class="p">:</span><span class="n">user_id</span><span class="p">,</span><span class="w"> </span><span class="p">...);</span>
+</code></pre></div>
+<p>When <code>SP_CLAIM_NEXT</code> is added (Phase 2) this collapses to one atomic call.</p>
+<h3 id="95-supervisor">9.5 Supervisor<a class="headerlink" href="#95-supervisor" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">child</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">spawn</span><span class="p">(</span><span class="nx">PYTHON_BIN</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="s1">'-m'</span><span class="p">,</span><span class="w"> </span><span class="s1">'quant.queue.worker'</span><span class="p">,</span><span class="w"> </span><span class="nx">queueId</span><span class="p">],</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nx">env</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">,</span><span class="w"> </span><span class="nx">DB_URL</span><span class="p">,</span><span class="w"> </span><span class="nx">WORKER_PROGRESS_EVERY_N</span><span class="o">:</span><span class="w"> </span><span class="s1">'25'</span><span class="p">,</span><span class="w"> </span><span class="nx">WORKER_PROGRESS_EVERY_T</span><span class="o">:</span><span class="w"> </span><span class="s1">'1.0'</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nx">stdio</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s1">'ignore'</span><span class="p">,</span><span class="w"> </span><span class="s1">'pipe'</span><span class="p">,</span><span class="w"> </span><span class="s1">'pipe'</span><span class="p">],</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="p">});</span>
+</code></pre></div>
+<ul>
+<li><code>stdout</code> is line-buffered → JSON-parsed → <code>manager.handleWorkerEvent(queueId, event)</code>.</li>
+<li><code>stderr</code> is forwarded to the coordinator log.</li>
+<li>On <code>child.on('exit', code)</code> → <code>manager.notifyWorkerExit(queueId, code)</code>. If exit code ≠ 0 and no terminal row exists in DB → coordinator writes FAILED.</li>
+<li>On <code>POST /jobs/:id/cancel</code> for the currently running job: write <code>CANCEL_REQUESTED</code> row, then <code>child.kill('SIGTERM')</code>. Worker observes either via signal handler or via the next DB checkpoint poll.</li>
+<li>Hard kill: if SIGTERM doesn't take effect within 60 s, send <code>SIGKILL</code>.</li>
+</ul>
+<h3 id="96-sse-fanout">9.6 SSE fanout<a class="headerlink" href="#96-sse-fanout" title="Permanent link">&para;</a></h3>
+<p><code>Set&lt;{ controller, lastEventId }&gt;</code>. <code>subscribe()</code> adds; the route's <code>try/finally</code> removes on disconnect. <code>broadcast(event)</code> writes <code>id: &lt;queue_id&gt;:&lt;queue_vid&gt;\nevent: &lt;type&gt;\ndata: &lt;json&gt;\n\n</code> to every controller. Bun's stream backpressure is honoured via <code>await controller.write()</code>.</p>
+<hr />
+<h2 id="10-worker-process-quantqueueworkerpy">10. Worker process — <code>quant/queue/worker.py</code><a class="headerlink" href="#10-worker-process-quantqueueworkerpy" title="Permanent link">&para;</a></h2>
+<p>The worker is a normal Python module invoked as <code>python -m quant.queue.worker &lt;queue_id&gt;</code>. It is the <strong>entire</strong> Python contract the coordinator depends on.</p>
+<h3 id="101-invocation-contract">10.1 Invocation contract<a class="headerlink" href="#101-invocation-contract" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>python<span class="w"> </span>-m<span class="w"> </span>quant.queue.worker<span class="w"> </span>&lt;queue_id&gt;
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Channel</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>argv[1]</code></td>
+<td>Queue ID (UUID string)</td>
+</tr>
+<tr>
+<td><code>stdin</code></td>
+<td>Unused</td>
+</tr>
+<tr>
+<td><code>stdout</code></td>
+<td>Newline-delimited JSON events (see §10.3). One object per line, terminated by <code>\n</code>.</td>
+</tr>
+<tr>
+<td><code>stderr</code></td>
+<td>Human logs (forwarded to coordinator log)</td>
+</tr>
+<tr>
+<td>Exit code</td>
+<td><code>0</code> = terminal state written to DB. <code>1</code> = uncaught crash. <code>2</code> = config error. <code>137</code>/<code>143</code> = SIGKILL/SIGTERM.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="102-environment-passed-by-coordinator">10.2 Environment (passed by coordinator)<a class="headerlink" href="#102-environment-passed-by-coordinator" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Var</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DB_URL</code></td>
+<td>psycopg conninfo</td>
+</tr>
+<tr>
+<td><code>WORKER_PROGRESS_EVERY_N</code></td>
+<td>Default <code>25</code>. Emit progress every N trials.</td>
+</tr>
+<tr>
+<td><code>WORKER_PROGRESS_EVERY_T</code></td>
+<td>Default <code>1.0</code> (seconds). Emit progress at most once per T regardless of N.</td>
+</tr>
+<tr>
+<td><code>WORKER_TIMEOUT_SECONDS</code></td>
+<td>Optional hard deadline. Worker self-terminates on exceed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="103-stdout-json-protocol">10.3 stdout JSON protocol<a class="headerlink" href="#103-stdout-json-protocol" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="s2">"started"</span><span class="p">,</span><span class="nt">"queue_id"</span><span class="p">:</span><span class="s2">"..."</span><span class="p">,</span><span class="nt">"ts"</span><span class="p">:</span><span class="s2">"2026-05-03T12:00:00Z"</span><span class="p">}</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="s2">"progress"</span><span class="p">,</span><span class="nt">"queue_id"</span><span class="p">:</span><span class="s2">"..."</span><span class="p">,</span><span class="nt">"trial"</span><span class="p">:</span><span class="mi">250</span><span class="p">,</span><span class="nt">"total"</span><span class="p">:</span><span class="mi">20000</span><span class="p">,</span><span class="nt">"best_sharpe"</span><span class="p">:</span><span class="mf">1.12</span><span class="p">,</span><span class="nt">"ts"</span><span class="p">:</span><span class="s2">"..."</span><span class="p">}</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="s2">"terminal"</span><span class="p">,</span><span class="nt">"queue_id"</span><span class="p">:</span><span class="s2">"..."</span><span class="p">,</span><span class="nt">"status"</span><span class="p">:</span><span class="s2">"COMPLETED"</span><span class="p">,</span><span class="nt">"result_id"</span><span class="p">:</span><span class="s2">"..."</span><span class="p">,</span><span class="nt">"ts"</span><span class="p">:</span><span class="s2">"..."</span><span class="p">}</span>
+</code></pre></div>
+<p><code>progress</code> is forwarded to SSE subscribers as-is. <code>terminal</code> is a fast-path notification — the DB is still the source of truth, but emitting it on stdout lets SSE update before the coordinator polls.</p>
+<p>Malformed lines are logged but do not kill the worker.</p>
+<h3 id="104-flow">10.4 Flow<a class="headerlink" href="#104-flow" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Parse <code>queue_id</code> from <code>sys.argv[1]</code>. Exit 2 if invalid UUID.</li>
+<li>Open psycopg connection from <code>DB_URL</code> (no pool).</li>
+<li><code>CALL BT.SP_GET_QUEUE_LATEST(queue_id)</code> → active <code>BT.QUEUE</code> row joined to frozen <code>CONFIG_JSON</code> (<code>BT.STRATEGY</code> on <code>STRATEGY_VID</code>). Exit 2 if no row.</li>
+<li>Reconstruct <code>OptimizeRequest</code> from <code>CONFIG_JSON</code>.</li>
+<li>Install <code>SIGTERM</code> handler: set <code>cancel_flag = True</code> → next callback raises <code>JobCancelled</code>.</li>
+<li>Set <code>deadline = now + WORKER_TIMEOUT_SECONDS</code> (if set).</li>
+<li>Emit <code>started</code> JSON.</li>
+<li>Run <code>param_opt</code> with the per-trial callback (§10.5).</li>
+<li>On normal completion: generate <code>RESULT_ID</code> (UUID), <code>CALL BT.SP_INS_RESULT(...)</code>, then <code>CALL BT.SP_INS_QUEUE(..., COMPLETED, ...)</code>.</li>
+<li>On <code>JobCancelled</code>: <code>CALL BT.SP_INS_QUEUE(..., CANCELLED, ...)</code>.</li>
+<li>On any other exception: <code>CALL BT.SP_INS_QUEUE(..., FAILED, error_text=traceback)</code>.</li>
+<li>Emit <code>terminal</code> JSON. Exit 0.</li>
+</ol>
+<h3 id="105-per-trial-callback-throttled">10.5 Per-trial callback (throttled)<a class="headerlink" href="#105-per-trial-callback-throttled" title="Permanent link">&para;</a></h3>
+<p>Body runs only when <code>trial % N == 0</code> <strong>or</strong> <code>time.monotonic() - last &gt;= T</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">callback</span><span class="p">(</span><span class="n">trial</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">total</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">best</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">_should_emit</span><span class="p">(</span><span class="n">trial</span><span class="p">):</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>        <span class="k">return</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="k">if</span> <span class="n">cancel_flag</span> <span class="ow">or</span> <span class="n">_cancel_requested_in_db</span><span class="p">():</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>        <span class="k">raise</span> <span class="n">JobCancelled</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="k">if</span> <span class="n">deadline</span> <span class="ow">and</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">&gt;</span> <span class="n">deadline</span><span class="p">:</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>        <span class="k">raise</span> <span class="n">JobTimeout</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"progress"</span><span class="p">,</span> <span class="s2">"queue_id"</span><span class="p">:</span> <span class="n">qid</span><span class="p">,</span> <span class="s2">"trial"</span><span class="p">:</span> <span class="n">trial</span><span class="p">,</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>        <span class="s2">"total"</span><span class="p">:</span> <span class="n">total</span><span class="p">,</span> <span class="s2">"best_sharpe"</span><span class="p">:</span> <span class="n">best</span><span class="p">,</span> <span class="s2">"ts"</span><span class="p">:</span> <span class="n">_iso_now</span><span class="p">(),</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    <span class="p">}),</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<p><code>_cancel_requested_in_db()</code> issues a single-row read on <code>BT.QUEUE</code> for the active row's <code>QUEUE_STATUS_ID</code>. Cheap (~1 ms) at the throttled cadence.</p>
+<h3 id="106-signal-handling">10.6 Signal handling<a class="headerlink" href="#106-signal-handling" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>SIGTERM</code> → set <code>cancel_flag = True</code>. Callback raises <code>JobCancelled</code> on next checkpoint. Worker exits 0 after writing CANCELLED.</li>
+<li><code>SIGKILL</code> → process dies immediately. Coordinator's <code>child.on('exit')</code> sees code <code>137</code> and writes FAILED with <code>error_text = "killed by SIGKILL"</code>.</li>
+</ul>
+<h3 id="107-why-the-worker-is-the-only-writer-of-its-own-success">10.7 Why the worker is the only writer of its own success<a class="headerlink" href="#107-why-the-worker-is-the-only-writer-of-its-own-success" title="Permanent link">&para;</a></h3>
+<p>The DB row is the single source of truth. If the coordinator wrote COMPLETED based on a stdout <code>terminal</code> event, a stdout flush race could mark a job COMPLETED that actually crashed mid-write. Letting the worker write its own success keeps the invariant: <strong>coordinator only writes FAILED, and only when the worker is provably dead with no terminal row.</strong></p>
+<hr />
+<h2 id="11-frontend">11. Frontend<a class="headerlink" href="#11-frontend" title="Permanent link">&para;</a></h2>
+<h3 id="111-state-split">11.1 State split<a class="headerlink" href="#111-state-split" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Owner</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>draftConfig</code></td>
+<td><code>BacktestPage</code></td>
+<td><code>useState</code></td>
+</tr>
+<tr>
+<td><code>queue</code></td>
+<td><code>useJobsStream()</code></td>
+<td>TanStack Query + EventSource</td>
+</tr>
+<tr>
+<td><code>selectedJobId</code></td>
+<td><code>BacktestPage</code></td>
+<td>URL param <code>?job=&lt;uuid&gt;</code></td>
+</tr>
+</tbody>
+</table>
+<p>URL-driven <code>selectedJobId</code> makes job views shareable and survives refresh.</p>
+<h3 id="112-type-sharing-with-coordinator">11.2 Type sharing with coordinator<a class="headerlink" href="#112-type-sharing-with-coordinator" title="Permanent link">&para;</a></h3>
+<p><code>coordinator/src/types/queue.ts</code> exports zod schemas + inferred TS types. Frontend imports them via a workspace package or relative path (depending on monorepo setup) so request/response types are guaranteed to match.</p>
+<h3 id="113-layout">11.3 Layout<a class="headerlink" href="#113-layout" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Region</th>
+<th>Width</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Left main column</td>
+<td>~70% desktop</td>
+<td>Draft config drawer trigger + selected job's results (charts, metrics, top-10)</td>
+</tr>
+<tr>
+<td>Right side panel</td>
+<td>~30% desktop</td>
+<td>Queue table (running, queued, recent terminal)</td>
+</tr>
+</tbody>
+</table>
+<p>Mobile: queue collapses into a bottom sheet or a tab.</p>
+<h3 id="114-queue-table-columns">11.4 Queue table columns<a class="headerlink" href="#114-queue-table-columns" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>State</td>
+<td>Coloured chip</td>
+</tr>
+<tr>
+<td>Position</td>
+<td>Empty for non-queued</td>
+</tr>
+<tr>
+<td>Strategy name</td>
+<td>Click → loads result into main panel</td>
+</tr>
+<tr>
+<td>Submitted</td>
+<td>Relative time</td>
+</tr>
+<tr>
+<td>Progress</td>
+<td>Bar + <code>734 / 20000</code> for running</td>
+</tr>
+<tr>
+<td>Best Sharpe</td>
+<td>Live for running, final for completed</td>
+</tr>
+<tr>
+<td>Actions</td>
+<td>Cancel · Delete (terminal only)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="115-editable-ui-while-jobs-run">11.5 Editable UI while jobs run<a class="headerlink" href="#115-editable-ui-while-jobs-run" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Editing the draft form never mutates submitted jobs.</li>
+<li>"Add to Queue" calls <code>POST /api/v1/backtest/jobs</code> with priority <code>normal</code>.</li>
+<li>"Run Now" calls <code>POST /api/v1/backtest/jobs</code> with priority <code>high</code> (jumps queue, does <strong>not</strong> preempt running job).</li>
+<li>Clicking a queue row sets <code>selectedJobId</code>; main panel shows that job's result.</li>
+</ul>
+<h3 id="116-sse-reconnection">11.6 SSE reconnection<a class="headerlink" href="#116-sse-reconnection" title="Permanent link">&para;</a></h3>
+<p><code>useJobsStream()</code> uses native <code>EventSource</code>. On disconnect, browser auto-reconnects with <code>Last-Event-ID</code> header. Coordinator parses <code>(queue_id, queue_vid)</code> and replays any newer events from the DB before resuming live broadcast.</p>
+<h3 id="117-vite-dev-proxy">11.7 Vite dev proxy<a class="headerlink" href="#117-vite-dev-proxy" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1">// frontend/vite.config.ts</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nx">proxy</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="s1">'/api/v1/backtest/jobs'</span><span class="o">:</span><span class="w"> </span><span class="s1">'http://localhost:3001'</span><span class="p">,</span><span class="w">     </span><span class="c1">// coordinator</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="s1">'/api'</span><span class="o">:</span><span class="w">         </span><span class="s1">'http://localhost:8000'</span><span class="p">,</span><span class="w">     </span><span class="c1">// FastAPI (everything else)</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="p">}</span>
+</code></pre></div>
+<p>In production the same routing happens at nginx.</p>
+<hr />
+<h2 id="12-failure-handling">12. Failure handling<a class="headerlink" href="#12-failure-handling" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Worker raises</td>
+<td>Worker writes FAILED via <code>SP_INS_QUEUE</code> itself → emits <code>terminal</code> JSON → coordinator broadcasts SSE → claims next.</td>
+</tr>
+<tr>
+<td>Worker crashes (exit ≠ 0, no terminal row)</td>
+<td>Coordinator writes FAILED with <code>error_text = "worker crashed exit=N"</code>.</td>
+</tr>
+<tr>
+<td>Worker exceeds <code>WORKER_TIMEOUT_SECONDS</code></td>
+<td>Worker self-terminates with FAILED + <code>error_text = "timeout after N seconds"</code>. If unresponsive, coordinator SIGKILLs after grace and writes FAILED.</td>
+</tr>
+<tr>
+<td>Coordinator restart during RUNNING</td>
+<td>Stale recovery on startup marks orphaned RUNNING jobs FAILED. <strong>Never auto-requeue</strong> — partial <code>BT.RESULT</code> writes may already exist.</td>
+</tr>
+<tr>
+<td>Coordinator can't reach DB at startup</td>
+<td>Fail fast (process exits ≠ 0). Container restarts.</td>
+</tr>
+<tr>
+<td>Worker can't reach DB</td>
+<td>Worker exits 1. Coordinator handles as crash.</td>
+</tr>
+<tr>
+<td>&gt; 20 QUEUED per user</td>
+<td><code>429</code>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="13-test-strategy">13. Test strategy<a class="headerlink" href="#13-test-strategy" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Tests</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DB (<code>tests/integration/test_jobs_db.py</code>)</td>
+<td>Each procedure/function round-trip from psycopg. State transition correctness. <code>FN_GET_QUEUE_FOR_TERMINAL</code> filtering.</td>
+</tr>
+<tr>
+<td>Worker (<code>tests/unit/test_worker.py</code>)</td>
+<td>Stub the optimization pipeline. Test progress throttling, cancellation observation, timeout enforcement, terminal state writes for each exit path. Verify exit codes.</td>
+</tr>
+<tr>
+<td>Coordinator manager (<code>coordinator/tests/manager.test.ts</code>)</td>
+<td>Mock <code>repo</code> + <code>supervisor</code>. Test event loop, watchdog, stale recovery on startup, SSE fanout, idempotent cancel.</td>
+</tr>
+<tr>
+<td>Coordinator HTTP (<code>coordinator/tests/http.test.ts</code>)</td>
+<td>Auth, rate limiting (20-queued cap), enqueue → list → cancel → delete flow, SSE reconnect with <code>Last-Event-ID</code>.</td>
+</tr>
+<tr>
+<td>Frontend (<code>useJobsStream.test.tsx</code>)</td>
+<td>Apply each event type to local state. Reconnect uses native EventSource. Cancel button calls API.</td>
+</tr>
+<tr>
+<td>End-to-end (<code>tests/e2e/test_queue_loop.py</code>)</td>
+<td>Spawn coordinator + Python worker against live DB. Submit → claim → complete. Submit + cancel mid-run. Coordinator restart with orphaned RUNNING.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="14-performance-considerations">14. Performance considerations<a class="headerlink" href="#14-performance-considerations" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Single worker (default) prevents CPU oversubscription. Set <code>MAX_WORKERS=N</code> later.</li>
+<li>Worker progress polls DB at most every <code>WORKER_PROGRESS_EVERY_T</code> seconds.</li>
+<li>SSE payloads ~500 B. No chart data on the stream.</li>
+<li><code>GET /api/v1/backtest/jobs</code> returns active queue + 50 most-recent terminal jobs. Older history loaded on demand.</li>
+<li>Coordinator process is ~30 MB resident (Bun) vs ~150 MB for the FastAPI process — easier to autoscale.</li>
+<li><code>LISTEN/NOTIFY</code> (when added) is in-process to PostgreSQL — no extra hop.</li>
+</ol>
+<hr />
+<h2 id="15-security">15. Security<a class="headerlink" href="#15-security" title="Permanent link">&para;</a></h2>
+<ol>
+<li>All <code>/api/v1/backtest/jobs/*</code> endpoints validate the <code>qs_token</code> JWT cookie. Same secret as FastAPI (<code>JWT_SECRET</code> env).</li>
+<li><code>USER_ID</code> stamped on every queue row. Read endpoints filter by user (admins later).</li>
+<li><code>CONFIG_JSON</code> is data — never <code>eval</code>'d. Worker reconstructs Pydantic model with strict validation.</li>
+<li>Rate limit: max 20 QUEUED per user.</li>
+<li>Cancel/delete authorized only for the owning user.</li>
+<li>Worker child process inherits only <code>DB_URL</code> + worker tunables — no <code>JWT_SECRET</code>, no API keys it doesn't need.</li>
+</ol>
+<hr />
+<h2 id="16-phased-implementation-plan">16. Phased implementation plan<a class="headerlink" href="#16-phased-implementation-plan" title="Permanent link">&para;</a></h2>
+<p>Each slice is independently shippable.</p>
+<h3 id="slice-a-schema-procedures-done">Slice A — Schema + procedures ✅ Done<a class="headerlink" href="#slice-a-schema-procedures-done" title="Permanent link">&para;</a></h3>
+<ol>
+<li>~~Liquibase: squashed <code>db/liquidbase/bt/bt-changelog.xml</code> (<code>bt-000</code> … <code>bt-003</code>) — tables, procedures, <code>FN_GET_QUEUE_FOR_TERMINAL</code>, legacy drops.~~</li>
+<li>~~<code>SP_INS_QUEUE</code>, <code>SP_INS_RESULT</code>, <code>SP_GET_QUEUE</code>, <code>SP_GET_QUEUE_FOR_TERMINAL</code>, <code>FN_GET_QUEUE_FOR_TERMINAL</code>, …~~</li>
+<li>~~<code>src/jobs.py</code> — <code>BacktestJobRepo</code> (read methods used by worker; writes used for terminal transitions).~~</li>
+</ol>
+<h3 id="slice-b-coordinator-skeleton-done">Slice B — Coordinator skeleton ✅ Done<a class="headerlink" href="#slice-b-coordinator-skeleton-done" title="Permanent link">&para;</a></h3>
+<ol>
+<li>~~<code>coordinator/</code> Bun project: <code>package.json</code>, <code>tsconfig.json</code>, <code>Dockerfile</code>, <code>bun:test</code> setup.~~</li>
+<li>~~<code>db/client.ts</code> + <code>queue/repo.ts</code> — <code>queryQueue()</code>; Hono <code>GET /api/v1/backtest/jobs</code> returns real DB rows (paths differ slightly from the original <code>db/repo.ts</code> sketch).~~</li>
+<li>~~<code>http/server.ts</code> — Hono app, <code>/health</code>, <code>/health/ready</code>.~~</li>
+<li>~~<code>docker-compose.yml</code> — <code>coordinator</code> service on port <strong>3001</strong> (<code>COORDINATOR_PORT</code> override supported).~~</li>
+<li>~~Smoke test: <code>curl</code> <strong>examples</strong> (after <code>docker compose up coordinator</code> or <code>bun run start</code> in <code>coordinator/</code> with env set):~~</li>
+<li><code>curl -sS "http://localhost:3001/health"</code></li>
+<li><code>curl -sS "http://localhost:3001/api/v1/backtest/jobs"</code> — JSON with <code>rows</code> when DB is reachable and Liquibase BT objects exist.</li>
+<li><strong>Compose note:</strong> set <strong><code>QUANTDB_URL</code></strong> and <strong><code>JWT_SECRET</code></strong> in <code>.env</code> (see <code>.env.example</code>). For Postgres on the host (SSM tunnel), use something like <code>host.docker.internal</code> / the host IP in <code>QUANTDB_URL</code>.</li>
+</ol>
+<h3 id="slice-c-submit-claim-spawn">Slice C — Submit + claim + spawn<a class="headerlink" href="#slice-c-submit-claim-spawn" title="Permanent link">&para;</a></h3>
+<ol>
+<li><code>repo.submit()</code> → <code>SP_INS_QUEUE QUEUED</code>. Returns <code>queue_id</code>.</li>
+<li><code>repo.claimNext()</code> → SELECT + <code>SP_INS_QUEUE RUNNING</code>.</li>
+<li><code>manager.ts</code> — wakeup queue, event loop.</li>
+<li><code>supervisor.ts</code> — <code>child_process.spawn</code>, exit detection.</li>
+<li><code>src/worker.py</code> — minimal version (no progress, no cancel): read config → run optimize → write RESULT → <code>SP_INS_QUEUE COMPLETED</code>.</li>
+<li><strong>End-to-end milestone</strong>: <code>POST /api/v1/backtest/jobs</code> → coordinator claims → spawns Python → DB shows COMPLETED. No frontend yet.</li>
+</ol>
+<h3 id="slice-d-worker-progress-cancel-timeout">Slice D — Worker progress + cancel + timeout<a class="headerlink" href="#slice-d-worker-progress-cancel-timeout" title="Permanent link">&para;</a></h3>
+<ol>
+<li><code>src/worker.py</code> per-trial callback (throttled progress + cancel poll + deadline).</li>
+<li>Stdout JSON protocol parsing in <code>supervisor.ts</code>.</li>
+<li><code>POST /jobs/:id/cancel</code> → <code>SP_INS_QUEUE CANCEL_REQUESTED</code> + <code>SIGTERM</code>.</li>
+<li>SIGKILL after grace period.</li>
+<li>Stale recovery on coordinator startup.</li>
+<li>Unit + e2e tests.</li>
+</ol>
+<h3 id="slice-e-sse-frontend">Slice E — SSE + frontend<a class="headerlink" href="#slice-e-sse-frontend" title="Permanent link">&para;</a></h3>
+<ol>
+<li><code>manager/sse.ts</code> + <code>http/routes/stream.ts</code>.</li>
+<li>Frontend <code>coordinator/src/types/queue.ts</code> shared with <code>frontend/</code>.</li>
+<li><code>frontend/src/features/queue/</code> — <code>useJobsStream()</code>, queue panel, cancel button.</li>
+<li>URL-driven <code>selectedJobId</code>.</li>
+<li>Replace <code>Run Optimization</code> button with <code>Add to Queue</code> + <code>Run Now</code>.</li>
+</ol>
+<h3 id="slice-f-authentication">Slice F — Authentication<a class="headerlink" href="#slice-f-authentication" title="Permanent link">&para;</a></h3>
+<ol>
+<li>JWT verification middleware in <code>coordinator/src/http/server.ts</code> using <code>jose</code>.</li>
+<li>Shared <code>JWT_SECRET</code> env between coordinator and FastAPI.</li>
+<li><code>USER_ID</code> propagation into <code>repo.submit()</code>.</li>
+<li>Rate limiting (20 QUEUED per user).</li>
+</ol>
+<h3 id="phase-2-quality-of-life">Phase 2 — Quality of life<a class="headerlink" href="#phase-2-quality-of-life" title="Permanent link">&para;</a></h3>
+<ol>
+<li><code>SP_CLAIM_NEXT</code> stored procedure for atomic claim.</li>
+<li><code>pg_notify</code> in <code>SP_INS_QUEUE</code> + <code>coordinator/src/db/notify.ts</code> LISTEN consumer.</li>
+<li>Retry button (copies config into a new job).</li>
+<li>Per-job event log viewer.</li>
+</ol>
+<h3 id="phase-3-scale-out-only-if-needed">Phase 3 — Scale-out (only if needed)<a class="headerlink" href="#phase-3-scale-out-only-if-needed" title="Permanent link">&para;</a></h3>
+<ol>
+<li><code>MAX_WORKERS=N</code> configurable.</li>
+<li>Multiple coordinator instances behind ALB (requires <code>SP_CLAIM_NEXT</code> from Phase 2).</li>
+<li>Heartbeat-based stale detection finer than <code>WORKER_TIMEOUT_SECONDS</code>.</li>
+<li>Optional partial-result persistence so a restart can resume mid-run.</li>
+<li>Per-job CPU / memory / disk envelope — see below.</li>
+</ol>
+<h3 id="worker-resource-envelope">Worker resource envelope<a class="headerlink" href="#worker-resource-envelope" title="Permanent link">&para;</a></h3>
+<p>Nothing constrains what a job consumes today. There is no <code>mem_limit</code>, <code>cpus</code>
+or <code>pids_limit</code> on the <code>worker</code> service, and <code>MAX_CONCURRENT_WORKERS=1</code> is the
+only throttle. On a shared t4g.medium (decision #34) that makes a runaway grid
+search a host-wide event: the kernel OOM killer picks its victim by badness
+score, which can be <code>quant-api</code> rather than the job that caused it. Once the
+TRADE executor shares the box (decision #35, through Phase 3.7) that is a
+missed trade — schedules run with <code>RetryPolicy.n = 0</code>, so a skipped tick waits
+a full interval rather than retrying.</p>
+<p>The choice is really about <em>where</em> a job runs, because per-job sizing is a
+property of the execution substrate:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Per-job sizing</th>
+<th>Ceiling</th>
+<th>Change required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Compose <code>mem_limit</code> / <code>cpus</code></td>
+<td>No — one static size for every job</td>
+<td>Host: 2 vCPU / 4 GiB</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Fargate task per job</td>
+<td>Yes — 0.25–16 vCPU, 0.5–120 GiB, 20–200 GiB ephemeral</td>
+<td>None</td>
+<td>Spawn call only; worker code unchanged</td>
+</tr>
+<tr>
+<td>Lambda per job</td>
+<td>Yes — 128 MiB–10 GiB (vCPU scales with it), 512 MiB–10 GiB <code>/tmp</code></td>
+<td><strong>15 min, hard</strong></td>
+<td>Job must shard; queue trigger redesigned</td>
+</tr>
+</tbody>
+</table>
+<p><code>WorkerLoop.DEFAULT_JOB_TIMEOUT_S = 6000</code> — the design already permits a job to
+run 100 minutes, 6.7× Lambda's ceiling. Lambda therefore cannot host a backtest
+as a single invocation, and no tuning changes that; it is a platform limit.
+It becomes viable only if a run is split into sub-15-minute shards. Grid search
+is embarrassingly parallel across parameter combinations and shards cleanly —
+it would get <em>faster</em>, not merely cheaper. Optuna resists sharding because TPE
+is adaptive and needs prior trials, though its RDS storage backend supports
+distributed trials against the Postgres already in use.</p>
+<p>Fargate is the drop-in. The task runs the same <code>python -m quant.queue.worker
+&lt;queue_id&gt;</code>, claims from the same <code>BT.QUEUE</code> and writes the same <code>BT.RESULT</code>;
+only the spawn changes, and size becomes a per-job argument rather than a host
+property. It also removes co-tenancy instead of merely containing it. Both
+paths need <code>SP_CLAIM_NEXT</code> (Phase 2) first, since claiming stops being
+single-process.</p>
+<div class="admonition note">
+<p class="admonition-title">Lambda is already in the stack, but as a doorbell</p>
+<p><code>aws/lambda/scheduled-task/handler.py</code> is an HTTP bridge — EventBridge
+invokes it, it calls the FastAPI route, and the work still executes on EC2.
+It offloads the <em>trigger</em>, not the <em>load</em>. Short, I/O-bound scheduled work
+(price bar sync) is the case where moving execution into the Lambda itself
+genuinely takes load off the box. Backtests are not that case.</p>
+</div>
+<hr />
+<h2 id="17-open-questions">17. Open questions<a class="headerlink" href="#17-open-questions" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Monorepo layout for type sharing.</strong> Either (a) <code>coordinator/src/types/queue.ts</code> exported as a workspace package consumed by <code>frontend/</code>, or (b) symlink / build-time copy. Recommendation: workspace package once <code>frontend/</code> is moved into a top-level <code>pnpm</code>/<code>bun</code> workspace.</li>
+<li><strong>Per-user queue or global queue?</strong> Global queue, <code>USER_ID</code> stamped and surfaced. Single trader running multiple strategies is the v1 reality.</li>
+<li><strong>Run Now jumping the queue — fair?</strong> Yes for single-tenant. Revisit if multi-user.</li>
+<li><strong>Should the SSE stream multiplex with the existing FastAPI optimize SSE?</strong> No. Different lifetimes. Keep them on separate endpoints.</li>
+<li><strong>Auth — share JWT secret or have coordinator query session table?</strong> Phase 1: share <code>JWT_SECRET</code> env (verify-only, no signing). Phase 2: revisit if FastAPI moves to asymmetric keys.</li>
+</ol>
+<hr />
+<h2 id="18-recommendation">18. Recommendation<a class="headerlink" href="#18-recommendation" title="Permanent link">&para;</a></h2>
+<p>Build slices A → F in order. Each is independently reviewable. FastAPI is untouched throughout — <code>/optimize</code> stays as the legacy single-shot path until the queue is fully wired through the frontend, then it can be retired (or kept as an admin-only path).</p>
+<p>The TS-coordinator + Python-worker split is the long-term shape (see §19). Doing it now as a focused slice — replacing only the deleted <code>api/queue/</code> — proves the boundary at low risk before any further FastAPI ports are considered.</p>
+<hr />
+<h2 id="19-why-this-architecture-ts-coordinator-python-worker-postgres">19. Why this architecture (TS coordinator + Python worker + Postgres)<a class="headerlink" href="#19-why-this-architecture-ts-coordinator-python-worker-postgres" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>Decision history — superseded by #32.</strong> v6 collapsed the TS coordinator into FastAPI; the polyglot split below describes the v5 design and is retained for context only.</p>
+</blockquote>
+<p>This split is the standard polyglot pattern at small scale: a thin gateway in the runtime built for I/O, fanning out to compute services in the runtime built for the workload, with the database as the only shared contract.</p>
+<h3 id="191-what-we-actually-need">19.1 What we actually need<a class="headerlink" href="#191-what-we-actually-need" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Required today</th>
+<th>Right runtime</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Durable job state across restarts</td>
+<td>Yes</td>
+<td>PostgreSQL</td>
+</tr>
+<tr>
+<td>FIFO with priority</td>
+<td>Yes</td>
+<td>PostgreSQL (<code>ORDER BY PRIORITY, CREATED_AT</code>)</td>
+</tr>
+<tr>
+<td>At-most-one worker per slot</td>
+<td>Yes (Phase 1)</td>
+<td><code>SELECT FOR UPDATE SKIP LOCKED</code> (future)</td>
+</tr>
+<tr>
+<td>Push-based wakeup</td>
+<td>Yes</td>
+<td><code>LISTEN/NOTIFY</code> (future)</td>
+</tr>
+<tr>
+<td>SSE fan-out to many browser tabs</td>
+<td>Yes</td>
+<td>Node/Bun</td>
+</tr>
+<tr>
+<td>Heavy pandas/numpy compute</td>
+<td>Yes</td>
+<td>CPython</td>
+</tr>
+<tr>
+<td>Hard CPU isolation per job</td>
+<td>Yes</td>
+<td>OS process</td>
+</tr>
+<tr>
+<td>Cross-language type contract</td>
+<td>Yes</td>
+<td>zod schemas (TS) ↔ Pydantic (Python) ↔ DB</td>
+</tr>
+</tbody>
+</table>
+<h3 id="192-why-typescript-for-the-coordinator">19.2 Why TypeScript for the coordinator<a class="headerlink" href="#192-why-typescript-for-the-coordinator" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>I/O concurrency.</strong> The coordinator is 100% I/O — HTTP, SSE, child-process pipes, LISTEN/NOTIFY. Node/Bun's event loop handles 10k+ idle SSE connections per process trivially. CPython + uvicorn struggles past a few hundred without careful tuning.</li>
+<li><strong>Faster cold start.</strong> ~50 ms (Bun) vs ~1–2 s (Python + FastAPI + pandas import). Matters for autoscaling, serverless, and CI.</li>
+<li><strong>Type sharing with the React frontend.</strong> <code>zod</code> schemas in the coordinator are imported by the frontend — eliminates an entire class of API contract drift.</li>
+<li><strong>Edge deployability.</strong> Hono runs unchanged on Cloudflare Workers / Deno Deploy / Vercel Edge. Python doesn't. Even if we never deploy to the edge, keeping the option open is cheap.</li>
+<li><strong>Lower memory.</strong> ~30 MB resident vs ~150 MB. Easier to run many coordinator replicas.</li>
+</ol>
+<h3 id="193-why-python-for-the-worker">19.3 Why Python for the worker<a class="headerlink" href="#193-why-python-for-the-worker" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Library ecosystem.</strong> <code>pandas</code>, <code>numpy</code>, <code>scipy</code>, <code>optuna</code>, the existing <code>param_opt</code> pipeline. Rewriting in TS would lose <code>Decimal</code>, <code>NaN</code> vs <code>NA</code> distinction, timezone handling, <code>DataFrame</code> ergonomics.</li>
+<li><strong>Existing code.</strong> The whole <code>src/</code> pipeline already exists and is tested. Worker is 200 lines of glue, not a rewrite.</li>
+<li><strong>Process isolation = GIL irrelevant.</strong> One worker = one process = no GIL contention with the coordinator.</li>
+</ol>
+<h3 id="194-why-postgres-as-the-only-contract">19.4 Why Postgres as the only contract<a class="headerlink" href="#194-why-postgres-as-the-only-contract" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Single source of truth.</strong> Coordinator and worker can't disagree about job state — there's only one place to read it from.</li>
+<li><strong>Already operated.</strong> Cluster, credentials, backups, Liquibase all in place.</li>
+<li><strong>No new failure mode.</strong> If Postgres is down, the system is already down.</li>
+<li><strong>Clean migration path.</strong> Worker could be rewritten in Rust tomorrow; coordinator could be rewritten in Go. As long as both speak <code>BT.SP_INS_QUEUE</code> + <code>INSERT INTO BT.RESULT</code>, they interoperate.</li>
+</ol>
+<h3 id="195-why-not-pure-python-fastapi-multiprocessing">19.5 Why not pure Python (FastAPI + multiprocessing)<a class="headerlink" href="#195-why-not-pure-python-fastapi-multiprocessing" title="Permanent link">&para;</a></h3>
+<p>This was the v3/v4 design. Rejected for v5 because:</p>
+<ol>
+<li>SSE fan-out under uvicorn doesn't scale past a few hundred concurrent subscribers without async-everything discipline that's easy to violate.</li>
+<li>Coordinator and HTTP API contend for the same event loop. A slow REFDATA query stalls SSE delivery.</li>
+<li>No type sharing with the frontend — every endpoint shape duplicated in Pydantic and TS.</li>
+<li>Python's <code>multiprocessing.Process</code> semantics differ between Linux (fork) and macOS (spawn), making local dev painful.</li>
+<li>Locks us into Python for any future service. A TS coordinator is a clean boundary that lets us add Go/Rust services later without changing the queue contract.</li>
+</ol>
+<h3 id="196-why-not-kafka-or-redis">19.6 Why not Kafka or Redis<a class="headerlink" href="#196-why-not-kafka-or-redis" title="Permanent link">&para;</a></h3>
+<p>Unchanged from previous designs — both are real infrastructure adding ops weight without solving anything our scale needs. Postgres queues comfortably handle hundreds of jobs per second on a single Aurora instance, well beyond requirements. Re-evaluate Redis only if SSE fan-out exceeds ~5000 concurrent subscribers; re-evaluate Kafka only if we add live tick-data ingestion.</p>
+<h3 id="197-decision">19.7 Decision<a class="headerlink" href="#197-decision" title="Permanent link">&para;</a></h3>
+<p>TypeScript coordinator (Bun + Hono) + Python worker (<code>src/worker.py</code>) + PostgreSQL queue. Coordinator owns HTTP for <code>/jobs/*</code>, SSE, supervision, LISTEN/NOTIFY. Worker owns one backtest run end to end. FastAPI keeps everything else until a separate decision retires it.</p>
+<hr />
+<h2 id="20-future-migration-candidates-beyond-the-queue">20. Future migration candidates (beyond the queue)<a class="headerlink" href="#20-future-migration-candidates-beyond-the-queue" title="Permanent link">&para;</a></h2>
+<p>This slice introduces the coordinator and proves the polyglot boundary. Once it ships, the same pattern can absorb the rest of the FastAPI surface incrementally. Each row below is a <strong>candidate</strong>, not a commitment — order is risk-adjusted, easiest first.</p>
+<h3 id="201-fastapi-router-by-router-assessment">20.1 FastAPI router-by-router assessment<a class="headerlink" href="#201-fastapi-router-by-router-assessment" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Router</th>
+<th>Endpoints</th>
+<th>Has numeric compute?</th>
+<th>Recommended action</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>quant/api/routers/refdata.py</code></td>
+<td><code>GET /refdata/{table}</code>, <code>POST /refdata/refresh</code></td>
+<td>No — pure SQL reads + in-process dict</td>
+<td><strong>Port to coordinator.</strong> REFDATA cache becomes the single source of truth in TS. FastAPI version deleted.</td>
+<td>1 (easiest)</td>
+</tr>
+<tr>
+<td><code>quant/api/routers/inst.py</code></td>
+<td><code>GET /inst/products</code>, <code>GET /inst/products/:id/xrefs</code>, <code>POST /inst/refresh</code></td>
+<td>No — pure SQL reads via <code>InstrumentCache</code></td>
+<td><strong>Port to coordinator.</strong> Same shape as REFDATA.</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>quant/api/auth/router.py</code></td>
+<td><code>POST /auth/login</code>, <code>POST /auth/logout</code>, <code>GET /auth/me</code></td>
+<td>No — bcrypt/argon2 verify + JWT sign</td>
+<td><strong>Port to coordinator.</strong> Use <code>argon2</code> (Node) and <code>jose</code> for JWT. Removes the need to share <code>JWT_SECRET</code> across runtimes.</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>quant/api/routers/backtest.py — /performance</code></td>
+<td><code>POST /backtest/performance</code></td>
+<td><strong>Yes</strong> — runs <code>perf.py</code> (single backtest, returns equity curve + metrics)</td>
+<td><strong>Move to a dedicated Python service</strong> invoked by the coordinator over HTTP, <strong>or</strong> queue it through the existing job system as a "single-trial" job. Recommendation: queue route — reuses the worker.</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>quant/api/routers/backtest.py — /walk-forward</code></td>
+<td><code>POST /backtest/walk-forward</code></td>
+<td><strong>Yes</strong> — runs <code>walk_forward.py</code></td>
+<td>Same as <code>/performance</code>: queue as a single-trial job. The frontend already accepts async job results.</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>quant/api/routers/backtest.py — /optimize</code> + <code>/optimize/stream</code></td>
+<td>Synchronous + SSE</td>
+<td><strong>Yes</strong> — runs <code>param_opt.py</code></td>
+<td><strong>Retire</strong> once the queue is fully wired. Every optimization becomes a queued job. The legacy sync path can stay as an admin-only fallback.</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>quant/api/services/backtest.py</code></td>
+<td>Internal</td>
+<td><strong>Yes</strong> — orchestrates <code>data → strat → perf → param_opt</code></td>
+<td><strong>Stays in Python.</strong> Becomes the worker entry point that <code>src/worker.py</code> calls into. Nothing to port.</td>
+<td>n/a</td>
+</tr>
+<tr>
+<td><code>src/data.py</code>, <code>strat.py</code>, <code>perf.py</code>, <code>param_opt.py</code>, <code>walk_forward.py</code></td>
+<td>Library modules</td>
+<td><strong>Yes</strong></td>
+<td><strong>Stay in Python forever.</strong> Library ecosystem reasons (§19.3).</td>
+<td>n/a</td>
+</tr>
+</tbody>
+</table>
+<h3 id="202-migration-order-strangler-fig-pattern">20.2 Migration order — strangler-fig pattern<a class="headerlink" href="#202-migration-order-strangler-fig-pattern" title="Permanent link">&para;</a></h3>
+<p>Once the queue (Slices A–F) is stable:</p>
+<ol>
+<li><strong>Refdata port</strong> — coordinator reads <code>REFDATA.SP_GET_ENUM</code> and serves <code>/api/v1/refdata/*</code>. Frontend repointed via Vite proxy. Delete <code>quant/api/routers/refdata.py</code> + <code>quant/api/services/refdata_cache.py</code> <em>(if separate)</em>. Sanity check: TanStack Query cache invalidation still works.</li>
+<li><strong>Inst port</strong> — same pattern. Delete <code>quant/api/routers/inst.py</code>.</li>
+<li><strong>Auth port</strong> — port <code>qs_token</code> issue/verify into TS. Frontend unaffected (still sets <code>HttpOnly</code> cookie). FastAPI loses its auth middleware. Coordinator becomes the only origin issuing the cookie.</li>
+<li><strong><code>/performance</code> and <code>/walk-forward</code> queueing</strong> — extend <code>BT.QUEUE</code> with a <code>JOB_KIND</code> column (<code>'OPTIMIZE' | 'PERFORMANCE' | 'WALK_FORWARD'</code>). Worker dispatches on kind. Frontend submits these as ordinary queue jobs.</li>
+<li><strong>Retire <code>/optimize</code> (sync) and <code>/optimize/stream</code></strong> — once all callers are queued. Phase out FastAPI.</li>
+</ol>
+<p>After step 5, the FastAPI deployment unit can be removed entirely. The coordinator handles all HTTP. Python only ever runs as a child process under coordinator supervision.</p>
+<h3 id="203-things-that-explicitly-stay-in-python">20.3 Things that explicitly stay in Python<a class="headerlink" href="#203-things-that-explicitly-stay-in-python" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/data.py</code> (data sources, <code>RefDataCache</code>, <code>BacktestCache</code>)</td>
+<td>pandas/numpy DataFrames, vendor SDKs (<code>futu</code>, glassnode) are Python-only.</td>
+</tr>
+<tr>
+<td><code>src/strat.py</code>, <code>src/perf.py</code>, <code>src/param_opt.py</code>, <code>src/walk_forward.py</code></td>
+<td>Heavy numerics.</td>
+</tr>
+<tr>
+<td><code>src/db.py</code> (<code>DbGateway</code>)</td>
+<td>Used by both worker and any debug CLI.</td>
+</tr>
+<tr>
+<td><code>quant/cli.py</code> (CLI backtest)</td>
+<td>Synchronous local-dev tool. No queue benefit.</td>
+</tr>
+<tr>
+<td>Liquibase migrations (<code>db/liquidbase/</code>)</td>
+<td>Java-based, runtime-agnostic.</td>
+</tr>
+<tr>
+<td>Any future ML / training scripts</td>
+<td>Python ecosystem.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="204-components-beyond-the-api-to-consider">20.4 Components beyond the API to consider<a class="headerlink" href="#204-components-beyond-the-api-to-consider" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Current</th>
+<th>Long-term option</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Frontend build</strong> (<code>frontend/vite.config.ts</code>)</td>
+<td>Vite + Vitest</td>
+<td>Already TS — no change. Once coordinator exists, consider a top-level <code>bun</code>/<code>pnpm</code> workspace so <code>coordinator/</code> and <code>frontend/</code> share <code>types/</code>.</td>
+</tr>
+<tr>
+<td><strong>Nginx routing</strong> (<code>docker/nginx/nginx.conf</code>)</td>
+<td>Routes <code>/api/*</code> → FastAPI</td>
+<td>Add <code>location /api/v1/backtest/jobs/ { proxy_pass http://coordinator:3001; }</code> first. Expand as routers port.</td>
+</tr>
+<tr>
+<td><strong>Docker Compose</strong> (<code>docker-compose.yml</code>)</td>
+<td><code>api</code>, <code>frontend</code>, <code>nginx</code></td>
+<td>Add <code>coordinator</code> service. After full migration, remove <code>api</code>.</td>
+</tr>
+<tr>
+<td><strong>CI / CD</strong> (<code>.github/workflows/</code>)</td>
+<td>Builds Python + frontend</td>
+<td>Add coordinator build (Bun image) + tests (<code>bun test</code>).</td>
+</tr>
+<tr>
+<td><strong>Observability</strong></td>
+<td>Logging only</td>
+<td>Add OpenTelemetry early — Python and TS both export to the same collector. Critical once requests hop runtimes.</td>
+</tr>
+<tr>
+<td><strong>Trade execution</strong> (<code>quant/trade/</code>)</td>
+<td>Python (Futu, ccxt)</td>
+<td><strong>Stays Python</strong> — broker SDKs only ship Python/C++. Coordinator could expose <code>/api/v1/trade/*</code> HTTP and dispatch to a long-running Python trade process via the same DB-only contract used for workers.</td>
+</tr>
+<tr>
+<td><strong>Live market data ingestion</strong> (future)</td>
+<td>Not built</td>
+<td>If/when added, evaluate Go for the ingestion daemon (binary deployable, small footprint). Coordinator stays the HTTP boundary.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="205-what-this-enables-long-term">20.5 What this enables long-term<a class="headerlink" href="#205-what-this-enables-long-term" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Independent scaling</strong> — coordinator (I/O) and workers (CPU) scale on different curves. Today's deployment can run 1 coordinator + 1 worker; tomorrow's can run 3 coordinators behind an ALB + 16 workers across hosts without changing application code.</li>
+<li><strong>Heterogeneous workers</strong> — <code>python -m quant.queue.worker</code> today, <code>python -m quant.queue.worker_gpu</code> for GPU jobs, <code>cargo run --bin fast_worker</code> for Rust hot-paths. Same DB contract.</li>
+<li><strong>Edge-deployable read paths</strong> — once <code>/refdata/*</code> and <code>/inst/*</code> are TS, they can be cached at Cloudflare/Vercel edge with no Python in the request path.</li>
+<li><strong>Cleaner blast radius</strong> — a worker crash, a coordinator OOM, or a FastAPI bug each affect only their own process. Today everything shares one uvicorn worker.</li>
+</ul>
+<h3 id="206-non-decision">20.6 Non-decision<a class="headerlink" href="#206-non-decision" title="Permanent link">&para;</a></h3>
+<p>This section is a <strong>roadmap</strong>, not a commitment. Each future port should be a separate decision with its own design note in <code>docs/design/</code>. The only thing this design <em>commits</em> to is the queue itself (§1–§19). Everything in §20 is here so the boundary established by the queue is understood as a deliberate stepping stone, not an accident.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>

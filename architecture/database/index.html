@@ -1,0 +1,3782 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/architecture/database/">
+      
+      
+        <link rel="prev" href="../frontend/">
+      
+      
+        <link rel="next" href="../credentials/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Database - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#database" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Database
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../design/backtest-queue/" class="md-tabs__link">
+          
+  
+  
+  Design Docs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../archive/" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schemas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conventions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Conventions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#column-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column Naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#internal_cusip-convention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        INTERNAL_CUSIP Convention
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="INTERNAL_CUSIP Convention">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multi-broker-crypto-spot-bybit-binance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-broker crypto spot (Bybit + Binance)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inst-versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        INST Versioning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creating-an-instrument" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating an instrument
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core_admin-exchange-api-credentials-phase-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CORE_ADMIN — exchange API credentials (Phase 1.1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trade-live-execution-phase-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TRADE — live execution (Phase 1.2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bt-strategy-catalog-phase-16-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BT — strategy catalog (Phase 1.6 + 1.7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refdata-promotion-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        REFDATA — promotion metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deployment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automated-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automated (production)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-local" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual (local)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre-merge-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-merge checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#release-based-changelogs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release-based changelogs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stored-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stored Procedures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Stored Procedures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#timing-a-procedure-clock_timestamp-never-current_timestamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timing a procedure: clock_timestamp(), never CURRENT_TIMESTAMP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-procedures-deliberately-do-not-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two procedures deliberately do not log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reading-a-result-without-the-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a result without the queue
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recording-the-position-an-apply-saw" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recording the position an apply saw
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#directory-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Directory Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/best-vid-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/live-order-execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/market-data-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/plan-to-profit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schemas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conventions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Conventions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#column-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column Naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#internal_cusip-convention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        INTERNAL_CUSIP Convention
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="INTERNAL_CUSIP Convention">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multi-broker-crypto-spot-bybit-binance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-broker crypto spot (Bybit + Binance)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inst-versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        INST Versioning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creating-an-instrument" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating an instrument
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core_admin-exchange-api-credentials-phase-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CORE_ADMIN — exchange API credentials (Phase 1.1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trade-live-execution-phase-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TRADE — live execution (Phase 1.2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bt-strategy-catalog-phase-16-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BT — strategy catalog (Phase 1.6 + 1.7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refdata-promotion-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        REFDATA — promotion metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deployment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automated-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automated (production)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-local" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual (local)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre-merge-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-merge checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#release-based-changelogs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release-based changelogs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stored-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stored Procedures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Stored Procedures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#timing-a-procedure-clock_timestamp-never-current_timestamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timing a procedure: clock_timestamp(), never CURRENT_TIMESTAMP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-procedures-deliberately-do-not-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two procedures deliberately do not log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reading-a-result-without-the-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a result without the queue
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recording-the-position-an-apply-saw" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recording the position an apply saw
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#directory-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Directory Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="database">Database<a class="headerlink" href="#database" title="Permanent link">&para;</a></h1>
+<p>The project uses <strong>PostgreSQL 17</strong> with Liquibase for schema management. Each schema is deployed independently with its own <code>databasechangelog</code> tracking table.</p>
+<p>See <a href="../overview/">System Overview</a> for schema relationships and <a href="../dev-vs-prod/">Dev vs Prod</a> for connection topology.</p>
+<h2 id="schemas">Schemas<a class="headerlink" href="#schemas" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Schema</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CORE_ADMIN</code></td>
+<td>App users (<code>APP_USER</code>), proc audit log (<code>LOG_PROC_DETAIL</code>), exchange API credentials (<code>API_CREDENTIAL</code>)</td>
+</tr>
+<tr>
+<td><code>REFDATA</code></td>
+<td>Reference data (<code>APP</code>, <code>INDICATOR</code>, <code>SIGNAL_TYPE</code>, <code>CONJUNCTION</code>, <code>DATA_COLUMN</code>, <code>APP_METRIC</code>, <code>PROMOTION_METRIC</code>, …) + <code>SP_GET_ENUM</code> procedure for cache loading. <code>REFDATA.APP</code> includes <strong><code>IS_EXCHANGE_IND</code></strong> (<code>Y</code> = broker/exchange, <code>N</code> = data provider) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. <code>REFDATA.PROMOTION_METRIC</code> stores auto-promote rules (HARD gates + SOFT comparison metrics).</td>
+</tr>
+<tr>
+<td><code>BT</code></td>
+<td>Backtest results (<code>STRATEGY</code>, <code>QUEUE</code>, <code>RESULT</code>, <code>PROMOTION</code>, <code>API_REQUEST</code>, <code>API_REQUEST_PAYLOAD</code>) + insert/get procedures</td>
+</tr>
+<tr>
+<td><code>TRADE</code></td>
+<td>Live trading: <code>DEPLOYMENT</code>, <code>DEPLOYMENT_SCHEDULE_STATUS</code>, <code>EXECUTION_EVENT</code>, <code>TRANSACTION</code> + SPs (no <code>INTENT</code> — decision #38)</td>
+</tr>
+<tr>
+<td><code>MARKET_DATA</code></td>
+<td>Normalized price bars for live apply: <code>PRICE_BAR</code> (OHLCV rows) — see <a href="../../design/scheduler-price-bars/">Scheduler &amp; Price Bars</a> — plus <code>BAR_SUBSCRIPTION</code>, standing capture requests with no deployment behind them (<a href="../../design/market-data-capture/">Market data capture</a>)</td>
+</tr>
+<tr>
+<td><code>INST</code></td>
+<td>Instrument / product master (<code>PRODUCT</code>, <code>PRODUCT_XREF</code>, <code>PRODUCT_GRP</code>, <code>PRODUCT_GRP_MEMBER</code>) — <code>REFDATA.TICKER_MAPPING</code> has been dropped</td>
+</tr>
+</tbody>
+</table>
+<h2 id="conventions">Conventions<a class="headerlink" href="#conventions" title="Permanent link">&para;</a></h2>
+<div class="admonition danger">
+<p class="admonition-title">No Direct SQL in Application Code</p>
+<p><strong>All</strong> database access from Python/FastAPI goes through <strong><code>CALL schema.procedure(...)</code></strong> — both reads (<code>SP_GET_*</code>) and writes (<code>SP_INS_*</code>, <code>SP_UPD_*</code>). No raw <code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, or <code>DELETE</code> in Python code. Exceptions: <strong><code>BT.QUEUE</code></strong> mutations use <strong><code>BT.SP_INS_QUEUE</code></strong> only (<strong><code>IN_ACTION</code></strong> discriminates enqueue / claim / terminal / cancel). Liquibase seed changesets may use direct SQL. <code>information_schema</code> catalog queries (e.g. REFDATA table discovery) are permitted.</p>
+<ul>
+<li><strong>REFDATA reads</strong> — application code reads REFDATA via the Redis-backed <code>RedisRefData</code> reader (<code>quant/refdata/reader.py</code>). Postgres is hit only by the publisher (<code>quant/refdata/publisher.py</code>) at startup and on <code>POST /api/v1/refdata/refresh</code>, which runs <code>CALL REFDATA.SP_GET_ENUM(table_name, ...)</code> per table. Never query REFDATA tables directly from application code.</li>
+<li>If a required procedure does not exist yet, create it first.</li>
+</ul>
+</div>
+<h3 id="column-naming">Column Naming<a class="headerlink" href="#column-naming" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Example</th>
+<th>Usage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;TABLE&gt;_ID</code></td>
+<td><code>STRATEGY_ID</code></td>
+<td>Primary key</td>
+</tr>
+<tr>
+<td><code>&lt;TABLE&gt;_VID</code></td>
+<td><code>STRATEGY_VID</code></td>
+<td>Soft-version ID</td>
+</tr>
+<tr>
+<td><code>&lt;TABLE&gt;_NM</code></td>
+<td><code>STRATEGY_NM</code></td>
+<td>Name column</td>
+</tr>
+<tr>
+<td><code>USER_ID</code></td>
+<td>—</td>
+<td>Audit: who created. One exception — <code>MARKET_DATA.BAR_SUBSCRIPTION</code> omits it, because the procedure logs the caller to <code>CORE_ADMIN.LOG_PROC_DETAIL</code> and a row copy would be a second record of the same fact (<a href="../../decisions/">decision #50</a>)</td>
+</tr>
+<tr>
+<td><code>CREATED_AT</code></td>
+<td>—</td>
+<td>Audit: when created (<code>TIMESTAMPTZ</code>)</td>
+</tr>
+<tr>
+<td><code>IS_CURRENT_IND</code></td>
+<td>—</td>
+<td>Soft-versioning flag (<code>CHAR(1)</code> Y/N) — <strong>deprecated</strong> in <code>BT.STRATEGY</code>, replaced by <code>TRANSACT_FROM_TS</code> / <code>TRANSACT_TO_TS</code></td>
+</tr>
+<tr>
+<td><code>TRANSACT_FROM_TS</code> / <code>TRANSACT_TO_TS</code></td>
+<td>—</td>
+<td>Transaction-time window (<code>TIMESTAMPTZ</code>). Active row: <code>TRANSACT_TO_TS = '9999-12-31'</code></td>
+</tr>
+<tr>
+<td><code>IS_BEST_IND</code></td>
+<td>—</td>
+<td>Best-performing version flag (<code>CHAR(1)</code> Y/N, no DEFAULT). Used on <code>BT.STRATEGY</code>.</td>
+</tr>
+<tr>
+<td><code>LOGICAL_DELETE_IND</code></td>
+<td>—</td>
+<td>Usability flag (<code>CHAR(1)</code> Y/N, no DEFAULT) on <code>BT.STRATEGY</code>. <code>'Y'</code> retires the row from the Trade picker, Recommended banner, and new deploys; history stays. Orthogonal to <code>IS_BEST_IND</code>.</td>
+</tr>
+<tr>
+<td><code>UPDATED_AT</code></td>
+<td>—</td>
+<td>In-place mutation stamp on genuinely mutable tables. On <code>BT.STRATEGY</code> it is set at insert (same instant as <code>CREATED_AT</code>) and bumped when <code>IS_BEST_IND</code> or <code>LOGICAL_DELETE_IND</code> flips. <strong>Not</strong> returned by <code>SP_GET_*</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="internal_cusip-convention">INTERNAL_CUSIP Convention<a class="headerlink" href="#internal_cusip-convention" title="Permanent link">&para;</a></h3>
+<p><code>INST.PRODUCT.INTERNAL_CUSIP</code> is the stable, human-readable product identifier used across the entire pipeline. Format: <strong><code>{symbol}.{suffix}</code></strong>, always <strong>lowercase</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Asset class</th>
+<th>Suffix / venue portion</th>
+<th>Example</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Crypto spot</td>
+<td><code>.crypto</code></td>
+<td><code>btcusdt.crypto</code></td>
+<td><strong>One product per traded pair</strong> — not per broker. Bybit and Binance share this row; xref supplies <code>BTCUSDT</code> (or each venue's ccxt id). Symbol encodes quote currency (<code>btcusdt</code>, not <code>btc-usd</code>).</td>
+</tr>
+<tr>
+<td>Crypto derivatives</td>
+<td>actual exchange</td>
+<td><code>btc-perp.binance</code></td>
+<td>Exchange-specific when margin/settlement differs</td>
+</tr>
+<tr>
+<td>Listed equity</td>
+<td>listing exchange</td>
+<td><code>aapl.nyse</code></td>
+<td>Unambiguous listing venue</td>
+</tr>
+<tr>
+<td>OTC / fixed income</td>
+<td>clearing house</td>
+<td><code>ust10y.dtcc</code></td>
+<td>Clearing venue is the stable identifier</td>
+</tr>
+<tr>
+<td>Index</td>
+<td>provider</td>
+<td><code>spx.cboe</code></td>
+<td>Index publisher is the authority</td>
+</tr>
+</tbody>
+</table>
+<h4 id="multi-broker-crypto-spot-bybit-binance">Multi-broker crypto spot (Bybit + Binance)<a class="headerlink" href="#multi-broker-crypto-spot-bybit-binance" title="Permanent link">&para;</a></h4>
+<p>Brokers are <strong>not</strong> part of the cusip. Enabling a second ccxt venue does <strong>not</strong> create a second <code>INST.PRODUCT</code> row.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>INST.PRODUCT          INTERNAL_CUSIP = btcusdt.crypto   (one row)
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>INST.PRODUCT_XREF     app_id=34 (bybit)   → BTCUSDT
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>INST.PRODUCT_XREF     app_id=35 (binance) → BTCUSDT
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>INST.PRODUCT_XREF     app_id=1  (yahoo)   → BTC-USD   (research proxy)
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>INST.PRODUCT_XREF     app_id=2  (glassnode) → BTC
+</code></pre></div>
+<p><code>TRADE.DEPLOYMENT</code> stores <code>internal_cusip</code> + <code>app_id</code> (which broker). Live apply resolves xref for that pair, fetches bars from that venue, and places orders there. A deployment moved from Bybit to Binance keeps the same cusip — only <code>app_id</code> and xref change.</p>
+<p><strong>Anti-patterns</strong></p>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Why it breaks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>btcusdt.bybit</code> / <code>btcusdt.binance</code></td>
+<td>Duplicates one instrument; splits cache, price bars, and strategies</td>
+</tr>
+<tr>
+<td><code>btc-usd.crypto</code> when trading USDT on exchanges</td>
+<td>Cusip says USD; venues quote USDT — silent mismatch at apply</td>
+</tr>
+<tr>
+<td><code>EXCHANGE = 'bybit'</code> on a <code>.crypto</code> row</td>
+<td>Broker belongs in xref + deployment, not product identity</td>
+</tr>
+</tbody>
+</table>
+<p>Vendor-specific symbols (exact case, ccxt format) live in <code>INST.PRODUCT_XREF.VENDOR_SYMBOL</code> — one current row per <code>(PRODUCT_ID, APP_ID)</code> pair.</p>
+<p>Current operating model:</p>
+<ul>
+<li><code>PRODUCT_XREF</code> is the authoritative vendor-symbol mapping table.</li>
+<li>The target design is semi-automatic vendor import with approval before insert.</li>
+<li>A new instrument is created through the API — <code>POST /api/v1/inst/products</code> — <strong>not</strong> by hand in the database. One request writes the <code>PRODUCT</code> row and its first <code>PRODUCT_XREF</code> row together, because a product with no xref is invisible to every venue-scoped read. See <a href="#creating-an-instrument">Creating an instrument</a> below and decision #62.</li>
+<li>Bulk vendor import is still unbuilt, so seeding a whole venue's catalogue remains a Liquibase seed changeset.</li>
+</ul>
+<h3 id="inst-versioning">INST Versioning<a class="headerlink" href="#inst-versioning" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Versioned?</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PRODUCT</code></td>
+<td><strong>Yes</strong> — <code>PRODUCT_VID</code> + <code>IS_CURRENT_IND</code></td>
+<td>Product attributes (CCY, description, asset type) can change</td>
+</tr>
+<tr>
+<td><code>PRODUCT_XREF</code></td>
+<td><strong>Yes</strong> — <code>PRODUCT_XREF_VID</code> + <code>TRANSACT_FROM_TS</code> / <code>TRANSACT_TO_TS</code></td>
+<td>Vendor symbols can change; current row is the open-ended transaction-time record</td>
+</tr>
+<tr>
+<td><code>PRODUCT_GRP</code></td>
+<td><strong>No</strong> — uses <code>UPDATED_AT</code></td>
+<td>Hierarchy versioning is impractical; rare admin-only edits</td>
+</tr>
+<tr>
+<td><code>PRODUCT_GRP_MEMBER</code></td>
+<td><strong>No</strong> — add/remove only</td>
+<td>Junction table; <code>CREATED_AT</code> audit is sufficient</td>
+</tr>
+</tbody>
+</table>
+<h3 id="creating-an-instrument">Creating an instrument<a class="headerlink" href="#creating-an-instrument" title="Permanent link">&para;</a></h3>
+<p>Neither table has a sequence, and application code is barred from raw <code>SELECT</code>
+on application tables — so "what is the next <code>PRODUCT_ID</code>" is a question only a
+procedure can answer. Since INST release <code>1.4.0</code>, both insert procedures answer
+it themselves and report the result back:</p>
+<table>
+<thead>
+<tr>
+<th>Procedure</th>
+<th><code>IN_..._ID</code> NULL means</th>
+<th>Reports back</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SP_INS_PRODUCT</code></td>
+<td>New instrument: <code>MAX(PRODUCT_ID)+1</code>, <code>PRODUCT_VID = 1</code></td>
+<td><code>OUT_PRODUCT_ID</code>, <code>OUT_PRODUCT_VID</code></td>
+</tr>
+<tr>
+<td><code>SP_INS_PRODUCT_XREF</code></td>
+<td>New mapping: <code>MAX(PRODUCT_XREF_ID)+1</code>, <code>PRODUCT_XREF_VID = 1</code></td>
+<td><code>OUT_PRODUCT_XREF_ID</code>, <code>OUT_PRODUCT_XREF_VID</code></td>
+</tr>
+</tbody>
+</table>
+<p>Passing a non-NULL id amends that row instead, appending a version. Allocating
+the id is the <em>only</em> thing these procedures gained; the soft-versioning above it
+is unchanged, and correcting a mistyped vendor symbol means naming the
+<code>PRODUCT_XREF_ID</code> to version.</p>
+<p><strong>The DDL is the validation.</strong> Neither procedure checks its input, by design —
+a required-field or duplicate check written in plpgsql is a second copy of a
+rule the schema already states, and keeping the two in step is work that buys
+nothing. The enforcement is:</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Enforced by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Required fields present</td>
+<td><code>NOT NULL</code> on the columns, and <code>CreateInstrumentRequest</code> before the call</td>
+</tr>
+<tr>
+<td>One current row per cusip</td>
+<td><code>UQ_PRODUCT_CUSIP_CURRENT</code> (partial, <code>IS_CURRENT_IND = 'Y'</code>)</td>
+</tr>
+<tr>
+<td>One open mapping per <code>(PRODUCT_ID, APP_ID)</code></td>
+<td><code>UQ_PRODUCT_XREF_CURRENT</code> (partial, on the open <code>TRANSACT_TO_TS</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>A violation therefore reaches the caller as Postgres' own message, which names
+the index rather than the row that already holds the value.
+<code>InstrumentCache.create_instrument</code> composes the two writes and reloads the
+cache, and <code>quant/api/exception_handlers.py</code> maps the <code>SQLSTATE</code> through: <code>23*</code>
+to 409.</p>
+<p>Two things are consequently <em>not</em> checked on write, and both are deliberate.
+There is no FK from <code>PRODUCT_XREF.PRODUCT_ID</code> to <code>PRODUCT</code>, so a mapping onto a
+missing product is accepted and simply omitted by every venue-scoped read. And
+<code>VENDOR_SYMBOL</code> has no unique index, so two products may claim the same symbol
+on one venue.</p>
+<p><code>MAX+1</code> races under concurrent inserts. The composite primary key rejects the
+loser rather than merging two instruments, and this is an admin action measured
+in rows per month, so it is not worth a sequence.</p>
+<p>The two writes are <strong>not one transaction</strong> — each <code>CALL</code> commits — so a product
+whose xref is rejected exists and is listed nowhere. It is logged, and the next
+attempt under the same cusip is a 409 from <code>UQ_PRODUCT_CUSIP_CURRENT</code>.</p>
+<h3 id="core_admin-exchange-api-credentials-phase-11">CORE_ADMIN — exchange API credentials (Phase 1.1)<a class="headerlink" href="#core_admin-exchange-api-credentials-phase-11" title="Permanent link">&para;</a></h3>
+<p><code>CORE_ADMIN.API_CREDENTIAL</code> stores <strong>per-user exchange API keys</strong> (encrypted at rest). Broker is identified by <strong><code>APP_ID</code></strong> (<code>REFDATA.APP</code>), not a free-text exchange column.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>API_CREDENTIAL_ID</code></td>
+<td><code>INTEGER</code> — assigned in <code>SP_INS_API_CREDENTIAL</code> (<code>MAX+1</code>), <strong>not</strong> <code>GENERATED AS IDENTITY</code></td>
+</tr>
+<tr>
+<td><code>API_CREDENTIAL_VID</code></td>
+<td>Soft-version; bump on key rotation</td>
+</tr>
+<tr>
+<td><code>APP_USER_ID</code></td>
+<td>Owner</td>
+</tr>
+<tr>
+<td><code>APP_ID</code></td>
+<td>Broker / venue app (e.g. Bybit row in <code>REFDATA.APP</code>)</td>
+</tr>
+<tr>
+<td><code>LABEL</code></td>
+<td>User-facing account name</td>
+</tr>
+<tr>
+<td><code>API_KEY_CIPHERTEXT</code> / <code>API_SECRET_CIPHERTEXT</code></td>
+<td>Fernet blobs — encrypt in Python before SP</td>
+</tr>
+<tr>
+<td><code>IS_ACTIVE_IND</code> / <code>IS_CURRENT_IND</code></td>
+<td>Revoke / current version</td>
+</tr>
+<tr>
+<td><code>CREATED_AT</code></td>
+<td>Per version row — <strong>no <code>UPDATED_AT</code></strong></td>
+</tr>
+</tbody>
+</table>
+<p>PK: <code>(API_CREDENTIAL_ID, API_CREDENTIAL_VID)</code>. Multiple rows per <code>(APP_USER_ID, APP_ID)</code> allowed (multiple accounts on same broker).</p>
+<p><strong>No <code>TRADE.CONNECTION</code> table</strong> — runtime broker sessions are ephemeral. Trade audit = <code>TRADE.EXECUTION_EVENT</code> + <code>TRADE.TRANSACTION</code>. <code>TRADE.DEPLOYMENT</code> (Phase 1.2) references <code>API_CREDENTIAL_ID</code> only. <strong>No <code>TRADE.INTENT</code></strong> — current signal lives in the worker for one tick; see decision #38.</p>
+<h3 id="trade-live-execution-phase-12">TRADE — live execution (Phase 1.2)<a class="headerlink" href="#trade-live-execution-phase-12" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DEPLOYMENT</code></td>
+<td>Apply target: pinned strategy, credential, product, qty (soft-versioned via <code>DEPLOYMENT_VID</code> + <code>TRANSACT_FROM/TO</code>)</td>
+</tr>
+<tr>
+<td><code>DEPLOYMENT_SCHEDULE_STATUS</code></td>
+<td>Per-tick schedule cursor — <code>NEXT_SCHEDULED_TS</code> advance after each apply pass</td>
+</tr>
+<tr>
+<td><code>EXECUTION_EVENT</code></td>
+<td>Append-only submit / error diary; <code>TRANSACT_AT</code> = tick time, <code>CREATED_AT</code> = audit insert, <code>POSITION_QTY</code> = signed broker position the attempt decided against</td>
+</tr>
+<tr>
+<td><code>TRANSACTION</code></td>
+<td>Append-only broker-confirmed fills</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Not stored:</strong> current signal / target position between ticks (<code>TRADE.INTENT</code> rejected — decision #38).</p>
+<table>
+<thead>
+<tr>
+<th>Procedure</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SP_INS_DEPLOYMENT</code></td>
+<td>Create or version deployment</td>
+</tr>
+<tr>
+<td><code>SP_GET_DEPLOYMENT</code></td>
+<td>Read current or historical deployment (owner-scoped, REFCURSOR)</td>
+</tr>
+<tr>
+<td><code>SP_GET_DEPLOYMENT_CHECK</code></td>
+<td>Validation read by deployment_id — no owner filter (caller checks)</td>
+</tr>
+<tr>
+<td><code>SP_GET_MISSED_DUE_DEPLOYMENTS</code></td>
+<td>Due deployments for one interval (scheduler poller)</td>
+</tr>
+<tr>
+<td><code>SP_GET_NEXT_DUE_DEPLOYMENTS</code></td>
+<td>Not-yet-due preview (UI / ops)</td>
+</tr>
+<tr>
+<td><code>SP_INS_DEPLOYMENT_SCHEDULE_STATUS</code></td>
+<td>Append schedule cursor after an apply pass</td>
+</tr>
+<tr>
+<td><code>SP_GET_SCHEDULED_INSTRUMENTS</code></td>
+<td>Distinct instruments scheduled deployments will trade (bar warmer)</td>
+</tr>
+<tr>
+<td><code>SP_INS_EXECUTION_EVENT</code></td>
+<td>Append execution event, incl. the position it decided against — see <a href="#recording-the-position-an-apply-saw">Recording the position an apply saw</a></td>
+</tr>
+<tr>
+<td><code>SP_GET_EXECUTION_EVENT</code></td>
+<td>Read execution diary (owner-scoped, REFCURSOR)</td>
+</tr>
+<tr>
+<td><code>SP_INS_TRANSACTION</code></td>
+<td>Append fill row</td>
+</tr>
+<tr>
+<td><code>SP_GET_TRANSACTION</code></td>
+<td>Read fill history (owner-scoped, REFCURSOR)</td>
+</tr>
+</tbody>
+</table>
+<p>Validation: Python <code>TradeRepo</code> before SP calls. See <a href="../../design/plan-to-profit/#phase-12-trade-schema-apply-api">Plan to Profit §1.2</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Procedure</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SP_INS_API_CREDENTIAL</code></td>
+<td>New account (assign id) or rotate keys (new VID)</td>
+</tr>
+<tr>
+<td><code>SP_GET_API_CREDENTIAL</code></td>
+<td>List/get for owner; returns ciphertext</td>
+</tr>
+<tr>
+<td><code>SP_GET_CREDENTIAL_CHECK</code></td>
+<td>Validation read by credential_id — no owner filter (caller checks ownership + active status)</td>
+</tr>
+<tr>
+<td><code>SP_UPD_API_CREDENTIAL_REVOKE</code></td>
+<td>Soft-version revoke</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="../../design/plan-to-profit/#phase-11-user-secrets">Plan to Profit §1.1</a> and decision #36.</p>
+<p><strong>Application code:</strong> <code>ApiCredentialRepo</code> extends <code>DbGateway</code> (same as <code>AuthRepo</code>); routes use <code>require_user</code>; Fernet key separate from <code>JWT_SECRET</code> — see <a href="../../design/login/#64-reuse-from-login-jwt-credential-api-phase-11">Login §6.4</a>.</p>
+<p><strong>SP OUT parameter order:</strong> All write procedures called via <code>DbGateway._call_write</code> must return the status triplet <code>(OUT_SQLSTATE, OUT_SQLMSG, OUT_SQLERRMC)</code> <strong>first</strong>, then any business OUT params. Credential SPs were corrected in release <code>1.1.1-credential-sp-out-order</code> (applied to prod; archived in <code>releases/</code>).</p>
+<h3 id="bt-strategy-catalog-phase-16-17">BT — strategy catalog (Phase 1.6 + 1.7)<a class="headerlink" href="#bt-strategy-catalog-phase-16-17" title="Permanent link">&para;</a></h3>
+<p><code>BT.STRATEGY</code> uses <strong>temporal versioning</strong> (<code>TRANSACT_FROM_TS</code> / <code>TRANSACT_TO_TS</code>, active = <code>9999-12-31</code>) instead of <code>IS_CURRENT_IND</code> (dropped). <strong><code>IS_BEST_IND</code></strong> (<code>CHAR(1)</code>, no DEFAULT) marks the best-performing VID per <code>STRATEGY_ID</code> — at most one <code>'Y'</code> row per strategy. <strong><code>LOGICAL_DELETE_IND</code></strong> (<code>CHAR(1)</code>, no DEFAULT) retires a lineage from use without dropping history — VID 1 is always the default best, so demoting cannot hide a buggy card. <strong><code>UPDATED_AT</code></strong> stamps those in-place flag flips (and the insert); GET procedures do not return it. See <a href="../../design/best-vid-promotion/">Best-VID Promotion</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Procedure</th>
+<th>Status</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SP_GET_STRATEGY</code></td>
+<td><strong>live</strong></td>
+<td><strong>Get-one only:</strong> <code>IN_STRATEGY_ID</code> required; optional <code>IN_STRATEGY_VID</code>; <code>IN_IS_BEST_IND='Y'</code> fetches best VID; else active row (<code>TRANSACT_TO_TS = 9999-12-31</code>).</td>
+</tr>
+<tr>
+<td><code>SP_GET_STRATEGY_LIST</code></td>
+<td><strong>live (1.12.0+)</strong></td>
+<td><strong>List catalog</strong> for Trade picker — <code>IN_USER_ID</code> required; <code>IN_IS_BEST_IND='Y'</code> for best VID only, <code>NULL</code> for all VIDs. Omits <code>LOGICAL_DELETE_IND='Y'</code>. Joins current shredded metrics from <code>BT.RESULT</code> (<code>IS_CURRENT_IND='Y'</code>) on <code>(STRATEGY_ID, STRATEGY_VID)</code> (release <code>1.13.0</code> keys + <code>1.15.0</code> versioning).</td>
+</tr>
+<tr>
+<td><code>SP_UPD_PROMOTE_STRATEGY</code></td>
+<td><strong>live</strong></td>
+<td>Demote current best + promote target VID. <code>IN_STRATEGY_VID = NULL</code> = demote-only. Stamps <code>UPDATED_AT</code>.</td>
+</tr>
+<tr>
+<td><code>SP_UPD_STRATEGY_LOGICAL_DELETE</code></td>
+<td><strong>live (1.21.0+)</strong></td>
+<td>Flip <code>LOGICAL_DELETE_IND</code> in place. <code>IN_STRATEGY_VID = NULL</code> = every VID of the lineage. Stamps <code>UPDATED_AT</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Persisted strategies (<code>BT.STRATEGY</code>) are created when backtest jobs complete — distinct from REFDATA <code>SIGNAL_TYPE</code>. Jobs store owner as <code>USER_ID = str(app_user_id)</code> (UUID text).</p>
+<h3 id="refdata-promotion-metrics">REFDATA — promotion metrics<a class="headerlink" href="#refdata-promotion-metrics" title="Permanent link">&para;</a></h3>
+<p><code>REFDATA.PROMOTION_METRIC</code> stores configurable auto-promote rules. Two types:</p>
+<ul>
+<li><strong>HARD</strong> — threshold gates (e.g. Sharpe GT 0, Max DD LTE 40%). Must all pass to be eligible.</li>
+<li><strong>SOFT</strong> — comparison metrics evaluated in priority order against the current best VID.</li>
+</ul>
+<p>Loaded at runtime via <code>RedisRefData.get_promotion_metrics()</code>. See <a href="../../design/best-vid-promotion/#2-promotion-metric-configuration-refdata-driven">Best-VID Promotion §2</a>.</p>
+<h2 id="deployment">Deployment<a class="headerlink" href="#deployment" title="Permanent link">&para;</a></h2>
+<h3 id="automated-production">Automated (production)<a class="headerlink" href="#automated-production" title="Permanent link">&para;</a></h3>
+<p>A push to <code>main</code> touching <code>db/liquidbase/**</code> queues the <strong>migrate database</strong> job, which applies only changesets whose <code>context</code> includes <strong><code>prod-deploy</code></strong>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">APP_ENV</span><span class="o">=</span>prod<span class="w"> </span><span class="nv">USE_SSM</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">LIQUIBASE_CONTEXTS</span><span class="o">=</span>prod-deploy<span class="w"> </span>bash<span class="w"> </span>scripts/liquibase-deploy.sh
+</code></pre></div>
+<p>That job sits in the <code>production-db</code> environment behind a <strong>required reviewer</strong>, so it parks in <em>Waiting</em> until a human approves it — see <a href="../infrastructure/#approving-a-migration">Approving a migration</a>. It is pinned to the pushed commit rather than <code>main</code>, so a long approval cannot silently widen what gets applied.</p>
+<p>It runs <strong>before</strong> the containers restart — <code>deploy</code> takes a <code>needs:</code> on it — so a release that the incoming app version depends on is in place by the time that version starts serving. The reverse order would leave the old image talking to the new schema. Reject the approval and <code>deploy</code> is held back too, leaving prod on a matched old schema and old image.</p>
+<p>To read the result, look at the end of the <strong>migrate database</strong> job for a per-schema recap:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>── MIGRATION SUMMARY (contexts: prod-deploy) ──
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  MASTER (schemas)                     2 applied
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  TRADE                               12 applied
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  TOTAL                               22 applied
+</code></pre></div>
+<p>The workflow prints only the tail of the remote output, so <code>liquibase-deploy.sh</code> also writes this block to a file that <code>liquibase-ssm-run.sh</code> re-prints last. A migration that fails leaves <code>deploy</code> unrun, so no container restarts, and the Liquibase error is the final thing in the job log.</p>
+<p>Tag a changeset <code>context="&lt;schema&gt;,prod-deploy"</code> when it must ship with the app that needs it, and only after the person owning the release agrees — the reviewer gate shows a job name, not a diff, so it cannot catch a changeset that was tagged by mistake but looks routine. Leave the tag off and the changeset stays pending until someone runs a migration by hand — either the manually gated <strong>database</strong> workflow (verify / deploy, with a typed confirmation) or:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># On EC2 (or locally with tunnel to prod) — no filter, applies everything pending</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nb">cd</span><span class="w"> </span>/opt/quant<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nv">APP_ENV</span><span class="o">=</span>prod<span class="w"> </span><span class="nv">USE_SSM</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>./scripts/liquibase-deploy.sh
+</code></pre></div>
+<p>Active changelogs have <strong>no baseline includes</strong> — prod data is not touched until you explicitly add a new <code>releases/X.Y.Z-*.xml</code> and <code>&lt;include&gt;</code> it.</p>
+<p><strong>RDS CloudFormation</strong> (<code>aws/cfn/02-database.yml</code>) deploys only when that template or relevant <code>aws/params/prod.json</code> keys change — not on every app push. Use workflow_dispatch <code>deploy_database=true</code> only when intentionally changing Aurora infrastructure.</p>
+<h3 id="manual-local">Manual (local)<a class="headerlink" href="#manual-local" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">source</span><span class="w"> </span>.env
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>./scripts/liquibase-deploy.sh
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Dry-run — no DDL applied</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>./scripts/liquibase-verify.sh<span class="w"> </span>--offline<span class="w">   </span><span class="c1"># validate + render prod-deploy SQL, no DB</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>./scripts/liquibase-verify.sh<span class="w">             </span><span class="c1"># status + update-sql preview (needs DB)</span>
+</code></pre></div>
+<h3 id="pre-merge-checks">Pre-merge checks<a class="headerlink" href="#pre-merge-checks" title="Permanent link">&para;</a></h3>
+<p>Every pull request runs two independent gates, both of which fail the build:</p>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Runs</th>
+<th>Catches</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>liquibase (offline validate)</code> in <strong>tests</strong></td>
+<td><code>liquibase-verify.sh --offline</code> against <code>url=offline:postgresql</code></td>
+<td>Malformed XML, an <code>&lt;include&gt;</code> or <code>&lt;sqlFile&gt;</code> that does not resolve, duplicate changeset ids, and any changeset whose SQL fails to render under <code>--context-filter=prod-deploy</code></td>
+</tr>
+<tr>
+<td><code>pytest</code></td>
+<td><code>tests/unit/test_liquibase_changelogs.py</code></td>
+<td>A changeset with no <code>context</code> (which would join <em>every</em> filtered run, including the automated prod deploy), <code>prod-deploy</code> used without its schema context, and a procedure missing <code>splitStatements="false"</code></td>
+</tr>
+</tbody>
+</table>
+<p>The split is not arbitrary. Liquibase validates structure but has no view on convention — its policy engine (<code>liquibase checks</code>) is Pro-only — so the conventions this repo depends on are asserted in pytest instead.</p>
+<p>An offline run records what it applied in a <code>databasechangelog.csv</code>. The script points each run at a throwaway copy; a stale one left beside a changelog would make later runs report nothing pending and quietly pass.</p>
+<p>Or run schemas individually:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">source</span><span class="w"> </span>.env
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">cd</span><span class="w"> </span>db/liquidbase<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>liquibase<span class="w"> </span>--defaults-file<span class="o">=</span>liquibase.properties<span class="w"> </span>update<span class="w">   </span><span class="c1"># schemas (MARKET_DATA)</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nb">cd</span><span class="w"> </span>db/liquidbase/core_admin<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>liquibase<span class="w"> </span>--defaults-file<span class="o">=</span>liquibase.properties<span class="w"> </span>update
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nb">cd</span><span class="w"> </span>db/liquidbase/refdata<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>liquibase<span class="w"> </span>--defaults-file<span class="o">=</span>liquibase.properties<span class="w"> </span>update
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="nb">cd</span><span class="w"> </span>db/liquidbase/bt<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>liquibase<span class="w"> </span>--defaults-file<span class="o">=</span>liquibase.properties<span class="w"> </span>update
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="nb">cd</span><span class="w"> </span>db/liquidbase/trade<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>liquibase<span class="w"> </span>--defaults-file<span class="o">=</span>liquibase.properties<span class="w"> </span>update
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="nb">cd</span><span class="w"> </span>db/liquidbase/market_data<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>liquibase<span class="w"> </span>--defaults-file<span class="o">=</span>liquibase.properties<span class="w"> </span>update
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="nb">cd</span><span class="w"> </span>db/liquidbase/inst<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>liquibase<span class="w"> </span>--defaults-file<span class="o">=</span>liquibase.properties<span class="w"> </span>update
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="nb">cd</span><span class="w"> </span>db/liquidbase/core_admin<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>liquibase<span class="w"> </span>--defaults-file<span class="o">=</span>liquibase.properties<span class="w"> </span>update<span class="w">   </span><span class="c1"># GRANTS refresh</span>
+</code></pre></div>
+<p><strong>Developer copy of prod data:</strong> see <a href="../../guides/database-dump-restore/">Database dump &amp; restore</a> (<code>./scripts/dbctl.sh</code>).</p>
+<h3 id="release-based-changelogs">Release-based changelogs<a class="headerlink" href="#release-based-changelogs" title="Permanent link">&para;</a></h3>
+<p>Each schema root (<code>*-changelog.xml</code>) includes <strong>forward-only</strong> release files under <code>releases/</code>. <strong>Baseline DDL is not included</strong> — prod already has data and <code>DATABASECHANGELOG</code> tracks applied history.</p>
+<p>Active changelogs are short manifests — see XML comments in each <code>db/liquidbase/*/*-changelog.xml</code>. Archive baselines live under <code>releases/archive/baseline-1.0.0.xml</code> (reference only, never included on prod).</p>
+<p><strong>Release lifecycle:</strong> once a release is applied to prod, drop its <code>&lt;include&gt;</code> and <code>git mv</code> the file into <code>releases/archive/</code>. Archived files are outside the include graph — neither <code>liquibase validate</code> nor the tests resolve their <code>&lt;sqlFile path="..."&gt;</code> — so <strong>do not edit them on the way in</strong>; the move is the whole operation and the file stays as it shipped. <code>git log</code> has the history. Applied status comes from each schema's <code>DATABASECHANGELOG</code>, not from age: a release that looks old may simply never have run.</p>
+<p><code>releases/</code> therefore holds what is pending: <code>bt</code> 1.18.0, 1.19.0 and 1.20.0, <code>inst</code> 1.4.0, <code>market_data</code> 1.4.0, and <code>core_admin</code> 1.3.0 — the last being <code>runAlways</code>, so it never leaves.</p>
+<p><strong>Editing a procedure body is a migration you have to write.</strong> A <code>runOnChange</code> changeset re-applies a body when the <code>.sql</code> changes, but only while its release is still included — and releases get archived as soon as they are applied. There is no standing changeset waiting to pick up an edit. Change <code>SP_GET_QUEUE.sql</code> without adding a changeset that deploys it and the edit lands in git, the deploy goes green, and prod keeps the old definition.</p>
+<p>This is deliberate, and it is a reversal (<a href="../../decisions/">decision #60</a>). The tree previously kept twelve fully-applied releases included purely so that editing any procedure would redeploy it, with <code>test_every_procedure_is_still_managed_by_an_active_release</code> failing the build if one lost its carrier. Automatic re-apply is not a safety property: whether a body <em>should</em> go to prod is a decision, and inferring it from a file's mtime hides that decision from review — which is how a sweeping "re-apply every procedure" release got written and <a href="#stored-procedures">took the 2026-08-16 deploy down</a>. Each procedure deploy is now its own changeset, visible in the diff and countable in the release.</p>
+<p><strong><code>runAlways</code> is the one thing that pins a release.</strong> It means "re-run on every deploy", so archiving it does not preserve the work — it stops it. <code>core_admin</code> 1.3.0 is fully applied and references no procedure, which makes it look like the easiest archive in the tree; its single changeset re-applies <code>sql/GRANTS.sql</code> every deploy, and moving it would quietly freeze grants at whatever they were that day. <code>test_archive_holds_no_run_always_changeset</code> guards it.</p>
+<p><strong>Frozen files are the mirror-image hazard.</strong> A few <code>.sql</code> files are superseded bodies kept only so an archived changeset still resolves; their header says <code>FROZEN at release &lt;version&gt; — do not edit</code>. <code>bt/procedures/SP_INS_STRATEGY.sql</code> is the one that exists today: it declares four OUT parameters, while the <code>BT.SP_INS_STRATEGY</code> prod actually runs has five and comes from <code>SP_INS_STRATEGY_VID_BY_NM.sql</code>. A procedure's OUT list <em>is</em> its return type, so <code>CREATE OR REPLACE</code> cannot change it in place — re-applying a frozen body aborts with <code>cannot change return type of existing function</code>. That is exactly how the 2026-08-16 deploy failed: the 1.16.0 timing release swept every procedure in the tree into a <code>runOnChange</code> changeset, frozen file included, and Liquibase stopped 15 changesets into <code>BT</code>. When a sweeping release touches every file, point the changeset at the file holding the live definition and skip the frozen one; <code>test_no_active_release_reapplies_a_frozen_file</code> now enforces that.</p>
+<h2 id="stored-procedures">Stored Procedures<a class="headerlink" href="#stored-procedures" title="Permanent link">&para;</a></h2>
+<h3 id="timing-a-procedure-clock_timestamp-never-current_timestamp">Timing a procedure: <code>clock_timestamp()</code>, never <code>CURRENT_TIMESTAMP</code><a class="headerlink" href="#timing-a-procedure-clock_timestamp-never-current_timestamp" title="Permanent link">&para;</a></h3>
+<p>A procedure that logs itself declares <code>V_LOG_START TIMESTAMPTZ := clock_timestamp();</code> and passes it to <code>CORE_INS_LOG_PROC</code> as the start instant. <code>CORE_INS_LOG_PROC</code> closes the interval with <code>clock_timestamp()</code> when the caller passes <code>NULL</code> for the end.</p>
+<p><code>CURRENT_TIMESTAMP</code> (and its aliases <code>now()</code> and <code>transaction_timestamp()</code>) is the <em>transaction</em> start. It does not move for the life of the transaction, so subtracting two readings always yields exactly <code>0</code> — which is what every one of the 109,985 <code>LOG_PROC_DETAIL.DURATION</code> rows written before 2026-08-11 contained. <code>statement_timestamp()</code> does not help either: a <code>CALL</code> is a single top-level statement and the whole body runs inside it. Timezone is unrelated — <code>now() AT TIME ZONE 'UTC'</code> only reformats the same frozen instant.</p>
+<p><code>V_START_TS</code> remains <code>CURRENT_TIMESTAMP</code> in the seven procedures that also stamp <code>TRANSACT_FROM_TS</code> / <code>TRANSACT_TO_TS</code>. Transaction time is correct there: the closed row's end and the new row's start must be the same instant, leaving no gap in the version window. Those procedures declare both variables. <code>tests/unit/test_proc_log_timing.py</code> enforces the split.</p>
+<h3 id="two-procedures-deliberately-do-not-log">Two procedures deliberately do not log<a class="headerlink" href="#two-procedures-deliberately-do-not-log" title="Permanent link">&para;</a></h3>
+<p><code>BT.SP_GET_QUEUE</code> and <code>MARKET_DATA.SP_INS_PRICE_BAR</code> write no <code>LOG_PROC_DETAIL</code> row. Both are called in a tight loop, and between them they held <strong>236,000 of the table's rows</strong> — the queue reader 177,274 at a flat ~2,870 calls a day whether or not a job was ever queued, the bar insert 59,229 at one <code>CALL</code> per bar. Every other procedure in every schema combined came to under 2,500. A row per call was recording how often the loop ran, which is not a fact the audit log is for; see <a href="../../decisions/">decision #59</a>.</p>
+<p>The cost is real and worth knowing before you go looking for their timings: <code>LOG_PROC_SUMMARY</code> aggregates the detail rows, so these two leave the summary as well. Their duration history ends at the change. What replaces it is app-side logging, which reports how many bars a backfill pass wrote but not how long it took.</p>
+<p>Neither the retention window nor the dump was touched to achieve this. <code>LOG_PROC_DETAIL</code> is a <strong>30-day rolling window</strong>, purged by <code>SP_INS_LOG_PROC_SUMMARY</code> on each run — it is a retention period, not a size cap, so the table holds whatever the platform generates in a month, and a large table is not by itself evidence that the cleanup is broken. That summariser runs <strong>daily</strong>, not weekly: it aggregates and purges in the same call, so a weekly tick let the detail table run to retention plus another six days. <code>pg_dump</code> copies the table in full, deliberately — a local mirror without production's timings cannot be used to investigate something that has not been named yet.</p>
+<table>
+<thead>
+<tr>
+<th>Procedure</th>
+<th>Schema</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CORE_INS_LOG_PROC</code></td>
+<td><code>CORE_ADMIN</code></td>
+<td>Central logging — measures with <code>clock_timestamp()</code>. Called by every SP except the two loop-called ones above</td>
+</tr>
+<tr>
+<td><code>SP_GET_ENUM</code></td>
+<td><code>REFDATA</code></td>
+<td>Generic REFCURSOR select for any REFDATA table</td>
+</tr>
+<tr>
+<td><code>SP_INS_STRATEGY</code></td>
+<td><code>BT</code></td>
+<td>Resolves <code>STRATEGY_ID</code> from <code>(USER_ID, STRATEGY_NM)</code>; bumps VID; returns <code>OUT_STRATEGY_ID</code> + <code>OUT_STRATEGY_VID</code>. Advisory lock per identity. See <a href="../../archive/strategy-vid-versioning/">strategy-vid-versioning.md</a>.</td>
+</tr>
+<tr>
+<td><code>SP_INS_QUEUE</code></td>
+<td><code>BT</code></td>
+<td><strong>Unified queue state machine</strong>: <code>IN_ACTION</code> = <strong><code>ENQUEUE</code></strong>, <strong><code>CLAIM_NEXT</code></strong>, <strong><code>TERMINAL</code></strong>, <strong><code>CANCEL</code></strong> — all <strong><code>BT.QUEUE</code></strong> transitions</td>
+</tr>
+<tr>
+<td><code>SP_GET_QUEUE</code></td>
+<td><code>BT</code></td>
+<td>Flexible queue reader (REFCURSOR); FastAPI jobs list/detail + the worker's claim poll. <strong>Writes no audit row</strong> — the poll ran ~2,870×/day into <code>LOG_PROC_DETAIL</code></td>
+</tr>
+<tr>
+<td><code>SP_GET_QUEUE_FOR_TERMINAL</code></td>
+<td><code>BT</code></td>
+<td>Active rows + strategy metadata (REFCURSOR)</td>
+</tr>
+<tr>
+<td><code>FN_GET_QUEUE_FOR_TERMINAL</code></td>
+<td><code>BT</code></td>
+<td><strong>Function</strong> — UI terminal lookup (<code>RETURNS TABLE</code>); worker uses <code>SP_GET_QUEUE_LATEST</code></td>
+</tr>
+<tr>
+<td><code>SP_GET_QUEUE_LATEST</code></td>
+<td><code>BT</code></td>
+<td><strong>Queue worker</strong>: active row for one <strong><code>QUEUE_ID</code></strong> + frozen <strong><code>CONFIG_JSON</code></strong> (<code>QUEUE</code> ⋈ <strong><code>STRATEGY</code></strong> on <strong><code>STRATEGY_VID</code></strong>)</td>
+</tr>
+<tr>
+<td><code>SP_INS_RESULT</code></td>
+<td><code>BT</code></td>
+<td>Inserts <strong><code>BT.RESULT</code></strong> with shredded metrics from <code>PAYLOAD_JSON</code> + denormalized <code>STRATEGY_ID</code>/<code>STRATEGY_VID</code> from <code>BT.QUEUE</code>; bumps <code>RESULT_VID</code> and flips prior rows' <code>IS_CURRENT_IND</code> within the same strategy VID; <strong><code>IN_RESULT_ID</code></strong> is caller-supplied UUID; OUT row is status triplet only</td>
+</tr>
+<tr>
+<td><code>SP_GET_RESULT</code></td>
+<td><code>BT</code></td>
+<td>Fetch result row for a <code>QUEUE_ID</code> (REFCURSOR); includes <code>RESULT_VID</code>, <code>IS_CURRENT_IND</code></td>
+</tr>
+<tr>
+<td><code>SP_GET_RESULT_BY_STRATEGY</code></td>
+<td><code>BT</code></td>
+<td>Current result for <code>(STRATEGY_ID, STRATEGY_VID)</code> where <code>IS_CURRENT_IND = 'Y'</code> (REFCURSOR). What the <strong>live trading path</strong> reads — see <a href="#reading-a-result-without-the-queue">Reading a result without the queue</a></td>
+</tr>
+<tr>
+<td><code>SP_INS_API_REQUEST</code></td>
+<td><code>BT</code></td>
+<td>Soft-versioning insert — combined header + JSONB payload in a single call (writes both <code>API_REQUEST</code> and the partitioned <code>API_REQUEST_PAYLOAD</code>)</td>
+</tr>
+<tr>
+<td><code>SP_INS_API_CREDENTIAL</code></td>
+<td><code>CORE_ADMIN</code></td>
+<td>New exchange credential or rotate keys (soft-version); status triplet OUT first</td>
+</tr>
+<tr>
+<td><code>SP_GET_API_CREDENTIAL</code></td>
+<td><code>CORE_ADMIN</code></td>
+<td>List/get credentials for <code>APP_USER_ID</code> (REFCURSOR)</td>
+</tr>
+<tr>
+<td><code>SP_GET_CREDENTIAL_CHECK</code></td>
+<td><code>CORE_ADMIN</code></td>
+<td>Validation read by <code>API_CREDENTIAL_ID</code> — no owner filter; caller checks ownership + active status</td>
+</tr>
+<tr>
+<td><code>SP_UPD_API_CREDENTIAL_REVOKE</code></td>
+<td><code>CORE_ADMIN</code></td>
+<td>Soft-version revoke; status triplet OUT first</td>
+</tr>
+<tr>
+<td><code>SP_UPD_PROMOTE_STRATEGY</code></td>
+<td><code>BT</code></td>
+<td>Flip <code>IS_BEST_IND</code>: demote current best + promote target VID. <code>IN_STRATEGY_VID = NULL</code> = demote-only (no replacement). Stamps <code>UPDATED_AT</code>.</td>
+</tr>
+<tr>
+<td><code>SP_UPD_STRATEGY_LOGICAL_DELETE</code></td>
+<td><code>BT</code></td>
+<td>Flip <code>LOGICAL_DELETE_IND</code> in place (<code>Y</code> = retired). <code>IN_STRATEGY_VID = NULL</code> = whole lineage. Stamps <code>UPDATED_AT</code>. Not returned by GET procedures.</td>
+</tr>
+<tr>
+<td><code>SP_INS_PROMOTION</code></td>
+<td><code>BT</code></td>
+<td>Persist auto-promote decision (outcome, gate results, decisive metric) — one row per completed backtest</td>
+</tr>
+<tr>
+<td><code>SP_GET_STRATEGY</code></td>
+<td><code>BT</code></td>
+<td>Get-one: <code>IN_STRATEGY_ID</code> required; optional <code>IN_STRATEGY_VID</code>; <code>IN_IS_BEST_IND='Y'</code> fetches best VID; else active row. Listing is <code>SP_GET_STRATEGY_LIST</code>.</td>
+</tr>
+<tr>
+<td><code>SP_GET_STRATEGY_LIST</code></td>
+<td><code>BT</code></td>
+<td>List catalog for Trade picker — <code>IN_USER_ID</code> required; optional <code>IN_IS_BEST_IND</code> filter (REFCURSOR)</td>
+</tr>
+<tr>
+<td><code>SP_INS_DEPLOYMENT</code></td>
+<td><code>TRADE</code></td>
+<td>Create or version deployment (includes schedule fields)</td>
+</tr>
+<tr>
+<td><code>SP_GET_DEPLOYMENT</code></td>
+<td><code>TRADE</code></td>
+<td>Read deployment rows (REFCURSOR)</td>
+</tr>
+<tr>
+<td><code>SP_GET_MISSED_DUE_DEPLOYMENTS</code></td>
+<td><code>TRADE</code></td>
+<td>Apply-now rows for <code>IN_TM_INTERVAL_ID</code> (poller); includes <code>NEXT_SCHEDULED_TS</code></td>
+</tr>
+<tr>
+<td><code>SP_GET_NEXT_DUE_DEPLOYMENTS</code></td>
+<td><code>TRADE</code></td>
+<td>Not-yet-due preview (UI / ops, optional)</td>
+</tr>
+<tr>
+<td><code>SP_INS_DEPLOYMENT_SCHEDULE_STATUS</code></td>
+<td><code>TRADE</code></td>
+<td>Append schedule version (poller advance after apply)</td>
+</tr>
+<tr>
+<td><code>SP_GET_DEPLOYMENT_CHECK</code></td>
+<td><code>TRADE</code></td>
+<td>Validation read by <code>DEPLOYMENT_ID</code> — no owner filter; caller checks ownership</td>
+</tr>
+<tr>
+<td><code>SP_GET_SCHEDULED_INSTRUMENTS</code></td>
+<td><code>TRADE</code></td>
+<td>Distinct <code>(TM_INTERVAL_ID, INTERNAL_CUSIP, APP_ID)</code> for scheduled deployments (bar warmer)</td>
+</tr>
+<tr>
+<td><code>SP_INS_EXECUTION_EVENT</code></td>
+<td><code>TRADE</code></td>
+<td>Append event; diary only, no scheduler side effects. <code>IN_POSITION_QTY</code> since <code>1.7.0</code> — see <a href="#recording-the-position-an-apply-saw">Recording the position an apply saw</a></td>
+</tr>
+<tr>
+<td><code>SP_GET_EXECUTION_EVENT</code></td>
+<td><code>TRADE</code></td>
+<td>Read execution diary (owner-scoped, REFCURSOR)</td>
+</tr>
+<tr>
+<td><code>SP_INS_TRANSACTION</code></td>
+<td><code>TRADE</code></td>
+<td>Append fill row</td>
+</tr>
+<tr>
+<td><code>SP_GET_TRANSACTION</code></td>
+<td><code>TRADE</code></td>
+<td>Read fill history (owner-scoped, REFCURSOR)</td>
+</tr>
+<tr>
+<td><code>SP_INS_PRICE_BAR</code></td>
+<td><code>MARKET_DATA</code></td>
+<td>Insert one OHLCV bar (one row per call). <strong>Writes no audit row</strong> — a 10,000-bar backfill pass logged 10,000 of them</td>
+</tr>
+<tr>
+<td><code>SP_GET_PRICE_BAR</code></td>
+<td><code>MARKET_DATA</code></td>
+<td>Range read by <code>(INTERNAL_CUSIP, TM_INTERVAL_ID, SOURCE_APP_ID, start, end)</code></td>
+</tr>
+<tr>
+<td><code>SP_GET_PRICE_BAR_COVERAGE</code></td>
+<td><code>MARKET_DATA</code></td>
+<td><code>MIN</code>/<code>MAX</code> timestamps via index <code>LIMIT 1</code> probes</td>
+</tr>
+<tr>
+<td><code>SP_INS_BAR_SUBSCRIPTION</code></td>
+<td><code>MARKET_DATA</code></td>
+<td>Version a capture request — create, enable, disable, retarget</td>
+</tr>
+<tr>
+<td><code>SP_GET_BAR_SUBSCRIPTION</code></td>
+<td><code>MARKET_DATA</code></td>
+<td>Current subscriptions, for the Market data page (not user-scoped — bars are shared)</td>
+</tr>
+<tr>
+<td><code>SP_GET_ACTIVE_BAR_SUBSCRIPTIONS</code></td>
+<td><code>MARKET_DATA</code></td>
+<td>Enabled series for the bar warmer, shaped like <code>TRADE.SP_GET_SCHEDULED_INSTRUMENTS</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="reading-a-result-without-the-queue">Reading a result without the queue<a class="headerlink" href="#reading-a-result-without-the-queue" title="Permanent link">&para;</a></h3>
+<p><code>BT.RESULT</code> can be reached two ways, and the live trading path must use the
+second one:</p>
+<table>
+<thead>
+<tr>
+<th>Procedure</th>
+<th>Keyed on</th>
+<th>Used by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SP_GET_RESULT</code></td>
+<td><code>QUEUE_ID</code></td>
+<td>Job views — "what did <em>this run</em> produce?"</td>
+</tr>
+<tr>
+<td><code>SP_GET_RESULT_BY_STRATEGY</code></td>
+<td><code>(STRATEGY_ID, STRATEGY_VID)</code></td>
+<td>Live dry-run and apply — "what parameters does this strategy trade on?"</td>
+</tr>
+</tbody>
+</table>
+<p><code>BtQueueRepo.fetch_result_payload</code> originally answered the second question with
+the first procedure: it listed <code>BT.QUEUE</code> for the strategy, matched a row on
+<code>STRATEGY_VID</code>, then fetched that row's result. That made live trading depend on
+<code>BT.QUEUE</code>, which is transient work-tracking data. When the queue was purged in
+production, every <code>QUEUE_ID</code> on <code>BT.RESULT</code> became an orphan and a live dry-run
+failed with <code>no optimization result found for strategy — run backtest first</code>,
+while all four result payloads sat in the table intact.</p>
+<p><code>SP_INS_RESULT</code> denormalizes <code>STRATEGY_ID</code> and <code>STRATEGY_VID</code> onto <code>BT.RESULT</code>
+at insert time precisely so this lookup needs no join, and
+<code>IX_RESULT_STRATEGY_CURRENT</code> is a partial index on those columns for
+<code>IS_CURRENT_IND = 'Y'</code>. The filter on <code>IS_CURRENT_IND</code> is what makes the live
+path follow the newest backtest automatically: re-running a strategy version
+bumps <code>RESULT_VID</code> and flips the prior row.</p>
+<div class="admonition note">
+<p class="admonition-title">Purging <code>BT.QUEUE</code> is safe</p>
+<p>That is the point of this split. Nothing on the live path reads the queue to
+find parameters, so queue rows can be cleared without stranding a
+deployment. Anything that still needs "which submission produced this?" has
+<code>BT.RESULT.QUEUE_ID</code> to follow, and tolerates it pointing nowhere.</p>
+</div>
+<h3 id="recording-the-position-an-apply-saw">Recording the position an apply saw<a class="headerlink" href="#recording-the-position-an-apply-saw" title="Permanent link">&para;</a></h3>
+<p><code>TRADE.EXECUTION_EVENT.POSITION_QTY</code> is the signed broker position — negative
+for short — read immediately before an order attempt. It is not a diagnostic
+extra: <code>intended_side(signal, position_qty)</code> answers HOLD when the position
+already agrees with the signal, so it is half of every trade decision, and it is
+what stops repeated applies from stacking.</p>
+<p>It is written <strong>per attempt</strong>, not per apply cycle, because each attempt
+re-reads the book — a partial fill between two attempts then shows as a moving
+position instead of one number repeated.</p>
+<p>The number was previously fetched, used, and discarded: it reached <code>ApplyReport</code>
+and the UI and was never written down. That held up while every apply was a
+human reading the report back. The hourly scheduler tick made it a gap, because
+unattended <strong>a HOLD and a tick that did nothing leave the same trace</strong>, and a
+liquidation or a manual trade on the exchange moves the position with nothing
+recording that it moved.</p>
+<div class="admonition warning">
+<p class="admonition-title"><code>0</code> and <code>NULL</code> are not the same</p>
+<p><code>0.0</code> is a flat book — the position was read and there is none. <code>NULL</code> means
+it was never read, because the apply raised before reaching the broker. The
+column is nullable rather than <code>DEFAULT 0</code> so those two stay distinguishable;
+treating an unknown position as flat is how a reconciliation quietly agrees
+with itself.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Adding a parameter creates an overload</p>
+<p><code>1.7.0</code> appends <code>IN_POSITION_QTY</code> to <code>SP_INS_EXECUTION_EVENT</code>, and
+<code>CREATE OR REPLACE PROCEDURE</code> with a longer parameter list <strong>adds a second
+procedure</strong> rather than replacing the first — verified locally, where the
+catalog briefly held both a 10-argument and an 11-argument version. Two live
+signatures is how an un-migrated caller silently writes <code>NULL</code> positions, so
+the release closes with an explicit <code>DROP PROCEDURE</code> of the old signature,
+the same step <code>1.4.0-012</code> took when <code>IN_TRANSACT_AT</code> was added. Any future
+signature change on a procedure owes the same three changesets: alter,
+replace, drop.</p>
+</div>
+<p>The diary read path ships in release <strong><code>1.8.0-execution-log-reads</code></strong> (in the working
+tree, not yet deployed to prod): <code>TRADE.SP_GET_EXECUTION_EVENT</code> and
+<code>SP_GET_TRANSACTION</code>, exposed at <code>GET /api/v1/trade/execution-events</code> /
+<code>/trade/transactions</code>, rendered by <code>ExecutionLogPanel</code> in <code>TradeLayout</code>.</p>
+<div class="admonition info">
+<p class="admonition-title">It is the <em>account's</em> position, not the deployment's</p>
+<p><code>fetch_positions([symbol])</code> reports what the <strong>credential</strong> holds in that
+symbol; Bybit in one-way mode keeps one net position per symbol per account
+and has no notion of a strategy's share. With one enabled deployment per
+symbol the two are the same number, which is the case today. With several
+they are not, and the column then describes the <em>(credential, symbol)</em> pair
+rather than the row's <code>DEPLOYMENT_ID</code>.</p>
+<p>That pair has no table of its own, which is the deeper issue:
+<code>EXECUTION_EVENT</code> merges "what one strategy wanted" with "what we sent to
+the exchange", and those separate as soon as orders are netted across
+strategies. Recorded, deliberately not built — see
+<a href="../../design/multi-strategy-netting/">Multi-strategy netting</a>.</p>
+</div>
+<h2 id="directory-layout">Directory Layout<a class="headerlink" href="#directory-layout" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>db/
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>├── liquidbase/                    # Liquibase changelogs
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>│   ├── quantdb-changelog.xml     # Master manifest (comments only until new release)
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>│   ├── releases/                 # TEMPLATE.xml + archive/ (baseline reference)
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>│   ├── liquibase.properties      # Master properties
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>│   ├── core_admin/               # *-changelog.xml + releases/archive/
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>│   ├── refdata/                  # REFDATA + releases/
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>│   ├── bt/                       # BT + releases/
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>│   ├── trade/                    # TRADE + releases/
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>│   ├── market_data/              # MARKET_DATA price bars + releases/
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>│   └── inst/                     # INST + releases/
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>├── sql/                          # Standalone SQL scripts
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>└── syncddl/                      # Extracted live DDL (gitignored, for diff)
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>

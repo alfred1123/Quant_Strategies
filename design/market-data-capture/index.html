@@ -1,0 +1,3575 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/design/market-data-capture/">
+      
+      
+        <link rel="prev" href="../scheduler-trade-open-questions/">
+      
+      
+        <link rel="next" href="../multi-strategy-netting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Market Data Capture - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#market-data-capture-bars-for-products-you-dont-trade" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Market Data Capture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../backtest-queue/" class="md-tabs__link">
+          
+  
+  
+  Design Docs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../archive/" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best-vid-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-order-execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-gap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The gap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-why-the-coupling-is-incidental" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Why the coupling is incidental
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-what-is-subscribed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. What is subscribed
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. What is subscribed">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-the-key-is-the-bar-key-minus-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 The key is the bar key minus time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-one-row-per-series-a-subscription-has-no-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 One row per series — a subscription has no owner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-soft-versioned-like-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Soft-versioned, like DEPLOYMENT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-ddl-sketch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 DDL sketch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-subscriptions-are-not-implied-by-deployments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Subscriptions are not implied by deployments
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-who-warms-it-and-where-that-code-should-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Who warms it — and where that code should live
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-backfill-explicit-and-it-reports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Backfill — explicit, and it reports
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Backfill — explicit, and it reports">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-the-venues-floor-not-a-date-somebody-typed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 The venue's floor, not a date somebody typed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-there-is-no-to-and-there-is-a-ceiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 There is no "to", and there is a ceiling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-a-pass-ends-where-coverage-begins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 A pass ends where coverage begins
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-coverage-answering-can-i-backtest-this-yet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Coverage — answering "can I backtest this yet?"
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Coverage — answering &#34;can I backtest this yet?&#34;">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-two-lists-not-one-list-with-a-status-column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Two lists, not one list with a status column
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#61a-continuous-is-not-finished" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1a "Continuous" is not "finished"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-the-vendor-symbol-belongs-on-the-row" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 The vendor symbol belongs on the row
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-the-venue-chooses-the-products-not-the-other-way-round" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 The venue chooses the products, not the other way round
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-the-backtest-seam-built" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. The backtest seam (built)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. The backtest seam (built)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-dry-run-reads-what-the-apply-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Dry run reads what the apply reads
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-api-and-auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. API and auth
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-what-this-amends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. What this amends
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-implementation-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Implementation order
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plan-to-profit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-gap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The gap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-why-the-coupling-is-incidental" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Why the coupling is incidental
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-what-is-subscribed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. What is subscribed
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. What is subscribed">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-the-key-is-the-bar-key-minus-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 The key is the bar key minus time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-one-row-per-series-a-subscription-has-no-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 One row per series — a subscription has no owner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-soft-versioned-like-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Soft-versioned, like DEPLOYMENT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-ddl-sketch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 DDL sketch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-subscriptions-are-not-implied-by-deployments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Subscriptions are not implied by deployments
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-who-warms-it-and-where-that-code-should-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Who warms it — and where that code should live
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-backfill-explicit-and-it-reports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Backfill — explicit, and it reports
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Backfill — explicit, and it reports">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-the-venues-floor-not-a-date-somebody-typed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 The venue's floor, not a date somebody typed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-there-is-no-to-and-there-is-a-ceiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 There is no "to", and there is a ceiling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-a-pass-ends-where-coverage-begins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 A pass ends where coverage begins
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-coverage-answering-can-i-backtest-this-yet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Coverage — answering "can I backtest this yet?"
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Coverage — answering &#34;can I backtest this yet?&#34;">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-two-lists-not-one-list-with-a-status-column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Two lists, not one list with a status column
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#61a-continuous-is-not-finished" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1a "Continuous" is not "finished"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-the-vendor-symbol-belongs-on-the-row" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 The vendor symbol belongs on the row
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-the-venue-chooses-the-products-not-the-other-way-round" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 The venue chooses the products, not the other way round
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-the-backtest-seam-built" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. The backtest seam (built)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. The backtest seam (built)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-dry-run-reads-what-the-apply-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Dry run reads what the apply reads
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-api-and-auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. API and auth
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-what-this-amends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. What this amends
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-implementation-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Implementation order
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="market-data-capture-bars-for-products-you-dont-trade">Market data capture — bars for products you don't trade<a class="headerlink" href="#market-data-capture-bars-for-products-you-dont-trade" title="Permanent link">&para;</a></h1>
+<p><strong>Status: built.</strong> All of §11 is committed — <code>MARKET_DATA.BAR_SUBSCRIPTION</code> and
+its three procedures, the subscription repo and <code>InstrumentSource</code> union, the API
+routes, the Market data page, and the backtest seam (§7) that makes the captured
+bars usable for the decision that motivated capturing them. Recorded as
+<a href="../../decisions/">decision #50</a> and <a href="../../decisions/">#51</a>.</p>
+<p>The DDL is <strong>staged, not released</strong>: <code>1.3.0-bar-subscription.xml</code> carries
+<code>context="market_data"</code> without <code>prod-deploy</code>, so a push to <code>main</code> does not
+queue it for the production migrate job.</p>
+<p>One decision here was <strong>reversed during implementation</strong>: subscriptions are
+platform-wide rather than per user. §3.2 records both sides and which won.</p>
+<p><strong>Parent:</strong> <a href="../scheduler-price-bars/">Scheduler &amp; Price Bars</a> §3.2
+<strong>Related:</strong> <a href="../separate-underlying/">Separate Underlying &amp; Cache</a>, <a href="../../archive/backtest-api/">Backtest API</a>, <a href="../alt-data-sources/">Alternative Data Sources</a></p>
+<hr />
+<h2 id="1-the-gap">1. The gap<a class="headerlink" href="#1-the-gap" title="Permanent link">&para;</a></h2>
+<p>To accumulate history for a product today you must deploy a strategy against it:
+<code>price_bar_sync</code> takes its instrument list from <code>TRADE.SP_GET_SCHEDULED_INSTRUMENTS</code>,
+which reads <code>TRADE.DEPLOYMENT</code>. A deployment needs a strategy, a broker
+credential and a quantity.</p>
+<p>So the one thing you cannot do is the thing you want first: <strong>collect prices for
+a product while deciding whether to trade it.</strong> The backtest that informs the
+decision needs history, and the history only starts accruing once the decision is
+already made. <a href="../scheduler-price-bars/#2-decisions">Decision #5</a> — <em>"only products
+with active deployments get bars stored"</em> — was aimed at avoiding a bulk ingest of
+every product, which is still right. It was never asked about research.</p>
+<h2 id="2-why-the-coupling-is-incidental">2. Why the coupling is incidental<a class="headerlink" href="#2-why-the-coupling-is-incidental" title="Permanent link">&para;</a></h2>
+<p>Nothing about collecting bars needs a deployment:</p>
+<ul>
+<li><strong>Bars are public.</strong> <code>CcxtBarFetcher</code> deliberately builds a <em>keyless</em> ccxt
+  client (<a href="../scheduler-price-bars/#75-bar-fetcher-quantmarket_datafetcherpy">§7.5</a>),
+  precisely so market data does not depend on a user's API keys or on a trading
+  session being up. Capture needs no credential, no strategy and no quantity.</li>
+<li><strong><code>PriceBarService</code> already does all of it.</strong> <code>sync</code>, <code>backfill</code>, <code>find_gaps</code>
+  and <code>read_bars</code> are written and tested. What is missing is a second answer to
+  <em>which instruments matter</em> — not new machinery.</li>
+</ul>
+<p>There is also a positive reason, not just an absence of obstacles.
+<a href="../scheduler-price-bars/#recording-which-series-produced-the-signal">§7.7</a> records
+a live problem: <strong>strategy parameters are fitted on provider history and traded
+against exchange prints.</strong> The Phase 0.1 candidate was signed off on Glassnode
+daily data and now prices against Bybit bars, which are a different series, so the
+same config can produce a different position on the same day. Capturing a venue's
+bars <em>before</em> committing capital is what would let a strategy be fitted on the
+series it will actually trade. That is the point of this feature, and it is worth
+more than the convenience.</p>
+<h2 id="3-what-is-subscribed">3. What is subscribed<a class="headerlink" href="#3-what-is-subscribed" title="Permanent link">&para;</a></h2>
+<h3 id="31-the-key-is-the-bar-key-minus-time">3.1 The key is the bar key minus time<a class="headerlink" href="#31-the-key-is-the-bar-key-minus-time" title="Permanent link">&para;</a></h3>
+<p>A subscription names <code>(INTERNAL_CUSIP, TM_INTERVAL_ID, SOURCE_APP_ID)</code> — exactly
+<code>MARKET_DATA.PRICE_BAR</code>'s primary key without <code>BAR_TIMESTAMP</code>, and exactly the
+triple <code>PriceBarService.sync</code> is grouped by. Venue is part of it because
+<a href="../../decisions/">decision #47</a> makes a bar a fact <em>from a venue</em>: <code>btcusdt.crypto</code>
+on Bybit and on Binance are two separate series, and subscribing to one is not
+subscribing to the other.</p>
+<p>That the triple matches <code>TRADE.SP_GET_SCHEDULED_INSTRUMENTS</code>' output shape is what
+makes the union in §4 trivial rather than a translation layer.</p>
+<h3 id="32-one-row-per-series-a-subscription-has-no-owner">3.2 One row per series — a subscription has no owner<a class="headerlink" href="#32-one-row-per-series-a-subscription-has-no-owner" title="Permanent link">&para;</a></h3>
+<p><strong>Reversed from the original proposal.</strong> This section first argued for one row
+per user, so that unsubscribing would remove only your own request:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Consequence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>~~One row per user, warmer reads <code>DISTINCT</code>~~</td>
+<td>Unsubscribing removes only your request; the series stays warm while anyone wants it</td>
+</tr>
+<tr>
+<td><strong>One platform-wide row, no owner column</strong></td>
+<td>Disabling stops the capture for everyone</td>
+</tr>
+</tbody>
+</table>
+<p>The per-user model was rejected because it answers a question the domain does
+not ask. A bar is a <strong>shared fact</strong> — one row per <code>(cusip, interval, venue,
+timestamp)</code>, readable by everybody — so a per-user request row models private
+ownership of something nobody owns. It is not analogous to <code>DEPLOYMENT</code>, whose
+<code>APP_USER_ID</code> isolation (<a href="../../decisions/">decision #42</a>) exists because a
+deployment spends <em>your</em> money through <em>your</em> credential. Capture spends
+neither.</p>
+<p>What the per-user model bought was a <code>DISTINCT</code> and the ability to withdraw
+privately; what it cost was a second copy of every popular series and a list
+that shows you only your own corner of a shared resource.</p>
+<p>So: <code>UQ_BAR_SUBSCRIPTION_OPEN</code> allows exactly one open row per series, and
+<code>SP_GET_ACTIVE_BAR_SUBSCRIPTIONS</code> needs no <code>DISTINCT</code> because the index already
+guarantees it.</p>
+<p>The table carries <strong>no <code>USER_ID</code></strong> either, a deliberate exception to the audit
+convention every other table follows. <code>SP_INS_BAR_SUBSCRIPTION</code> still takes
+<code>IN_USER_ID</code> and hands it to <code>CORE_ADMIN.CORE_INS_LOG_PROC</code>, so who enabled,
+disabled or retargeted a series is answerable from <code>CORE_ADMIN.LOG_PROC_DETAIL</code>
+against the version window this table already stamps. A copy on the row would be
+a second record of one fact, free to disagree with the log, and nothing in the
+API or UI ever read it.</p>
+<p><strong>The cost is real and accepted.</strong> Disabling a subscription cools the series
+for every user, and the bars missed while it was paused are recoverable only as
+far back as the venue still retains them. That is exactly why the list is
+unscoped and the row is visible to everyone: you cannot reason about whether to
+pause a capture you cannot see. The UI confirms a pause and says who it affects.</p>
+<h3 id="33-soft-versioned-like-deployment">3.3 Soft-versioned, like <code>DEPLOYMENT</code><a class="headerlink" href="#33-soft-versioned-like-deployment" title="Permanent link">&para;</a></h3>
+<p>Enabling, disabling and changing the wanted history depth are edits to a mutable
+entity, so the table soft-versions rather than updating in place — consistent with
+<code>TRADE.DEPLOYMENT</code> and with the convention that <code>UPDATED_AT</code> is <em>not</em> added for
+<code>IS_CURRENT_IND</code> flips. It also buys something real: a record of which series the
+platform was capturing when, which is part of reproducing a backtest.</p>
+<h3 id="34-ddl-sketch">3.4 DDL sketch<a class="headerlink" href="#34-ddl-sketch" title="Permanent link">&para;</a></h3>
+<p>As built (<code>db/liquidbase/market_data/tables/BAR_SUBSCRIPTION.sql</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">MARKET_DATA</span><span class="p">.</span><span class="n">BAR_SUBSCRIPTION</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="n">BAR_SUBSCRIPTION_ID</span><span class="w">   </span><span class="n">UUID</span><span class="w">          </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">   </span><span class="c1">-- stable across versions</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="n">BAR_SUBSCRIPTION_VID</span><span class="w">  </span><span class="nb">INTEGER</span><span class="w">       </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="n">INTERNAL_CUSIP</span><span class="w">        </span><span class="nb">TEXT</span><span class="w">          </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">   </span><span class="c1">-- INST.PRODUCT</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="n">TM_INTERVAL_ID</span><span class="w">        </span><span class="nb">INTEGER</span><span class="w">       </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">   </span><span class="c1">-- REFDATA.TM_INTERVAL</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="n">SOURCE_APP_ID</span><span class="w">         </span><span class="nb">INTEGER</span><span class="w">       </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">   </span><span class="c1">-- REFDATA.APP, IS_EXCHANGE_IND = 'Y'</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="n">IS_ENABLED_IND</span><span class="w">        </span><span class="nb">CHAR</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w">       </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="n">BACKFILL_FROM_TS</span><span class="w">      </span><span class="n">TIMESTAMPTZ</span><span class="p">,</span><span class="w">              </span><span class="c1">-- history wanted; NULL = forward only</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="n">TRANSACT_FROM_TS</span><span class="w">      </span><span class="n">TIMESTAMPTZ</span><span class="w">   </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="n">TRANSACT_TO_TS</span><span class="w">        </span><span class="n">TIMESTAMPTZ</span><span class="w">   </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="n">CREATED_AT</span><span class="w">            </span><span class="n">TIMESTAMPTZ</span><span class="w">   </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">BAR_SUBSCRIPTION_ID</span><span class="p">,</span><span class="w"> </span><span class="n">BAR_SUBSCRIPTION_VID</span><span class="p">)</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">);</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1">-- One live subscription per series. This is what makes the warmer's read a</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="c1">-- plain scan rather than a DISTINCT: the index is the uniqueness.</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">UNIQUE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">UQ_BAR_SUBSCRIPTION_OPEN</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">MARKET_DATA</span><span class="p">.</span><span class="n">BAR_SUBSCRIPTION</span><span class="w"> </span><span class="p">(</span><span class="n">TM_INTERVAL_ID</span><span class="p">,</span><span class="w"> </span><span class="n">INTERNAL_CUSIP</span><span class="p">,</span><span class="w"> </span><span class="n">SOURCE_APP_ID</span><span class="p">)</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">    </span><span class="k">WHERE</span><span class="w"> </span><span class="n">TRANSACT_TO_TS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TIMESTAMPTZ</span><span class="w"> </span><span class="s1">'9999-12-31 00:00:00+00'</span><span class="p">;</span>
+</code></pre></div>
+<p><code>BACKFILL_FROM_TS</code> is <strong>intent, not progress</strong> — how far back the user wants
+history, so the UI can show a target and offer to fill toward it. The fill itself
+stays an explicit, reported operation (§5); a column that tracked progress would
+imply a background crawler this design does not propose.</p>
+<p>Procedures, mirroring the TRADE side:</p>
+<table>
+<thead>
+<tr>
+<th>Procedure</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MARKET_DATA.SP_INS_BAR_SUBSCRIPTION</code></td>
+<td>Append a version — create, enable, disable, retarget</td>
+</tr>
+<tr>
+<td><code>MARKET_DATA.SP_GET_BAR_SUBSCRIPTION</code></td>
+<td>Current rows, for the UI. Disabled rows included — their absence would read as "deleted"</td>
+</tr>
+<tr>
+<td><code>MARKET_DATA.SP_GET_ACTIVE_BAR_SUBSCRIPTIONS</code></td>
+<td>Enabled <code>(TM_INTERVAL_ID, INTERNAL_CUSIP, APP_ID)</code>, for the warmer. No <code>DISTINCT</code> — the unique index already guarantees it, unlike the deployment-side read where a dozen deployments can name one instrument</td>
+</tr>
+</tbody>
+</table>
+<p>Coverage is deliberately <strong>not</strong> joined into the list read: it is a
+<code>MARKET_DATA.PRICE_BAR</code> question, answered per row by
+<code>SP_GET_PRICE_BAR_COVERAGE</code> (two index probes), and folding an aggregate over
+the bar table into the list would turn a cheap read into a scan.</p>
+<h3 id="35-subscriptions-are-not-implied-by-deployments">3.5 Subscriptions are not implied by deployments<a class="headerlink" href="#35-subscriptions-are-not-implied-by-deployments" title="Permanent link">&para;</a></h3>
+<p>Scheduling a deployment does <strong>not</strong> create a subscription row, and the two are
+unioned rather than kept in step. The alternative — auto-subscribing on deploy —
+forces a bad question on every stop: was that subscription the deployment's, or
+did the user also want the data? Independence means stopping a deployment removes
+its instruments from the warm by construction, exactly as it does today, while an
+explicit subscription survives on its own terms.</p>
+<h2 id="4-who-warms-it-and-where-that-code-should-live">4. Who warms it — and where that code should live<a class="headerlink" href="#4-who-warms-it-and-where-that-code-should-live" title="Permanent link">&para;</a></h2>
+<p>The warmer's instrument list becomes <code>deployments ∪ subscriptions</code>. Both sides
+already produce the same triple, so the union is a concatenation and a <code>DISTINCT</code>.
+The real question is <em>which package owns the loop</em>.</p>
+<p><a href="../scheduler-price-bars/#78-scheduled-bar-warming-quantmarket_datawarmpy">§7.8</a>
+puts <code>BarWarmer</code> in <code>quant/trade/</code> with an explicit justification: <em>"the question
+it answers — which instruments matter — is a deployment question."</em> <strong>This feature
+is what stops that being true.</strong> After it, that question is a market-data question
+with a trading input.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Shape</th>
+<th>Trade-off</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A — minimal</strong></td>
+<td><code>BarWarmer</code> stays in <code>quant/trade/scheduler/warm.py</code>, gains a subscription repo</td>
+<td>Smallest diff; but a research feature's warm loop lives in the trading package, and <code>quant/trade/</code> acquires a reason to exist for users who never trade</td>
+</tr>
+<tr>
+<td><strong>B — invert (taken)</strong></td>
+<td><code>BarWarmer</code> moves to <code>quant/market_data/warm.py</code> and takes a list of <code>InstrumentSource</code>; <code>quant/trade/</code> supplies the deployment-derived one</td>
+<td>Ownership matches the domain, and the one-way rule gets <em>stronger</em> — <code>quant/market_data/</code> still knows nothing about deployments, only a protocol</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">InstrumentSource</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="sd">"""Rows of (tm_interval_id, internal_cusip, app_id)."""</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">instruments</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span> <span class="o">...</span>
+</code></pre></div>
+<p>B was a <strong>move, not a rewrite</strong>: the grouping, the settle, the per-group
+<code>except</code> and <code>WarmResult</code> are unchanged; only where the rows come from moved
+behind the protocol. <code>DeploymentInstrumentSource</code> (in <code>quant/trade/bar_source.py</code>,
+the module that already composes trade and market data) wraps <code>TradeRepo</code>;
+<code>SubscriptionInstrumentSource</code> wraps the new repo; the route handler wires both.
+The route stays <code>POST /api/v1/market-data/price-bars/sync</code>, which was <em>already</em>
+under <code>market-data</code> despite the handler living in <code>quant/trade/</code> — a mismatch
+this resolves.</p>
+<p>Two details the move forced, both small and both in the same direction:</p>
+<ul>
+<li><strong>The factory is a protocol too.</strong> <code>BarWarmer</code> used to take
+  <code>PriceBarServiceFactory</code>, which lives in <code>quant/trade/</code>. Importing it from
+  <code>quant/market_data/warm.py</code> would have re-created the dependency the move
+  removed, so <code>BarServiceFactory</code> is declared as a <code>Protocol</code> beside
+  <code>PriceBarService</code> — the same trick <code>BarFetcher</code> already uses.</li>
+<li><strong>A failing source is not absorbed.</strong> The broad <code>except</code> covers a failing
+  <em>venue</em>, which is weather. A source that cannot be read is a missing procedure
+  or a broken connection — a bug, and warming a partial estate while reporting
+  success would hide it.</li>
+</ul>
+<p>One schedule still serves everything. <code>price_bar_sync</code> sweeps whatever intervals
+the rows mention, so a subscription on <code>1H</code> for research while trading <code>DAILY</code>
+needs no new schedule, and an interval nobody uses contributes no rows.</p>
+<p><strong>Cost is not proportional to the lookback.</strong> <code>DEFAULT_WARM_LOOKBACK</code> is
+<code>live_lookback_bars(110)</code>, but <code>ensure_fresh</code> fetches only <em>missing</em> bars, so a
+subscription in steady state costs one bar per instrument per tick. The generous
+lookback is what repairs a gap after downtime, not a per-tick price.</p>
+<h2 id="5-backfill-explicit-and-it-reports">5. Backfill — explicit, and it reports<a class="headerlink" href="#5-backfill-explicit-and-it-reports" title="Permanent link">&para;</a></h2>
+<p><code>PriceBarService.backfill(internal_cusip, tm_interval_id, source_app_id, start, end)</code>
+exists, is tested, and is reachable from <strong>no route and no CLI</strong>. Exposing it is
+most of the historical half of this feature.</p>
+<p>It deliberately <strong>does not fail closed</strong>, inverting the rule the rest of the
+module follows (<a href="../../decisions/">decision #48</a>). On the trade path a hole must
+stop the run; during a repair a hole is ordinary — the range may predate the
+listing, or reach past what the venue retains — and aborting would discard the
+bars that <em>were</em> recoverable. <code>BackfillResult.unfilled</code> names what could not be
+filled and <code>is_continuous</code> is the check a backtest should make.</p>
+<p>Depth is bounded by the venue, not by us: ccxt <code>fetch_ohlcv</code> retention varies by
+exchange and timeframe, and deep intraday history is often unavailable at any
+price. A paid provider under its own <code>SOURCE_APP_ID</code> remains the answer where the
+exchange cannot reach far enough — which is what #47's wide key already permits.</p>
+<p><strong>This is the honest limit of the feature.</strong> Subscribing today does not
+retroactively create history; it starts a series and lets you fill backward as
+far as the venue will serve.</p>
+<h3 id="51-the-venues-floor-not-a-date-somebody-typed">5.1 The venue's floor, not a date somebody typed<a class="headerlink" href="#51-the-venues-floor-not-a-date-somebody-typed" title="Permanent link">&para;</a></h3>
+<p>The first version asked the user how far back they wanted history, as a free
+date field. That reliably produced targets the venue could never meet — a
+<code>btcusdt.crypto</code> subscription asking for 2017-01-01 when Bybit's first daily
+<code>BTCUSDT</code> bar is <strong>2020-03-25</strong>. The row then reported a permanent shortfall
+against history that was never obtainable, which is indistinguishable on the
+page from a gap a backfill could close.</p>
+<p>The exchange knows the answer, so it is asked: <code>CcxtBarFetcher.earliest_bar</code>
+reads the oldest bar a venue still serves, and <code>PriceBarService.venue_depth</code>
+pairs it with how many bars that is at the requested interval. Both dialogs
+default to it. <code>MARKET_DATA.BAR_SUBSCRIPTION.BACKFILL_FROM_TS</code> still stores a
+target, but it is now the venue's floor unless someone deliberately narrows it.</p>
+<p>Reading it takes two steps, and the one-step version silently lies. <code>since=0</code>
+does not mean "from the beginning" — it is falsy, so ccxt sends no start and
+Bybit answers with the <em>newest</em> page, reporting that a six-year-old series began
+this morning. So the request anchors on the listing time ccxt normalises into
+<code>market['created']</code> and lets the venue clamp forward. The listing time is only
+an anchor, never the answer: Bybit lists <code>BTCUSDT</code> on 2020-03-15 and prints its
+first daily bar ten days later. Retention also differs per timeframe, so it is
+read per <code>(symbol, period)</code> rather than cached per venue.</p>
+<p>A venue that publishes no listing time returns <strong>unknown</strong>, and the dialog asks
+for a date as before. The tempting alternative — anchor on some fixed instant
+predating every exchange — was rejected: a guessed floor is worse than an absent
+one, because it arrives wearing the same authority as a real answer, and the
+whole point here is that the date stops being a guess.</p>
+<h3 id="52-there-is-no-to-and-there-is-a-ceiling">5.2 There is no "to", and there is a ceiling<a class="headerlink" href="#52-there-is-no-to-and-there-is-a-ceiling" title="Permanent link">&para;</a></h3>
+<p>Backfill takes no end date. It always ran to the last closed bar — a forming bar
+cannot be stored and nothing beyond it exists to fetch — so the field only
+invented a decision that had one correct answer.</p>
+<p>The start is bounded instead, by <code>MAX_BACKFILL_BARS</code> (10,000). Backfill is one
+synchronous blocking request that writes a row per bar through
+<code>SP_INS_PRICE_BAR</code>, measured at <strong>~200 bar/s</strong> against a local database and
+slower against Aurora. The ceiling is therefore a time budget in disguise:
+roughly 50s locally against the ~100s a proxy allows before abandoning the
+request. Cost scales with the interval, not the calendar — the same Bybit
+history is ~2,300 daily bars, ~56,000 hourly and ~3.4 million 1-minute:</p>
+<table>
+<thead>
+<tr>
+<th>Interval</th>
+<th>Bars in full Bybit <code>BTCUSDT</code> history</th>
+<th>One pass?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Daily</td>
+<td>~2,300</td>
+<td>yes, with room to spare</td>
+</tr>
+<tr>
+<td>Hourly</td>
+<td>~56,000</td>
+<td>no — about six passes</td>
+</tr>
+<tr>
+<td>1-minute</td>
+<td>~3,400,000</td>
+<td>no, and not by this mechanism</td>
+</tr>
+</tbody>
+</table>
+<p>Oversized ranges are refused <strong>before</strong> <code>find_gaps</code> materialises one entry per
+boundary, by arithmetic on the span — a guard that exhausts memory reaching its
+own refusal is not a guard. Raising the ceiling does not make a minute-scale
+fill work; that needs a background job with progress tracking, which
+<a href="#9-open-questions">§9</a> deliberately rejects.</p>
+<h3 id="53-a-pass-ends-where-coverage-begins">5.3 A pass ends where coverage begins<a class="headerlink" href="#53-a-pass-ends-where-coverage-begins" title="Permanent link">&para;</a></h3>
+<p>The "about six passes" in the table above was, for a while, a fiction. The
+refusal told you to fill a nearer date and repeat, and repeating could not work:
+<strong>every fill ran to the last closed bar</strong>, so the range always included whatever
+was already stored. An hourly series holding a year has no start that both
+reaches further back and stays under 10,000 — 2020 is ~56,000 bars, and even a
+start six months back is ~12,000, most of them bars already held. The span is
+counted either way. Deep intraday history was not slow; it was unreachable, and
+the message pointed at a door that was not there.</p>
+<p>The fix is direction. A pass now ends at <strong>the bar before coverage begins</strong>
+rather than at the last close, so it spans only bars that are absent, and the
+next pass resumes from the ground the last one gained:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>target                    coverage
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  ▼                          ▼
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  ├─── pass 3 ─┼─ pass 2 ─┼─ pass 1 ─┤████████ stored ████████┤
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>                                      ▲
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                                 first stored bar
+</code></pre></div>
+<p><code>PriceBarService.plan_backfill</code> computes that window — two index probes and
+arithmetic, no exchange call — and reports the bar count and passes remaining,
+so the commitment is visible before the first click. A series with nothing
+stored anchors on the last closed bar rather than on the target, so the first
+pass returns bars a strategy can already use; walking forward from history
+instead would leave the series worthless until the final pass.</p>
+<p>The looping is still the user's. Doing it server-side would be the background
+filler under another name — the same progress tracking, just hidden inside a
+request — so a pass is a click, and each one reports exactly what arrived. What
+the ceiling now bounds is <em>one pass</em>, not the history obtainable.</p>
+<h2 id="6-coverage-answering-can-i-backtest-this-yet">6. Coverage — answering "can I backtest this yet?"<a class="headerlink" href="#6-coverage-answering-can-i-backtest-this-yet" title="Permanent link">&para;</a></h2>
+<p>The question the UI must answer is not "am I subscribed" but "do I have enough
+continuous history". Two reads already exist:
+<code>SP_GET_PRICE_BAR_COVERAGE</code> (<code>MIN</code>/<code>MAX</code>, two index probes) and <code>find_gaps</code>
+(read-only, no exchange call). Surfacing first bar, last bar and gap count per
+subscription is what turns capture from an act of faith into something checkable
+before a backtest is trusted.</p>
+<h3 id="61-two-lists-not-one-list-with-a-status-column">6.1 Two lists, not one list with a status column<a class="headerlink" href="#61-two-lists-not-one-list-with-a-status-column" title="Permanent link">&para;</a></h3>
+<p>Paused series are listed <strong>separately</strong> from capturing ones rather than sharing
+a table with a status chip. "What is accruing right now" is the operational
+question the page exists to answer, and a mixed table dilutes it — the reader
+filters by eye on every visit, and a paused row looks identical to an active one
+until you read the chip. Splitting also gives the dormant set somewhere to say
+what being dormant costs: bars missed while paused are recoverable only as far
+back as the venue still retains them.</p>
+<p>The paused section is hidden entirely when nothing is paused, so the common case
+is one list.</p>
+<h3 id="61a-continuous-is-not-finished">6.1a "Continuous" is not "finished"<a class="headerlink" href="#61a-continuous-is-not-finished" title="Permanent link">&para;</a></h3>
+<p>The green <em>continuous</em> chip means only that there are no holes <strong>inside</strong> what is
+stored. It says nothing about reaching the target, and the two are easy to
+confuse when they sit in adjacent columns: a daily series complete back to the
+venue's first bar and an hourly series one year into a six-year target both
+rendered the same green, and the only colour on either row said success.</p>
+<p>So a row short of its target now says by how much, in days. Days rather than
+bars because a bar count needs the interval's period, and fetching that per row
+to label a table is a cost the backfill dialog already pays once — where it can
+also say how many passes remain, which is the more useful form of the same fact.</p>
+<p>A target the venue can never meet is a different failure and is prevented at the
+source (<a href="#51-the-venues-floor-not-a-date-somebody-typed">§5.1</a>): rows created
+before that defaulted to whatever was typed, and one asking for 2017-01-01 on a
+pair listed in 2020 would now show a permanent shortfall against history that
+never existed. Such rows are retargeted to the venue floor rather than being
+special-cased in the display.</p>
+<p>So the chip has three states rather than two. A series whose first bar has
+reached its target is <strong>completed</strong> — the target is the venue's floor, so
+reaching it means there is nothing older to fetch and the capture is finished,
+not merely hole-free. Short of the target it stays <em>continuous</em>, which is the
+honest reading: no holes inside what is stored, and still accruing. A row with
+no target at all stays <em>continuous</em> too, since absent intent must not be read
+as success.</p>
+<p>Both facts are already on the row — <code>BACKFILL_FROM_TS</code> and
+<code>coverage.first_bar</code> — so this is a comparison the page makes, not a field the
+API gained. That matters for the case that prompted it: Bybit's first hourly
+<code>BTCUSDT</code> bar is <code>2020-03-25 10:00</code>, ten bars after midnight, and those ten
+will never arrive. Reading that series as unfinished invites a backfill that
+can only fail.</p>
+<h3 id="62-the-vendor-symbol-belongs-on-the-row">6.2 The vendor symbol belongs on the row<a class="headerlink" href="#62-the-vendor-symbol-belongs-on-the-row" title="Permanent link">&para;</a></h3>
+<p>Each row carries the ticker the <strong>venue</strong> prints — <code>BTCUSDT</code> — beside the
+internal CUSIP it is stored under. An internal identifier cannot be checked
+against anything: you cannot look up <code>btcusdt.crypto</code> on an exchange, so a row
+showing only that is unverifiable by the person who has to decide whether the
+right series is being captured. This is the same complaint that opened #51,
+where a deployment dialog showed a Yahoo symbol beside a Bybit account.</p>
+<p>It is resolved through the same <code>InstrumentCache</code> the fetcher uses, so the page
+cannot disagree with what actually gets requested — a lookup, not a query, and
+no change to <code>SP_GET_BAR_SUBSCRIPTION</code>. A withdrawn <code>INST.PRODUCT_XREF</code> row
+renders as <strong>not listed on this venue</strong> rather than blanking: capture is broken
+at that point, and the list is exactly where somebody would look to find out
+why.</p>
+<p>Search filters on <strong>either</strong> identifier, because nobody reliably remembers which
+of the two they know.</p>
+<h3 id="63-the-venue-chooses-the-products-not-the-other-way-round">6.3 The venue chooses the products, not the other way round<a class="headerlink" href="#63-the-venue-chooses-the-products-not-the-other-way-round" title="Permanent link">&para;</a></h3>
+<p>The capture dialog asked for a product first, from a dropdown holding every
+instrument the platform knows. With Bybit as the venue that list is mostly
+Nasdaq and NYSE Arca tickers — <code>ibit.nasdaq</code>, <code>fbtc.cboebzx</code> — none of which
+Bybit has ever listed. Picking one could only produce a subscription that never
+captures a bar, because capture resolves the product through
+<code>INST.PRODUCT_XREF</code> to reach the venue at all.</p>
+<p>Making it a search box helped and did not fix it: a set that large is still not
+one anyone should have to filter, and typing <code>btc</code> still surfaces a dozen ETFs
+before the perpetual. The list was simply the wrong list.</p>
+<p>So <strong>venue is now the first field</strong>, and the product options are what that venue
+lists — served by <code>GET /api/v1/inst/apps/{app_id}/products</code> from the in-memory
+<code>InstrumentCache</code>, since listing is precisely what <code>PRODUCT_XREF</code> records.
+Bybit's handful of pairs needs no scrolling at all, and the search became a
+convenience rather than a necessity. Changing venue clears the chosen product,
+because the same product is not listed everywhere.</p>
+<p>Each option carries the vendor symbol as well as the CUSIP, and the search
+matches any of the three, so the ticker from the exchange's own screen is a
+valid way in. The field is disabled until a venue is chosen and says how many
+products that venue lists, so "no options" after typing reads as a search miss
+rather than a broken form.</p>
+<p>Scoping the list to the venue left one dead end, which is now closed. A venue
+with no xrefs lists nothing, and the empty state said <em>"add an <code>INST.PRODUCT_XREF</code>
+row for it"</em> — an instruction to open a SQL client against production, from
+inside the page whose whole point was that capture no longer required one. The
+Market data page now has an <strong>Add an instrument</strong> action beside <em>Capture a
+series</em>, and the empty state points at it. It writes the <code>INST.PRODUCT</code> row and
+its first <code>INST.PRODUCT_XREF</code> row in one submit, because a product without an
+xref is invisible to this very dropdown — see decision #62 and
+<a href="../../architecture/database/#creating-an-instrument">Creating an instrument</a>.</p>
+<h2 id="7-the-backtest-seam-built">7. The backtest seam (built)<a class="headerlink" href="#7-the-backtest-seam-built" title="Permanent link">&para;</a></h2>
+<p>Backtest used to read the provider and only the provider. <code>_build_data_dict</code>
+calls <code>fetch_df(symbol, start, end, data_source, …)</code> per symbol, where
+<code>data_source</code> names a <code>REFDATA.APP</code> row and <code>class_name</code> selects the vendor
+client — and for an exchange row there is no such class, so choosing Bybit in
+the dropdown raised <code>AttributeError: module 'quant.data.sources' has no
+attribute 'Bybit'</code>. The venue you traded on was the one venue you could not fit
+on.</p>
+<p>The seam was already there, and it is <code>data_source</code>. <strong>Bybit is an app in
+<code>REFDATA.APP</code></strong> with <code>IS_EXCHANGE_IND = 'Y'</code>, so <code>fetch_df</code> now branches on that
+flag and reads <code>PriceBarService.read_bars</code> instead of instantiating a vendor
+client. No parallel switch and no new request field to choose a "mode": picking
+Bybit as the data source <em>is</em> pinning <code>SOURCE_APP_ID</code>, which is what #47
+requires of a reproducible backtest.</p>
+<p><code>read_bars</code> returns the exact DataFrame shape the pipeline consumes (index,
+<code>price</code>, <code>factor</code>, <code>Open/High/Low/Close/Volume</code>), so <code>Performance</code> and the
+indicator math needed no changes at all.</p>
+<p>Four things follow, and each is a decision rather than a detail:</p>
+<ul>
+<li><strong>The bar cache is bypassed on this path.</strong> <code>PRICE_BAR</code> <em>is</em> the store.
+  Copying it into <code>BT.API_REQUEST</code> would create a second version of the same
+  fact, free to diverge from the first.</li>
+<li><strong>It refuses rather than substitutes.</strong> A range the store cannot cover is an
+  error naming the range it <em>can</em> — never a shorter series quietly returned
+  under the requested label. Nor does a backtest trigger a fetch: capture is a
+  standing decision made on the Market data page (§5), not a side effect of
+  pressing Run, so a five-year request never becomes a five-year exchange crawl
+  on someone's behalf.</li>
+<li><strong>The interval comes from the request, not from this module.</strong> <code>read_bars</code>
+  needs a <code>tm_interval_id</code> and <code>OptimizeRequest.tm_interval_id</code> supplies it,
+  required for the same reason <code>data_source</code> is: it names an input series, and
+  a default picks one on the caller's behalf silently. It was briefly a
+  <code>BACKTEST_BAR_PERIOD</code> constant resolved through REFDATA on every run, which
+  made intraday backtests
+  (<a href="../scheduler-price-bars/#46-backtest-compatibility-same-dataframe-contract">§4.6</a>)
+  impossible and left captured hourly bars unreachable. The forming-bar slack
+  is now one bar <em>of that interval</em> — as a fixed day it would have excused a
+  24-bar hole at the tail of an hourly series.</li>
+<li><strong><code>_enforce_date_sync</code> becomes load-bearing.</strong> It already refuses when products
+  and factors do not share coverage. Against a rolling-window table with possible
+  holes that guard is doing more work than it was written for, and it is the right
+  place for it — complemented by <code>is_continuous</code> before trusting a range.</li>
+</ul>
+<p><strong>Factors keep their own source</strong> — the §9 question, now closed. <code>_build_data_dict</code>
+already reads <code>f.data_source or req.data_source</code>, so a factor may name a provider
+while the traded product names a venue. Only the <em>traded</em> product has to follow
+the venue it executes on; a <code>^VIX</code> filter on a crypto strategy is a legitimate
+research question and no exchange serves <code>^VIX</code>. Inheriting an exchange source is
+therefore allowed but explained: a factor with no <code>INST.PRODUCT_XREF</code> row on that
+venue is refused with the instruction to give it its own source, rather than the
+bare "not captured" the traded product gets.</p>
+<p>This is deliberately <em>looser</em> than live, where <code>bar_loader</code> routes every symbol to
+the exchange. The asymmetry is intentional: mixing series is a research choice
+worth making knowingly, and a fatal one to make silently with capital at risk.</p>
+<h3 id="71-dry-run-reads-what-the-apply-reads">7.1 Dry run reads what the apply reads<a class="headerlink" href="#71-dry-run-reads-what-the-apply-reads" title="Permanent link">&para;</a></h3>
+<p>Same class of bug, opposite corner. The dry run called
+<code>compute_latest_position</code> <strong>without</strong> a <code>bar_loader</code> while the live apply passed
+one, so the preview a user checked before going live was computed from the
+provider and the order that followed was computed from the exchange. Near a band
+edge that is a preview reporting HOLD and an apply placing a BUY, with neither
+malfunctioning and nothing in either output to show why.</p>
+<p><code>LiveApplyOrchestrator._resolve_signal_source</code> was the only place the venue rule
+lived, so it moved to <code>bar_source.resolve_signal_source</code> and both callers use it.
+A dry run predates its schedule, so it passes <code>schedule_tm_interval_id=None</code> and
+falls through to daily — the only cadence a deployment may run on anyway.</p>
+<p><code>DryRunReport.bar_source</code> carries the label to the UI, next to <code>ApplyReport</code>'s,
+for the same reason: two sources are two sets of numbers, and a divergence is
+diagnosable only when the input is recorded beside the output.</p>
+<h2 id="8-api-and-auth">8. API and auth<a class="headerlink" href="#8-api-and-auth" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /api/v1/market-data/subscriptions</code></td>
+<td>Every subscription + coverage (not caller-scoped — §3.2)</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/market-data/subscriptions</code></td>
+<td>Create / enable / disable / retarget. <strong>200, not 201</strong> — only one of those creates anything</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/market-data/price-bars/backfill</code></td>
+<td>Fill from a start to the last closed bar, returns <code>BackfillResult</code></td>
+</tr>
+<tr>
+<td><code>GET /api/v1/market-data/price-bars/coverage</code></td>
+<td><code>MIN</code>/<code>MAX</code> + gaps for one series — what we <em>hold</em></td>
+</tr>
+<tr>
+<td><code>GET /api/v1/market-data/price-bars/venue-depth</code></td>
+<td>Earliest bar the venue serves + bar count + fill ceiling — what <em>exists</em> (<a href="#51-the-venues-floor-not-a-date-somebody-typed">§5.1</a>)</td>
+</tr>
+</tbody>
+</table>
+<p><code>coverage</code> and <code>venue-depth</code> are separate routes because they are different
+questions with different costs: coverage is two index probes, <code>venue-depth</code> asks
+the exchange. That is also why the list endpoint carries coverage per row but
+never depth — one network call per row to render a table is not a trade worth
+making. The dialogs ask for depth on demand, once a whole series is identified.</p>
+<p>The <code>market_data</code> router is gated at <strong>router level</strong> with
+<code>require_user_or_service</code> so the Lambda can drive <code>price-bars/sync</code>
+(<a href="../scheduler-price-bars/#64-service-auth-implemented">§6.4</a>). These are human
+actions, so each adds <code>require_user</code> itself — the documented pattern for that
+router, and the reason the router-level gate is a floor rather than a ceiling. A
+service token must not be able to subscribe or backfill: both spend exchange rate
+limit on behalf of a user who did not ask.</p>
+<p><strong>Validate at subscribe time, not at warm time.</strong> A subscription is only
+warmable if the product exists in <code>INST.PRODUCT</code>, an <code>INST.PRODUCT_XREF</code> row maps
+it to a vendor symbol for that app, and the app resolves to a ccxt venue.
+Checking on write turns three silent per-tick failures into one immediate error.
+<code>SubscriptionError</code> carries that to <strong>400</strong> and is logged server-side like every
+other handled error.</p>
+<p>Two failure modes are deliberately <em>not</em> symmetric. Subscribing to a series that
+already exists is a 400 that names the series, because the unique index caught
+it and the caller should edit that row — which, subscriptions being shared, may
+be somebody else's. But a venue that cannot answer a <strong>coverage</strong> read degrades
+one row instead of failing the list: a page showing ten series must still render
+when one exchange is away, so the row reports <code>coverage.error</code> and the rest
+display.</p>
+<h2 id="9-open-questions">9. Open questions<a class="headerlink" href="#9-open-questions" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Do factors follow the main product's source, or keep their own?</td>
+<td><strong>Closed — their own</strong> (§7). Same-venue-or-nothing stays right for live and stays wrong for a <code>^VIX</code>-filtered crypto backtest, so the two paths differ on purpose. A factor inheriting a venue it is not listed on is refused with the instruction to name its own source</td>
+</tr>
+<tr>
+<td>Should a subscription cap retention?</td>
+<td><strong>Open, deferred.</strong> <code>PRICE_BAR</code> is append-only immutable facts and <a href="../scheduler-price-bars/#43-volume-projections">§4.3</a> makes volume trivial (~52 MB for 10 products × 5 years), so nothing prunes today</td>
+</tr>
+<tr>
+<td>Is <code>BACKFILL_FROM_TS</code> worth storing before a filler consumes it?</td>
+<td><strong>Kept.</strong> §6's page needs a target to display. It is no longer typed, though: <a href="#51-the-venues-floor-not-a-date-somebody-typed">§5.1</a> defaults it to the venue's own earliest bar</td>
+</tr>
+<tr>
+<td>Does anything auto-backfill on subscribe?</td>
+<td><strong>No.</strong> A synchronous fill blocks the request; a background one needs progress tracking this design avoids. Subscribing makes the series eligible for the next warm pass, and nothing more</td>
+</tr>
+<tr>
+<td>Should a fill too large for one pass be chunked automatically?</td>
+<td><strong>No</strong> — refused instead (<a href="#52-there-is-no-to-and-there-is-a-ceiling">§5.2</a>). Chunking is the background filler under another name, and needs the same progress tracking. The refusal names a range that fits, and each pass keeps what it stored, so repeating is safe</td>
+</tr>
+<tr>
+<td>How would intraday capture ever work, then?</td>
+<td><strong>Open, deferred — and not by raising <code>MAX_BACKFILL_BARS</code>.</strong> A request/response API writing a row per bar is the wrong shape for millions of them at any ceiling. Minute-scale capture is a streaming problem: a pipeline (Kafka for transport, Spark for batch load) rather than a bigger blocking call. Nothing here should be built as a half-step toward it — the current design is honest about serving daily, and the refusal is what keeps that honest</td>
+</tr>
+<tr>
+<td>Who may subscribe?</td>
+<td><strong>Any signed-in user</strong>, unbounded. Rate limit is a shared resource and this is a throttling risk that nothing currently caps — revisit if the subscription list grows past a handful. A service token may <em>not</em> subscribe (§8)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="10-what-this-amends">10. What this amends<a class="headerlink" href="#10-what-this-amends" title="Permanent link">&para;</a></h2>
+<p>Recorded as <a href="../../decisions/">decision #50</a>. It amends <strong>decision #5</strong> (bar
+population follows deployments) and extends <strong>#44</strong> (<code>market_data/</code> owns
+MARKET_DATA end-to-end) to cover the warm loop, §4 option B having been taken.
+It leaves <strong>#47</strong> and <strong>#48</strong> intact and leans on both: the per-venue key is what
+lets a subscription mean one series, and explicit backfill is already the
+sanctioned continuity repair.</p>
+<h2 id="11-implementation-order">11. Implementation order<a class="headerlink" href="#11-implementation-order" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>State</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. <strong>DDL</strong> — <code>MARKET_DATA.BAR_SUBSCRIPTION</code> + three procedures</td>
+<td><strong>Done and released</strong> — <code>1.3.0-bar-subscription.xml</code>, <code>context="market_data,prod-deploy"</code></td>
+</tr>
+<tr>
+<td>2. <strong>Python</strong> — subscription repo; <code>InstrumentSource</code> protocol; warmer union (§4)</td>
+<td><strong>Done</strong> — <code>quant/market_data/subscriptions.py</code>, <code>quant/market_data/warm.py</code></td>
+</tr>
+<tr>
+<td>3. <strong>API</strong> — subscription CRUD, backfill and coverage routes, <code>require_user</code></td>
+<td><strong>Done</strong> — <code>quant/api/market_data/router.py</code></td>
+</tr>
+<tr>
+<td>4. <strong>UI</strong> — a Market data page: product / interval / venue pickers from REFDATA and <code>INST.PRODUCT</code>, coverage per row, and an explicit backfill action</td>
+<td><strong>Done</strong> — <code>frontend/src/pages/MarketDataPage.tsx</code>. This is the part that was looked for and not found</td>
+</tr>
+<tr>
+<td>5. <strong>Backtest seam</strong> — exchange <code>data_source</code> → <code>read_bars</code></td>
+<td><strong>Done</strong> — <code>fetch_df</code> branches on <code>IS_EXCHANGE_IND</code>; §9's factor question closed. An optional interval on the request is still open, and daily is resolved from REFDATA meanwhile</td>
+</tr>
+<tr>
+<td>6. <strong>Tests</strong> — repo, warmer union, backfill reporting, and a backtest run pinned to a <code>SOURCE_APP_ID</code></td>
+<td><strong>Done</strong> — <code>tests/unit/test_backtest_exchange_source.py</code> covers the pinned run and the four refusals</td>
+</tr>
+</tbody>
+</table>
+<p>Steps 1–4 deliver capture on their own. Step 5 is what makes the captured bars
+usable for the decision that motivated capturing them: a strategy can now be
+fitted on the series it will be traded on, and §7.1 makes the dry run preview
+that same series.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>

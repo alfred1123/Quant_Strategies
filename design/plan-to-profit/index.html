@@ -1,0 +1,5987 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/design/plan-to-profit/">
+      
+      
+        <link rel="prev" href="../frontend-audit/">
+      
+      
+        <link rel="next" href="../../archive/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Plan to Profit - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#plan-to-profit" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Plan to Profit
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../backtest-queue/" class="md-tabs__link">
+          
+  
+  
+  Design Docs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../archive/" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best-vid-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-order-execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-data-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-current-strategy-confidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Current Strategy &amp; Confidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-phased-roadmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Phased Roadmap
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Phased Roadmap">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#progress-tracker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress tracker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-0-operational-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 0 — Operational baseline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 0 — Operational baseline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-01-strategy-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 0.1 — Strategy health
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-02-host-capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 0.2 — Host capacity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-03-deploy-topology-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 0.3 — Deploy topology decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-fastest-profit-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1 — Fastest profit pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 1 — Fastest profit pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-11-user-secrets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.1 — User secrets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-12-trade-schema-apply-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.2 — Trade schema + apply API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-13-bybit-adapter-dry-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.3 — Bybit adapter (dry run)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-14-trade-ui-shell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.4 — Trade UI shell
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-15-exchange-config-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.5 — Exchange config UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-16-strategy-picker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.6 — Strategy picker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-17-live-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.7 — Live apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-18-execution-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.8 — Execution log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-19-scheduler-price-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.9 — Scheduler + price bars
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-prove-profitability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — Prove profitability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 2 — Prove profitability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-21-reconcile-data-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2.1 — Reconcile data model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-22-daily-sharpe-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2.2 — Daily Sharpe job
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-23-reconcile-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2.3 — Reconcile UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-24-telegram-error-alerts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2.4 — Telegram error alerts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-25-silent-failure-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2.5 — Silent failure detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-full-product-ux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 — Full product UX
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 3 — Full product UX">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-31-top-nav-trade-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.1 — Top nav + Trade tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-32-strategy-ranking-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.2 — Strategy ranking backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-33-best-strategy-banner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.3 — Best strategy banner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-34-backtest-side-nav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.4 — Backtest side nav
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-35-compact-queue-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.5 — Compact queue table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-36-job-strategy-detail-drawer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.6 — Job / strategy detail drawer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-37-separate-trade-host-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.7 — Separate TRADE host (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-prerequisites-data-model-ranking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Prerequisites (data model &amp; ranking)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-frontend-shell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Frontend shell
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Frontend shell">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#40-ui-visualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.0 UI visualization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4.0 UI visualization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#app-shell-phase-31-top-nav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        App shell (Phase 3.1 — top nav)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-mvp-trade-tab-only-subphases-14-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1 MVP — Trade tab only (subphases 1.4 – 1.8)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-target-backtest-tab-31-36" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 target — Backtest tab (3.1 – 3.6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-target-trade-tab-1x-layout-23-reconcile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 target — Trade tab (1.x layout + 2.3 reconcile)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#overlays-phase-35-36" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overlays (Phase 3.5 – 3.6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ui-rollout-by-subphase" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI rollout by subphase
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zone-map-full-product" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Zone map (full product)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#41-backtest-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Backtest tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-trade-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Trade tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-cross-cutting-concerns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Cross-cutting concerns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Cross-cutting concerns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-user-secrets-exchange-api-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 User secrets (exchange API keys)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-api-url-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 API URL layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-error-handling-observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Error handling &amp; observability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-dry-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Dry run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-auth-security-guardrails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Auth &amp; security guardrails
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5.5 Auth &amp; security guardrails">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reuse-login-plumbing-not-login-crypto" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reuse login plumbing — not login crypto
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#authorization-model-v1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authorization model (v1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#secrets-at-rest-and-in-transit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secrets at rest and in transit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API hardening
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frontend-reuse-login-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frontend reuse (login page)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-review-outcomes-2026-06-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 Review outcomes (2026-06-20)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-infrastructure-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Infrastructure &amp; ops
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-work-breakdown-maps-to-subphases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Work breakdown (maps to subphases)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-open-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Open decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-out-of-scope-ideas-captured-not-roadmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Out of scope (ideas captured, not roadmap)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Related documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-current-strategy-confidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Current Strategy &amp; Confidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-phased-roadmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Phased Roadmap
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Phased Roadmap">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#progress-tracker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress tracker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-0-operational-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 0 — Operational baseline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 0 — Operational baseline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-01-strategy-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 0.1 — Strategy health
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-02-host-capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 0.2 — Host capacity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-03-deploy-topology-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 0.3 — Deploy topology decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-fastest-profit-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1 — Fastest profit pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 1 — Fastest profit pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-11-user-secrets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.1 — User secrets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-12-trade-schema-apply-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.2 — Trade schema + apply API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-13-bybit-adapter-dry-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.3 — Bybit adapter (dry run)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-14-trade-ui-shell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.4 — Trade UI shell
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-15-exchange-config-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.5 — Exchange config UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-16-strategy-picker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.6 — Strategy picker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-17-live-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.7 — Live apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-18-execution-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.8 — Execution log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-19-scheduler-price-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1.9 — Scheduler + price bars
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-prove-profitability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — Prove profitability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 2 — Prove profitability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-21-reconcile-data-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2.1 — Reconcile data model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-22-daily-sharpe-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2.2 — Daily Sharpe job
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-23-reconcile-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2.3 — Reconcile UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-24-telegram-error-alerts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2.4 — Telegram error alerts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-25-silent-failure-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2.5 — Silent failure detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-full-product-ux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 — Full product UX
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 3 — Full product UX">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-31-top-nav-trade-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.1 — Top nav + Trade tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-32-strategy-ranking-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.2 — Strategy ranking backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-33-best-strategy-banner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.3 — Best strategy banner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-34-backtest-side-nav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.4 — Backtest side nav
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-35-compact-queue-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.5 — Compact queue table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-36-job-strategy-detail-drawer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.6 — Job / strategy detail drawer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-37-separate-trade-host-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3.7 — Separate TRADE host (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-prerequisites-data-model-ranking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Prerequisites (data model &amp; ranking)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-frontend-shell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Frontend shell
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Frontend shell">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#40-ui-visualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.0 UI visualization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4.0 UI visualization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#app-shell-phase-31-top-nav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        App shell (Phase 3.1 — top nav)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-mvp-trade-tab-only-subphases-14-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1 MVP — Trade tab only (subphases 1.4 – 1.8)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-target-backtest-tab-31-36" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 target — Backtest tab (3.1 – 3.6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-target-trade-tab-1x-layout-23-reconcile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 target — Trade tab (1.x layout + 2.3 reconcile)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#overlays-phase-35-36" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overlays (Phase 3.5 – 3.6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ui-rollout-by-subphase" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI rollout by subphase
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zone-map-full-product" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Zone map (full product)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#41-backtest-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Backtest tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-trade-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Trade tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-cross-cutting-concerns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Cross-cutting concerns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Cross-cutting concerns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-user-secrets-exchange-api-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 User secrets (exchange API keys)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-api-url-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 API URL layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-error-handling-observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Error handling &amp; observability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-dry-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Dry run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-auth-security-guardrails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Auth &amp; security guardrails
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5.5 Auth &amp; security guardrails">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reuse-login-plumbing-not-login-crypto" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reuse login plumbing — not login crypto
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#authorization-model-v1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authorization model (v1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#secrets-at-rest-and-in-transit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secrets at rest and in transit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API hardening
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frontend-reuse-login-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frontend reuse (login page)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-review-outcomes-2026-06-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 Review outcomes (2026-06-20)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-infrastructure-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Infrastructure &amp; ops
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-work-breakdown-maps-to-subphases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Work breakdown (maps to subphases)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-open-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Open decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-out-of-scope-ideas-captured-not-roadmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Out of scope (ideas captured, not roadmap)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Related documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Success criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="plan-to-profit">Plan to Profit<a class="headerlink" href="#plan-to-profit" title="Permanent link">&para;</a></h1>
+<div class="admonition info">
+<p class="admonition-title">Status</p>
+<p><strong>Planning — derived from product notes.</strong> This document turns informal goals into a phased roadmap. It does not replace detailed design docs; it links to them and records open decisions.</p>
+</div>
+<p><strong>Source notes:</strong> <code>../notes/plan_to_profit.md</code> (workspace sibling)</p>
+<p><strong>North star:</strong> Run the current best backtested strategy live on Bybit (Bollinger-band price signal), prove profitability with daily Sharpe reconciliation, and grow the React SPA into a two-tab product (<strong>Backtest</strong> | <strong>Trade</strong>).</p>
+<hr />
+<h2 id="1-current-strategy-confidence">1. Current Strategy &amp; Confidence<a class="headerlink" href="#1-current-strategy-confidence" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Live candidate</strong></td>
+<td>Bybit execution, Bollinger band on <strong>price</strong></td>
+</tr>
+<tr>
+<td><strong>Backtest Sharpe</strong></td>
+<td>~1.22 (historical)</td>
+</tr>
+<tr>
+<td><strong>Expected live Sharpe</strong></td>
+<td>~1.08 (haircut vs backtest)</td>
+</tr>
+<tr>
+<td><strong>Risk</strong></td>
+<td>Sharpe may degrade over time — must monitor, not assume static edge</td>
+</tr>
+<tr>
+<td><strong>Why it matters</strong></td>
+<td>This is the <strong>Phase 0</strong> anchor: keep the strategy running while the profit pipeline is built around it</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Immediate engineering implication:</strong> Phase 1 deliverables should not block on perfect UI; they should unblock <strong>deploy → execute → log → reconcile</strong>.</p>
+<hr />
+<h2 id="2-phased-roadmap">2. Phased Roadmap<a class="headerlink" href="#2-phased-roadmap" title="Permanent link">&para;</a></h2>
+<p>Work <strong>one subphase at a time</strong> — finish exit criteria before starting the next. Update the status column as you go (<code>—</code> → <code>in progress</code> → <code>done</code>).</p>
+<h3 id="progress-tracker">Progress tracker<a class="headerlink" href="#progress-tracker" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Subphase</th>
+<th>Title</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#phase-01-strategy-health">0.1</a></td>
+<td>Strategy health</td>
+<td>done</td>
+</tr>
+<tr>
+<td><a href="#phase-02-host-capacity">0.2</a></td>
+<td>Host capacity</td>
+<td>done</td>
+</tr>
+<tr>
+<td><a href="#phase-03-deploy-topology-decision">0.3</a></td>
+<td>Deploy topology decision</td>
+<td>done</td>
+</tr>
+<tr>
+<td><a href="#phase-11-user-secrets">1.1</a></td>
+<td>User secrets</td>
+<td>done</td>
+</tr>
+<tr>
+<td><a href="#phase-12-trade-schema-apply-api">1.2</a></td>
+<td>Trade schema + apply API</td>
+<td>done</td>
+</tr>
+<tr>
+<td><a href="#phase-13-bybit-adapter-dry-run">1.3</a></td>
+<td>Bybit adapter (dry run)</td>
+<td>done</td>
+</tr>
+<tr>
+<td><a href="#phase-14-trade-ui-shell">1.4</a></td>
+<td>Trade UI shell</td>
+<td>done</td>
+</tr>
+<tr>
+<td><a href="#phase-15-exchange-config-ui">1.5</a></td>
+<td>Exchange config UI</td>
+<td>done</td>
+</tr>
+<tr>
+<td><a href="#phase-16-strategy-picker">1.6</a></td>
+<td>Strategy picker</td>
+<td>done</td>
+</tr>
+<tr>
+<td><a href="#phase-17-live-apply">1.7</a></td>
+<td>Live apply</td>
+<td>done</td>
+</tr>
+<tr>
+<td><a href="#phase-18-execution-log">1.8</a></td>
+<td>Execution log</td>
+<td>done (writes); read UI in release 1.8.0</td>
+</tr>
+<tr>
+<td><a href="#phase-19-scheduler-price-bars">1.9</a></td>
+<td>Scheduler + price bars</td>
+<td>done</td>
+</tr>
+<tr>
+<td><a href="#phase-21-reconcile-data-model">2.1</a></td>
+<td>Reconcile data model</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="#phase-22-daily-sharpe-job">2.2</a></td>
+<td>Daily Sharpe job</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="#phase-23-reconcile-ui">2.3</a></td>
+<td>Reconcile UI</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="#phase-24-telegram-error-alerts">2.4</a></td>
+<td>Telegram error alerts</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="#phase-25-silent-failure-detection">2.5</a></td>
+<td>Silent failure detection</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="#phase-31-top-nav-trade-tab">3.1</a></td>
+<td>Top nav + Trade tab</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="#phase-32-strategy-ranking-backend">3.2</a></td>
+<td>Strategy ranking backend</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="#phase-33-best-strategy-banner">3.3</a></td>
+<td>Best strategy banner</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="#phase-34-backtest-side-nav">3.4</a></td>
+<td>Backtest side nav</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="#phase-35-compact-queue-table">3.5</a></td>
+<td>Compact queue table</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="#phase-36-job-strategy-detail-drawer">3.6</a></td>
+<td>Job / strategy detail drawer</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="#phase-37-separate-trade-host-optional">3.7</a></td>
+<td>Separate TRADE host (optional)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid"><code>flowchart TB
+  subgraph P0[Phase 0]
+    P01[0.1 Health]
+    P02[0.2 Capacity]
+    P03[0.3 Topology]
+    P01 --&gt; P02 --&gt; P03
+  end
+  subgraph P1[Phase 1]
+    P11[1.1 Secrets]
+    P12[1.2 Schema/API]
+    P13[1.3 Dry run]
+    P14[1.4 UI shell]
+    P15[1.5 Config UI]
+    P16[1.6 Picker]
+    P17[1.7 Live]
+    P18[1.8 Log]
+    P19[1.9 Scheduler]
+    P11 --&gt; P12 --&gt; P13
+    P14 --&gt; P15
+    P12 --&gt; P16 --&gt; P17 --&gt; P18 --&gt; P19
+    P13 --&gt; P17
+    P15 --&gt; P17
+  end
+  subgraph P2[Phase 2]
+    P21[2.1 DB]
+    P22[2.2 Job]
+    P23[2.3 UI]
+    P24[2.4 Telegram]
+    P25[2.5 Heartbeat]
+    P21 --&gt; P22 --&gt; P23
+    P24 --&gt; P25
+  end
+  subgraph P3[Phase 3]
+    P31[3.1 Nav]
+    P32[3.2 Rank]
+    P33[3.3 Banner]
+    P34[3.4 Side nav]
+    P35[3.5 Queue]
+    P36[3.6 Drawer]
+    P37[3.7 ECR]
+    P31 --&gt; P34
+    P32 --&gt; P33
+    P35 --&gt; P36
+  end
+  P0 --&gt; P1 --&gt; P2 --&gt; P3</code></pre>
+<hr />
+<h3 id="phase-0-operational-baseline">Phase 0 — Operational baseline<a class="headerlink" href="#phase-0-operational-baseline" title="Permanent link">&para;</a></h3>
+<p><strong>Phase goal:</strong> Confirm the live edge still exists and the host plan won’t break when TRADE containers/jobs land.</p>
+<h4 id="phase-01-strategy-health">Phase 0.1 — Strategy health<a class="headerlink" href="#phase-01-strategy-health" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>1.6, 1.7 (confidence in strategy id)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Scope:</strong> Research sign-off only — <strong>not</strong> production trade tracking. Use existing backtest tooling (<code>python -m quant.cli --walk-forward</code>); do <strong>not</strong> build rolling-Sharpe scripts against historical bars for go/no-go.</p>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[x] Run walk-forward on the live candidate (e.g. <code>btcusdt.crypto</code>, Bollinger / momentum) via CLI or queued optimize + WF.</li>
+<li>[x] Record OOS Sharpe, overfitting ratio, and chosen <code>window</code> / <code>signal</code> in a ticket or <a href="../../decisions/">decisions log</a>.</li>
+<li>[x] Agree go / no-go / watch for promoting that <code>strategy_id</code> into the Trade picker.</li>
+</ul>
+<p><strong>Exit criteria:</strong> Written note with walk-forward OOS metrics; live candidate <code>strategy_id</code> confirmed for Phase 1.6 / 1.7.</p>
+<p><strong>Result (2026-05-20):</strong> <strong>WATCH</strong> — <code>bollinger_momentum_60_1.75</code> on <code>btcusdt.crypto</code>. Full Sharpe 1.19; OOS (30%) 0.42; WF OOS negative. Dry-run/paper OK; defer live apply. See <a href="../../archive/phase-0/phase-0.1-signoff/">phase-0.1-signoff.md</a> and decision #33.</p>
+<hr />
+<h4 id="phase-02-host-capacity">Phase 0.2 — Host capacity<a class="headerlink" href="#phase-02-host-capacity" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>— (can run parallel with 0.1)</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>1.7, 3.7</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[x] Capture current EC2 CPU/mem with API + worker + Redis (and any manual Bybit process).</li>
+<li>[x] Estimate headroom for +1 Docker service (trade worker or reconcile cron).</li>
+<li>[x] List which processes must move off the box first if headroom is tight.</li>
+</ul>
+<p><strong>Exit criteria:</strong> One-page capacity snapshot with “safe to add container Y/N” and rough CPU/mem budget.</p>
+<p><strong>Result (2026-05-20):</strong> t4g.small (2 GiB) — <strong>NO</strong> for +1 trade worker without upgrade; <strong>YES</strong> for daily reconcile cron. <strong>Upgraded to t4g.medium</strong> per decision #34. See <a href="../../archive/phase-0/phase-0.2-capacity/">phase-0.2-capacity.md</a>; live metrics: <code>bash aws/scripts/capacity_snapshot.sh</code> on EC2.</p>
+<hr />
+<h4 id="phase-03-deploy-topology-decision">Phase 0.3 — Deploy topology decision<a class="headerlink" href="#phase-03-deploy-topology-decision" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>0.2</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>3.7 (execution only)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[x] Decide timing: TRADE on same EC2 vs separate host vs ECR image.</li>
+<li>[x] Decide whether daily Sharpe job shares host with trade executor.</li>
+<li>[x] Log decision in <a href="../../decisions/">Decisions log</a> (see <a href="#8-open-decisions">open decision #4</a>).</li>
+</ul>
+<p><strong>Exit criteria:</strong> Recorded decision — no need to implement ECR yet unless chosen “now.”</p>
+<p><strong>Result (2026-05-20):</strong> <strong>Same EC2</strong> for Phase 1 TRADE + Phase 2 reconcile after <strong>t4g.medium</strong> upgrade. <strong>ECR pull deploy adopted now</strong> (before Phase 1 app work). Separate TRADE host only if needed in Phase 3.7. See <a href="../../archive/phase-0/phase-0.3-topology/">phase-0.3-topology.md</a> and decision #35.</p>
+<hr />
+<h3 id="phase-1-fastest-profit-pipeline">Phase 1 — Fastest profit pipeline<a class="headerlink" href="#phase-1-fastest-profit-pipeline" title="Permanent link">&para;</a></h3>
+<p><strong>Phase goal:</strong> Closed loop — configure credentials → pick backtested strategy → dry-run → live apply → see executions in UI.<br />
+<strong>Out of scope until Phase 3:</strong> strategy JSON popup, full optimization browser, enlarged queue, best-strategy banner.</p>
+<h4 id="phase-11-user-secrets">Phase 1.1 — User secrets<a class="headerlink" href="#phase-11-user-secrets" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>Auth (<code>CORE_ADMIN.APP_USER</code>)</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>1.3, 1.5, 1.7</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Scope:</strong> Per-user <strong>exchange API keys</strong> in <code>CORE_ADMIN</code> only. No <code>TRADE.CONNECTION</code> table — runtime sessions to Bybit are ephemeral; the audit trail you care about is <strong><code>TRADE.EXECUTION_EVENT</code> / <code>TRADE.TRANSACTION</code></strong> (Phase 1.8), not “which connection was opened.”</p>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[x] DDL: <code>CORE_ADMIN.API_CREDENTIAL</code> (soft-versioned; see below).</li>
+<li>[x] REFDATA: seed <code>bybit</code> row in <code>REFDATA.APP</code> (broker identified by <code>APP_ID</code>, not free-text exchange).</li>
+<li>[x] SPs: insert (new account / rotate keys) / get / revoke — <strong>no raw DML</strong> from Python.</li>
+<li>[x] App-layer Fernet encryption before <code>SP_INS_*</code>; key from SSM <code>EXCHANGE_SECRETS_KEY</code>.</li>
+<li>[x] API: <code>/api/v1/credentials</code> — masked read, write, rotate, revoke (never log or return full secrets).</li>
+<li>[x] Security review: multi-user prod does not store per-user exchange keys in <code>.env</code>.</li>
+<li>[x] Security: prod boot <strong>fail-fast</strong> without <code>EXCHANGE_SECRETS_KEY</code> (mirror <code>JWT_SECRET</code> — never reuse it).</li>
+<li>[x] Security: API response schemas exclude ciphertext columns; unit test GET never returns <code>*_CIPHERTEXT</code>.</li>
+<li>[x] Security: rate-limit <code>POST</code>/<code>PUT</code> <code>/api/v1/credentials</code> (same pattern as login — see <a href="../login/#112-rate-limiting-defense-in-depth">login.md §11.2</a>).</li>
+</ul>
+<p><strong>Data model — <code>CORE_ADMIN.API_CREDENTIAL</code></strong></p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>API_CREDENTIAL_ID</code></td>
+<td><code>INTEGER</code> — <strong>not</strong> <code>IDENTITY</code>; assigned in SP (<code>COALESCE(MAX(...), 0) + 1</code>) on <strong>new account</strong></td>
+</tr>
+<tr>
+<td><code>API_CREDENTIAL_VID</code></td>
+<td>Soft-version; bump on <strong>key rotation</strong> only</td>
+</tr>
+<tr>
+<td><code>APP_USER_ID</code></td>
+<td>Owner (<code>UUID</code>, JWT <code>sub</code>)</td>
+</tr>
+<tr>
+<td><code>APP_ID</code></td>
+<td><code>REFDATA.APP</code> — e.g. Bybit broker row</td>
+</tr>
+<tr>
+<td><code>LABEL</code></td>
+<td>User label (“Main”, “Subaccount”)</td>
+</tr>
+<tr>
+<td><code>API_KEY_CIPHERTEXT</code> / <code>API_SECRET_CIPHERTEXT</code></td>
+<td>Fernet blobs (encrypt in app before SP)</td>
+</tr>
+<tr>
+<td><code>IS_ACTIVE_IND</code></td>
+<td><code>Y</code>/<code>N</code> — revoke</td>
+</tr>
+<tr>
+<td><code>IS_CURRENT_IND</code></td>
+<td><code>Y</code>/<code>N</code> — current version</td>
+</tr>
+<tr>
+<td><code>CREATED_AT</code></td>
+<td><code>TIMESTAMPTZ</code> — per row; <strong>no <code>UPDATED_AT</code></strong></td>
+</tr>
+</tbody>
+</table>
+<p>PK: <code>(API_CREDENTIAL_ID, API_CREDENTIAL_VID)</code>. No unique on <code>(APP_USER_ID, APP_ID)</code> — <strong>multiple accounts per exchange</strong> via distinct <code>API_CREDENTIAL_ID</code> values (1, 2, 3, …).</p>
+<p><strong>Stored procedures</strong></p>
+<table>
+<thead>
+<tr>
+<th>Procedure</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SP_INS_API_CREDENTIAL</code></td>
+<td><strong>New account</strong> (<code>IN_API_CREDENTIAL_ID</code> NULL): assign next <code>API_CREDENTIAL_ID</code>, <code>VID=1</code>. <strong>Rotate</strong> (id set): demote current row, <code>VID := MAX(VID)+1</code>, insert.</td>
+</tr>
+<tr>
+<td><code>SP_GET_API_CREDENTIAL</code></td>
+<td>By <code>APP_USER_ID</code>; optional id; default <code>IS_CURRENT_IND='Y'</code> + <code>IS_ACTIVE_IND='Y'</code>.</td>
+</tr>
+<tr>
+<td><code>SP_UPD_API_CREDENTIAL_REVOKE</code></td>
+<td>Soft-version revoke: new row, <code>IS_ACTIVE_IND='N'</code>, cleared ciphertext.</td>
+</tr>
+</tbody>
+</table>
+<p>Optional <code>CORE_INS_LOG_PROC</code> on credential SPs only (security-sensitive writes).</p>
+<p><strong>API (1.1 — no UI)</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/credentials</code></td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/credentials/{api_credential_id}</code></td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/credentials</code> — body: <code>app_id</code>, <code>label</code>, <code>api_key</code>, <code>api_secret</code></td>
+</tr>
+<tr>
+<td><code>PUT</code></td>
+<td><code>/api/v1/credentials/{api_credential_id}</code> — rotate keys</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/v1/credentials/{api_credential_id}</code> — revoke</td>
+</tr>
+</tbody>
+</table>
+<p>Responses: <code>api_key_masked</code>, <code>app_id</code>, <code>label</code>, <code>api_credential_id</code> — never full secrets.</p>
+<p><strong>Application layer — reuse from auth</strong></p>
+<p>Reuse login/JWT <strong>plumbing</strong>, not login <strong>crypto</strong>. Full table: <a href="../login/#64-reuse-from-login-jwt-credential-api-phase-11">Login design §6.4</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Reuse</th>
+<th>Do not reuse</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>require_user</code>, <code>DbGateway</code> / <code>AuthRepo</code> pattern, SSM config, never log secrets, ownership scoping</td>
+<td>JWT, Argon2, <code>SESSION_GEN</code>, decrypted-key cache</td>
+</tr>
+</tbody>
+</table>
+<p>Implement Fernet in <code>quant/shared/secrets_crypto.py</code>; <code>ApiCredentialRepo</code> calls <code>CORE_ADMIN.SP_*</code> only; router behind <code>require_user</code>.</p>
+<p><strong>Explicitly out of scope for 1.1</strong></p>
+<ul>
+<li><code>TRADE.CONNECTION</code> table or connection audit/history</li>
+<li><code>CONFIG_JSON</code> or trade-default columns (add on <code>TRADE.DEPLOYMENT</code> or credential when needed)</li>
+<li>Bybit validation (1.3), Config UI (1.5)</li>
+</ul>
+<p><strong>Exit criteria:</strong> Test user saves Bybit keys (<code>app_id</code> from REFDATA) via API; GET returns masked credential; rotate bumps <code>API_CREDENTIAL_VID</code>; revoke sets inactive; second account on same exchange gets a new <code>API_CREDENTIAL_ID</code>. <strong>Security:</strong> prod refuses to start without <code>EXCHANGE_SECRETS_KEY</code>; GET/POST responses never include <code>*_CIPHERTEXT</code>; cross-user credential id returns <strong>404</strong> (not 403); <code>POST</code>/<code>PUT</code> credentials are rate-limited.</p>
+<hr />
+<h4 id="phase-12-trade-schema-apply-api">Phase 1.2 — Trade schema + apply API<a class="headerlink" href="#phase-12-trade-schema-apply-api" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>1.3, 1.6, 1.7, 1.8, 2.1</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[x] DDL: <code>TRADE.DEPLOYMENT</code>, <code>TRADE.EXECUTION_EVENT</code>, <code>TRADE.TRANSACTION</code> (per <a href="../trade-api/">Trade API</a>). <strong>No <code>TRADE.INTENT</code></strong> — signal computed in worker; see decision #38.</li>
+<li>[x] <code>TRADE.DEPLOYMENT</code> includes <strong><code>API_CREDENTIAL_ID INTEGER</code></strong> (points at current credential row via GET with <code>IS_CURRENT_IND='Y'</code>) — not a separate connection entity.</li>
+<li>[x] SP: create deployment linked to <code>BT.STRATEGY</code> id + <code>API_CREDENTIAL_ID</code>.</li>
+<li>[x] API: <code>POST</code> apply / <code>GET</code> deployment status (skeleton OK without exchange call).</li>
+</ul>
+<p><strong>Exit criteria:</strong> Deployment row persists with <code>strategy_id</code> and <code>api_credential_id</code>; status endpoint returns stored state.</p>
+<hr />
+<h4 id="phase-13-bybit-adapter-dry-run">Phase 1.3 — Bybit adapter (dry run)<a class="headerlink" href="#phase-13-bybit-adapter-dry-run" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>1.1, 1.2</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>1.7</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[x] Implement ccxt broker stack (<code>quant/trade/brokers/ccxt/</code>, registry, <code>CcxtTradeAdapter</code>) with dry-run path — see <a href="../ccxt-trade-and-xref-validation/">ccxt trade design</a>.</li>
+<li>[x] Validate credentials, <code>INST.PRODUCT_XREF</code> symbol mapping, sizing — no live orders.</li>
+<li>[x] Return structured dry-run report (signals, intended side, errors) via <code>POST /api/v1/trade/deployments/dry-run</code>.</li>
+<li>[ ] Trade UI dry-run button (deferred — use harness below until 1.6/1.7 UI wiring).</li>
+<li>[ ] Live order path (<code>place_order</code> / <code>apply_signal</code>) — Phase 1.7.</li>
+</ul>
+<p><strong>Golden harness (run before any trade-layer change)</strong></p>
+<p>Local validation script — <strong>source of truth</strong> for Bybit testnet + dry-run behaviour:</p>
+<p><code>scripts/bybit_local_testnet.py</code></p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--suite</code></td>
+<td>Full matrix: DB, Redis, xref, strategy payload, credential decrypt, diagnose, gateway, probe-intended, refresh-data, dry-run</td>
+</tr>
+<tr>
+<td><code>--suite --json</code></td>
+<td>Same, machine-readable (CI / diff golden output)</td>
+</tr>
+<tr>
+<td><code>--suite --with-api</code></td>
+<td>Also hits <code>POST /api/v1/trade/deployments/dry-run</code> (needs dev API + <code>LOCAL_LOGIN_PASSWORD</code>)</td>
+</tr>
+<tr>
+<td><code>--check</code></td>
+<td>Prerequisites only (Fernet, DB credentials, env)</td>
+</tr>
+<tr>
+<td><code>--diagnose</code></td>
+<td>Which Bybit env accepts the key (testnet / demo / mainnet)</td>
+</tr>
+<tr>
+<td><code>--save</code></td>
+<td>Persist <code>BYBIT_TESTNET_*</code> keys to <code>CORE_ADMIN.API_CREDENTIAL</code></td>
+</tr>
+<tr>
+<td><code>--gateway</code></td>
+<td>ccxt connect + xref + position</td>
+</tr>
+<tr>
+<td><code>--dry-run --refresh-data</code></td>
+<td>Full orchestration (Yahoo cache + signal + broker; no orders)</td>
+</tr>
+<tr>
+<td><code>--intended-matrix</code></td>
+<td>Golden <code>signal × position → BUY/SELL/HOLD</code> (no network)</td>
+</tr>
+<tr>
+<td><code>--probe-intended</code></td>
+<td>Live position + what signals -1/0/1 would do</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Prerequisites:</strong> local Postgres (<code>DB_TARGET=local</code>), Redis (<code>./scripts/appctl.sh dev start</code>), <code>EXCHANGE_SECRETS_KEY</code>, <code>CCXT_ITEST_*</code> in <code>.env</code> (see <code>.env.example</code>), Bybit <strong>testnet</strong> keys (<a href="https://testnet.bybit.com/">testnet.bybit.com</a>), strategy with <code>BT.RESULT</code> payload, <code>btcusdt.crypto → BTCUSDT</code> xref for <code>app_id=34</code>.</p>
+<p><strong>Automated mirror (CI / optional):</strong> <code>tests/integration/test_ccxt_dry_run.py</code> — gateway + full dry-run; run after <code>--suite</code> passes. Not in default <code>pytest tests/</code> (<code>-m e2e</code> only).</p>
+<p><strong>Exit criteria:</strong> <code>--suite</code> exits 0 for test user against Bybit testnet; dry-run API succeeds (<code>--api-dry-run</code> or <code>--suite --with-api</code> when dev API is up). <strong>Security:</strong> dry-run never calls <code>create_order</code>.</p>
+<p><strong>Result (2026-07-05):</strong> Automated mirror green end-to-end against Bybit paper testnet — <code>tests/integration/test_ccxt_dry_run.py -m e2e</code>: credential decrypt (<code>API_CREDENTIAL_ID=8</code>), <code>INST.PRODUCT_XREF</code> resolve (<code>btcusdt.crypto</code> → <code>BTCUSDT</code>, <code>app_id=34</code>), <code>validate_credentials()</code>, <code>market_exists()</code>, position qty fetch, and full <code>run_dry_run()</code> orchestration all pass (4 passed, 1 skipped). Unit suite (<code>test_dry_run_service.py</code>, <code>test_trade_router.py</code>, <code>test_bybit_adapter.py</code>, <code>test_trade_registry.py</code>, <code>test_trade_db_repo.py</code>, <code>test_trade.py</code>, <code>test_trade_service.py</code>): 87 passed.</p>
+<hr />
+<h4 id="phase-14-trade-ui-shell">Phase 1.4 — Trade UI shell<a class="headerlink" href="#phase-14-trade-ui-shell" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>React router</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>1.5, 1.6, 1.8, 3.1</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[x] Add <strong>Trade</strong> route (<code>/trade/config</code>, <code>/trade/apply</code>) with layout: sidebar + main + bottom execution-log placeholder.</li>
+<li>[x] Sidebar nav entries: <strong>Config</strong> | <strong>Trade</strong>.</li>
+<li>[x] Auth-gate same as Backtest (<code>RequireAuth</code>).</li>
+<li>[x] <strong>Toolbar</strong> (compact, not full-width): <strong>Exchange</strong> filter · <strong>Account</strong> filter · <strong>Paper / Live</strong> toggle — shared via <code>TradeSessionContext</code>.</li>
+<li>[x] <strong>Deployments table</strong> on Trade page with Exchange + Account columns; rows filtered by toolbar selection.</li>
+<li>[x] Wire <code>GET /api/v1/trade/deployments</code> via <code>useDeployments()</code> (TanStack Query).</li>
+</ul>
+<p><strong>Exit criteria:</strong> Logged-in user navigates to Trade layout; sidebar switches Config ↔ Trade; toolbar filters deployments; execution-log panel is a placeholder.</p>
+<p><strong>Result (2026-05-20):</strong> <code>TradeLayout</code>, <code>TradeNavBar</code>, <code>TradeSessionContext</code>, <code>TradeConfigPage</code>, <code>TradeApplyPage</code> in <code>frontend/src/</code>. See <a href="../../architecture/frontend/#trade-ui-phase-14">Frontend § Trade</a>.</p>
+<hr />
+<h4 id="phase-15-exchange-config-ui">Phase 1.5 — Exchange config UI<a class="headerlink" href="#phase-15-exchange-config-ui" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>1.1, 1.4</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>1.7</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[x] <strong>Accounts table</strong> on Config page: Exchange · Account · Mode (Paper/Live) · masked API key · Status — click row to set toolbar account filter (<code>BrokerAccountsTable</code>).</li>
+<li>[x] <strong>Multi-broker / multi-account</strong> UX: toolbar <strong>Exchange</strong> + <strong>Account</strong> dropdowns filter deployments and highlight table rows (not one broker / one account).</li>
+<li>[x] Compact <strong>Add account</strong> form (Exchange, label, paper toggle, API key/secret).</li>
+<li>[x] <strong>Paper / Live</strong> mode toggle in toolbar (filters deployments by <code>is_paper_ind</code>; apply buttons reflect mode).</li>
+<li>[x] Wire <strong>REFDATA.APP</strong> broker dropdown (<code>app_id</code>) on add form.</li>
+<li>[x] Wire <code>GET</code> / <code>POST</code> / <code>PUT</code> / <code>DELETE</code> → <code>/api/v1/credentials</code>.</li>
+<li>[x] Enable save, rotate, revoke actions in table.</li>
+<li>[ ] Trade defaults (size, Telegram chat id) deferred until columns exist on <code>TRADE.DEPLOYMENT</code> or credential.</li>
+</ul>
+<p><strong>Exit criteria:</strong> User saves Bybit credential in UI and reload sees masked keys in the accounts table; can register <strong>multiple accounts per broker</strong> and filter Trade/deployments via toolbar.</p>
+<p><strong>Result (2026-05-28):</strong> <code>TradeConfigPage</code> + <code>BrokerAccountsTable</code> wired to <code>/api/v1/credentials</code>; REFDATA exchange dropdown; rotate/revoke dialogs. See <a href="../../architecture/frontend/#trade-ui-phase-14">Frontend § Trade</a>.</p>
+<hr />
+<h4 id="phase-16-strategy-picker">Phase 1.6 — Strategy picker<a class="headerlink" href="#phase-16-strategy-picker" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>1.2, 1.4, 0.1 (recommended)</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>1.7</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Track:</strong> <a href="../trade-deployment-rollout/">Trade Deployment Rollout</a> — queue-free path; no <code>BT.QUEUE</code> / <code>SP_INS_STRATEGY</code> changes.</p>
+<p><strong>Scope:</strong> Pick an <strong>existing</strong> <code>BT.STRATEGY</code> row for deployment — not build a new backtest config. Do <strong>not</strong> reuse Backtest <code>ConfigDrawer</code> / <code>FactorCard</code> (those edit REFDATA signal types for optimize requests). See <a href="../trade-api/#21-strategy-catalog-phase-16">Trade API §2.1</a>.</p>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[x] DDL: <strong><code>BT.SP_GET_STRATEGY_LIST</code></strong> — read-only list SP (release <code>1.12.0</code>; joins <code>BT.RESULT</code> on <code>STRATEGY_ID</code>/<code>STRATEGY_VID</code> from release <code>1.13.0</code>).</li>
+<li>[x] API module: <code>quant/api/strategies/</code> — <code>GET /api/v1/strategies</code> calls list SP; behind <code>require_user</code>.</li>
+<li>[x] Frontend: <code>frontend/src/api/strategies.ts</code> + <code>StrategyPicker</code> on Trade Apply.</li>
+<li>[x] Selecting row sets active <code>{ strategy_id, strategy_vid }</code> for deploy payload.</li>
+<li>[x] <strong>1.7 prep:</strong> deployment create validates strategy exists and is owned by caller via <code>SP_GET_STRATEGY</code>.</li>
+</ul>
+<p><strong>Architecture (decided)</strong></p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Choice</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Backend</strong></td>
+<td>New <code>quant/api/strategies/</code> calling <strong><code>BT.SP_GET_STRATEGY_LIST</code></strong> (read-only list)</td>
+<td>Avoids <code>SP_GET_STRATEGY</code> signature churn during queue work; matches GET SP convention (<a href="../../architecture/database/">database.md</a>). Not <code>quant/strategy/</code> (execution math) or <code>quant/trade/</code> (deployments only).</td>
+</tr>
+<tr>
+<td><strong>Frontend</strong></td>
+<td>New <code>StrategyPicker</code> + <code>useStrategies()</code></td>
+<td>Trade-specific UX. Extract to <code>components/strategy/</code> only when Backtest also needs the same picker (e.g. “Deploy this”).</td>
+</tr>
+<tr>
+<td><strong>Do not</strong></td>
+<td>Reuse Backtest config UI or move <code>quant/strategy/</code> to shared</td>
+<td>Wrong domain — signal-type builder ≠ persisted strategy catalog.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exit criteria:</strong> User picks a strategy by name/id in UI; selection passed to apply payload as <code>strategy_id</code> + <code>strategy_vid</code>.</p>
+<p><strong>Known gap (v1):</strong> <code>BT.STRATEGY</code> rows are globally readable to any logged-in user today; ownership enforcement lands in <strong>1.7</strong> deployment create. See <a href="../login/">login.md</a> and <a href="#55-auth-security-guardrails">§5.5</a>.</p>
+<hr />
+<h4 id="phase-17-live-apply">Phase 1.7 — Live apply<a class="headerlink" href="#phase-17-live-apply" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>1.2, 1.3, 1.5, 1.6</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>1.8, 2.x</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="../live-order-execution/">Live Order Execution</a> for the fill-confirmation, retry/cancel, and
+alerting design for the live order path itself.</p>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] UI: Dry-run button → show report; Apply button → confirm live.</li>
+<li>[ ] Backend: apply uses BT strategy config + deployment record + Bybit live path.</li>
+<li>[ ] Error responses surfaced in UI (Telegram deferred to 2.4).</li>
+<li>[ ] Security: server enforces <code>is_paper_ind</code> — UI Paper/Live toggle is <strong>not</strong> an auth boundary (see <a href="#55-auth-security-guardrails">§5.5</a>).</li>
+<li>[ ] Security: live apply requires prior dry-run + explicit confirm payload; reject <code>is_paper_ind='N'</code> without both.</li>
+<li>[ ] Security: deployment create validates strategy <strong>ownership</strong> (<code>BT.STRATEGY</code> user matches <code>CurrentUser</code>).</li>
+<li>[ ] Security: <code>PATCH</code> deployment kill switch (<code>is_enabled_ind</code>) before first live apply (see <a href="../trade-api/#4-risk-safety">Trade API §4</a>).</li>
+</ul>
+<p><strong>Exit criteria:</strong> <strong>M1 — Pipeline</strong> met: one real (or testnet) live apply completes end-to-end for Bollinger strategy. <strong>Security:</strong> backend rejects live apply without dry-run + confirm; paper/live cannot be bypassed via raw API; caller cannot deploy another user's strategy; deployment can be disabled via PATCH without DB access.</p>
+<p><strong>Promotion runbook:</strong> when to move Slack to prod ops and Bybit to mainnet — <a href="../../guides/live-trading-promotion/">Live Trading Promotion</a>.</p>
+<p><strong>Result (2026-07-05):</strong> Core order-placement mechanics (<code>CcxtTradeGateway.create_market_order</code>,
+<code>CcxtTradeAdapter.place_order</code>/<code>apply_signal</code>) implemented and validated end-to-end against Bybit
+testnet via the golden harness (<code>scripts/bybit_local_testnet.py --apply-signal {signal} --confirm</code>).
+All 6 lifecycle actions confirmed with real fills, human-verified against <code>testnet.bybit.com</code>:
+BUY (flat→long), HOLD (long, signal=+1), SELL (long→flat), HOLD (flat, signal=0), OPEN_SHORT
+(flat→short), CLOSE_SHORT (short→flat). Found and fixed a real bug along the way:
+<code>fetch_position_qty</code> compared ccxt's unified symbol against the raw vendor symbol and always
+returned <code>0.0</code> for any open position (masked until an open position existed to test against) — 3
+regression tests added. Two account-level blockers hit and resolved: Bybit API key needed
+explicit trade permission (was read-only), and a one-time derivatives risk-disclosure gate
+(<code>10024</code>) had to be accepted via Bybit's UI before API orders would go through. Unit suite green:
+<code>test_bybit_adapter.py</code> 34 passed, <code>test_trade*.py</code> 72 passed. Remaining for Phase 1.7: UI wiring,
+ownership/kill-switch security tasks above, and the poll-to-confirm + retry/alert robustness layer
+— see <a href="../live-order-execution/">Live Order Execution</a> for that design (Slack alerting explicitly
+deferred pending further detail).</p>
+<hr />
+<h4 id="phase-18-execution-log">Phase 1.8 — Execution log<a class="headerlink" href="#phase-18-execution-log" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>1.2, 1.7, 1.4</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>2.2 (live PnL inputs)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] SP: append execution rows to <code>TRADE.EXECUTION_EVENT</code> on submit/error; fills to <code>TRADE.TRANSACTION</code>.</li>
+<li>[ ] API: paginated transaction history per deployment.</li>
+<li>[ ] UI: bottom-right panel lists recent executions with refresh.</li>
+</ul>
+<p><strong>Exit criteria:</strong> After 1.7 apply, user sees at least one row in transaction history without DB access.</p>
+<hr />
+<h4 id="phase-19-scheduler-price-bars">Phase 1.9 — Scheduler + price bars<a class="headerlink" href="#phase-19-scheduler-price-bars" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>1.7, 1.8</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>2.2 (daily Sharpe needs scheduled runs)</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="../scheduler-price-bars/">Scheduler &amp; Price Bars</a> for the full design.</p>
+<p><strong>Scope:</strong> Two linked concerns — automated trade scheduling via EventBridge and normalized price bars for live signal computation. Backtest cache refresh stays application-owned via <code>BacktestCache.refresh_payload</code> (no DB consolidation SP).</p>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[x] REFDATA: seed <code>REFDATA.TM_INTERVAL</code> (<code>1=DAILY</code>, <code>2=1H</code>) — <code>db/liquidbase/refdata/releases/1.5.0-tm-interval.xml</code>.</li>
+<li>[x] DDL: <code>MARKET_DATA</code> schema with <code>PRICE_BAR</code> table and SPs — <code>db/liquidbase/market_data/releases/1.0.0-price-bars.xml</code>.</li>
+<li>[x] DDL: <code>TRADE.DEPLOYMENT</code> schedule column, <code>DEPLOYMENT_SCHEDULE_STATUS</code> + <code>SP_INS_DEPLOYMENT</code> / <code>SP_GET_DEPLOYMENT</code> / <code>SP_GET_MISSED_DUE_DEPLOYMENTS</code> — <code>db/liquidbase/trade/releases/1.4.0-deployment-scheduler.xml</code>.</li>
+<li>[x] ~~DDL: <code>BT.SP_CONSOLIDATE_API_REQUEST</code>~~ removed — <code>BacktestCache.refresh_payload</code> closes the prior VID and inserts the merged range; no scheduled DB purge.</li>
+<li>[x] Python: <code>quant/market_data/</code> — <code>PriceBarRepo</code> (SP wrappers), <code>CcxtBarFetcher</code> (public <code>fetch_ohlcv</code>), <code>PriceBarService</code> (freshness check + gap fill + <code>read_bars</code>); interval math in <code>quant/shared/intervals.py</code> resolved from <code>REFDATA.TM_INTERVAL</code> via <code>RedisRefData</code>, no hardcoded enum.</li>
+<li>[x] Integration: price bar refresh wired into live apply — venue-bound deployments (e.g. Bybit) compute signals from <code>PRICE_BAR</code> via <code>PriceBarService.load_window</code> (daily when unscheduled; schedule sets interval only), provider-only brokers (e.g. Futu) keep the provider path, and a missing bar source is refused rather than silently priced off the daily feed (<a href="../scheduler-price-bars/#76-signal-source-selection-quantstrategylive_servicepy">§7.6–7.7</a>).</li>
+<li>[ ] Integration: expose <code>POST /api/v1/market-data/price-bars/sync</code> (calls <code>PriceBarService.sync</code>) + the <code>price_bar_sync</code> Lambda task, so bars are warmed <strong>once per interval</strong> rather than once per deployment (<a href="../scheduler-price-bars/#bar-sync-is-one-schedule-per-interval-not-one-per-deployment">§6.2</a>).</li>
+<li>[ ] UI: Schedule interval dropdown (from <code>REFDATA.TM_INTERVAL</code>) in deployment dialog; show <code>last_run_at</code> in deployments table (optional computed next run for display).</li>
+<li>[x] AWS infra: EventBridge schedule group + <code>quant-scheduled-task</code> Lambda + IAM (<code>aws/cfn/04-scheduler.yml</code>); deploy via <code>bash aws/deploy.sh scheduler</code>.</li>
+<li>[x] AWS/app: service auth on <code>/apply</code> (<code>TRADE_SERVICE_TOKEN</code>) + <strong>one platform tick</strong> instead of per-deployment boto3 schedules. The boundary race (firing at <code>:00</code> before the exchange publishes the bar that just closed) is handled by timing, not by avoiding the boundary: bar sync fires on <code>:00</code> and sleeps 10 s before reading the clock, the apply tick runs at <code>:05</code> (<a href="../scheduler-price-bars/#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment">§6.2</a>).</li>
+</ul>
+<p><strong>Exit criteria:</strong> A deployment scheduled <code>DAILY</code> executes automatically via EventBridge without manual intervention. <code>MARKET_DATA.PRICE_BAR</code> contains fresh bars for active products.</p>
+<p><strong>Promotion runbook:</strong> <a href="../../guides/live-trading-promotion/">Live Trading Promotion</a> — Slack ops channel and Bybit mainnet cutover.</p>
+<hr />
+<h3 id="phase-2-prove-profitability">Phase 2 — Prove profitability<a class="headerlink" href="#phase-2-prove-profitability" title="Permanent link">&para;</a></h3>
+<p><strong>Phase goal:</strong> Trust but verify — daily Sharpe vs backtest, loud failures, quiet success. Reconcile frequency can drop after stabilization.</p>
+<h4 id="phase-21-reconcile-data-model">Phase 2.1 — Reconcile data model<a class="headerlink" href="#phase-21-reconcile-data-model" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>1.2, 1.8</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>2.2, 2.3</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] Design table(s) for daily deployment snapshots (live Sharpe, cumulative return, vs backtest expectation).</li>
+<li>[ ] Avoid full scan of <code>TRADE.EXECUTION_EVENT</code> / <code>BT.RESULT</code> each run — aggregate on write or nightly rollup.</li>
+<li>[ ] SP: insert daily snapshot; SP/GET: series for chart.</li>
+</ul>
+<p><strong>Exit criteria:</strong> Schema + procedures merged; manual insert of one test snapshot succeeds.</p>
+<hr />
+<h4 id="phase-22-daily-sharpe-job">Phase 2.2 — Daily Sharpe job<a class="headerlink" href="#phase-22-daily-sharpe-job" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>2.1, 1.8</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>2.3</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] Scheduled job (cron / worker) runs once per day per active deployment.</li>
+<li>[ ] Computes live metrics vs stored backtest benchmark for same strategy.</li>
+<li>[ ] Idempotent per <code>(deployment_id, trade_date)</code>.</li>
+</ul>
+<p><strong>Exit criteria:</strong> Job runs manually twice; second run updates or no-ops without duplicate bad rows.</p>
+<hr />
+<h4 id="phase-23-reconcile-ui">Phase 2.3 — Reconcile UI<a class="headerlink" href="#phase-23-reconcile-ui" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>2.2, 1.4</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] Trade page top-right: chart or summary of Sharpe / drift vs backtest.</li>
+<li>[ ] Show last reconcile timestamp and stale warning if &gt; 36h old.</li>
+<li>[ ] <em>(Nice-to-have)</em> Calendar-year live Sharpe table (Year | Sharpe | return) from reconcile snapshots — production tracking only, not backtest.</li>
+</ul>
+<p><strong>Exit criteria:</strong> User opens Trade and sees at least 7 days of reconcile data (or explicit “insufficient data”).</p>
+<hr />
+<h4 id="phase-24-telegram-error-alerts">Phase 2.4 — Telegram error alerts<a class="headerlink" href="#phase-24-telegram-error-alerts" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>1.7</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>2.5 (optional coupling)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] User preference: Telegram chat id (Config or profile).</li>
+<li>[ ] Notify on apply failure, adapter errors, kill-switch trips — not on success heartbeats.</li>
+<li>[ ] Rate-limit duplicate alerts.</li>
+</ul>
+<p><strong>Exit criteria:</strong> Forced test error delivers one Telegram message; healthy apply sends none.</p>
+<hr />
+<h4 id="phase-25-silent-failure-detection">Phase 2.5 — Silent failure detection<a class="headerlink" href="#phase-25-silent-failure-detection" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>1.7, 2.4 (recommended)</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] Heartbeat or last-seen timestamp on deployment / worker.</li>
+<li>[ ] Alert if no heartbeat in N hours while deployment status = RUNNING.</li>
+<li>[ ] Document runbook: EC2 down, exchange disconnect, stuck process (see <a href="#8-open-decisions">open decision #5</a>).</li>
+</ul>
+<p><strong>Exit criteria:</strong> <strong>M2 — Proof</strong> met: simulated missed heartbeat triggers Telegram; 24h healthy run triggers none.</p>
+<hr />
+<h3 id="phase-3-full-product-ux">Phase 3 — Full product UX<a class="headerlink" href="#phase-3-full-product-ux" title="Permanent link">&para;</a></h3>
+<p><strong>Phase goal:</strong> Research and operations in one app — ranked strategies, structured backtest nav, rich queue UX. Can overlap Phase 2 subphases once M1 is done.</p>
+<h4 id="phase-31-top-nav-trade-tab">Phase 3.1 — Top nav + Trade tab<a class="headerlink" href="#phase-31-top-nav-trade-tab" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>1.4</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>3.4</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] Top navigation: <strong>Backtest</strong> | <strong>Trade</strong> tabs.</li>
+<li>[ ] Route each tab to its own layout shell with side nav slot.</li>
+</ul>
+<p><strong>Exit criteria:</strong> Tab switch preserves auth; URLs deep-link (<code>/backtest</code>, <code>/trade</code>).</p>
+<hr />
+<h4 id="phase-32-strategy-ranking-backend">Phase 3.2 — Strategy ranking backend<a class="headerlink" href="#phase-32-strategy-ranking-backend" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td><a href="#3-prerequisites-data-model-ranking">§3 Prerequisites</a></td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>3.3</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] Add/queryable strategy summary columns (Sharpe, overfitting ratio, etc.).</li>
+<li>[ ] Background job writes rank cache (not computed on every page load).</li>
+<li>[ ] Define ranking formula and tie-break rules.</li>
+</ul>
+<p><strong>Exit criteria:</strong> <code>GET</code> rank endpoint returns ordered list from cache with <code>cached_at</code> timestamp.</p>
+<hr />
+<h4 id="phase-33-best-strategy-banner">Phase 3.3 — Best strategy banner<a class="headerlink" href="#phase-33-best-strategy-banner" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>3.2, 3.1</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] Backtest page top-right: show #1 ranked strategy (name + key metrics).</li>
+<li>[ ] Link to strategy detail when 3.6 exists; stub until then.</li>
+</ul>
+<p><strong>Exit criteria:</strong> Banner matches rank API #1; updates after cache refresh job.</p>
+<hr />
+<h4 id="phase-34-backtest-side-nav">Phase 3.4 — Backtest side nav<a class="headerlink" href="#phase-34-backtest-side-nav" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>3.1, <a href="#8-open-decisions">side nav decision</a></td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] Implement chosen taxonomy (recommended: <strong>B — Object</strong>: Strategies · Jobs · Leaderboard · Settings).</li>
+<li>[ ] Move <strong>Configure</strong> entry off center of monolithic backtest page into nav or sub-route.</li>
+</ul>
+<p><strong>Exit criteria:</strong> All backtest flows reachable via side nav without scrolling past unrelated sections.</p>
+<hr />
+<h4 id="phase-35-compact-queue-table">Phase 3.5 — Compact queue table<a class="headerlink" href="#phase-35-compact-queue-table" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>Existing jobs API</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>3.6</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] Bottom-right (or Jobs section): compact table — <code>STRATEGY_NM</code>, status, View / Cancel / Re-enqueue.</li>
+<li>[ ] <strong>Enlarge</strong> opens full-width modal or route with same data + more columns.</li>
+<li>[ ] QUEUED jobs: status only, no partial optimization preview.</li>
+</ul>
+<p><strong>Exit criteria:</strong> User can cancel and re-enqueue from compact table; enlarge shows full queue view.</p>
+<hr />
+<h4 id="phase-36-job-strategy-detail-drawer">Phase 3.6 — Job / strategy detail drawer<a class="headerlink" href="#phase-36-job-strategy-detail-drawer" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>3.5, <a href="../jobs-table-detail-ux/">Jobs Table Detail UX</a></td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] View action opens drawer: left = strategy JSON summary, right = optimization summary (not full equity curve unless stored).</li>
+<li>[ ] Deep-link <code>?job=&lt;queue_id&gt;</code>.</li>
+<li>[ ] Trade tab can link here for optional drill-down (nice-to-have).</li>
+</ul>
+<p><strong>Exit criteria:</strong> Shared drawer works from queue and from strategy banner link; <code>?job=</code> loads correct row.</p>
+<hr />
+<h4 id="phase-37-separate-trade-host-optional">Phase 3.7 — Separate TRADE host (optional)<a class="headerlink" href="#phase-37-separate-trade-host-optional" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Depends on</strong></td>
+<td>0.3, 1.7 stable</td>
+</tr>
+<tr>
+<td><strong>Blocks</strong></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Scope:</strong> ECR for app/nginx is <strong>already live</strong> (decision #35). This subphase is only about a <strong>second EC2</strong> if metrics warrant isolation.</p>
+<p><strong>Tasks</strong></p>
+<ul>
+<li>[ ] If metrics warrant: second EC2 pulling same ECR <code>quant-app</code> image with trade-only <code>command:</code>.</li>
+<li>[ ] If same host: document why and set revisit trigger (CPU &gt; X%).</li>
+</ul>
+<p><strong>Exit criteria:</strong> <strong>M3 — Product</strong> met when 3.1–3.6 done; 3.7 done only if topology decision requires it.</p>
+<p>Align with <a href="../backtest-queue/">Backtest Queue</a>, <a href="../../architecture/infrastructure/#cicd-github-actions">Infrastructure CI/CD</a>.</p>
+<hr />
+<h2 id="3-prerequisites-data-model-ranking">3. Prerequisites (data model &amp; ranking)<a class="headerlink" href="#3-prerequisites-data-model-ranking" title="Permanent link">&para;</a></h2>
+<p>Before the “best strategy” banner and one-liner strategy rows work at DB scale:</p>
+<table>
+<thead>
+<tr>
+<th>Prerequisite</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Strategy summary columns</strong></td>
+<td>Expose Sharpe, overfitting ratio, etc. as queryable columns (not only inside JSON blobs) for list views and ranking</td>
+</tr>
+<tr>
+<td><strong>Ranking job</strong></td>
+<td>Background process computes leaderboard; <strong>cache</strong> before UI reads</td>
+</tr>
+<tr>
+<td><strong>Result retention policy</strong></td>
+<td>Decide what optimization artifacts are stored vs recomputed (equity curve, full grid, etc.)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Retention principle (from notes):</strong></p>
+<ul>
+<li>Persist <strong>immediately</strong> when user <strong>applies strategy to trade</strong>.</li>
+<li>Other heavy artifacts: store only if needed for UX/cost tradeoff; otherwise require rerun.</li>
+<li>While job is <strong>QUEUED</strong>: show queue status only — no partial optimization UI.</li>
+</ul>
+<hr />
+<h2 id="4-frontend-shell">4. Frontend shell<a class="headerlink" href="#4-frontend-shell" title="Permanent link">&para;</a></h2>
+<p>Wireframes, zone maps, and rollout-by-subphase: <strong><a href="#40-ui-visualization">§4.0 UI visualization</a></strong>.</p>
+<h3 id="40-ui-visualization">4.0 UI visualization<a class="headerlink" href="#40-ui-visualization" title="Permanent link">&para;</a></h3>
+<p>Layouts below use a <strong>12-column grid</strong> mental model. Subphase tags show when each region first ships.</p>
+<h4 id="app-shell-phase-31-top-nav">App shell (Phase 3.1 — top nav)<a class="headerlink" href="#app-shell-phase-31-top-nav" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌──────────────────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│  Quant Strategies          [ Backtest ]  [ Trade ]              user ▾  ⎋   │  ← 3.1
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├──────────────────────────────────────────────────────────────────────────────┤
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│                                                                              │
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│                         (active tab content — see below)                     │
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│                                                                              │
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>└──────────────────────────────────────────────────────────────────────────────┘
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Tab</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/backtest</code></td>
+<td>Backtest</td>
+<td>Default after login today; gains side nav in 3.4</td>
+</tr>
+<tr>
+<td><code>/trade</code></td>
+<td>Trade</td>
+<td>Shell in <strong>1.4</strong>; full layout by <strong>1.8</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="phase-1-mvp-trade-tab-only-subphases-14-18">Phase 1 MVP — Trade tab only (subphases 1.4 – 1.8)<a class="headerlink" href="#phase-1-mvp-trade-tab-only-subphases-14-18" title="Permanent link">&para;</a></h4>
+<p>Routes: <code>/backtest</code> (default) and <code>/trade/config</code> | <code>/trade/apply</code>. App mode switch in header (Backtest | Trade); full top nav tabs ship in <strong>3.1</strong>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>┌──────────────────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>│  Quant Strategies     [ Backtest ] [ Trade* ]                    user ▾     │
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├──────────┬───────────────────────────────────────────────────────────────────┤
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>│ SIDE     │  Filter: [Exchange ▾] [Account ▾]  [ Paper | Live ]     (1.4)   │  ← compact toolbar
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>│ 1.4      ├───────────────────────────────────────────────────────────────────┤
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>│          │                                                                   │
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>│ ● Config │   (Config = accounts table + add form  OR  Trade = picker/apply)  │
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>│ ○ Trade  │                                                                   │
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>│          │   Trade page — DEPLOYMENTS TABLE (filtered by toolbar):           │
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>│          │   ┌─────────┬─────────┬─────────┬──────────┬──────┬────────┬───┐ │
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>│          │   │Exchange │ Account │ Product │ Strategy │ Mode │ Status │Qty│ │
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>│          │   ├─────────┼─────────┼─────────┼──────────┼──────┼────────┼───┤ │
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>│          │   │ Bybit   │ Main    │ btc…    │ boll…    │Paper │ ACTIVE │…  │ │
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>│          │   └─────────┴─────────┴─────────┴──────────┴──────┴────────┴───┘ │
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>│          │   [ Dry run ]  [ Apply paper/live ]  (1.7)                        │
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>│          ├───────────────────────────────────────────────────────────────────┤
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>│          │  EXECUTION LOG (1.8) — bottom panel                             │
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>│          │  ┌────────┬──────────┬────────┬─────────┐                        │
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>│          │  │ Time   │ Side     │ Qty    │ Status  │                        │
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>│          │  └────────┴──────────┴────────┴─────────┘                        │
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>└──────────┴───────────────────────────────────────────────────────────────────┘
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>Config page (sidebar ● Config) — multi-broker account registry (1.5):
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>┌──────────────────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>│ Exchange accounts                                                            │
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>├──────────┬─────────┬──────┬────────────┬────────┬─────────┐                  │
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>│ Exchange │ Account │ Mode │ API key    │ Status │ Actions │  ← click row     │
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>├──────────┼─────────┼──────┼────────────┼────────┼─────────┤    sets toolbar│
+<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>│ Bybit    │ Main    │ Paper│ ****1234   │ Active │ Revoke  │    account filter│
+<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>│ Bybit    │ Sub     │ Live │ ****5678   │ Active │ Revoke  │                  │
+<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>│ Futu     │ HK      │ Live │ ****9012   │ Active │ Revoke  │                  │
+<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>└──────────┴─────────┴──────┴────────────┴────────┴─────────┘                  │
+<a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>│ Add account (compact row, ~160px fields — not full width):                   │
+<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>│ [Exchange ▾] [Label] [Paper toggle]  [API key] [API secret]  [Save]          │
+<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>│ → POST /api/v1/credentials when 1.1 + 1.5 wiring complete                    │
+<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>└──────────────────────────────────────────────────────────────────────────────┘
+</code></pre></div>
+<p><strong>Filter model:</strong> Toolbar <strong>Account</strong> dropdown is a <strong>filter</strong> over the consolidated deployments (and accounts) table — “All exchanges” / “All accounts” show everything; narrowing Exchange then Account scopes Trade and Config row highlight. <strong>Paper / Live</strong> toggles which <code>is_paper_ind</code> rows appear.</p>
+<hr />
+<h4 id="phase-3-target-backtest-tab-31-36">Phase 3 target — Backtest tab (3.1 – 3.6)<a class="headerlink" href="#phase-3-target-backtest-tab-31-36" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>┌──────────────────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>│  Quant Strategies          [ Backtest*]  [ Trade ]              user ▾       │
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>├──────────┬───────────────────────────────────────────────────────────────────┤
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>│ SIDE     │                    BEST STRATEGY (3.3)                            │
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>│ 3.4      │         ★ bollinger_momentum_20_1.0 · Sharpe 1.22 · [details]   │
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>│          ├─────────────────────────────────────────────┬─────────────────────┤
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>│ Strategies│  MAIN — Configure / Run / Charts           │ QUEUE compact (3.5)│
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>│ Jobs     │  (today’s backtest UI; Configure in nav)   │ ┌──────┬────┬─────┐ │
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>│ Leaderboard│                                            │ │ Name │ St │ Act │ │
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>│ Settings │                                              │ ├──────┼────┼─────┤ │
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>│          │                                              │ │ bol… │ RUN│ ⋮   │ │
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>│          │                                              │ └──────┴────┴─────┘ │
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>│          │                                              │      [ Enlarge ]   │
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>└──────────┴─────────────────────────────────────────────┴─────────────────────┘
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>          │◄──────────── ~8 cols main ────────────────►│◄── ~4 cols queue ──►│
+</code></pre></div>
+<p><strong>Side nav (recommended B — Object):</strong></p>
+<pre class="mermaid"><code>flowchart LR
+  subgraph backtestSide["Backtest sidebar 3.4"]
+    S[Strategies]
+    J[Jobs]
+    L[Leaderboard]
+    SET[Settings]
+  end
+  S --&gt; configure[Configure / edit]
+  S --&gt; run[Run / enqueue]
+  J --&gt; queueFocus[Scroll to queue panel]
+  L --&gt; banner[Feeds top-right banner 3.3]</code></pre>
+<table>
+<thead>
+<tr>
+<th>Side item</th>
+<th>Main area shows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Strategies</strong></td>
+<td>Factor cards, configure, run / enqueue</td>
+</tr>
+<tr>
+<td><strong>Jobs</strong></td>
+<td>Highlights queue panel; same compact table</td>
+</tr>
+<tr>
+<td><strong>Leaderboard</strong></td>
+<td>Ranked table (source for banner #1)</td>
+</tr>
+<tr>
+<td><strong>Settings</strong></td>
+<td>Backtest defaults (not exchange secrets)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="phase-3-target-trade-tab-1x-layout-23-reconcile">Phase 3 target — Trade tab (1.x layout + 2.3 reconcile)<a class="headerlink" href="#phase-3-target-trade-tab-1x-layout-23-reconcile" title="Permanent link">&para;</a></h4>
+<p>Same compact toolbar as Phase 1 MVP; reconcile chart added top-right of main area.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>┌──────────────────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>│  Quant Strategies          [ Backtest ]  [ Trade*]              user ▾       │
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>├──────────┬───────────────────────────────────────────────────────────────────┤
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>│ SIDE     │  Filter: [Exchange ▾] [Account ▾] [Paper|Live]  RECONCILE (2.3)  │
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>│          │                                     ┌─────────────────────────┐   │
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>│ ● Config │                                     │ chart: live vs BT exp   │   │
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>│ ○ Trade  │                                     │ last run: today 06:00   │   │
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>│          ├────────────────────────────────────────┴─────────────────────────┤
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>│          │  STRATEGY PICKER + deployments table + [ Dry run ] [ Apply ]      │
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>│          ├───────────────────────────────────────────────────────────────────┤
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>│          │  EXECUTION LOG (transaction table — full width bottom)             │
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>└──────────┴───────────────────────────────────────────────────────────────────┘
+</code></pre></div>
+<hr />
+<h4 id="overlays-phase-35-36">Overlays (Phase 3.5 – 3.6)<a class="headerlink" href="#overlays-phase-35-36" title="Permanent link">&para;</a></h4>
+<p><strong>Enlarged queue</strong> — triggered by <code>[ Enlarge ]</code> on Backtest (modal or <code>/backtest/jobs</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>┌──────────────────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>│  Jobs (full)                                                    [ ✕ Close ] │
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>├──────────────┬───────────┬──────────┬──────────┬────────────────────────────┤
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>│ STRATEGY_NM  │ Status    │ Queued   │ Updated  │ Actions                    │
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>├──────────────┼───────────┼──────────┼──────────┼────────────────────────────┤
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>│ bollinger_…  │ RUNNING   │ 10:00    │ 10:05    │ View · Cancel · Re-enqueue │
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>│ rsi_rev_…    │ QUEUED    │ 10:06    │ —        │ View · Cancel              │
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>└──────────────┴───────────┴──────────┴──────────┴────────────────────────────┘
+</code></pre></div>
+<p><strong>Job / strategy detail drawer</strong> (3.6) — <code>View</code> or <code>?job=&lt;id&gt;</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>                                    ┌──────────────────────────────────────────┐
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>                                    │  Job detail                        [ ✕ ] │
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>                                    ├────────────────────┬─────────────────────┤
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>                                    │ STRATEGY (left)    │ RESULTS (right)     │
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>                                    │ · name, ticker     │ · best Sharpe       │
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>                                    │ · substrategies    │ · params grid sum.  │
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>                                    │ · JSON (collapsed) │ · (no equity curve  │
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>                                    │                    │   unless stored)    │
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>                                    │                    │                     │
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>                                    │ QUEUED: banner only│ "Queued — no preview"│
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>                                    └────────────────────┴─────────────────────┘
+</code></pre></div>
+<p>Slides in from the right; Backtest page dims behind. Trade tab may deep-link here later (optional).</p>
+<hr />
+<h4 id="ui-rollout-by-subphase">UI rollout by subphase<a class="headerlink" href="#ui-rollout-by-subphase" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Subphase</th>
+<th>UI change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1.4</strong></td>
+<td>Trade routes + sidebar + compact filter toolbar (Exchange / Account / Paper·Live) + deployments table + execution-log placeholder</td>
+</tr>
+<tr>
+<td><strong>1.5</strong></td>
+<td>Config accounts table + compact add form; wire <code>/api/v1/credentials</code></td>
+</tr>
+<tr>
+<td><strong>1.6</strong></td>
+<td>Strategy picker in Trade main</td>
+</tr>
+<tr>
+<td><strong>1.7</strong></td>
+<td>Dry-run report + Apply buttons</td>
+</tr>
+<tr>
+<td><strong>1.8</strong></td>
+<td>Bottom execution log table</td>
+</tr>
+<tr>
+<td><strong>2.3</strong></td>
+<td>Trade top-right reconcile chart</td>
+</tr>
+<tr>
+<td><strong>2.4</strong></td>
+<td>Telegram chat id on Config page</td>
+</tr>
+<tr>
+<td><strong>3.1</strong></td>
+<td>Top nav Backtest | Trade</td>
+</tr>
+<tr>
+<td><strong>3.3</strong></td>
+<td>Backtest top-right best-strategy banner</td>
+</tr>
+<tr>
+<td><strong>3.4</strong></td>
+<td>Backtest left sidebar (4 items)</td>
+</tr>
+<tr>
+<td><strong>3.5</strong></td>
+<td>Backtest bottom-right compact queue + Enlarge</td>
+</tr>
+<tr>
+<td><strong>3.6</strong></td>
+<td>Detail drawer + <code>?job=</code></td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid"><code>flowchart TB
+  subgraph p1["Phase 1 UI"]
+    T1[Trade shell 1.4]
+    T2[Config 1.5]
+    T3[Picker + Apply 1.6-1.7]
+    T4[Exec log 1.8]
+    T1 --&gt; T2 --&gt; T3 --&gt; T4
+  end
+  subgraph p2["Phase 2 UI"]
+    R[Reconcile chart 2.3]
+    TG[Telegram field 2.4]
+  end
+  subgraph p3["Phase 3 UI"]
+    NAV[Top tabs 3.1]
+    BT[Backtest layout 3.3-3.5]
+    DR[Drawer 3.6]
+    NAV --&gt; BT --&gt; DR
+  end
+  p1 --&gt; p2
+  p1 --&gt; p3
+  T4 --&gt; R</code></pre>
+<hr />
+<h4 id="zone-map-full-product">Zone map (full product)<a class="headerlink" href="#zone-map-full-product" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Zone</th>
+<th>Backtest tab</th>
+<th>Trade tab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Top bar</td>
+<td>App title · <strong>Backtest</strong> | <strong>Trade</strong> · user menu</td>
+<td>Same</td>
+</tr>
+<tr>
+<td>Left column</td>
+<td>Side nav: Strategies, Jobs, Leaderboard, Settings</td>
+<td>Side nav: <strong>Config</strong>, <strong>Trade</strong></td>
+</tr>
+<tr>
+<td>Below header</td>
+<td>—</td>
+<td>Compact toolbar: <strong>Exchange</strong> filter · <strong>Account</strong> filter · <strong>Paper / Live</strong> toggle</td>
+</tr>
+<tr>
+<td>Top-right of main</td>
+<td>Best strategy banner</td>
+<td>Live Sharpe / reconcile chart (Phase 2)</td>
+</tr>
+<tr>
+<td>Main center</td>
+<td>Configure, run, charts</td>
+<td>Config: <strong>accounts table</strong> + add form · Trade: picker, deployments table, dry-run, apply</td>
+</tr>
+<tr>
+<td>Bottom / right</td>
+<td>Compact queue (+ Enlarge)</td>
+<td>Execution log (full width bottom)</td>
+</tr>
+<tr>
+<td>Overlay</td>
+<td>Enlarged jobs · detail drawer</td>
+<td>Optional link to drawer</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="41-backtest-tab">4.1 Backtest tab<a class="headerlink" href="#41-backtest-tab" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Zone</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Top right</strong></td>
+<td>Best strategy ever (from cached rank)</td>
+</tr>
+<tr>
+<td><strong>Main</strong></td>
+<td>Existing backtest configure/run flows — move <strong>Configure</strong> entry out of monolithic page center if possible</td>
+</tr>
+<tr>
+<td><strong>Bottom right</strong></td>
+<td>Queue table (subset of columns) + <strong>Enlarge</strong> button</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Queue columns (minimum):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>STRATEGY_NM</code></td>
+<td>Human-readable name</td>
+</tr>
+<tr>
+<td>Status</td>
+<td><code>QUEUED</code> / <code>RUNNING</code> / terminal states</td>
+</tr>
+<tr>
+<td>Actions</td>
+<td>View, Cancel, Re-enqueue</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Later:</strong> View opens drawer/popup — left: strategy details, right: optimization summary. Deep-link <code>?job=</code> per <a href="../jobs-table-detail-ux/">Jobs Table Detail UX</a>.</p>
+<p><strong>Backtest side nav (proposed categories — pick one structure):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Sections</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A — Workflow</strong></td>
+<td>Configure → Run / Queue → Results → History</td>
+</tr>
+<tr>
+<td><strong>B — Object</strong></td>
+<td>Strategies → Jobs → Leaderboard → Settings</td>
+</tr>
+<tr>
+<td><strong>C — Role</strong></td>
+<td>Research (configure + run) · Operations (queue) · Review (ranked results)</td>
+</tr>
+</tbody>
+</table>
+<p>Recommendation: start with <strong>B</strong> — matches mental model (strategy artifact vs job vs leaderboard).</p>
+<h3 id="42-trade-tab">4.2 Trade tab<a class="headerlink" href="#42-trade-tab" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Zone</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Side nav</strong></td>
+<td><strong>Config</strong> (register broker accounts) · <strong>Trade</strong> (apply strategy)</td>
+</tr>
+<tr>
+<td><strong>Toolbar</strong></td>
+<td><strong>Exchange</strong> dropdown (~160px) · <strong>Account</strong> dropdown (~200px) · <strong>Paper / Live</strong> toggle — filters deployments and highlights Config table rows</td>
+</tr>
+<tr>
+<td><strong>Config main</strong></td>
+<td><strong>Accounts table</strong> (Exchange · Account · Mode · masked key · Status) + compact <strong>Add account</strong> form</td>
+</tr>
+<tr>
+<td><strong>Trade main</strong></td>
+<td>Strategy picker (1.6) · deployments table (Exchange · Account · …) · Dry-run / Apply buttons</td>
+</tr>
+<tr>
+<td><strong>Top right</strong></td>
+<td>Live Sharpe / reconcile series (Phase 2)</td>
+</tr>
+<tr>
+<td><strong>Bottom</strong></td>
+<td>Execution / transaction history (Phase 1.8)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Multi-broker model:</strong></p>
+<ul>
+<li>Many rows in <code>CORE_ADMIN.API_CREDENTIAL</code> — distinct <code>API_CREDENTIAL_ID</code> per saved key pair; same user may have multiple accounts on the same <code>APP_ID</code> (exchange).</li>
+<li>Toolbar <strong>Account</strong> filter scopes the deployments table (and Config row selection); “All accounts” shows every deployment matching Exchange + Paper/Live filters.</li>
+<li><strong>Paper / Live</strong> toggle filters by <code>is_paper_ind</code> on credentials and deployments — not a separate “connection” entity.</li>
+</ul>
+<p><strong>Flow:</strong></p>
+<ol>
+<li>User registers accounts on <strong>Config</strong> (table); selects filter via toolbar or by clicking a table row.</li>
+<li>On <strong>Trade</strong>, pick strategy (1.6) and optional <strong>dry run</strong> before live apply.</li>
+<li>Apply uses BT strategy + <code>TRADE.DEPLOYMENT</code> (holds <code>API_CREDENTIAL_ID</code>); <strong>audit = <code>TRADE.EXECUTION_EVENT</code> + <code>TRADE.TRANSACTION</code></strong>, not connection history (<a href="../../decisions/">Decisions log</a> #36).</li>
+<li>Errors → Telegram; refer strategy detail via Backtest/leaderboard when drill-down exists.</li>
+</ol>
+<p><strong>Bybit:</strong> ccxt adapter in <code>quant/trade/brokers/ccxt/</code>; live apply via <code>LiveApplyOrchestrator</code>. See <a href="../trade-api/">Trade API</a>.</p>
+<p><strong>Futu:</strong> Prototype in <code>quant/trade/futu_trader.py</code>; target architecture in <a href="../futu-trading/">Futu Trading — OOP Implementation</a> (<code>FutuAdapter</code>, <code>FutuTradeGateway</code>, <code>AdapterRegistry</code>).</p>
+<hr />
+<h2 id="5-cross-cutting-concerns">5. Cross-cutting concerns<a class="headerlink" href="#5-cross-cutting-concerns" title="Permanent link">&para;</a></h2>
+<h3 id="51-user-secrets-exchange-api-keys">5.1 User secrets (exchange API keys)<a class="headerlink" href="#51-user-secrets-exchange-api-keys" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Direction</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Per-user credentials</td>
+<td><code>CORE_ADMIN.API_CREDENTIAL</code>; not in <code>.env</code> for multi-user prod</td>
+</tr>
+<tr>
+<td>Broker identity</td>
+<td><code>APP_ID</code> → <code>REFDATA.APP</code> (seed <code>bybit</code>, etc.) — not free-text <code>EXCHANGE</code></td>
+</tr>
+<tr>
+<td>Multiple accounts</td>
+<td>Distinct <code>API_CREDENTIAL_ID</code> (SP-assigned integer) per saved key pair; same user + same <code>APP_ID</code> allowed</td>
+</tr>
+<tr>
+<td>Versioning</td>
+<td>Soft-version (<code>API_CREDENTIAL_VID</code> + <code>IS_CURRENT_IND</code>); rotate keys = new VID; <strong>no <code>UPDATED_AT</code></strong>; <strong>no table IDENTITY</strong></td>
+</tr>
+<tr>
+<td>Encryption</td>
+<td>Fernet in app before SP; <code>EXCHANGE_SECRETS_KEY</code> in SSM</td>
+</tr>
+<tr>
+<td>Writes</td>
+<td><code>CALL CORE_ADMIN.SP_*</code> only — no raw DML</td>
+</tr>
+<tr>
+<td>Audit</td>
+<td>Credential SPs may use <code>CORE_INS_LOG_PROC</code>; <strong>no connection entity or connection audit</strong> — trade audit = <code>TRADE.EXECUTION_EVENT</code> / <code>TRANSACTION</code></td>
+</tr>
+<tr>
+<td>UI</td>
+<td>Trade → Config sidebar (1.5); API <code>/api/v1/credentials</code> (1.1)</td>
+</tr>
+<tr>
+<td>App patterns</td>
+<td>Reuse <code>require_user</code>, <code>DbGateway</code>, secret bootstrap — <strong>not</strong> JWT/Argon2 (<a href="../login/#64-reuse-from-login-jwt-credential-api-phase-11">login.md §6.4</a>)</td>
+</tr>
+</tbody>
+</table>
+<p>Align with <a href="../login/">Login design</a> (<code>CORE_ADMIN.APP_USER</code>) and <a href="../../architecture/database/">Database</a>. See decision #36.</p>
+<h3 id="52-api-url-layout">5.2 API URL layout<a class="headerlink" href="#52-api-url-layout" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Prefix</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Auth</td>
+<td><code>/api/v1/auth/*</code></td>
+<td>done</td>
+</tr>
+<tr>
+<td>Backtest (sync)</td>
+<td><code>/api/v1/backtest/*</code></td>
+<td>done</td>
+</tr>
+<tr>
+<td>Backtest queue</td>
+<td><code>/api/v1/backtest/jobs/*</code></td>
+<td>done</td>
+</tr>
+<tr>
+<td>REFDATA / INST</td>
+<td><code>/api/v1/refdata/*</code>, <code>/api/v1/inst/*</code></td>
+<td>done (shared)</td>
+</tr>
+<tr>
+<td>Credentials</td>
+<td><code>/api/v1/credentials/*</code></td>
+<td>1.1 (API) · 1.5 (UI)</td>
+</tr>
+<tr>
+<td>Trade deployments</td>
+<td><code>/api/v1/trade/deployments/*</code></td>
+<td><strong>done</strong> (1.2)</td>
+</tr>
+<tr>
+<td>Trade dry-run / log</td>
+<td><code>/api/v1/trade/*</code> (future)</td>
+<td>1.3+</td>
+</tr>
+</tbody>
+</table>
+<p>No backward-compat aliases — update all call sites when paths change (decision #37).</p>
+<h3 id="53-error-handling-observability">5.3 Error handling &amp; observability<a class="headerlink" href="#53-error-handling-observability" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Channel</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Trade / deployment errors</td>
+<td>Telegram first (user-supplied chat id), Slack optional via notifier adapter</td>
+</tr>
+<tr>
+<td>Healthy steady state</td>
+<td>No Telegram noise</td>
+</tr>
+<tr>
+<td>Process / host health</td>
+<td>Heartbeat or external monitor — TBD</td>
+</tr>
+</tbody>
+</table>
+<h3 id="54-dry-run">5.4 Dry run<a class="headerlink" href="#54-dry-run" title="Permanent link">&para;</a></h3>
+<p>Required before first live apply per deployment:</p>
+<ul>
+<li>Validate credentials, symbol mapping (<code>INST.PRODUCT_XREF</code>), position sizing, and signal path without placing orders (or exchange paper mode if available).</li>
+</ul>
+<h3 id="55-auth-security-guardrails">5.5 Auth &amp; security guardrails<a class="headerlink" href="#55-auth-security-guardrails" title="Permanent link">&para;</a></h3>
+<p>Cross-cutting rules from the <a href="../login/">login</a> / trade security review (2026-05-28). Phase-specific exit criteria in <a href="#phase-11-user-secrets">§1.1</a> and <a href="#phase-17-live-apply">§1.7</a>.</p>
+<h4 id="reuse-login-plumbing-not-login-crypto">Reuse login plumbing — not login crypto<a class="headerlink" href="#reuse-login-plumbing-not-login-crypto" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Reuse</th>
+<th>Do not reuse</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>require_user</code>, <code>DbGateway</code> / repo + <code>CALL SP_*</code>, SSM secret bootstrap, never log secrets, ownership scoping (<code>APP_USER_ID</code>), Pydantic input strip, <strong>404</strong> for cross-user resource ids</td>
+<td>JWT/Argon2/<code>SESSION_GEN</code>, decrypted-key cache, timing-attack dummy verify</td>
+</tr>
+</tbody>
+</table>
+<p>Full table: <a href="../login/#64-reuse-from-login-jwt-credential-api-phase-11">login.md §6.4</a>.</p>
+<h4 id="authorization-model-v1">Authorization model (v1)<a class="headerlink" href="#authorization-model-v1" title="Permanent link">&para;</a></h4>
+<p>Full matrix, phased backlog, and Futu/Bybit split: <strong><a href="../user-isolation/">User isolation requirements</a></strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>v1 behaviour</th>
+<th>When to revisit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RBAC</td>
+<td><strong>None</strong> — any logged-in user can save credentials, create deployments, and (1.7) live apply</td>
+<td>Second user who is not fully trusted</td>
+</tr>
+<tr>
+<td>Strategy visibility</td>
+<td><code>BT.STRATEGY</code> / results are <strong>globally readable</strong> to any logged-in user (<code>USER_ID</code> audit-only today)</td>
+<td>login.md Phase 2 multi-user isolation</td>
+</tr>
+<tr>
+<td>Strategy deploy</td>
+<td>Must validate strategy <strong>ownership</strong> before 1.7 — <code>_strategy_exists</code> alone is insufficient</td>
+<td></td>
+</tr>
+<tr>
+<td>Paper vs live</td>
+<td><strong><code>is_paper_ind</code> on server</strong> — client toolbar filter is UX only</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="secrets-at-rest-and-in-transit">Secrets at rest and in transit<a class="headerlink" href="#secrets-at-rest-and-in-transit" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SP_GET_API_CREDENTIAL</code> returns ciphertext</td>
+<td>Service layer strips before JSON; response schema has no <code>*_CIPHERTEXT</code> fields; unit test</td>
+</tr>
+<tr>
+<td>Missing Fernet bootstrap</td>
+<td><code>EXCHANGE_SECRETS_KEY</code> from SSM; prod <strong>fail-fast</strong> at boot (mirror <code>_resolve_jwt_secret</code>); <strong>never</strong> reuse <code>JWT_SECRET</code></td>
+</tr>
+<tr>
+<td>Worker decrypt path</td>
+<td>Decrypt only at adapter boundary; short-lived; never log; no parallel env-key path once 1.1 is live</td>
+</tr>
+<tr>
+<td>Legacy <code>.env</code> exchange keys</td>
+<td>Multi-user prod uses <code>CORE_ADMIN.API_CREDENTIAL</code> only — not shared <code>.env</code> keys (house account exception must be explicit)</td>
+</tr>
+<tr>
+<td>Futu unlock password</td>
+<td>Not covered by key+secret model — decide before Futu live: extra column, credential type, or infra-only unlock</td>
+</tr>
+</tbody>
+</table>
+<h4 id="api-hardening">API hardening<a class="headerlink" href="#api-hardening" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rate limit credential writes</td>
+<td><code>POST</code>/<code>PUT</code> <code>/api/v1/credentials</code> — at least login-tier limits</td>
+</tr>
+<tr>
+<td>CSRF</td>
+<td><code>SameSite=Strict</code> + HTTPS same-origin SPA is sufficient for v1; cross-origin frontend needs CSRF tokens (<a href="../login/#16-open-questions">login.md §16 Q5</a>)</td>
+</tr>
+<tr>
+<td>Kill switch</td>
+<td><code>PATCH</code> deployment <code>is_enabled_ind</code> — required before 1.7 (<a href="../trade-api/#4-risk-safety">Trade API §4</a>)</td>
+</tr>
+<tr>
+<td>Live apply step-up</td>
+<td>Align with <a href="../trade-api/#41-confirmation-flow-for-live-trading">Trade API §4.1</a>: dry-run first, explicit confirm; Futu may need trade-unlock password</td>
+</tr>
+</tbody>
+</table>
+<h4 id="frontend-reuse-login-page">Frontend reuse (login page)<a class="headerlink" href="#frontend-reuse-login-page" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Reuse</th>
+<th>Do not reuse</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RequireAuth</code>, <code>useMe()</code>, controlled form + error display, <code>type="password"</code> for key/secret fields</td>
+<td>Persisting API keys in <code>localStorage</code>; mixing credential calls into <code>/auth/login</code> module</td>
+</tr>
+</tbody>
+</table>
+<h3 id="56-review-outcomes-2026-06-20">5.6 Review outcomes (2026-06-20)<a class="headerlink" href="#56-review-outcomes-2026-06-20" title="Permanent link">&para;</a></h3>
+<p>This section records implementation viewpoints from the latest trade-readiness review and how the roadmap changes.</p>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Viewpoint</th>
+<th>Plan change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Force INST input before trade</td>
+<td>Deployment/apply must fail fast unless (<code>internal_cusip</code>, <code>app_id</code>) resolves in <code>INST.PRODUCT_XREF</code> and a vendor symbol exists. Do not let adapter infer symbols from free-text ticker.</td>
+<td>Add mandatory preflight validation in 1.6/1.7 (<code>SP_GET_DEPLOYMENT_CHECK</code> + API guard) before dry-run/apply execution.</td>
+</tr>
+<tr>
+<td>Telegram / Slack system message</td>
+<td>Keep one notifier path for now; avoid dual implementation in Phase 1.</td>
+<td>Keep Telegram in 2.4 as the first target; implement a notifier interface so Slack can be added without rewiring trade logic.</td>
+</tr>
+<tr>
+<td>Strategy sharing vs cloning</td>
+<td>Shared read-only catalog is fine, but live deployment should be user-owned to prevent implicit coupling to someone else's future best-VID changes.</td>
+<td>Change 1.6/1.7 behavior: if selected strategy owner differs from caller, require clone to a new <code>strategy_id</code> owned by caller before deployment. Keep a "sync from source" action as optional UX.</td>
+</tr>
+<tr>
+<td>Strategy visibility in UI</td>
+<td>If clone-per-user is required, duplicate rows can overwhelm the picker.</td>
+<td>Add a grouped strategy view (<code>source_strategy_id</code> family) in 1.6 UI backlog; default list shows caller-owned rows first, shared templates second.</td>
+</tr>
+<tr>
+<td>Truncate BT tables for <code>strategy_vid</code> reset</td>
+<td>Since trade is not live, bulk reset is the fastest path for one-time cleanup, but must be explicit and non-prod guarded.</td>
+<td>Add a one-off runbook SQL for non-live environments only: <code>TRUNCATE BT.PROMOTION, BT.RESULT, BT.QUEUE, BT.STRATEGY;</code> with pre/post row-count checks. Do not use as routine ops after live starts.</td>
+</tr>
+<tr>
+<td>Dry-run value</td>
+<td>Dry-run is still required: it validates credentials, product mapping, sizing, and payload shape before any live order path. Skipping now increases live-apply risk and support burden.</td>
+<td>Keep 1.3 mandatory before 1.7. Allow a "fast path" only for paper mode if dry-run succeeded for the same deployment version recently.</td>
+</tr>
+<tr>
+<td>Bybit field coverage (<code>EXECUTION_EVENT</code> / <code>TRANSACTION</code>)</td>
+<td>Most core fields are available at submit/fill time, but lifecycle/status details may arrive asynchronously.</td>
+<td>In 1.8, write available fields immediately; leave nullable fields null; in 2.1/2.2 reconcile, backfill by <code>vendor_order_id</code> idempotently.</td>
+</tr>
+<tr>
+<td>Reconcile + re-execute when fields missing</td>
+<td>Re-execute should be a controlled follow-up, not part of first release apply loop.</td>
+<td>Keep as later-stage work under Phase 2 (reconcile first, optional remediation action second).</td>
+</tr>
+<tr>
+<td>AWS event scheduler effort</td>
+<td>Moderate if using EventBridge + ECS/Fargate; low if starting with host-local scheduler.</td>
+<td>For speed to value: start with EC2 cron/systemd timer in 2.2; move to EventBridge scheduler when trade worker isolation/scaling becomes necessary.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Plan delta summary</strong></p>
+<ul>
+<li>1.6 now includes clone-on-select workflow (when owner differs).</li>
+<li>1.7 now hard-requires INST mapping preflight and dry-run gate.</li>
+<li>1.8 writes partial execution payloads; 2.x reconcile owns completion/backfill.</li>
+<li>2.4 starts with Telegram, but notifier abstraction is required so Slack can be plugged in later.</li>
+<li>BT truncate is treated as a one-off pre-live reset runbook, not a standing data-management strategy.</li>
+</ul>
+<hr />
+<h2 id="6-infrastructure-ops">6. Infrastructure &amp; ops<a class="headerlink" href="#6-infrastructure-ops" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>EC2 + Docker</strong></td>
+<td>Measure CPU/mem before adding trade container alongside API + worker + Redis</td>
+</tr>
+<tr>
+<td><strong>ECR step 1</strong></td>
+<td><strong>Done</strong> — <code>quant-ecr</code> stack, repos <code>quant-app</code> / <code>quant-nginx</code>, EC2 ECR read, CI IAM</td>
+</tr>
+<tr>
+<td><strong>ECR pipeline</strong></td>
+<td><strong>Done</strong> — compose + CI push/pull + selective deploy; see <a href="../../architecture/infrastructure/#cicd-github-actions">infrastructure.md</a></td>
+</tr>
+<tr>
+<td><strong>Existing stack</strong></td>
+<td>See <a href="../../architecture/infrastructure/">Infrastructure</a>, <a href="../../architecture/dev-vs-prod/">Dev vs Prod</a></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-work-breakdown-maps-to-subphases">7. Work breakdown (maps to subphases)<a class="headerlink" href="#7-work-breakdown-maps-to-subphases" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Subphase</th>
+<th>Work item (summary)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>0.1</strong></td>
+<td>Walk-forward sign-off on live candidate (<code>quant.cli --walk-forward</code>)</td>
+</tr>
+<tr>
+<td><strong>0.2</strong></td>
+<td>EC2 + Docker capacity snapshot</td>
+</tr>
+<tr>
+<td><strong>0.3</strong></td>
+<td>ECR / separate-host decision → decisions log</td>
+</tr>
+<tr>
+<td><strong>1.1</strong></td>
+<td><code>CORE_ADMIN.API_CREDENTIAL</code> + SPs + <code>/api/v1/credentials</code> (Fernet, <code>APP_ID</code>, soft-version)</td>
+</tr>
+<tr>
+<td><strong>1.2</strong></td>
+<td><code>TRADE.DEPLOYMENT</code> / <code>EXECUTION_EVENT</code> / <code>TRANSACTION</code> + apply endpoint (no <code>INTENT</code>)</td>
+</tr>
+<tr>
+<td><strong>1.3</strong></td>
+<td>Bybit adapter dry-run — golden harness: <code>scripts/bybit_local_testnet.py --suite</code></td>
+</tr>
+<tr>
+<td><strong>1.4</strong></td>
+<td>Trade tab shell + sidebar routes + multi-broker filter toolbar</td>
+</tr>
+<tr>
+<td><strong>1.5</strong></td>
+<td>Exchange config UI — accounts table + credentials API wiring</td>
+</tr>
+<tr>
+<td><strong>1.6</strong></td>
+<td>Strategy picker — <code>GET /api/v1/strategies</code> + <code>StrategyPicker</code> (reads <code>BT.STRATEGY</code>; not Backtest config UI)</td>
+</tr>
+<tr>
+<td><strong>1.7</strong></td>
+<td>Live apply (dry-run → apply)</td>
+</tr>
+<tr>
+<td><strong>1.8</strong></td>
+<td>Execution log UI + <code>TRADE.EXECUTION_EVENT</code> writes</td>
+</tr>
+<tr>
+<td><strong>1.9</strong></td>
+<td>Scheduler (EventBridge + Lambda) + <code>MARKET_DATA.PRICE_BAR</code> — see <a href="../scheduler-price-bars/">scheduler-price-bars.md</a></td>
+</tr>
+<tr>
+<td><strong>2.1</strong></td>
+<td>Reconcile snapshot schema + SP</td>
+</tr>
+<tr>
+<td><strong>2.2</strong></td>
+<td>Daily Sharpe reconcile job</td>
+</tr>
+<tr>
+<td><strong>2.3</strong></td>
+<td>Reconcile chart (Trade top-right)</td>
+</tr>
+<tr>
+<td><strong>2.4</strong></td>
+<td>Telegram error notifier + user chat id</td>
+</tr>
+<tr>
+<td><strong>2.5</strong></td>
+<td>Heartbeat / silent-failure alerts</td>
+</tr>
+<tr>
+<td><strong>3.1</strong></td>
+<td>Top nav Backtest | Trade</td>
+</tr>
+<tr>
+<td><strong>3.2</strong></td>
+<td>Strategy summary columns + rank cache job</td>
+</tr>
+<tr>
+<td><strong>3.3</strong></td>
+<td>Best strategy banner</td>
+</tr>
+<tr>
+<td><strong>3.4</strong></td>
+<td>Backtest side nav + configure placement</td>
+</tr>
+<tr>
+<td><strong>3.5</strong></td>
+<td>Compact queue table + enlarge</td>
+</tr>
+<tr>
+<td><strong>3.6</strong></td>
+<td>Job / strategy detail drawer + <code>?job=</code></td>
+</tr>
+<tr>
+<td><strong>3.7</strong></td>
+<td>Trade worker ECR / separate host (if 0.3 requires)</td>
+</tr>
+</tbody>
+</table>
+<p>Detailed tasks and exit criteria for each row are in <a href="#2-phased-roadmap">§2 Phased Roadmap</a>.</p>
+<hr />
+<h2 id="8-open-decisions">8. Open decisions<a class="headerlink" href="#8-open-decisions" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Question</th>
+<th>Options / notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>Backtest side nav taxonomy</strong></td>
+<td>See §4.1 options A/B/C</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>What to store per optimization</strong></td>
+<td>Full equity curve vs summary stats only</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Sharpe reconcile storage</strong></td>
+<td>Daily snapshot table vs rolling window materialized view</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>ECR cutover for TRADE</strong></td>
+<td><strong>Resolved (0.3):</strong> <strong>ECR now</strong> — see <a href="../../architecture/infrastructure/#cicd-github-actions">infrastructure.md § CI/CD</a>.</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Silent failure policy</strong></td>
+<td>Heartbeat table, external uptime, exchange position reconcile</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Exchange limit detection</strong></td>
+<td>Post-MVP per exchange</td>
+</tr>
+</tbody>
+</table>
+<p>Record resolutions in <a href="../../decisions/">Decisions log</a> when agreed.</p>
+<hr />
+<h2 id="9-out-of-scope-ideas-captured-not-roadmap">9. Out of scope (ideas captured, not roadmap)<a class="headerlink" href="#9-out-of-scope-ideas-captured-not-roadmap" title="Permanent link">&para;</a></h2>
+<p>Notes mentioned alternative profit paths (e.g. horse racing, Poisson/Bernoulli models with small <em>n</em>). These are <strong>not</strong> part of this codebase roadmap unless explicitly promoted later.</p>
+<hr />
+<h2 id="10-related-documentation">10. Related documentation<a class="headerlink" href="#10-related-documentation" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Doc</th>
+<th>Relevance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../trade-api/">Trade API</a></td>
+<td>Strategy JSON, deployment, adapters, risk checks</td>
+</tr>
+<tr>
+<td><a href="../futu-trading/">Futu Trading (OOP)</a></td>
+<td>Futu adapter class design, OpenD, implementation phases</td>
+</tr>
+<tr>
+<td><a href="../backtest-queue/">Backtest Queue</a></td>
+<td>Queue states, worker, jobs API</td>
+</tr>
+<tr>
+<td><a href="../jobs-table-detail-ux/">Jobs Table Detail UX</a></td>
+<td>Drawer / <code>?job=</code> deep links</td>
+</tr>
+<tr>
+<td><a href="../../architecture/database/">Database</a></td>
+<td><code>BT.*</code>, planned <code>TRADE.*</code></td>
+</tr>
+<tr>
+<td><a href="../../architecture/frontend/">Frontend</a></td>
+<td>React SPA structure</td>
+</tr>
+<tr>
+<td><a href="../../guides/trading/">Paper Trading guide</a></td>
+<td>Existing Futu utility (pattern reference)</td>
+</tr>
+<tr>
+<td><a href="../../archive/deploy-build-pipeline/">Deploy Build Pipeline</a></td>
+<td>ECR history — <strong>live ops:</strong> <a href="../../architecture/infrastructure/#cicd-github-actions">infrastructure.md</a></td>
+</tr>
+<tr>
+<td><a href="../scheduler-price-bars/">Scheduler &amp; Price Bars</a></td>
+<td>EventBridge scheduler, <code>MARKET_DATA.PRICE_BAR</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="11-success-criteria">11. Success criteria<a class="headerlink" href="#11-success-criteria" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Milestone</th>
+<th>Subphases</th>
+<th>Definition of done</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>M1 — Pipeline</strong></td>
+<td>1.1 – 1.9 (after 0.x)</td>
+<td>User configures Bybit credentials, selects a backtested strategy, dry-runs, applies live, sees transactions in UI, and deployments execute on a recurring schedule</td>
+</tr>
+<tr>
+<td><strong>M2 — Proof</strong></td>
+<td>2.1 – 2.5</td>
+<td>Daily Sharpe reconcile visible; Telegram on failure; no silent 24h outage without alert</td>
+</tr>
+<tr>
+<td><strong>M3 — Product</strong></td>
+<td>3.1 – 3.6 (+ 3.7 if needed)</td>
+<td>Backtest + Trade tabs with side nav, ranked best strategy, compact queue with enlarge/detail</td>
+</tr>
+</tbody>
+</table>
+<p>When <strong>M1</strong> is reached (subphases <strong>1.7</strong> + <strong>1.8</strong> + <strong>1.9</strong>), the project has a <strong>closed loop</strong> from research → execution → audit — the minimum bar for “plan to profit.”</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>

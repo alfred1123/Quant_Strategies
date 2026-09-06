@@ -1,0 +1,3779 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/architecture/infrastructure/">
+      
+      
+        <link rel="prev" href="../refdata-cache/">
+      
+      
+        <link rel="next" href="../dev-vs-prod/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Infrastructure - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#infrastructure" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Infrastructure
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../design/backtest-queue/" class="md-tabs__link">
+          
+  
+  
+  Design Docs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../archive/" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#directory-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Directory layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stacks-deployment-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stacks (deployment order)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deploying" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploying
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deploying">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#first-time-bootstrap-secrets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First time — bootstrap secrets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deploy-all-stacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy all stacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deploy-a-single-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy a single stack
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#updating" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updating
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#existing-infrastructure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Existing infrastructure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ssm-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SSM parameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trade-scheduler-eventbridge-lambda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trade scheduler (EventBridge + Lambda)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Trade scheduler (EventBridge + Lambda)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deploying_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploying
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scheduling-from-the-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduling from the UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs-to-use-from-the-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outputs to use from the app
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tearing-down" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tearing down
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cicd-github-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI/CD — GitHub Actions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CI/CD — GitHub Actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#docs-workflow-the-mermaid-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docs workflow — the mermaid gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-the-build-runs-on-arm64" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the build runs on arm64
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployment-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment logic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#github-setup-one-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub setup (one-time)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#approving-a-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approving a migration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bootstrap-the-ec2-one-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bootstrap the EC2 (one-time)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-deploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual deploy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#troubleshooting-disk-full-on-deploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting — disk full on deploy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-ecs-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future: ECS migration
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/best-vid-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/live-order-execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/market-data-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/plan-to-profit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#directory-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Directory layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stacks-deployment-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stacks (deployment order)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deploying" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploying
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deploying">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#first-time-bootstrap-secrets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First time — bootstrap secrets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deploy-all-stacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy all stacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deploy-a-single-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy a single stack
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#updating" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updating
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#existing-infrastructure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Existing infrastructure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ssm-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SSM parameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trade-scheduler-eventbridge-lambda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trade scheduler (EventBridge + Lambda)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Trade scheduler (EventBridge + Lambda)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deploying_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploying
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scheduling-from-the-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduling from the UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs-to-use-from-the-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outputs to use from the app
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tearing-down" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tearing down
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cicd-github-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI/CD — GitHub Actions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CI/CD — GitHub Actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#docs-workflow-the-mermaid-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docs workflow — the mermaid gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-the-build-runs-on-arm64" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the build runs on arm64
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployment-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment logic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#github-setup-one-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub setup (one-time)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#approving-a-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approving a migration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bootstrap-the-ec2-one-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bootstrap the EC2 (one-time)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-deploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual deploy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#troubleshooting-disk-full-on-deploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting — disk full on deploy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-ecs-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future: ECS migration
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="infrastructure">Infrastructure<a class="headerlink" href="#infrastructure" title="Permanent link">&para;</a></h1>
+<p>Infrastructure as Code for the Quant Strategies deployment.
+All resources are defined as CloudFormation templates under <code>aws/cfn/</code>
+and deployed via the AWS CLI.</p>
+<p>See <a href="../overview/">System Overview</a> for runtime topology and <a href="../dev-vs-prod/">Dev vs Prod</a> for environment differences.</p>
+<hr />
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>                        ┌──────────────┐
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                        │   Internet   │
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                        └──────┬───────┘
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>                               │  HTTP :80  (HTTPS :443 with TLS overlay)
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                               ▼
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                   ┌───────────────────────┐
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                   │   EC2  (t4g.medium)   │
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                   │                       │
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                   │  ┌─────────────────┐  │
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>                   │  │  nginx          │  │  SPA (ECR quant-nginx)
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>                   │  │  :80 → api:8000 │  │
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>                   │  └────────┬────────┘  │
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                   │           │           │
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>                   │  ┌────────▼────────┐  │
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>                   │  │  api + worker   │  │  FastAPI + queue worker (ECR quant-app)
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>                   │  │  redis          │  │
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>                   │  └────────┬────────┘  │
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                   │           │           │
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>                   └───────────┼───────────┘
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>                               │  VPC direct :5432
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>                               ▼
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>                   ┌───────────────────────┐
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>                   │  Aurora Serverless v2  │
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>                   │  PostgreSQL 17.9       │
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>                   │  0.5 – 2.0 ACU        │
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>                   └───────────────────────┘
+</code></pre></div>
+<p>SSM Parameter Store supplies secrets (<code>JWT_SECRET</code>, <code>EXCHANGE_SECRETS_KEY</code>, DB credentials) at app startup.</p>
+<p>The base <code>docker-compose.yml</code> exposes nginx on <strong>:80</strong> (HTTP, using <code>nginx.dev.conf</code>). For HTTPS there are two overlays:</p>
+<ul>
+<li><strong><code>docker-compose.cloudflare.yml</code></strong> — production default. Site sits behind Cloudflare (orange cloud) with a <strong>Cloudflare Origin Certificate</strong> terminating TLS at nginx (<code>nginx.cloudflare.conf</code>, <code>:443</code>). Wired automatically by the deploy pipeline when the <code>DOMAIN</code> GitHub variable and <code>/quant/prod/ORIGIN_TLS_CERT</code> + <code>ORIGIN_TLS_KEY</code> SSM params are present. See <a href="../../guides/https-cloudflare/">HTTPS via Cloudflare</a>.</li>
+<li><strong><code>docker-compose.tls.yml</code></strong> — alternative for a DNS-only (grey cloud) / no-CDN setup. Swaps in <code>nginx.conf</code> and adds <strong>:443</strong> with Let's Encrypt (certbot).</li>
+</ul>
+<hr />
+<h2 id="directory-layout">Directory layout<a class="headerlink" href="#directory-layout" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>aws/
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── import-db-resources.json   ← resource mapping used during Aurora import
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├── deploy.sh                  ← deploy / update all stacks
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├── cfn/
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>│   ├── 00-ecr.yml             ← ECR repos quant-app, quant-nginx
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>│   ├── 01-network.yml         ← security groups (EC2 + RDS)
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>│   ├── 02-database.yml        ← Aurora PostgreSQL Serverless v2
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>│   ├── 03-compute.yml         ← EC2 + IAM role + EIP
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>│   └── 04-scheduler.yml       ← EventBridge Scheduler + scheduled-task Lambda
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>├── lambda/
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>│   └── scheduled-task/        ← Lambda handler (uploaded by deploy.sh)
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>├── params/
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>│   └── prod.json              ← parameter values for prod
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>├── iam/
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>│   ├── github-deploy-cfn-policy.json   ← CFN deploy via GitHub Actions
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>│   ├── github-deploy-policy.json       ← SSM Run Command deploy
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>│   └── github-deploy-ecr-policy.json   ← ECR push (attach before workflow step 3)
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>└── scripts/
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    ├── bootstrap-ec2.sh     ← one-time EC2 setup
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    ├── init-ssm-params.sh   ← bootstrap SSM secrets (run once)
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    └── capacity_snapshot.sh ← Phase 0.2 host CPU/mem capture
+</code></pre></div>
+<hr />
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>AWS CLI v2</strong> installed and authenticated (<code>aws sso login --profile &lt;profile&gt;</code>)</li>
+<li><strong>EC2 key pair</strong> created in the target region (current: <code>tradingServerKey</code>)</li>
+<li><strong>Domain name</strong> (optional but recommended for TLS)</li>
+</ol>
+<hr />
+<h2 id="stacks-deployment-order">Stacks (deployment order)<a class="headerlink" href="#stacks-deployment-order" title="Permanent link">&para;</a></h2>
+<p>Stacks must be deployed in order due to cross-stack references.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Stack</th>
+<th>Template</th>
+<th>Creates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td><code>quant-ecr</code></td>
+<td><code>00-ecr.yml</code></td>
+<td>ECR repos <code>quant-app</code>, <code>quant-nginx</code></td>
+</tr>
+<tr>
+<td>1</td>
+<td><code>quant-network</code></td>
+<td><code>01-network.yml</code></td>
+<td>EC2 SG (22/80/443), RDS SG (5432 from EC2 only)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>quant-database</code></td>
+<td><code>02-database.yml</code></td>
+<td>Aurora cluster, serverless instance, DB subnet group</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>quant-compute</code></td>
+<td><code>03-compute.yml</code></td>
+<td>EC2 instance, IAM role (SSM access), Elastic IP</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>quant-scheduler</code></td>
+<td><code>04-scheduler.yml</code></td>
+<td>scheduled-task Lambda, EventBridge schedule group, invoke + EC2 manage IAM</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="deploying">Deploying<a class="headerlink" href="#deploying" title="Permanent link">&para;</a></h2>
+<h3 id="first-time-bootstrap-secrets">First time — bootstrap secrets<a class="headerlink" href="#first-time-bootstrap-secrets" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Set up SSM parameters (prompts for DB password and JWT secret)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>bash<span class="w"> </span>aws/scripts/init-ssm-params.sh
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Prod only — add Fernet key for exchange credentials (required for API boot)</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>aws<span class="w"> </span>ssm<span class="w"> </span>put-parameter<span class="w"> </span>--name<span class="w"> </span>/quant/prod/EXCHANGE_SECRETS_KEY<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span>--value<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'</span><span class="k">)</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span>--type<span class="w"> </span>SecureString<span class="w"> </span>--region<span class="w"> </span>ap-southeast-1
+</code></pre></div>
+<h3 id="deploy-all-stacks">Deploy all stacks<a class="headerlink" href="#deploy-all-stacks" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Validate templates first (no changes)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>bash<span class="w"> </span>aws/deploy.sh<span class="w"> </span>all<span class="w"> </span>--dry-run
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Deploy everything</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>bash<span class="w"> </span>aws/deploy.sh
+</code></pre></div>
+<h3 id="deploy-a-single-stack">Deploy a single stack<a class="headerlink" href="#deploy-a-single-stack" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>bash<span class="w"> </span>aws/deploy.sh<span class="w"> </span>network
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>bash<span class="w"> </span>aws/deploy.sh<span class="w"> </span>database
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>bash<span class="w"> </span>aws/deploy.sh<span class="w"> </span>compute
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>bash<span class="w"> </span>aws/deploy.sh<span class="w"> </span>scheduler<span class="w">   </span><span class="c1"># normally CI; requires /quant/prod/TRADE_SERVICE_TOKEN in SSM</span>
+</code></pre></div>
+<h3 id="updating">Updating<a class="headerlink" href="#updating" title="Permanent link">&para;</a></h3>
+<p>Re-run <code>bash aws/deploy.sh &lt;stack&gt;</code>. CloudFormation creates a changeset
+and only modifies what changed. <code>--no-fail-on-empty-changeset</code> ensures
+the script succeeds even when nothing needs updating.</p>
+<hr />
+<h2 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h2>
+<p>All stack parameters have defaults. Override per-environment via <code>params/&lt;env&gt;.json</code>.</p>
+<p>Key parameters to review in <code>params/prod.json</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Current</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>InstanceType</code></td>
+<td><code>t4g.medium</code></td>
+<td>Graviton ARM (4 GiB, ~$14/mo reserved)</td>
+</tr>
+<tr>
+<td><code>AmiId</code></td>
+<td>Latest AL2023 ARM</td>
+<td><code>al2023-ami-kernel-default-arm64</code> (auto-resolved via SSM)</td>
+</tr>
+<tr>
+<td><code>SshCidr</code></td>
+<td><code>0.0.0.0/0</code></td>
+<td>Restrict to your IP for production</td>
+</tr>
+<tr>
+<td><code>MinACU</code> / <code>MaxACU</code></td>
+<td>0.5 / 2.0</td>
+<td>Aurora scaling range (cost vs headroom)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="existing-infrastructure">Existing infrastructure<a class="headerlink" href="#existing-infrastructure" title="Permanent link">&para;</a></h2>
+<p>The templates codify the current live setup. If deploying fresh,
+they produce an equivalent environment. The following resources are
+managed by CloudFormation:</p>
+<table>
+<thead>
+<tr>
+<th>Stack</th>
+<th>Resource</th>
+<th>Live ID</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>—</td>
+<td>VPC</td>
+<td><code>vpc-06e76bd6f283ed4a4</code></td>
+<td>Default VPC (not managed by CFN)</td>
+</tr>
+<tr>
+<td><code>quant-network</code></td>
+<td>EC2 SG</td>
+<td><code>sg-0c48c9010eaf84372</code></td>
+<td>Web + SSH</td>
+</tr>
+<tr>
+<td><code>quant-network</code></td>
+<td>RDS SG</td>
+<td><code>sg-0278c603461bbf8fa</code></td>
+<td>Postgres from EC2 only</td>
+</tr>
+<tr>
+<td><code>quant-database</code></td>
+<td>Aurora cluster</td>
+<td><code>quantdb-cluster</code></td>
+<td>Imported; Serverless v2, 0.5–2.0 ACU</td>
+</tr>
+<tr>
+<td><code>quant-compute</code></td>
+<td>EC2</td>
+<td><em>(resolve via CFN <code>InstanceId</code> output)</em></td>
+<td><code>quant-server</code>, t4g.medium ARM, 30 GiB root</td>
+</tr>
+<tr>
+<td><code>quant-compute</code></td>
+<td>IAM role</td>
+<td><code>quant-ec2-role</code></td>
+<td>SSM access</td>
+</tr>
+<tr>
+<td><code>quant-compute</code></td>
+<td>EIP</td>
+<td><em>(resolve via CFN <code>PublicIp</code> output)</em></td>
+<td>Static public IP</td>
+</tr>
+<tr>
+<td>—</td>
+<td>Key pair</td>
+<td><code>tradingServerKey</code></td>
+<td>SSH access (not managed by CFN)</td>
+</tr>
+</tbody>
+</table>
+<p>Instance and EIP IDs change when the compute stack replaces EC2 — resolve at
+runtime from <code>quant-compute</code> outputs (<code>InstanceId</code>, <code>PublicIp</code>). See
+<a href="../dev-vs-prod/#resolve-the-current-prod-ec2-instance-id">Dev vs Prod — resolve instance ID</a>.</p>
+<hr />
+<h2 id="ssm-parameters">SSM parameters<a class="headerlink" href="#ssm-parameters" title="Permanent link">&para;</a></h2>
+<p>All app secrets live under <code>/quant/&lt;env&gt;/</code> in SSM Parameter Store.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>QUANTDB_HOST</code></td>
+<td>String</td>
+<td>Aurora cluster endpoint</td>
+</tr>
+<tr>
+<td><code>QUANTDB_PORT</code></td>
+<td>String</td>
+<td><code>5432</code></td>
+</tr>
+<tr>
+<td><code>QUANTDB_USERNAME</code></td>
+<td>SecureString</td>
+<td>DB admin user</td>
+</tr>
+<tr>
+<td><code>QUANTDB_PASSWORD</code></td>
+<td>SecureString</td>
+<td>DB admin password</td>
+</tr>
+<tr>
+<td><code>JWT_SECRET</code></td>
+<td>SecureString</td>
+<td><code>openssl rand -base64 32</code></td>
+</tr>
+<tr>
+<td><code>EXCHANGE_SECRETS_KEY</code></td>
+<td>SecureString</td>
+<td>Fernet key for <code>CORE_ADMIN.API_CREDENTIAL</code> — <strong>required in prod</strong> (<code>CredentialCrypto</code> fail-fast at API boot)</td>
+</tr>
+<tr>
+<td><code>ORIGIN_TLS_CERT</code></td>
+<td>SecureString</td>
+<td>Cloudflare Origin Certificate (PEM) — written to <code>secrets/origin.pem</code> by the deploy job when <code>DOMAIN</code> is set</td>
+</tr>
+<tr>
+<td><code>ORIGIN_TLS_KEY</code></td>
+<td>SecureString</td>
+<td>Cloudflare Origin private key (PEM) — written to <code>secrets/origin-key.pem</code>; enables the <code>docker-compose.cloudflare.yml</code> overlay</td>
+</tr>
+<tr>
+<td><code>CLOUDFLARE_API_TOKEN</code></td>
+<td>SecureString</td>
+<td>Zone → DNS → Edit token for <code>aws/scripts/cloudflare-dns.sh</code> (DNS record management)</td>
+</tr>
+<tr>
+<td><code>CORS_ORIGINS</code></td>
+<td>String</td>
+<td><code>https://yourdomain.com</code></td>
+</tr>
+<tr>
+<td><code>FUTU_HOST</code></td>
+<td>String</td>
+<td><code>127.0.0.1</code></td>
+</tr>
+<tr>
+<td><code>FUTU_PORT</code></td>
+<td>String</td>
+<td><code>11111</code></td>
+</tr>
+<tr>
+<td><code>TRADE_SERVICE_TOKEN</code></td>
+<td>SecureString</td>
+<td>Shared secret for Lambda → API scheduled apply (auto-created by <code>init-ssm-params.sh</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>The app loads these at startup via <code>quant/shared/config.py</code> when <code>USE_SSM=1</code>.</p>
+<p><strong>Note:</strong> <code>JWT_SECRET</code> must be the same across all app instances sharing
+a database — otherwise JWTs minted by one instance cannot be verified
+by another. <code>EXCHANGE_SECRETS_KEY</code> must also be stable — rotating it
+invalidates all stored credential ciphertext until users re-save keys.</p>
+<hr />
+<h2 id="trade-scheduler-eventbridge-lambda">Trade scheduler (EventBridge + Lambda)<a class="headerlink" href="#trade-scheduler-eventbridge-lambda" title="Permanent link">&para;</a></h2>
+<p>Phase 1.9 AWS side — see <a href="../../design/scheduler-price-bars/">Scheduler &amp; Price Bars</a>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>EventBridge Scheduler (one schedule per task, not per deployment)
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>        │  cron, event {"task": "trade_apply_tick",
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>        │               "path": "/api/v1/scheduler/tick"}   ← both from the YAML
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>        ▼
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>quant-scheduled-task Lambda ──POST──►  https://algodaemon.com/api/v1/scheduler/tick
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        │                              Authorization: Bearer TRADE_SERVICE_TOKEN
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        ▼                              (token fetched from SSM at Lambda cold start)
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>FastAPI on EC2 (every due deployment: bars → signal → order)
+</code></pre></div>
+<p>The Lambda is a <strong>generic bridge</strong>: the schedule's event carries both the task
+name and the path to post to, so a new job is a YAML file in <code>config/scheduler/</code>
+and nothing else — no handler change, no Lambda redeploy, no stack change.</p>
+<p>Each row below is one file in <code>config/scheduler/</code>, which declares the <code>task</code>,
+the <code>path</code>, the cron expression and whether it is enabled:</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Schedule</th>
+<th>Endpoint</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>trade_apply_tick</code></td>
+<td><code>cron(5 * * * ? *)</code></td>
+<td><code>/api/v1/scheduler/tick</code></td>
+<td>Apply every due deployment, all intervals</td>
+</tr>
+<tr>
+<td><code>log_proc_summary</code></td>
+<td><code>cron(15 23 ? * SAT *)</code></td>
+<td><code>/api/v1/admin/log-proc-summary/summarize</code></td>
+<td>Aggregate <code>LOG_PROC_DETAIL</code> into daily summaries</td>
+</tr>
+<tr>
+<td><code>price_bar_sync</code></td>
+<td><code>cron(0 * * * ? *)</code></td>
+<td><code>/api/v1/market-data/price-bars/sync</code></td>
+<td>Warm <code>MARKET_DATA.PRICE_BAR</code> for scheduled deployments</td>
+</tr>
+</tbody>
+</table>
+<p>No path takes substitution fields, and none points at
+<code>/trade/deployments/{id}/apply</code>. That route requires a human — it trades on the
+caller's own account — so a schedule aimed at it could only ever 401. The tick
+resolves each deployment's owner from the database instead, which is what lets
+one schedule serve every deployment.</p>
+<p>Two things have to agree for a job to run: the <code>path</code> in the YAML and the route
+FastAPI serves. A mismatch only shows up when the schedule fires, as a 404 on a
+tick that is not retried, so <code>tests/unit/test_scheduled_task_paths.py</code> checks
+every declared path against the routers behind the service-token gate, along
+with the properties above.</p>
+<div class="admonition note">
+<p class="admonition-title">Why the path lives in the config, not the Lambda</p>
+<p>It used to be a <code>_TASK_PATHS</code> map in <code>handler.py</code>, which made three files
+have to agree instead of two — and the map was a second copy of what the
+YAML already implied, kept in step only by that test. The handler now takes
+the path from the event and holds no task knowledge, so a job can be added
+or repointed without touching Lambda code.</p>
+<p>That map doubled as an allowlist of paths the service token could reach. The
+real control is the API's own gate: <code>require_user_or_service</code> admits the
+service token on exactly three routers, and anything acting on a user's
+account requires a human token and refuses the Lambda regardless of path.
+The handler still rejects a <code>path</code> that is a URL rather than an absolute
+path, so an event cannot redirect the token to another host.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title"><code>price_bar_sync</code> at :00; <code>trade_apply_tick</code> at :05</p>
+<p>The two jobs are staggered on purpose. Summarisation runs at <code>:15</code> on
+Saturdays to stay clear of deployments and container restarts. The bar warmer
+fires at <code>:00</code> and <code>BarWarmer</code> sleeps <code>DEFAULT_SETTLE_S</code> (10s) before reading
+the clock — that pause lets the exchange finish publishing the candle that
+just closed and keeps an early delivery from making <code>floor_to_period</code> land a
+period back on a bar already stored.</p>
+<p>Apply runs at <code>:05</code> so the warm usually finishes first. A pass that runs
+after applies have fetched their own bars has done nothing for warming, but
+overlap is safe — the bar insert treats a unique violation as a concurrent
+write. Hourly cadence serves the <code>1H</code> interval; <code>DAILY</code> instruments are
+swept on every warm pass too and cost one coverage read each, returning
+immediately once the bar is stored.</p>
+</div>
+<p><code>trade_apply_tick</code> waits <code>ScheduleSweeper.DEFAULT_SETTLE_S</code> (10s) after the
+<code>:05</code> delivery before asking what is due — a cursor sitting exactly on the
+boundary would answer "not yet" to a delivery a few milliseconds early and then
+wait a whole interval.</p>
+<p><strong>Prod only.</strong> Dev boxes run an in-process poller inside FastAPI that supplies
+the same wakeups on a timer — no EventBridge, Lambda, or service token. Both
+drivers run the identical pass (<code>ScheduleSweeper</code>). See
+<a href="../../design/scheduler-price-bars/#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment">Scheduler design §6.2</a>.</p>
+<p><strong>Slack + mainnet promotion:</strong> when to move alerts to prod ops and orders to Bybit mainnet —
+<a href="../../guides/live-trading-promotion/">Live Trading Promotion</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Name</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Schedule group (tasks)</td>
+<td><code>quant-system-jobs</code></td>
+<td>Task schedules from <code>config/scheduler/</code> — written by <code>scripts/sync_schedules.py</code></td>
+</tr>
+<tr>
+<td>Schedule group (legacy)</td>
+<td><code>quant-trade-deployments</code></td>
+<td>Created by CFN; per-deployment schedules were dropped in favour of the platform tick</td>
+</tr>
+<tr>
+<td>Lambda</td>
+<td><code>quant-scheduled-task</code></td>
+<td>Task-routed HTTP bridge (<code>aws/lambda/scheduled-task/handler.py</code>)</td>
+</tr>
+<tr>
+<td>IAM role</td>
+<td><code>quant-scheduler-invoke</code></td>
+<td>Assumed by EventBridge Scheduler to invoke Lambda</td>
+</tr>
+<tr>
+<td>IAM role</td>
+<td><code>quant-scheduled-task-lambda</code></td>
+<td>Lambda execution (CloudWatch Logs + SSM read of <code>TRADE_SERVICE_TOKEN</code>)</td>
+</tr>
+<tr>
+<td>IAM policy</td>
+<td><code>quant-ec2-scheduler-manage</code></td>
+<td>Attached to <code>quant-ec2-role</code> — boto3 create/update/delete schedules</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Schedule retry policy</p>
+<p>Every schedule sets <code>RetryPolicy.MaximumRetryAttempts = 0</code>, in
+<code>scripts/sync_schedules.py</code>. EventBridge Scheduler's default (185 retries
+over 24h) would repeatedly re-invoke a failing trade apply — order-level
+retries live in the API (<code>OrderRetryExecutor</code>), and the scheduler tick's own
+attempt budget decides when to try a deployment again, on the next wakeup
+rather than seconds later.</p>
+<p><code>quant-ec2-scheduler-manage</code> is now only used by that script. Application
+code creates no schedules: deployment create, update and stop write to the
+database alone, so there is no second source of truth to keep in step.</p>
+</div>
+<h3 id="deploying_1">Deploying<a class="headerlink" href="#deploying_1" title="Permanent link">&para;</a></h3>
+<p>The <code>deploy</code> workflow owns this stack, same as the other four. Its <code>cfn</code> job runs
+<code>bash aws/deploy.sh scheduler</code> — CFN, then the Lambda zip upload, then
+<code>scripts/sync_schedules.py</code> — whenever a push to <code>main</code> touches
+<code>aws/cfn/04-scheduler.yml</code>, <code>aws/lambda/scheduled-task/**</code>, <code>aws/deploy.sh</code>, or
+<code>config/scheduler/**</code>. A manual <strong>Run workflow</strong> deploys it unconditionally,
+which is how you redeploy without an infra commit.</p>
+<p>Running it by hand needs <code>boto3</code> and <code>pyyaml</code> importable by the <code>python3</code> on
+your PATH — <code>sync_schedules.py</code> is invoked as a plain script, so having them in
+the repo's <code>env/</code> does not count. The deploy checks this before touching
+CloudFormation and tells you what to install. The Lambda package itself is built
+with the standard library (<code>python3 -m zipfile</code>), so no <code>zip</code> binary is needed
+on the runner or the host.</p>
+<p>One bootstrap step still needs admin credentials, because the GitHub deploy user
+can read SSM but not write it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Once per environment — the deploy fails with instructions if it is missing.</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>aws<span class="w"> </span>ssm<span class="w"> </span>put-parameter<span class="w"> </span>--name<span class="w"> </span>/quant/prod/TRADE_SERVICE_TOKEN<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--value<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>openssl<span class="w"> </span>rand<span class="w"> </span>-base64<span class="w"> </span><span class="m">32</span><span class="k">)</span><span class="s2">"</span><span class="w"> </span>--type<span class="w"> </span>SecureString<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>--region<span class="w"> </span>ap-southeast-1
+</code></pre></div>
+<p>The API host picks the same value up automatically: it runs with <code>USE_SSM=1</code>,
+and <code>load_config()</code> loads every parameter under <code>/quant/prod/</code> into the
+environment, where <code>require_user_or_service</code> reads it.</p>
+<p>Smoke-test the Lambda directly once the stack is up:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>aws<span class="w"> </span>lambda<span class="w"> </span>invoke<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--function-name<span class="w"> </span>quant-scheduled-task<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>--payload<span class="w"> </span><span class="s1">'{"task":"log_proc_summary"}'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>--cli-binary-format<span class="w"> </span>raw-in-base64-out<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>/tmp/out.json<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cat<span class="w"> </span>/tmp/out.json
+</code></pre></div>
+<h3 id="scheduling-from-the-ui">Scheduling from the UI<a class="headerlink" href="#scheduling-from-the-ui" title="Permanent link">&para;</a></h3>
+<p>Deployments can be put on a schedule from <strong><code>DeploymentDialog</code></strong> (create) or
+<strong><code>ScheduleCell</code></strong> (inline edit on the deployments table). Manual is the default;
+the hourly platform tick (<code>trade_apply_tick</code>) picks up any non-null schedule.
+Platform schedulers (<code>price_bar_sync</code>, <code>trade_apply_tick</code>) need no separate toggle.
+See <a href="../../design/scheduler-price-bars/#31-product-ux-how-scheduling-is-enabled">scheduler design §3.1</a>.</p>
+<p>Per-deployment EventBridge schedules were dropped in favour of the platform tick
+(<a href="../../design/scheduler-price-bars/#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment">scheduler design §6.2</a>).
+The service token is accepted by the <code>admin</code>, <code>market_data</code>, and <code>scheduler</code> routers.</p>
+<h3 id="outputs-to-use-from-the-app">Outputs to use from the app<a class="headerlink" href="#outputs-to-use-from-the-app" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>aws<span class="w"> </span>cloudformation<span class="w"> </span>describe-stacks<span class="w"> </span>--stack-name<span class="w"> </span>quant-scheduler<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>--query<span class="w"> </span><span class="s1">'Stacks[0].Outputs'</span><span class="w"> </span>--output<span class="w"> </span>table
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Output</th>
+<th>Used by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ScheduledTaskLambdaArn</code></td>
+<td><code>sync_schedules.py</code> — schedule <code>Target.Arn</code></td>
+</tr>
+<tr>
+<td><code>SchedulerInvokeRoleArn</code></td>
+<td><code>sync_schedules.py</code> — schedule <code>Target.RoleArn</code></td>
+</tr>
+<tr>
+<td><code>ScheduleGroupName</code></td>
+<td><code>sync_schedules.py</code> — <code>GroupName</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="tearing-down">Tearing down<a class="headerlink" href="#tearing-down" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Reverse order — scheduler/compute first, network last</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>aws<span class="w"> </span>cloudformation<span class="w"> </span>delete-stack<span class="w"> </span>--stack-name<span class="w"> </span>quant-scheduler
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>aws<span class="w"> </span>cloudformation<span class="w"> </span>delete-stack<span class="w"> </span>--stack-name<span class="w"> </span>quant-compute
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>aws<span class="w"> </span>cloudformation<span class="w"> </span>delete-stack<span class="w"> </span>--stack-name<span class="w"> </span>quant-database<span class="w">   </span><span class="c1"># DeletionPolicy: Retain</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>aws<span class="w"> </span>cloudformation<span class="w"> </span>delete-stack<span class="w"> </span>--stack-name<span class="w"> </span>quant-network
+</code></pre></div>
+<p>The database stack has <code>DeletionPolicy: Retain</code> — Aurora resources are
+kept even if the stack is deleted (imported resources). <code>DeletionProtection: true</code>
+prevents accidental deletion (disable it manually first if you really mean to).</p>
+<hr />
+<h2 id="cicd-github-actions">CI/CD — GitHub Actions<a class="headerlink" href="#cicd-github-actions" title="Permanent link">&para;</a></h2>
+<p>Push to <code>main</code> triggers an automated deploy pipeline (<code>.github/workflows/deploy.yml</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>push to main → changes (path filter) ─┐
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>               test ──────────────────┤
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>               frontend (build+audit) ─┤
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>                                       ├─→ build-and-push (only changed images)
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>               cfn (infra, parallel) ──┤
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>               migrate (db, gated) ────┘             │
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>                                                      ▼
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>                                                   deploy (SSM: selective pull + up)
+</code></pre></div>
+<p><code>deploy</code> waits on <code>test</code>, <code>cfn</code>, <code>build-and-push</code>, and <code>migrate</code> (the last three may be skipped). <code>build-and-push</code> requires both <code>test</code> <strong>and</strong> <code>frontend</code> to pass.</p>
+<p>The workflow uses <code>paths-ignore</code> for <code>docs/**</code>, <code>*.md</code>, <code>tests/**</code>, <code>scripts/**</code>, <code>.github/skills/**</code>, <code>.github/instructions/**</code>, <code>.cursor/**</code> — pushes touching only ignored paths do <strong>not</strong> trigger the workflow. A push to <code>db/liquidbase/**</code> <strong>does</strong> trigger the workflow (so the <code>migrate</code> job can run). The docs site has its own workflow (<code>.github/workflows/docs.yml</code>).</p>
+<h3 id="docs-workflow-the-mermaid-gate">Docs workflow — the mermaid gate<a class="headerlink" href="#docs-workflow-the-mermaid-gate" title="Permanent link">&para;</a></h3>
+<p><code>docs.yml</code> runs two jobs: <code>mermaid</code>, then <code>deploy</code> (which <code>needs</code> it). The gate
+exists because <strong>a malformed diagram does not fail <code>mkdocs build</code></strong>. MkDocs emits
+the block as <code>&lt;pre class="mermaid"&gt;</code> whatever it contains, <code>mermaid-init.js</code>
+flattens it to raw text, and <code>mermaid.run()</code> only then throws — in the reader's
+browser. The result is the diagram source displayed as a code block, with a green
+build behind it. Two diagrams sat broken in the wiki that way.</p>
+<p><code>scripts/mermaid-check/check.mjs</code> parses every <code>```mermaid</code> fence under
+<code>docs/</code> with the real mermaid parser (via jsdom, since mermaid is a browser
+library) and exits non-zero on the first failure, naming <code>file:line</code>. Run it
+locally the same way CI does:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">cd</span><span class="w"> </span>scripts/mermaid-check<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npm<span class="w"> </span>ci
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>node<span class="w"> </span>scripts/mermaid-check/check.mjs<span class="w"> </span>docs<span class="w">   </span><span class="c1"># from the repo root</span>
+</code></pre></div>
+<p>Parsing the raw fence is faithful to what the browser parses: MkDocs escapes the
+block to entities (<code>--&amp;gt;</code>), but <code>mermaid-init.js</code> reads it back through
+<code>code.textContent</code>, which unescapes them.</p>
+<p>Two syntax traps account for both historical breakages — a <code>;</code> inside a
+sequence-diagram message, which mermaid reads as a statement separator, and a
+bare quoted string where a node id belongs (<code>--&gt;|authed| "Redirect /"</code> rather
+than <code>--&gt;|authed| RedirectHome["Redirect /"]</code>).</p>
+<h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Changes job</strong> — <code>dorny/paths-filter</code> detects which artifacts changed:</li>
+<li><strong>app</strong> — <code>quant/**</code>, <code>Dockerfile</code>, <code>requirements.txt</code>, <code>config/db-targets.json</code></li>
+<li><strong>nginx</strong> — <code>frontend/**</code>, <code>docker/nginx/**</code></li>
+<li><strong>compose</strong> — <code>docker-compose.yml</code>, <code>docker-compose.prod.yml</code>, <code>docker-compose.tls.yml</code>, <code>docker-compose.cloudflare.yml</code></li>
+<li><strong>deploy</strong> — true when any of app / nginx / compose changed (gate for the deploy job)</li>
+<li><strong>db</strong> — <code>db/liquidbase/**</code> (gate for the migrate job)</li>
+<li><strong>Test job</strong> — runs <code>pytest tests/unit/</code> on GitHub's runner (Python 3.12)</li>
+<li><strong>Frontend job</strong> — <code>npm ci</code>, <code>npm audit --audit-level=high</code>, <code>npm run build</code> (type-check + Vite build), <code>npm test</code> on Node 24. Validates the SPA on the runner; a build/audit/test failure blocks <code>build-and-push</code>.</li>
+<li><strong>CFN job</strong> — deploys infra stacks when the matching <code>aws/cfn/**</code> template or relevant <code>aws/params/prod.json</code> keys change (per-stack detection). The <strong>database</strong> stack only deploys when <code>02-database.yml</code> / DB params change and requires the <code>DB_MASTER_PASSWORD</code> secret (it is otherwise guarded by <code>DeletionPolicy=Retain</code>, <code>UpdateReplacePolicy=Snapshot</code>, <code>DeletionProtection=true</code>).</li>
+<li><strong>Build-and-push job</strong> — skipped when neither app nor nginx changed; otherwise builds only the affected image(s) for <code>linux/arm64</code> with GitHub Actions layer cache and pushes to ECR (tags: git SHA + <code>latest</code>). Runs on a native arm64 runner (<code>ubuntu-24.04-arm</code>), so there is no QEMU in the path — see <a href="#why-the-build-runs-on-arm64">Why the build runs on arm64</a>.</li>
+<li><strong>Migrate job</strong> — skipped unless <code>db/liquidbase/**</code> changed; otherwise runs <code>aws/scripts/liquibase-ssm-run.sh deploy &lt;sha&gt;</code> on EC2 with <code>LIQUIBASE_CONTEXTS=prod-deploy</code>. Gated by the <code>production-db</code> environment (see <a href="#approving-a-migration">Approving a migration</a>).</li>
+<li><strong>Deploy job</strong> — skipped when no app/nginx/compose changes; otherwise SSM Run Command runs the inline deploy script (see <a href="#deployment-logic">Deployment logic</a> below). Waits on <code>migrate</code>, so containers never restart ahead of the schema.</li>
+</ol>
+<p><strong>Manual full deploy:</strong> Actions → deploy → Run workflow (<code>workflow_dispatch</code>). Rebuilds both images and deploys regardless of paths. The optional <code>deploy_database</code> input (default off) additionally deploys the RDS stack — leave unchecked unless you intend an Aurora change.</p>
+<p>Rollback: re-run the workflow on an older commit (images tagged by SHA), or redeploy with a previous <code>IMAGE_TAG=&lt;older-git-sha&gt;</code>.</p>
+<p>No SSH keys needed — deploy uses SSM Run Command (same IAM role the EC2 already has).</p>
+<div class="admonition note">
+<p class="admonition-title">Frontend build vs CI check</p>
+<p>The production SPA bundle ships <strong>inside the quant-nginx Docker image</strong> (built in CI for arm64). The separate <code>frontend</code> runner job is a fast <strong>validation gate</strong> (build + <code>npm audit</code> + unit tests) — it does not produce the deployed artifact.</p>
+</div>
+<h3 id="why-the-build-runs-on-arm64">Why the build runs on arm64<a class="headerlink" href="#why-the-build-runs-on-arm64" title="Permanent link">&para;</a></h3>
+<p>The EC2 host is Graviton, so the images must be <code>linux/arm64</code>. That used to be produced by cross-building from an x64 runner under QEMU, which made image builds bimodal: ~1 min when <code>requirements.txt</code> was untouched and BuildKit reused the cached pip layer, but 4–17 min whenever it changed.</p>
+<p>Emulation bought nothing. Every dependency resolves to a prebuilt <code>manylinux_2_28_aarch64</code> wheel, and the only source build (<code>futu-api</code>) finishes in seconds. What QEMU actually slowed down was pip unpacking ~120 wheels and byte-compiling them to <code>.pyc</code> — a single phase that took 288s of an 8m build on 2026-08-11.</p>
+<p>Two changes address it:</p>
+<ul>
+<li><strong><code>runs-on: ubuntu-24.04-arm</code></strong> and no <code>setup-qemu-action</code>. Native arm64 runners are free and unlimited on public repos, with the same 4 vCPU / 16 GB as the x64 ones.</li>
+<li><strong><code>requirements.txt</code> is runtime-only.</strong> <code>pytest</code>, <code>mkdocs-material</code> and <code>pyyaml</code> moved to <code>requirements-dev.txt</code>, which starts with <code>-r requirements.txt</code>. That drops ~18 packages of test and docs tooling (mkdocs, babel, pygments, watchdog, …) out of the API and worker containers — nothing under <code>quant/</code> imports them.</li>
+</ul>
+<p>Install <code>requirements-dev.txt</code> locally; <code>setup.sh</code> and the CI test jobs already do. The <code>Dockerfile</code> installs <code>requirements.txt</code> alone, so a package added there ships to production.</p>
+<h3 id="deployment-logic">Deployment logic<a class="headerlink" href="#deployment-logic" title="Permanent link">&para;</a></h3>
+<p>The <code>deploy</code> job sends one <code>AWS-RunShellScript</code> SSM command to the EC2 and polls <code>ssm get-command-invocation</code> for up to ~15 min. The inline script (in <code>.github/workflows/deploy.yml</code>, <code>deploy</code> job) does, in order:</p>
+<ol>
+<li><strong>Resolve target</strong> — <code>InstanceId</code> from the <code>quant-compute</code> CFN output (falls back to the <code>EC2_INSTANCE_ID</code> repo var).</li>
+<li><strong>Sync source</strong> — clone <code>/opt/quant</code> if missing, else <code>git fetch --prune</code> + <code>git reset --hard origin/main</code> (compose/nginx config come from the repo).</li>
+<li><strong>TLS overlay</strong> — when the <code>DOMAIN</code> repo var is set, fetch <code>ORIGIN_TLS_CERT</code> / <code>ORIGIN_TLS_KEY</code> from SSM into <code>secrets/</code>; if both land, append <code>-f docker-compose.cloudflare.yml</code>. Missing cert/key → stay HTTP-only with a warning.</li>
+<li><strong>Disk hygiene</strong> — <code>docker builder prune -af</code> + <code>docker image prune -af</code> before pulling (the 8→30 GiB volume history made this necessary).</li>
+<li><strong>Digest-aware pull</strong> — per service, compare the ECR image digest to the local one; <strong>skip the pull when they match</strong>. Tag resolution falls back from <code>${git_sha}</code> to <code>latest</code> if the SHA tag is missing.</li>
+<li><strong>Selective <code>up</code></strong> — only the changed services restart: <code>DEPLOY_APP</code> → <code>api</code>+<code>worker</code>, <code>DEPLOY_NGINX</code> → <code>nginx</code>, <code>DEPLOY_COMPOSE</code> → full <code>up -d --remove-orphans</code>. All <code>up</code> calls use <code>--no-build</code> so prod <strong>never</strong> builds on EC2.</li>
+<li><strong>Report</strong> — <code>docker image prune -f</code>, then <code>docker compose ps</code>; the job tails the SSM <code>StandardOutputContent</code> and fails on <code>Failed</code>/<code>TimedOut</code>/<code>Cancelled</code>.</li>
+</ol>
+<h3 id="github-setup-one-time">GitHub setup (one-time)<a class="headerlink" href="#github-setup-one-time" title="Permanent link">&para;</a></h3>
+<p><strong>Secrets</strong> (repo → Settings → Secrets and variables → Actions → Secrets):</p>
+<table>
+<thead>
+<tr>
+<th>Secret</th>
+<th>Value</th>
+<th>How to get it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AWS_ACCESS_KEY_ID</code></td>
+<td>IAM user access key</td>
+<td>Deploy IAM user (<code>quant_deploy</code>) with SSM Run Command, CFN deploy, and ECR push policies attached</td>
+</tr>
+<tr>
+<td><code>AWS_SECRET_ACCESS_KEY</code></td>
+<td>IAM user secret key</td>
+<td>Same IAM user</td>
+</tr>
+<tr>
+<td><code>DB_MASTER_PASSWORD</code></td>
+<td>Aurora master password</td>
+<td><strong>Only</strong> needed to deploy the <code>quant-database</code> stack (manual <code>workflow_dispatch</code> with <code>deploy_database</code> checked). Without it the <code>cfn</code> job fails fast instead of hanging on an interactive prompt.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Variables</strong> (repo → Settings → Secrets and variables → Actions → Variables):</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>EC2_INSTANCE_ID</code></td>
+<td><em>(optional fallback only)</em></td>
+</tr>
+<tr>
+<td><code>DOMAIN</code></td>
+<td>Public domain (e.g. <code>algodaemon.com</code>). When set, the deploy job fetches <code>ORIGIN_TLS_CERT</code>/<code>ORIGIN_TLS_KEY</code> from SSM and merges <code>docker-compose.cloudflare.yml</code> for HTTPS. Unset → HTTP-only.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Environments</strong> (repo → Settings → Environments):</p>
+<ul>
+<li><code>production</code> — used by <code>build-and-push</code>, <code>cfn</code>, and <code>deploy</code>. No protection rules; it exists to scope secrets, not to gate.</li>
+<li><code>production-db</code> — used by <code>migrate</code> only. Carries a <strong>required reviewer</strong>, which is what makes a schema change wait for a human.</li>
+</ul>
+<h3 id="approving-a-migration">Approving a migration<a class="headerlink" href="#approving-a-migration" title="Permanent link">&para;</a></h3>
+<p>A push touching <code>db/liquidbase/**</code> parks the <code>migrate</code> job in <em>Waiting</em> and notifies the reviewer. Approve it in the run page and the migration proceeds, then <code>deploy</code> restarts the containers. Reject it and <code>deploy</code> is held back too, so prod keeps both the old schema and the old image — a consistent pair.</p>
+<p>Only <code>migrate</code> is gated. An app-only push still deploys with no prompt; gating every job would mean approving container-only changes as well, and a reviewer who clicks through by reflex is not a gate.</p>
+<p>The job runs against <code>github.sha</code>, not <code>main</code>. Approval can sit for hours, and pinning the commit means the migration that runs is the one that was reviewed, even if <code>main</code> has moved on.</p>
+<p>Two things the gate deliberately does not do. It shows a job name rather than a diff, so it catches an unintended migration but cannot tell you whether the SQL is correct — read the changesets before approving. And it does not distinguish a one-line procedure edit from a schema rewrite: nearly every procedure and function file under <code>db/liquidbase/</code> sits behind an active <code>prod-deploy</code> <code>runOnChange</code> changeset, so editing any of them queues this job.</p>
+<h3 id="bootstrap-the-ec2-one-time">Bootstrap the EC2 (one-time)<a class="headerlink" href="#bootstrap-the-ec2-one-time" title="Permanent link">&para;</a></h3>
+<p>Before the first deploy, run on the EC2:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># SSH or SSM session into the instance, then:</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>bash<span class="w"> </span>/opt/quant/aws/scripts/bootstrap-ec2.sh
+</code></pre></div>
+<p>Or remotely via SSM (resolve instance ID from CFN — it changes on EC2 replacement):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nv">INSTANCE_ID</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>aws<span class="w"> </span>cloudformation<span class="w"> </span>describe-stacks<span class="w"> </span>--stack-name<span class="w"> </span>quant-compute<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span>--region<span class="w"> </span>ap-southeast-1<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span>--query<span class="w"> </span><span class="s2">"Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue"</span><span class="w"> </span>--output<span class="w"> </span>text<span class="k">)</span><span class="s2">"</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>aws<span class="w"> </span>ssm<span class="w"> </span>send-command<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">  </span>--instance-ids<span class="w"> </span><span class="s2">"</span><span class="nv">$INSTANCE_ID</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">  </span>--document-name<span class="w"> </span>AWS-RunShellScript<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">  </span>--parameters<span class="w"> </span>file://aws/scripts/ssm-ec2-deploy.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">  </span>--region<span class="w"> </span>ap-southeast-1
+</code></pre></div>
+<p>Or for disk recovery:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>aws<span class="w"> </span>ssm<span class="w"> </span>send-command<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span>--instance-ids<span class="w"> </span><span class="s2">"</span><span class="nv">$INSTANCE_ID</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span>--document-name<span class="w"> </span>AWS-RunShellScript<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span>--parameters<span class="w"> </span>file://aws/scripts/ssm-ec2-recover.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span>--region<span class="w"> </span>ap-southeast-1
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">SSM <code>--parameters</code> escaping</p>
+<p>Do <strong>not</strong> pass long inline <code>commands=[...]</code> strings from a local shell — bash will expand <code>$VAR</code> and break JSON (<code>ParamValidation</code> / empty <code>CommandId</code>). Use <code>--parameters file://aws/scripts/ssm-ec2-deploy.json</code> (or <code>ssm-ec2-deploy-inline.json</code> before <code>ec2-deploy.sh</code> is on <code>main</code>). SSM runs without <code>$HOME</code>; scripts set <code>export HOME=/root</code> and <code>git config --global --add safe.directory /opt/quant</code>.</p>
+</div>
+<p>One-time bootstrap (legacy curl):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nv">INSTANCE_ID</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>aws<span class="w"> </span>cloudformation<span class="w"> </span>describe-stacks<span class="w"> </span>--stack-name<span class="w"> </span>quant-compute<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span>--region<span class="w"> </span>ap-southeast-1<span class="w"> </span>--profile<span class="w"> </span>alfcheun<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span>--query<span class="w"> </span><span class="s2">"Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue"</span><span class="w"> </span>--output<span class="w"> </span>text<span class="k">)</span><span class="s2">"</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>aws<span class="w"> </span>ssm<span class="w"> </span>send-command<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">  </span>--instance-ids<span class="w"> </span><span class="s2">"</span><span class="nv">$INSTANCE_ID</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">  </span>--document-name<span class="w"> </span>AWS-RunShellScript<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">  </span>--parameters<span class="w"> </span><span class="s1">'commands=["curl -fsSL https://raw.githubusercontent.com/alfred1123/Quant_Strategies/main/aws/scripts/bootstrap-ec2.sh | sudo -u ec2-user bash"]'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">  </span>--profile<span class="w"> </span>alfcheun<span class="w"> </span>--region<span class="w"> </span>ap-southeast-1
+</code></pre></div>
+<h3 id="manual-deploy">Manual deploy<a class="headerlink" href="#manual-deploy" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Trigger from GitHub (no code push needed)</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>deploy
+</code></pre></div>
+<h3 id="troubleshooting-disk-full-on-deploy">Troubleshooting — disk full on deploy<a class="headerlink" href="#troubleshooting-disk-full-on-deploy" title="Permanent link">&para;</a></h3>
+<p>Default AL2023 root volume is <strong>8 GiB</strong> — too small once Docker accumulates old build layers from pre-ECR deploys.</p>
+<p><strong>Symptoms:</strong> <code>no space left on device</code> during pull/extract; Compose warns <code>Some service image(s) must be built from source</code> and tries to <strong>build on EC2</strong> (never do this in prod).</p>
+<p><strong>Immediate recovery (SSM on EC2):</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nv">INSTANCE_ID</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>aws<span class="w"> </span>cloudformation<span class="w"> </span>describe-stacks<span class="w"> </span>--stack-name<span class="w"> </span>quant-compute<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span>--region<span class="w"> </span>ap-southeast-1<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span>--query<span class="w"> </span><span class="s2">"Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue"</span><span class="w"> </span>--output<span class="w"> </span>text<span class="k">)</span><span class="s2">"</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>aws<span class="w"> </span>ssm<span class="w"> </span>send-command<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span>--instance-ids<span class="w"> </span><span class="s2">"</span><span class="nv">$INSTANCE_ID</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">  </span>--document-name<span class="w"> </span>AWS-RunShellScript<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">  </span>--parameters<span class="w"> </span>file://aws/scripts/ssm-ec2-recover.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="w">  </span>--region<span class="w"> </span>ap-southeast-1
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="c1"># Then re-run the GitHub deploy workflow, or:</span>
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>aws<span class="w"> </span>ssm<span class="w"> </span>send-command<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a><span class="w">  </span>--instance-ids<span class="w"> </span><span class="s2">"</span><span class="nv">$INSTANCE_ID</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a><span class="w">  </span>--document-name<span class="w"> </span>AWS-RunShellScript<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a><span class="w">  </span>--parameters<span class="w"> </span>file://aws/scripts/ssm-ec2-deploy.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a><span class="w">  </span>--region<span class="w"> </span>ap-southeast-1
+</code></pre></div>
+<p><strong>Long-term:</strong> CFN <code>03-compute.yml</code> sets <strong>30 GiB gp3</strong> root volume (<code>RootVolumeSize</code>). Update the live volume without replacing the instance:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Find volume id for the instance root device, then:</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>aws<span class="w"> </span>ec2<span class="w"> </span>modify-volume<span class="w"> </span>--volume-id<span class="w"> </span>vol-XXXXXXXX<span class="w"> </span>--size<span class="w"> </span><span class="m">30</span><span class="w"> </span>--region<span class="w"> </span>ap-southeast-1
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="c1"># On the instance after volume shows "optimizing" → "completed":</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>sudo<span class="w"> </span>growpart<span class="w"> </span>/dev/nvme0n1<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sudo<span class="w"> </span>xfs_growfs<span class="w"> </span>/
+</code></pre></div>
+<p>Deploy script uses <code>--no-build</code> on all <code>compose up</code> commands so prod never builds on EC2.</p>
+<hr />
+<h2 id="future-ecs-migration">Future: ECS migration<a class="headerlink" href="#future-ecs-migration" title="Permanent link">&para;</a></h2>
+<p>When the workload outgrows a single EC2 (e.g. independent queue worker
+scaling), add an ECS stack:</p>
+<ol>
+<li>Reuse existing ECR repos (<code>00-ecr.yml</code> — <code>quant-app</code>, <code>quant-nginx</code>)</li>
+<li>Create <code>05-ecs.yml</code> for ECS cluster, ALB, API service, worker service</li>
+<li>The same Docker images and SSM parameters work unchanged</li>
+<li>Remove the compute stack (<code>03-compute.yml</code>) when ready</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>
