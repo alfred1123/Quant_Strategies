@@ -52,7 +52,7 @@ Run `python -m quant.cli --help` for the full list.
 | `--signal` | `1.0` | Signal threshold for single backtest |
 | `--fee` | `10.0` | Transaction fee in basis points (Bybit VIP-0 spot taker). Use `5.5` for USDT perp taker. |
 | `--no-grid` | `false` | Skip parameter optimization |
-| `--win-min/max/step` | `5/100/5` | Grid search window range |
+| `--win-min/max/step` | `5/100/5` | Grid search window range, in **daily bars**. The UI scales these by bars-per-day when the cadence is not daily; the CLI has no interval flag. |
 | `--sig-min/max/step` | `0.25/2.50/0.25` | Grid search signal range |
 | `--walk-forward` | `false` | Run walk-forward overfitting test |
 | `--split` | `0.5` | In-sample ratio for walk-forward split (0.0–1.0) |

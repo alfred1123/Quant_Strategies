@@ -38,3 +38,24 @@ export function barsPerDay(periodLength: string): number | null {
   const seconds = periodSeconds(periodLength);
   return seconds === null ? null : 86_400 / seconds;
 }
+
+/**
+ * Indicator lookback is a bar count. `REFDATA.INDICATOR.WIN_*` are written
+ * in daily bars (typically 5 / 100 / 5), so an hourly run left on those
+ * numbers searches ~4 calendar days while daily searched ~100.
+ *
+ * Min, max, and step all move so the grid stays the same number of points
+ * (~20). Scaling only max would explode exhaustive search. Signal range is
+ * a threshold, not a bar count, and is not scaled.
+ */
+export function scaleWindowRange(
+  range: { min: number; max: number; step: number },
+  fromBarsPerDay: number,
+  toBarsPerDay: number,
+): { min: number; max: number; step: number } {
+  if (fromBarsPerDay <= 0 || toBarsPerDay <= 0 || fromBarsPerDay === toBarsPerDay) {
+    return range;
+  }
+  const scale = (n: number) => Math.max(1, Math.round((n * toBarsPerDay) / fromBarsPerDay));
+  return { min: scale(range.min), max: scale(range.max), step: scale(range.step) };
+}

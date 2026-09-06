@@ -32,7 +32,7 @@ To add a new technical indicator to the backtest pipeline, follow this pattern.
     );
     ```
 
-    `NAME` is the canonical short name (NOT NULL); `METHOD_NAME` must match the method on `TechnicalAnalysis` exactly.
+    `NAME` is the canonical short name (NOT NULL); `METHOD_NAME` must match the method on `TechnicalAnalysis` exactly. `WIN_MIN` / `WIN_MAX` / `WIN_STEP` are **daily-bar** counts — the config drawer scales them by the selected interval's bars-per-day (hourly Win Max = 100 × 24). Do not seed a second set of intraday values.
 
 4. **Write tests** in `tests/unit/test_ta.py` — verify output shape, edge cases, NaN handling.
 

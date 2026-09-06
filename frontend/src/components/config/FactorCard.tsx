@@ -9,6 +9,7 @@ import type {
   AppRow, DataColumnRow, IndicatorRow, ProductRow, SignalTypeRow,
 } from '../../types/refdata';
 import { countSteps } from '../../utils/grid';
+import { scaleWindowRange } from '../../utils/interval';
 
 interface Props {
   index: number;
@@ -22,12 +23,19 @@ interface Props {
   dataColumns: DataColumnRow[];
   products: ProductRow[];
   apps: AppRow[];
+  /**
+   * Bars this cadence produces in a day. REFDATA WIN_* are daily-bar
+   * counts; the grid is scaled so lookback stays in calendar days.
+   */
+  barsPerDay?: number;
 }
 
 /**
  * Self-contained card for one factor: product override, data column,
  * indicator, strategy, and the two RangeFields blocks. Picking an
- * indicator auto-populates window/signal ranges from REFDATA defaults.
+ * indicator auto-populates window/signal ranges from REFDATA defaults,
+ * with the window grid scaled by bars-per-day so lookback stays in
+ * calendar days (hourly Win Max is 100 × 24, not 100 bars).
  */
 function factorRoleLabel(index: number, total: number, conjunction: string): string {
   if (conjunction === 'FILTER' && total > 1) {
@@ -40,6 +48,7 @@ function factorRoleLabel(index: number, total: number, conjunction: string): str
 export default function FactorCard({
   index, total, conjunction = 'AND', factor, onChange, onRemove,
   indicators, signalTypes, dataColumns, products, apps,
+  barsPerDay = 1,
 }: Props) {
   const trials = countSteps(factor.window_range) * countSteps(factor.signal_range);
   const ind = indicators.find(x => x.method_name === factor.indicator);
@@ -51,7 +60,11 @@ export default function FactorCard({
       indicator: method_name,
       ...(next
         ? {
-            window_range: { min: next.win_min, max: next.win_max, step: next.win_step } as RangeParam,
+            window_range: scaleWindowRange(
+              { min: next.win_min, max: next.win_max, step: next.win_step } as RangeParam,
+              1,
+              barsPerDay,
+            ),
             signal_range: { min: next.sig_min, max: next.sig_max, step: next.sig_step } as RangeParam,
           }
         : {}),

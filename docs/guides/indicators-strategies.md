@@ -54,6 +54,22 @@ The `trading_period` parameter controls Sharpe ratio annualization:
 
 Sharpe and annualized return are **undefined** (`NaN`) when `Performance.get_metric_n_obs()` is below 60 finite PnL bars after indicator warmup. The optimizer does not re-count bars; it already maps a non-finite Sharpe to `-inf`, so a short sample cannot win the grid.
 
+The drawer also scales `trading_period` by the selected bar interval's bars-per-day (365 daily → 8,760 hourly). See [Window grid](#window-grid) for the matching lookback scale.
+
+## Window grid
+
+`REFDATA.INDICATOR.WIN_MIN` / `WIN_MAX` / `WIN_STEP` are **daily-bar** counts (typically 5 / 100 / 5). The config drawer scales all three by the selected interval's bars-per-day — the same factor that scales `trading_period` (decisions #57, #67):
+
+| Cadence | bars/day | Default Win Min / Max / Step |
+|---------|----------|------------------------------|
+| Daily | 1 | 5 / 100 / 5 |
+| Hourly | 24 | 120 / 2,400 / 120 |
+| 15-minute | 96 | 480 / 9,600 / 480 |
+
+Step scales with min and max so the grid stays ~20 points. Scaling only max would turn a 20-point daily grid into hundreds of hourly windows. Signal range is a threshold, not a bar count, and is not scaled. Changing Bar Interval rescales whatever is in the Win fields; clone/replay leaves stored `CONFIG_JSON` as saved.
+
+The CLI `--win-min` / `--win-max` / `--win-step` defaults stay daily. The CLI has no bar-interval flag.
+
 ## Transaction Costs
 
 `quant/strategy/performance.py` applies **10 bps (0.10%) per unit of turnover** by default (`DEFAULT_FEE_BPS = 10.0`). That is Bybit VIP-0 **spot taker** — the research product is `*.crypto` spot (decision #21) and live apply is a market order (decision #38), so the haircut is taker, not maker.

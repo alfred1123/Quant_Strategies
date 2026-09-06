@@ -49,6 +49,8 @@ const DEFAULT_CONFIG: BacktestConfig = {
       indicator: '',
       strategy: '',
       data_column: 'price',
+      // Daily-bar REFDATA defaults. ConfigDrawer scales min/max/step when
+      // the bar interval is not daily (hourly Win Max = 100 × 24).
       window_range: { min: 5, max: 100, step: 5 },
       signal_range: { min: 0.25, max: 2.5, step: 0.25 },
       symbol: 'btcusdt.crypto',

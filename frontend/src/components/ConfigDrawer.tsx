@@ -15,7 +15,7 @@ import { useProducts } from '../api/inst';
 import { useStoredCoverage } from '../api/marketData';
 import type { AssetTypeRow } from '../types/refdata';
 import { countSteps } from '../utils/grid';
-import { barsPerDay } from '../utils/interval';
+import { barsPerDay, scaleWindowRange } from '../utils/interval';
 import { validateBacktestConfig } from '../utils/validate';
 import { capturedRange, rangeFits } from '../utils/capturedRange';
 import type { BacktestConfig, FactorConfig } from '../types/backtest';
@@ -119,6 +119,18 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
     return perDay ? Math.round(dailyTradingPeriod * perDay) : dailyTradingPeriod;
   };
 
+  /** Bars this cadence produces in a day; 1 when the interval is unknown. */
+  const cadenceBarsPerDay = (intervalId: number | null): number => {
+    const row = tmIntervals.find(i => i.tm_interval_id === intervalId);
+    return (row && barsPerDay(row.period_length)) || 1;
+  };
+
+  const dailyWindowRange = (ind?: { win_min?: number; win_max?: number; win_step?: number }) => ({
+    min: ind?.win_min ?? 5,
+    max: ind?.win_max ?? 100,
+    step: ind?.win_step ?? 5,
+  });
+
   const rangeOutsideCapture = captured !== null
     && !rangeFits(captured, config.start, config.end);
 
@@ -150,7 +162,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
       indicator: first?.method_name ?? '',
       strategy: signalTypes[0]?.name ?? '',
       data_column: 'price',
-      window_range: { min: first?.win_min ?? 5, max: first?.win_max ?? 100, step: first?.win_step ?? 5 },
+      window_range: scaleWindowRange(dailyWindowRange(first), 1, cadenceBarsPerDay(config.tmIntervalId)),
       signal_range: { min: first?.sig_min ?? 0, max: first?.sig_max ?? 0, step: first?.sig_step ?? 1 },
       symbol: config.symbol,
       vendor_symbol: config.vendorSymbol || undefined,
@@ -233,11 +245,20 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
             value={config.tmIntervalId === null ? '' : String(config.tmIntervalId)}
             onChange={e => {
               const id = Number(e.target.value);
-              set({
-                tmIntervalId: id,
-                ...(selectedAssetType
-                  ? { tradingPeriod: annualization(selectedAssetType.trading_period, id) }
-                  : {}),
+              onChange(prev => {
+                const fromBpd = cadenceBarsPerDay(prev.tmIntervalId);
+                const toBpd = cadenceBarsPerDay(id);
+                return {
+                  ...prev,
+                  tmIntervalId: id,
+                  ...(selectedAssetType
+                    ? { tradingPeriod: annualization(selectedAssetType.trading_period, id) }
+                    : {}),
+                  factors: prev.factors.map(f => ({
+                    ...f,
+                    window_range: scaleWindowRange(f.window_range, fromBpd, toBpd),
+                  })),
+                };
               });
             }}
           >
@@ -415,6 +436,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
               dataColumns={dataColumns}
               products={products}
               apps={apps}
+              barsPerDay={cadenceBarsPerDay(config.tmIntervalId)}
             />
           </Box>
         ))}

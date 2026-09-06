@@ -400,6 +400,67 @@ describe('ConfigDrawer — the bar interval', () => {
     expect(last.tradingPeriod).toBe(8_760);
   });
 
+  it('rescales the window grid so lookback stays in calendar days', () => {
+    // REFDATA WIN_MAX=100 is a daily-bar count. Left at 100 on hourly, the
+    // optimizer searches ~4 days of lookback while daily searched ~100 days.
+    // Min, max, and step all move so the grid stays 20 points, not 479.
+    const observer = vi.fn();
+    renderWithProviders(<Host initial={{ ...bybitCfg }} observer={observer} />);
+
+    pickHourly();
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.factors[0].window_range).toEqual({ min: 120, max: 2_400, step: 120 });
+    expect(last.factors[0].signal_range).toEqual({ min: 0.25, max: 2.5, step: 0.25 });
+  });
+
+  it('undoes the window grid when returning to daily', () => {
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host
+        initial={{
+          ...bybitCfg,
+          tmIntervalId: 2,
+          tradingPeriod: 8_760,
+          factors: [{
+            ...bybitCfg.factors[0],
+            window_range: { min: 120, max: 2_400, step: 120 },
+          }],
+        }}
+        observer={observer}
+      />,
+    );
+
+    fireEvent.mouseDown(screen.getByLabelText('Bar Interval'));
+    fireEvent.click(screen.getByRole('option', { name: 'Daily' }));
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.factors[0].window_range).toEqual({ min: 5, max: 100, step: 5 });
+  });
+
+  it('applies scaled REFDATA window defaults when a factor is added on hourly', () => {
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host
+        initial={{
+          ...bybitCfg,
+          tmIntervalId: 2,
+          tradingPeriod: 8_760,
+          factors: [{
+            ...bybitCfg.factors[0],
+            window_range: { min: 120, max: 2_400, step: 120 },
+          }],
+        }}
+        observer={observer}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Add Factor/ }));
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.factors[1].window_range).toEqual({ min: 120, max: 2_400, step: 120 });
+  });
+
   it('keeps the asset type as the base when rescaling, not the scaled value', () => {
     // Switching hourly → daily must land back on 365, not 8,760 × 24.
     const observer = vi.fn();
