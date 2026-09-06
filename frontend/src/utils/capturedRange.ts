@@ -104,3 +104,37 @@ export function capturedRange(coverage: Coverage | undefined): CapturedRange | n
 export function rangeFits(captured: CapturedRange, start: string, end: string): boolean {
   return start >= captured.first && end <= captured.latestEnd;
 }
+
+/**
+ * The window every series in a run can actually serve.
+ *
+ * Each exchange fetch must cover the requested range in full, so a BTC
+ * snap of 2020-03-25 10:00 on an ETH series that starts 2021-03-15 is
+ * refused rather than shortened. The overlap is the only range that
+ * would not produce that refusal.
+ */
+export function coverageIntersection(ranges: CapturedRange[]): CapturedRange | null {
+  if (ranges.length === 0) return null;
+  let first = ranges[0].first;
+  let last = ranges[0].last;
+  let latestEnd = ranges[0].latestEnd;
+  let intraday = ranges[0].intraday;
+  for (const r of ranges.slice(1)) {
+    if (r.first > first) first = r.first;
+    if (r.last < last) last = r.last;
+    if (r.latestEnd < latestEnd) latestEnd = r.latestEnd;
+    if (r.intraday) intraday = true;
+  }
+  if (first > last) return null;
+  return { first, last, latestEnd, intraday };
+}
+
+/** Snap a requested window onto captured bounds when it would be refused. */
+export function fitToCaptured(
+  captured: CapturedRange,
+  start: string,
+  end: string,
+): { start: string; end: string } {
+  if (rangeFits(captured, start, end)) return { start, end };
+  return { start: captured.first, end: captured.last };
+}

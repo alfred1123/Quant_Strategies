@@ -65,11 +65,20 @@ vi.mock('../api/inst', () => ({
 let storedCoverage: Coverage | undefined;
 const coverageAsked = vi.fn();
 
+function coverageQuery(key: Record<string, unknown>) {
+  coverageAsked(key);
+  const complete = Boolean(key.internal_cusip && key.tm_interval_id && key.source_app_id);
+  const data = complete ? storedCoverage : undefined;
+  return {
+    data,
+    isLoading: complete && data === undefined,
+    isFetched: data !== undefined,
+  };
+}
+
 vi.mock('../api/marketData', () => ({
-  useStoredCoverage: (key: Record<string, unknown>) => {
-    coverageAsked(key);
-    return { data: storedCoverage };
-  },
+  useStoredCoverage: (key: Record<string, unknown>) => coverageQuery(key),
+  useStoredCoverages: (keys: Array<Record<string, unknown>>) => keys.map(coverageQuery),
 }));
 
 const BYBIT_COVERAGE: Coverage = {
@@ -118,7 +127,13 @@ const baseCfg: BacktestConfig = {
  * of the actual React batching behavior, and the regression test below
  * would silently pass for the wrong reason.
  */
-function Host({ initial, observer }: { initial: BacktestConfig; observer: (c: BacktestConfig) => void }) {
+function Host({
+  initial, observer, onRun,
+}: {
+  initial: BacktestConfig;
+  observer: (c: BacktestConfig) => void;
+  onRun?: (c: BacktestConfig) => void;
+}) {
   const [cfg, setCfg] = useState<BacktestConfig>(initial);
   return (
     <ConfigDrawer
@@ -132,7 +147,7 @@ function Host({ initial, observer }: { initial: BacktestConfig; observer: (c: Ba
           return resolved;
         });
       }}
-      onRun={() => { /* noop */ }}
+      onRun={onRun ?? (() => { /* noop */ })}
       isRunning={false}
     />
   );
@@ -185,6 +200,28 @@ describe('ConfigDrawer — product pick updates symbol AND asset type atomically
     // Asset type should remain — the user only changed vendor symbol.
     expect(last.assetType).toBe('Equity HK');
     expect(last.tradingPeriod).toBe(252);
+  });
+
+  it('fills Asset Type from the product when a restored config omitted it', () => {
+    // CONFIG_JSON has no assetType. Re-backtest must still be runnable, and
+    // must not rewrite tradingPeriod — that figure is already on the wire.
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host
+        initial={{
+          ...baseCfg,
+          symbol: 'btcusdt.crypto',
+          dataSource: 'yahoo',
+          assetType: '',
+          tradingPeriod: 8_760,
+        }}
+        observer={observer}
+      />,
+    );
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.assetType).toBe('Crypto');
+    expect(last.tradingPeriod).toBe(8_760);
   });
 });
 
@@ -274,8 +311,21 @@ describe('ConfigDrawer — the captured range decides the dates', () => {
       <Host initial={{ ...baseCfg, symbol: 'btcusdt.crypto', start: '2016-01-01' }} observer={observer} />,
     );
 
-    expect(coverageAsked).toHaveBeenCalledWith({});
-    expect(observer).not.toHaveBeenCalled();
+    expect(coverageAsked).not.toHaveBeenCalled();
+    // Asset Type is filled from the product; dates must not snap to Bybit coverage.
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.start).toBe('2016-01-01');
+    expect(last.assetType).toBe('Crypto');
+  });
+
+  it('keeps a restored window that already fits, so re-backtest does not rewrite dates', () => {
+    storedCoverage = BYBIT_COVERAGE;
+    renderWithProviders(
+      <Host initial={{ ...bybitCfg, start: '2021-01-01', end: '2026-01-01' }} observer={vi.fn()} />,
+    );
+
+    expect(screen.getByLabelText('Start')).toHaveValue('2021-01-01');
+    expect(screen.getByLabelText('End')).toHaveValue('2026-01-01');
   });
 
   it('says what is captured once the range fits', () => {
@@ -325,7 +375,7 @@ describe('ConfigDrawer — a range outside the capture is flagged, not silently 
 
     fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2016-01-01' } });
 
-    expect(screen.getByText(/will be refused rather than quietly shortened/)).toBeTruthy();
+    expect(screen.getByText(/worker will refuse/)).toBeTruthy();
   });
 
   it('warns when a hand-typed end reaches past the last close', () => {
@@ -334,7 +384,7 @@ describe('ConfigDrawer — a range outside the capture is flagged, not silently 
 
     fireEvent.change(screen.getByLabelText('End'), { target: { value: '2027-01-01' } });
 
-    expect(screen.getByText(/will be refused rather than quietly shortened/)).toBeTruthy();
+    expect(screen.getByText(/worker will refuse/)).toBeTruthy();
   });
 
   it('offers the captured range as a one-click fix', () => {
@@ -348,6 +398,45 @@ describe('ConfigDrawer — a range outside the capture is flagged, not silently 
     const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
     expect(last.start).toBe('2020-03-25');
     expect(last.end).toBe('2026-08-29');
+  });
+
+  it('fits the captured range on Run instead of enqueueing a job the worker will refuse', () => {
+    // A real FAILED run: ETH hourly coverage starts 2021-03-15, the drawer
+    // still held BTC's 2020-03-25 10:00 snap, and Run submitted it anyway.
+    storedCoverage = {
+      first_bar: '2021-03-15T00:00:00+00:00',
+      last_bar: '2026-09-06T12:00:00+00:00',
+      gaps: 0,
+      error: null,
+    };
+    const onRun = vi.fn();
+    renderWithProviders(
+      <Host
+        initial={{ ...bybitCfg, symbol: 'ethusdt.crypto', tmIntervalId: 2 }}
+        observer={vi.fn()}
+        onRun={onRun}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2020-03-25T10:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run Optimization' }));
+
+    expect(onRun).toHaveBeenCalledTimes(1);
+    const submitted = onRun.mock.calls[0][0] as BacktestConfig;
+    expect(submitted.start).toBe('2021-03-15T00:00');
+    expect(submitted.end).toBe('2026-09-06T12:00');
+  });
+
+  it('does not run while capture has not answered', () => {
+    storedCoverage = undefined;
+    const onRun = vi.fn();
+    renderWithProviders(
+      <Host initial={bybitCfg} observer={vi.fn()} onRun={onRun} />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Run Optimization' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Run Optimization' }));
+    expect(onRun).not.toHaveBeenCalled();
   });
 
   it('does not warn about an end of today, whose bar has not closed', () => {

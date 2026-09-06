@@ -21,12 +21,13 @@ import { APP_NAME } from '../constants/brand';
 import { runPerformance } from '../api/backtest';
 import { fetchJob, useEnqueueJob, useJobCompletionEffects } from '../api/jobs';
 import { useMe } from '../api/auth';
-import { useTmIntervals } from '../api/refdata';
+import { useAssetTypes, useTmIntervals } from '../api/refdata';
+import { useProducts } from '../api/inst';
 import type {
   BacktestConfig, OptimizeResponse, PerformanceResponse, Top10Row,
   WalkForwardResponse, OptimizeProgress,
 } from '../types/backtest';
-import { effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest } from '../utils/requestBuilders';
+import { effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest, configFromOptimizeRequest } from '../utils/requestBuilders';
 import { buildStrategyNm } from '../utils/strategyIdentity';
 import { overfitColor, overfitLabel, formatMetric, formatDecimal, formatPercent, rowLabel } from '../utils/format';
 import { firstValidationError } from '../utils/validate';
@@ -70,6 +71,8 @@ function isAbortError(err: unknown): boolean {
 export default function BacktestPage() {
   const { data: currentUser } = useMe();
   const { data: tmIntervals } = useTmIntervals();
+  const { data: products = [] } = useProducts();
+  const { data: assetTypes = [] } = useAssetTypes();
   const enqueue = useEnqueueJob();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [config, setConfig] = useState<BacktestConfig>(DEFAULT_CONFIG);
@@ -141,9 +144,11 @@ export default function BacktestPage() {
     }
   };
 
+  const hydrateConfig = (raw: Record<string, unknown> | null | undefined) =>
+    configFromOptimizeRequest(raw, DEFAULT_CONFIG, { products, assetTypes });
+
   const handleCloneEdit = (_strategyId: string, configJson: Record<string, unknown>) => {
-    const cfg = configJson as unknown as Partial<BacktestConfig>;
-    setConfig({ ...DEFAULT_CONFIG, ...cfg });
+    setConfig(hydrateConfig(configJson));
     setDrawerOpen(true);
   };
 
@@ -154,8 +159,7 @@ export default function BacktestPage() {
     try {
       const detail = await fetchJob(queueId);
       if (detail.config_json) {
-        const cfg = detail.config_json as unknown as Partial<BacktestConfig>;
-        setConfig({ ...DEFAULT_CONFIG, ...cfg });
+        setConfig(hydrateConfig(detail.config_json));
       }
       setPageTab(0);
       setDrawerOpen(true);
@@ -178,8 +182,7 @@ export default function BacktestPage() {
       const optResult = detail.result as unknown as OptimizeResponse;
       // Restore the frozen config so summary chips + factor count match.
       if (detail.config_json) {
-        const cfg = detail.config_json as unknown as Partial<BacktestConfig>;
-        setConfig({ ...DEFAULT_CONFIG, ...cfg });
+        setConfig(hydrateConfig(detail.config_json));
       }
       setOptimizeResult(optResult);
       setPerfResult(optResult.performance ?? null);
@@ -200,8 +203,8 @@ export default function BacktestPage() {
     }
   };
 
-  const handleRun = async () => {
-    const validationError = firstValidationError(config);
+  const handleRun = async (cfg: BacktestConfig) => {
+    const validationError = firstValidationError(cfg);
     if (validationError) {
       setError(validationError);
       return;
@@ -211,7 +214,7 @@ export default function BacktestPage() {
     // run was not fitted on — that is what puts an hourly run into a daily
     // lineage, where promotion compares the two on different scales.
     const cadence = tmIntervals?.find(
-      (iv) => iv.tm_interval_id === config.tmIntervalId,
+      (iv) => iv.tm_interval_id === cfg.tmIntervalId,
     )?.name;
     if (!cadence) {
       setError('Bar interval has not loaded yet — reopen the config and pick one.');
@@ -225,8 +228,8 @@ export default function BacktestPage() {
     setError(null);
     setDrawerOpen(false);
     try {
-      const req = buildOptimizeRequest(config);
-      const strategyNm = buildStrategyNm(config, cadence);
+      const req = buildOptimizeRequest(cfg);
+      const strategyNm = buildStrategyNm(cfg, cadence);
       const result = await enqueue.mutateAsync({
         strategy_nm: strategyNm,
         config_json: req,

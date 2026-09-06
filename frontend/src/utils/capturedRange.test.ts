@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capturedRange, isoDate, nextDay, rangeFits } from './capturedRange';
+import { capturedRange, coverageIntersection, fitToCaptured, isoDate, nextDay, rangeFits } from './capturedRange';
 import type { Coverage } from '../types/marketData';
 
 const coverage = (overrides: Partial<Coverage> = {}): Coverage => ({
@@ -129,5 +129,48 @@ describe('rangeFits', () => {
     expect(rangeFits(hourly, hourly.first, hourly.last)).toBe(true);
     // Midnight on the first day is still refused: those ten bars never existed.
     expect(rangeFits(hourly, '2020-03-25', hourly.last)).toBe(false);
+  });
+});
+
+describe('coverageIntersection', () => {
+  const btc = {
+    first: '2020-03-25T10:00', last: '2026-09-06T12:00',
+    latestEnd: '2026-09-06T12:00', intraday: true,
+  };
+  const eth = {
+    first: '2021-03-15T00:00', last: '2026-09-06T12:00',
+    latestEnd: '2026-09-06T12:00', intraday: true,
+  };
+
+  it('keeps the later head so every series can serve the window', () => {
+    expect(coverageIntersection([btc, eth])?.first).toBe('2021-03-15T00:00');
+  });
+
+  it('is null when the windows do not overlap', () => {
+    expect(coverageIntersection([
+      { ...btc, last: '2020-12-01T00:00' },
+      eth,
+    ])).toBeNull();
+  });
+});
+
+describe('fitToCaptured', () => {
+  const captured = {
+    first: '2021-03-15T00:00', last: '2026-09-06T12:00',
+    latestEnd: '2026-09-06T12:00', intraday: true,
+  };
+
+  it('replaces a start the store cannot serve', () => {
+    expect(fitToCaptured(captured, '2020-03-25T10:00', '2026-09-06T12:00')).toEqual({
+      start: '2021-03-15T00:00',
+      end: '2026-09-06T12:00',
+    });
+  });
+
+  it('leaves a window that already fits', () => {
+    expect(fitToCaptured(captured, '2022-01-01T00:00', '2025-01-01T00:00')).toEqual({
+      start: '2022-01-01T00:00',
+      end: '2025-01-01T00:00',
+    });
   });
 });

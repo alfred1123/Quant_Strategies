@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 import type {
   BackfillPlan,
@@ -110,16 +110,24 @@ export function useVenueDepth(key: Partial<SeriesKey>) {
  * Costs two index probes rather than an exchange call, but still keyed and
  * cached per series so switching products does not re-ask.
  */
-export function useStoredCoverage(key: Partial<SeriesKey>) {
-  const complete =
-    key.internal_cusip !== undefined
-    && key.tm_interval_id !== undefined
-    && key.source_app_id !== undefined;
-  return useQuery({
+/**
+ * What is actually stored for one series, for callers outside the
+ * subscription list.
+ *
+ * Distinct from `useVenueDepth`, and the difference matters wherever a range
+ * is chosen: depth is what the venue *would* serve, coverage is what has been
+ * captured. A backtest reads the store, so the store is the honest bound —
+ * offering a venue floor that has not been backfilled would propose a range
+ * the run then refuses.
+ *
+ * Costs two index probes rather than an exchange call, but still keyed and
+ * cached per series so switching products does not re-ask.
+ */
+function coverageQuery(key: SeriesKey) {
+  return {
     queryKey: ['market-data', 'coverage', key] as const,
-    enabled: complete,
     staleTime: 60_000,
-    retry: false,
+    retry: false as const,
     queryFn: async (): Promise<Coverage> => {
       const { data } = await apiClient.get<Coverage>(
         '/market-data/price-bars/coverage',
@@ -127,6 +135,24 @@ export function useStoredCoverage(key: Partial<SeriesKey>) {
       );
       return data;
     },
+  };
+}
+
+export function useStoredCoverage(key: Partial<SeriesKey>) {
+  const complete =
+    key.internal_cusip !== undefined
+    && key.tm_interval_id !== undefined
+    && key.source_app_id !== undefined;
+  return useQuery({
+    ...coverageQuery(key as SeriesKey),
+    enabled: complete,
+  });
+}
+
+/** Coverage for every exchange series a backtest will fetch, in key order. */
+export function useStoredCoverages(keys: SeriesKey[]) {
+  return useQueries({
+    queries: keys.map(key => ({ ...coverageQuery(key), enabled: true })),
   });
 }
 

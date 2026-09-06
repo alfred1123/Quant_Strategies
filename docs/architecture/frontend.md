@@ -267,6 +267,7 @@ Once you know these shapes, every function signature and component prop makes se
 - **`queryClient.ts`** — Shared TanStack Query client. Exported separately so the Axios 401 interceptor can mutate the auth cache from outside React.
 - **`Plot.ts`** — Handles CJS/ESM interop for `react-plotly.js`.
 - **`grid.ts`** — `countSteps({ min, max, step })` returns how many discrete values a range produces.
+- **`requestBuilders.ts`** — `buildOptimizeRequest` / `configFromOptimizeRequest` are inverses: form state ↔ stored `CONFIG_JSON`.
 - **`interval.ts`** — Parses `TM_INTERVAL.PERIOD_LENGTH` into `barsPerDay`. `scaleWindowRange` multiplies a daily-bar `WIN_*` grid by that factor so lookback stays in calendar days when the cadence is not daily.
 
 ### Layer 4: Components (`components/`) — UI building blocks
@@ -274,12 +275,12 @@ Once you know these shapes, every function signature and component prop makes se
 - **`config/RangeFields.tsx`** — Three `<TextField>` inputs (min, max, step). Smallest unit.
 - **`config/FactorCard.tsx`** — One factor: indicator dropdown, strategy dropdown, data column, window range, signal range. Uses `RangeFields`. Picking an indicator applies REFDATA defaults; the window grid is scaled by bars-per-day.
 - **`config/ProductSelector.tsx`** — Autocomplete for picking a product or entering a vendor symbol directly.
-- **`ConfigDrawer.tsx`** — Composes `ProductSelector` + 1–2 `FactorCard`s + date/fee/walk-forward controls. The `set()` helper merges partial updates into config state. Changing Bar Interval rescales `trading_period` and every factor's `window_range` by bars-per-day.
+- **`ConfigDrawer.tsx`** — Composes `ProductSelector` + 1–2 `FactorCard`s + date/fee/walk-forward controls. The `set()` helper merges partial updates into config state. Changing Bar Interval rescales `trading_period` and every factor's `window_range` by bars-per-day. Run Optimization fits Start/End to captured coverage rather than enqueueing a job the worker will refuse.
 - **`Top10Table.tsx`**, **`MetricsCards.tsx`**, **`HeatmapChart.tsx`**, **`EquityCurveChart.tsx`** — Results display. Each receives data via props.
 
 ### Layer 5: Pages (`pages/`) — orchestration
 
-- **`BacktestPage.tsx`** — The main page. Owns all state (`useState` for config, results, progress, errors). Wires `ConfigDrawer` → `buildOptimizeRequest()` → `runOptimizeStream()` → results components. This is the file to read to understand the full data flow. Reads `currentUser` from `useMe()` hook directly.
+- **`BacktestPage.tsx`** — The main page. Owns all state (`useState` for config, results, progress, errors). Wires `ConfigDrawer` → `buildOptimizeRequest()` → enqueue. Re-backtest, Clone, and View hydrate the drawer through `configFromOptimizeRequest` so the stored snake_case `CONFIG_JSON` becomes the camelCase form (venue, cadence, window grid, walk-forward) rather than `DEFAULT_CONFIG`. Reads `currentUser` from `useMe()` hook directly.
 - **`App.tsx`** — Sets up `BrowserRouter`, the shared MUI dark theme (`theme.ts`), and `ErrorBoundary`. Routes: `/login`, `/backtest`, `/trade/config`, `/trade/apply` (nested under `TradeLayout`). `RequireAuth` / `GuestOnly` wrappers gate auth.
 - **`LoginPage.tsx`** — Login form. On success, navigates to `/` (or the page that triggered the auth redirect via `location.state.from`).
 - **`main.tsx`** — Mounts `<App />` inside `<QueryClientProvider>` and `<StrictMode>`.

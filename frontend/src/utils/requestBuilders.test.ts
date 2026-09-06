@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest } from './requestBuilders';
+import { effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest, configFromOptimizeRequest } from './requestBuilders';
 import type { BacktestConfig, Top10Row } from '../types/backtest';
 
 function baseCfg(overrides: Partial<BacktestConfig> = {}): BacktestConfig {
@@ -85,6 +85,58 @@ describe('buildOptimizeRequest', () => {
     // rejected — and validateBacktestConfig blocks it before that.
     const req = buildOptimizeRequest(baseCfg({ dataSource: '' }));
     expect(req.data_source).toBe('');
+  });
+});
+
+describe('configFromOptimizeRequest', () => {
+  const products = [
+    { product_id: 11, product_vid: 1, internal_cusip: 'ethusdt.crypto', display_nm: 'ETH', asset_type_id: 1, exchange: null, ccy: 'USDT', description: null },
+  ];
+  const assetTypes = [
+    { asset_type_id: 1, name: 'crypto', display_name: 'Crypto', trading_period: 365 },
+  ];
+
+  it('maps a stored hourly Bybit payload back onto the drawer, not DEFAULT_CONFIG', () => {
+    // Spreading CONFIG_JSON onto BacktestConfig left dataSource=yahoo,
+    // tmIntervalId=null and tradingPeriod=365 — Re-backtest then edited
+    // a different strategy than the one on the card.
+    const stored = buildOptimizeRequest(baseCfg({
+      symbol: 'ethusdt.crypto',
+      dataSource: 'bybit',
+      tmIntervalId: 2,
+      tradingPeriod: 8_760,
+      feeBps: 10,
+      walkForward: true,
+      splitRatio: 0.7,
+      start: '2021-03-15T00:00',
+      end: '2026-09-06T12:00',
+    }));
+    const cfg = configFromOptimizeRequest(
+      stored as unknown as Record<string, unknown>,
+      baseCfg(),
+      { products, assetTypes },
+    );
+    expect(cfg.dataSource).toBe('bybit');
+    expect(cfg.tmIntervalId).toBe(2);
+    expect(cfg.tradingPeriod).toBe(8_760);
+    expect(cfg.feeBps).toBe(10);
+    expect(cfg.walkForward).toBe(true);
+    expect(cfg.splitRatio).toBe(0.7);
+    expect(cfg.start).toBe('2021-03-15T00:00');
+    expect(cfg.end).toBe('2026-09-06T12:00');
+    expect(cfg.symbol).toBe('ethusdt.crypto');
+    expect(cfg.assetType).toBe('Crypto');
+    expect(cfg.factors[0].indicator).toBe('sma');
+  });
+
+  it('treats a vendor ticker that is not a cusip as vendorSymbol', () => {
+    const cfg = configFromOptimizeRequest(
+      { symbol: 'BTC-USD', data_source: 'yahoo', tm_interval_id: 1 },
+      baseCfg(),
+    );
+    expect(cfg.symbol).toBe('');
+    expect(cfg.vendorSymbol).toBe('BTC-USD');
+    expect(cfg.dataSource).toBe('yahoo');
   });
 });
 

@@ -1,5 +1,12 @@
-import type { BacktestConfig, OptimizeRequest, PerformanceRequest, Top10Row } from '../types/backtest';
+import type { BacktestConfig, FactorConfig, OptimizeRequest, PerformanceRequest, Top10Row } from '../types/backtest';
+import type { AssetTypeRow, ProductRow } from '../types/refdata';
 import { isSingleFactorRow, multiFactorParams } from './top10';
+
+function wireValue<T>(camel: unknown, snake: unknown, fallback: T): T {
+  if (camel !== undefined) return camel as T;
+  if (snake !== undefined) return snake as T;
+  return fallback;
+}
 
 export function effectiveSymbol(cfg: BacktestConfig): string {
   return cfg.vendorSymbol || cfg.symbol;
@@ -32,6 +39,60 @@ export function buildOptimizeRequest(cfg: BacktestConfig): OptimizeRequest {
     ...(cfg.factors.length > 1 ? { conjunction: cfg.conjunction } : {}),
     walk_forward: cfg.walkForward,
     split_ratio: cfg.splitRatio,
+  };
+}
+
+/**
+ * Inverse of `buildOptimizeRequest`.
+ *
+ * Stored `CONFIG_JSON` is the wire payload (snake_case). Spreading it onto
+ * `BacktestConfig` left `dataSource`, `tmIntervalId`, `tradingPeriod` and
+ * the rest at `DEFAULT_CONFIG`, so Re-backtest / Clone opened Yahoo daily
+ * 365 for an hourly Bybit run. Asset type is not on the wire — it is
+ * recovered from `INST.PRODUCT` when the cusip is known.
+ */
+export function configFromOptimizeRequest(
+  raw: Record<string, unknown> | null | undefined,
+  defaults: BacktestConfig,
+  lookup?: { products?: ProductRow[]; assetTypes?: AssetTypeRow[] },
+): BacktestConfig {
+  if (!raw) return { ...defaults };
+
+  const wireSymbol = typeof raw.symbol === 'string' ? raw.symbol : defaults.symbol;
+  const products = lookup?.products ?? [];
+  const known = products.find(p => p.internal_cusip === wireSymbol);
+  const asCusip = Boolean(known) || wireSymbol.includes('.');
+
+  let assetType = typeof raw.assetType === 'string' && raw.assetType
+    ? raw.assetType
+    : defaults.assetType;
+  if (!assetType && known && lookup?.assetTypes) {
+    const at = lookup.assetTypes.find(a => a.asset_type_id === known.asset_type_id);
+    if (at) assetType = at.display_name;
+  }
+
+  const factors = Array.isArray(raw.factors)
+    ? raw.factors as FactorConfig[]
+    : defaults.factors;
+
+  return {
+    ...defaults,
+    symbol: asCusip ? wireSymbol : '',
+    vendorSymbol: asCusip
+      ? (typeof raw.vendorSymbol === 'string' ? raw.vendorSymbol : '')
+      : wireSymbol,
+    dataSource: wireValue(raw.dataSource, raw.data_source, defaults.dataSource),
+    assetType,
+    tmIntervalId: wireValue(raw.tmIntervalId, raw.tm_interval_id, defaults.tmIntervalId),
+    start: typeof raw.start === 'string' ? raw.start : defaults.start,
+    end: typeof raw.end === 'string' ? raw.end : defaults.end,
+    tradingPeriod: wireValue(raw.tradingPeriod, raw.trading_period, defaults.tradingPeriod),
+    feeBps: wireValue(raw.feeBps, raw.fee_bps, defaults.feeBps),
+    refreshDataset: wireValue(raw.refreshDataset, raw.refresh_dataset, defaults.refreshDataset),
+    conjunction: typeof raw.conjunction === 'string' ? raw.conjunction : defaults.conjunction,
+    factors,
+    walkForward: wireValue(raw.walkForward, raw.walk_forward, defaults.walkForward),
+    splitRatio: wireValue(raw.splitRatio, raw.split_ratio, defaults.splitRatio),
   };
 }
 

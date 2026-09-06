@@ -57,7 +57,7 @@ Use a **right-side drawer** (not a modal dialog, not a new route): MUI `Drawer` 
 
 The drawer is the natural home for two future flows:
 
-- **Clone & edit** — Opens the config drawer pre-filled from this job’s `config_json`. Preferred path for “re-run with one knob tweaked.”
+- **Clone & edit** — Opens the config drawer pre-filled from this job’s `config_json`, mapped through `configFromOptimizeRequest` (wire snake_case → drawer camelCase). Preferred path for “re-run with one knob tweaked.”
 - **Export selected as batch JSON** — Multi-select rows → bulk-export an array of `config_json` blobs. That array matches the format a future **batch import** accepts, with no extra schema.
 
 **Contract:** one **StrategyConfig** JSON schema powers the enqueue endpoint, clone/edit, hover preview, drawer Strategy tab, Raw JSON tab, and batch import/export — single source of truth, no format drift.

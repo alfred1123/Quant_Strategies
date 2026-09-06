@@ -12,12 +12,13 @@ import {
   useTmIntervals, intervalLabel,
 } from '../api/refdata';
 import { useProducts } from '../api/inst';
-import { useStoredCoverage } from '../api/marketData';
+import { useStoredCoverages } from '../api/marketData';
 import type { AssetTypeRow } from '../types/refdata';
 import { countSteps } from '../utils/grid';
 import { barsPerDay, scaleWindowRange } from '../utils/interval';
 import { validateBacktestConfig } from '../utils/validate';
-import { capturedRange, rangeFits } from '../utils/capturedRange';
+import { capturedRange, coverageIntersection, fitToCaptured, rangeFits } from '../utils/capturedRange';
+import { exchangeSeriesKeys, seriesKeyId } from '../utils/exchangeSeries';
 import type { BacktestConfig, FactorConfig } from '../types/backtest';
 import ProductSelector from './config/ProductSelector';
 import FactorCard from './config/FactorCard';
@@ -32,7 +33,8 @@ interface Props {
    * within a single event handler — see the `set()` helper below.
    */
   onChange: (next: BacktestConfig | ((prev: BacktestConfig) => BacktestConfig)) => void;
-  onRun: () => void;
+  /** Receives the config that will be enqueued — already fitted to capture. */
+  onRun: (config: BacktestConfig) => void;
   isRunning: boolean;
 }
 
@@ -59,20 +61,25 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
     () => [...tmIntervals].sort((a, b) => a.tm_interval_id - b.tm_interval_id),
     [tmIntervals],
   );
-  const tradedSeries = isExchangeSource && config.symbol && tradedApp && config.tmIntervalId
-    ? {
-      internal_cusip: config.symbol,
-      tm_interval_id: config.tmIntervalId,
-      source_app_id: tradedApp.app_id,
-    }
-    : {};
-  const { data: coverage } = useStoredCoverage(tradedSeries);
-  const captured = capturedRange(coverage);
+  const seriesKeys = useMemo(
+    () => exchangeSeriesKeys(config, apps),
+    [config, apps],
+  );
+  const coverageQueries = useStoredCoverages(seriesKeys);
+  const coverageLoading = seriesKeys.length > 0
+    && coverageQueries.some(q => q.isLoading);
+  const coverageReady = seriesKeys.length > 0
+    && coverageQueries.length === seriesKeys.length
+    && coverageQueries.every(q => q.isFetched && !q.isLoading);
+  const captured = useMemo(() => {
+    if (!coverageReady) return null;
+    const ranges = coverageQueries.map(q => capturedRange(q.data));
+    if (ranges.some(r => r === null)) return null;
+    return coverageIntersection(ranges as NonNullable<typeof ranges[number]>[]);
+  }, [coverageReady, coverageQueries]);
   // Cadence is part of the identity: daily and hourly are separately captured
   // series with their own coverage, so switching interval must re-snap.
-  const seriesId = isExchangeSource && config.symbol && tradedApp
-    ? `${config.symbol}|${tradedApp.app_id}|${config.tmIntervalId}`
-    : null;
+  const seriesId = seriesKeys.map(seriesKeyId).join(';') || null;
 
   /**
    * Snap the dates to what is captured, once per series.
@@ -88,7 +95,14 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
     if (!seriesId || !captured) return;
     if (snappedFor.current === seriesId) return;
     snappedFor.current = seriesId;
-    onChange(prev => ({ ...prev, start: captured.first, end: captured.last }));
+    // Keep a restored or edited window that the store can already serve.
+    // Only rewrite dates that would be refused (DEFAULT 2016, leftover BTC
+    // on ETH). Re-backtest must not throw away the run's own range.
+    onChange(prev => (
+      rangeFits(captured, prev.start, prev.end)
+        ? prev
+        : { ...prev, start: captured.first, end: captured.last }
+    ));
   }, [seriesId, captured, onChange]);
 
   /**
@@ -104,6 +118,21 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
     if (config.tmIntervalId !== null || dailyIntervalId === undefined) return;
     onChange(prev => ({ ...prev, tmIntervalId: dailyIntervalId }));
   }, [dailyIntervalId, config.tmIntervalId, onChange]);
+
+  /**
+   * Asset type is not stored on CONFIG_JSON. When a cusip is restored
+   * without one, fill it from the product — and do not touch
+   * tradingPeriod, which the wire payload already scaled for the cadence.
+   */
+  useEffect(() => {
+    if (config.assetType || !config.symbol) return;
+    const product = products.find(p => p.internal_cusip === config.symbol);
+    const at = product
+      ? assetTypes.find(a => a.asset_type_id === product.asset_type_id)
+      : undefined;
+    if (!at) return;
+    onChange(prev => (prev.assetType ? prev : { ...prev, assetType: at.display_name }));
+  }, [config.assetType, config.symbol, products, assetTypes, onChange]);
 
   /**
    * Periods per year for a cadence, from the asset type's daily figure.
@@ -183,7 +212,19 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
     assetTypes.find(a => a.display_name === config.assetType) ?? null;
 
   const missingFields = validateBacktestConfig(config);
-  const isRunnable = missingFields.length === 0;
+  const noCapture = coverageReady && captured === null;
+  const isRunnable = missingFields.length === 0 && !coverageLoading && !noCapture;
+
+  const handleRunClick = () => {
+    if (!isRunnable) return;
+    const fitted = captured
+      ? { ...config, ...fitToCaptured(captured, config.start, config.end) }
+      : config;
+    if (fitted.start !== config.start || fitted.end !== config.end) {
+      onChange(fitted);
+    }
+    onRun(fitted);
+  };
 
   const totalTrials = config.factors.reduce(
     (acc, f) => acc * countSteps(f.window_range) * countSteps(f.signal_range),
@@ -348,8 +389,24 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
       {isExchangeSource && captured && !rangeOutsideCapture && (
         <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
           {tradedApp?.display_name} has {captured.first} to {captured.last} captured
-          for {config.symbol} — the run reads those bars, not a provider.
+          {seriesKeys.length > 1
+            ? ' across the series in this run'
+            : ` for ${config.symbol}`}
+          {' '}— the run reads those bars, not a provider.
         </Typography>
+      )}
+
+      {coverageLoading && (
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+          Checking captured range…
+        </Typography>
+      )}
+
+      {noCapture && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          No bars captured for this series — subscribe and backfill on the Market
+          data page before running. A job submitted now would fail.
+        </Alert>
       )}
 
       {captured && rangeOutsideCapture && (
@@ -365,9 +422,11 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
             </Button>
           }
         >
-          Only {captured.first} to {captured.last} is captured for {config.symbol} on{' '}
-          {tradedApp?.display_name}, so this run will be refused rather than quietly
-          shortened. Backfill more history on the Market data page, or narrow the range.
+          Only {captured.first} to {captured.last} is captured
+          {seriesKeys.length > 1 ? ' across the series in this run' : ` for ${config.symbol} on ${tradedApp?.display_name}`}.
+          {' '}Run Optimization will use that range rather than submit a job the
+          worker will refuse. Backfill more history on the Market data page to
+          keep a wider window.
         </Alert>
       )}
 
@@ -465,7 +524,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
         <Button
           variant="contained"
           size="large"
-          onClick={onRun}
+          onClick={handleRunClick}
           disabled={isRunning || !isRunnable}
           startIcon={isRunning ? <CircularProgress size={16} color="inherit" /> : <PlayArrowRoundedIcon />}
         >
