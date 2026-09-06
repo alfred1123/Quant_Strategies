@@ -17,7 +17,7 @@ from quant.data.backtest_cache import BacktestCache
 from quant.refdata.bundle import DataCaches
 from quant.schemas.backtest import OptimizeRequest
 from quant.strategy.backtest_service import BacktestError, build_config, fetch_df
-from quant.strategy.optimizer import extract_best_params
+from quant.strategy.optimizer import OptimizeResult
 from quant.strategy.performance import (
     Performance,
     live_date_range,
@@ -57,7 +57,7 @@ def _resolve_config_and_params(
                 "no optimization result found for strategy — run backtest first"
             )
         try:
-            window, signal = extract_best_params(result_payload["best"])
+            window, signal = OptimizeResult.params_from_best(result_payload["best"])
         except ValueError as exc:
             raise LiveEvaluationError(
                 f"result payload missing best params: {exc}"

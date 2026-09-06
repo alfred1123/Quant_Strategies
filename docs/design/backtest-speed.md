@@ -1,174 +1,128 @@
-# Design: Backtest Speed Optimization
+# Design: Backtest Speed
 
-**Status:** Draft — not yet implemented (informational analysis only)
-**Date:** 2026-04-15
-**Scope:** `quant/strategy/optimizer.py`, `quant/strategy/performance.py`, `quant/strategy/{indicators,signals}.py`
+**Status:** Implemented (2026-09-06)
+**Dates:** 2026-04-15 (first analysis) · 2026-09-05 (re-profiled) · 2026-09-06 (landed)
+**Scope:** `quant/strategy/optimizer.py`, `quant/strategy/objective.py`, `tests/unit/test_objective.py`, `tests/unit/test_param_opt.py`
+**Out of scope:** `quant/strategy/performance.py` (unchanged — still the report engine)
+
+See [OOP Strategy Framework](../architecture/oop-framework.md) for the class conventions
+and [Pipeline](../architecture/pipeline.md) for where the optimizer sits.
+
+---
 
 ## 1. Problem
 
-Parameter optimization (grid search / Bayesian) is the slowest user-facing operation. A 200-trial Bollinger grid takes ~0.8 s today; a 10 000-trial multi-factor search can take minutes. The bottleneck is **per-trial overhead**, not algorithmic complexity.
+A queued backtest spends its time in `ParametersOptimization.run()` → one evaluation per
+`(window, signal)` set. Two costs stacked:
 
-## 2. Profiling Results
+1. **The objective did report-grade work for one scalar.** `Performance.enrich_performance()`
+   writes ten DataFrame columns so `get_sharpe_ratio()` can read one of them. Indicators and
+   `pct_change()` were recomputed every trial.
+2. **`optuna.samplers.GridSampler` is O(n²).** Before every trial it walks every prior trial
+   (`_get_unvisited_grid_ids`). At 420 trials this already cost ~4× the objective; at
+   `OPTUNA_MAX_TRIALS = 10_000` it extrapolated to ~0.8 s/trial — past the worker's
+   100-minute deadline.
 
-Measured on 2 500-row dataset (≈10 years daily), Bollinger band indicator, 500 iterations each:
+---
 
-| Component | Time / trial | % of total |
-|-----------|-------------|------------|
-| `df.copy()` | 0.01 ms | <1% |
-| `TechnicalAnalysis.__init__` | 0.01 ms | <1% |
-| Indicator (`get_bollinger_band`) | 0.25 ms | 6% |
-| Signal function | 0.01 ms | <1% |
-| `_compute_pnl_columns` (pandas) | ~3.1 ms | **74%** |
-| `get_sharpe_ratio` (pandas `.loc`) | ~0.3 ms | 7% |
-| Other (pct_change, object init) | ~0.5 ms | 12% |
-| **Full trial** | **4.2 ms** | 100% |
+## 2. What landed
 
-### Numpy-only alternative (same math, no DataFrame writes):
+Strict OOP. No closures capturing `self`, no `GridSampler`, no leftover Cartesian comment
+block. Public `ParametersOptimization.optimize` / `optimize_multi` / `run` signatures are
+unchanged, so `backtest_service.py` and `walk_forward.py` did not move.
 
-| Approach | Time / trial | Speedup vs current |
-|----------|-------------|-------------------|
-| Numpy PnL + Sharpe only | 0.024 ms | **149×** |
-| Cached indicator + numpy PnL + Sharpe | 0.029 ms | **120×** |
+| Class | Module | Role |
+|---|---|---|
+| `ParametersOptimization` | `optimizer.py` | Build `SearchSpace` + `Objective`, pick the search, shape `OptimizeResult` |
+| `SearchSpace` | `optimizer.py` | Named axes, product size, param ↔ `(windows, signals)` |
+| `SearchStrategy` (ABC) | `optimizer.py` | `log_start` + `search` — no `isinstance` in the orchestrator |
+| `ExhaustiveSearch` | `optimizer.py` | `itertools.product` + `study.add_trial` (restores [decision #7](../decisions.md)) |
+| `BayesianSearch` | `optimizer.py` | `TPESampler`; `suggest_and_evaluate` is a method, not a closure |
+| `Objective` (ABC) | `objective.py` | Precompute `chg` / fee / period; numpy Sharpe including `MIN_METRIC_OBS` (#63) |
+| `SingleFactorObjective` | `objective.py` | One `IndicatorCache`, `config.signal_func` |
+| `MultiFactorObjective` | `objective.py` | One cache per `SubStrategy`; `combine_positions` with strengths |
+| `IndicatorCache` | `objective.py` | `{window: ndarray}` via `TechnicalAnalysis`, `reindex`-aligned (RSI is short) |
 
-The 120× speedup is achievable because:
-1. `_compute_pnl_columns` writes 7 pandas DataFrame columns per trial — but the optimizer only needs the Sharpe ratio scalar.
-2. Indicators are recomputed from scratch every trial, even when the window hasn't changed (many `(window, signal)` pairs share the same window).
-3. `pct_change()` is recomputed every trial — it depends only on price data, not on window/signal.
+`Performance` is still the engine for best-trial metrics, equity curves, walk-forward
+IS/OOS evaluation, and live `compute_latest_position`. The objective is tested against it,
+never allowed to call it.
 
-## 3. Proposed Optimizations
+**Coverage fail-fast.** A cross-product factor below 80 % date coverage used to fail every
+trial (`-inf`) and finish as an empty `COMPLETED` job. The check now runs once in the
+`Objective` constructor and raises `ValueError`, so the worker writes `FAILED` with the
+cause. See [decision #64](../decisions.md).
 
-### O-1: Fast Sharpe objective (numpy-only path in `param_opt.py`)
+---
 
-**Impact: ~100× for single-factor optimization**
+## 3. Profiling (2026-09-05, before the change)
 
-Add a numpy-only Sharpe computation directly in the `objective()` closure, bypassing `Performance` + `_compute_pnl_columns` entirely during optimization.
+2 500-row synthetic daily series, Bollinger, `momentum_band_signal`, fee 5 bps, period 365.
+Python 3.12.3 / optuna 4.8.0 / pandas 3.0.3 / numpy 2.4.6. `time.perf_counter()`, 200 reps.
 
-```
-# Pre-compute once outside the trial loop:
-chg = data['price'].pct_change().values
-tc  = fee_bps / 10_000
+| Component | ms / trial |
+|---|---|
+| `Performance.__init__` | 0.04 |
+| `_trade_enrich_positions` | 1.70 |
+| `_compute_pnl_columns` | 2.69 |
+| `get_sharpe_ratio` | 0.17 |
+| **Full objective** | **4.60** |
+| numpy Sharpe on a cached indicator | **0.054** (bit-identical on that data) |
 
-# Per trial (numpy only):
-indicator_vals = indicator_func(window)       # pandas → .values
-position = signal_func(indicator_vals, signal) # already returns ndarray
-pos_x1 = np.empty_like(position)
-pos_x1[0] = np.nan; pos_x1[1:] = position[:-1]
-trade = np.abs(position - pos_x1)
-pnl = pos_x1 * chg - trade * tc
-sl = pnl[max_window:]
-mask = ~np.isnan(sl)
-sharpe = np.mean(sl[mask]) / np.std(sl[mask], ddof=1) * np.sqrt(trading_period)
-```
+`GridSampler` overhead, constant objective: 2.2 / 18.3 / 59.4 / 160 ms per trial at
+100 / 420 / 1 000 / 2 000 trials. `TPESampler` at 10 000 trials: 37 ms/trial.
+`study.add_trial` + `best_value`: 0.16 ms/trial at 420, 0.98 ms at 10 000.
 
-**Trade-off:** The optimizer no longer builds full `Performance` DataFrames. The final best-params result still uses the full `Performance` path (for all metrics + visualization).
+End-to-end `optimize` on a 20×21 grid: **10.88 s (25.9 ms/trial)** — ~80 % sampler.
 
-**Risk:** Low — same math, just avoids pandas column assignment overhead. Must validate numerical equivalence in tests.
+Do not call `study.trials` or `study.get_trials()` (default `deepcopy=True`) inside the
+trial loop; both scan-and-copy the whole study.
 
-### O-2: Indicator cache by window (`param_opt.py`)
+---
 
-**Impact: ~5–10× fewer indicator computations**
+## 4. Math contract with `Performance`
 
-For single-factor optimization, many trials share the same window (varying only signal). Pre-compute all indicators for all unique windows once, then look up per trial.
+| `Performance` | `Objective` |
+|---|---|
+| `price.pct_change()` per trial | once, via the same pandas call |
+| same-cusip single factor: indicator on the loaded `factor` column (`data_column` ignored) | same |
+| other-cusip / multi: `sub.data_column`, 80 % coverage check | once, at construction |
+| `indicator_func(w).reindex(index)` | cached after the same `reindex` |
+| `FinalPosition.shift(1)` → trade → pnl | ndarray slice / `abs` / multiply |
+| `iloc[max(windows):]`, skipna `std(ddof=1)`, zero-std → NaN | `finite.size < MIN_METRIC_OBS` → NaN, then the same std guard |
+| per-trial exception → `-inf` | constructor errors propagate; per-trial exceptions still `-inf` |
 
-```python
-# Before study.optimize():
-ta = TechnicalAnalysis(data)
-indicator_func = getattr(ta, config.indicator_name)
-indicator_cache = {}
-for w in window_values:
-    indicator_cache[w] = indicator_func(w).values  # compute once
+---
 
-# In objective():
-ind_arr = indicator_cache[window]  # O(1) lookup
-```
+## 5. Tests
 
-For multi-factor, extend to per-factor caches:
-```python
-factor_caches = []  # list of {window: ndarray}
-for i, sub in enumerate(subs):
-    ta_i = TechnicalAnalysis(sub_data_i)
-    func_i = getattr(ta_i, sub.indicator_name)
-    factor_caches.append({w: func_i(w).values for w in window_ranges[i]})
-```
+- Existing `tests/unit/test_param_opt.py` / `test_walk_forward.py` — result shape, TPE log
+  token, callbacks, dispatch.
+- `TestObjectiveEquivalence` — every `TechnicalAnalysis` indicator × every
+  `SignalDirection` function × 10 random pairs; multi-factor AND/OR/FILTER; cross-product;
+  flat series; window ≥ row count; fee_bps. Tolerance `1e-12`, NaN ↔ NaN.
+- `TestIndicatorCache`, `TestSearchSelection`, `TestExhaustiveSearch`, `TestCoverageFailFast`.
 
-### O-3: Pre-compute `pct_change()` once
+---
 
-**Impact: Minor (~0.1 ms/trial saved)**
+## 6. What did not change
 
-Currently `_enrich_single_factor()` calls `self.data['price'].pct_change()` inside every trial. Move it outside the loop:
+- `Performance` methods, `TechnicalAnalysis`, `SignalDirection`, `combine_positions`.
+- `OptimizeResult` (``best_params`` / ``params_from_best``), `OPTUNA_MAX_TRIALS`, `OPTUNA_SEED`.
+- SSE `init` / `progress` / `result` and the callback signature (`trial.number`,
+  `study.best_value`).
+- Anything in the database.
 
-```python
-chg = self.data['price'].pct_change().values  # once
-```
+Bayesian (TPE) jobs remain TPE-bound (~37 ms/trial at 10 000). That path is only taken
+when the space exceeds `OPTUNA_MAX_TRIALS`. Measure before changing the sampler.
 
-This is subsumed by O-1 (which pre-computes `chg` outside the loop), but is also a standalone micro-optimization if O-1 is deferred.
+---
 
-### O-4: Multi-factor numpy fast path
+## 7. Rejected alternatives
 
-**Impact: ~50–100× for multi-factor optimization**
-
-Same principle as O-1 but for `optimize_multi()`. Pre-compute per-factor indicator caches (O-2), then in each trial:
-
-1. Look up cached indicator arrays per factor
-2. Apply signal functions (already numpy)
-3. Combine positions with `combine_positions()` (already numpy-based)
-4. Compute Sharpe via numpy
-
-Requires `combine_positions` to accept raw numpy arrays (it already does via `np.where`).
-
-## 4. What Does NOT Change
-
-- **`Performance` class** — unchanged. `enrich_performance()` / `_compute_pnl_columns()` remain the canonical path for single-run backtests, result visualization, and CSV export.
-- **`get_sharpe_ratio()` and other metric methods** — unchanged. Only the optimization objective uses the fast numpy path.
-- **Signal functions** — unchanged (already return numpy arrays).
-- **`TechnicalAnalysis` indicator methods** — unchanged (called once per window, cached).
-- **`main.py` / `app.py` / API single-backtest** — unchanged. Speed optimization only applies to `param_opt.py` optimization loops.
-
-## 5. Implementation Plan
-
-| Phase | Change | Files | Est. Speedup |
-|-------|--------|-------|-------------|
-| 1 | O-1 + O-2 + O-3: Fast single-factor objective | `param_opt.py` | ~100× |
-| 2 | O-4: Fast multi-factor objective | `param_opt.py` | ~50–100× |
-| 3 | Numerical equivalence tests | `tests/unit/test_param_opt.py` | — |
-
-### Phase 1 detail
-
-In `ParametersOptimization.optimize()`:
-1. Pre-compute `chg = self.data['price'].pct_change().values`
-2. Build `indicator_cache = {w: indicator_func(w).values for w in window_values}`
-3. Replace `objective()` body with numpy-only Sharpe (O-1), using cached indicators (O-2)
-4. After `study.optimize()`, reconstruct full `Performance` only for the best trial (for the `OptimizeResult` metrics/plots)
-
-### Phase 2 detail
-
-In `ParametersOptimization.optimize_multi()`:
-1. Pre-compute per-factor `chg` arrays and indicator caches
-2. Replace multi-factor `objective()` with numpy-only path using `combine_positions` on raw arrays
-3. Same post-optimization full-Performance reconstruction
-
-## 6. Testing
-
-- **Numerical equivalence**: For each indicator × signal type, run 10 random (window, signal) pairs through both the pandas `Performance` path and the numpy fast path. Assert Sharpe ratios match within `1e-10`.
-- **Edge cases**: NaN-heavy data, zero-std positions, single-row data, all-flat positions.
-- **Regression**: Existing 342 tests must pass unchanged.
-- **Benchmark**: Before/after timing on 200-trial and 2000-trial grids, logged to stdout (not committed).
-
-## 7. Risks & Mitigations
-
-| Risk | Mitigation |
-|------|-----------|
-| Numerical drift between pandas and numpy paths | Equivalence tests with tight tolerance |
-| Indicator cache memory for large window ranges | Cache is `O(n_windows × n_rows)` — at 100 windows × 10k rows × 8 bytes = 8 MB, negligible |
-| Multi-factor `combine_positions` assumes numpy input | Already uses `np.where` / `np.searchsorted` — verify with unit tests |
-| Breaking the SSE progress callback | Callbacks still fire per-trial in `study.optimize()` — no change to callback mechanism |
-
-## 8. Expected Outcome
-
-| Scenario | Current | After |
-|----------|---------|-------|
-| 200-trial single-factor (Bollinger) | ~0.8 s | ~0.06 s |
-| 2 000-trial single-factor | ~8 s | ~0.6 s |
-| 10 000-trial multi-factor (2 factors) | ~42 s | ~1–2 s |
-
-These estimates assume 2 500-row datasets. Larger datasets scale linearly with row count for the numpy path.
+| Alternative | Why not |
+|---|---|
+| Subclass `GridSampler` and cache unvisited ids | Private optuna internals; the exhaustive case does not need a sampler |
+| Drop optuna | `extract_plots()` and TPE need it — keep it as recorder + Bayesian |
+| Speed up `Performance` itself | Its cost *is* its output (ten report columns) |
+| Multiprocessing inside one job | `MAX_CONCURRENT_WORKERS` is the parallelism knob; it does not remove O(n²) |
+| Procedural closures that "just precompute" | Rejected: new code follows the OOP framework |

@@ -28,7 +28,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from quant.strategy.optimizer import ParametersOptimization, extract_best_params
+from quant.strategy.optimizer import ParametersOptimization
 from quant.strategy.performance import Performance
 
 logger = logging.getLogger(__name__)
@@ -117,7 +117,7 @@ class WalkForward:
             is_data_dict, self.config, fee_bps=self.fee_bps,
         ).run(window_values, signal_values)
 
-        best_window, best_signal = extract_best_params(opt_result.best)
+        best_window, best_signal = opt_result.best_params()
 
         logger.info("In-sample best: window=%s, signal=%s, Sharpe=%.4f",
                     best_window, best_signal, opt_result.best['sharpe'])
