@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from quant.api.schemas.jobs import EnqueueRequest
-from quant.api.services.jobs import JobsService, StrategyNameMismatch
+from quant.api.services.jobs import JobsService, StrategyNameMismatch, StrategyNotFound
 
 
 @pytest.fixture
@@ -91,3 +91,27 @@ def test_enqueue_refuses_a_config_with_no_cadence(svc: JobsService) -> None:
         svc.enqueue("user-uuid", req)
 
     svc._repo.sp_ins_strategy.assert_not_called()
+
+
+def test_set_logical_delete_requires_a_queue_row(svc: JobsService) -> None:
+    sid = uuid.uuid4()
+    svc._repo.sp_get_queue.return_value = []
+
+    with pytest.raises(StrategyNotFound):
+        svc.set_logical_delete("user-uuid", sid, "Y")
+
+    svc._repo.sp_upd_strategy_logical_delete.assert_not_called()
+
+
+def test_set_logical_delete_flips_the_lineage(svc: JobsService) -> None:
+    sid = uuid.uuid4()
+    svc._repo.sp_get_queue.return_value = [{"queue_id": uuid.uuid4()}]
+
+    svc.set_logical_delete("user-uuid", sid, "Y")
+
+    svc._repo.sp_upd_strategy_logical_delete.assert_called_once_with(
+        strategy_id=sid,
+        strategy_vid=None,
+        logical_delete_ind="Y",
+        user_id="user-uuid",
+    )

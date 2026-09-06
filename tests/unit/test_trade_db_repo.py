@@ -44,7 +44,7 @@ def _deployment_kwargs(**overrides):
 
 
 def _owned_strategy(app_user_id):
-    return {"user_id": str(app_user_id)}
+    return {"user_id": str(app_user_id), "logical_delete_ind": "N"}
 
 
 class TestValidateCreateDeployment:
@@ -139,6 +139,25 @@ class TestValidateCreateDeployment:
             **_deployment_kwargs(app_user_id=uid, is_paper_ind="N"),
             confirm_live=True,
         )
+
+
+    @patch.object(TradeRepo, "_fetch_credential")
+    @patch.object(TradeRepo, "_fetch_strategy")
+    def test_logically_deleted_strategy_rejected(self, mock_strat, mock_cred, repo):
+        uid = uuid4()
+        mock_cred.return_value = {
+            "app_user_id": uid,
+            "app_id": 10,
+            "is_active_ind": "Y",
+            "is_current_ind": "Y",
+        }
+        mock_strat.return_value = {
+            "user_id": str(uid),
+            "logical_delete_ind": "Y",
+        }
+        with pytest.raises(TradeValidationError, match="logically deleted") as exc:
+            repo.validate_create_deployment(**_deployment_kwargs(app_user_id=uid))
+        assert exc.value.status_code == 400
 
 
 class TestValidateDryRun:

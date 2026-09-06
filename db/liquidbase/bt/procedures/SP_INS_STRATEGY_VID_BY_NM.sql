@@ -89,9 +89,11 @@ BEGIN
         CONFIG_JSON,
         USER_ID,
         CREATED_AT,
+        UPDATED_AT,
         TRANSACT_FROM_TS,
         TRANSACT_TO_TS,
-        IS_BEST_IND
+        IS_BEST_IND,
+        LOGICAL_DELETE_IND
     ) VALUES (
         V_STRATEGY_ID,
         V_VID,
@@ -100,8 +102,10 @@ BEGIN
         IN_USER_ID,
         V_START_TS,
         V_START_TS,
+        V_START_TS,
         TIMESTAMPTZ '9999-12-31 00:00:00+00',
-        CASE WHEN V_VID = 1 THEN 'Y' ELSE 'N' END
+        CASE WHEN V_VID = 1 THEN 'Y' ELSE 'N' END,
+        'N'
     );
 
     OUT_STRATEGY_ID  := V_STRATEGY_ID;

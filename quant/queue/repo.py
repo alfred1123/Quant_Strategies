@@ -255,3 +255,27 @@ class BtQueueRepo(DbGateway):
             (user_id, int(limit), is_best_ind),
         )
 
+    def sp_upd_strategy_logical_delete(
+        self,
+        *,
+        strategy_id: uuid.UUID | str,
+        logical_delete_ind: str,
+        user_id: str,
+        strategy_vid: int | None = None,
+    ) -> None:
+        """Wrap ``BT.SP_UPD_STRATEGY_LOGICAL_DELETE``.
+
+        ``strategy_vid=None`` flips every VID of the lineage.
+        """
+        self._call_write(
+            "CALL bt.sp_upd_strategy_logical_delete("
+            "%s::uuid, %s::integer, %s::char, %s::text,"
+            " NULL::text, NULL::text, NULL::text)",
+            (
+                str(strategy_id),
+                _opt(int, strategy_vid),
+                logical_delete_ind,
+                user_id,
+            ),
+        )
+

@@ -4,8 +4,9 @@
 --                  promotion history. When NULL, returns the global log.
 -- IN_LIMIT        optional — row cap (defaults to 200 when NULL).
 --
--- STRATEGY_NM and the live IS_BEST_IND flag are resolved via a LEFT JOIN
--- on the frozen BT.STRATEGY snapshot (STRATEGY_ID + STRATEGY_VID). The
+-- STRATEGY_NM, live IS_BEST_IND, and LOGICAL_DELETE_IND are resolved via a
+-- LEFT JOIN on the frozen BT.STRATEGY snapshot (STRATEGY_ID + STRATEGY_VID).
+-- The
 -- candidate's shredded performance metrics are pulled from the latest
 -- BT.RESULT row for the decision's QUEUE_ID so the Promotion tab can
 -- rank VIDs and reconstruct the soft-metric comparison without N+1
@@ -46,6 +47,7 @@ BEGIN
                P.STRATEGY_VID,
                S.STRATEGY_NM,
                S.IS_BEST_IND,
+               S.LOGICAL_DELETE_IND,
                P.OUTCOME,
                P.COMPARED_VID,
                P.GATE_RESULTS,

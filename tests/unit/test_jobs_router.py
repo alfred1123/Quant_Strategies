@@ -323,6 +323,49 @@ class TestPromote:
         assert resp.status_code == 422
 
 
+# ── POST /api/v1/backtest/jobs/strategies/{id}/logical-delete ─────────
+
+
+class TestLogicalDelete:
+    def test_happy_path_lineage(self, client_and_svc):
+        client, svc, user = client_and_svc
+        sid = uuid.uuid4()
+        svc.set_logical_delete.return_value = None
+
+        resp = client.post(
+            f"/api/v1/backtest/jobs/strategies/{sid}/logical-delete",
+            json={"logical_delete_ind": "Y"},
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["strategy_id"] == str(sid)
+        assert data["logical_delete_ind"] == "Y"
+        assert data["strategy_vid"] is None
+        svc.set_logical_delete.assert_called_once_with(
+            str(user.app_user_id), sid, "Y", None,
+        )
+
+    def test_not_found_returns_404(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        from quant.api.services.jobs import StrategyNotFound
+        svc.set_logical_delete.side_effect = StrategyNotFound("missing")
+
+        resp = client.post(
+            f"/api/v1/backtest/jobs/strategies/{uuid.uuid4()}/logical-delete",
+            json={"logical_delete_ind": "N"},
+        )
+        assert resp.status_code == 404
+
+    def test_invalid_flag_returns_422(self, client_and_svc):
+        client, _, _ = client_and_svc
+        resp = client.post(
+            f"/api/v1/backtest/jobs/strategies/{uuid.uuid4()}/logical-delete",
+            json={"logical_delete_ind": "X"},
+        )
+        assert resp.status_code == 422
+
+
 # ── auth gating (only checks the route is wired through require_user) ──
 
 

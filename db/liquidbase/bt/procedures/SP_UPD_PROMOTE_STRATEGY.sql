@@ -43,13 +43,15 @@ BEGIN
     OUT_SQLMSG := '15';
     IF IN_STRATEGY_VID IS NULL THEN
         UPDATE BT.STRATEGY
-           SET IS_BEST_IND = 'N'
+           SET IS_BEST_IND = 'N',
+               UPDATED_AT  = NOW() AT TIME ZONE 'UTC'
          WHERE STRATEGY_ID = IN_STRATEGY_ID
            AND IS_BEST_IND = 'Y';
 
         -- Fallback: VID 1 is always the default best when none qualifies.
         UPDATE BT.STRATEGY
-           SET IS_BEST_IND = 'Y'
+           SET IS_BEST_IND = 'Y',
+               UPDATED_AT  = NOW() AT TIME ZONE 'UTC'
          WHERE STRATEGY_ID  = IN_STRATEGY_ID
            AND STRATEGY_VID = 1
            AND NOT EXISTS (
@@ -97,14 +99,16 @@ BEGIN
     -- Step 40: Demote current best.
     OUT_SQLMSG := '40';
     UPDATE BT.STRATEGY
-       SET IS_BEST_IND = 'N'
+       SET IS_BEST_IND = 'N',
+           UPDATED_AT  = NOW() AT TIME ZONE 'UTC'
      WHERE STRATEGY_ID = IN_STRATEGY_ID
        AND IS_BEST_IND = 'Y';
 
     -- Step 50: Promote target VID.
     OUT_SQLMSG := '50';
     UPDATE BT.STRATEGY
-       SET IS_BEST_IND = 'Y'
+       SET IS_BEST_IND = 'Y',
+           UPDATED_AT  = NOW() AT TIME ZONE 'UTC'
      WHERE STRATEGY_ID  = IN_STRATEGY_ID
        AND STRATEGY_VID = IN_STRATEGY_VID;
 

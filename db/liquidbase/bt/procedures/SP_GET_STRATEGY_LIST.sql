@@ -3,6 +3,8 @@
 -- IN_USER_ID      required — caller's identity; only that owner's rows are returned.
 -- IN_LIMIT        optional — row cap (defaults to 200 when NULL).
 -- IN_IS_BEST_IND  optional — pass 'Y' for best VID per strategy only; NULL for all VIDs.
+-- Logically deleted rows (LOGICAL_DELETE_IND = 'Y') are omitted — the picker
+-- is a deploy catalog, not a history list.
 --
 -- Shredded metrics from the current BT.RESULT row (IS_CURRENT_IND = 'Y')
 -- for the same (STRATEGY_ID, STRATEGY_VID).
@@ -48,6 +50,7 @@ BEGIN
                S.STRATEGY_VID,
                S.STRATEGY_NM,
                S.IS_BEST_IND,
+               S.LOGICAL_DELETE_IND,
                S.CREATED_AT,
                R.SHARPE_RATIO,
                R.CALMAR_RATIO,
@@ -60,6 +63,7 @@ BEGIN
            AND R.STRATEGY_VID    = S.STRATEGY_VID
            AND R.IS_CURRENT_IND  = 'Y'
          WHERE S.USER_ID = IN_USER_ID
+           AND S.LOGICAL_DELETE_IND = 'N'
            AND (IN_IS_BEST_IND IS DISTINCT FROM 'Y' OR S.IS_BEST_IND = 'Y')
          ORDER BY S.CREATED_AT DESC, S.STRATEGY_NM ASC, S.STRATEGY_VID DESC
          LIMIT V_LIMIT;

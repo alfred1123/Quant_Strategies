@@ -253,12 +253,13 @@ with no N+1 round-trips.
 
 Content:
 
-- **Recommended strategy banner** — the overall best strategy across all `strategy_id`s (highest Sharpe among rows with `IS_BEST_IND = 'Y'`)
-- **Strategy list** — accordions grouped by `strategy_id`, showing all VIDs with their promotion outcome chip (PROMOTED / KEPT / DEMOTED / REJECTED, label from `REFDATA.PROMOTION_STATE`), Sharpe/Calmar, and a "Best" chip on the current best VID
+- **Recommended strategy banner** — the overall best strategy across all `strategy_id`s (highest Sharpe among rows with `IS_BEST_IND = 'Y'` and `LOGICAL_DELETE_IND <> 'Y'`)
+- **Strategy list** — accordions grouped by `strategy_id`, showing all VIDs with their promotion outcome chip (PROMOTED / KEPT / DEMOTED / REJECTED, label from `REFDATA.PROMOTION_STATE`), Sharpe/Calmar, a "Best" chip on the current best VID, and a "Removed" chip when `LOGICAL_DELETE_IND = 'Y'`
 - **VID comparison panel** — click a VID to see hard gate results (pass/fail per gate with value + threshold from the `GATE_RESULTS` snapshot) and a soft-metric comparison vs the `COMPARED_VID` baseline; the first decisive soft metric (walked in `REFDATA.PROMOTION_METRIC` priority order) is highlighted. **VID 1 and any current-best re-run write `compared_vid = NULL`** — they have no opponent, and the panel says “Baseline VID — no other version to compare” rather than mirroring this row against itself. Legacy rows that stored `compared_vid` equal to this VID are treated the same.
 - **Promotion rules card** — read-only display of `REFDATA.PROMOTION_METRIC` (hard gates with thresholds, then soft metrics in priority order)
 - **"Re-backtest" button** — fetches the decision's frozen `config_json` via its `QUEUE_ID`, prefills the Backtest drawer, and switches to the Backtest tab
 - **"Deploy" button** — navigates to the Trade tab (`/trade/apply`) carrying `strategyId` + `strategyVid` in router state, ready for the Phase 1.7 apply form
+- **"Remove" / "Restore"** — flips `LOGICAL_DELETE_IND` on the lineage (`POST /backtest/jobs/strategies/{id}/logical-delete`). Remove drops the card from Recommended and the Trade picker; Restore puts it back. The decision log still lists it.
 
 The soft-comparison baseline reuses the decision row whose `strategy_vid` equals
 `compared_vid` within the same strategy group — each row already carries that VID's
@@ -267,6 +268,20 @@ shredded metrics, so no extra fetch is needed.
 ### 5c. Design principle — progressive disclosure
 
 Each tab answers a different question at a different stage. Adding a tab is justified when the **mental model** changes, not just when there is more data. The Promotion tab is a genuinely different task (strategy improvement) from Queue (job monitoring).
+
+### 5d. Logical delete — retiring a strategy that should not be used
+
+`IS_BEST_IND` answers "which VID is best". It cannot answer "this lineage should not be used": VID 1 is always the default best, and demote-only restores it. A buggy VID-1 result (decision #63's toy-sample Sharpe) therefore stayed on the Recommended banner.
+
+`LOGICAL_DELETE_IND` is the third flag, orthogonal to temporal versioning and quality:
+
+| Flag | Meaning |
+|------|---------|
+| `TRANSACT_TO_TS = 9999-12-31` | Latest version |
+| `IS_BEST_IND = 'Y'` | Best-performing VID |
+| `LOGICAL_DELETE_IND = 'Y'` | Retired from the pool — not recommended, not pickable, not newly deployable |
+
+Flipped in place by `SP_UPD_STRATEGY_LOGICAL_DELETE` (one VID, or the whole `STRATEGY_ID` when VID is omitted). `UPDATED_AT` stamps the write; GET procedures do not return it. New inserts are `'N'`. `SP_GET_STRATEGY_LIST` omits `'Y'` rows so the Trade picker cannot offer them. `SP_GET_PROMOTION` still returns them so the tab can show history and Restore.
 
 ## 6. Shared Strategy Pool
 

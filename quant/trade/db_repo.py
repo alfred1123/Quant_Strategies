@@ -66,6 +66,10 @@ class TradeRepo(DbGateway):
             raise TradeValidationError(
                 "strategy does not belong to user", status_code=403
             )
+        if row.get("logical_delete_ind") == "Y":
+            raise TradeValidationError(
+                "strategy is logically deleted", status_code=400
+            )
         return row
 
     def _assert_credential_usable(

@@ -14,6 +14,7 @@ export interface PromotionRow {
   strategy_vid: number;
   strategy_nm: string | null;
   is_best_ind: string | null;
+  logical_delete_ind: string | null;
   outcome: string;
   compared_vid: number | null;
   gate_results: GateResult[] | null;

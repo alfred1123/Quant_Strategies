@@ -245,6 +245,31 @@ class JobsService:
             user_id=user_id,
         )
 
+    def set_logical_delete(
+        self,
+        user_id: str,
+        strategy_id: uuid.UUID,
+        logical_delete_ind: str,
+        strategy_vid: int | None = None,
+    ) -> None:
+        """Set ``LOGICAL_DELETE_IND`` on a strategy (or one VID).
+
+        Same ownership gate as :meth:`promote`: the caller must have a queue
+        row for this ``strategy_id``.
+        """
+        ownership = self._repo.sp_get_queue(
+            strategy_id=strategy_id, user_id=user_id, limit=1,
+        )
+        if not ownership:
+            raise StrategyNotFound(str(strategy_id))
+
+        self._repo.sp_upd_strategy_logical_delete(
+            strategy_id=strategy_id,
+            strategy_vid=strategy_vid,
+            logical_delete_ind=logical_delete_ind,
+            user_id=user_id,
+        )
+
     # ── SSE polling ─────────────────────────────────────────────────────
 
     def snapshot_status(self, user_id: str, queue_id: uuid.UUID) -> dict | None:

@@ -17,7 +17,7 @@ from quant.api.auth.dependencies import require_user
 from quant.api.auth.models import CurrentUser
 from quant.shared.config import get_redis_url
 from quant.api.deps import get_data_caches
-from quant.api.schemas.jobs import EnqueueRequest, EnqueueResponse, JobDetail, JobRow, PromoteRequest
+from quant.api.schemas.jobs import EnqueueRequest, EnqueueResponse, JobDetail, JobRow, LogicalDeleteRequest, PromoteRequest
 from quant.api.services.jobs import (
     CancelNotAllowed,
     JobNotFound,
@@ -171,6 +171,36 @@ def promote_strategy(
     except StrategyNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return {"strategy_id": str(strategy_id), "promoted_vid": req.strategy_vid}
+
+
+# ── POST /strategies/{strategy_id}/logical-delete ──────────────────────
+
+
+@router.post(
+    "/strategies/{strategy_id}/logical-delete",
+    status_code=status.HTTP_200_OK,
+)
+def logical_delete_strategy(
+    strategy_id: UUID,
+    req: LogicalDeleteRequest,
+    user: CurrentUser = Depends(require_user),
+    svc: JobsService = Depends(get_jobs_service),
+) -> dict:
+    """Set LOGICAL_DELETE_IND on a strategy lineage (or one VID)."""
+    try:
+        svc.set_logical_delete(
+            str(user.app_user_id),
+            strategy_id,
+            req.logical_delete_ind,
+            req.strategy_vid,
+        )
+    except StrategyNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return {
+        "strategy_id": str(strategy_id),
+        "logical_delete_ind": req.logical_delete_ind,
+        "strategy_vid": req.strategy_vid,
+    }
 
 
 # ── GET /jobs/{id}/events (SSE) ─────────────────────────────────────────

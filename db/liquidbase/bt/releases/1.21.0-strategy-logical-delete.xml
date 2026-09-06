@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      A strategy that should not be used (bug, toy-sample metrics, retired
+      recipe) cannot be hidden with IS_BEST_IND: VID 1 is always the default
+      best, and demote-only restores it. LOGICAL_DELETE_IND is the usability
+      flag, flipped in place like IS_BEST_IND — not a new STRATEGY_VID.
+      UPDATED_AT stamps those in-place edits (and the insert); GET procedures
+      do not return it.
+
+      'N' on every existing row (nothing is retired until someone says so).
+      New inserts write 'N'. SP_GET_STRATEGY_LIST omits 'Y' so the Trade
+      picker cannot offer them; SP_GET_PROMOTION still returns them so the
+      Promotion tab can show a Removed chip and Restore.
+    -->
+
+    <changeSet id="1.21.0-001-strategy-logical-delete-ind" author="alfcheun" context="bt,prod-deploy">
+        <comment>BT.STRATEGY.LOGICAL_DELETE_IND + UPDATED_AT — retire a lineage; stamp in-place edits</comment>
+        <sql>
+            ALTER TABLE BT.STRATEGY ADD COLUMN IF NOT EXISTS LOGICAL_DELETE_IND CHAR(1);
+            ALTER TABLE BT.STRATEGY ADD COLUMN IF NOT EXISTS UPDATED_AT TIMESTAMPTZ;
+
+            UPDATE BT.STRATEGY
+               SET LOGICAL_DELETE_IND = 'N'
+             WHERE LOGICAL_DELETE_IND IS NULL;
+
+            UPDATE BT.STRATEGY
+               SET UPDATED_AT = CREATED_AT
+             WHERE UPDATED_AT IS NULL;
+
+            ALTER TABLE BT.STRATEGY ALTER COLUMN LOGICAL_DELETE_IND SET NOT NULL;
+            ALTER TABLE BT.STRATEGY ALTER COLUMN UPDATED_AT SET NOT NULL;
+        </sql>
+        <rollback>
+            ALTER TABLE BT.STRATEGY DROP COLUMN IF EXISTS LOGICAL_DELETE_IND;
+            ALTER TABLE BT.STRATEGY DROP COLUMN IF EXISTS UPDATED_AT;
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.21.0-002-sp-ins-strategy-logical-delete" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_INS_STRATEGY — new VIDs start LOGICAL_DELETE_IND='N'</comment>
+        <sqlFile path="../procedures/SP_INS_STRATEGY_VID_BY_NM.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.21.0-003-sp-get-strategy-logical-delete" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_STRATEGY — add LOGICAL_DELETE_IND to every cursor</comment>
+        <sqlFile path="../procedures/SP_GET_STRATEGY.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.21.0-004-sp-get-strategy-list-logical-delete" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_STRATEGY_LIST — omit logically deleted rows from the Trade picker</comment>
+        <sqlFile path="../procedures/SP_GET_STRATEGY_LIST.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.21.0-005-sp-get-promotion-logical-delete" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_PROMOTION — surface live LOGICAL_DELETE_IND on each decision</comment>
+        <sqlFile path="../procedures/SP_GET_PROMOTION.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.21.0-006-sp-upd-strategy-logical-delete" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_UPD_STRATEGY_LOGICAL_DELETE — flip the flag (VID or whole lineage)</comment>
+        <sqlFile path="../procedures/SP_UPD_STRATEGY_LOGICAL_DELETE.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback>
+            <sql>DROP PROCEDURE IF EXISTS BT.SP_UPD_STRATEGY_LOGICAL_DELETE(UUID, INTEGER, CHAR, TEXT, TEXT, TEXT, TEXT);</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.21.0-007-sp-upd-promote-strategy-updated-at" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_UPD_PROMOTE_STRATEGY — stamp UPDATED_AT on IS_BEST_IND flips</comment>
+        <sqlFile path="../procedures/SP_UPD_PROMOTE_STRATEGY.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

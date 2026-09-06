@@ -30,5 +30,6 @@
     <!-- 1.19 reads CONFIG_JSON.tm_interval_id, which 1.18 is what backfills -->
     <include file="releases/1.19.0-strategy-nm-cadence.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.20.0-queue-poll-no-audit.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.21.0-strategy-logical-delete.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

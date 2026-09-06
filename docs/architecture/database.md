@@ -35,6 +35,8 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `IS_CURRENT_IND` | — | Soft-versioning flag (`CHAR(1)` Y/N) — **deprecated** in `BT.STRATEGY`, replaced by `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` |
 | `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` | — | Transaction-time window (`TIMESTAMPTZ`). Active row: `TRANSACT_TO_TS = '9999-12-31'` |
 | `IS_BEST_IND` | — | Best-performing version flag (`CHAR(1)` Y/N, no DEFAULT). Used on `BT.STRATEGY`. |
+| `LOGICAL_DELETE_IND` | — | Usability flag (`CHAR(1)` Y/N, no DEFAULT) on `BT.STRATEGY`. `'Y'` retires the row from the Trade picker, Recommended banner, and new deploys; history stays. Orthogonal to `IS_BEST_IND`. |
+| `UPDATED_AT` | — | In-place mutation stamp on genuinely mutable tables. On `BT.STRATEGY` it is set at insert (same instant as `CREATED_AT`) and bumped when `IS_BEST_IND` or `LOGICAL_DELETE_IND` flips. **Not** returned by `SP_GET_*`. |
 
 ### INTERNAL_CUSIP Convention
 
@@ -197,13 +199,14 @@ See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11-user-secrets) an
 
 ### BT — strategy catalog (Phase 1.6 + 1.7)
 
-`BT.STRATEGY` uses **temporal versioning** (`TRANSACT_FROM_TS` / `TRANSACT_TO_TS`, active = `9999-12-31`) instead of `IS_CURRENT_IND` (dropped). **`IS_BEST_IND`** (`CHAR(1)`, no DEFAULT) marks the best-performing VID per `STRATEGY_ID` — at most one `'Y'` row per strategy. See [Best-VID Promotion](../design/best-vid-promotion.md).
+`BT.STRATEGY` uses **temporal versioning** (`TRANSACT_FROM_TS` / `TRANSACT_TO_TS`, active = `9999-12-31`) instead of `IS_CURRENT_IND` (dropped). **`IS_BEST_IND`** (`CHAR(1)`, no DEFAULT) marks the best-performing VID per `STRATEGY_ID` — at most one `'Y'` row per strategy. **`LOGICAL_DELETE_IND`** (`CHAR(1)`, no DEFAULT) retires a lineage from use without dropping history — VID 1 is always the default best, so demoting cannot hide a buggy card. **`UPDATED_AT`** stamps those in-place flag flips (and the insert); GET procedures do not return it. See [Best-VID Promotion](../design/best-vid-promotion.md).
 
 | Procedure | Status | Purpose |
 |-----------|--------|---------|
 | `SP_GET_STRATEGY` | **live** | **Get-one only:** `IN_STRATEGY_ID` required; optional `IN_STRATEGY_VID`; `IN_IS_BEST_IND='Y'` fetches best VID; else active row (`TRANSACT_TO_TS = 9999-12-31`). |
-| `SP_GET_STRATEGY_LIST` | **live (1.12.0+)** | **List catalog** for Trade picker — `IN_USER_ID` required; `IN_IS_BEST_IND='Y'` for best VID only, `NULL` for all VIDs. Joins current shredded metrics from `BT.RESULT` (`IS_CURRENT_IND='Y'`) on `(STRATEGY_ID, STRATEGY_VID)` (release `1.13.0` keys + `1.15.0` versioning). |
-| `SP_UPD_PROMOTE_STRATEGY` | **live** | Demote current best + promote target VID. `IN_STRATEGY_VID = NULL` = demote-only. |
+| `SP_GET_STRATEGY_LIST` | **live (1.12.0+)** | **List catalog** for Trade picker — `IN_USER_ID` required; `IN_IS_BEST_IND='Y'` for best VID only, `NULL` for all VIDs. Omits `LOGICAL_DELETE_IND='Y'`. Joins current shredded metrics from `BT.RESULT` (`IS_CURRENT_IND='Y'`) on `(STRATEGY_ID, STRATEGY_VID)` (release `1.13.0` keys + `1.15.0` versioning). |
+| `SP_UPD_PROMOTE_STRATEGY` | **live** | Demote current best + promote target VID. `IN_STRATEGY_VID = NULL` = demote-only. Stamps `UPDATED_AT`. |
+| `SP_UPD_STRATEGY_LOGICAL_DELETE` | **live (1.21.0+)** | Flip `LOGICAL_DELETE_IND` in place. `IN_STRATEGY_VID = NULL` = every VID of the lineage. Stamps `UPDATED_AT`. |
 
 Persisted strategies (`BT.STRATEGY`) are created when backtest jobs complete — distinct from REFDATA `SIGNAL_TYPE`. Jobs store owner as `USER_ID = str(app_user_id)` (UUID text).
 
@@ -346,7 +349,8 @@ Neither the retention window nor the dump was touched to achieve this. `LOG_PROC
 | `SP_GET_API_CREDENTIAL` | `CORE_ADMIN` | List/get credentials for `APP_USER_ID` (REFCURSOR) |
 | `SP_GET_CREDENTIAL_CHECK` | `CORE_ADMIN` | Validation read by `API_CREDENTIAL_ID` — no owner filter; caller checks ownership + active status |
 | `SP_UPD_API_CREDENTIAL_REVOKE` | `CORE_ADMIN` | Soft-version revoke; status triplet OUT first |
-| `SP_UPD_PROMOTE_STRATEGY` | `BT` | Flip `IS_BEST_IND`: demote current best + promote target VID. `IN_STRATEGY_VID = NULL` = demote-only (no replacement) |
+| `SP_UPD_PROMOTE_STRATEGY` | `BT` | Flip `IS_BEST_IND`: demote current best + promote target VID. `IN_STRATEGY_VID = NULL` = demote-only (no replacement). Stamps `UPDATED_AT`. |
+| `SP_UPD_STRATEGY_LOGICAL_DELETE` | `BT` | Flip `LOGICAL_DELETE_IND` in place (`Y` = retired). `IN_STRATEGY_VID = NULL` = whole lineage. Stamps `UPDATED_AT`. Not returned by GET procedures. |
 | `SP_INS_PROMOTION` | `BT` | Persist auto-promote decision (outcome, gate results, decisive metric) — one row per completed backtest |
 | `SP_GET_STRATEGY` | `BT` | Get-one: `IN_STRATEGY_ID` required; optional `IN_STRATEGY_VID`; `IN_IS_BEST_IND='Y'` fetches best VID; else active row. Listing is `SP_GET_STRATEGY_LIST`. |
 | `SP_GET_STRATEGY_LIST` | `BT` | List catalog for Trade picker — `IN_USER_ID` required; optional `IN_IS_BEST_IND` filter (REFCURSOR) |

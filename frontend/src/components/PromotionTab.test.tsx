@@ -5,12 +5,16 @@ import PromotionTab from './PromotionTab';
 import { renderWithProviders } from '../test/wrapper';
 import { usePromotions } from '../api/promotion';
 import { useMe } from '../api/auth';
+import { useSetStrategyLogicalDelete } from '../api/jobs';
 import { usePromotionMetrics, usePromotionStates } from '../api/refdata';
 import type { PromotionRow } from '../types/promotion';
 import type { PromotionMetricRow, PromotionStateRow } from '../types/refdata';
 
 vi.mock('../api/promotion', () => ({ usePromotions: vi.fn() }));
 vi.mock('../api/auth', () => ({ useMe: vi.fn() }));
+vi.mock('../api/jobs', () => ({
+  useSetStrategyLogicalDelete: vi.fn(),
+}));
 vi.mock('../api/refdata', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api/refdata')>()),
   usePromotionMetrics: vi.fn(),
@@ -47,6 +51,7 @@ function prow(overrides: Partial<PromotionRow> = {}): PromotionRow {
     strategy_vid: 1,
     strategy_nm: 'btcusdt.crypto@bybit:DAILY ← price FILTER Volume',
     is_best_ind: 'Y',
+    logical_delete_ind: 'N',
     outcome: 'KEPT',
     compared_vid: null,
     gate_results: [
@@ -83,6 +88,13 @@ function setup(rows: PromotionRow[]) {
   vi.mocked(usePromotionStates).mockReturnValue({
     data: STATES,
   } as unknown as ReturnType<typeof usePromotionStates>);
+  vi.mocked(useSetStrategyLogicalDelete).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    reset: vi.fn(),
+  } as unknown as ReturnType<typeof useSetStrategyLogicalDelete>);
 }
 
 describe('PromotionTab comparison panel', () => {
@@ -126,5 +138,31 @@ describe('PromotionTab comparison panel', () => {
     expect(screen.getByText('This VID')).toBeInTheDocument();
     expect(screen.getByText('Best v1')).toBeInTheDocument();
     expect(screen.getByText('vs v1')).toBeInTheDocument();
+  });
+
+  it('omits a logically deleted best VID from Recommended', () => {
+    setup([prow({ logical_delete_ind: 'Y' })]);
+    renderWithProviders(<PromotionTab />);
+    expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
+    expect(screen.getByText('Removed')).toBeInTheDocument();
+  });
+
+  it('removes the recommended lineage when the owner clicks Remove', async () => {
+    const mutate = vi.fn();
+    setup([prow()]);
+    vi.mocked(useSetStrategyLogicalDelete).mockReturnValue({
+      mutate,
+      isPending: false,
+      isError: false,
+      error: null,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useSetStrategyLogicalDelete>);
+    renderWithProviders(<PromotionTab />);
+    const removeButtons = screen.getAllByRole('button', { name: 'Remove' });
+    await userEvent.click(removeButtons[0]);
+    expect(mutate).toHaveBeenCalledWith({
+      strategyId: 's1',
+      logicalDeleteInd: 'Y',
+    });
   });
 });

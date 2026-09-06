@@ -8,7 +8,8 @@
 --                   returns the active row (TRANSACT_TO_TS = 9999-12-31).
 --
 -- Cursor columns: STRATEGY_ID, STRATEGY_VID, STRATEGY_NM, CONFIG_JSON,
--- USER_ID, CREATED_AT, TRANSACT_FROM_TS, TRANSACT_TO_TS, IS_BEST_IND.
+-- USER_ID, CREATED_AT, TRANSACT_FROM_TS, TRANSACT_TO_TS, IS_BEST_IND,
+-- LOGICAL_DELETE_IND.
 CREATE OR REPLACE PROCEDURE BT.SP_GET_STRATEGY(
     IN  IN_STRATEGY_ID   UUID,
     IN  IN_STRATEGY_VID  INTEGER,
@@ -58,7 +59,8 @@ BEGIN
                    CREATED_AT,
                    TRANSACT_FROM_TS,
                    TRANSACT_TO_TS,
-                   IS_BEST_IND
+                   IS_BEST_IND,
+                   LOGICAL_DELETE_IND
               FROM BT.STRATEGY
              WHERE STRATEGY_ID  = IN_STRATEGY_ID
                AND STRATEGY_VID = IN_STRATEGY_VID;
@@ -73,7 +75,8 @@ BEGIN
                    CREATED_AT,
                    TRANSACT_FROM_TS,
                    TRANSACT_TO_TS,
-                   IS_BEST_IND
+                   IS_BEST_IND,
+                   LOGICAL_DELETE_IND
               FROM BT.STRATEGY
              WHERE STRATEGY_ID = IN_STRATEGY_ID
                AND IS_BEST_IND = 'Y';
@@ -88,7 +91,8 @@ BEGIN
                    CREATED_AT,
                    TRANSACT_FROM_TS,
                    TRANSACT_TO_TS,
-                   IS_BEST_IND
+                   IS_BEST_IND,
+                   LOGICAL_DELETE_IND
               FROM BT.STRATEGY
              WHERE STRATEGY_ID  = IN_STRATEGY_ID
                AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00';

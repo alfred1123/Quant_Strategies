@@ -25,6 +25,7 @@ class PromotionRow(BaseModel):
     strategy_vid: int
     strategy_nm: str | None = None
     is_best_ind: str | None = None
+    logical_delete_ind: str | None = None
     outcome: str
     compared_vid: int | None = None
     gate_results: list[GateResultRow] | None = None

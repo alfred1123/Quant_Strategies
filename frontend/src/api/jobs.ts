@@ -159,3 +159,32 @@ export function usePromoteStrategy() {
     },
   });
 }
+
+// ── logical delete ──────────────────────────────────────────────────
+
+interface LogicalDeleteParams {
+  strategyId: string;
+  logicalDeleteInd: 'Y' | 'N';
+  strategyVid?: number | null;
+}
+
+async function setStrategyLogicalDelete({
+  strategyId, logicalDeleteInd, strategyVid,
+}: LogicalDeleteParams): Promise<void> {
+  await apiClient.post(`/backtest/jobs/strategies/${strategyId}/logical-delete`, {
+    logical_delete_ind: logicalDeleteInd,
+    strategy_vid: strategyVid ?? null,
+  });
+}
+
+/** Retire or restore a strategy — invalidates jobs + promotions on success. */
+export function useSetStrategyLogicalDelete() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: setStrategyLogicalDelete,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: JOBS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: PROMOTIONS_QUERY_KEY });
+    },
+  });
+}

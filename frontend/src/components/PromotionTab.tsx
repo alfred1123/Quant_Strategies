@@ -14,6 +14,7 @@ import { strategyGroupKey } from '../utils/strategyIdentity';
 import type { PromotionRow } from '../types/promotion';
 import type { PromotionMetricRow } from '../types/refdata';
 import DeploymentDialog, { type DeploymentSelection } from './trade/DeploymentDialog';
+import { useSetStrategyLogicalDelete } from '../api/jobs';
 
 const OUTCOME_COLOR: Record<string, 'success' | 'default' | 'warning' | 'error'> = {
   PROMOTED: 'success',
@@ -48,6 +49,7 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deploySelection, setDeploySelection] = useState<DeploymentSelection | null>(null);
+  const setLogicalDelete = useSetStrategyLogicalDelete();
 
   const rows = useMemo(() => promotions.data ?? [], [promotions.data]);
 
@@ -68,9 +70,13 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
     return Array.from(byKey.entries());
   }, [rows]);
 
-  // Recommended: highest Sharpe among current-best (IS_BEST_IND='Y') rows.
+  // Recommended: highest Sharpe among current-best rows that are still in the pool.
   const recommended = useMemo(() => {
-    const best = rows.filter((r) => r.is_best_ind === 'Y' && toFiniteNumber(r.sharpe_ratio) != null);
+    const best = rows.filter((r) =>
+      r.is_best_ind === 'Y'
+      && r.logical_delete_ind !== 'Y'
+      && toFiniteNumber(r.sharpe_ratio) != null
+    );
     if (best.length === 0) return null;
     return best.reduce((a, b) =>
       (toFiniteNumber(b.sharpe_ratio) ?? -Infinity) > (toFiniteNumber(a.sharpe_ratio) ?? -Infinity) ? b : a,
@@ -119,7 +125,28 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
           </Alert>
         )}
 
-        <RecommendedBanner row={recommended} />
+        {setLogicalDelete.isError && (
+          <Alert severity="error" onClose={() => setLogicalDelete.reset()}>
+            Could not update strategy: {(setLogicalDelete.error as Error)?.message ?? 'unknown error'}
+          </Alert>
+        )}
+
+        <RecommendedBanner
+          row={recommended}
+          canRemove={
+            recommended != null
+            && currentUser != null
+            && recommended.user_id === currentUser.app_user_id
+          }
+          removePending={setLogicalDelete.isPending}
+          onRemove={() => {
+            if (recommended == null) return;
+            setLogicalDelete.mutate({
+              strategyId: recommended.strategy_id,
+              logicalDeleteInd: 'Y',
+            });
+          }}
+        />
 
         {rows.length === 0 ? (
           <Alert severity="info">
@@ -150,6 +177,19 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
                 selected != null
                 && currentUser != null
                 && selected.user_id === currentUser.app_user_id
+                && selected.logical_delete_ind !== 'Y'
+              }
+              canMutate={
+                selected != null
+                && currentUser != null
+                && selected.user_id === currentUser.app_user_id
+              }
+              mutatePending={setLogicalDelete.isPending}
+              onLogicalDelete={(r) =>
+                setLogicalDelete.mutate({
+                  strategyId: r.strategy_id,
+                  logicalDeleteInd: r.logical_delete_ind === 'Y' ? 'N' : 'Y',
+                })
               }
               onDeploy={(r) =>
                 setDeploySelection({
@@ -193,7 +233,14 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
   );
 }
 
-function RecommendedBanner({ row }: { row: PromotionRow | null }) {
+function RecommendedBanner({
+  row, canRemove, removePending, onRemove,
+}: {
+  row: PromotionRow | null;
+  canRemove: boolean;
+  removePending: boolean;
+  onRemove: () => void;
+}) {
   if (!row) return null;
   return (
     <Paper variant="outlined" sx={{ p: 2, borderColor: 'success.main' }}>
@@ -207,6 +254,17 @@ function RecommendedBanner({ row }: { row: PromotionRow | null }) {
         <Metric label="Calmar" value={row.calmar_ratio} />
         <Metric label="Max DD" value={row.max_drawdown} />
         <Metric label="Total Ret" value={row.total_return} />
+        {canRemove && (
+          <Button
+            size="small"
+            color="warning"
+            variant="outlined"
+            disabled={removePending}
+            onClick={onRemove}
+          >
+            Remove
+          </Button>
+        )}
       </Stack>
     </Paper>
   );
@@ -270,6 +328,10 @@ function StrategyList({
                               <Chip size="small" label="Best" color="success" variant="outlined"
                                 sx={{ height: 18, fontSize: '0.65rem' }} />
                             )}
+                            {d.logical_delete_ind === 'Y' && (
+                              <Chip size="small" label="Removed" color="warning" variant="outlined"
+                                sx={{ height: 18, fontSize: '0.65rem' }} />
+                            )}
                           </Stack>
                         </TableCell>
                         <TableCell>
@@ -298,6 +360,7 @@ function StrategyList({
 
 function ComparisonPanel({
   row, rows, metrics, outcomeLabel, onReBacktest, onDeploy, canDeploy,
+  canMutate, mutatePending, onLogicalDelete,
 }: {
   row: PromotionRow | null;
   rows: PromotionRow[];
@@ -306,6 +369,9 @@ function ComparisonPanel({
   onReBacktest?: (queueId: string) => void;
   onDeploy: (row: PromotionRow) => void;
   canDeploy: boolean;
+  canMutate: boolean;
+  mutatePending: boolean;
+  onLogicalDelete: (row: PromotionRow) => void;
 }) {
   if (!row) {
     return (
@@ -442,6 +508,17 @@ function ComparisonPanel({
         {canDeploy && (
           <Button size="small" variant="outlined" color="primary" onClick={() => onDeploy(row)}>
             Deploy
+          </Button>
+        )}
+        {canMutate && (
+          <Button
+            size="small"
+            variant="outlined"
+            color="warning"
+            disabled={mutatePending}
+            onClick={() => onLogicalDelete(row)}
+          >
+            {row.logical_delete_ind === 'Y' ? 'Restore' : 'Remove'}
           </Button>
         )}
       </Stack>

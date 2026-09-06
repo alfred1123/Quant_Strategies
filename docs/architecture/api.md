@@ -62,6 +62,7 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `GET`  | `/api/v1/backtest/jobs/{queue_id}/events` | SSE stream of job progress events. |
 | `GET`  | `/api/v1/backtest/promotions` | Promotion history rows for the Promotion tab (`?limit=`). |
 | `POST` | `/api/v1/backtest/jobs/strategies/{strategy_id}/promote` | Manual promote/demote a strategy VID. |
+| `POST` | `/api/v1/backtest/jobs/strategies/{strategy_id}/logical-delete` | Retire or restore a strategy (`LOGICAL_DELETE_IND`). Body: `{ "logical_delete_ind": "Y" or "N", "strategy_vid"?: number }`. Omit `strategy_vid` to flip the whole lineage. |
 
 ### Trade (Phase 1.2 — deployments)
 
@@ -204,7 +205,7 @@ See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11-user-secrets) an
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/api/v1/strategies` | Required | List caller-owned `BT.STRATEGY` rows for the Trade strategy picker. Query `versions=best` (default — `IS_BEST_IND` rows only) or `all`; `limit` defaults to 200. |
+| `GET` | `/api/v1/strategies` | Required | List caller-owned `BT.STRATEGY` rows for the Trade strategy picker. Query `versions=best` (default — `IS_BEST_IND` rows only) or `all`; `limit` defaults to 200. Logically deleted rows (`LOGICAL_DELETE_IND='Y'`) are omitted. |
 
 Not the same as REFDATA `signal_type` — see [trade-api §2.1](../design/trade-api.md#21-strategy-catalog-phase-16).
 

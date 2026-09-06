@@ -38,6 +38,16 @@ class PromoteRequest(BaseModel):
     strategy_vid: int
 
 
+class LogicalDeleteRequest(BaseModel):
+    """Retire or restore a strategy lineage (LOGICAL_DELETE_IND).
+
+    ``strategy_vid`` omitted or null flips every VID of the strategy.
+    """
+
+    logical_delete_ind: Literal["Y", "N"]
+    strategy_vid: int | None = None
+
+
 class JobRow(BaseModel):
     """One active or terminal BT.QUEUE row, joined to status name + strategy name."""
 
