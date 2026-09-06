@@ -269,13 +269,15 @@ Once you know these shapes, every function signature and component prop makes se
 - **`grid.ts`** — `countSteps({ min, max, step })` returns how many discrete values a range produces.
 - **`requestBuilders.ts`** — `buildOptimizeRequest` / `configFromOptimizeRequest` are inverses: form state ↔ stored `CONFIG_JSON`.
 - **`interval.ts`** — Parses `TM_INTERVAL.PERIOD_LENGTH` into `barsPerDay`. `scaleWindowRange` multiplies a daily-bar `WIN_*` grid by that factor so lookback stays in calendar days when the cadence is not daily.
+- **`exchangeSeries.ts`** — Every exchange series a run will fetch (traded leg + factors). Coverage is asked for this set, not only the trade product.
+- **`capturedRange.ts`** — `coverageIntersection` is the window every series in that set can serve; `fitToCaptured` is what Run applies.
 
 ### Layer 4: Components (`components/`) — UI building blocks
 
 - **`config/RangeFields.tsx`** — Three `<TextField>` inputs (min, max, step). Smallest unit.
-- **`config/FactorCard.tsx`** — One factor: indicator dropdown, strategy dropdown, data column, window range, signal range. Uses `RangeFields`. Picking an indicator applies REFDATA defaults; the window grid is scaled by bars-per-day.
+- **`config/FactorCard.tsx`** — One factor: indicator dropdown, strategy dropdown, data column, window range, signal range. Uses `RangeFields`. Picking an indicator applies REFDATA defaults; the window grid is scaled by bars-per-day. Picking a product while the factor is still on a provider, and the trade is an exchange, moves the factor onto the traded venue so it joins the captured overlap.
 - **`config/ProductSelector.tsx`** — Autocomplete for picking a product or entering a vendor symbol directly.
-- **`ConfigDrawer.tsx`** — Composes `ProductSelector` + 1–2 `FactorCard`s + date/fee/walk-forward controls. The `set()` helper merges partial updates into config state. Changing Bar Interval rescales `trading_period` and every factor's `window_range` by bars-per-day. Run Optimization fits Start/End to captured coverage rather than enqueueing a job the worker will refuse.
+- **`ConfigDrawer.tsx`** — Composes `ProductSelector` + 1–2 `FactorCard`s + date/fee/walk-forward controls. The `set()` helper merges partial updates into config state. Changing Bar Interval rescales `trading_period` and every factor's `window_range` by bars-per-day. Changing the traded venue or product updates factors that still match the previous ones. Run Optimization fits Start/End to the captured overlap of every exchange series in the run (trade + factors) rather than enqueueing a job the worker will refuse.
 - **`Top10Table.tsx`**, **`MetricsCards.tsx`**, **`HeatmapChart.tsx`**, **`EquityCurveChart.tsx`** — Results display. Each receives data via props.
 
 ### Layer 5: Pages (`pages/`) — orchestration

@@ -28,6 +28,10 @@ interface Props {
    * counts; the grid is scaled so lookback stays in calendar days.
    */
   barsPerDay?: number;
+  /** Traded venue. A leftover provider override is dropped when the
+   *  factor product is picked and this venue is an exchange — otherwise
+   *  ETH on a Bybit run stays pinned to Yahoo and is left out of coverage. */
+  tradeDataSource?: string;
 }
 
 /**
@@ -49,6 +53,7 @@ export default function FactorCard({
   index, total, conjunction = 'AND', factor, onChange, onRemove,
   indicators, signalTypes, dataColumns, products, apps,
   barsPerDay = 1,
+  tradeDataSource,
 }: Props) {
   const trials = countSteps(factor.window_range) * countSteps(factor.signal_range);
   const ind = indicators.find(x => x.method_name === factor.indicator);
@@ -100,6 +105,18 @@ export default function FactorCard({
             if ('symbol' in patch) out.symbol = patch.symbol;
             if ('vendorSymbol' in patch) out.vendor_symbol = patch.vendorSymbol;
             if ('dataSource' in patch) out.data_source = patch.dataSource;
+            // Picking a product while the factor still carries a provider
+            // override (DEFAULT used to pin yahoo) would keep ETH off the
+            // Bybit coverage set. Drop that leftover so the factor inherits
+            // the traded exchange; a deliberate Yahoo/^VIX factor is set
+            // afterwards by changing Data Source.
+            if ('symbol' in patch && tradeDataSource) {
+              const tradeApp = apps.find(a => a.name === tradeDataSource);
+              const factorApp = apps.find(a => a.name === (out.data_source ?? factor.data_source));
+              if (tradeApp?.is_exchange_ind === 'Y' && factorApp?.is_exchange_ind !== 'Y') {
+                out.data_source = tradeDataSource;
+              }
+            }
             onChange(out);
           }}
           products={products}

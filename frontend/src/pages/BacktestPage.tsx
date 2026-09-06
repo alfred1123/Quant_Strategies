@@ -55,7 +55,8 @@ const DEFAULT_CONFIG: BacktestConfig = {
       window_range: { min: 5, max: 100, step: 5 },
       signal_range: { min: 0.25, max: 2.5, step: 0.25 },
       symbol: 'btcusdt.crypto',
-      data_source: 'yahoo',
+      // No data_source — inherit the traded venue. Pinning yahoo here
+      // kept a Bybit ETH factor off the captured-overlap set (#68).
     },
   ],
   walkForward: true,

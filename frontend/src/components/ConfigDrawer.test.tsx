@@ -43,6 +43,7 @@ const tmIntervals: TmIntervalRow[] = [
 const products: ProductRow[] = [
   { product_id: 10, product_vid: 1, internal_cusip: '00434.hkex', display_nm: 'Boyaa Interactive', asset_type_id: 2, exchange: 'HKEX', ccy: 'HKD', description: null },
   { product_id: 11, product_vid: 1, internal_cusip: 'btcusdt.crypto', display_nm: 'Bitcoin / Tether', asset_type_id: 1, exchange: null, ccy: 'USDT', description: null },
+  { product_id: 12, product_vid: 1, internal_cusip: 'ethusdt.crypto', display_nm: 'Ethereum / USDT', asset_type_id: 1, exchange: null, ccy: 'USDT', description: null },
 ];
 
 vi.mock('../api/refdata', () => ({
@@ -63,12 +64,16 @@ vi.mock('../api/inst', () => ({
 
 /** What the coverage endpoint answers, and who it was asked about. */
 let storedCoverage: Coverage | undefined;
+let coverageByCusip: Record<string, Coverage | undefined> = {};
 const coverageAsked = vi.fn();
 
 function coverageQuery(key: Record<string, unknown>) {
   coverageAsked(key);
   const complete = Boolean(key.internal_cusip && key.tm_interval_id && key.source_app_id);
-  const data = complete ? storedCoverage : undefined;
+  const cusip = String(key.internal_cusip ?? '');
+  const data = complete
+    ? (cusip in coverageByCusip ? coverageByCusip[cusip] : storedCoverage)
+    : undefined;
   return {
     data,
     isLoading: complete && data === undefined,
@@ -92,6 +97,14 @@ const BYBIT_COVERAGE: Coverage = {
 const BYBIT_HOURLY_COVERAGE: Coverage = {
   first_bar: '2020-03-25T10:00:00+00:00',
   last_bar: '2026-09-03T14:00:00+00:00',
+  gaps: 0,
+  error: null,
+};
+
+/** ETH listed later than BTC — leftover BTC dates fail the worker. */
+const ETH_HOURLY_COVERAGE: Coverage = {
+  first_bar: '2021-03-15T00:00:00+00:00',
+  last_bar: '2026-09-06T12:00:00+00:00',
   gaps: 0,
   error: null,
 };
@@ -156,6 +169,7 @@ function Host({
 beforeEach(() => {
   vi.clearAllMocks();
   storedCoverage = undefined;
+  coverageByCusip = {};
 });
 
 describe('ConfigDrawer — product pick updates symbol AND asset type atomically', () => {
@@ -425,6 +439,89 @@ describe('ConfigDrawer — a range outside the capture is flagged, not silently 
     const submitted = onRun.mock.calls[0][0] as BacktestConfig;
     expect(submitted.start).toBe('2021-03-15T00:00');
     expect(submitted.end).toBe('2026-09-06T12:00');
+  });
+
+  it('snaps to the overlap when the factor is a later-listed pair', () => {
+    // The screenshot that followed #68: trade BTC (first bar 2020-03-25
+    // 10:00), factor ETH (first bar 2021-03-15), hint still named only
+    // btcusdt.crypto, Run submitted the BTC window, worker FAILED.
+    coverageByCusip = {
+      'btcusdt.crypto': {
+        first_bar: '2020-03-25T10:00:00+00:00',
+        last_bar: '2026-09-06T13:00:00+00:00',
+        gaps: 0,
+        error: null,
+      },
+      'ethusdt.crypto': ETH_HOURLY_COVERAGE,
+    };
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host
+        initial={{
+          ...bybitCfg,
+          tmIntervalId: 2,
+          start: '2020-03-25T10:00',
+          end: '2026-09-06T13:00',
+          factors: [{
+            ...bybitCfg.factors[0],
+            symbol: 'ethusdt.crypto',
+            data_source: 'bybit',
+          }],
+        }}
+        observer={observer}
+      />,
+    );
+
+    expect(coverageAsked).toHaveBeenCalledWith({
+      internal_cusip: 'ethusdt.crypto',
+      tm_interval_id: 2,
+      source_app_id: 34,
+    });
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.start).toBe('2021-03-15T00:00');
+    expect(last.end).toBe('2026-09-06T12:00');
+    expect(screen.getByText(/across btcusdt\.crypto and ethusdt\.crypto/)).toBeTruthy();
+  });
+
+  it('moves a leftover provider factor onto the traded venue when its product is picked', () => {
+    // DEFAULT_CONFIG pinned factor data_source to yahoo. Trade Bybit +
+    // pick ETH left the factor on Yahoo, so coverage never asked for ETH
+    // and the dates stayed on BTC's first bar.
+    coverageByCusip = {
+      'btcusdt.crypto': {
+        first_bar: '2020-03-25T10:00:00+00:00',
+        last_bar: '2026-09-06T13:00:00+00:00',
+        gaps: 0,
+        error: null,
+      },
+      'ethusdt.crypto': ETH_HOURLY_COVERAGE,
+    };
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host
+        initial={{
+          ...bybitCfg,
+          tmIntervalId: 2,
+          start: '2020-03-25T10:00',
+          end: '2026-09-06T13:00',
+          factors: [{
+            ...bybitCfg.factors[0],
+            symbol: 'btcusdt.crypto',
+            data_source: 'yahoo',
+          }],
+        }}
+        observer={observer}
+      />,
+    );
+
+    const productInputs = screen.getAllByLabelText('Product');
+    fireEvent.mouseDown(productInputs[1]);
+    fireEvent.click(screen.getByText('Ethereum / USDT'));
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.factors[0].symbol).toBe('ethusdt.crypto');
+    expect(last.factors[0].data_source).toBe('bybit');
+    expect(last.start).toBe('2021-03-15T00:00');
   });
 
   it('does not run while capture has not answered', () => {

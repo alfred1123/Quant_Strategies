@@ -29,6 +29,10 @@ export function exchangeSeriesKeys(config: BacktestConfig, apps: AppRow[]): Seri
 
   add(config.symbol.trim() || undefined, config.dataSource);
   for (const f of config.factors) {
+    // Same source the worker uses: an unset factor source inherits
+    // the traded venue. A leftover provider on the factor (DEFAULT
+    // used to pin `data_source: 'yahoo'`) is *not* an inherit — that
+    // is how ETH on Bybit was skipped while the hint still named BTC.
     add(
       (f.symbol || f.vendor_symbol) || undefined,
       f.data_source || config.dataSource,

@@ -53,6 +53,33 @@ describe('exchangeSeriesKeys', () => {
     ]);
   });
 
+  it('inherits the traded venue when the factor has no source of its own', () => {
+    const cfg: BacktestConfig = {
+      ...base,
+      factors: [{ ...base.factors[0], symbol: 'ethusdt.crypto' }],
+    };
+    expect(exchangeSeriesKeys(cfg, apps).map(k => k.internal_cusip)).toEqual([
+      'btcusdt.crypto',
+      'ethusdt.crypto',
+    ]);
+  });
+
+  it('does not treat a leftover provider source as an inherit', () => {
+    // DEFAULT_CONFIG used to pin factor data_source to yahoo. The worker
+    // then reads ETH from Yahoo, and Bybit coverage for it is not asked.
+    const cfg: BacktestConfig = {
+      ...base,
+      factors: [{
+        ...base.factors[0],
+        symbol: 'ethusdt.crypto',
+        data_source: 'yahoo',
+      }],
+    };
+    expect(exchangeSeriesKeys(cfg, apps).map(k => k.internal_cusip)).toEqual([
+      'btcusdt.crypto',
+    ]);
+  });
+
   it('does not ask a provider', () => {
     expect(exchangeSeriesKeys({ ...base, dataSource: 'yahoo' }, apps)).toEqual([]);
   });

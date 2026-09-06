@@ -181,31 +181,39 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
     onChange(prev => ({ ...prev, ...patch }));
 
   // ── factor list mutators ──
+  // Functional updaters: ProductSelector can fire symbol + vendor in one
+  // click, and a stale `config.factors` would drop the first patch.
   const updateFactor = (i: number, patch: Partial<FactorConfig>) =>
-    set({ factors: config.factors.map((f, idx) => idx === i ? { ...f, ...patch } : f) });
+    onChange(prev => ({
+      ...prev,
+      factors: prev.factors.map((f, idx) => (idx === i ? { ...f, ...patch } : f)),
+    }));
 
   const addFactor = () => {
     if (config.factors.length >= 2) return;
     const first = indicators[0];
-    const newFactor: FactorConfig = {
-      indicator: first?.method_name ?? '',
-      strategy: signalTypes[0]?.name ?? '',
-      data_column: 'price',
-      window_range: scaleWindowRange(dailyWindowRange(first), 1, cadenceBarsPerDay(config.tmIntervalId)),
-      signal_range: { min: first?.sig_min ?? 0, max: first?.sig_max ?? 0, step: first?.sig_step ?? 1 },
-      symbol: config.symbol,
-      vendor_symbol: config.vendorSymbol || undefined,
-      data_source: config.dataSource || undefined,
-    };
-    set({
-      factors: config.conjunction === 'FILTER'
-        ? [newFactor, ...config.factors]
-        : [...config.factors, newFactor],
+    onChange(prev => {
+      const newFactor: FactorConfig = {
+        indicator: first?.method_name ?? '',
+        strategy: signalTypes[0]?.name ?? '',
+        data_column: 'price',
+        window_range: scaleWindowRange(dailyWindowRange(first), 1, cadenceBarsPerDay(prev.tmIntervalId)),
+        signal_range: { min: first?.sig_min ?? 0, max: first?.sig_max ?? 0, step: first?.sig_step ?? 1 },
+        symbol: prev.symbol,
+        vendor_symbol: prev.vendorSymbol || undefined,
+        data_source: prev.dataSource || undefined,
+      };
+      return {
+        ...prev,
+        factors: prev.conjunction === 'FILTER'
+          ? [newFactor, ...prev.factors]
+          : [...prev.factors, newFactor],
+      };
     });
   };
 
   const removeFactor = (i: number) =>
-    set({ factors: config.factors.filter((_, idx) => idx !== i) });
+    onChange(prev => ({ ...prev, factors: prev.factors.filter((_, idx) => idx !== i) }));
 
   // ── derived UI state ──
   const selectedAssetType: AssetTypeRow | null =
@@ -262,11 +270,33 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
             dataSource: config.dataSource,
           }}
           onChange={patch => {
-            const out: Partial<BacktestConfig> = {};
-            if ('symbol' in patch) out.symbol = patch.symbol ?? '';
-            if ('vendorSymbol' in patch) out.vendorSymbol = patch.vendorSymbol ?? '';
-            if ('dataSource' in patch) out.dataSource = patch.dataSource ?? '';
-            set(out);
+            // Factors that still match the traded product / venue follow
+            // the change. A leftover DEFAULT yahoo on the factor is the
+            // same source as a fresh drawer, so switching the trade to
+            // Bybit must move it or ETH stays off the coverage set.
+            onChange(prev => {
+              const next = { ...prev };
+              if ('symbol' in patch) {
+                const nextSym = patch.symbol ?? '';
+                next.symbol = nextSym;
+                next.factors = prev.factors.map(f => (
+                  !f.symbol || f.symbol === prev.symbol
+                    ? { ...f, symbol: nextSym || undefined }
+                    : f
+                ));
+              }
+              if ('vendorSymbol' in patch) next.vendorSymbol = patch.vendorSymbol ?? '';
+              if ('dataSource' in patch) {
+                const nextSource = patch.dataSource ?? '';
+                next.dataSource = nextSource;
+                next.factors = next.factors.map(f => (
+                  !f.data_source || f.data_source === prev.dataSource
+                    ? { ...f, data_source: nextSource || undefined }
+                    : f
+                ));
+              }
+              return next;
+            });
           }}
           onProductPicked={(product) => {
             const at = assetTypes.find(a => a.asset_type_id === product.asset_type_id);
@@ -390,7 +420,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
         <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
           {tradedApp?.display_name} has {captured.first} to {captured.last} captured
           {seriesKeys.length > 1
-            ? ' across the series in this run'
+            ? ` across ${seriesKeys.map(k => k.internal_cusip).join(' and ')}`
             : ` for ${config.symbol}`}
           {' '}— the run reads those bars, not a provider.
         </Typography>
@@ -437,6 +467,20 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
             .filter(Boolean).join(', ')
           } — will use the main trading product.
         </Typography>
+      )}
+
+      {isExchangeSource && config.factors.some(f => {
+        const cusip = f.symbol || f.vendor_symbol;
+        if (!cusip || cusip === config.symbol) return false;
+        return !seriesKeys.some(k => k.internal_cusip === cusip);
+      }) && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          A factor product is not on the captured overlap — its Data Source
+          is still a provider, so Run will not read {tradedApp?.display_name}{' '}
+          bars for it. Set that factor to the same captured venue as the
+          trade, or the worker will refuse a range only the traded series
+          can serve.
+        </Alert>
       )}
 
       <Divider sx={{ mb: 2 }} />
@@ -490,6 +534,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
               factor={factor}
               onChange={patch => updateFactor(i, patch)}
               onRemove={() => removeFactor(i)}
+              tradeDataSource={config.dataSource}
               indicators={indicators}
               signalTypes={signalTypes}
               dataColumns={dataColumns}
