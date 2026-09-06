@@ -1,23 +1,25 @@
 '''
 Parameter optimization for single-factor and multi-factor strategies.
 
-Uses optuna for efficient search:
-- GridSampler (exhaustive) when n_trials covers the full parameter space.
-- TPESampler (Bayesian / Tree-structured Parzen Estimator) when n_trials
-  is smaller than the space — typically for large grids (>10 000 combos).
+ExhaustiveSearch walks the Cartesian product and records each trial into
+an optuna study (for plots). BayesianSearch uses TPE when n_trials is
+smaller than the space — typically for large grids (>10 000 combos).
 '''
 
 import itertools
 import logging
 import math
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import numpy as np
 import optuna
 import pandas as pd
-from optuna.samplers import GridSampler, TPESampler
+from optuna.distributions import CategoricalDistribution
+from optuna.samplers import TPESampler
+from optuna.trial import create_trial
 
-from quant.strategy.performance import Performance
+from quant.strategy.objective import Objective
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,27 @@ class OptimizeResult:
     grid: list             # All rows (NaN → None)
     n_valid: int           # Trials with finite Sharpe
     study: object          # optuna.Study — for visualization
+
+    def best_params(self) -> tuple:
+        """``(window, signal)`` from :attr:`best` — scalars or per-factor tuples."""
+        return self.params_from_best(self.best)
+
+    @staticmethod
+    def params_from_best(best: dict) -> tuple:
+        """Extract ``(window, signal)`` from an optimize ``best`` row.
+
+        Single-factor dicts use ``window`` / ``signal`` keys.
+        Multi-factor dicts use ``window_0``, ``signal_0``, …
+        """
+        if "window" in best:
+            return int(best["window"]), float(best["signal"])
+        n = sum(1 for k in best if k.startswith("window_"))
+        if n == 0:
+            raise ValueError("best params missing window/signal keys")
+        return (
+            tuple(int(best[f"window_{i}"]) for i in range(n)),
+            tuple(float(best[f"signal_{i}"]) for i in range(n)),
+        )
 
     def extract_plots(self) -> dict | None:
         """Serialize optuna visualizations as Plotly JSON dicts.
@@ -92,21 +115,155 @@ class OptimizeResult:
         return plots or None
 
 
-def extract_best_params(best: dict) -> tuple:
-    """Extract ``(window, signal)`` from an optimize ``best`` row.
+class SearchSpace:
+    """Named categorical axes the search walks, plus the window spec for Objective."""
 
-    Single-factor dicts use ``window`` / ``signal`` keys.
-    Multi-factor dicts use ``window_0``, ``signal_0``, …
-    """
-    if "window" in best:
-        return int(best["window"]), float(best["signal"])
-    n = sum(1 for k in best if k.startswith("window_"))
-    if n == 0:
-        raise ValueError("best params missing window/signal keys")
-    return (
-        tuple(int(best[f"window_{i}"]) for i in range(n)),
-        tuple(float(best[f"signal_{i}"]) for i in range(n)),
-    )
+    def __init__(self, mapping: dict, window_spec, n_factors: int) -> None:
+        self.mapping = mapping
+        self.window_spec = window_spec
+        self.n_factors = n_factors
+
+    @classmethod
+    def single(cls, window_values, signal_values) -> "SearchSpace":
+        return cls(
+            {"window": list(window_values), "signal": list(signal_values)},
+            window_values,
+            1,
+        )
+
+    @classmethod
+    def multi(cls, window_ranges, signal_ranges) -> "SearchSpace":
+        n_factors = len(window_ranges)
+        if len(signal_ranges) != n_factors:
+            raise ValueError(
+                f"window_ranges has {n_factors} entries but "
+                f"signal_ranges has {len(signal_ranges)}"
+            )
+        mapping = {}
+        for i, (windows, signals) in enumerate(zip(window_ranges, signal_ranges)):
+            mapping[f"window_{i}"] = list(windows)
+            mapping[f"signal_{i}"] = list(signals)
+        return cls(mapping, window_ranges, n_factors)
+
+    @property
+    def total(self) -> int:
+        if self.n_factors == 1:
+            return len(self.mapping["window"]) * len(self.mapping["signal"])
+        return math.prod(
+            len(self.mapping[f"window_{i}"]) * len(self.mapping[f"signal_{i}"])
+            for i in range(self.n_factors)
+        )
+
+    @property
+    def keys(self) -> list:
+        return list(self.mapping)
+
+    def distributions(self) -> dict:
+        return {k: CategoricalDistribution(v) for k, v in self.mapping.items()}
+
+    def windows_signals(self, params: dict) -> tuple[tuple, tuple]:
+        if "window" in params:
+            return (params["window"],), (params["signal"],)
+        return (
+            tuple(params[f"window_{i}"] for i in range(self.n_factors)),
+            tuple(params[f"signal_{i}"] for i in range(self.n_factors)),
+        )
+
+
+class SearchStrategy(ABC):
+    """Proposes parameter sets, evaluates them, records each as a COMPLETE trial."""
+
+    @abstractmethod
+    def search(self, objective, space: SearchSpace, n_trials, callbacks) -> optuna.Study:
+        """Run *n_trials* evaluations and return the populated study."""
+
+    @abstractmethod
+    def log_start(self, space: SearchSpace, n_trials: int) -> None:
+        """One INFO line naming this search, before the loop."""
+
+    def evaluate(self, objective, windows, signals) -> float:
+        try:
+            sharpe = objective(windows, signals)
+            return sharpe if np.isfinite(sharpe) else float("-inf")
+        except Exception:
+            logger.warning("Optimization failed for windows=%s, signals=%s",
+                           windows, signals, exc_info=True)
+            return float("-inf")
+
+
+class ExhaustiveSearch(SearchStrategy):
+    """Every combination, product order, recorded with ``study.add_trial``."""
+
+    def log_start(self, space: SearchSpace, n_trials: int) -> None:
+        if space.n_factors == 1:
+            logger.info(
+                "Exhaustive optimization: %d windows × %d signals = %d trials",
+                len(space.mapping["window"]), len(space.mapping["signal"]),
+                space.total,
+            )
+            return
+        logger.info(
+            "Exhaustive multi-factor optimization: %d factors, %d trials",
+            space.n_factors, space.total,
+        )
+
+    def search(self, objective, space: SearchSpace, n_trials, callbacks) -> optuna.Study:
+        distributions = space.distributions()
+        study = optuna.create_study(direction="maximize")
+        cbs = callbacks or []
+        for combo in itertools.product(*(space.mapping[k] for k in space.keys)):
+            params = dict(zip(space.keys, combo))
+            windows, signals = space.windows_signals(params)
+            value = self.evaluate(objective, windows, signals)
+            study.add_trial(create_trial(
+                params=params, distributions=distributions, value=value,
+            ))
+            frozen = study.get_trials(deepcopy=False)[-1]
+            for cb in cbs:
+                cb(study, frozen)
+        return study
+
+
+class BayesianSearch(SearchStrategy):
+    """``TPESampler`` through ``study.optimize``."""
+
+    def __init__(self) -> None:
+        self._objective = None
+        self._space: SearchSpace | None = None
+
+    def log_start(self, space: SearchSpace, n_trials: int) -> None:
+        if space.n_factors == 1:
+            logger.info(
+                "Bayesian optimization: %d space, %d trials (TPE)",
+                space.total, n_trials,
+            )
+            return
+        logger.info(
+            "Bayesian multi-factor optimization: "
+            "%d factors, %d space, %d trials (TPE)",
+            space.n_factors, space.total, n_trials,
+        )
+
+    def search(self, objective, space: SearchSpace, n_trials, callbacks) -> optuna.Study:
+        self._objective = objective
+        self._space = space
+        study = optuna.create_study(
+            direction="maximize", sampler=TPESampler(seed=OPTUNA_SEED),
+        )
+        study.optimize(
+            self.suggest_and_evaluate,
+            n_trials=n_trials,
+            callbacks=callbacks or [],
+        )
+        return study
+
+    def suggest_and_evaluate(self, trial) -> float:
+        params = {
+            k: trial.suggest_categorical(k, self._space.mapping[k])
+            for k in self._space.keys
+        }
+        windows, signals = self._space.windows_signals(params)
+        return self.evaluate(self._objective, windows, signals)
 
 
 class ParametersOptimization:
@@ -118,84 +275,27 @@ class ParametersOptimization:
 
     def optimize(self, window_values, signal_values, *, n_trials=None,
                  callbacks=None):
-        """Optimize window × signal via optuna.
+        """Optimize window × signal.
 
-        Uses GridSampler (exhaustive) when *n_trials* covers the full space,
-        TPESampler (Bayesian) otherwise.
-
-        Args:
-            window_values: Tuple of candidate window values.
-            signal_values: Tuple of candidate signal values.
-            n_trials: Number of trials.  Defaults to
-                      ``min(total_combinations, OPTUNA_MAX_TRIALS)``.
-            callbacks: Optional list of optuna callbacks, each called
-                       ``cb(study, trial)`` after every trial.
-
-        Returns:
-            pd.DataFrame with columns ``[window, signal, sharpe]``.
+        Exhaustive (Cartesian product) when *n_trials* covers the full space,
+        Bayesian (TPE) otherwise.
         """
-        total = len(window_values) * len(signal_values)
-        if n_trials is None:
-            n_trials = min(total, OPTUNA_MAX_TRIALS)
+        return self._run(
+            SearchSpace.single(window_values, signal_values),
+            n_trials, callbacks,
+        )
 
-        search_space = {
-            "window": list(window_values),
-            "signal": list(signal_values),
-        }
-
-        if n_trials >= total:
-            sampler = GridSampler(search_space, seed=OPTUNA_SEED)
-            n_trials = total
-            logger.info("Exhaustive optimization: %d windows × %d signals "
-                        "= %d trials (GridSampler)",
-                        len(window_values), len(signal_values), total)
-        else:
-            sampler = TPESampler(seed=OPTUNA_SEED)
-            logger.info("Bayesian optimization: %d space, %d trials (TPE)",
-                        total, n_trials)
-
-        study = optuna.create_study(direction="maximize", sampler=sampler)
-
-        def objective(trial):
-            window = trial.suggest_categorical("window", search_space["window"])
-            signal = trial.suggest_categorical("signal", search_space["signal"])
-            try:
-                perf = Performance(
-                    self.data, self.config,
-                    window, signal, fee_bps=self.fee_bps,
-                )
-                perf.enrich_performance()
-                sharpe = perf.get_sharpe_ratio()
-                return sharpe if np.isfinite(sharpe) else float("-inf")
-            except Exception:
-                logger.warning("Optimization failed for window=%s, signal=%s",
-                               window, signal, exc_info=True)
-                return float("-inf")
-
-        study.optimize(objective, n_trials=n_trials,
-                       callbacks=callbacks or [])
-
-        rows = []
-        for trial in study.trials:
-            if trial.state == optuna.trial.TrialState.COMPLETE:
-                sharpe = trial.value if trial.value > float("-inf") else np.nan
-                rows.append({
-                    "window": trial.params["window"],
-                    "signal": trial.params["signal"],
-                    "sharpe": sharpe,
-                })
-
-        logger.info("Optimization complete: %d trials evaluated", len(rows))
-        return self._build_result(pd.DataFrame(rows), study)
+    def optimize_multi(self, window_ranges, signal_ranges, *, n_trials=None,
+                       callbacks=None):
+        """Multi-factor optimization over N-dimensional parameter space."""
+        return self._run(
+            SearchSpace.multi(window_ranges, signal_ranges),
+            n_trials, callbacks,
+        )
 
     def run(self, window_values, signal_values, *, n_trials=None, callbacks=None):
-        """Auto-dispatch to optimize() or optimize_multi() based on config substrategies.
-
-        Mirrors the auto-dispatch pattern in WalkForward.run().
-        Single-factor configs call optimize(); multi-factor call optimize_multi().
-        """
-        subs = self.config.get_substrategies()
-        if len(subs) > 1:
+        """Auto-dispatch to optimize() or optimize_multi() based on config substrategies."""
+        if len(self.config.get_substrategies()) > 1:
             return self.optimize_multi(
                 window_values, signal_values,
                 n_trials=n_trials, callbacks=callbacks,
@@ -205,106 +305,36 @@ class ParametersOptimization:
             n_trials=n_trials, callbacks=callbacks,
         )
 
-    def optimize_multi(self, window_ranges, signal_ranges, *, n_trials=None,
-                       callbacks=None):
-        """Multi-factor optimization over N-dimensional parameter space.
-
-        Uses GridSampler when *n_trials* covers the full space,
-        TPESampler (Bayesian) otherwise.
-
-        Args:
-            window_ranges: list of tuples, one per substrategy.
-                           e.g. ``[(10, 20, 30), (5, 10, 15)]``
-            signal_ranges: list of tuples, one per substrategy.
-                           e.g. ``[(0.5, 1.0), (20, 50, 80)]``
-            n_trials: Number of trials.  Defaults to
-                      ``min(total_combinations, OPTUNA_MAX_TRIALS)``.
-            callbacks: Optional list of optuna callbacks, each called
-                       ``cb(study, trial)`` after every trial.
-
-        Returns:
-            pd.DataFrame with columns ``window_0``, ``signal_0``, …,
-            ``window_N``, ``signal_N``, ``sharpe``.
-        """
-        n_factors = len(window_ranges)
-        if len(signal_ranges) != n_factors:
-            raise ValueError(
-                f"window_ranges has {n_factors} entries but "
-                f"signal_ranges has {len(signal_ranges)}"
-            )
-
-        per_factor = [
-            list(itertools.product(w, s))
-            for w, s in zip(window_ranges, signal_ranges)
-        ]
-        total = math.prod(len(g) for g in per_factor)
-
-        if n_trials is None:
-            n_trials = min(total, OPTUNA_MAX_TRIALS)
-
-        search_space = {}
-        for i in range(n_factors):
-            search_space[f"window_{i}"] = list(window_ranges[i])
-            search_space[f"signal_{i}"] = list(signal_ranges[i])
-
-        if n_trials >= total:
-            sampler = GridSampler(search_space, seed=OPTUNA_SEED)
-            n_trials = total
-            logger.info("Exhaustive multi-factor optimization: "
-                        "%d factors, %d trials (GridSampler)",
-                        n_factors, total)
-        else:
-            sampler = TPESampler(seed=OPTUNA_SEED)
-            logger.info("Bayesian multi-factor optimization: "
-                        "%d factors, %d space, %d trials (TPE)",
-                        n_factors, total, n_trials)
-
-        study = optuna.create_study(direction="maximize", sampler=sampler)
-
-        def objective(trial):
-            windows = []
-            signals = []
-            for i in range(n_factors):
-                w = trial.suggest_categorical(
-                    f"window_{i}", search_space[f"window_{i}"],
-                )
-                s = trial.suggest_categorical(
-                    f"signal_{i}", search_space[f"signal_{i}"],
-                )
-                windows.append(w)
-                signals.append(s)
-
-            try:
-                perf = Performance(
-                    self.data, self.config,
-                    tuple(windows), tuple(signals), fee_bps=self.fee_bps,
-                )
-                perf.enrich_performance()
-                sharpe = perf.get_sharpe_ratio()
-                return sharpe if np.isfinite(sharpe) else float("-inf")
-            except Exception:
-                logger.warning("Optimization failed for windows=%s, signals=%s",
-                               windows, signals, exc_info=True)
-                return float("-inf")
-
-        study.optimize(objective, n_trials=n_trials,
-                       callbacks=callbacks or [])
-
-        rows = []
-        for trial in study.trials:
-            if trial.state == optuna.trial.TrialState.COMPLETE:
-                row = {}
-                for i in range(n_factors):
-                    row[f"window_{i}"] = trial.params[f"window_{i}"]
-                    row[f"signal_{i}"] = trial.params[f"signal_{i}"]
-                sharpe = trial.value if trial.value > float("-inf") else np.nan
-                row["sharpe"] = sharpe
-                rows.append(row)
-
-        logger.info("Multi-factor optimization complete: %d trials evaluated",
-                     len(rows))
+    def _run(self, space: SearchSpace, n_trials, callbacks) -> OptimizeResult:
+        search, n_trials = self._select_search(space.total, n_trials)
+        search.log_start(space, n_trials)
+        objective = Objective.for_config(
+            self.data, self.config, space.window_spec, fee_bps=self.fee_bps,
+        )
+        study = search.search(objective, space, n_trials, callbacks)
+        rows = self._rows_from_study(study, space.keys)
+        logger.info("Optimization complete: %d trials evaluated", len(rows))
         return self._build_result(pd.DataFrame(rows), study)
 
+    @staticmethod
+    def _select_search(total, n_trials) -> tuple[SearchStrategy, int]:
+        if n_trials is None:
+            n_trials = min(total, OPTUNA_MAX_TRIALS)
+        if n_trials >= total:
+            return ExhaustiveSearch(), total
+        return BayesianSearch(), n_trials
+
+    @staticmethod
+    def _rows_from_study(study, keys) -> list[dict]:
+        rows = []
+        for trial in study.get_trials(deepcopy=False):
+            if trial.state != optuna.trial.TrialState.COMPLETE:
+                continue
+            sharpe = trial.value if trial.value > float("-inf") else np.nan
+            row = {k: trial.params[k] for k in keys}
+            row["sharpe"] = sharpe
+            rows.append(row)
+        return rows
 
     @staticmethod
     def _build_result(df: pd.DataFrame, study) -> "OptimizeResult":
@@ -321,72 +351,3 @@ class ParametersOptimization:
             n_valid=valid,
             study=study,
         )
-
-
-# ---------- Legacy Cartesian grid search (kept as reference) ----------
-#
-# GRID_WARN_THRESHOLD = 10_000
-#
-# def optimize(self, indicator_tuple, strategy_tuple):
-#     """Single-factor grid search over window × signal.
-#     Yields: (window, signal, sharpe) tuples.
-#     """
-#     total = len(indicator_tuple) * len(strategy_tuple)
-#     logger.info("Starting grid search: %d windows × %d signals = %d combinations",
-#                 len(indicator_tuple), len(strategy_tuple), total)
-#     for window, signal in itertools.product(indicator_tuple, strategy_tuple):
-#         try:
-#             perf = Performance(self.data, self.config,
-#                                window, signal, fee_bps=self.fee_bps)
-#             perf.enrich_performance()
-#             sharpe = perf.get_sharpe_ratio()
-#         except Exception:
-#             logger.warning("Grid search failed for window=%s, signal=%s",
-#                            window, signal, exc_info=True)
-#             sharpe = np.nan
-#         yield (window, signal, sharpe)
-#     logger.info("Grid search complete: %d combinations evaluated", total)
-#
-# def optimize_multi(self, window_ranges, signal_ranges):
-#     """Multi-factor grid search over N-dimensional parameter space.
-#     Yields: dict with window_0, signal_0, …, window_N, signal_N, sharpe.
-#     """
-#     n_factors = len(window_ranges)
-#     if len(signal_ranges) != n_factors:
-#         raise ValueError(
-#             f"window_ranges has {n_factors} entries but "
-#             f"signal_ranges has {len(signal_ranges)}"
-#         )
-#     per_factor = [
-#         list(itertools.product(w, s))
-#         for w, s in zip(window_ranges, signal_ranges)
-#     ]
-#     total = math.prod(len(g) for g in per_factor)
-#     if total > GRID_WARN_THRESHOLD:
-#         logger.warning("Large grid: %d combinations (threshold %d). "
-#                        "Consider reducing ranges or using Bayesian optimization.",
-#                        total, GRID_WARN_THRESHOLD)
-#     logger.info("Starting multi-factor grid search: %d factors, %d combinations",
-#                  n_factors, total)
-#     for combo in itertools.product(*per_factor):
-#         windows = tuple(c[0] for c in combo)
-#         signals = tuple(c[1] for c in combo)
-#         try:
-#             perf = Performance(
-#                 self.data.copy(), self.config,
-#                 windows, signals, fee_bps=self.fee_bps,
-#             )
-#             perf.enrich_performance()
-#             sharpe = perf.get_sharpe_ratio()
-#         except Exception:
-#             logger.warning("Grid search failed for windows=%s, signals=%s",
-#                            windows, signals, exc_info=True)
-#             sharpe = np.nan
-#         row = {}
-#         for i, (w, s) in enumerate(zip(windows, signals)):
-#             row[f'window_{i}'] = w
-#             row[f'signal_{i}'] = s
-#         row['sharpe'] = sharpe
-#         yield row
-#     logger.info("Multi-factor grid search complete: %d combinations evaluated", total)
-    

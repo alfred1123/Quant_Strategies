@@ -3,7 +3,12 @@ import pandas as pd
 import pytest
 
 from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, SignalDirection
-from quant.strategy.optimizer import ParametersOptimization, OptimizeResult, OPTUNA_MAX_TRIALS
+from quant.strategy.optimizer import (
+    BayesianSearch,
+    ExhaustiveSearch,
+    OptimizeResult,
+    ParametersOptimization,
+)
 
 
 _BOLLINGER_CONFIG = StrategyConfig("test", "get_bollinger_band",
@@ -275,3 +280,62 @@ class TestRun:
         opt = ParametersOptimization({_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()}, _BOLLINGER_CONFIG)
         result = opt.optimize((5,), (0.5,))
         assert len(result.grid_df) == 1
+
+
+class TestSearchSelection:
+    def test_covers_space_is_exhaustive(self):
+        search, n = ParametersOptimization._select_search(12, 12)
+        assert isinstance(search, ExhaustiveSearch)
+        assert n == 12
+
+    def test_default_none_clamps_to_total(self):
+        search, n = ParametersOptimization._select_search(12, None)
+        assert isinstance(search, ExhaustiveSearch)
+        assert n == 12
+
+    def test_capped_is_bayesian(self):
+        search, n = ParametersOptimization._select_search(12, 3)
+        assert isinstance(search, BayesianSearch)
+        assert n == 3
+
+    def test_n_trials_above_total_is_exhaustive(self):
+        search, n = ParametersOptimization._select_search(12, 100)
+        assert isinstance(search, ExhaustiveSearch)
+        assert n == 12
+
+
+class TestExhaustiveSearch:
+    def test_visits_every_combination(self, sample_ohlc_df):
+        opt = ParametersOptimization(
+            {_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()},
+            _BOLLINGER_CONFIG,
+        )
+        result = opt.optimize((5, 10, 15), (0.5, 1.0))
+        assert len(result.grid_df) == 6
+        assert all(
+            t.state.name == "COMPLETE" for t in result.study.get_trials(deepcopy=False)
+        )
+
+    def test_callback_numbers_and_running_best(self, sample_ohlc_df):
+        opt = ParametersOptimization(
+            {_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()},
+            _BOLLINGER_CONFIG,
+        )
+        numbers = []
+        bests = []
+
+        def on_trial(study, trial):
+            numbers.append(trial.number)
+            bests.append(study.best_value)
+
+        opt.optimize((5, 10), (0.5, 1.0), callbacks=[on_trial])
+        assert numbers == [0, 1, 2, 3]
+        assert bests == list(np.maximum.accumulate(bests))
+
+    def test_extract_plots_available(self, sample_ohlc_df):
+        opt = ParametersOptimization(
+            {_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()},
+            _BOLLINGER_CONFIG,
+        )
+        result = opt.optimize((5, 10), (0.5, 1.0))
+        assert result.extract_plots() is not None

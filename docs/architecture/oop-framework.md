@@ -97,7 +97,8 @@ quant/strategy/
 │   ├── __init__.py
 │   ├── base.py
 │   └── max_drawdown.py
-├── optimizer.py         # (existing) grid driver → calls engine
+├── optimizer.py         # SearchStrategy (Exhaustive / Bayesian) → Objective
+├── objective.py         # Objective ABC + IndicatorCache — scalar Sharpe for search
 ├── performance.py       # (existing) metrics; eventually reads Portfolio
 ├── walk_forward.py      # (existing) uses same engine on IS/OOS splits
 └── backtest_service.py  # (existing) HTTP/CLI shell — unchanged API surface
