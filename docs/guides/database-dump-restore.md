@@ -23,23 +23,22 @@ Copy **Aurora (prod)** into a **local Postgres 17** database for offline dev, fa
 | Requirement | Notes |
 |-------------|--------|
 | **AWS SSO** | `aws sso login --profile alfcheun` (or your profile) |
-| **SSM tunnel** | Aurora reachable at `127.0.0.1:5433` — see below |
+| **Prod tunnel** | Aurora reachable at `127.0.0.1:5433` — `./scripts/appctl.sh prod tunnel start` |
 | **`.env`** | `QUANTDB_PASSWORD` = Aurora admin password (same as prod tunnel) |
 | **PostgreSQL 17 client** | `pg_dump` / `pg_restore` — script uses `/usr/lib/postgresql/17/bin/pg_dump` |
 | **Local Postgres 17 server** | Only for **restore** — `sudo systemctl start postgresql` |
 
-Tunnel (automatic via Cursor hook, or manual):
+The dump reads **prod Aurora**. Local/dev on `:5432` does not need this
+forward. Start the **prod tunnel**:
 
 ```bash
-./scripts/appctl.sh dev tunnel start
-# verify
-pg_isready -h localhost -p 5433
+./scripts/appctl.sh prod tunnel start
+pg_isready -h 127.0.0.1 -p 5433
 ```
 
-The tunnel forwards **localhost:5433 → Aurora** through the **prod EC2** SSM
-jump host (there is no separate dev instance). Target instance ID is resolved
-from `SSM_TARGET_INSTANCE` in `.env` or the default in `appctl.sh` — see
-[Dev vs Prod — resolve instance ID](../architecture/dev-vs-prod.md#resolve-the-current-prod-ec2-instance-id).
+The forward is laptop `:5433` → Aurora `:5432` through the **prod** EC2 SSM
+jump host. Target instance ID is `SSM_TARGET_INSTANCE` in `.env` or the
+default in `appctl.sh` — see [Dev vs Prod — resolve instance ID](../architecture/dev-vs-prod.md#resolve-the-current-prod-ec2-instance-id).
 
 ---
 
@@ -91,7 +90,7 @@ Dump format: **custom** (`-Fc`), compressed (`-Z 6`). Typical size ~3–5 MB.
 
 ```bash
 source .env
-./scripts/appctl.sh dev tunnel start   # if not already up
+./scripts/appctl.sh prod tunnel start   # if not already up
 ./scripts/dbctl.sh dump
 ```
 
@@ -158,7 +157,7 @@ pg_restore -h localhost -p 5432 -U quant_admin -d quantdb \
 
 | Symptom | Fix |
 |---------|-----|
-| `SSM tunnel is not running on :5433` | `./scripts/appctl.sh dev tunnel start`; confirm AWS SSO; resolve current instance via [Dev vs Prod](../architecture/dev-vs-prod.md#resolve-the-current-prod-ec2-instance-id) if you override `SSM_TARGET_INSTANCE` |
+| `Prod tunnel is not running on :5433` | `./scripts/appctl.sh prod tunnel start`; confirm AWS SSO; resolve current instance via [Dev vs Prod](../architecture/dev-vs-prod.md#resolve-the-current-prod-ec2-instance-id) if you override `SSM_TARGET_INSTANCE` |
 | `SSL connection required` / SSL errors on dump | Ensure `PGSSLMODE=require` (set automatically by `dbctl dump`) |
 | `.env missing QUANTDB_PASSWORD` | Copy from `.env.example`; use Aurora password from SSM `/quant/prod/QUANTDB_PASSWORD` |
 | `pg_dump: command not found` / wrong version | Install `postgresql-client-17`; script expects `/usr/lib/postgresql/17/bin/pg_dump` |

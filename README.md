@@ -17,16 +17,22 @@ cd Quant_Strategies
 ./setup.sh
 cp .env.example .env       # then fill in QUANTDB_PASSWORD, etc.
 
-# 2. Start the AWS SSM tunnel to shared Aurora (5433 -> RDS:5432)
-./scripts/appctl.sh dev tunnel start
-
-# 3. Start backend (uvicorn) + frontend (vite)
+# 2. Local/dev talks to Postgres on :5432 — no tunnel
+#    (set DB_TARGET=local in .env after the first dump/restore)
 ./scripts/appctl.sh dev start
 ```
 
 Open `http://localhost:5173`. Login, then configure and run backtests from the UI.
 
-**Optional — work offline against a local Postgres** (no SSM tunnel, no shared DB):
+**Prod Aurora from the laptop** is a separate command. It is not part of `dev start`:
+
+```bash
+aws sso login --profile alfcheun
+./scripts/appctl.sh prod tunnel start   # localhost:5433 → Aurora :5432
+pg_isready -h 127.0.0.1 -p 5433
+```
+
+**Optional — first-time local copy** (dump needs the prod tunnel; daily `dev start` does not):
 
 ```bash
 sudo apt install -y postgresql-17 docker.io docker-compose-v2

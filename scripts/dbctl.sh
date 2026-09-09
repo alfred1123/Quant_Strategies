@@ -14,7 +14,7 @@
 # claim_local_db. Restart it afterwards with ./scripts/appctl.sh dev start.
 #
 # Prerequisites:
-#   - SSM tunnel running: ./scripts/appctl.sh dev tunnel start
+#   - Prod tunnel running: ./scripts/appctl.sh prod tunnel start
 #   - Local PG17 server running: sudo systemctl start postgresql
 #   - .env with QUANTDB_PASSWORD set (Aurora password)
 # =============================================================================
@@ -65,7 +65,7 @@ try:
     s.connect(('$RDS_HOST', $RDS_PORT)); s.close()
 except Exception:
     sys.exit(1)
-" || error "SSM tunnel is not running on :$RDS_PORT. Start it with: ./scripts/appctl.sh dev tunnel start"
+" || error "Prod tunnel is not running on :$RDS_PORT. Start it with: ./scripts/appctl.sh prod tunnel start"
 }
 
 require_local_pg() {

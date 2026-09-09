@@ -68,8 +68,9 @@ docker compose up                         docker compose -f docker-compose.yml
     port-forwarding through the **prod** EC2 instance (`quant-compute` stack).
     There is no separate dev instance — do not hardcode an instance ID in docs
     or scripts; resolve it from CloudFormation (see below) or use
-    `./scripts/appctl.sh dev tunnel start`, which reads `SSM_TARGET_INSTANCE`
-    from `.env` when set.
+    `./scripts/appctl.sh prod tunnel start`, which reads `SSM_TARGET_INSTANCE`
+    from `.env` when set. Local/dev (`DB_TARGET=local`) does not start this
+    tunnel.
 
 ### Resolve the current prod EC2 instance ID
 
@@ -85,8 +86,30 @@ aws cloudformation describe-stacks \
   --output text
 ```
 
-Optional fallback: set `SSM_TARGET_INSTANCE` in `.env` (dev tunnel) or
+Optional fallback: set `SSM_TARGET_INSTANCE` in `.env` (prod tunnel) or
 `EC2_INSTANCE_ID` in GitHub Actions repo variables if CFN lookup fails.
+
+---
+
+## Prod tunnel — laptop to Aurora on 5433
+
+`appctl.sh prod` without `tunnel` is the **Docker Compose stack**. The
+forward that puts Aurora on the laptop is a different subcommand:
+
+```bash
+aws sso login --profile alfcheun
+./scripts/appctl.sh prod tunnel start
+./scripts/appctl.sh prod tunnel status
+pg_isready -h 127.0.0.1 -p 5433
+```
+
+| Port | What it is | Who starts it |
+|------|------------|---------------|
+| `5432` | Local Postgres (`DB_TARGET=local`) | `systemctl` / `dbctl` — **no tunnel** |
+| `5433` | Prod Aurora via SSM through prod EC2 | `./scripts/appctl.sh prod tunnel start` |
+
+`dev tunnel` is the same handler under the old name. `dev start` with
+`DB_TARGET=local` must not be asked to open `:5433`.
 
 ---
 
@@ -116,21 +139,16 @@ export QUANTDB_PASSWORD=<your_password>
 JWT_SECRET=<any_value_or_leave_blank_for_auto>
 ```
 
-Start the SSM tunnel (preferred — resolves target from `SSM_TARGET_INSTANCE` in
-`.env`, or the default in `scripts/appctl.sh`):
+Local/dev (`DB_TARGET=local`) talks to Postgres on `:5432` and **does not
+need a tunnel**. Reaching **prod Aurora** from the laptop is a different
+command — see [Prod tunnel](#prod-tunnel-laptop-to-aurora-on-5433).
+
+When `DB_TARGET=prod`, `dev start` will start that prod tunnel if `:5433`
+is down. Verify:
 
 ```bash
-./scripts/appctl.sh dev tunnel start
-./scripts/appctl.sh dev tunnel status   # confirms tunnel + DB on :5433
-```
-
-The tunnel also starts automatically via the Cursor hook, or when you run
-`./scripts/appctl.sh dev start` with `DB_TARGET=prod` (default).
-
-Verify:
-
-```bash
-pg_isready -h localhost -p 5433
+./scripts/appctl.sh prod tunnel status
+pg_isready -h 127.0.0.1 -p 5433
 ```
 
 Manual SSM (only if debugging — substitute `$INSTANCE_ID` from the CFN query
@@ -165,14 +183,11 @@ docker compose up -d --build
 
 ## Optional: point dev at a local Postgres
 
-By default `./scripts/appctl.sh dev start` uses the SSM tunnel on `localhost:5433`
-to reach the shared Aurora cluster. This is the recommended path — every
-teammate gets it for free with just AWS SSO.
-
-If you also want a **local** Postgres (offline work, faster iteration, safe to
-break), the toolchain supports it as an opt-in via `DB_TARGET=local`. Teammates
-without a local DB are unaffected — leaving `DB_TARGET` unset keeps the prod
-tunnel as the default.
+`./scripts/appctl.sh dev start` with `DB_TARGET=local` uses Postgres on
+`:5432` and does **not** start a tunnel. Reaching the shared Aurora cluster
+from a laptop is [prod tunnel](#prod-tunnel-laptop-to-aurora-on-5433) on
+`:5433`. Leaving `DB_TARGET` unset still selects that prod target — then
+`dev start` will start the prod tunnel if it is down.
 
 ### One-time setup
 
@@ -370,7 +385,7 @@ aws ssm send-command --instance-ids "$INSTANCE_ID" \
 | `quant/api/auth/router.py` | Cookie `Secure` flag — reads `COOKIE_SECURE` or falls back to `APP_ENV` |
 | `quant/api/main.py` | Swagger toggle, CORS — reads `APP_ENV`, `CORS_ORIGINS` |
 | `aws/scripts/init-ssm-params.sh` | Bootstraps SSM parameters (run once) |
-| `.cursor/hooks/ssm-port-forward-loop.sh` | Auto-starts SSM tunnel for dev |
+| `.cursor/hooks/ssm-port-forward-loop.sh` | Optional Cursor hook — same prod tunnel on `:5433` |
 
 ---
 

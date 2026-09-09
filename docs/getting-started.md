@@ -27,7 +27,7 @@ cp .env.example .env   # fill in keys — ask admin for DB password / AWS access
 | Script | Purpose |
 |---|---|
 | `setup.sh` | Create `env/`, install Python + frontend deps |
-| `scripts/appctl.sh` | Start/stop **dev** (uvicorn + Vite) or **prod** (Docker Compose) |
+| `scripts/appctl.sh` | Start/stop **dev** (uvicorn + Vite) or **prod** (Docker Compose). `prod tunnel` is the laptop → Aurora forward on `:5433` |
 | `scripts/dbctl.sh` | Dump/restore/reset **local** Postgres (`:5432`) |
 | `scripts/liquibase-deploy.sh` | Apply pending DB migrations |
 | `scripts/liquibase-verify.sh` | Dry-run: validate changelogs, preview SQL (no apply) |
@@ -36,32 +36,46 @@ Admin / debug helpers (see [Login](design/login.md)): `scripts/hash_password.py`
 
 ## Run the app (dev)
 
-`scripts/appctl.sh` starts the FastAPI backend and Vite frontend. With `DB_TARGET=local` it also brings up Redis + the queue worker via `docker-compose.dev.yml`.
+`scripts/appctl.sh` first argument is **how the app runs** (`dev` = uvicorn + Vite on the laptop; `prod` = Docker Compose). It is not which database you talk to.
 
-### Option A — Shared prod DB (default)
+**Local/dev does not need a tunnel.** `DB_TARGET=local` uses Postgres on `:5432`.
 
-Uses Aurora via SSM port-forward on `localhost:5433`. No local Postgres or Docker required (backtests queue on the shared worker in prod).
+**Prod Aurora from a laptop** is a different command: the SSM port-forward on `:5433`. That is `prod tunnel`, not `dev start`.
+
+### Option A — Local DB (no tunnel)
+
+Offline (or isolated) dev on `localhost:5432` with a local backtest queue. Requires **Docker** for Redis + worker. See [Database dump & restore](guides/database-dump-restore.md) for the first dump.
 
 ```bash
-./scripts/appctl.sh dev tunnel start   # once per session
-./scripts/appctl.sh dev start
+# in .env: DB_TARGET=local
+./scripts/appctl.sh dev start          # uvicorn + vite + docker-compose.dev.yml
 ```
 
 Open **http://localhost:5173** (API: http://localhost:8000).
 
-### Option B — Local DB copy
+A dump from Aurora (one-time) does need the prod tunnel — that is Option B's command, used only for `dbctl dump`.
 
-Offline dev on `localhost:5432` with a full local backtest queue. Requires **Docker** for Redis + worker. See [Database dump & restore](guides/database-dump-restore.md) for detail.
+### Option B — Prod Aurora from the laptop (prod tunnel)
+
+Uses Aurora through SSM on `localhost:5433`. The laptop is not on the VPC; the forward goes through the **prod** EC2 jump host. AWS SSO must be valid. `dev start` still runs uvicorn/Vite; it does not start this tunnel.
 
 ```bash
-./scripts/appctl.sh dev tunnel start   # needed for dump from Aurora
+aws sso login --profile alfcheun
+./scripts/appctl.sh prod tunnel start
+pg_isready -h 127.0.0.1 -p 5433
+
+# in .env: DB_TARGET=prod  (or leave DB_TARGET unset)
+./scripts/appctl.sh dev start
+```
+
+```bash
+# First-time local copy: tunnel, then dump, then switch to Option A
+./scripts/appctl.sh prod tunnel start
 ./scripts/dbctl.sh reset
 ./scripts/dbctl.sh dump
 ./scripts/dbctl.sh restore
 ./scripts/dbctl.sh bootstrap-roles
-
-# in .env: DB_TARGET=local
-./scripts/appctl.sh dev start          # uvicorn + vite + docker-compose.dev.yml
+# then set DB_TARGET=local and use Option A — no tunnel after that
 ```
 
 ## Database migrations (Liquibase)
@@ -71,7 +85,7 @@ Schema changes live under `db/liquidbase/`. Use **`DB_TARGET`** to pick the port
 | Target | Port | When |
 |---|---|---|
 | `DB_TARGET=local` | `:5432` | Local Postgres after `dbctl restore` |
-| `DB_TARGET=prod` (default) | `:5433` | Aurora via SSM tunnel |
+| `DB_TARGET=prod` (default) | `:5433` | Aurora via **prod tunnel** (`./scripts/appctl.sh prod tunnel start`) |
 
 ```bash
 # Preview pending changes (safe — does not apply)
@@ -84,7 +98,8 @@ DB_TARGET=local ./scripts/liquibase-deploy.sh
 # Prod schema (Aurora) — GitHub Actions → **database** workflow (verify or deploy)
 # Or: bash aws/scripts/liquibase-ssm-run.sh verify main
 
-# Prod from laptop (SSM tunnel on :5433 must be up)
+# Prod Aurora from the laptop (prod tunnel on :5433 must be up)
+./scripts/appctl.sh prod tunnel start
 PROD_DB_PORT=5433 APP_ENV=prod USE_SSM=1 ./scripts/liquibase-verify.sh
 PROD_DB_PORT=5433 APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
 ```

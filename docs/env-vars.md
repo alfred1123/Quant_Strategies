@@ -41,7 +41,7 @@ code; see [Dev vs Prod](architecture/dev-vs-prod.md#where-local-and-prod-are-def
 
 | Variable | Required? | Description |
 |---|---|---|
-| `DB_TARGET` | Optional | `prod` (default) → Aurora, via the SSM tunnel from a laptop. `local` → host-side Postgres 17 (set up via `./scripts/dbctl.sh`). When `local`, `appctl.sh dev start` ALSO brings up Redis + the Python queue worker via `docker-compose.dev.yml`. |
+| `DB_TARGET` | Optional | `local` → host-side Postgres 17 on `:5432` (no tunnel; `dev start` also brings up Redis + worker via `docker-compose.dev.yml`). `prod` (default if unset) → Aurora on `:5433` after `./scripts/appctl.sh prod tunnel start`. |
 | `LOCAL_DB_HOST` | Optional | Overrides the `local` host (default `127.0.0.1`). |
 | `LOCAL_DB_PORT` | Optional | Overrides the `local` port (default `5432`). |
 | `LOCAL_DB_NAME` | Optional | Overrides the `local` database (default `quantdb`). |

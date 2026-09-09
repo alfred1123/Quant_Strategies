@@ -96,7 +96,7 @@ All other mutations use schema stored procedures (e.g. `BT.SP_INS_STRATEGY`, `BT
 
 ### REFDATA as Single Source of Truth for UI Dropdowns
 
-All UI dropdown, radio, and selectbox values must come from `REFDATA` tables in PostgreSQL (`localhost:5433`). Agents must **never** hardcode indicator lists, strategy names, asset types, conjunctions, or grid search defaults in UI or API code.
+All UI dropdown, radio, and selectbox values must come from `REFDATA` tables in PostgreSQL. Local/dev (`DB_TARGET=local`) is `localhost:5432` and does **not** need a tunnel. Prod Aurora from a laptop is `localhost:5433` after `./scripts/appctl.sh prod tunnel start`. Agents must **never** hardcode indicator lists, strategy names, asset types, conjunctions, or grid search defaults in UI or API code.
 
 | Dropdown | REFDATA Table | Label Column | Value Column |
 |----------|---------------|--------------|--------------|
@@ -117,7 +117,7 @@ The `INDICATOR_DEFAULTS` dict in `quant/strategy/signals.py` is a **legacy fallb
 - **`RedisRefData`** (`quant/refdata/reader.py`) is the read-only accessor for API handlers and the worker. Checks `refdata:version` on every `get()` and rebuilds its local snapshot when bumped.
 - No TTL — REFDATA changes are rare, admin-only. Refresh via `POST /api/v1/refdata/refresh`.
 - Frontend fetches REFDATA via `GET /api/v1/refdata/{table_name}` and caches client-side with TanStack Query (stale-while-revalidate).
-- DB connection: `localhost:5433` via AWS SSM port-forward.
+- DB connection: `localhost:5432` when `DB_TARGET=local`; `localhost:5433` is prod Aurora via `./scripts/appctl.sh prod tunnel start`.
 - If DB is unreachable at startup, the backend fails fast — REFDATA is required.
 
 ### Checking Schema Discrepancies (DB vs Source DDL)

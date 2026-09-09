@@ -173,9 +173,9 @@ Liquibase runs in CI: a push touching `db/liquidbase/**` queues the **migrate da
 
 ### Local development
 
-**Default:** SSM tunnel to Aurora on `localhost:5433`, uvicorn + Vite on host.
+**Local/dev:** `DB_TARGET=local` → Postgres 17 on `:5432`, uvicorn + Vite on the host, Redis + worker via `docker-compose.dev.yml`. **No tunnel.**
 
-**Optional:** `DB_TARGET=local` → Postgres 17 on `:5432`, Redis + worker via `docker-compose.dev.yml`. See [Dev vs Prod](dev-vs-prod.md).
+**Prod Aurora from a laptop:** `./scripts/appctl.sh prod tunnel start` → `:5433`. See [Dev vs Prod — prod tunnel](dev-vs-prod.md#prod-tunnel-laptop-to-aurora-on-5433).
 
 ---
 

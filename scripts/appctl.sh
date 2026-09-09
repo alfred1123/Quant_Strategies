@@ -48,6 +48,11 @@ else
   db_assert_not_local 127.0.0.1 "$DB_PORT" || exit 1
 fi
 
+# Laptop → Aurora SSM forward. Always :5433, even when DB_TARGET=local
+# (local Postgres is :5432 and does not use this). `prod tunnel` is the
+# command; `dev tunnel` is the same handler under the old name.
+TUNNEL_PORT="${PROD_DB_PORT:-$(db_field prod port)}"
+
 # AWS SSM port-forward target (override via .env if needed).
 SSM_TARGET_INSTANCE="${SSM_TARGET_INSTANCE:-i-09c327d8c657d79ab}"
 SSM_RDS_HOST="${SSM_RDS_HOST:-quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com}"
@@ -66,12 +71,14 @@ usage() {
   cat <<'EOF'
 Usage:
   ./scripts/appctl <dev|prod> <start|stop|kill|restart|status>
-  ./scripts/appctl dev tunnel <start|stop|kill|restart|status>
+  ./scripts/appctl prod tunnel <start|stop|kill|restart|status>
+  ./scripts/appctl dev tunnel  …     # same as prod tunnel (legacy name)
 
 Examples:
-  ./scripts/appctl dev tunnel start  # start AWS SSM port-forward to RDS (5433)
-  ./scripts/appctl dev start         # local dev (uvicorn + Vite). Refuses to
-                                     # start if the SSM tunnel / DB is down.
+  ./scripts/appctl prod tunnel start # laptop → Aurora on :5433 (needs AWS SSO)
+  ./scripts/appctl prod tunnel status
+  ./scripts/appctl dev start         # uvicorn + Vite. Local Postgres on :5432
+                                     # when DB_TARGET=local — no tunnel.
   ./scripts/appctl dev kill
   ./scripts/appctl prod start        # Docker Compose (redis + api + worker + nginx)
   ./scripts/appctl prod status
@@ -87,15 +94,15 @@ Notes:
   - DB target is selected via DB_TARGET (set in .env or shell):
       DB_TARGET=prod   → AWS Aurora via SSM tunnel on :5433  (default)
       DB_TARGET=local  → local Postgres 17 on :5432          (set up via ./scripts/dbctl.sh)
-  - 'dev tunnel' manages a single canonical AWS SSM port-forward to RDS so you
-    only ever have one reconnect loop running (avoids races on port 5433).
-    Not needed when DB_TARGET=local.
+  - 'prod tunnel' is the laptop → Aurora SSM port-forward on :5433.
+    Local/dev (DB_TARGET=local) does not need it — that is Postgres on :5432.
+    'dev tunnel' is the same command under the old name.
   - When DB_TARGET=local, 'dev start' tries to start local Postgres if it is
     down (systemctl / pg_ctlcluster), then brings up Redis + the queue worker
     via docker-compose.dev.yml so the backtest queue runs end-to-end.
     'dev stop|kill' tears it down. Requires docker + docker compose v2.
-  - When DB_TARGET=prod, 'dev start' auto-starts the SSM tunnel if :5433 is
-    down (same as 'dev tunnel start').
+  - When DB_TARGET=prod, 'dev start' auto-starts the prod tunnel if :5433 is
+    down (same as 'prod tunnel start').
   - prod mode loads ./.env when present (set -a) so docker compose can substitute
     QUANTDB_URL, JWT_SECRET, REDIS_URL, etc. FastAPI and the worker both load
     secrets via SSM inside their containers when USE_SSM=1.
@@ -118,7 +125,10 @@ fi
 cd "$ROOT_DIR"
 
 # ── Prod mode delegates to Docker Compose ─────────────────────────────
-if [[ "$MODE" == "prod" ]]; then
+# `prod tunnel` is the laptop → Aurora forward on :5433, not this stack.
+# Fall through so the shared tunnel handler runs (and checks :5433 even
+# when .env has DB_TARGET=local).
+if [[ "$MODE" == "prod" && "$ACTION" != "tunnel" ]]; then
   COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
   # Export vars from ./.env so ${QUANTDB_URL}, ${JWT_SECRET}, … interpolate in YAML
   # (matches what you set manually on EC2 before `docker compose up`).
@@ -167,14 +177,17 @@ if [[ "$MODE" == "prod" ]]; then
 fi
 
 # ── Dev mode runs bare processes ──────────────────────────────────────
+# Prod tunnel also lands here so it can share start_service / pid files.
+# It does not need the venv — only AWS CLI + python3.
 mkdir -p "$RUN_DIR" "$LOG_DIR"
 
-if [[ ! -f "$ROOT_DIR/env/bin/activate" ]]; then
-  echo "Missing virtualenv at env/. Run ./setup.sh first." >&2
-  exit 1
+if [[ "$ACTION" != "tunnel" ]]; then
+  if [[ ! -f "$ROOT_DIR/env/bin/activate" ]]; then
+    echo "Missing virtualenv at env/. Run ./setup.sh first." >&2
+    exit 1
+  fi
+  source "$ROOT_DIR/env/bin/activate"
 fi
-
-source "$ROOT_DIR/env/bin/activate"
 
 backend_command() {
   # Scope --reload to source dirs only. Watching the repo root made WatchFiles
@@ -225,25 +238,34 @@ tunnel_command() {
   # Single canonical reconnect loop. Logs each cycle to $TUNNEL_LOG_FILE.
   local params
   params=$(printf '{"host":["%s"],"portNumber":["%s"],"localPortNumber":["%s"]}' \
-    "$SSM_RDS_HOST" "$SSM_REMOTE_PORT" "$DB_PORT")
+    "$SSM_RDS_HOST" "$SSM_REMOTE_PORT" "$TUNNEL_PORT")
   printf '%s' "while true; do echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] starting SSM port-forward...\"; aws ssm start-session --target '$SSM_TARGET_INSTANCE' --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters '$params' --profile '$SSM_AWS_PROFILE'; echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] SSM session ended (exit \$?). Reconnecting in 5s...\"; sleep 5; done"
 }
 
-db_reachable() {
-  # Real TCP handshake check (don't keep the socket open — SSM port-forward
+tcp_open() {
+  # Real TCP handshake (don't keep the socket open — SSM port-forward
   # would tunnel the empty connection through to RDS and stall).
-  local host="${LOCAL_DB_HOST:-127.0.0.1}"
-  python3 - <<PY 2>/dev/null
+  local host="$1" port="$2"
+  python3 - "$host" "$port" <<'PY' 2>/dev/null
 import socket, sys
+host, port = sys.argv[1], int(sys.argv[2])
 s = socket.socket()
 s.settimeout(2)
 try:
-    s.connect(("$host", $DB_PORT))
+    s.connect((host, port))
     s.close()
     sys.exit(0)
 except Exception:
     sys.exit(1)
 PY
+}
+
+db_reachable() {
+  tcp_open "${LOCAL_DB_HOST:-127.0.0.1}" "$DB_PORT"
+}
+
+tunnel_reachable() {
+  tcp_open 127.0.0.1 "$TUNNEL_PORT"
 }
 
 _start_systemd_postgresql() {
@@ -303,20 +325,20 @@ ensure_local_postgres() {
 }
 
 ensure_prod_db_tunnel() {
-  # When DB_TARGET=prod, DB == SSM tunnel on :5433. Start tunnel if down.
-  if db_reachable; then
+  # When DB_TARGET=prod, the API talks to Aurora through :5433.
+  if tunnel_reachable; then
     return 0
   fi
   local tunnel_pid
   tunnel_pid="$(read_pid "$TUNNEL_PID_FILE")"
   if ! pid_is_running "$tunnel_pid"; then
-    echo "DB tunnel on 127.0.0.1:$DB_PORT is down — starting SSM port-forward ..."
-    start_service "tunnel" "$TUNNEL_PID_FILE" "$TUNNEL_LOG_FILE" "$(tunnel_command)" "$DB_PORT"
+    echo "Prod tunnel on 127.0.0.1:$TUNNEL_PORT is down — starting SSM port-forward ..."
+    start_service "tunnel" "$TUNNEL_PID_FILE" "$TUNNEL_LOG_FILE" "$(tunnel_command)" "$TUNNEL_PORT"
   fi
   local i
   for ((i = 1; i <= 15; i++)); do
-    if db_reachable; then
-      echo "DB reachable on 127.0.0.1:$DB_PORT via SSM tunnel"
+    if tunnel_reachable; then
+      echo "Aurora reachable on 127.0.0.1:$TUNNEL_PORT via prod tunnel"
       return 0
     fi
     sleep 1
@@ -598,34 +620,33 @@ SELF_CMD="${APPCTL_ENTRYPOINT:-$(basename "$0")}"
 
 case "$ACTION" in
   tunnel)
-    # Manage just the SSM port-forward.  Sub-command in $3 (default: start).
+    # Laptop → Aurora on :5433. Canonical name is `prod tunnel`.
     SUB="${3:-start}"
     case "$SUB" in
       start)
-        start_service "tunnel" "$TUNNEL_PID_FILE" "$TUNNEL_LOG_FILE" "$(tunnel_command)" "$DB_PORT"
-        # Wait briefly for the tunnel to bind 5433.
+        start_service "tunnel" "$TUNNEL_PID_FILE" "$TUNNEL_LOG_FILE" "$(tunnel_command)" "$TUNNEL_PORT"
         for _ in 1 2 3 4 5 6 7 8 9 10; do
-          db_reachable && { echo "DB reachable on 127.0.0.1:$DB_PORT"; exit 0; }
+          tunnel_reachable && { echo "Aurora reachable on 127.0.0.1:$TUNNEL_PORT"; exit 0; }
           sleep 1
         done
-        echo "WARN: tunnel started but DB not reachable yet — check $TUNNEL_LOG_FILE" >&2
+        echo "WARN: prod tunnel started but Aurora not reachable yet — check $TUNNEL_LOG_FILE" >&2
         ;;
       stop|kill)
-        kill_service "tunnel" "$TUNNEL_PID_FILE" "$DB_PORT"
+        kill_service "tunnel" "$TUNNEL_PID_FILE" "$TUNNEL_PORT"
         ;;
       status)
-        status_service "tunnel" "$TUNNEL_PID_FILE" "$DB_PORT"
-        if db_reachable; then
-          echo "DB: reachable on 127.0.0.1:$DB_PORT"
+        status_service "tunnel" "$TUNNEL_PID_FILE" "$TUNNEL_PORT"
+        if tunnel_reachable; then
+          echo "Aurora: reachable on 127.0.0.1:$TUNNEL_PORT  (prod tunnel)"
         else
-          echo "DB: UNREACHABLE on 127.0.0.1:$DB_PORT"
+          echo "Aurora: UNREACHABLE on 127.0.0.1:$TUNNEL_PORT  (prod tunnel)"
         fi
         ;;
       restart)
-        "$0" dev tunnel kill
-        "$0" dev tunnel start
+        "$0" prod tunnel kill
+        "$0" prod tunnel start
         ;;
-      *) echo "Usage: $0 dev tunnel <start|stop|kill|restart|status>" >&2; exit 1 ;;
+      *) echo "Usage: $0 prod tunnel <start|stop|kill|restart|status>" >&2; exit 1 ;;
     esac
     exit 0
     ;;
@@ -636,11 +657,11 @@ case "$ACTION" in
         echo "Local Postgres on 127.0.0.1:$DB_PORT is NOT reachable." >&2
         echo "  - Start manually: sudo systemctl start postgresql" >&2
         echo "  - Or restore:     ./scripts/dbctl.sh reset && ./scripts/dbctl.sh restore" >&2
-        echo "  - Or use prod DB: set DB_TARGET=prod in .env and run ./scripts/appctl.sh dev tunnel start" >&2
+        echo "  - Or use prod Aurora: set DB_TARGET=prod and run ./scripts/appctl.sh prod tunnel start" >&2
       else
         echo "DB on 127.0.0.1:$DB_PORT is NOT reachable." >&2
-        echo "  - Check tunnel:   ./scripts/appctl.sh dev tunnel status" >&2
-        echo "  - Start tunnel:   ./scripts/appctl.sh dev tunnel start" >&2
+        echo "  - Check tunnel:   ./scripts/appctl.sh prod tunnel status" >&2
+        echo "  - Start tunnel:   ./scripts/appctl.sh prod tunnel start" >&2
         echo "  - Tunnel log:     $TUNNEL_LOG_FILE" >&2
         echo "(Or use local DB: set DB_TARGET=local in .env after ./scripts/dbctl.sh restore)" >&2
       fi
@@ -686,7 +707,8 @@ case "$ACTION" in
     ;;
   status)
     echo "Mode: dev  (DB_TARGET=$DB_TARGET)"
-    echo "Command: ./scripts/$SELF_CMD dev <start|stop|kill|restart|status|tunnel>"
+    echo "Command: ./scripts/$SELF_CMD dev <start|stop|kill|restart|status>"
+    echo "Prod Aurora: ./scripts/$SELF_CMD prod tunnel <start|status>"
     if [[ "$DB_TARGET" == "prod" ]]; then
       status_service "tunnel"   "$TUNNEL_PID_FILE"   "$DB_PORT"
     fi
