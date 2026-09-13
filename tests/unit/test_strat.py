@@ -48,6 +48,27 @@ class TestMomentumBandSignal:
         assert result.dtype == float
 
 
+class TestLongOnlySignals:
+    def test_momentum_band_never_short(self):
+        data = np.array([2.0, 0.0, -2.0, -5.0])
+        result = Strategy.momentum_band_signal_long_only(data, 1.0)
+        np.testing.assert_array_equal(result, [1.0, 0.0, 0.0, 0.0])
+
+    def test_reversion_band_never_short(self):
+        data = np.array([-2.0, 0.0, 2.0, 5.0])
+        result = Strategy.reversion_band_signal_long_only(data, 1.0)
+        np.testing.assert_array_equal(result, [1.0, 0.0, 0.0, 0.0])
+
+    def test_resolve_momentum_long(self):
+        indicators = [{"method_name": "get_bollinger_band", "is_bounded_ind": "N"}]
+        signal_types = [
+            {"name": "momentum_long", "func_name_band": "momentum_band_signal_long_only",
+             "func_name_bounded": "momentum_bounded_signal_long_only"},
+        ]
+        fn = resolve_signal_func("momentum_long", "get_bollinger_band", indicators, signal_types)
+        assert fn is SignalDirection.momentum_band_signal_long_only
+
+
 class TestReversionBandSignal:
     def test_long_when_below_neg_signal(self):
         data = np.array([-2.0, -3.0, -5.0])

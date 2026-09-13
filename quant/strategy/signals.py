@@ -233,6 +233,13 @@ class SignalDirection:
     """Trading signal generators — all static methods with signature (data_col, signal)."""
 
     @staticmethod
+    def _long_only(position: np.ndarray) -> np.ndarray:
+        """Clip short (-1) legs to flat — for spot / jurisdictions that cannot short."""
+        out = position.astype(float, copy=True)
+        out[out < 0] = 0.0
+        return out
+
+    @staticmethod
     def momentum_band_signal(data_col, signal):
         """Go long when indicator > +signal, short when < -signal, flat otherwise."""
         position = np.where(data_col > signal, 1, np.where(data_col < -signal, -1, 0))
@@ -265,6 +272,34 @@ class SignalDirection:
         position = position.astype(float)
         position[np.isnan(data_col)] = np.nan
         return position
+
+    @staticmethod
+    def momentum_band_signal_long_only(data_col, signal):
+        """Momentum band — long or flat only."""
+        return SignalDirection._long_only(
+            SignalDirection.momentum_band_signal(data_col, signal)
+        )
+
+    @staticmethod
+    def reversion_band_signal_long_only(data_col, signal):
+        """Reversion band — long or flat only."""
+        return SignalDirection._long_only(
+            SignalDirection.reversion_band_signal(data_col, signal)
+        )
+
+    @staticmethod
+    def momentum_bounded_signal_long_only(data_col, signal):
+        """Momentum bounded — long or flat only."""
+        return SignalDirection._long_only(
+            SignalDirection.momentum_bounded_signal(data_col, signal)
+        )
+
+    @staticmethod
+    def reversion_bounded_signal_long_only(data_col, signal):
+        """Reversion bounded — long or flat only."""
+        return SignalDirection._long_only(
+            SignalDirection.reversion_bounded_signal(data_col, signal)
+        )
 
 
 # Pre-existing alias kept for callers that import the symbol ``Strategy``.

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.24.0-001-signal-type-long-only" author="alfcheun" context="refdata,prod-deploy">
+        <comment>REFDATA.SIGNAL_TYPE — long-only momentum/reversion for spot / no-short accounts</comment>
+        <sql splitStatements="false"><![CDATA[
+            INSERT INTO REFDATA.SIGNAL_TYPE (
+                NAME, DISPLAY_NAME, FUNC_NAME_BAND, FUNC_NAME_BOUNDED, DESCRIPTION, USER_ID, UPDATED_AT
+            )
+            SELECT 'momentum_long', 'Momentum (long only)',
+                   'momentum_band_signal_long_only', 'momentum_bounded_signal_long_only',
+                   'Long or flat — never short', 'alfcheun', NOW() AT TIME ZONE 'UTC'
+             WHERE NOT EXISTS (
+                   SELECT 1 FROM REFDATA.SIGNAL_TYPE WHERE NAME = 'momentum_long'
+             );
+
+            INSERT INTO REFDATA.SIGNAL_TYPE (
+                NAME, DISPLAY_NAME, FUNC_NAME_BAND, FUNC_NAME_BOUNDED, DESCRIPTION, USER_ID, UPDATED_AT
+            )
+            SELECT 'reversion_long', 'Reversion (long only)',
+                   'reversion_band_signal_long_only', 'reversion_bounded_signal_long_only',
+                   'Long or flat — never short', 'alfcheun', NOW() AT TIME ZONE 'UTC'
+             WHERE NOT EXISTS (
+                   SELECT 1 FROM REFDATA.SIGNAL_TYPE WHERE NAME = 'reversion_long'
+             );
+        ]]></sql>
+    </changeSet>
+
+</databaseChangeLog>
