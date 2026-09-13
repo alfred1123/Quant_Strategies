@@ -65,7 +65,26 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
           </Typography>
         ),
       },
-      { field: 'strategy_nm', headerName: 'Strategy', flex: 1, minWidth: 160 },
+      {
+        field: 'strategy_nm',
+        headerName: 'Strategy',
+        width: 360,
+        minWidth: 120,
+        renderCell: (p: GridRenderCellParams<JobRow, string | null>) => (
+          <Typography
+            variant="body2"
+            sx={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              width: '100%',
+            }}
+            title={p.value ?? undefined}
+          >
+            {p.value}
+          </Typography>
+        ),
+      },
       {
         field: 'strategy_vid',
         headerName: 'VID',
@@ -264,6 +283,7 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
           loading={jobs.isLoading}
           disableRowSelectionOnClick
           density="compact"
+          columnResizeMode="onEnd"
           initialState={{
             sorting: { sortModel: [{ field: 'transact_from_ts', sort: 'desc' }] },
             pagination: { paginationModel: { pageSize: 25 } },
