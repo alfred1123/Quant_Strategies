@@ -283,7 +283,6 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
           loading={jobs.isLoading}
           disableRowSelectionOnClick
           density="compact"
-          columnResizeMode="onEnd"
           initialState={{
             sorting: { sortModel: [{ field: 'transact_from_ts', sort: 'desc' }] },
             pagination: { paginationModel: { pageSize: 25 } },
