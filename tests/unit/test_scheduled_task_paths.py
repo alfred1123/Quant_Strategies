@@ -205,7 +205,11 @@ class TestSyncCarriesThePath:
         return (PROJECT_ROOT / "scripts" / "sync_schedules.py").read_text()
 
     def test_event_input_includes_task_and_path(self, sync_source):
-        assert '"task": job["task"], "path": job["path"]' in sync_source
+        assert '"task": job["task"]' in sync_source
+        assert '"path": job["path"]' in sync_source
+
+    def test_event_input_carries_optional_payload(self, sync_source):
+        assert '"payload": job["payload"]' in sync_source
 
     def test_a_job_without_a_path_is_fatal(self, sync_source):
         """Skipping it would drop the schedule silently."""

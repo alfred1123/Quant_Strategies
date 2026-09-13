@@ -6,6 +6,7 @@ import logging
 import os
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
+from enum import StrEnum
 from uuid import UUID
 
 import requests
@@ -13,6 +14,21 @@ import requests
 logger = logging.getLogger(__name__)
 
 _ENV_SLACK_WEBHOOK = "SLACK_WEBHOOK_URL"
+
+
+class AlertCategory(StrEnum):
+    """Searchable Slack alert families — prefix every ops message with one."""
+
+    TRADE = "TRADE"
+    DB = "DB"
+
+
+def prefix_alert(category: AlertCategory, message: str) -> str:
+    """Prepend ``[CATEGORY]`` so Slack search can filter (e.g. ``[DB]``)."""
+    tag = f"[{category.value}]"
+    if message.startswith(tag):
+        return message
+    return f"{tag} {message}"
 
 
 class Notifier(ABC):
@@ -85,7 +101,7 @@ class TradeAlertFormatter:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         mode = "paper" if paper else "live"
         ids = ", ".join(vendor_order_ids) if vendor_order_ids else "(none)"
-        return (
+        body = (
             f"*{title}*\n"
             f"• time: `{ts}`\n"
             f"• deployment: `{deployment_id}` ({mode})\n"
@@ -95,3 +111,4 @@ class TradeAlertFormatter:
             f"• vendor_order_ids: {ids}\n"
             f"• last error: {last_message}"
         )
+        return prefix_alert(AlertCategory.TRADE, body)

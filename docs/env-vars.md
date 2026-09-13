@@ -79,7 +79,7 @@ code; see [Dev vs Prod](architecture/dev-vs-prod.md#where-local-and-prod-are-def
 
 | Variable | Required? | Description |
 |---|---|---|
-| `SLACK_WEBHOOK_URL` | Optional | Incoming Webhook for **internal ops alerts** on live-apply failures. If unset, alerts are logged only. Use a **test channel** in dev; prod ops channel only after the pipeline checklist in [Live Trading Promotion](guides/live-trading-promotion.md). |
+| `SLACK_WEBHOOK_URL` | Optional | Incoming Webhook for **internal ops alerts** (live-apply failures, stale DB connections, …). Messages are prefixed with a searchable category tag (`[TRADE]`, `[DB]`, … — see `AlertCategory` in `quant/shared/notify.py`). If unset, alerts are logged only. Use a **test channel** in dev; prod ops channel only after the pipeline checklist in [Live Trading Promotion](guides/live-trading-promotion.md). |
 
 User accounts are admin-managed — there is no signup endpoint. See [Login & Authentication](design/login.md) for the provisioning flow.
 

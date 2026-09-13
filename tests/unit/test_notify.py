@@ -6,10 +6,12 @@ from uuid import uuid4
 import requests
 
 from quant.shared.notify import (
+    AlertCategory,
     LoggingNotifier,
     Notifier,
     SlackNotifier,
     TradeAlertFormatter,
+    prefix_alert,
 )
 
 
@@ -40,6 +42,15 @@ class TestNotifierFromEnv:
         assert isinstance(Notifier.from_env(), SlackNotifier)
 
 
+class TestAlertCategoryPrefix:
+    def test_prefixes_message(self):
+        assert prefix_alert(AlertCategory.DB, "hello") == "[DB] hello"
+
+    def test_idempotent_when_already_prefixed(self):
+        msg = "[DB] hello"
+        assert prefix_alert(AlertCategory.DB, msg) == msg
+
+
 class TestTradeAlertFormatter:
     def test_permanent_title(self):
         title = TradeAlertFormatter().title_for_apply_failure(is_permanent=True)
@@ -67,6 +78,7 @@ class TestTradeAlertFormatter:
             last_message="fill unconfirmed",
             vendor_order_ids=["oid-1", "oid-2"],
         )
+        assert text.startswith("[TRADE] ")
         assert "Test alert" in text
         assert str(dep_id) in text
         assert "BTCUSDT" in text

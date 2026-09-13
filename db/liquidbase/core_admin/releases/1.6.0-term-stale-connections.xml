@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Hourly hygiene: terminate quant_app idle sessions older than one hour.
+      Driven by EventBridge → Lambda → POST /api/v1/admin/db/terminate-stale-connections.
+    -->
+
+    <changeSet id="1.6.0-001-sp-term-stale-connections" author="alfcheun" context="core_admin,prod-deploy" runOnChange="true">
+        <comment>SP_TERM_STALE_CONNECTIONS — pg_terminate_backend on idle quant_app sessions</comment>
+        <sqlFile path="../procedures/SP_TERM_STALE_CONNECTIONS.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="true"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

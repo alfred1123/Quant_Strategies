@@ -31,5 +31,6 @@
     <!-- runAlways: stays included forever. Archiving it would not preserve the
          grants refresh, it would stop it. -->
     <include file="releases/1.3.0-grants-refresh.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.6.0-term-stale-connections.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

@@ -231,8 +231,9 @@ the `path`, the cron expression and whether it is enabled:
 | Task | Schedule | Endpoint | Purpose |
 |------|----------|----------|---------|
 | `trade_apply_tick` | `cron(5 * * * ? *)` | `/api/v1/scheduler/tick` | Apply every due deployment, all intervals |
-| `log_proc_summary` | `cron(15 23 ? * SAT *)` | `/api/v1/admin/log-proc-summary/summarize` | Aggregate `LOG_PROC_DETAIL` into daily summaries |
+| `log_proc_summary` | `cron(15 23 * * ? *)` | `/api/v1/admin/log-proc-summary/summarize` | Aggregate `LOG_PROC_DETAIL` into daily summaries |
 | `price_bar_sync` | `cron(0 * * * ? *)` | `/api/v1/market-data/price-bars/sync` | Warm `MARKET_DATA.PRICE_BAR` for scheduled deployments |
+| `term_stale_connections` | `cron(45 * * * ? *)` | `/api/v1/admin/db/terminate-stale-connections` | Terminate `quant_app` idle Postgres sessions older than one hour |
 
 No path takes substitution fields, and none points at
 `/trade/deployments/{id}/apply`. That route requires a human — it trades on the

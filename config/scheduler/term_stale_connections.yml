@@ -1,0 +1,20 @@
+# term_stale_connections — drop idle quant_app Postgres sessions.
+#
+# Long-lived caches (InstrumentCache, BacktestCache) hold a persistent
+# connection; Aurora may drop the other end while pg_stat_activity still
+# lists the session as idle. An hourly sweep terminates quant_app-owned
+# idle backends older than one hour so they cannot accumulate for days.
+
+task: term_stale_connections
+path: /api/v1/admin/db/terminate-stale-connections
+description: Terminate quant_app Postgres sessions idle longer than one hour
+enabled: true
+
+payload:
+  idle_seconds: 3600
+
+schedule:
+  # :45 — after price_bar_sync (:00) and trade_apply_tick (:05), before the
+  # next hour's traffic. FlexibleTimeWindow is OFF, so a missed tick is lost.
+  expression: "cron(45 * * * ? *)"
+  timezone: UTC

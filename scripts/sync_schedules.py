@@ -129,7 +129,11 @@ def main():
             description=job.get("description", ""),
             target_arn=lambda_arn,
             role_arn=role_arn,
-            event_input={"task": job["task"], "path": job["path"]},
+            event_input={
+                "task": job["task"],
+                "path": job["path"],
+                **({"payload": job["payload"]} if job.get("payload") else {}),
+            },
             enabled=job.get("enabled", True),
             dry_run=dry_run,
         )
