@@ -1,10 +1,20 @@
 CREATE OR REPLACE PROCEDURE BT.SP_INS_RESULT(
-    IN  IN_RESULT_ID       UUID,
-    IN  IN_QUEUE_ID        UUID,
-    IN  IN_PAYLOAD_JSON    JSONB,
-    OUT OUT_SQLSTATE       TEXT,
-    OUT OUT_SQLMSG         TEXT,
-    OUT OUT_SQLERRMC       TEXT
+    IN  IN_RESULT_ID                  UUID,
+    IN  IN_QUEUE_ID                   UUID,
+    IN  IN_PAYLOAD_JSON               JSONB,
+    IN  IN_TOTAL_RETURN               NUMERIC,
+    IN  IN_ANNUALIZED_RETURN          NUMERIC,
+    IN  IN_SHARPE_RATIO               NUMERIC,
+    IN  IN_MAX_DRAWDOWN               NUMERIC,
+    IN  IN_CALMAR_RATIO               NUMERIC,
+    IN  IN_BUY_HOLD_TOTAL_RETURN      NUMERIC,
+    IN  IN_BUY_HOLD_ANNUALIZED_RETURN NUMERIC,
+    IN  IN_BUY_HOLD_SHARPE_RATIO      NUMERIC,
+    IN  IN_BUY_HOLD_MAX_DRAWDOWN      NUMERIC,
+    IN  IN_BUY_HOLD_CALMAR_RATIO      NUMERIC,
+    OUT OUT_SQLSTATE                  TEXT,
+    OUT OUT_SQLMSG                    TEXT,
+    OUT OUT_SQLERRMC                  TEXT
 )
 LANGUAGE plpgsql
 SET plan_cache_mode = 'force_generic_plan'
@@ -18,8 +28,6 @@ DECLARE
     V_STRATEGY_ID  UUID;
     V_STRATEGY_VID INTEGER;
     V_RESULT_VID   INTEGER;
-    V_METRICS      JSONB;
-    V_BH_METRICS   JSONB;
 BEGIN
     OUT_SQLSTATE := '00000';
     OUT_SQLMSG   := '0';
@@ -57,9 +65,6 @@ BEGIN
        AND STRATEGY_VID = V_STRATEGY_VID
        AND IS_CURRENT_IND = 'Y';
 
-    V_METRICS    := IN_PAYLOAD_JSON -> 'performance' -> 'strategy_metrics';
-    V_BH_METRICS := IN_PAYLOAD_JSON -> 'performance' -> 'buy_hold_metrics';
-
     OUT_SQLMSG := '10';
     INSERT INTO BT.RESULT (
         RESULT_ID,
@@ -88,16 +93,16 @@ BEGIN
         V_RESULT_VID,
         'Y',
         IN_PAYLOAD_JSON,
-        (V_METRICS ->> 'Total Return')::NUMERIC,
-        (V_METRICS ->> 'Annualized Return')::NUMERIC,
-        (V_METRICS ->> 'Sharpe Ratio')::NUMERIC,
-        (V_METRICS ->> 'Max Drawdown')::NUMERIC,
-        (V_METRICS ->> 'Calmar Ratio')::NUMERIC,
-        (V_BH_METRICS ->> 'Total Return')::NUMERIC,
-        (V_BH_METRICS ->> 'Annualized Return')::NUMERIC,
-        (V_BH_METRICS ->> 'Sharpe Ratio')::NUMERIC,
-        (V_BH_METRICS ->> 'Max Drawdown')::NUMERIC,
-        (V_BH_METRICS ->> 'Calmar Ratio')::NUMERIC,
+        IN_TOTAL_RETURN,
+        IN_ANNUALIZED_RETURN,
+        IN_SHARPE_RATIO,
+        IN_MAX_DRAWDOWN,
+        IN_CALMAR_RATIO,
+        IN_BUY_HOLD_TOTAL_RETURN,
+        IN_BUY_HOLD_ANNUALIZED_RETURN,
+        IN_BUY_HOLD_SHARPE_RATIO,
+        IN_BUY_HOLD_MAX_DRAWDOWN,
+        IN_BUY_HOLD_CALMAR_RATIO,
         NOW() AT TIME ZONE 'UTC'
     );
 

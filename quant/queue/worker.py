@@ -38,6 +38,7 @@ from quant.strategy.backtest_service import run_optimize
 
 from quant.promotion.repo import PromotionRepo
 from quant.queue.repo import BtQueueRepo
+from quant.queue.result_metrics import ShreddedResultMetrics, extract_shredded_metrics
 from quant.refdata.bundle import DataCaches
 from quant.trade.bar_source import PriceBarServiceFactory
 from quant.shared.util import utc_now_iso
@@ -62,13 +63,34 @@ class WorkerRepo(BtQueueRepo):
     # ── writes ──────────────────────────────────────────────────────────
 
     def ins_result(
-        self, result_id: uuid.UUID, queue_id: uuid.UUID, payload: dict
+        self,
+        result_id: uuid.UUID,
+        queue_id: uuid.UUID,
+        payload: dict,
+        metrics: ShreddedResultMetrics,
     ) -> None:
-        """SP_INS_RESULT — shreds metrics from payload; OUT row ``(SQLSTATE, SQLMSG, SQLERRMC)``."""
+        """SP_INS_RESULT — payload + caller-shredded metrics; OUT status triplet."""
         self._call_write(
             "CALL bt.sp_ins_result("
-            "%s::uuid, %s::uuid, %s::jsonb, NULL::text, NULL::text, NULL::text)",
-            (str(result_id), str(queue_id), json.dumps(payload, default=str)),
+            "%s::uuid, %s::uuid, %s::jsonb,"
+            " %s::numeric, %s::numeric, %s::numeric, %s::numeric, %s::numeric,"
+            " %s::numeric, %s::numeric, %s::numeric, %s::numeric, %s::numeric,"
+            " NULL::text, NULL::text, NULL::text)",
+            (
+                str(result_id),
+                str(queue_id),
+                json.dumps(payload, default=str),
+                metrics.total_return,
+                metrics.annualized_return,
+                metrics.sharpe_ratio,
+                metrics.max_drawdown,
+                metrics.calmar_ratio,
+                metrics.buy_hold_total_return,
+                metrics.buy_hold_annualized_return,
+                metrics.buy_hold_sharpe_ratio,
+                metrics.buy_hold_max_drawdown,
+                metrics.buy_hold_calmar_ratio,
+            ),
         )
 
 
@@ -134,7 +156,9 @@ class BacktestWorker:
 
         result_id = uuid.uuid4()
         payload = response.model_dump()
-        repo.ins_result(result_id, queue_id, payload)
+        repo.ins_result(
+            result_id, queue_id, payload, extract_shredded_metrics(payload)
+        )
 
         try:
             PromotionRepo(self._db_url, bt=repo).run(refdata, job, payload, queue_id)

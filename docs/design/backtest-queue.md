@@ -204,7 +204,7 @@ Queue rows store `(STRATEGY_ID, STRATEGY_VID)` at submission time. The worker jo
 
 ### 6.4 `BT.RESULT` (existing — unchanged)
 
-Worker inserts via `CALL BT.SP_INS_RESULT(...)` with a client-generated `RESULT_ID` (UUID) + `PAYLOAD_JSON`.
+Worker inserts via `CALL BT.SP_INS_RESULT(...)` with a client-generated `RESULT_ID` (UUID), full `PAYLOAD_JSON`, and shredded strategy + buy-and-hold metric columns extracted in Python (`quant/queue/result_metrics.py`).
 
 ### 6.5 State transitions
 

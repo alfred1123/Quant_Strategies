@@ -78,7 +78,7 @@ When proposing a release, state the blast radius — which schemas, how many cha
 
 **Never** write raw `INSERT`, `UPDATE`, or `DELETE` statements against application tables in Python, API services, or migration seed scripts, **except**:
 
-- **`BT.RESULT`** (queued backtest completion payloads): use **`CALL BT.SP_INS_RESULT(...)`** with a **client-generated** **`RESULT_ID`** (UUID) — no raw **`INSERT`** into **`BT.RESULT`** from Python/API. Procedure OUT row matches **`BT.SP_INS_QUEUE`**: status triplet only.
+- **`BT.RESULT`** (queued backtest completion payloads): use **`CALL BT.SP_INS_RESULT(...)`** with a **client-generated** **`RESULT_ID`** (UUID), full payload JSONB, and **caller-supplied shredded metric columns** (extract via `quant/queue/result_metrics.py`) — no raw **`INSERT`** into **`BT.RESULT`** from Python/API and no JSON shredding inside the procedure. Procedure OUT row matches **`BT.SP_INS_QUEUE`**: status triplet only.
 - **`BT.QUEUE`** row transitions — use **`CALL BT.SP_INS_QUEUE(...)` only** with `IN_ACTION` ∈ `ENQUEUE` | `CLAIM_NEXT` | `TERMINAL` | `CANCEL` — no standalone `BT.SP_CLAIM_*` / `SP_CANCEL_*`.
 
 All other mutations use schema stored procedures (e.g. `BT.SP_INS_STRATEGY`, `BT.SP_INS_API_REQUEST`, `BT.SP_INS_API_REQUEST_PAYLOAD`).

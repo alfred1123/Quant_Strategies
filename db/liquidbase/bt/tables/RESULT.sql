@@ -7,9 +7,10 @@
 -- RESULT_VID + IS_CURRENT_IND soft-version within (STRATEGY_ID, STRATEGY_VID):
 -- re-backtesting the same strategy VID bumps RESULT_VID and flips prior rows.
 --
--- Key metrics are shredded from PAYLOAD_JSON into dedicated columns for
--- fast promotion comparison and catalog queries. The full payload
--- (equity curves, trade log, CSV) stays in PAYLOAD_JSON.
+-- Key metrics are shredded into dedicated columns at insert time (supplied
+-- by the worker from performance.strategy_metrics / buy_hold_metrics) for
+-- fast promotion comparison and catalog queries. The full payload (equity
+-- curves, trade log, CSV) stays in PAYLOAD_JSON.
 --
 -- No FK constraint on QUEUE_ID (BT.QUEUE PK is composite (QUEUE_ID,
 -- QUEUE_VID); the result is associated with the submission, not a single

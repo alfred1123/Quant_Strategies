@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Shredded BT.RESULT metrics are supplied by the worker at insert time;
+      SP_INS_RESULT no longer parses PAYLOAD_JSON for column values.
+    -->
+
+    <changeSet id="1.23.0-001-drop-sp-ins-result" author="alfcheun" context="bt,prod-deploy">
+        <comment>DROP SP_INS_RESULT — signature gains explicit shredded metric IN params</comment>
+        <sql splitStatements="false">
+            DROP PROCEDURE IF EXISTS BT.SP_INS_RESULT(UUID, UUID, JSONB);
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.23.0-002-sp-ins-result-app-metrics" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_INS_RESULT — caller-supplied strategy + buy-and-hold shredded columns</comment>
+        <sqlFile path="../procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true" splitStatements="false"/>
+    </changeSet>
+
+</databaseChangeLog>

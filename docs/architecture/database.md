@@ -341,7 +341,7 @@ Neither the retention window nor the dump was touched to achieve this. `LOG_PROC
 | `SP_GET_QUEUE_FOR_TERMINAL` | `BT` | Active rows + strategy metadata (REFCURSOR) |
 | `FN_GET_QUEUE_FOR_TERMINAL` | `BT` | **Function** — UI terminal lookup (`RETURNS TABLE`); worker uses `SP_GET_QUEUE_LATEST` |
 | `SP_GET_QUEUE_LATEST` | `BT` | **Queue worker**: active row for one **`QUEUE_ID`** + frozen **`CONFIG_JSON`** (`QUEUE` ⋈ **`STRATEGY`** on **`STRATEGY_VID`**) |
-| `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`** with shredded strategy + buy-and-hold metrics from `PAYLOAD_JSON` + denormalized `STRATEGY_ID`/`STRATEGY_VID` from `BT.QUEUE`; bumps `RESULT_VID` and flips prior rows' `IS_CURRENT_IND` within the same strategy VID; **`IN_RESULT_ID`** is caller-supplied UUID; OUT row is status triplet only |
+| `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`** with caller-supplied shredded strategy + buy-and-hold columns + full `PAYLOAD_JSON`; denormalizes `STRATEGY_ID`/`STRATEGY_VID` from `BT.QUEUE`; bumps `RESULT_VID` and flips prior rows' `IS_CURRENT_IND` within the same strategy VID; worker extracts metrics in Python (`quant/queue/result_metrics.py`); **`IN_RESULT_ID`** is caller-supplied UUID; OUT row is status triplet only |
 | `SP_GET_RESULT` | `BT` | Fetch result row for a `QUEUE_ID` (REFCURSOR); includes `RESULT_VID`, `IS_CURRENT_IND` |
 | `SP_GET_RESULT_BY_STRATEGY` | `BT` | Current result for `(STRATEGY_ID, STRATEGY_VID)` where `IS_CURRENT_IND = 'Y'` (REFCURSOR). What the **live trading path** reads — see [Reading a result without the queue](#reading-a-result-without-the-queue) |
 | `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`) |
