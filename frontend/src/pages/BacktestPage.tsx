@@ -35,7 +35,7 @@ import { firstValidationError } from '../utils/validate';
 const DEFAULT_CONFIG: BacktestConfig = {
   symbol: 'btcusdt.crypto',
   vendorSymbol: '',
-  dataSource: 'yahoo',
+  dataSource: 'bybit',
   start: '2016-01-01',
   end: new Date().toISOString().slice(0, 10),
   assetType: '',
