@@ -23,6 +23,11 @@ export interface PromotionRow {
   max_drawdown: number | string | null;
   total_return: number | string | null;
   annualized_return: number | string | null;
+  buy_hold_sharpe_ratio: number | string | null;
+  buy_hold_calmar_ratio: number | string | null;
+  buy_hold_max_drawdown: number | string | null;
+  buy_hold_total_return: number | string | null;
+  buy_hold_annualized_return: number | string | null;
   user_id: string;
   created_at: string;
 }

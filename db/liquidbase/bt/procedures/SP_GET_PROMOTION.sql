@@ -6,12 +6,9 @@
 --
 -- STRATEGY_NM, live IS_BEST_IND, and LOGICAL_DELETE_IND are resolved via a
 -- LEFT JOIN on the frozen BT.STRATEGY snapshot (STRATEGY_ID + STRATEGY_VID).
--- The
--- candidate's shredded performance metrics are pulled from the latest
--- BT.RESULT row for the decision's QUEUE_ID so the Promotion tab can
--- rank VIDs and reconstruct the soft-metric comparison without N+1
--- round-trips. GATE_RESULTS carries the point-in-time {name, passed,
--- value, threshold} hard-gate snapshot.
+-- Strategy and buy-and-hold metrics come from shredded BT.RESULT columns on
+-- QUEUE_ID (one result row per completed submission). GATE_RESULTS carries the
+-- point-in-time {name, passed, value, threshold} hard-gate snapshot.
 CREATE OR REPLACE PROCEDURE BT.SP_GET_PROMOTION(
     IN  IN_STRATEGY_ID   UUID,
     IN  IN_LIMIT         INTEGER,
@@ -56,20 +53,19 @@ BEGIN
                R.MAX_DRAWDOWN,
                R.TOTAL_RETURN,
                R.ANNUALIZED_RETURN,
+               R.BUY_HOLD_SHARPE_RATIO,
+               R.BUY_HOLD_CALMAR_RATIO,
+               R.BUY_HOLD_MAX_DRAWDOWN,
+               R.BUY_HOLD_TOTAL_RETURN,
+               R.BUY_HOLD_ANNUALIZED_RETURN,
                P.USER_ID,
                P.CREATED_AT
           FROM BT.PROMOTION P
           LEFT JOIN BT.STRATEGY S
                  ON S.STRATEGY_ID  = P.STRATEGY_ID
                 AND S.STRATEGY_VID = P.STRATEGY_VID
-          LEFT JOIN LATERAL (
-                 SELECT SHARPE_RATIO, CALMAR_RATIO, MAX_DRAWDOWN,
-                        TOTAL_RETURN, ANNUALIZED_RETURN
-                   FROM BT.RESULT
-                  WHERE QUEUE_ID = P.QUEUE_ID
-                  ORDER BY CREATED_AT DESC
-                  LIMIT 1
-               ) R ON TRUE
+          LEFT JOIN BT.RESULT R
+                 ON R.QUEUE_ID = P.QUEUE_ID
          WHERE IN_STRATEGY_ID IS NULL
             OR P.STRATEGY_ID = IN_STRATEGY_ID
          ORDER BY P.CREATED_AT DESC

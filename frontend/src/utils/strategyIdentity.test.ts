@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BacktestConfig, FactorConfig } from '../types/backtest';
-import { buildStrategyNm, strategyGroupKey } from './strategyIdentity';
+import { buildStrategyNm, strategyGroupKey, tradeAssetFromStrategyNm } from './strategyIdentity';
 
 const baseFactor = (overrides: Partial<FactorConfig> = {}): FactorConfig => ({
   data_column: 'c',
@@ -111,5 +111,17 @@ describe('strategyGroupKey', () => {
 
   it('falls back to strategy id when name is null', () => {
     expect(strategyGroupKey('alice', null, 'uuid-123')).toBe('alice\0uuid-123');
+  });
+});
+
+describe('tradeAssetFromStrategyNm', () => {
+  it('extracts the cusip before @', () => {
+    expect(
+      tradeAssetFromStrategyNm('btcusdt.crypto@bybit:DAILY ← price FILTER Volume'),
+    ).toBe('btcusdt.crypto');
+  });
+
+  it('returns null when @ is missing', () => {
+    expect(tradeAssetFromStrategyNm('legacy-name')).toBeNull();
   });
 });

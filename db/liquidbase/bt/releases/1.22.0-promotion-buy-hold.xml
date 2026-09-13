@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Promotion tab: buy-and-hold on the trade asset shredded onto BT.RESULT
+      (mirrors strategy metrics). SP_GET_PROMOTION joins RESULT on QUEUE_ID.
+    -->
+
+    <changeSet id="1.22.0-001-result-buy-hold-columns" author="alfcheun" context="bt,prod-deploy">
+        <comment>Add shredded buy-and-hold metric columns to BT.RESULT</comment>
+        <sql splitStatements="true">
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS BUY_HOLD_TOTAL_RETURN NUMERIC;
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS BUY_HOLD_ANNUALIZED_RETURN NUMERIC;
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS BUY_HOLD_SHARPE_RATIO NUMERIC;
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS BUY_HOLD_MAX_DRAWDOWN NUMERIC;
+            ALTER TABLE BT.RESULT ADD COLUMN IF NOT EXISTS BUY_HOLD_CALMAR_RATIO NUMERIC;
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.22.0-002-result-backfill-buy-hold" author="alfcheun" context="bt,prod-deploy">
+        <comment>Backfill buy-and-hold shredded metrics from PAYLOAD_JSON</comment>
+        <sql splitStatements="false"><![CDATA[
+            UPDATE BT.RESULT
+               SET BUY_HOLD_TOTAL_RETURN      = (PAYLOAD_JSON -> 'performance' -> 'buy_hold_metrics' ->> 'Total Return')::NUMERIC,
+                   BUY_HOLD_ANNUALIZED_RETURN = (PAYLOAD_JSON -> 'performance' -> 'buy_hold_metrics' ->> 'Annualized Return')::NUMERIC,
+                   BUY_HOLD_SHARPE_RATIO      = (PAYLOAD_JSON -> 'performance' -> 'buy_hold_metrics' ->> 'Sharpe Ratio')::NUMERIC,
+                   BUY_HOLD_MAX_DRAWDOWN      = (PAYLOAD_JSON -> 'performance' -> 'buy_hold_metrics' ->> 'Max Drawdown')::NUMERIC,
+                   BUY_HOLD_CALMAR_RATIO      = (PAYLOAD_JSON -> 'performance' -> 'buy_hold_metrics' ->> 'Calmar Ratio')::NUMERIC
+             WHERE BUY_HOLD_TOTAL_RETURN IS NULL
+               AND PAYLOAD_JSON -> 'performance' -> 'buy_hold_metrics' IS NOT NULL;
+        ]]></sql>
+    </changeSet>
+
+    <changeSet id="1.22.0-003-sp-ins-result-buy-hold" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_INS_RESULT — shred buy_hold_metrics on insert</comment>
+        <sqlFile path="../procedures/SP_INS_RESULT.sql" relativeToChangelogFile="true" splitStatements="false"/>
+    </changeSet>
+
+    <changeSet id="1.22.0-004-sp-get-promotion-buy-hold" author="alfcheun" context="bt,prod-deploy" runOnChange="true">
+        <comment>SP_GET_PROMOTION — join RESULT on QUEUE_ID; return shredded buy-and-hold columns</comment>
+        <sqlFile path="../procedures/SP_GET_PROMOTION.sql" relativeToChangelogFile="true" splitStatements="false"/>
+    </changeSet>
+
+</databaseChangeLog>

@@ -9,8 +9,8 @@ import { usePromotions } from '../api/promotion';
 import { useMe } from '../api/auth';
 import { usePromotionMetrics, usePromotionStates } from '../api/refdata';
 import { formatMetric, toFiniteNumber } from '../utils/format';
-import { readPromotionMetric } from '../utils/promotionMetric';
-import { strategyGroupKey } from '../utils/strategyIdentity';
+import { hasBuyHoldBenchmark, readBuyHoldMetric, readPromotionMetric } from '../utils/promotionMetric';
+import { strategyGroupKey, tradeAssetFromStrategyNm } from '../utils/strategyIdentity';
 import type { PromotionRow } from '../types/promotion';
 import type { PromotionMetricRow } from '../types/refdata';
 import DeploymentDialog, { type DeploymentSelection } from './trade/DeploymentDialog';
@@ -409,6 +409,12 @@ function ComparisonPanel({
     }
   }
 
+  const tradeAsset = tradeAssetFromStrategyNm(row.strategy_nm);
+  const showBuyHold = hasBuyHoldBenchmark(
+    row,
+    softMetrics.map((m) => m.metric_key),
+  );
+
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
@@ -495,6 +501,47 @@ function ComparisonPanel({
       ) : (
         <Typography variant="body2" color="text.secondary">
           Baseline VID — no other version to compare.
+        </Typography>
+      )}
+
+      <Divider sx={{ my: 1.5 }} />
+
+      <Typography variant="subtitle2">
+        vs buy &amp; hold{tradeAsset ? ` (${tradeAsset})` : ' (trade asset)'}
+      </Typography>
+      {showBuyHold ? (
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Metric</TableCell>
+                <TableCell align="right">Strategy</TableCell>
+                <TableCell align="right">Buy &amp; hold</TableCell>
+                <TableCell align="center">Winner</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {softMetrics.map((m) => {
+                const strat = readPromotionMetric(row, m.metric_key);
+                const bench = readBuyHoldMetric(row, m.metric_key);
+                const cmp = compareMetric(strat, bench, m.direction);
+                return (
+                  <TableRow key={`bh-${m.promotion_metric_id}`}>
+                    <TableCell>{m.display_name}</TableCell>
+                    <TableCell align="right" sx={{ fontFamily: 'monospace' }}>{formatMetric(strat)}</TableCell>
+                    <TableCell align="right" sx={{ fontFamily: 'monospace' }}>{formatMetric(bench)}</TableCell>
+                    <TableCell align="center">
+                      {cmp === 0 ? '—' : cmp > 0 ? 'Strategy' : 'B&H'}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : (
+        <Typography variant="body2" color="text.secondary">
+          No buy &amp; hold benchmark recorded for this run.
         </Typography>
       )}
 

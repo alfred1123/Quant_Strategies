@@ -19,6 +19,7 @@ DECLARE
     V_STRATEGY_VID INTEGER;
     V_RESULT_VID   INTEGER;
     V_METRICS      JSONB;
+    V_BH_METRICS   JSONB;
 BEGIN
     OUT_SQLSTATE := '00000';
     OUT_SQLMSG   := '0';
@@ -56,7 +57,8 @@ BEGIN
        AND STRATEGY_VID = V_STRATEGY_VID
        AND IS_CURRENT_IND = 'Y';
 
-    V_METRICS := IN_PAYLOAD_JSON -> 'performance' -> 'strategy_metrics';
+    V_METRICS    := IN_PAYLOAD_JSON -> 'performance' -> 'strategy_metrics';
+    V_BH_METRICS := IN_PAYLOAD_JSON -> 'performance' -> 'buy_hold_metrics';
 
     OUT_SQLMSG := '10';
     INSERT INTO BT.RESULT (
@@ -72,6 +74,11 @@ BEGIN
         SHARPE_RATIO,
         MAX_DRAWDOWN,
         CALMAR_RATIO,
+        BUY_HOLD_TOTAL_RETURN,
+        BUY_HOLD_ANNUALIZED_RETURN,
+        BUY_HOLD_SHARPE_RATIO,
+        BUY_HOLD_MAX_DRAWDOWN,
+        BUY_HOLD_CALMAR_RATIO,
         CREATED_AT
     ) VALUES (
         IN_RESULT_ID,
@@ -86,6 +93,11 @@ BEGIN
         (V_METRICS ->> 'Sharpe Ratio')::NUMERIC,
         (V_METRICS ->> 'Max Drawdown')::NUMERIC,
         (V_METRICS ->> 'Calmar Ratio')::NUMERIC,
+        (V_BH_METRICS ->> 'Total Return')::NUMERIC,
+        (V_BH_METRICS ->> 'Annualized Return')::NUMERIC,
+        (V_BH_METRICS ->> 'Sharpe Ratio')::NUMERIC,
+        (V_BH_METRICS ->> 'Max Drawdown')::NUMERIC,
+        (V_BH_METRICS ->> 'Calmar Ratio')::NUMERIC,
         NOW() AT TIME ZONE 'UTC'
     );
 

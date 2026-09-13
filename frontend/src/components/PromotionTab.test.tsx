@@ -62,6 +62,11 @@ function prow(overrides: Partial<PromotionRow> = {}): PromotionRow {
     max_drawdown: 0.0225,
     total_return: 0.1184,
     annualized_return: 1.8001,
+    buy_hold_sharpe_ratio: 0.8,
+    buy_hold_calmar_ratio: 1.2,
+    buy_hold_total_return: 0.5,
+    buy_hold_annualized_return: 0.12,
+    buy_hold_max_drawdown: 0.15,
     user_id: 'u1',
     created_at: '2026-09-05T00:00:00Z',
     ...overrides,
@@ -115,6 +120,15 @@ describe('PromotionTab comparison panel', () => {
     await userEvent.click(screen.getByText('v1'));
     expect(screen.getByText(/Baseline VID — no other version to compare/)).toBeInTheDocument();
     expect(screen.queryByText('This VID')).not.toBeInTheDocument();
+  });
+
+  it('renders buy-and-hold comparison against the trade asset', async () => {
+    setup([prow({ strategy_vid: 2, compared_vid: null, sharpe_ratio: 1.2342 })]);
+    renderWithProviders(<PromotionTab />);
+    await userEvent.click(screen.getByText('v2'));
+    expect(screen.getByText(/vs buy & hold \(btcusdt\.crypto\)/)).toBeInTheDocument();
+    expect(screen.getByText('Buy & hold')).toBeInTheDocument();
+    expect(screen.getAllByText('Strategy').length).toBeGreaterThan(0);
   });
 
   it('renders the soft table when compared against a different VID', async () => {

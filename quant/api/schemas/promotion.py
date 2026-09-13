@@ -34,5 +34,10 @@ class PromotionRow(BaseModel):
     max_drawdown: float | None = None
     total_return: float | None = None
     annualized_return: float | None = None
+    buy_hold_sharpe_ratio: float | None = None
+    buy_hold_calmar_ratio: float | None = None
+    buy_hold_max_drawdown: float | None = None
+    buy_hold_total_return: float | None = None
+    buy_hold_annualized_return: float | None = None
     user_id: str
     created_at: datetime

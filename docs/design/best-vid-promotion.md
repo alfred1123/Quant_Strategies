@@ -246,16 +246,16 @@ The Promotion tab is the **strategy improvement loop** — users iterate there u
 ### 5b. Promotion tab (implemented)
 
 Third tab in `BacktestPage` (`frontend/src/components/PromotionTab.tsx`), fed by
-`GET /api/v1/backtest/promotions` (polled every 10s). `BT.SP_GET_PROMOTION` is
-enriched with a `LEFT JOIN LATERAL` on `BT.RESULT` (candidate's shredded metrics)
-and `BT.STRATEGY` (live `IS_BEST_IND`), so the whole tab renders from one query
-with no N+1 round-trips.
+`GET /api/v1/backtest/promotions` (polled every 10s). `BT.SP_GET_PROMOTION` joins
+`BT.RESULT` on `QUEUE_ID` (strategy + buy-and-hold shredded metrics) and
+`BT.STRATEGY` (live `IS_BEST_IND`), so the whole tab renders from one query with
+no N+1 round-trips.
 
 Content:
 
 - **Recommended strategy banner** — the overall best strategy across all `strategy_id`s (highest Sharpe among rows with `IS_BEST_IND = 'Y'` and `LOGICAL_DELETE_IND <> 'Y'`)
 - **Strategy list** — accordions grouped by `strategy_id`, showing all VIDs with their promotion outcome chip (PROMOTED / KEPT / DEMOTED / REJECTED, label from `REFDATA.PROMOTION_STATE`), Sharpe/Calmar, a "Best" chip on the current best VID, and a "Removed" chip when `LOGICAL_DELETE_IND = 'Y'`
-- **VID comparison panel** — click a VID to see hard gate results (pass/fail per gate with value + threshold from the `GATE_RESULTS` snapshot) and a soft-metric comparison vs the `COMPARED_VID` baseline; the first decisive soft metric (walked in `REFDATA.PROMOTION_METRIC` priority order) is highlighted. **VID 1 and any current-best re-run write `compared_vid = NULL`** — they have no opponent, and the panel says “Baseline VID — no other version to compare” rather than mirroring this row against itself. Legacy rows that stored `compared_vid` equal to this VID are treated the same.
+- **VID comparison panel** — click a VID to see hard gate results (pass/fail per gate with value + threshold from the `GATE_RESULTS` snapshot) and a soft-metric comparison vs the `COMPARED_VID` baseline; the first decisive soft metric (walked in `REFDATA.PROMOTION_METRIC` priority order) is highlighted. **VID 1 and any current-best re-run write `compared_vid = NULL`** — they have no opponent, and the panel says “Baseline VID — no other version to compare” rather than mirroring this row against itself. Legacy rows that stored `compared_vid` equal to this VID are treated the same. Below that, a **buy & hold (trade asset)** table compares the same SOFT metrics against shredded `BUY_HOLD_*` columns on `BT.RESULT` (joined on `QUEUE_ID` in `SP_GET_PROMOTION`, release `1.22.0`); the trade asset label is parsed from the `STRATEGY_NM` prefix before `@`.
 - **Promotion rules card** — read-only display of `REFDATA.PROMOTION_METRIC` (hard gates with thresholds, then soft metrics in priority order)
 - **"Re-backtest" button** — fetches the decision's frozen `config_json` via its `QUEUE_ID`, maps that wire payload (`data_source`, `tm_interval_id`, `trading_period`, …) back onto drawer state, fills Asset Type from `INST.PRODUCT` (it is not on the JSON), prefills the Backtest drawer, and switches to the Backtest tab. Spreading the JSON onto `BacktestConfig` is wrong — the keys do not match, and the form fell back to Yahoo / daily / 365.
 - **"Deploy" button** — navigates to the Trade tab (`/trade/apply`) carrying `strategyId` + `strategyVid` in router state, ready for the Phase 1.7 apply form

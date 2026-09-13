@@ -49,3 +49,11 @@ export function buildStrategyNm(cfg: BacktestConfig, cadence: string): string {
 export function strategyGroupKey(userId: string, strategyNm: string | null, strategyId: string): string {
   return `${userId}\0${strategyNm ?? strategyId}`;
 }
+
+/** Traded instrument cusip from STRATEGY_NM (`TRADE@VENUE:CADENCE ← …`). */
+export function tradeAssetFromStrategyNm(strategyNm: string | null): string | null {
+  if (!strategyNm) return null;
+  const at = strategyNm.indexOf('@');
+  if (at <= 0) return null;
+  return strategyNm.slice(0, at);
+}
