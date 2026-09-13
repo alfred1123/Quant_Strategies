@@ -46,7 +46,10 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.0",
     "vite": "^8.0.4",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "maplibre-gl": "^6.4.1"
   },
   "optionalDependencies": {
     "@rolldown/binding-linux-x64-gnu": "^1.0.3"
