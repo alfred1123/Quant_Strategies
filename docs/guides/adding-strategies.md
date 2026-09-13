@@ -37,7 +37,11 @@ To add a new trading strategy (signal direction) to the backtest pipeline.
 
 For spot accounts or jurisdictions that cannot short, pick **Momentum (long only)** or **Reversion (long only)** in the backtest Strategy dropdown (`REFDATA.SIGNAL_TYPE` names `momentum_long` / `reversion_long`). These map to `*_long_only` functions in `quant/strategy/signals.py`, which clip `-1` legs to flat. The same config flows to live apply — a fitted long-only strategy never signals `OPEN_SHORT`.
 
-Release `1.24.0-signal-type-long-only` seeds the REFDATA rows; after migrate, refresh REFDATA (`POST /api/v1/refdata/refresh`).
+Release `1.24.0-signal-type-long-only` seeds the REFDATA rows.
+
+**Production:** a new signal needs **migrate + `quant-app` deploy + Redis refresh**
+— not any single step alone. See **[Production Rollout](prod-rollout.md)** for the
+full layer checklist, partial-deploy pitfalls, SSO, and verification commands.
 
 !!! note
     See the `add-strategy` skill at `.github/skills/add-strategy/SKILL.md` for the full checklist.

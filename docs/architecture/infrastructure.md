@@ -398,17 +398,15 @@ prevents accidental deletion (disable it manually first if you really mean to).
 Push to `main` triggers an automated deploy pipeline (`.github/workflows/deploy.yml`):
 
 ```
-push to main → changes (path filter) ─┐
-               test ──────────────────┤
-               frontend (build+audit) ─┤
-                                       ├─→ build-and-push (only changed images)
+push to main → changes (path filter) ─┬─→ test ──→ build-app (quant/** only)
+               frontend (build+audit) ┼─→ build-nginx (frontend/** only)
                cfn (infra, parallel) ──┤
-               migrate (db, gated) ────┘             │
-                                                      ▼
-                                                   deploy (SSM: selective pull + up)
+               migrate (db, gated) ────┘
+                                       ▼
+                                    deploy (SSM: selective pull + up + REFDATA refresh)
 ```
 
-`deploy` waits on `test`, `cfn`, `build-and-push`, and `migrate` (the last three may be skipped). `build-and-push` requires both `test` **and** `frontend` to pass.
+`deploy` waits on `test`, `cfn`, `build-app`, `build-nginx`, and `migrate` (most may be skipped). `build-app` depends on **Python tests only**; `build-nginx` still requires the frontend job — so a SPA build failure does not block shipping `quant-app`.
 
 The workflow uses `paths-ignore` for `docs/**`, `*.md`, `tests/**`, `scripts/**`, `.github/skills/**`, `.github/instructions/**`, `.cursor/**` — pushes touching only ignored paths do **not** trigger the workflow. A push to `db/liquidbase/**` **does** trigger the workflow (so the `migrate` job can run). The docs site has its own workflow (`.github/workflows/docs.yml`).
 
@@ -448,12 +446,13 @@ than `-->|authed| RedirectHome["Redirect /"]`).
    - **compose** — `docker-compose.yml`, `docker-compose.prod.yml`, `docker-compose.tls.yml`, `docker-compose.cloudflare.yml`
    - **deploy** — true when any of app / nginx / compose changed (gate for the deploy job)
    - **db** — `db/liquidbase/**` (gate for the migrate job)
+   - **refdata** — `db/liquidbase/refdata/**` (gate for post-migrate Redis republish)
 2. **Test job** — runs `pytest tests/unit/` on GitHub's runner (Python 3.12)
-3. **Frontend job** — `npm ci`, `npm audit --audit-level=high`, `npm run build` (type-check + Vite build), `npm test` on Node 24. Validates the SPA on the runner; a build/audit/test failure blocks `build-and-push`.
+3. **Frontend job** — `npm ci`, `npm audit --audit-level=high`, `npm run build` (type-check + Vite build), `npm test` on Node 24. Gates **`build-nginx` only** — not `build-app`.
 4. **CFN job** — deploys infra stacks when the matching `aws/cfn/**` template or relevant `aws/params/prod.json` keys change (per-stack detection). The **database** stack only deploys when `02-database.yml` / DB params change and requires the `DB_MASTER_PASSWORD` secret (it is otherwise guarded by `DeletionPolicy=Retain`, `UpdateReplacePolicy=Snapshot`, `DeletionProtection=true`).
-5. **Build-and-push job** — skipped when neither app nor nginx changed; otherwise builds only the affected image(s) for `linux/arm64` with GitHub Actions layer cache and pushes to ECR (tags: git SHA + `latest`). Runs on a native arm64 runner (`ubuntu-24.04-arm`), so there is no QEMU in the path — see [Why the build runs on arm64](#why-the-build-runs-on-arm64).
+5. **Build jobs** — `build-app` when `quant/**` (etc.) changed; `build-nginx` when `frontend/**` changed. Each pushes to ECR (git SHA + `latest`) on native arm64 — see [Why the build runs on arm64](#why-the-build-runs-on-arm64).
 6. **Migrate job** — skipped unless `db/liquidbase/**` changed; otherwise runs `aws/scripts/liquibase-ssm-run.sh deploy <sha>` on EC2 with `LIQUIBASE_CONTEXTS=prod-deploy`. Gated by the `production-db` environment (see [Approving a migration](#approving-a-migration)).
-7. **Deploy job** — skipped when no app/nginx/compose changes; otherwise SSM Run Command runs the inline deploy script (see [Deployment logic](#deployment-logic) below). Waits on `migrate`, so containers never restart ahead of the schema.
+7. **Deploy job** — skipped when no app/nginx/compose/db changes; SSM Run Command runs the inline deploy script (see [Deployment logic](#deployment-logic) below). Waits on `migrate`, so containers never restart ahead of the schema. Sets `REFRESH_REFDATA` after a REFDATA migrate when `quant-app` was not rebuilt.
 
 **Manual full deploy:** Actions → deploy → Run workflow (`workflow_dispatch`). Rebuilds both images and deploys regardless of paths. The optional `deploy_database` input (default off) additionally deploys the RDS stack — leave unchecked unless you intend an Aurora change.
 
@@ -486,8 +485,9 @@ The `deploy` job sends one `AWS-RunShellScript` SSM command to the EC2 and polls
 3. **TLS overlay** — when the `DOMAIN` repo var is set, fetch `ORIGIN_TLS_CERT` / `ORIGIN_TLS_KEY` from SSM into `secrets/`; if both land, append `-f docker-compose.cloudflare.yml`. Missing cert/key → stay HTTP-only with a warning.
 4. **Disk hygiene** — `docker builder prune -af` + `docker image prune -af` before pulling (the 8→30 GiB volume history made this necessary).
 5. **Digest-aware pull** — per service, compare the ECR image digest to the local one; **skip the pull when they match**. Tag resolution falls back from `${git_sha}` to `latest` if the SHA tag is missing.
-6. **Selective `up`** — only the changed services restart: `DEPLOY_APP` → `api`+`worker`, `DEPLOY_NGINX` → `nginx`, `DEPLOY_COMPOSE` → full `up -d --remove-orphans`. All `up` calls use `--no-build` so prod **never** builds on EC2.
-7. **Report** — `docker image prune -f`, then `docker compose ps`; the job tails the SSM `StandardOutputContent` and fails on `Failed`/`TimedOut`/`Cancelled`.
+6. **Selective `up`** — only the changed services restart: `DEPLOY_APP` → `api`+`worker`, `DEPLOY_NGINX` → `nginx`, `DEPLOY_COMPOSE` → full `up -d --remove-orphans`. All `up` calls use `--no-build` so prod **never** builds on EC2. `DEPLOY_APP` is set when `quant/**` changed **or** the `build-app` job pushed an image in the same run. After a REFDATA-only migrate, `REFRESH_REFDATA` runs `quant.refdata.publisher` inside `quant-api` without a full app rebuild. See [Production Rollout](../guides/prod-rollout.md).
+7. **Split image builds** — `build-app` depends on Python tests only; `build-nginx` still waits on the frontend job. A frontend build failure no longer blocks shipping `quant-app`.
+8. **Report** — `docker image prune -f`, then `docker compose ps`; the job tails the SSM `StandardOutputContent` and fails on `Failed`/`TimedOut`/`Cancelled`.
 
 ### GitHub setup (one-time)
 
@@ -508,7 +508,7 @@ The `deploy` job sends one `AWS-RunShellScript` SSM command to the EC2 and polls
 
 **Environments** (repo → Settings → Environments):
 
-- `production` — used by `build-and-push`, `cfn`, and `deploy`. No protection rules; it exists to scope secrets, not to gate.
+- `production` — used by `build-app`, `build-nginx`, `cfn`, and `deploy`. No protection rules; it exists to scope secrets, not to gate.
 - `production-db` — used by `migrate` only. Carries a **required reviewer**, which is what makes a schema change wait for a human.
 
 ### Approving a migration

@@ -128,8 +128,33 @@ changes are rare and admin-triggered via the refresh endpoint.
 
 ---
 
+## After REFDATA changes in production
+
+REFDATA is one **cache layer** on top of Aurora. Seeds that reference new Python
+symbols (e.g. `FUNC_NAME_BAND = momentum_band_signal_long_only`) also require a
+**`quant-app` deploy** — refreshing Redis alone leaves the worker on old code.
+See **[Production Rollout](../guides/prod-rollout.md)** for the full five-layer
+checklist (Aurora, containers, Redis, nginx, browser), partial-deploy failure
+modes, SSO, and agent approval.
+
+**Refresh prod Redis only** (when Aurora already has the rows and `quant-app` is
+current):
+
+```bash
+# Logged into prod site:
+curl -X POST "https://<your-domain>/api/v1/refdata/refresh" -b "qs_token=…"
+
+# Or on EC2 (requires aws sso login — see prod-rollout guide):
+docker exec quant-api python -m quant.refdata.publisher
+```
+
+Verify: `refdata:version` incremented and `GET refdata:<table>` matches Aurora.
+
+---
+
 ## Related
 
+- [Production Rollout](../guides/prod-rollout.md) — Aurora + containers + Redis + nginx sync
 - [FastAPI Backend](api.md) — endpoint catalogue and cache wiring
 - [Database](database.md) — `REFDATA` schema tables
 - [Decisions](../decisions.md) — REFDATA as single source of truth for UI dropdowns

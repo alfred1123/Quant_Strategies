@@ -116,6 +116,7 @@ The `INDICATOR_DEFAULTS` dict in `quant/strategy/signals.py` is a **legacy fallb
 - **`RefDataPublisher`** (`quant/refdata/publisher.py`) loads REFDATA from Postgres via `REFDATA.SP_GET_ENUM` and writes JSON snapshots to Redis (`refdata:<table>` keys). Invoked at FastAPI startup and on `POST /api/v1/refdata/refresh`.
 - **`RedisRefData`** (`quant/refdata/reader.py`) is the read-only accessor for API handlers and the worker. Checks `refdata:version` on every `get()` and rebuilds its local snapshot when bumped.
 - No TTL — REFDATA changes are rare, admin-only. Refresh via `POST /api/v1/refdata/refresh`.
+- **Prod rollout is not “refresh REFDATA” alone.** Aurora migrate, `quant-app` image (`api`+`worker`), Redis, and nginx update independently; partial deploys (e.g. frontend-only push after a failed `quant/**` build) leave stale workers. See `docs/guides/prod-rollout.md`. Before SSM/ECR/prod mutations, ensure the user has run `aws sso login` and approved prod access in the IDE.
 - Frontend fetches REFDATA via `GET /api/v1/refdata/{table_name}` and caches client-side with TanStack Query (stale-while-revalidate).
 - DB connection: `localhost:5432` when `DB_TARGET=local`; `localhost:5433` is prod Aurora via `./scripts/appctl.sh prod tunnel start`.
 - If DB is unreachable at startup, the backend fails fast — REFDATA is required.
