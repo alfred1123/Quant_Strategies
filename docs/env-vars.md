@@ -49,6 +49,11 @@ code; see [Dev vs Prod](architecture/dev-vs-prod.md#where-local-and-prod-are-def
 | `LOCAL_DB_PASSWORD` | Optional | Local user password (default `LetsGetRich888` — change for non-default installs). |
 | `PROD_DB_PORT` | Optional | Overrides the `prod` port ahead of `QUANTDB_PORT`. For a tunnel on a non-standard local port. |
 | `MAX_CONCURRENT_WORKERS` | Optional | Max concurrent backtest worker subprocesses spawned by one `quant.queue.worker_loop` (default `1`). Bump only after `SP_CLAIM_NEXT` becomes atomic — see `docs/design/backtest-queue.md` §0. |
+| `DB_POOL_MIN` | Optional | Process Postgres pool floor (default `2`). |
+| `DB_POOL_MAX` | Optional | Process Postgres pool cap (default `10`). |
+| `DB_POOL_MAX_IDLE` | Optional | Seconds an extra connection may sit unused before the pool closes it (default `600`). |
+| `DB_POOL_MAX_LIFETIME` | Optional | Seconds after which a connection is discarded on the next checkout (default `1800`). |
+| `DB_POOL_TIMEOUT` | Optional | Seconds to wait for a free pooled connection (default `30`). |
 
 ## Liquibase (DB migrations)
 

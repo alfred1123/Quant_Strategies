@@ -27,7 +27,7 @@ import sys
 
 import redis
 
-from quant.shared.db import DbGateway
+from quant.shared.db import DbGateway, close_pools, open_pool
 
 logger = logging.getLogger(__name__)
 
@@ -120,8 +120,12 @@ def main() -> int:
     from quant.shared.config import get_redis_url, load_config
 
     conninfo = load_config()
-    RefDataPublisher(conninfo, get_redis_url()).publish_all()
-    return 0
+    try:
+        open_pool(conninfo)
+        RefDataPublisher(conninfo, get_redis_url()).publish_all()
+        return 0
+    finally:
+        close_pools()
 
 
 if __name__ == "__main__":

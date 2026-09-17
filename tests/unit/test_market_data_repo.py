@@ -23,7 +23,7 @@ BAR_TS = datetime(2026, 8, 1, 9, 0, tzinfo=UTC)
 
 @pytest.fixture
 def repo():
-    """A repo with no connection — PriceBarRepo holds a persistent one."""
+    """A repo that never opens a pool — methods under test call ``_call_*``."""
     instance = PriceBarRepo.__new__(PriceBarRepo)
     instance.user_id = "tester"
     return instance

@@ -8,12 +8,18 @@ Write procs return one row beginning with ``(SQLSTATE, SQLMSG, SQLERRMC)``
 (the same prefix as ``BT.SP_INS_QUEUE``). Additional OUT columns, if any,
 follow. ``_call_write`` validates the triplet and returns trailing OUT values
 as a tuple (often empty).
+
+Each process owns one ``ConnectionPool`` per conninfo. Gateways borrow a
+connection for one call and return it — they do not hold sockets.
+See decision #69 and ``docs/design/db-connections.md``.
 """
 
 import logging
+import os
 import re
+import threading
 
-import psycopg
+from psycopg_pool import ConnectionPool
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +32,63 @@ _FERNET_PREFIX = "gAAAAA"
 
 #: Longest string parameter reproduced verbatim in a log line.
 _MAX_LOGGED_PARAM_CHARS = 200
+
+_LOCK = threading.Lock()
+_pools: dict[str, ConnectionPool] = {}
+
+
+def _pool_kwargs() -> dict:
+    min_size = int(os.getenv("DB_POOL_MIN", "2"))
+    max_size = int(os.getenv("DB_POOL_MAX", "10"))
+    if min_size < 1 or max_size < min_size:
+        raise ValueError("DB_POOL_MIN must be >= 1 and DB_POOL_MAX >= DB_POOL_MIN")
+    return {
+        "min_size": min_size,
+        "max_size": max_size,
+        "timeout": float(os.getenv("DB_POOL_TIMEOUT", "30")),
+        "max_idle": float(os.getenv("DB_POOL_MAX_IDLE", "600")),
+        "max_lifetime": float(os.getenv("DB_POOL_MAX_LIFETIME", "1800")),
+        "check": ConnectionPool.check_connection,
+    }
+
+
+def pool_for(conninfo: str) -> ConnectionPool:
+    """Process pool for ``conninfo``. Created on first use."""
+    if not conninfo:
+        raise ValueError("conninfo is required")
+    with _LOCK:
+        pool = _pools.get(conninfo)
+        if pool is None or pool.closed:
+            kwargs = _pool_kwargs()
+            pool = ConnectionPool(conninfo, **kwargs)
+            _pools[conninfo] = pool
+            logger.info(
+                "Postgres pool opened min=%s max=%s max_idle=%s max_lifetime=%s",
+                kwargs["min_size"],
+                kwargs["max_size"],
+                kwargs["max_idle"],
+                kwargs["max_lifetime"],
+            )
+        return pool
+
+
+def open_pool(conninfo: str, *, timeout: float = 15.0) -> ConnectionPool:
+    """Create the process pool and wait until ``min_size`` connections are up."""
+    pool = pool_for(conninfo)
+    pool.wait(timeout=timeout)
+    return pool
+
+
+def close_pools() -> None:
+    """Close every pool this process opened. Safe to call repeatedly."""
+    with _LOCK:
+        pools = list(_pools.values())
+        _pools.clear()
+    for pool in pools:
+        try:
+            pool.close()
+        except Exception:
+            logger.debug("Postgres pool close failed", exc_info=True)
 
 
 def _proc_name_from_sql(sql: str) -> str:
@@ -78,58 +141,21 @@ class DbGateway:
     Encapsulates all psycopg usage. Subclasses add proc wrappers and
     business methods per schema and **never** import psycopg directly.
 
-    Connection mode is set at construction via ``persistent``:
-
-    - ``persistent=False`` (default) — every call opens and closes a
-      short-lived connection (one connect per call).
-    - ``persistent=True`` — a single connection is opened at init and
-      reused for every call until ``close()`` is invoked. Used by long-
-      lived caches (``InstrumentCache``, ``BacktestCache``).
+    Connections come from the process pool. A gateway does not own a
+    socket and has no ``close()`` — entry points call ``close_pools()``.
     """
 
-    def __init__(
-        self,
-        conninfo: str,
-        user_id: str = "quant_admin",
-        *,
-        persistent: bool = False,
-    ) -> None:
+    def __init__(self, conninfo: str, user_id: str = "quant_admin") -> None:
         self._conninfo = conninfo
         self.user_id = user_id
-        self._conn: psycopg.Connection | None = (
-            psycopg.connect(conninfo) if persistent else None
-        )
-
-    # ── lifecycle ────────────────────────────────────────────────────────
-
-    def close(self) -> None:
-        """Release the persistent connection, if any. Safe to call repeatedly."""
-        if self._conn is None:
-            return
-        try:
-            self._conn.close()
-        except Exception:
-            logger.debug("DbGateway connection close failed", exc_info=True)
-        finally:
-            self._conn = None
-
-    # ── helpers ──────────────────────────────────────────────────────────
 
     def _run(self, fn):
-        """Execute ``fn(cursor)`` on the held connection (if persistent) or
-        on a fresh short-lived one. Returns ``(result, conn)`` where ``conn``
-        is the held connection or ``None`` for short-lived. Rolls back on
-        error.
+        """Borrow a pooled connection, run ``fn(cursor)``, return it.
+
+        The pool context commits on success and rolls back on error.
         """
-        if self._conn is not None:
-            try:
-                with self._conn.cursor() as cur:
-                    return fn(cur), self._conn
-            except Exception:
-                self._conn.rollback()
-                raise
-        with psycopg.connect(self._conninfo) as c, c.cursor() as cur:
-            return fn(cur), None
+        with pool_for(self._conninfo).connection() as conn, conn.cursor() as cur:
+            return fn(cur)
 
     def _call_get(self, sql: str, params: tuple) -> list[dict]:
         """CALL a SP_GET proc → drain REFCURSOR → return ``list[dict]``."""
@@ -157,8 +183,7 @@ class DbGateway:
             )
             return rows
 
-        rows, _ = self._run(work)
-        return rows
+        return self._run(work)
 
     def _call_get_one(self, sql: str, params: tuple) -> dict | None:
         """CALL a SP_GET proc returning at most one row → first row or ``None``."""
@@ -168,9 +193,8 @@ class DbGateway:
     def _call_write(self, sql: str, params: tuple) -> tuple:
         """CALL a SP_INS/SP_UPD proc whose OUT row starts with the status triplet.
 
-        Commits on the held connection (persistent mode) or via the
-        short-lived connection's commit. Returns trailing OUT values
-        (often empty).
+        The borrowed connection commits when ``_run`` returns cleanly.
+        Returns trailing OUT values (often empty).
         """
         def work(cur) -> tuple:
             cur.execute(sql, params)
@@ -193,9 +217,7 @@ class DbGateway:
                 raise ProcedureError(proc=proc, sqlstate=sqlstate, message=sqlerrmc)
             return row[3:]
 
-        tail, held = self._run(work)
-        if held is not None:
-            held.commit()
+        tail = self._run(work)
         logger.info("_call_write committed — params=%s", _redact(params))
         return tail
 
@@ -211,13 +233,9 @@ class DbGateway:
             cols = [desc.name for desc in (cur.description or [])]
             return [dict(zip(cols, r)) for r in cur.fetchall()]
 
-        rows, _ = self._run(work)
-        return rows
+        return self._run(work)
 
     def health_check(self, *, timeout: int = 3) -> None:
-        """Cheap connectivity probe — raises ``psycopg.Error`` on failure,
-        returns ``None`` on success. Used by the FastAPI readiness endpoint.
-        Always uses a short-lived connection independent of ``persistent``.
-        """
-        with psycopg.connect(self._conninfo, connect_timeout=timeout) as conn:
+        """Probe the process pool — raises on failure, ``None`` on success."""
+        with pool_for(self._conninfo).connection(timeout=timeout) as conn:
             conn.execute("SELECT 1")

@@ -71,9 +71,11 @@ def cusip():
 
 @pytest.fixture
 def repo():
+    from quant.shared.db import close_pools
+
     instance = PriceBarRepo(DB_URL, user_id="pytest")
     yield instance
-    instance.close()
+    close_pools()
 
 
 def _seed(repo, cusip, hours=BAR_HOURS, source_app_id=APP_ID, px_offset=0):

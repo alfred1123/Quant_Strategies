@@ -99,11 +99,13 @@ def _purge(product_id: int) -> None:
 
 @pytest.fixture
 def cache():
+    from quant.shared.db import close_pools
+
     instance = InstrumentCache(DB_URL, user_id="pytest")
     try:
         yield instance
     finally:
-        instance.close()
+        close_pools()
 
 
 def test_creating_an_instrument_allocates_its_own_ids(cache):

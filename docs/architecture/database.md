@@ -2,7 +2,7 @@
 
 The project uses **PostgreSQL 17** with Liquibase for schema management. Each schema is deployed independently with its own `databasechangelog` tracking table.
 
-See [System Overview](overview.md) for schema relationships and [Dev vs Prod](dev-vs-prod.md) for connection topology.
+See [System Overview](overview.md) for schema relationships and [Dev vs Prod](dev-vs-prod.md) for connection topology. Python processes borrow from a process-wide `ConnectionPool` ([DB connections](../design/db-connections.md), decision #69).
 
 ## Schemas
 

@@ -110,6 +110,7 @@ nav:
       - Alternative Data Sources: design/alt-data-sources.md
       - Separate Underlying & Cache: design/separate-underlying.md
       - Login & Authentication: design/login.md
+      - Database Connections: design/db-connections.md
       - User Isolation: design/user-isolation.md
       - Best-VID Promotion: design/best-vid-promotion.md
       - Trade Deployment Rollout: design/trade-deployment-rollout.md

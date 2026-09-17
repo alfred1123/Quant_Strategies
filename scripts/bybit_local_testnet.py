@@ -200,24 +200,21 @@ def ensure_bybit_xref(conninfo: str) -> None:
     from quant.data.instruments import InstrumentCache
 
     cache = InstrumentCache(conninfo, user_id="bybit_local_testnet")
-    try:
-        cache.load_all()
-        if cache.resolve_vendor_symbol(BTCUSDT_PRODUCT_ID, BYBIT_APP_ID) == (
-            BYBIT_VENDOR_SYMBOL
-        ):
-            print("[xref] btcusdt.crypto → Bybit already mapped")
-            return
-        # No id passed: the procedure resolves the open row for this
-        # (product, app) pair when there is one, so a mapping that points
-        # somewhere else is repointed rather than colliding with
-        # UQ_PRODUCT_XREF_CURRENT.
-        xref_id, xref_vid = cache.sp_ins_product_xref(
-            product_id=BTCUSDT_PRODUCT_ID,
-            app_id=BYBIT_APP_ID,
-            vendor_symbol=BYBIT_VENDOR_SYMBOL,
-        )
-    finally:
-        cache.close()
+    cache.load_all()
+    if cache.resolve_vendor_symbol(BTCUSDT_PRODUCT_ID, BYBIT_APP_ID) == (
+        BYBIT_VENDOR_SYMBOL
+    ):
+        print("[xref] btcusdt.crypto → Bybit already mapped")
+        return
+    # No id passed: the procedure resolves the open row for this
+    # (product, app) pair when there is one, so a mapping that points
+    # somewhere else is repointed rather than colliding with
+    # UQ_PRODUCT_XREF_CURRENT.
+    xref_id, xref_vid = cache.sp_ins_product_xref(
+        product_id=BTCUSDT_PRODUCT_ID,
+        app_id=BYBIT_APP_ID,
+        vendor_symbol=BYBIT_VENDOR_SYMBOL,
+    )
     print(
         f"[xref] wrote product_xref_id={xref_id} v{xref_vid} "
         f"btcusdt.crypto → {BYBIT_VENDOR_SYMBOL} (app_id={BYBIT_APP_ID})"
@@ -371,7 +368,6 @@ def run_gateway(paper: bool, *, bybit_demo: bool = False) -> None:
         print(f"[gateway] OK paper={paper} demo={bybit_demo} vendor_symbol={vendor} position_qty={qty} usdt_nav={nav}")
     finally:
         adapter.disconnect()
-        inst_cache.close()
 
 
 def refresh_live_data(
@@ -691,7 +687,6 @@ def probe_intended_with_live_position(paper: bool, *, bybit_demo: bool = False) 
         position_qty = adapter.get_position_qty(vendor)
     finally:
         adapter.disconnect()
-        inst_cache.close()
 
     print(f"[probe-intended] vendor_symbol={vendor} position_qty={position_qty}")
     outcomes: dict[str, str] = {}
@@ -773,7 +768,6 @@ def run_apply_signal(
         print(f"[apply-signal] position_after={position_after}")
     finally:
         adapter.disconnect()
-        inst_cache.close()
 
 
 def _poll_position_change(

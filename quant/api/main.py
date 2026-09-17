@@ -32,13 +32,14 @@ from quant.api.exception_handlers import register as register_exception_handlers
 from quant.api.routers import backtest, deployments, inst, jobs, promotion, refdata, strategies  # noqa: E402
 from quant.refdata.bundle import DataCaches  # noqa: E402
 from quant.refdata.publisher import RefDataPublisher  # noqa: E402
+from quant.shared.db import DbGateway, close_pools, open_pool  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: publish REFDATA → Redis, then build DataCaches bundle.
+    """Startup: open the DB pool, publish REFDATA → Redis, build caches.
 
     Order matters: the publisher seeds ``refdata:<table>`` keys from
     Postgres so the bundle's ``RedisRefData`` reader (and the worker's)
@@ -46,71 +47,68 @@ async def lifespan(app: FastAPI):
     endpoints will 503 but the server still boots so ``/health`` remains
     useful for diagnosis.
     """
-    # Build singletons — missing secrets fail the boot in prod.
-    app.state.auth_service = AuthService()
-    app.state.db_conninfo = DB_CONNINFO
-
-    from quant.shared.secrets_crypto import CredentialCrypto
-    app.state.credential_crypto = CredentialCrypto()
-    app.state.credential_service = CredentialService(app.state.credential_crypto)
-
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    open_pool(DB_CONNINFO)
     try:
-        n = RefDataPublisher(DB_CONNINFO, redis_url).publish_all()
-        logger.info("Published %d REFDATA tables to Redis", n)
-    except Exception:
-        logger.exception(
-            "RefDataPublisher.publish_all() failed — REFDATA endpoints will 503 "
-            "until POST /api/v1/refdata/refresh succeeds",
+        app.state.auth_service = AuthService()
+        app.state.db_conninfo = DB_CONNINFO
+
+        from quant.shared.secrets_crypto import CredentialCrypto
+        app.state.credential_crypto = CredentialCrypto()
+        app.state.credential_service = CredentialService(app.state.credential_crypto)
+
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        try:
+            n = RefDataPublisher(DB_CONNINFO, redis_url).publish_all()
+            logger.info("Published %d REFDATA tables to Redis", n)
+        except Exception:
+            logger.exception(
+                "RefDataPublisher.publish_all() failed — REFDATA endpoints will 503 "
+                "until POST /api/v1/refdata/refresh succeeds",
+            )
+
+        caches = DataCaches(DB_CONNINFO, redis_url)
+        caches.load_instruments(soft_fail=False)
+        app.state.data_caches = caches
+
+        from quant.trade.registry import AdapterRegistry, build_default_registry
+
+        try:
+            app.state.adapter_registry = build_default_registry(caches.refdata)
+            logger.info("Adapter registry ready for ccxt brokers")
+        except Exception:
+            logger.exception(
+                "Failed to build adapter registry — ccxt dry-run will reject unknown app_id",
+            )
+            app.state.adapter_registry = AdapterRegistry()
+
+        from quant.trade.bar_source import PriceBarServiceFactory
+
+        app.state.price_bars = PriceBarServiceFactory(DB_CONNINFO, caches)
+
+        # Application-scoped: the tick counts apply attempts per (deployment,
+        # due time) in memory. Rebuilt per request, the count would restart
+        # on every hourly wakeup and a broken deployment would retry forever.
+        from quant.api.routers.deployments import build_trade_service
+        from quant.queue.repo import BtQueueRepo
+        from quant.trade.db_repo import TradeRepo
+        from quant.trade.scheduler.sweep import DEFAULT_SETTLE_S, ScheduleSweeper
+        from quant.trade.scheduler.tick import ScheduleTickRunner
+
+        tick_bt = BtQueueRepo(DB_CONNINFO, user_id="system")
+        app.state.schedule_sweeper = ScheduleSweeper(
+            ScheduleTickRunner(
+                TradeRepo(DB_CONNINFO, bt=tick_bt, user_id="system"),
+                lambda app_user_id, deployment_id: build_trade_service(
+                    app.state
+                ).apply_deployment(app_user_id, deployment_id),
+            ),
+            caches.refdata,
+            settle_s=DEFAULT_SETTLE_S,
         )
 
-    caches = DataCaches(DB_CONNINFO, redis_url)
-    caches.load_instruments(soft_fail=False)
-    app.state.data_caches = caches
-
-    from quant.trade.registry import AdapterRegistry, build_default_registry
-
-    try:
-        app.state.adapter_registry = build_default_registry(caches.refdata)
-        logger.info("Adapter registry ready for ccxt brokers")
-    except Exception:
-        logger.exception(
-            "Failed to build adapter registry — ccxt dry-run will reject unknown app_id",
-        )
-        app.state.adapter_registry = AdapterRegistry()
-
-    # Application-scoped: holds a long-lived PriceBarRepo connection and caches
-    # a ccxt client per venue, so it must outlive the per-request TradeService.
-    from quant.trade.bar_source import PriceBarServiceFactory
-
-    app.state.price_bars = PriceBarServiceFactory(DB_CONNINFO, caches)
-
-    # Application-scoped for a different reason than the factory above: the tick
-    # counts apply attempts per (deployment, due time) in memory, and that budget
-    # is what eventually abandons a broken deployment so its schedule moves on.
-    # Rebuilt per request, the count would restart on every hourly wakeup and a
-    # deployment that can never trade would retry for ever.
-    from quant.api.routers.deployments import build_trade_service
-    from quant.queue.repo import BtQueueRepo
-    from quant.trade.db_repo import TradeRepo
-    from quant.trade.scheduler.sweep import DEFAULT_SETTLE_S, ScheduleSweeper
-    from quant.trade.scheduler.tick import ScheduleTickRunner
-
-    tick_bt = BtQueueRepo(DB_CONNINFO, user_id="system")
-    app.state.schedule_sweeper = ScheduleSweeper(
-        ScheduleTickRunner(
-            TradeRepo(DB_CONNINFO, bt=tick_bt, user_id="system"),
-            # A TradeService per apply, so one deployment's failure cannot leave
-            # shared state behind for the next.
-            lambda app_user_id, deployment_id: build_trade_service(
-                app.state
-            ).apply_deployment(app_user_id, deployment_id),
-        ),
-        caches.refdata,
-        settle_s=DEFAULT_SETTLE_S,
-    )
-
-    yield
+        yield
+    finally:
+        close_pools()
 
 
 _is_prod = os.getenv("APP_ENV", "dev").lower() == "prod"
@@ -164,10 +162,8 @@ def health():
 @app.get("/health/ready")
 def readiness(request: Request):
     """Liveness = /health.  Readiness = /health/ready (includes DB)."""
-    import psycopg
     try:
-        with psycopg.connect(request.app.state.db_conninfo, connect_timeout=3) as conn:
-            conn.execute("SELECT 1")
+        DbGateway(request.app.state.db_conninfo).health_check()
         return {"status": "ok", "db": "connected"}
     except Exception as exc:
         logger.warning("Readiness check failed: %s", exc)

@@ -641,9 +641,8 @@ class TestInstrumentCache:
     def test_resolve_internal_cusip_missing_xref(self, cache):
         assert cache.resolve_internal_cusip("ethusdt.crypto", 2) is None
 
-    @patch("quant.shared.db.psycopg.connect", return_value=MagicMock())
     @patch("quant.shared.db.DbGateway._call_get")
-    def test_load_all_calls_both_procs(self, mock_call_get, _mock_connect):
+    def test_load_all_calls_both_procs(self, mock_call_get):
         from quant.data.instruments import InstrumentCache
         mock_call_get.side_effect = [self.SAMPLE_PRODUCTS, self.SAMPLE_XREFS]
         c = InstrumentCache("dummy")
@@ -747,8 +746,7 @@ class TestInstrumentCacheWrites:
 
     def test_user_id_defaults_to_system(self):
         from quant.data.instruments import InstrumentCache
-        with patch("quant.shared.db.psycopg.connect", return_value=MagicMock()):
-            assert InstrumentCache("dummy").user_id == "system"
+        assert InstrumentCache("dummy").user_id == "system"
 
     # ── product + xref are one instrument ────────────────────────────────
 

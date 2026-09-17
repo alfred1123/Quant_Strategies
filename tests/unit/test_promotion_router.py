@@ -35,7 +35,7 @@ def _prow(*, outcome="PROMOTED", compared_vid=None, gates=None, nm="Strat A"):
 
 @pytest.fixture
 def client_and_svc():
-    with patch("quant.shared.db.psycopg"):
+    with patch("quant.shared.db.open_pool"):
         from quant.api.auth.dependencies import require_user
         from quant.api.auth.models import CurrentUser
         from quant.api.main import app
@@ -101,7 +101,7 @@ class TestList:
 
 class TestAuthGating:
     def test_requires_login(self):
-        with patch("quant.shared.db.psycopg"):
+        with patch("quant.shared.db.open_pool"):
             from quant.api.main import app
             app.state.db_conninfo = "postgresql://stub"
             app.state.data_caches = MagicMock()

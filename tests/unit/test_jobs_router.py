@@ -36,7 +36,7 @@ def _row(*, qid=None, status="QUEUED", status_id=1, vid=1, user="u1", priority=1
 @pytest.fixture
 def client_and_svc():
     """TestClient + a MagicMock JobsService injected via dependency_overrides."""
-    with patch("quant.shared.db.psycopg"):
+    with patch("quant.shared.db.open_pool"):
         from quant.api.auth.dependencies import require_user
         from quant.api.auth.models import CurrentUser
         from quant.api.main import app
@@ -372,7 +372,7 @@ class TestLogicalDelete:
 class TestAuthGating:
     def test_requires_login(self):
         """Without dependency_overrides the cookie is absent → 401."""
-        with patch("quant.shared.db.psycopg"):
+        with patch("quant.shared.db.open_pool"):
             from quant.api.main import app
             app.state.db_conninfo = "postgresql://stub"
             app.state.data_caches = MagicMock()

@@ -522,7 +522,7 @@ Malformed lines are logged but do not kill the worker.
 ### 10.4 Flow
 
 1. Parse `queue_id` from `sys.argv[1]`. Exit 2 if invalid UUID.
-2. Open psycopg connection from `DB_URL` (no pool).
+2. Open the process Postgres pool from `DB_URL` (`open_pool`).
 3. `CALL BT.SP_GET_QUEUE_LATEST(queue_id)` → active `BT.QUEUE` row joined to frozen `CONFIG_JSON` (`BT.STRATEGY` on `STRATEGY_VID`). Exit 2 if no row.
 4. Reconstruct `OptimizeRequest` from `CONFIG_JSON`.
 5. Install `SIGTERM` handler: set `cancel_flag = True` → next callback raises `JobCancelled`.

@@ -61,7 +61,7 @@ def _create_body(**overrides):
 @pytest.fixture
 def client_and_svc():
     """TestClient + a MagicMock TradeService injected via dependency_overrides."""
-    with patch("quant.shared.db.psycopg"):
+    with patch("quant.shared.db.open_pool"):
         from quant.api.auth.dependencies import require_user
         from quant.api.auth.models import CurrentUser
         from quant.api.main import app

@@ -572,4 +572,4 @@ quant/trade/service.py              # TradeService — deployments (Phase 1.2)
 quant/trade/db_repo.py              # TradeRepo — SP_INS/GET_DEPLOYMENT
 ```
 
-REFDATA, INST, and BT cache classes live under `quant/refdata/` and `quant/data/` (shared between the API and the worker via `quant/refdata/bundle.py::DataCaches`). All Postgres access goes through `quant/shared/db.py::DbGateway` — no other module imports `psycopg` (except the `/health/ready` DB ping in `main.py`).
+REFDATA, INST, and BT cache classes live under `quant/refdata/` and `quant/data/` (shared between the API and the worker via `quant/refdata/bundle.py::DataCaches`). All Postgres access goes through `quant/shared/db.py::DbGateway`, which borrows from the process-wide pool opened in `lifespan` ([decision #69](../decisions.md), [DB connections](../design/db-connections.md)). `/health/ready` uses the same pool. The remaining `psycopg` import outside `db.py` is `exception_handlers.py` (it maps `psycopg.Error`).

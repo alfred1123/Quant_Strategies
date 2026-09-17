@@ -19,9 +19,8 @@ logger = logging.getLogger(__name__)
 class BacktestCache(DbGateway):
     """BT cache read/write via stored procedures.
 
-    Holds a long-lived Postgres connection (managed by ``DbGateway``) for
-    BT schema SP calls so there is no per-query connect overhead. Uses a
-    ``RedisRefData`` reader for denormalized ID lookups (APP_ID, etc.).
+    BT schema SP calls go through the process pool via ``DbGateway``.
+    Uses a ``RedisRefData`` reader for denormalized ID lookups (APP_ID, etc.).
     """
 
     # Hardcoded default — daily bars. All callers omit tm_interval_id; this
@@ -32,7 +31,7 @@ class BacktestCache(DbGateway):
         # ``refdata`` duck-types the legacy RefDataCache surface — only
         # ``.get(table)`` and ``.resolve_app_metric_id(...)`` are used here,
         # both of which RedisRefData implements identically.
-        super().__init__(conninfo, user_id, persistent=True)
+        super().__init__(conninfo, user_id)
         self.refdata = refdata
 
     # ── helpers ─────────────────────────────────────────────────────────

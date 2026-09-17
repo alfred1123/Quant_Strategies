@@ -7,7 +7,7 @@ See docs/design/backtest-queue.md §10 for the full contract. This Slice C
 implementation covers steps 1-4 + 7 + 9 + 11-12 only:
 
     1. Parse queue_id from argv.
-    2. Connect to DB via DB_URL env var.
+    2. Open the process Postgres pool from DB_URL.
     3. Read CONFIG_JSON for the strategy version snapshot in BT.QUEUE.
     4. Reconstruct OptimizeRequest, run optimization to completion.
     7. Emit `started` JSON on stdout.
@@ -33,6 +33,7 @@ import traceback
 import uuid
 
 from quant.shared.config import load_config, get_redis_url
+from quant.shared.db import close_pools, open_pool
 from quant.schemas.backtest import OptimizeRequest
 from quant.strategy.backtest_service import run_optimize
 
@@ -194,6 +195,7 @@ def main(argv: list[str]) -> int:
         return 2
 
     try:
+        open_pool(db_url)
         return BacktestWorker(db_url).run(queue_id)
     except LookupError as exc:
         logger.error("config error: %s", exc)
@@ -204,6 +206,8 @@ def main(argv: list[str]) -> int:
             "(coordinator reaper should mark FAILED)"
         )
         return 1
+    finally:
+        close_pools()
 
 
 if __name__ == "__main__":

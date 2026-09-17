@@ -168,10 +168,12 @@ def _usdt_total_from_balance(balance: dict) -> float | None:
 def inst_cache(conninfo):
     from quant.data.instruments import InstrumentCache
 
+    from quant.shared.db import close_pools
+
     cache = InstrumentCache(conninfo)
     cache.load_all()
     yield cache
-    cache.close()
+    close_pools()
 
 
 @pytest.fixture(scope="module")

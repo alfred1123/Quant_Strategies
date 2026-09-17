@@ -39,6 +39,7 @@ from typing import Callable
 import redis
 
 from quant.shared.config import get_redis_url, load_config
+from quant.shared.db import close_pools, open_pool
 from quant.queue.repo import BtQueueRepo
 from quant.queue.wake import wait_for_wake
 from quant.refdata.reader import RedisRefData
@@ -355,8 +356,12 @@ def main() -> int:
         max_concurrent=max_concurrent,
         job_timeout_s=job_timeout_s,
     )
-    loop.run()
-    return 0
+    try:
+        open_pool(db_url)
+        loop.run()
+        return 0
+    finally:
+        close_pools()
 
 
 if __name__ == "__main__":

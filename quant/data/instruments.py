@@ -25,12 +25,11 @@ logger = logging.getLogger(__name__)
 class InstrumentCache(DbGateway):
     """In-process cache for INST product and cross-reference data.
 
-    Holds a long-lived Postgres connection (managed by ``DbGateway``) for
-    INST SP calls so there is no per-query connect overhead.
+    INST SP calls go through the process pool via ``DbGateway``.
     """
 
     def __init__(self, conninfo: str, user_id: str = "system") -> None:
-        super().__init__(conninfo, user_id=user_id, persistent=True)
+        super().__init__(conninfo, user_id=user_id)
         self._products: list[dict] = []
         self._xrefs: list[dict] = []
         self._by_cusip: dict[str, dict] = {}

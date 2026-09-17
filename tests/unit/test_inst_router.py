@@ -44,7 +44,7 @@ def price_bars():
 @pytest.fixture
 def client_and_cache(price_bars):
     """TestClient plus a stand-in InstrumentCache holding the fixtures above."""
-    with patch("quant.shared.db.psycopg"), patch(
+    with patch("quant.shared.db.open_pool"), patch(
         "quant.api.routers.inst.exchange_id_for_app",
         # Only Bybit is a ccxt venue here; NASDAQ lists products but publishes
         # no market table, which is the case the empty answer is for.
@@ -510,7 +510,7 @@ class TestAuthGating:
         401s. It is restated on the route rather than left to the router mount,
         so a remount cannot silently open a write path.
         """
-        with patch("quant.shared.db.psycopg"):
+        with patch("quant.shared.db.open_pool"):
             from quant.api.auth.service import AuthService
             from quant.api.main import app
 

@@ -55,7 +55,7 @@ def _subscription_row(**overrides) -> dict:
 @pytest.fixture
 def client_and_svc():
     """TestClient + a mock subscription service and warmer."""
-    with patch("quant.shared.db.psycopg"):
+    with patch("quant.shared.db.open_pool"):
         from quant.api.auth.dependencies import require_user, require_user_or_service
         from quant.api.auth.models import CurrentUser
         from quant.api.main import app

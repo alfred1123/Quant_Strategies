@@ -21,12 +21,11 @@ def _require(value, name: str) -> None:
 class PriceBarRepo(DbGateway):
     """SP wrappers for the MARKET_DATA schema.
 
-    Holds a long-lived connection like the other data-layer gateways — the
-    live apply path calls this on every scheduler tick.
+    MARKET_DATA SP calls go through the process pool via ``DbGateway``.
     """
 
     def __init__(self, conninfo: str, user_id: str = "quant_admin") -> None:
-        super().__init__(conninfo, user_id, persistent=True)
+        super().__init__(conninfo, user_id)
 
     def get_coverage(
         self, *, internal_cusip: str, tm_interval_id: int, source_app_id: int

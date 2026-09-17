@@ -26,7 +26,7 @@ def client():
       * ``app.dependency_overrides[require_user]`` returning a synthetic
         ``CurrentUser`` so the JWT cookie path is bypassed.
     """
-    with patch("quant.shared.db.psycopg"):
+    with patch("quant.shared.db.open_pool"):
         from quant.api.main import app
         from quant.api.auth.dependencies import require_user
         from quant.api.auth.models import CurrentUser
