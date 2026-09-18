@@ -83,7 +83,7 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 **Session state:** `TradeSessionProvider` (`trade/TradeSessionContext.tsx`; the `useTradeSession` / `useTradeSessionFilters` hooks live in `trade/useTradeSession.ts`) holds:
 
 - `brokerFilter` / `accountFilter` — toolbar Exchange and Account dropdowns (`ALL_BROKERS` / `ALL_ACCOUNTS` = no filter)
-- `tradingMode` — `'paper' | 'live'` toggle
+- `tradingMode` — `'paper' | 'live'` toggle (defaults to **live**; the server still requires `confirm_live` to place a live deployment)
 - `accounts` — from `useBrokerAccounts()` → `GET /api/v1/credentials`
 - `matchesSession()` — filters deployment rows by toolbar selection
 
@@ -95,7 +95,7 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 | `BrokerAccountsTable` | Exchange · Account · masked key · Status; **Rotate** / **Revoke** dialogs; row click sets account filter |
 | `TradeConfigPage` | Accounts table + add-account form wired to credentials API (create) |
 | `StrategyPicker` | Selectable caller-owned `BT.STRATEGY` catalog via `GET /api/v1/strategies` |
-| `DeploymentDialog` | Create deployment — strategy, account, qty, schedule dropdown, live/paper confirmation |
+| `DeploymentDialog` | Create deployment — strategy, account, qty, schedule dropdown; **mode defaults to live** and still requires `confirm_live` |
 | `ScheduleCell` | Cadence per deployment row, editable in place; `useTmIntervals()` + `PATCH /trade/deployments/{id}` |
 | `ExecutionLogPanel` | Recent order attempts and fills across the session's deployments |
 | `AccountSnapshotPanel` | Live cash + open positions for the selected account via `useAccountSnapshot()`; read-only |

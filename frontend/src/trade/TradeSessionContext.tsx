@@ -15,7 +15,7 @@ export function TradeSessionProvider({ children }: { children: ReactNode }) {
   const { data: apps = [] } = useApps();
   const [brokerFilter, setBrokerFilterRaw] = useState<BrokerFilter>(ALL_BROKERS);
   const [accountFilter, setAccountFilterRaw] = useState<AccountFilter>(ALL_ACCOUNTS);
-  const [tradingMode, setTradingMode] = useState<TradingMode>('paper');
+  const [tradingMode, setTradingMode] = useState<TradingMode>('live');
 
   const appNameById = useMemo(() => {
     const map = new Map<number, string>();

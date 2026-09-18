@@ -322,7 +322,7 @@ These checks run **before every order** in the Trade API. They are non-negotiabl
 | Check | Description | Default |
 |-------|-------------|---------|
 | **Kill switch** | `deployment.enabled` must be `true` | — |
-| **Paper-first** | New deployments default to `paper=true` | `true` |
+| **Paper-first** | New deployments default to `paper=true` when the flag is omitted. The Trade UI toolbar and deploy dialog start on **live**; the server still requires `confirm_live` for `paper=false`. | `true` |
 | **Max position** | Reject if position value > `max_position_usd` | $10,000 |
 | **Max daily trades** | Reject if trade count today > `max_daily_trades` | 10 |
 | **Stop loss** | Flatten position if unrealized loss > `stop_loss_pct` | 5% |

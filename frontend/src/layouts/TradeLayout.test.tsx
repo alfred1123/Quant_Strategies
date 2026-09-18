@@ -123,8 +123,9 @@ describe('TradeLayout', () => {
     renderWithProviders(<TradeRoutes />, { initialEntries: ['/trade/apply'] });
 
     const liveBtn = screen.getByRole('button', { name: 'Live trading' });
-    await user.click(liveBtn);
     expect(liveBtn).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: 'Paper trading' }));
+    expect(liveBtn).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('shows mode switch with Trade active at /trade/config', () => {

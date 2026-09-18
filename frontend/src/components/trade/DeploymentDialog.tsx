@@ -84,7 +84,7 @@ function DeploymentDialogContent({
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null);
   const [cusipOverride, setCusipOverride] = useState<string | null>(null);
   const [qty, setQty] = useState('');
-  const [mode, setMode] = useState<'paper' | 'live'>('paper');
+  const [mode, setMode] = useState<'paper' | 'live'>('live');
   const [enabled, setEnabled] = useState(true);
   const [confirmLive, setConfirmLive] = useState(false);
   // Manual is a real selection rather than an empty one, so the closed Select

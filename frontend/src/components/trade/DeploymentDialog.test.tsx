@@ -126,6 +126,7 @@ describe('DeploymentDialog schedule control', () => {
     const user = setup();
     expect(screen.getByLabelText('Schedule')).toHaveTextContent('Manual only');
     await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Paper trading' }));
     await user.click(screen.getByRole('button', { name: /Deploy paper/ }));
     expect(createMutate).toHaveBeenCalledWith(
       expect.objectContaining({ schedule_tm_interval_id: null }),
@@ -178,6 +179,7 @@ describe('DeploymentDialog schedule control', () => {
   it('sends the chosen cadence for a paper deployment without extra confirmation', async () => {
     const user = setup();
     await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Paper trading' }));
     await pickSchedule(user, 'Hourly');
     await user.click(screen.getByRole('button', { name: /Deploy paper/ }));
     expect(createMutate).toHaveBeenCalledWith(
