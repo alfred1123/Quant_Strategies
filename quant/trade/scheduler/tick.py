@@ -6,8 +6,9 @@ woken: EventBridge and the dev poller both land here. Each pass:
 1. ``SP_GET_MISSED_DUE_DEPLOYMENTS`` — enabled, not paused, ``PENDING`` with
    ``SCHEDULED_TS <= NOW()``. Every row carries ``NEXT_SCHEDULED_TS``.
 2. Apply each row.
-3. Advance the cursor to ``NEXT_SCHEDULED_TS`` once the interval is closed —
-   applied, or out of attempts.
+3. Advance the cursor to ``NEXT_SCHEDULED_TS`` once the interval is closed
+   (applied). Exhausted retries auto-pause the deployment instead — it drops
+   off the missed-due list until someone re-enables it.
 
 A failure that still has attempts left writes nothing, so the row stays due
 and the next pass retries it against the same ``SCHEDULED_TS``. Advancing
@@ -25,6 +26,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from quant.schemas.apply import ApplyReport
+from quant.schemas.deployments import DeploymentStatus
 from quant.trade.db_repo import TradeRepo
 
 logger = logging.getLogger(__name__)
@@ -51,12 +53,24 @@ def _position_of(report) -> float | None:
         return None
 
 
+def _completed_failure(report) -> str | None:
+    """Message when apply returned a failed order; ``None`` if it did not fail.
+
+    ``order_success is False`` is a finished cycle that rejected or never
+    confirmed. ``None`` (HOLD / no order) and ``True`` (fill) are not failures.
+    """
+    if getattr(report, "order_success", None) is False:
+        return getattr(report, "message", None) or "order failed"
+    return None
+
+
 class TickOutcome(StrEnum):
     """What one due deployment did on this pass."""
 
     APPLIED = "APPLIED"      # traded; cursor moved to the next interval
     RETRYING = "RETRYING"    # failed with budget left; still due
-    ABANDONED = "ABANDONED"  # out of attempts; cursor moved on untraded
+    PAUSED = "PAUSED"        # out of attempts; disabled so it drops off the due list
+    ABANDONED = "ABANDONED"  # out of attempts; pause write failed, cursor moved on
     STUCK = "STUCK"          # applied but the cursor did not move — see below
 
 
@@ -147,6 +161,10 @@ class ScheduleTickRunner:
             # broker read at all.
             return self._on_failure(row, attempt, exc)
 
+        failed = _completed_failure(report)
+        if failed is not None:
+            return self._on_failure(row, attempt, RuntimeError(failed))
+
         self._attempts.pop(deployment_id, None)
         return self._advance(
             row, TickOutcome.APPLIED, attempt, position_qty=_position_of(report)
@@ -170,15 +188,60 @@ class ScheduleTickRunner:
                 error=str(exc),
             )
 
+        self._attempts.pop(deployment_id, None)
+        return self._auto_pause(row, attempt, str(exc))
+
+    def _auto_pause(self, row: dict, attempt: int, error: str) -> TickResult:
+        """Disable the deployment so the next tick does not keep firing it.
+
+        ``write_deployment`` versions the row ``PAUSED`` + ``IS_ENABLED_IND='N'``.
+        ``SP_INS_DEPLOYMENT`` then closes the schedule as ``SUCCESS``, which is
+        why this path does not also advance to the next ``PENDING`` slot.
+        Flattening the broker position is a different question (§6).
+        """
+        deployment_id = row["deployment_id"]
+        try:
+            self._repo.write_deployment(
+                deployment_id=deployment_id,
+                app_user_id=row["app_user_id"],
+                strategy_id=row["strategy_id"],
+                strategy_vid=row["strategy_vid"],
+                api_credential_id=row["api_credential_id"],
+                app_id=row["app_id"],
+                internal_cusip=row["internal_cusip"],
+                qty=row["qty"],
+                is_paper_ind=row["is_paper_ind"],
+                is_enabled_ind="N",
+                deployment_status=DeploymentStatus.PAUSED,
+                user_id=row["user_id"],
+                schedule_tm_interval_id=row.get("schedule_tm_interval_id"),
+            )
+        except Exception as exc:
+            logger.exception(
+                "auto-pause failed for deployment=%s — advancing so the "
+                "schedule is not wedged: %s",
+                deployment_id,
+                exc,
+            )
+            return self._advance(
+                row,
+                TickOutcome.ABANDONED,
+                attempt,
+                error=f"{error}; pause failed: {exc}",
+            )
+
         logger.error(
-            "apply failed for deployment=%s on the last of %d attempts — "
-            "skipping this interval: %s",
+            "auto-paused deployment=%s after %d failed applies: %s",
             deployment_id,
             self._max_attempts,
-            exc,
+            error,
         )
-        self._attempts.pop(deployment_id, None)
-        return self._advance(row, TickOutcome.ABANDONED, attempt, error=str(exc))
+        return TickResult(
+            deployment_id=deployment_id,
+            outcome=TickOutcome.PAUSED,
+            attempt=attempt,
+            error=error,
+        )
 
     def _advance(
         self,

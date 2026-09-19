@@ -355,7 +355,7 @@ Same contract philosophy as `BacktestCache`: **reads may degrade loudly, writes 
 
 | Failure | Behaviour |
 |---------|-----------|
-| **Apply fails** (order rejected, broker error) after signal computed | Retry up to **3 times** same `SCHEDULED_TS` (app). Then `SP_INS_DEPLOYMENT_SCHEDULE_STATUS` with `NEXT_SCHEDULED_TS` from GET cursor. Diary in `EXECUTION_EVENT`. |
+| **Apply fails** (order rejected, broker error) after signal computed | Retry up to **3 times** same `SCHEDULED_TS` (app). Then auto-pause: `IS_ENABLED_IND='N'` + `PAUSED` via `SP_INS_DEPLOYMENT` so the row leaves the missed-due list (decision #70). Diary in `EXECUTION_EVENT`. Does not flatten. |
 | **Exchange fetch fails** (ccxt down, rate-limited, timeout) at scheduler tick | Do **not** compute a signal on stale bars. Abort the run, write `TRADE.EXECUTION_EVENT` row with `IS_SUCCESS_IND='N'` — schedule is **not** advanced (tick did not complete). Retry on next poll; does not consume the 3-attempt budget. |
 | **Bars stale but within tolerance** (fetch OK, exchange lagging one bar) | Freshness rule (§4.4) decides: if `MAX_BAR_TIMESTAMP` is within one interval of now, proceed; otherwise treat as fetch failure above. |
 | **Gap in bars** (exchange downtime, missed ticks) | `SP_GET_PRICE_BAR` returns what exists; `PriceBarService` validates row count vs expected window and refetches the missing range (ccxt `fetch_ohlcv` accepts a `since` param). If the gap persists, fail closed as above. |
@@ -505,9 +505,9 @@ unique violation as a concurrent write.
 
 The tick runner is **application-scoped** (`app.state.schedule_sweeper`, built
 in `quant/api/main.py`). Its per-`(deployment, due time)` attempt budget lives in
-memory, and that budget is what eventually abandons a deployment that cannot
-trade so its schedule moves on. Rebuilt per request, the count would reset on
-every wakeup and a broken deployment would retry for ever.
+memory, and that budget is what eventually auto-pauses a deployment that cannot
+trade so it leaves the missed-due list (decision #70). Rebuilt per request, the
+count would reset on every wakeup and a broken deployment would retry for ever.
 
 **Local poller** (dev) — `SchedulePoller` in `quant/trade/scheduler/poller.py`
 supplies wakeups only, every `poll_interval_s` (default 60s), plus a startup
@@ -918,7 +918,7 @@ what every downstream "newest closed bar" derives from.
 | `quant/market_data/fetcher.py` | `CcxtBarFetcher` — paginated public `fetch_ohlcv` |
 | `quant/market_data/service.py` | `PriceBarService` — freshness check, gap fill, range read, `load_window` |
 | `quant/trade/bar_source.py` | `PriceBarServiceFactory` — `APP_ID` → venue → price bar service |
-| `quant/trade/scheduler/tick.py` | `ScheduleTickRunner` — due rows → apply → advance, with a cross-pass attempt budget. One interval per call |
+| `quant/trade/scheduler/tick.py` | `ScheduleTickRunner` — due rows → apply → advance, with a cross-pass attempt budget. Exhausted retries auto-pause (decision #70). One interval per call |
 | `quant/trade/scheduler/sweep.py` | `ScheduleSweeper` — one tick per interval, plus the boundary settle. Shared by the endpoint and the poller (§6.2) |
 | `quant/trade/scheduler/poller.py` | `SchedulePoller` — dev asyncio loop supplying wakeups, with a startup catch-up drain |
 | `quant/market_data/warm.py` | `BarWarmer` — the `price_bar_sync` task: scheduled instruments ∪ subscriptions → grouped `PriceBarService.sync` (§7.8) |

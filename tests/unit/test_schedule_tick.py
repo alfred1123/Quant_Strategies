@@ -38,7 +38,9 @@ def _due_row(**overrides):
     return base
 
 
-def _apply_report(*, position_qty: float) -> ApplyReport:
+def _apply_report(
+    *, position_qty: float, order_success: bool | None = None
+) -> ApplyReport:
     """A real ApplyReport, so renaming ``position_qty`` fails here."""
     return ApplyReport(
         deployment_id=uuid4(),
@@ -47,7 +49,10 @@ def _apply_report(*, position_qty: float) -> ApplyReport:
         vendor_symbol="BTCUSDT",
         signal=1.0,
         position_qty=position_qty,
-        message="no order needed (HOLD)",
+        order_success=order_success,
+        message=(
+            "insufficient funds" if order_success is False else "no order needed (HOLD)"
+        ),
     )
 
 
@@ -173,6 +178,7 @@ class TestFailureKeepsTheRowDue:
         report = _runner(repo, apply_fn).run_interval(1)
 
         repo.sp_ins_deployment_schedule_status.assert_not_called()
+        repo.write_deployment.assert_not_called()
         assert report.results[0].outcome is TickOutcome.RETRYING
         assert report.advanced == 0
 
@@ -207,12 +213,43 @@ class TestAttemptBudget:
         assert outcomes == [
             TickOutcome.RETRYING,
             TickOutcome.RETRYING,
-            TickOutcome.ABANDONED,
+            TickOutcome.PAUSED,
         ]
-        repo.sp_ins_deployment_schedule_status.assert_called_once()
+        repo.write_deployment.assert_called_once()
+        repo.sp_ins_deployment_schedule_status.assert_not_called()
 
-    def test_abandoning_still_advances_so_the_schedule_is_not_wedged(self, repo):
+    def test_exhausted_retries_disable_and_pause(self, repo):
+        row = _due_row()
+        repo.sp_get_missed_due_deployments.return_value = [row]
+        apply_fn = MagicMock(side_effect=RuntimeError("boom"))
+        runner = _runner(repo, apply_fn, max_attempts=1)
+
+        report = runner.run_interval(1)
+
+        assert report.results[0].outcome is TickOutcome.PAUSED
+        assert report.advanced == 0
+        kwargs = repo.write_deployment.call_args.kwargs
+        assert kwargs["deployment_id"] == row["deployment_id"]
+        assert kwargs["is_enabled_ind"] == "N"
+        assert kwargs["deployment_status"] == "PAUSED"
+        assert kwargs["schedule_tm_interval_id"] == row["schedule_tm_interval_id"]
+        repo.sp_ins_deployment_schedule_status.assert_not_called()
+
+    def test_rejected_order_counts_as_a_failure(self, repo):
         repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(
+            return_value=_apply_report(position_qty=0.0, order_success=False)
+        )
+        runner = _runner(repo, apply_fn, max_attempts=1)
+
+        report = runner.run_interval(1)
+
+        assert report.results[0].outcome is TickOutcome.PAUSED
+        repo.write_deployment.assert_called_once()
+
+    def test_pause_write_failure_still_advances(self, repo):
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        repo.write_deployment.side_effect = RuntimeError("db down")
         apply_fn = MagicMock(side_effect=RuntimeError("boom"))
         runner = _runner(repo, apply_fn, max_attempts=1)
 
@@ -221,6 +258,7 @@ class TestAttemptBudget:
         assert report.results[0].outcome is TickOutcome.ABANDONED
         kwargs = repo.sp_ins_deployment_schedule_status.call_args.kwargs
         assert kwargs["scheduled_ts"] == NEXT_DUE_AT
+        assert "pause failed" in report.results[0].error
 
     def test_a_new_due_time_starts_the_budget_over(self, repo):
         """Yesterday's failures must not spend today's attempts."""

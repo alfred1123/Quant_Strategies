@@ -103,15 +103,17 @@ refusing its PATCH would be refusing to disable it.
 
 **Problem:** Order failures used to block schedule advance (when anchor lived on `EXECUTION_EVENT`). With `DEPLOYMENT_SCHEDULE_STATUS`, advance policy is separate — see §9.
 
-**Retry policy (app — pending):** Same `SCHEDULED_TS`, retry up to **3 times** when apply completes but fails (order rejected, broker error). Pre-completion aborts (missing strategy, bars, credentials) stay due without consuming the retry budget and without advance. After 3 failures: `SP_INS_DEPLOYMENT_SCHEDULE_STATUS` with `NEXT_SCHEDULED_TS` from GET cursor; leave `IS_ENABLED_IND` unchanged and wait for the next interval. Failures are diary-only in `EXECUTION_EVENT`; optional `FAILED` schedule status for history via `SP_INS`.
+**Retry policy (app):** Same `SCHEDULED_TS`, retry up to **3 times** when apply raises or returns `order_success=False`. After 3 failures: auto-pause (decision #70) — `IS_ENABLED_IND='N'` and `DEPLOYMENT_STATUS='PAUSED'` via `SP_INS_DEPLOYMENT`. That write closes the schedule as `SUCCESS`, so the row leaves `SP_GET_MISSED_DUE_DEPLOYMENTS`. If the pause write itself fails, the cursor still advances to `NEXT_SCHEDULED_TS` so the slot is not wedged. Failures stay diary-only in `EXECUTION_EVENT`.
 
-**What auto-pause would resolve:**
+Pre-completion aborts (missing strategy, bars, credentials) still spend the in-memory attempt budget today — splitting those out of the budget remains open.
 
-- After **permanent** broker failure or **exhausted retries**, set `IS_ENABLED_IND='N'` and `DEPLOYMENT_STATUS='PAUSED'`.
-- Removes deployment from missed-due proc (`IS_ENABLED_IND='Y'` filter).
+**What auto-pause resolves:**
+
+- After **exhausted retries**, set `IS_ENABLED_IND='N'` and `DEPLOYMENT_STATUS='PAUSED'`.
+- Removes deployment from missed-due proc (`IS_ENABLED_IND='Y'` / not-`PAUSED` filter).
 - Ops fixes config, dry-runs, re-enables manually.
 
-**Current state:** Manual **Stop** or kill switch only. Auto-pause **not** in Python (reverted).
+**Current state:** `ScheduleTickRunner` auto-pauses on the last failed attempt. It does **not** flatten the broker position — that is §6. Manual **Stop** remains a separate, explicit disable.
 
 ---
 
@@ -202,7 +204,7 @@ netting lands.
 
 Pre-completion aborts do not call SP_INS — row stays due.
 
-**Current state:** `SchedulePoller` (dev) and `ScheduleSweeper` + `POST /api/v1/scheduler/tick` (prod) sequence the three SP calls above. The apply-time due gate, in-flight lease, and auto-pause items below remain open.
+**Current state:** `SchedulePoller` (dev) and `ScheduleSweeper` + `POST /api/v1/scheduler/tick` (prod) sequence the three SP calls above. The apply-time due gate and in-flight lease remain open. Auto-pause is decision #70.
 
 
 ---
@@ -220,7 +222,7 @@ Pre-completion aborts do not call SP_INS — row stays due.
 | Cadence must match the fitted bars | — | Done — `quant/trade/schedule_policy.py` + `GET /trade/schedule-options` ([§3](#3-schedule_tm_interval_id-and-refdata-intervals)) |
 | Apply-time due gate | — | Pending |
 | In-flight lease | — | Pending |
-| Auto-pause on failure | — | Pending |
+| Auto-pause on failure | — | Done — last failed attempt versions `PAUSED` + disabled ([#70](../decisions.md)) |
 | Pause = flatten + disable | — | Pending |
 | One deployment per credential+product slot | — | Pending |
 | `ScheduleTrigger` / EventBridge sync | Dropped | Replaced by one platform tick — [design §6.2](scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment). Application code creates no AWS schedules |

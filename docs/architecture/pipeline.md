@@ -102,7 +102,7 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/trade/account.py` | `fetch_account_snapshot()` | Live balances and positions from the exchange. |
 | `quant/trade/registry.py` | `AdapterRegistry` | Resolves `APP_ID` → ccxt/Futu adapter. |
 | `quant/trade/scheduler/sweep.py` | `ScheduleSweeper` | Hourly platform tick — one pass per interval. |
-| `quant/trade/scheduler/tick.py` | `ScheduleTickRunner` | Apply one due deployment per interval pass. |
+| `quant/trade/scheduler/tick.py` | `ScheduleTickRunner` | Apply one due deployment per interval pass. Three failed applies auto-pause the deployment. |
 | `quant/market_data/warm.py` | `BarWarmer`, `InstrumentSource` | Pre-fetch bars for every series a deployment or a subscription wants. |
 | `quant/market_data/subscriptions.py` | `BarSubscriptionRepo`, `BarSubscriptionService` | Capture requests with no deployment behind them, plus coverage and backfill. |
 | `quant/strategy/live_service.py` | `bars_loader`, `load_window` | Live signal computation from `MARKET_DATA.PRICE_BAR`. |
