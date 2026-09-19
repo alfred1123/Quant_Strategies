@@ -28,5 +28,6 @@
     -->
 
     <include file="releases/1.24.0-signal-type-long-only.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.25.0-app-apply-timing.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

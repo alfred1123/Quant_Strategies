@@ -4,7 +4,7 @@
     **Design — Phase 1.9.** Covers automated trade scheduling via EventBridge and normalized price bars for live signal computation. Backtest cache versioning stays in the application layer (`BacktestCache.refresh_payload`).
 
 **Parent:** [Plan to Profit](plan-to-profit.md) Phase 1.9  
-**Related:** [Trade Deployment Rollout](trade-deployment-rollout.md), [Live Order Execution](live-order-execution.md), [Separate Underlying & Cache](separate-underlying.md), [Open questions (scheduler & trade)](scheduler-trade-open-questions.md)
+**Related:** [Trade Deployment Rollout](trade-deployment-rollout.md), [Live Order Execution](live-order-execution.md), [Separate Underlying & Cache](separate-underlying.md), [Open questions (scheduler & trade)](scheduler-trade-open-questions.md), [ccxt bar timezones & apply timing](ccxt-bar-timezones.md)
 
 ---
 
@@ -366,7 +366,7 @@ Same contract philosophy as `BacktestCache`: **reads may degrade loudly, writes 
 | **Crash after insert, before apply** | Coverage shows new bars — skip fetch/insert, re-run apply. |
 | **Duplicate insert** | `SP_INS_PRICE_BAR` stays a plain INSERT and reports `unique_violation` — the SP does not hide it. `PriceBarService` treats **that one SQLSTATE (23505)** as a lost race and moves on; any other `ProcedureError` propagates. Deployments sharing an instrument and interval fire at the same boundary, so several legitimately decide the same bar is missing before any of them writes; the winner stored the same bar the losers fetched. That last clause only holds because `SOURCE_APP_ID` is in the key (decision #47) — a conflict therefore means the *same venue's* same bar. Venue-blind, this same swallow would quietly adopt another exchange's print. A genuine double-insert is already ruled out by the missing-set calculation, so absorbing it here costs no real safety. |
 | **DB write fails after successful fetch** | Propagates (same as `BacktestCache.refresh_payload` contract). The scheduler run fails loudly; no order is placed on unpersisted data. |
-| **Timezone bugs** | Everything is `TIMESTAMPTZ` stored UTC; `BAR_TIMESTAMP` is the bar **open** time. Python side uses tz-aware UTC (`pd.Timestamp` convention already enforced by `BacktestCache._to_utc`). |
+| **Timezone bugs** | Everything is `TIMESTAMPTZ` stored UTC; `BAR_TIMESTAMP` is the bar **open** time. Python side uses tz-aware UTC (`pd.Timestamp` convention already enforced by `BacktestCache._to_utc`). ccxt returns open time in UTC; crypto dailies align to **00:00 UTC**. See [ccxt bar timezones](ccxt-bar-timezones.md). |
 
 ---
 
@@ -503,6 +503,17 @@ exactly on the boundary: delivery a few milliseconds early would answer "not yet
 and wait a whole interval. Overlap is safe regardless — the bar insert treats a
 unique violation as a concurrent write.
 
+!!! warning "Cursor phase vs cron (planned fix)"
+    Cron and settle target **`:05` after each bar close**, but `SP_INS_DEPLOYMENT`
+    still seeds `SCHEDULED_TS` from **deploy time**, so a daily deployment can be
+    due at `14:37 UTC` while bars close at `00:00 UTC`. Signal math is bar-aligned;
+    the trigger clock is not.     **ASAP fix:** seed and backfill `SCHEDULED_TS` at
+    `floor_to_period + EXECUTE_OFFSET` from `REFDATA.APP_APPLY_TIMING` (session
+    from `MARKET_CALENDAR` via the product's `LISTING_EXCHANGE`) via
+    `next_apply_slot()` — see
+    [ccxt bar timezones — Plan](ccxt-bar-timezones.md#plan-align-apply-clock-to-bar-close-asap)
+    and [open questions §10](scheduler-trade-open-questions.md#10-align-scheduled_ts-to-bar-close).
+
 The tick runner is **application-scoped** (`app.state.schedule_sweeper`, built
 in `quant/api/main.py`). Its per-`(deployment, due time)` attempt budget lives in
 memory, and that budget is what eventually auto-pauses a deployment that cannot
@@ -570,7 +581,8 @@ slow warm costs a redundant fetch, never a bad trade.
 `PriceBarService` computes its target as `last_closed_bar(now, period)`, so any
 firing time within the same closed interval resolves to the same bar. The 10s
 warm settle and the `:05` apply offset are about exchange publish latency and
-ordering, not changing which bar is targeted.
+ordering, not changing which bar is targeted. Why that matches “trade after the
+bar closes” is spelled out in [ccxt bar timezones](ccxt-bar-timezones.md).
 
 This applies to the EventBridge path. The local poller's ~60s cycle is naturally
 offset; `ScheduleSweeper` uses `settle_s=0` there.

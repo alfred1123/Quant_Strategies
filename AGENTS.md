@@ -108,6 +108,8 @@ All UI dropdown, radio, and selectbox values must come from `REFDATA` tables in 
 | Grid defaults | `REFDATA.INDICATOR` | — | `WIN_MIN`, `WIN_MAX`, `WIN_STEP`, `SIG_MIN`, `SIG_MAX`, `SIG_STEP` (same table). `WIN_*` are daily-bar counts; the drawer scales them by the interval's bars-per-day. |
 | Promotion state | `REFDATA.PROMOTION_STATE` | `DISPLAY_NAME` | `NAME` |
 | Promotion rules (gates + soft metrics) | `REFDATA.PROMOTION_METRIC` | `DISPLAY_NAME` | `NAME` (also `METRIC_KEY`, `REQUIREMENT_TYPE`, `PRIORITY`, `THRESHOLD`) |
+| Listing session calendar | `REFDATA.MARKET_CALENDAR` | — | `LISTING_EXCHANGE`, `BAR_TIMEZONE`, `MARKET_*` (via `get_market_calendar()`; `''` = default crypto; not a UI dropdown) |
+| Scheduled apply offset (broker × cadence) | `REFDATA.APP_APPLY_TIMING` | — | `EXECUTE_OFFSET` (via `get_execute_offset()` / `get_apply_timing()`) |
 
 The `INDICATOR_DEFAULTS` dict in `quant/strategy/signals.py` is a **legacy fallback** — grid defaults should come from `REFDATA.INDICATOR` via `RedisRefData.get_indicator_defaults()`.
 

@@ -481,6 +481,23 @@ See [Scheduler & Price Bars](scheduler-price-bars.md) for the full design.
 
 **Promotion runbook:** [Live Trading Promotion](../guides/live-trading-promotion.md) — Slack ops channel and Bybit mainnet cutover.
 
+#### 1.9.1 — Align apply clock to bar close
+
+**Depends on:** 1.9 (scheduler + price bars). **Blocks:** trustworthy daily live runs at bar close (2.2 Sharpe comparisons assume the apply uses the bar that just closed, not a random wall-clock phase).
+
+Cron is already correct (`price_bar_sync` at `:00`, `trade_apply_tick` at `:05` UTC). The gap is **`SCHEDULED_TS` phase**: deploy time seeds the cursor, so dailies can fire mid-session while ccxt dailies close at UTC midnight. See [ccxt bar timezones — Plan](ccxt-bar-timezones.md#plan-align-apply-clock-to-bar-close-asap).
+
+**Tasks**
+
+- [x] REFDATA: `MARKET_CALENDAR` (by `LISTING_EXCHANGE`) + `APP_APPLY_TIMING` (by broker × cadence) — `1.25.0`, `context="refdata"`.
+- [ ] Python: `get_market_calendar()` / `get_execute_offset()` / `get_apply_timing()` (done) + `next_apply_slot(after, period, offset)` + unit tests.
+- [ ] DDL: optional `IN_INITIAL_SCHEDULED_TS` on `SP_INS_DEPLOYMENT` (Liquibase `context="bt"`).
+- [ ] App: pass aligned slot on create, schedule change, and unpause (`TradeRepo` / `TradeService`) using deployment `APP_ID`.
+- [ ] Ops: one-time backfill script for existing `PENDING` schedules (`scripts/realign_schedule_phase.py` or admin route).
+- [ ] Decision **#71** when shipped; migrate REFDATA locally, refresh Redis, then app deploy + backfill (add `prod-deploy` to REFDATA release when ready).
+
+**Exit criteria:** A `DAILY` deployment created at any wall time shows `next_due_at` at the next `00:05 UTC`; prod applies for dailies cluster on the `00:05` tick pass, not deploy-phase hours.
+
 ---
 
 ### Phase 2 — Prove profitability

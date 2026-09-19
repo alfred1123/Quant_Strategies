@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.25.0-001-create-market-calendar" author="alfcheun" context="refdata,prod-deploy">
+        <comment>REFDATA.MARKET_CALENDAR — listing venue session calendar (no APP_ID)</comment>
+        <sqlFile path="../tables/MARKET_CALENDAR.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="1.25.0-002-create-app-apply-timing" author="alfcheun" context="refdata,prod-deploy">
+        <comment>REFDATA.APP_APPLY_TIMING — broker × interval execute offset after bar close</comment>
+        <sqlFile path="../tables/APP_APPLY_TIMING.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="1.25.0-003-seed-market-calendar" author="alfcheun" context="refdata,prod-deploy">
+        <comment>Default row LISTING_EXCHANGE='' — UTC 24/7 crypto / NULL EXCHANGE products</comment>
+        <sqlFile path="../data/MARKET_CALENDAR.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="1.25.0-004-seed-app-apply-timing" author="alfcheun" context="refdata,prod-deploy">
+        <comment>Seed Bybit/Binance × DAILY/1H at 5 min</comment>
+        <sqlFile path="../data/APP_APPLY_TIMING.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+</databaseChangeLog>

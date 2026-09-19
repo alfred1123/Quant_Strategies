@@ -7,8 +7,91 @@ import pytest
 from quant.refdata.reader import RedisRefData
 
 
+def _timing_reader(calendar_rows, timing_rows):
+    instance = RedisRefData.__new__(RedisRefData)
+
+    def get(table):
+        if table == "market_calendar":
+            return calendar_rows
+        if table == "app_apply_timing":
+            return timing_rows
+        raise AssertionError(f"unexpected table {table!r}")
+
+    instance.get = get
+    return instance
+
+
+class TestGetMarketCalendar:
+    def test_default_crypto_calendar(self):
+        reader = _timing_reader(
+            [
+                {
+                    "listing_exchange": "",
+                    "bar_timezone": "UTC",
+                    "market_open_time": None,
+                    "market_close_time": None,
+                }
+            ],
+            [],
+        )
+        cal = reader.get_market_calendar()
+        assert cal["listing_exchange"] == ""
+        assert cal["bar_timezone"] == "UTC"
+
+    def test_listing_venue_calendar(self):
+        reader = _timing_reader(
+            [
+                {
+                    "listing_exchange": "HKEX",
+                    "bar_timezone": "Asia/Hong_Kong",
+                    "market_open_time": "09:30:00",
+                    "market_close_time": "16:00:00",
+                }
+            ],
+            [],
+        )
+        cal = reader.get_market_calendar(listing_exchange="HKEX")
+        assert cal["bar_timezone"] == "Asia/Hong_Kong"
+
+    def test_missing_row_raises(self):
+        reader = _timing_reader([], [])
+        with pytest.raises(RuntimeError, match="MARKET_CALENDAR missing LISTING_EXCHANGE='HKEX'"):
+            reader.get_market_calendar(listing_exchange="HKEX")
+
+
+class TestGetExecuteOffset:
+    def test_resolves_offset_from_apply_timing(self):
+        reader = _timing_reader(
+            [],
+            [{"app_id": 34, "tm_interval_id": 1, "execute_offset": "0:05:00"}],
+        )
+        assert reader.get_execute_offset(34, 1) == timedelta(minutes=5)
+
+    def test_missing_row_raises(self):
+        reader = _timing_reader([], [])
+        with pytest.raises(RuntimeError, match="APP_APPLY_TIMING missing APP_ID=99"):
+            reader.get_execute_offset(99, 1)
+
+
+class TestGetApplyTiming:
+    def test_merges_listing_calendar_and_broker_offset(self):
+        reader = _timing_reader(
+            [
+                {
+                    "listing_exchange": "",
+                    "bar_timezone": "UTC",
+                    "market_open_time": None,
+                    "market_close_time": None,
+                }
+            ],
+            [{"app_id": 34, "tm_interval_id": 1, "execute_offset": "0:05:00"}],
+        )
+        timing = reader.get_apply_timing(34, 1)
+        assert timing["execute_offset"] == timedelta(minutes=5)
+        assert timing["bar_timezone"] == "UTC"
+
+
 def _reader(rows):
-    """A reader with its Redis-backed ``get`` stubbed out."""
     instance = RedisRefData.__new__(RedisRefData)
     instance.get = lambda table: rows if table == "tm_interval" else []
     return instance
@@ -16,7 +99,6 @@ def _reader(rows):
 
 class TestGetIntervalPeriod:
     def test_parses_the_stringified_interval_from_redis(self):
-        """The publisher's json.dumps(default=str) leaves PERIOD_LENGTH as text."""
         reader = _reader(
             [
                 {"tm_interval_id": 1, "name": "DAILY", "period_length": "1 day, 0:00:00"},
@@ -27,7 +109,6 @@ class TestGetIntervalPeriod:
         assert reader.get_interval_period(2) == timedelta(hours=1)
 
     def test_accepts_a_raw_timedelta(self):
-        """A row read straight from psycopg carries a timedelta, not text."""
         reader = _reader([{"tm_interval_id": 2, "period_length": timedelta(hours=1)}])
         assert reader.get_interval_period(2) == timedelta(hours=1)
 
@@ -42,8 +123,6 @@ class TestGetIntervalPeriod:
 
 
 class TestResolveIntervalId:
-    """The inverse lookup — period → id, ids never hardcoded."""
-
     def test_resolves_the_id_for_a_period(self):
         reader = _reader(
             [
@@ -61,8 +140,6 @@ class TestResolveIntervalId:
 
 
 class TestIntervalIds:
-    """The set the scheduler sweeps."""
-
     def test_ordered_shortest_period_first(self):
         reader = _reader(
             [

@@ -115,6 +115,7 @@ nav:
       - Best-VID Promotion: design/best-vid-promotion.md
       - Trade Deployment Rollout: design/trade-deployment-rollout.md
       - ccxt Trade & XREF Validation: design/ccxt-trade-and-xref-validation.md
+      - ccxt Bar Timezones & Apply Timing: design/ccxt-bar-timezones.md
       - Live Order Execution: design/live-order-execution.md
       - Scheduler, Price Bars & Consolidation: design/scheduler-price-bars.md
       - Scheduler & Trade Open Questions: design/scheduler-trade-open-questions.md

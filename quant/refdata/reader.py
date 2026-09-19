@@ -126,6 +126,63 @@ class RedisRefData:
         rows = self.get("promotion_metric")
         return sorted(rows, key=lambda r: int(r.get("priority", 999)))
 
+    @staticmethod
+    def _listing_exchange_key(listing_exchange: str | None) -> str:
+        """Normalize ``INST.PRODUCT.EXCHANGE`` (``''`` when NULL — default crypto calendar)."""
+        return (listing_exchange or "").strip()
+
+    @staticmethod
+    def _format_market_calendar(row: dict) -> dict:
+        return {
+            "listing_exchange": str(row.get("listing_exchange") or ""),
+            "bar_timezone": str(row["bar_timezone"]),
+            "market_open_time": row.get("market_open_time"),
+            "market_close_time": row.get("market_close_time"),
+        }
+
+    def get_market_calendar(self, *, listing_exchange: str | None = None) -> dict:
+        """Session calendar for a listing venue (``REFDATA.MARKET_CALENDAR``).
+
+        *listing_exchange* is ``INST.PRODUCT.EXCHANGE``; ``None`` / empty selects
+        the default row (``LISTING_EXCHANGE = ''``) used by ``.crypto`` products.
+        """
+        listing_key = self._listing_exchange_key(listing_exchange)
+        for r in self.get("market_calendar"):
+            if str(r.get("listing_exchange") or "") == listing_key:
+                return self._format_market_calendar(r)
+        raise RuntimeError(
+            f"REFDATA.MARKET_CALENDAR missing LISTING_EXCHANGE={listing_key!r}"
+        )
+
+    def get_execute_offset(self, app_id: int, tm_interval_id: int) -> timedelta:
+        """Delay after bar close for broker + schedule cadence."""
+        for r in self.get("app_apply_timing"):
+            if int(r["app_id"]) == int(app_id) and int(r["tm_interval_id"]) == int(
+                tm_interval_id
+            ):
+                return parse_period(r["execute_offset"])
+        raise RuntimeError(
+            "REFDATA.APP_APPLY_TIMING missing "
+            f"APP_ID={app_id} TM_INTERVAL_ID={tm_interval_id}"
+        )
+
+    def get_apply_timing(
+        self,
+        app_id: int,
+        tm_interval_id: int,
+        *,
+        listing_exchange: str | None = None,
+    ) -> dict:
+        """Merged listing calendar + broker execute offset for scheduled apply.
+
+        Calendar comes from the product's listing venue; offset from the broker.
+        See ``docs/design/ccxt-bar-timezones.md``.
+        """
+        return {
+            **self.get_market_calendar(listing_exchange=listing_exchange),
+            "execute_offset": self.get_execute_offset(app_id, tm_interval_id),
+        }
+
     def get_interval_period(self, tm_interval_id: int) -> timedelta:
         """``PERIOD_LENGTH`` for a ``TM_INTERVAL_ID``, as a timedelta.
 
