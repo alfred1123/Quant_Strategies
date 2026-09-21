@@ -79,6 +79,7 @@ The deploy workflow uses **path filters** (`.github/workflows/deploy.yml`):
 - `quant-app` builds **without waiting on the frontend job** — a TypeScript failure no longer blocks a Python-only push.
 - `DEPLOY_APP` is also set when **`build-app` succeeded** in the same run (not only when `quant/**` changed in the path filter).
 - `REFRESH_REFDATA` republishes Redis after a REFDATA Liquibase migrate when `quant-app` was not redeployed.
+- `aws/scripts/verify-https.sh` **retries the Cloudflare edge probe** (`EDGE_RETRIES`, default 10 × 6 s) instead of failing on the first non-200. Cloudflare returns **522** for a few seconds while it re-opens a connection to the origin after nginx restarts, which had been marking successful deploys as failed — the image was already live. The origin probe ahead of it stays single-shot: if the origin itself is not serving, there is nothing to wait for.
 
 **Failure mode:** push A changes `quant/` but **CI fails** on the frontend job
 (e.g. TypeScript error) → **no `quant-app` image** is pushed. Push B fixes only

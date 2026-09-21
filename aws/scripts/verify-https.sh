@@ -9,6 +9,8 @@
 #   APP_ENV=prod             (SSM prefix /quant/<env>/)
 #   AWS_REGION=ap-southeast-1
 #   SKIP_EDGE=true           (origin TLS only — skip Cloudflare edge checks)
+#   EDGE_RETRIES=10          (edge attempts before failing — covers nginx restart)
+#   EDGE_RETRY_DELAY=6       (seconds between edge attempts)
 set -euo pipefail
 
 DOMAIN="${DOMAIN:-}"
@@ -60,6 +62,28 @@ curl_code() {
   curl -sS -o /dev/null -w '%{http_code}' --max-time "$1" "${@:2}"
 }
 
+# Cloudflare answers 52x while it re-establishes a connection to the origin,
+# which happens routinely in the seconds after nginx restarts onto a new image.
+# The origin checks above already proved the stack is serving, so a single edge
+# blip must not fail a deploy that succeeded. Progress goes to stderr so it does
+# not land in the captured status code.
+retry_code() {
+  local expect="$1" timeout="$2" url="$3"
+  local attempts="${EDGE_RETRIES:-10}" delay="${EDGE_RETRY_DELAY:-6}"
+  local code i
+  for ((i = 1; i <= attempts; i++)); do
+    code="$(curl_code "$timeout" "$url")"
+    if [[ ",${expect}," == *",${code},"* ]]; then
+      printf '%s' "$code"
+      return 0
+    fi
+    echo "[verify-https] ${url} → HTTP ${code} (attempt ${i}/${attempts}), retrying in ${delay}s" >&2
+    sleep "$delay"
+  done
+  printf '%s' "$code"
+  return 1
+}
+
 # Cloudflare Origin Certificates are signed by Cloudflare Origin CA — trusted by
 # the Cloudflare edge in Full (strict), not by the public CA bundle curl uses.
 # Direct-to-origin checks skip chain verification (-k) but still require TLS + HTTP 200.
@@ -107,13 +131,12 @@ main() {
     return 0
   fi
 
-  code="$(curl_code 30 "https://${DOMAIN}/health")"
-  [[ "$code" == "200" ]] || die "Edge HTTPS https://${DOMAIN}/health returned HTTP ${code} (expected 200)"
+  code="$(retry_code 200 30 "https://${DOMAIN}/health")" \
+    || die "Edge HTTPS https://${DOMAIN}/health returned HTTP ${code} after ${EDGE_RETRIES:-10} attempts (expected 200)"
   log "Edge HTTPS: OK (HTTP 200)"
 
-  code="$(curl_code 30 "http://${DOMAIN}/health")"
-  [[ "$code" == "301" || "$code" == "308" ]] \
-    || die "HTTP http://${DOMAIN}/health returned HTTP ${code} (expected 301 or 308 redirect)"
+  code="$(retry_code 301,308 30 "http://${DOMAIN}/health")" \
+    || die "HTTP http://${DOMAIN}/health returned HTTP ${code} after ${EDGE_RETRIES:-10} attempts (expected 301 or 308 redirect)"
   log "HTTP → HTTPS redirect: OK (HTTP ${code})"
 }
 
