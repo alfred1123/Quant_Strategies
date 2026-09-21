@@ -224,9 +224,9 @@ Pre-completion aborts do not call SP_INS — row stays due.
 | **`next_apply_slot()` in `quant/shared/intervals.py`** | `floor_to_period + execute_offset` from REFDATA. |
 | **Seed on create / reschedule / unpause** | `SP_INS_DEPLOYMENT` accepts optional `IN_INITIAL_SCHEDULED_TS`; Python passes aligned slot using deployment `APP_ID` + schedule interval. |
 | **Advance unchanged** | `NEXT_SCHEDULED_TS = SCHEDULED_TS + PERIOD_LENGTH` keeps execute phase forever. |
-| **One-time backfill** | Ops script moves existing `PENDING` rows to `next_apply_slot(now(), period, offset)`. |
+| **One-time backfill** | Ops run `scripts/realign_schedule_phase.sql` (`UPDATE` current `PENDING` cursor); not embedded in Liquibase `prod-deploy`. |
 
-**Current state:** REFDATA table + reader **staged** (`1.25.0`, `context="refdata"`). App wiring pending — full step list in [ccxt bar timezones — Plan](ccxt-bar-timezones.md#plan-align-apply-clock-to-bar-close-asap). EventBridge cron and `DEFAULT_SETTLE_S` need no change while offsets stay ≤ 5 minutes.
+**Current state:** REFDATA `1.25.0` + app wiring (`next_apply_slot`, `IN_INITIAL_SCHEDULED_TS`, `TradeService`) ship with TRADE `1.7.0`. After deploy, run `scripts/realign_schedule_phase.sql` once per env to `UPDATE` existing cursors. EventBridge cron and `DEFAULT_SETTLE_S` need no change while offsets stay ≤ 5 minutes.
 
 **Not in scope here:** Daily-only EventBridge rule (optional later); per-venue boundary probe test.
 
@@ -246,7 +246,7 @@ Pre-completion aborts do not call SP_INS — row stays due.
 | Apply-time due gate | — | Pending |
 | In-flight lease | — | Pending |
 | Auto-pause on failure | — | Done — last failed attempt versions `PAUSED` + disabled ([#70](../decisions.md)) |
-| Align `SCHEDULED_TS` to bar close + exchange offset | `MARKET_CALENDAR` + `APP_APPLY_TIMING` + optional `IN_INITIAL_SCHEDULED_TS` | Partial — REFDATA `1.25.0` staged; app seed/backfill pending ([§10](#10-align-scheduled_ts-to-bar-close), [plan](ccxt-bar-timezones.md#plan-align-apply-clock-to-bar-close-asap)) |
+| Align `SCHEDULED_TS` to bar close + exchange offset | `MARKET_CALENDAR` + `APP_APPLY_TIMING` + optional `IN_INITIAL_SCHEDULED_TS` | Done in code — prod needs TRADE `1.7.0` + app deploy + one-time backfill ([§10](#10-align-scheduled_ts-to-bar-close), [plan](ccxt-bar-timezones.md#plan-align-apply-clock-to-bar-close-asap)) |
 | Pause = flatten + disable | — | Pending |
 | One deployment per credential+product slot | — | Pending |
 | `ScheduleTrigger` / EventBridge sync | Dropped | Replaced by one platform tick — [design §6.2](scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment). Application code creates no AWS schedules |

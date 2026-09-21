@@ -26,6 +26,7 @@ from quant.trade.dry_run import run_dry_run
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
 from quant.trade.live_apply import LiveApplyOrchestrator
 from quant.trade.registry import AdapterRegistry
+from quant.trade.schedule_align import compute_initial_scheduled_ts, should_realign_schedule
 from quant.trade.schedule_policy import require_fitted_interval, schedulable_interval_ids
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,13 @@ class TradeService:
             req.schedule_tm_interval_id, refdata=self._data_caches.refdata
         )
         deployment_id = req.deployment_id or uuid.uuid4()
+        initial_ts = None
+        if req.schedule_tm_interval_id is not None:
+            initial_ts = compute_initial_scheduled_ts(
+                refdata=self._data_caches.refdata,
+                app_id=req.app_id,
+                schedule_tm_interval_id=req.schedule_tm_interval_id,
+            )
         row = self._repo.sp_ins_deployment(
             deployment_id=deployment_id,
             app_user_id=app_user_id,
@@ -86,6 +94,7 @@ class TradeService:
             user_id=user_id,
             confirm_live=req.confirm_live,
             schedule_tm_interval_id=req.schedule_tm_interval_id,
+            initial_scheduled_ts=initial_ts,
         )
         return DeploymentRow.model_validate(row)
 
@@ -124,6 +133,18 @@ class TradeService:
             require_fitted_interval(
                 req.schedule_tm_interval_id, refdata=self._data_caches.refdata
             )
+        schedule_tm_interval_id = (
+            req.schedule_tm_interval_id
+            if "schedule_tm_interval_id" in req.model_fields_set
+            else current.schedule_tm_interval_id
+        )
+        initial_ts = None
+        if should_realign_schedule(current, req) and schedule_tm_interval_id is not None:
+            initial_ts = compute_initial_scheduled_ts(
+                refdata=self._data_caches.refdata,
+                app_id=current.app_id,
+                schedule_tm_interval_id=schedule_tm_interval_id,
+            )
         row = self._repo.write_deployment(
             deployment_id=deployment_id,
             app_user_id=app_user_id,
@@ -141,11 +162,8 @@ class TradeService:
             ),
             deployment_status=req.deployment_status or current.deployment_status,
             user_id=str(app_user_id),
-            schedule_tm_interval_id=(
-                req.schedule_tm_interval_id
-                if "schedule_tm_interval_id" in req.model_fields_set
-                else current.schedule_tm_interval_id
-            ),
+            schedule_tm_interval_id=schedule_tm_interval_id,
+            initial_scheduled_ts=initial_ts,
         )
         return DeploymentRow.model_validate(row)
 

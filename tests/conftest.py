@@ -6,6 +6,20 @@ from quant.refdata.reader import RedisRefData
 
 #: Shaped like the Redis snapshot: PERIOD_LENGTH arrives stringified, because
 #: the publisher serialises Postgres intervals with ``json.dumps(default=str)``.
+MARKET_CALENDAR_ROWS = [
+    {
+        "listing_exchange": "",
+        "bar_timezone": "UTC",
+        "market_open_time": None,
+        "market_close_time": None,
+    }
+]
+
+APP_APPLY_TIMING_ROWS = [
+    {"app_id": 10, "tm_interval_id": 1, "execute_offset": "0:05:00"},
+    {"app_id": 10, "tm_interval_id": 2, "execute_offset": "0:05:00"},
+]
+
 TM_INTERVAL_ROWS = [
     {
         "tm_interval_id": 1,
@@ -35,8 +49,13 @@ class StubRefData(RedisRefData):
         self._rows = TM_INTERVAL_ROWS if rows is None else rows
 
     def get(self, table: str) -> list[dict]:
-        assert table == "tm_interval"
-        return self._rows
+        if table == "tm_interval":
+            return self._rows
+        if table == "market_calendar":
+            return MARKET_CALENDAR_ROWS
+        if table == "app_apply_timing":
+            return APP_APPLY_TIMING_ROWS
+        raise AssertionError(f"unexpected REFDATA table {table!r}")
 
 
 @pytest.fixture

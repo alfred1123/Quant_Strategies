@@ -41,6 +41,9 @@ def svc():
     # Real reader over a fixed snapshot, so the cadence guard resolves ids the
     # way it does in production instead of against a mock that always agrees.
     data_caches.refdata = StubRefData()
+    data_caches.instrument_cache.get_product_by_cusip.return_value = {
+        "exchange": None,
+    }
     return TradeService(
         repo=MagicMock(),
         bt=MagicMock(),
@@ -106,6 +109,7 @@ class TestCreateDeployment:
         assert result.schedule_tm_interval_id == 1
         kwargs = svc._repo.sp_ins_deployment.call_args.kwargs
         assert kwargs["schedule_tm_interval_id"] == 1
+        assert kwargs["initial_scheduled_ts"] is not None
 
     def test_cadence_the_strategy_was_not_fitted_on_is_refused(self, svc):
         """Hourly bars through daily-fitted parameters would trade silently."""

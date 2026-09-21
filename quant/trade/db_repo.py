@@ -281,16 +281,18 @@ class TradeRepo(DbGateway):
         deployment_status: str,
         user_id: str,
         schedule_tm_interval_id: int | None = None,
+        initial_scheduled_ts: datetime | None = None,
     ) -> dict:
         """Raw SP_INS_DEPLOYMENT call + read-back — used by create and update.
 
         schedule_tm_interval_id NULL = manual-only; no scheduler row is created.
+        initial_scheduled_ts sets the first/next PENDING cursor (bar-close aligned).
         """
         self._call_write(
             "CALL trade.sp_ins_deployment("
             "%s::uuid, %s::uuid, %s::uuid, %s::integer, %s::integer, %s::integer,"
             " %s::text, %s::numeric, %s::char(1), %s::char(1), %s::text,"
-            " %s::integer, %s::text,"
+            " %s::integer, %s::text, %s::timestamptz,"
             " NULL::text, NULL::text, NULL::text)",
             (
                 str(deployment_id),
@@ -310,6 +312,7 @@ class TradeRepo(DbGateway):
                     else None
                 ),
                 user_id,
+                initial_scheduled_ts,
             ),
         )
         rows = self.sp_get_deployment(
@@ -339,6 +342,7 @@ class TradeRepo(DbGateway):
         user_id: str,
         confirm_live: bool = False,
         schedule_tm_interval_id: int | None = None,
+        initial_scheduled_ts: datetime | None = None,
     ) -> dict:
         self.validate_create_deployment(
             deployment_id=deployment_id,
@@ -369,6 +373,7 @@ class TradeRepo(DbGateway):
             deployment_status=deployment_status,
             user_id=user_id,
             schedule_tm_interval_id=schedule_tm_interval_id,
+            initial_scheduled_ts=initial_scheduled_ts,
         )
 
     def sp_ins_execution_event(

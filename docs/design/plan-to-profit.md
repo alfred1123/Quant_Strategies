@@ -490,11 +490,11 @@ Cron is already correct (`price_bar_sync` at `:00`, `trade_apply_tick` at `:05` 
 **Tasks**
 
 - [x] REFDATA: `MARKET_CALENDAR` (by `LISTING_EXCHANGE`) + `APP_APPLY_TIMING` (by broker × cadence) — `1.25.0`, `context="refdata"`.
-- [ ] Python: `get_market_calendar()` / `get_execute_offset()` / `get_apply_timing()` (done) + `next_apply_slot(after, period, offset)` + unit tests.
-- [ ] DDL: optional `IN_INITIAL_SCHEDULED_TS` on `SP_INS_DEPLOYMENT` (Liquibase `context="bt"`).
-- [ ] App: pass aligned slot on create, schedule change, and unpause (`TradeRepo` / `TradeService`) using deployment `APP_ID`.
-- [ ] Ops: one-time backfill script for existing `PENDING` schedules (`scripts/realign_schedule_phase.py` or admin route).
-- [ ] Decision **#71** when shipped; migrate REFDATA locally, refresh Redis, then app deploy + backfill (add `prod-deploy` to REFDATA release when ready).
+- [x] Python: `get_market_calendar()` / `get_execute_offset()` / `get_apply_timing()` + `next_apply_slot(after, period, offset)` + unit tests.
+- [x] DDL: optional `IN_INITIAL_SCHEDULED_TS` on `SP_INS_DEPLOYMENT` (Liquibase `1.7.0`, `context="trade,prod-deploy"`).
+- [x] App: pass aligned slot on create, schedule change, and unpause (`TradeRepo` / `TradeService`) using deployment `APP_ID`.
+- [x] Ops: one-time backfill for existing `PENDING` schedules (`scripts/realign_schedule_phase.sql` — `UPDATE` current row).
+- [x] Decision **#71**; prod: approve TRADE `1.7.0` migrate, deploy `quant-app`, refresh Redis, run backfill script (REFDATA `1.25.0` + `prod-deploy` when not yet live).
 
 **Exit criteria:** A `DAILY` deployment created at any wall time shows `next_due_at` at the next `00:05 UTC`; prod applies for dailies cluster on the `00:05` tick pass, not deploy-phase hours.
 

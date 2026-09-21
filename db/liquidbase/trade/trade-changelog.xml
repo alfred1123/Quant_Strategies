@@ -26,6 +26,6 @@
       stays in git and prod keeps the old definition.
     -->
 
-    <!-- Nothing pending. -->
+    <include file="releases/1.7.0-schedule-initial-ts.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

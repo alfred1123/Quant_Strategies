@@ -503,14 +503,15 @@ exactly on the boundary: delivery a few milliseconds early would answer "not yet
 and wait a whole interval. Overlap is safe regardless — the bar insert treats a
 unique violation as a concurrent write.
 
-!!! warning "Cursor phase vs cron (planned fix)"
-    Cron and settle target **`:05` after each bar close**, but `SP_INS_DEPLOYMENT`
-    still seeds `SCHEDULED_TS` from **deploy time**, so a daily deployment can be
-    due at `14:37 UTC` while bars close at `00:00 UTC`. Signal math is bar-aligned;
-    the trigger clock is not.     **ASAP fix:** seed and backfill `SCHEDULED_TS` at
-    `floor_to_period + EXECUTE_OFFSET` from `REFDATA.APP_APPLY_TIMING` (session
-    from `MARKET_CALENDAR` via the product's `LISTING_EXCHANGE`) via
-    `next_apply_slot()` — see
+!!! note "Cursor phase vs cron"
+    Cron and settle target **`:05` after each bar close**, and `SCHEDULED_TS` now
+    seeds to match: `next_apply_slot()` returns `floor_to_period + EXECUTE_OFFSET`
+    from `REFDATA.APP_APPLY_TIMING`, passed into `SP_INS_DEPLOYMENT` as
+    `IN_INITIAL_SCHEDULED_TS` on create, cadence change, re-enable, and unpause
+    ([decision #71](../decisions.md)). Before this, a deployment created at
+    `14:37 UTC` stayed due at `14:37` daily while its bars closed at `00:00`.
+    Existing cursors are corrected once per environment with
+    `scripts/realign_schedule_phase.sql` — see
     [ccxt bar timezones — Plan](ccxt-bar-timezones.md#plan-align-apply-clock-to-bar-close-asap)
     and [open questions §10](scheduler-trade-open-questions.md#10-align-scheduled_ts-to-bar-close).
 

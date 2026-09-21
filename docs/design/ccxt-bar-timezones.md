@@ -226,7 +226,7 @@ Compare with `MARKET_DATA.PRICE_BAR` for the same product:
 
 ## Plan — align apply clock to bar close (ASAP)
 
-**Status:** planned, not implemented. **Priority:** do this before adding a daily-only EventBridge rule — the hourly `:05` sweep already works once the cursor phase matches.
+**Status:** implemented in code ([decision #71](../decisions.md)); prod still needs the TRADE `1.7.0` migrate, a `quant-app` deploy, and the one-time backfill. A daily-only EventBridge rule remains unnecessary — the hourly `:05` sweep works now that the cursor phase matches.
 
 ### Problem
 
@@ -279,14 +279,14 @@ Three layers — do not conflate them:
 
 1. **ccxt bar timestamp** — always UTC ms at **candle open**; Bybit/Binance dailies at **00:00 UTC** regardless of NULL session columns.
 2. **Regular session** (`MARKET_OPEN_TIME` / `MARKET_CLOSE_TIME`) — **weekly** template for when the order book is open. NULL/NULL means the venue trades continuously; it does **not** change the UTC daily bar boundary on crypto. **Exchange holidays are not modeled here** — see [Later § holiday calendar](#later-not-blocking-the-shift).
-3. **Apply clock** (`EXECUTE_OFFSET` on ``APP_APPLY_TIMING``) — how long after bar **close** the scheduler arms `SCHEDULED_TS`. Phase-1 ccxt path still uses ``floor_to_period(..., PERIOD_LENGTH)`` from the Unix epoch (UTC midnight dailies). Listed equity uses ``MARKET_CALENDAR`` keyed by the product's ``INST.PRODUCT.EXCHANGE``.
+3. **Apply clock** (`EXECUTE_OFFSET` on ``APP_APPLY_TIMING``) — how long after bar **close** the scheduler arms `SCHEDULED_TS`. The shipped path uses ``floor_to_period(..., PERIOD_LENGTH)`` from the Unix epoch (UTC midnight dailies), which is correct for 24/7 crypto and is why only crypto apps are scheduled today. Listed equity will need ``MARKET_CALENDAR`` keyed by the product's ``INST.PRODUCT.EXCHANGE``; the table and its reader exist, but nothing in the deployment path consults them yet.
 
 ``INST.PRODUCT.EXCHANGE`` selects the **calendar row**; ``DEPLOYMENT.APP_ID`` selects the **execute offset row**.
 
 Pure interval math (offset passed in from REFDATA):
 
 ```python
-# quant/shared/intervals.py (new)
+# quant/shared/intervals.py
 def next_apply_slot(after: datetime, period: timedelta, offset: timedelta) -> datetime:
     """Next scheduled apply: bar boundary + exchange-specific execute offset."""
     boundary = floor_to_period(after, period)
@@ -321,22 +321,22 @@ Examples (`EXECUTE_OFFSET = 5 min` from REFDATA):
 |------|------|--------------|
 | **1** | DDL + seed `REFDATA.MARKET_CALENDAR` + `APP_APPLY_TIMING`; reader resolvers | REFDATA release `1.25.0` (`context="refdata"`) + Python reader |
 | **2** | Add `next_apply_slot()` + unit tests in `tests/unit/test_intervals.py` | Python only |
-| **3** | Extend `SP_INS_DEPLOYMENT` with optional `IN_INITIAL_SCHEDULED_TS TIMESTAMPTZ` — when set and `VID = 1` with a schedule, use it instead of `V_START_TS`. New Liquibase changeset (`context="bt"`). | One proc body |
+| **3** | Extend `SP_INS_DEPLOYMENT` with optional `IN_INITIAL_SCHEDULED_TS TIMESTAMPTZ` — when set and `VID = 1` with a schedule, use it instead of `V_START_TS`. Liquibase `1.7.0` (`context="trade,prod-deploy"` — replaces a procedure body, so the push queues the gated `migrate` job). | One proc body |
 | **4** | `TradeRepo.write_deployment` / `TradeService.create_deployment`: when `schedule_tm_interval_id` is set, resolve `period` + `offset` from `RedisRefData`, pass `next_apply_slot(now(), period, offset)` into the SP | Create path |
 | **5** | Same alignment on **schedule change** and **re-enable** (`IS_ENABLED_IND` flip back to `Y`, unpause): if the new row arms a `PENDING` schedule, seed with `next_apply_slot(now(), period, offset)` — not the prior deploy-phase cursor | Update path |
-| **6** | **Backfill** existing enabled, scheduled deployments: ops script `scripts/realign_schedule_phase.py` (or one admin API) that reads `SP_GET_DEPLOYMENT`, and for each `PENDING` row writes `SP_INS_DEPLOYMENT_SCHEDULE_STATUS(..., next_apply_slot(now(), period, offset))`. Run once per env after deploy. | Data migration (app-owned) |
+| **6** | **Backfill** existing enabled, scheduled deployments: one-shot `UPDATE` in `scripts/realign_schedule_phase.sql` (sets `SCHEDULED_TS` on current `PENDING` rows). Not in Liquibase deploy — run once per env after REFDATA 1.25.0. | Ops SQL |
 | **7** | Log decision **#71** in `decisions.md` when step 4 ships | Docs |
 | **8** | (Optional, later) Dedicated daily EventBridge rule at `00:05` — cosmetic; hourly sweep is sufficient once phase is aligned | AWS config |
 
 **Do not change** `config/scheduler/trade_apply_tick.yml` for the first cut — `cron(5 * * * ? *)` matches the seeded **5 minute** `EXECUTE_OFFSET`. If ops raises an exchange offset above 5 minutes, update the cron or accept hourly slip.
 
-### Backfill policy (step 5)
+### Backfill policy (step 6)
 
 For each deployment that is enabled, not `PAUSED`/`STOPPED`, has `schedule_tm_interval_id`, and current `STATUS = 'PENDING'`:
 
 1. Compute `offset = refdata.get_execute_offset(app_id, schedule_tm_interval_id)` and `aligned = next_apply_slot(now(), period, offset)`.
-2. If `aligned == scheduled_ts` (already on slot), skip.
-3. Else append schedule row with `scheduled_ts = aligned`.
+2. If `aligned == scheduled_ts` to the second (already on slot), skip.
+3. Else `UPDATE` the current row's `SCHEDULED_TS` in place — this corrects a cursor rather than recording a new decision, so it does not append a version and leaves `USER_ID` untouched.
 
 **Effect:** phase jumps to the **next** aligned slot from “now” — e.g. a daily row due at `14:37` at `10:00 UTC` moves to **`00:05` tomorrow**, not `14:37` today. That is intentional for “shift ASAP to bar close.” Ops should announce before running in prod.
 

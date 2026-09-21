@@ -79,9 +79,27 @@ def next_run_at(after: datetime, period: timedelta) -> datetime:
     """Next interval boundary strictly after ``after`` — for display only.
 
     Scheduler due-ness comes from ``SP_GET_MISSED_DUE_DEPLOYMENTS``; this is
-    what the UI shows as "next run".
+    what the UI shows as "next run". Does not include ``EXECUTE_OFFSET`` from
+    REFDATA — use :func:`next_apply_slot` for the poller cursor.
     """
     return floor_to_period(after, period) + period
+
+
+def next_apply_slot(after: datetime, period: timedelta, offset: timedelta) -> datetime:
+    """Next scheduled apply: bar boundary in ``after``'s period, plus ``offset``.
+
+    ``offset`` comes from ``REFDATA.APP_APPLY_TIMING`` (typically 5 minutes after
+    bar close). If the candidate slot in the current period is still in the
+    future, use it; otherwise use the next period's slot.
+    """
+    if not timedelta(0) <= offset < period:
+        raise ValueError(f"EXECUTE_OFFSET must be in [0, {period}), got {offset}")
+    after = as_utc(after)
+    boundary = floor_to_period(after, period)
+    candidate = boundary + offset
+    if candidate > after:
+        return candidate
+    return boundary + period + offset
 
 
 def bar_starts(start: datetime, end: datetime, period: timedelta) -> list[datetime]:
