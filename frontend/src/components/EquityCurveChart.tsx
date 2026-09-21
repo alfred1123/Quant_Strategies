@@ -15,8 +15,6 @@ function pct(v: unknown): number {
 export default function EquityCurveChart({ curve, splitDate }: Props) {
   if (!curve || !curve.length) return null;
 
-  if (!Plot) return <p style={{ color: '#ef5350' }}>Plotly failed to load.</p>;
-
   const dates = curve.map(p => p.datetime);
 
   const splitLine = splitDate

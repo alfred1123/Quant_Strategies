@@ -115,7 +115,7 @@ Items deferred from the hardening pass, ordered by approximate impact:
 2. **Drop legacy top-level config fields** — `BacktestConfig.indicator/strategy/windowRange/signalRange` are no longer edited by the UI; the form drives `factors[]` exclusively. Removing them is a typed refactor and an opportunity to formalise the request contract.
 3. **Backtest feature module + run-state hook** — Extract `useBacktestRun()` (or a small Zustand store) that owns the optimize stream, abort plumbing, perf load, derived flags and tab state. Removes the remaining god-component pressure in `BacktestPage.tsx`.
 4. **REFDATA-driven metric formatting** — Replace `MetricsCards.PERCENT_KEYS` and `FactorCard`'s nullable `sig_min/max` defaults with values fetched from REFDATA (per the workspace's "REFDATA as Single Source of Truth" decision).
-5. **Bundle/codesplitting** — Vite warns the production bundle exceeds 500 KB; lazy-load `react-plotly.js` and `@mui/x-data-grid` to drop initial JS.
+5. **Bundle/codesplitting** — `react-plotly.js` is now lazy-loaded via `lib/Plot.tsx`, which moved plotly.js into its own 4.7 MB async chunk and cut the entry bundle from 5.9 MB to 1.24 MB (1.68 MB → 376 kB gzipped). `@mui/x-data-grid` is still in the entry chunk and is the next candidate.
 6. **Tooling debt** — Either adopt Tailwind or remove it (zero `className=` usage today). Move `@rolldown/binding-linux-x64-gnu` out of `dependencies` once the Node 20 / rolldown native binding bug is resolved upstream.
 
 ## Decisions made during the hardening pass

@@ -7,6 +7,11 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   optimizeDeps: {
     include: ['plotly.js', 'react-plotly.js'],
+    // The maplibre-gl override (^6, for the audit fix) is ESM-only and exports
+    // "." under `import` alone, so pre-bundling plotly.js fails to resolve it
+    // under the `require` condition. It is only reached by plotly's map traces,
+    // which this app does not render.
+    exclude: ['maplibre-gl'],
   },
   server: {
     proxy: {

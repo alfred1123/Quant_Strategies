@@ -12,7 +12,6 @@ export default function HeatmapChart({ grid, mode = 'single' }: Props) {
   const matrix = useMemo(() => buildHeatmapMatrix(grid), [grid]);
 
   if (!grid || !grid.length || mode !== 'single') return null;
-  if (!Plot) return <p style={{ color: '#ef5350' }}>Plotly failed to load.</p>;
   if (matrix.windows.length === 0 || matrix.signals.length === 0) return null;
 
   return (

@@ -189,7 +189,7 @@ frontend/src/
 │
 ├── lib/                  # Shared singletons
 │   ├── queryClient.ts    # TanStack Query client (shared so interceptors can mutate cache)
-│   └── Plot.ts           # Plotly CJS interop wrapper
+│   └── Plot.tsx          # Lazy-loaded Plotly wrapper (CJS interop + error boundary)
 │
 ├── utils/
 │   ├── grid.ts            # countSteps() — calculates grid search trial count
@@ -265,7 +265,7 @@ Once you know these shapes, every function signature and component prop makes se
 ### Layer 3: Utilities (`lib/`, `utils/`)
 
 - **`queryClient.ts`** — Shared TanStack Query client. Exported separately so the Axios 401 interceptor can mutate the auth cache from outside React.
-- **`Plot.ts`** — Handles CJS/ESM interop for `react-plotly.js`.
+- **`Plot.tsx`** — Loads `react-plotly.js` through `React.lazy` so plotly.js lands in its own async chunk instead of the entry bundle, handles its CJS/ESM interop, and catches a failed chunk fetch in an error boundary so one chart fails instead of the page.
 - **`grid.ts`** — `countSteps({ min, max, step })` returns how many discrete values a range produces.
 - **`requestBuilders.ts`** — `buildOptimizeRequest` / `configFromOptimizeRequest` are inverses: form state ↔ stored `CONFIG_JSON`.
 - **`interval.ts`** — Parses `TM_INTERVAL.PERIOD_LENGTH` into `barsPerDay`. `scaleWindowRange` multiplies a daily-bar `WIN_*` grid by that factor so lookback stays in calendar days when the cadence is not daily.
