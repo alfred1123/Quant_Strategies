@@ -148,10 +148,7 @@ class BtQueueRepo(DbGateway):
                 )
             return int(count) if count is not None else 0
 
-        result, held = self._run(work)
-        if held is not None:
-            held.commit()
-        return result
+        return self._run(work)
 
     def list_for_user(self, user_id: str, limit: int = 50) -> list[dict]:
         """Active rows for one user via ``SP_GET_QUEUE`` (includes STRATEGY join)."""
