@@ -314,6 +314,6 @@ Metric values (Sharpe, Calmar, etc.) are **not duplicated** here — they live a
 
 ## Resolved Questions
 
-- **Calmar / Max Drawdown**: Fixed in `quant/strategy/performance.py`. `cumu = cumsum()` was kept; only Calmar Ratio formula corrected.
+- **Calmar / Max Drawdown**: Fixed in `quant/strategy/performance.py`. The Calmar formula was corrected first; `cumu = cumsum()` was kept at the time and has since been replaced by a compounded equity curve — see [Return Compounding](return-compounding.md). `max_dd_gate` at `0.40` now bounds a real 40% drawdown rather than an overstated additive one, which makes it looser than it was.
 - **Re-versioning flow**: `EnqueueRequest` does not include `strategy_id`. Clone always creates a new strategy. Re-versioning (VID 2+ under same strategy) deferred.
 - **VID 1 fails hard gates**: Fine to set `IS_BEST_IND='Y'` at insert. Worker demotes via `SP_UPD_PROMOTE_STRATEGY(vid=NULL)` if hard gates fail.

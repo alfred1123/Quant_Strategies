@@ -54,6 +54,38 @@ def live_date_range(window, trading_period: int) -> tuple[str, str]:
     return start.isoformat(), end.isoformat()
 
 
+def _compound(pnl: pd.Series) -> tuple[pd.Series, pd.Series]:
+    """``(cumulative_return, drawdown)`` from a per-bar **simple** return series.
+
+    Simple returns compound multiplicatively — ``cumsum`` is additive and is
+    only valid for log returns. Drawdown is read off the equity curve, which
+    bounds it to ``[0, 1]`` instead of the unbounded ``cummax - cumu``.
+
+    The lower clip floors a ruined position at zero equity, so a short that
+    loses more than 100% on one bar stays wiped out rather than flipping the
+    sign of every later bar. The peak is anchored at the starting capital of
+    ``1.0`` because ``cummax`` alone omits it, which would report no drawdown
+    for a strategy that is underwater from the first bar.
+    """
+    equity = (1.0 + pnl).clip(lower=0.0).cumprod()
+    peak = equity.cummax().clip(lower=1.0)
+    return equity - 1.0, 1.0 - equity / peak
+
+
+def _cagr(pnl: pd.Series, trading_period: int) -> float:
+    """Geometric annualised return from a per-bar **simple** return series.
+
+    The constant per-bar rate that reproduces realised growth over the series.
+    An arithmetic ``mean * trading_period`` annualises an average the capital
+    never actually earned, and overstates whenever returns vary.
+    """
+    n = int(pnl.notna().sum())
+    if n == 0:
+        return np.nan
+    equity = float((1.0 + pnl).clip(lower=0.0).prod())
+    return equity ** (trading_period / n) - 1.0
+
+
 def _latest_final_position(final_position: pd.Series) -> tuple[float, str]:
     """Return ``(position, data_as_of)`` from a ``FinalPosition`` series."""
     if not isinstance(final_position, pd.Series):
@@ -240,14 +272,11 @@ class Performance:
         self.data['trade'] = abs(self.data['FinalPosition'] - self.data['FinalPosition_x1'])
         self.data['pnl'] = (self.data['FinalPosition_x1'] * self.data['chg']
                             - self.data['trade'] * self.transaction_cost)
-        self.data['cumu'] = self.data['pnl'].cumsum()
-        self.data['dd'] = self.data['cumu'].cummax() - self.data['cumu']
+        self.data['cumu'], self.data['dd'] = _compound(self.data['pnl'])
 
         self.data['buy_hold'] = self.data['chg']
         self.data.loc[self.data['FinalPosition_x1'].isnull(), 'buy_hold'] = np.nan
-        self.data['buy_hold_cumu'] = self.data['buy_hold'].cumsum()
-        self.data['buy_hold_dd'] = (self.data['buy_hold_cumu'].cummax()
-                                    - self.data['buy_hold_cumu'])
+        self.data['buy_hold_cumu'], self.data['buy_hold_dd'] = _compound(self.data['buy_hold'])
 
 
     def _metric_col(self, col: str) -> pd.Series:
@@ -272,7 +301,7 @@ class Performance:
             logger.debug("Annualized return undefined (%d finite pnl bars, need %d)",
                          n, self.MIN_METRIC_OBS)
             return np.nan
-        return self._metric_col("pnl").mean() * self.trading_period
+        return _cagr(self._metric_col("pnl"), self.trading_period)
 
     def get_sharpe_ratio(self):
         n = self.get_metric_n_obs()
@@ -309,7 +338,7 @@ class Performance:
             logger.debug("Buy-hold annualized return undefined (%d finite pnl bars, need %d)",
                          n, self.MIN_METRIC_OBS)
             return np.nan
-        return self._metric_col("buy_hold").mean() * self.trading_period
+        return _cagr(self._metric_col("buy_hold"), self.trading_period)
 
     def get_buy_hold_sharpe_ratio(self):
         n = self.get_metric_n_obs()

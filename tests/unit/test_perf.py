@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, SignalDirection
-from quant.strategy.performance import Performance, live_lookback_days
+from quant.strategy.performance import Performance, _cagr, _compound, live_lookback_days
 
 
 _BOLLINGER_CONFIG = StrategyConfig("test", "get_bollinger_band",
@@ -133,6 +133,77 @@ class TestComputeLatestPositionParity:
         assert as_of == expected_as_of
 
 
+class TestCompound:
+    """Returns must compound, not sum — see docs/design/return-compounding.md."""
+
+    def test_gain_then_equal_loss_ends_down(self):
+        cumu, _ = _compound(pd.Series([0.5, -0.5]))
+        # Summing gives 0.0; compounding gives 1.5 * 0.5 - 1 = -0.25
+        assert cumu.iloc[-1] == pytest.approx(-0.25)
+
+    def test_cumu_is_product_of_gross_returns(self):
+        pnl = pd.Series([0.1, 0.2, -0.05, 0.03])
+        cumu, _ = _compound(pnl)
+        assert cumu.iloc[-1] == pytest.approx((1 + pnl).prod() - 1)
+
+    def test_drawdown_is_fraction_lost_from_peak(self):
+        # Peak equity 1.2 after +20%, then -50% to 0.6 → 50% drawdown
+        _, dd = _compound(pd.Series([0.2, -0.5, 0.0]))
+        assert dd.iloc[-1] == pytest.approx(0.5)
+        assert dd.max() == pytest.approx(0.5)
+
+    def test_drawdown_counts_losses_from_starting_capital(self):
+        # Never above the initial 1.0, so the peak is the starting capital
+        _, dd = _compound(pd.Series([-0.1, -0.1]))
+        assert dd.iloc[0] == pytest.approx(0.1)
+        assert dd.iloc[-1] == pytest.approx(0.19)
+
+    def test_drawdown_bounded_on_random_walk(self):
+        rng = np.random.default_rng(7)
+        _, dd = _compound(pd.Series(rng.normal(0, 0.05, 2000)))
+        assert (dd >= 0).all()
+        assert (dd <= 1).all()
+
+    def test_leading_nan_preserved_and_skipped(self):
+        cumu, dd = _compound(pd.Series([np.nan, 0.1, 0.1]))
+        assert np.isnan(cumu.iloc[0])
+        assert np.isnan(dd.iloc[0])
+        assert cumu.iloc[-1] == pytest.approx(1.1 * 1.1 - 1)
+
+    def test_ruin_floors_at_total_loss(self):
+        # A short losing more than 100% on one bar must not flip sign afterwards
+        cumu, dd = _compound(pd.Series([-1.5, 0.5]))
+        assert cumu.iloc[-1] == pytest.approx(-1.0)
+        assert dd.max() == pytest.approx(1.0)
+
+
+class TestCagr:
+    """Annualised return is geometric — see docs/design/return-compounding.md."""
+
+    def test_constant_rate_annualizes_to_itself(self):
+        # One full year of a flat 0.1%/bar compounds to exactly that year's growth
+        pnl = pd.Series([0.001] * 365)
+        assert _cagr(pnl, 365) == pytest.approx(1.001 ** 365 - 1)
+
+    def test_doubling_over_two_years_is_about_41_percent(self):
+        pnl = pd.Series([2 ** (1 / 730) - 1] * 730)
+        assert _cagr(pnl, 365) == pytest.approx(2 ** 0.5 - 1)
+
+    def test_below_arithmetic_when_returns_vary(self):
+        pnl = pd.Series([0.5, -0.4] * 100)
+        assert _cagr(pnl, 365) < pnl.mean() * 365
+
+    def test_nan_bars_excluded_from_horizon(self):
+        pnl = pd.Series([np.nan] * 100 + [0.001] * 365)
+        assert _cagr(pnl, 365) == pytest.approx(1.001 ** 365 - 1)
+
+    def test_ruin_is_total_loss(self):
+        assert _cagr(pd.Series([-1.5] + [0.01] * 99), 365) == pytest.approx(-1.0)
+
+    def test_undefined_without_observations(self):
+        assert np.isnan(_cagr(pd.Series([np.nan, np.nan]), 365))
+
+
 class TestLiveLookback:
     def test_scales_with_window(self):
         assert live_lookback_days(20, 365) == max(20 * 3 + 60, min(365, 400))
@@ -151,13 +222,25 @@ class TestPerformanceInit:
         for v in valid_positions:
             assert v in (-1.0, 0.0, 1.0)
 
-    def test_drawdown_non_negative(self, sample_ohlc_df):
+    def test_drawdown_bounded(self, sample_ohlc_df):
         perf = _make_performance(sample_ohlc_df)
-        assert (perf.data["dd"].dropna() >= 0).all()
+        dd = perf.data["dd"].dropna()
+        assert (dd >= 0).all()
+        assert (dd <= 1).all()
 
-    def test_buy_hold_drawdown_non_negative(self, sample_ohlc_df):
+    def test_buy_hold_drawdown_bounded(self, sample_ohlc_df):
         perf = _make_performance(sample_ohlc_df)
-        assert (perf.data["buy_hold_dd"].dropna() >= 0).all()
+        dd = perf.data["buy_hold_dd"].dropna()
+        assert (dd >= 0).all()
+        assert (dd <= 1).all()
+
+    def test_buy_hold_cumu_tracks_price(self, sample_ohlc_df):
+        """Always-long, fee-free buy-hold must equal the realised price move."""
+        perf = _make_performance(sample_ohlc_df)
+        first = perf.data["buy_hold"].first_valid_index()
+        start = perf.data["price"].shift(1).loc[first]
+        end = perf.data["price"].iloc[-1]
+        assert perf.get_buy_hold_total_return() == pytest.approx(end / start - 1)
 
     def test_trade_column_non_negative(self, sample_ohlc_df):
         perf = _make_performance(sample_ohlc_df)
@@ -180,9 +263,9 @@ class TestStrategyMetrics:
         sharpe = perf.get_sharpe_ratio()
         assert np.isfinite(sharpe) or np.isnan(sharpe)
 
-    def test_max_drawdown_non_negative(self, sample_ohlc_df):
+    def test_max_drawdown_bounded(self, sample_ohlc_df):
         perf = _make_performance(sample_ohlc_df)
-        assert perf.get_max_drawdown() >= 0
+        assert 0 <= perf.get_max_drawdown() <= 1
 
     def test_calmar_ratio_is_scalar(self, sample_ohlc_df):
         perf = _make_performance(sample_ohlc_df)
@@ -227,9 +310,9 @@ class TestBuyHoldMetrics:
         sharpe = perf.get_buy_hold_sharpe_ratio()
         assert np.isfinite(sharpe) or np.isnan(sharpe)
 
-    def test_buy_hold_max_drawdown_non_negative(self, sample_ohlc_df):
+    def test_buy_hold_max_drawdown_bounded(self, sample_ohlc_df):
         perf = _make_performance(sample_ohlc_df)
-        assert perf.get_buy_hold_max_drawdown() >= 0
+        assert 0 <= perf.get_buy_hold_max_drawdown() <= 1
 
     def test_buy_hold_calmar_ratio_is_scalar(self, sample_ohlc_df):
         perf = _make_performance(sample_ohlc_df)
@@ -381,11 +464,13 @@ class TestMultiFactorPerformance:
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
 
-    def test_drawdown_non_negative(self, multi_factor_df):
+    def test_drawdown_bounded(self, multi_factor_df):
         config = _multi_factor_config()
         perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config)
         perf.enrich_performance()
-        assert (perf.data["dd"].dropna() >= 0).all()
+        dd = perf.data["dd"].dropna()
+        assert (dd >= 0).all()
+        assert (dd <= 1).all()
 
     def test_single_factor_backward_compat(self, sample_ohlc_df):
         """Single-factor path produces identical results when window is not a tuple."""

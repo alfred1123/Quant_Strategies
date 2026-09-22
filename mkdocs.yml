@@ -121,6 +121,7 @@ nav:
       - Scheduler & Trade Open Questions: design/scheduler-trade-open-questions.md
       - Market Data Capture: design/market-data-capture.md
       - Multi-Strategy Netting: design/multi-strategy-netting.md
+      - Return Compounding (bug): design/return-compounding.md
       - Frontend Code Audit: design/frontend-audit.md
       - Plan to Profit: design/plan-to-profit.md
   - Archive:

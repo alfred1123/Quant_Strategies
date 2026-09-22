@@ -285,8 +285,9 @@ class TestTradingPeriodVariants:
         perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0)
         perf.enrich_performance()
         ann_ret = perf.get_annualized_return()
-        daily_mean = perf.data.iloc[20:]['pnl'].mean()
-        assert ann_ret == pytest.approx(daily_mean * 365)
+        pnl = perf.data.iloc[20:]['pnl']
+        growth = (1 + pnl).prod()
+        assert ann_ret == pytest.approx(growth ** (365 / pnl.notna().sum()) - 1)
 
 
 class TestEdgeCases:
