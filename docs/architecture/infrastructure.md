@@ -489,6 +489,25 @@ The `deploy` job sends one `AWS-RunShellScript` SSM command to the EC2 and polls
 7. **Split image builds** — `build-app` depends on Python tests only; `build-nginx` still waits on the frontend job. A frontend build failure no longer blocks shipping `quant-app`.
 8. **Report** — `docker image prune -f`, then `docker compose ps`; the job tails the SSM `StandardOutputContent` and fails on `Failed`/`TimedOut`/`Cancelled`.
 
+!!! note "A compose-only deploy still restarts `api` and `nginx`"
+    `DEPLOY_COMPOSE` runs `up -d --remove-orphans`, which recreates a service
+    when its **effective config** changes — and that includes the image
+    *reference string*, not just the image contents. On a push that touches only
+    a compose file, `build-app` and `build-nginx` are skipped, so
+    `resolve_app_tag` finds no image for the new commit SHA and falls back to
+    `latest`. `APP_IMAGE` therefore flips from
+    `quant-app:<previous-sha>` to `quant-app:latest`, compose sees a changed
+    service, and `api` + `worker` + `nginx` all restart even if only the
+    `worker` block was edited (observed on `423f9884d`, which edited `worker`
+    alone). `redis` is unaffected — its image is pinned to `redis:7-alpine`.
+
+    The bits are identical: `latest` and the previous SHA tag resolve to the
+    same digest, so this is a seconds-long restart, not a version change.
+    Two consequences worth knowing: expect a brief API blip on any compose-only
+    deploy, and the running containers are afterwards tracked by `latest`
+    rather than a pinned SHA, so read the digest rather than the tag when
+    establishing what is deployed.
+
 ### GitHub setup (one-time)
 
 **Secrets** (repo → Settings → Secrets and variables → Actions → Secrets):
