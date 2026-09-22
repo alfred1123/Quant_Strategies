@@ -43,6 +43,8 @@ Per repo convention: lower layers stay policy-agnostic; a single higher layer co
 | Layer | Module | Responsibility |
 |-------|--------|-----------------|
 | Mechanics — submit | `CcxtTradeGateway.create_market_order` | One market order, one ccxt call |
+| Mechanics — venue rules | `CcxtTradeGateway.fetch_market_limits` / `fetch_all_market_limits` | Read min lot / min notional out of `load_markets()` — facts, no judgement |
+| Rule — order size | `MarketLimits.undersized` (`quant/trade/models/market.py`) | Given a qty (and a price, for notional), say why the venue would refuse it |
 | Mechanics — confirm | `CcxtTradeGateway.fetch_order` (new) | Read one order's terminal status |
 | Mechanics — cancel | `CcxtTradeGateway.cancel_order` | Cancel one order |
 | Mechanics — submit+confirm | `CcxtTradeAdapter.place_order` | Submit **one** order, poll to a bounded terminal outcome, return `OrderResult` |
@@ -141,6 +143,44 @@ the same number of retries:**
 |-------------|----------------------------------------|--------------|
 | **Permanent / non-retryable** | `10005 permission denied` (API key missing trade permission), `10024 regulatory/KYC block`, invalid symbol, invalid order params | **1 attempt** — fail fast, then alert immediately. Identical retries will fail identically and just burn ~10s × N and rate-limit budget for nothing. |
 | **Retryable** | Unconfirmed/timeout fills, transient network errors, rate limits | **Up to 5 attempts** |
+
+### A refusal is classified where it is decided, not parsed back out of the message
+
+`OrderRetryPolicy` reads the failure's `OrderResult.reason` — an
+`OrderRejectReason` — before it looks at any text. String markers
+(`_PERMANENT_MARKERS`) remain only as the fallback for broker prose nothing has
+typed: a phrase list is the right tool for text an exchange wrote and the wrong
+one for a fact we established ourselves, which is what happens when one layer
+formats "qty 0.0001 is below BTCUSDT min qty 0.001" and another greps `min qty`
+to recover what the first one knew.
+
+`OrderRejectReason.requires_operator_fix` is the single predicate behind both
+consequences: the retry executor stops after one attempt, and the scheduler
+pauses the deployment on the first pass instead of spending its tick budget
+(#70 amended — see [Order size](#order-size-is-checked-before-the-order-not-discovered-by-it)).
+
+### Order size is checked before the order, not discovered by it
+
+`CcxtTradeAdapter.place_order` asks `MarketLimits.undersized` before submitting
+and returns a failed `OrderResult` carrying `SIZE_BELOW_MINIMUM` if the qty is
+under the venue's lot size, or worth less than its notional floor at the last
+traded price. Layering is deliberate: the gateway returns the venue's numbers,
+the value object owns the rule and the sentence describing a violation, and the
+adapter composes the two. Nothing is checked when a rule is unpublished or no
+quote is available — the order goes out and the exchange's own reject text is
+what gets recorded.
+
+The limits come from `load_markets()`, **not REFDATA**: an exchange changes a lot
+size when it likes, and a seeded table would refuse orders the venue accepts
+(decision #76). `exchange.market()` is an in-memory lookup against the table
+`connect()` already loaded, so the check costs no network call; only the notional
+rule fetches a ticker, and only when the venue publishes `limits.cost.min`.
+
+The same rules are cached in Redis per broker app (`venue_limits:<app_id>`, see
+`quant/trade/venue_limits.py`) so the API can refuse an impossible `qty` while a
+person is still editing it. `DeploymentRow.min_qty` carries the value to the
+qty editor. Order time stays authoritative — the cache can be stale or empty,
+and a snapshot is never what an order is judged against.
 
 ### Loop (retryable path)
 

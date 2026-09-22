@@ -241,6 +241,34 @@ class TestUpdateDeployment:
         )
         assert resp.status_code == 404
 
+    def test_change_qty(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        dep_id = uuid.uuid4()
+        row = _deployment_row(deployment_id=dep_id, qty=Decimal("0.002"), deployment_vid=2)
+        svc.update_deployment.return_value = row
+
+        resp = client.patch(
+            f"/api/v1/trade/deployments/{dep_id}",
+            json={"qty": "0.002"},
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["qty"] == "0.002"
+        req = svc.update_deployment.call_args.args[2]
+        assert req.qty == Decimal("0.002")
+
+    def test_qty_zero_returns_422(self, client_and_svc):
+        client, svc, _ = client_and_svc
+        dep_id = uuid.uuid4()
+
+        resp = client.patch(
+            f"/api/v1/trade/deployments/{dep_id}",
+            json={"qty": 0},
+        )
+
+        assert resp.status_code == 422
+        svc.update_deployment.assert_not_called()
+
 
 class TestScheduleOptions:
     def test_lists_the_cadences_a_deployment_may_use(self, client_and_svc):

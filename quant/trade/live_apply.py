@@ -198,6 +198,7 @@ class LiveApplyOrchestrator:
             avg_price=result.avg_price if result else None,
             fee=result.fee if result else None,
             message=message if message is not None else result.message,
+            reject_reason=result.reason if result else None,
         )
 
     def _audit_attempts(

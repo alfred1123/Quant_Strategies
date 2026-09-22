@@ -75,6 +75,8 @@ class OrderRetryResult:
 class OrderRetryPolicy:
     """Classify order failures and decide retry vs fail-fast."""
 
+    # Fallback for broker prose we never classified at the source. A reject that
+    # arrives with an OrderRejectReason is judged from that instead.
     _PERMANENT_MARKERS = (
         "permission denied",
         "10005",
@@ -107,6 +109,8 @@ class OrderRetryPolicy:
     def is_retryable(self, result: OrderResult) -> bool:
         """Transient / ambiguous failures may be retried; permanent ones fail fast."""
         if result.success:
+            return False
+        if result.reason is not None and result.reason.requires_operator_fix:
             return False
         msg = result.message.lower()
         if any(marker in msg for marker in self._PERMANENT_MARKERS):

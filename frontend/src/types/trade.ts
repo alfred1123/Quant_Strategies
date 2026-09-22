@@ -22,6 +22,11 @@ export interface DeploymentRow {
   next_due_at?: string | null;
   transact_from_ts: string;
   user_id: string;
+  /**
+   * Smallest order the venue accepts for this instrument, cached from ccxt.
+   * Null when nothing is cached — then only the pre-submit check applies.
+   */
+  min_qty?: number | null;
 }
 
 export interface CreateDeploymentRequest {
@@ -49,6 +54,8 @@ export interface UpdateDeploymentRequest {
    * existing schedule untouched.
    */
   schedule_tm_interval_id?: number | null;
+  /** Position size per signal. Must be > 0; omit to leave the stored qty. */
+  qty?: string;
 }
 
 /**

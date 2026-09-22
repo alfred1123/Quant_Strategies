@@ -214,14 +214,14 @@ Create/update remain on the jobs/backtest path until a dedicated editor is neede
 POST   /api/v1/trade/deployments               → Create / re-apply deployment    ✅ live
 GET    /api/v1/trade/deployments               → List deployments for user       ✅ live
 GET    /api/v1/trade/deployments/{id}          → One deployment (current ver.)   ✅ live
-PATCH  /api/v1/trade/deployments/{id}          → Toggle enabled / status / sched ✅ live
+PATCH  /api/v1/trade/deployments/{id}          → Toggle enabled / status / sched / qty ✅ live
 POST   /api/v1/trade/deployments/{id}/stop     → Stop deployment (idempotent)    ✅ live
 GET    /api/v1/trade/schedule-options          → Cadences a deployment may use   ✅ live
 ```
 
 `DeploymentRow` response fields include `transact_from_ts` (when this version became effective), `schedule_tm_interval_id`, `last_run_at`, and `next_due_at` (from `DEPLOYMENT_SCHEDULE_STATUS.SCHEDULED_TS`). **`created_at` is not returned** — table `CREATED_AT` is audit-only.
 
-`PATCH` accepts `enabled`, `deployment_status`, and `schedule_tm_interval_id`. Omitted fields keep their current value; sending `schedule_tm_interval_id: null` explicitly clears the schedule back to manual-only. A cadence the strategy was not fitted on is rejected with **400**, but only when the request actually sets it — a stored value is never re-validated, so the kill switch always gets through. `GET /api/v1/trade/schedule-options` returns the acceptable ids for the UI.
+`PATCH` accepts `enabled`, `deployment_status`, `schedule_tm_interval_id`, and `qty`. Omitted fields keep their current value; sending `schedule_tm_interval_id: null` explicitly clears the schedule back to manual-only. `qty` cannot be cleared — `null` is **400**, and `qty ≤ 0` is **422**. A `qty` under the venue's own lot size is **400** on create and update alike, checked against the cached exchange rules ([api.md](../architecture/api.md#a-qty-the-venue-would-refuse-is-refused-while-it-can-still-be-fixed)); `DeploymentRow.min_qty` returns that lot size so the editor can say so first. A cadence the strategy was not fitted on is rejected with **400**, but only when the request actually sets it — a stored value is never re-validated, so the kill switch always gets through. `GET /api/v1/trade/schedule-options` returns the acceptable ids for the UI.
 
 ### 2.3 Credentials — implemented (Phase 1.1)
 

@@ -28,15 +28,6 @@ class AdapterRegistry:
         self._by_app_id[app_id] = factory
         logger.debug("registered adapter for app_id=%s", app_id)
 
-    def register_by_name(
-        self, app_name: str, factory: AdapterFactory, *, refdata: RedisRefData
-    ) -> None:
-        """Resolve ``app_name`` via REFDATA and register."""
-        app_id = refdata.resolve_app_id(app_name)
-        if app_id is None:
-            raise ValueError(f"REFDATA.APP has no row for name={app_name!r}")
-        self.register(app_id, factory)
-
     def create(self, app_id: int, **kwargs: Any) -> TradeAdapter:
         factory = self._by_app_id.get(app_id)
         if factory is None:
@@ -56,11 +47,28 @@ def _factory_for(preset: CcxtExchangePreset) -> AdapterFactory:
     return factory
 
 
+def ccxt_apps(refdata: RedisRefData) -> list[tuple[int, CcxtExchangePreset]]:
+    """``(app_id, preset)`` for every ccxt broker REFDATA knows about.
+
+    The join between ``CCXT_PRESETS`` (code) and ``REFDATA.APP`` (Postgres →
+    Redis) lives here alone, so the registry, the price-bar source, and the
+    venue-limits publisher cannot disagree about which apps are brokers.
+    """
+    apps: list[tuple[int, CcxtExchangePreset]] = []
+    for app_name, preset in CCXT_PRESETS.items():
+        app_id = refdata.resolve_app_id(app_name)
+        if app_id is None:
+            logger.warning("REFDATA.APP has no row for name=%r", app_name)
+            continue
+        apps.append((app_id, preset))
+    return apps
+
+
 def build_default_registry(refdata: RedisRefData) -> AdapterRegistry:
     """Register built-in ccxt adapters. Called at API startup."""
     registry = AdapterRegistry()
-    for app_name, preset in CCXT_PRESETS.items():
-        registry.register_by_name(app_name, _factory_for(preset), refdata=refdata)
+    for app_id, preset in ccxt_apps(refdata):
+        registry.register(app_id, _factory_for(preset))
     return registry
 
 
@@ -71,7 +79,7 @@ def exchange_id_for_app(app_id: int, *, refdata: RedisRefData) -> str | None:
     read back out of ``CCXT_PRESETS`` rather than restated next to the price-bar
     code where it could drift.
     """
-    for app_name, preset in CCXT_PRESETS.items():
-        if refdata.resolve_app_id(app_name) == app_id:
+    for candidate_id, preset in ccxt_apps(refdata):
+        if candidate_id == app_id:
             return preset.exchange_id
     return None

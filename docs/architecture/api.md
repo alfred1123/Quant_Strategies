@@ -71,7 +71,7 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `POST` | `/api/v1/trade/deployments` | Required | Create or re-apply a deployment. Optional `schedule_tm_interval_id` (`REFDATA.TM_INTERVAL`) sets the apply cadence; omit or `null` for manual-only, which is what the UI's schedule dropdown defaults to (see [scheduler §3.1](../design/scheduler-price-bars.md#31-product-ux-how-scheduling-is-enabled)). |
 | `GET` | `/api/v1/trade/deployments` | Required | List current deployments for the authenticated user. |
 | `GET` | `/api/v1/trade/deployments/{id}` | Required | One deployment (current version). |
-| `PATCH` | `/api/v1/trade/deployments/{id}` | Required | Toggle `enabled` / `deployment_status`, or change `schedule_tm_interval_id`. Omitted fields keep their value; explicit `null` clears the schedule. |
+| `PATCH` | `/api/v1/trade/deployments/{id}` | Required | Toggle `enabled` / `deployment_status`, change `schedule_tm_interval_id`, or change `qty`. Omitted fields keep their value; explicit `null` clears the schedule. `qty` must be `> 0` and at least the venue's lot size (see [below](#a-qty-the-venue-would-refuse-is-refused-while-it-can-still-be-fixed)); sending `null` is refused. |
 | `POST` | `/api/v1/trade/deployments/{id}/stop` | Required | Stop a deployment — disables it and sets `STOPPED`. Idempotent. |
 | `POST` | `/api/v1/trade/deployments/{id}/apply` | Required | Run one live-apply cycle now. |
 | `POST` | `/api/v1/trade/deployments/dry-run` | Required | Preflight a deployment without placing orders. |
@@ -81,6 +81,7 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `GET` | `/api/v1/trade/deployments/{id}/transactions` | Required | Fill history for one deployment. |
 | `GET` | `/api/v1/trade/accounts/{api_credential_id}/snapshot` | Required | Live balances and open positions for one broker account. Read-only. Query `paper` (default `true`). **404** if the credential is not owned. |
 | `GET` | `/api/v1/trade/schedule-options` | Required | `tm_interval_ids` a deployment may be scheduled on — see [the cadence guard](#the-schedule-cadence-must-match-the-fitted-bars) below. |
+| `POST` | `/api/v1/trade/venue-limits/refresh` | Required | Re-read every broker's min lot / min notional from ccxt into Redis. Returns `{"apps": n}`. |
 
 #### The schedule cadence must match the fitted bars
 
@@ -100,6 +101,36 @@ whose cadence predates the rule.
 `GET /trade/schedule-options` publishes the same set, which is how
 `DeploymentDialog` and `ScheduleCell` grey out the cadences the API would refuse
 rather than keeping their own copy of the rule.
+
+#### A qty the venue would refuse is refused while it can still be fixed
+
+Every exchange has a smallest order. Bybit's linear `BTCUSDT` lot is `0.001`, so
+a deployment carrying `qty = 0.0001` places an order that can only be rejected —
+and a scheduled one does it again on every tick, at an hour when nobody is
+watching. `POST /trade/deployments` and `PATCH /trade/deployments/{id}` therefore
+check the qty against the venue's lot size and answer **400** naming it, a
+broker rule enforced at the API exactly as the cadence rule above is.
+
+The rules come from ccxt's `load_markets()`, cached in Redis per broker app
+(`venue_limits:<app_id>`) by `VenueLimitsPublisher` at startup and on
+`POST /trade/venue-limits/refresh` — never seeded into REFDATA, which owns values
+a *user* picks from, not facts an exchange can change without telling us
+([decision #76](../decisions.md)). Three consequences follow from a cache being
+a cache:
+
+- **An empty or stale snapshot enforces nothing.** A venue unreachable at boot,
+  or Redis down, leaves the edit unchecked rather than blocked; the pre-submit
+  check in `CcxtTradeAdapter` is the authority either way
+  ([live order execution](../design/live-order-execution.md#order-size-is-checked-before-the-order-not-discovered-by-it)).
+- **Only the lot size is checked here.** The notional floor needs a live price,
+  which is an exchange round-trip per edit, so it stays an order-time rule.
+- **A PATCH is checked only on the qty it sets**, the same exception the cadence
+  guard makes: a deployment saved before a venue raised its lot size must still
+  be reachable by the kill switch.
+
+`DeploymentRow.min_qty` carries the cached lot size — not a `DEPLOYMENT` column —
+so `QtyCell` can refuse the value inline instead of spending a round-trip to be
+told.
 
 #### A dry run previews the apply's own price series
 

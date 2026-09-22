@@ -13,6 +13,7 @@ from quant.trade.errors import (
     BrokerConnectionError,
     OrderNotFoundError,
 )
+from quant.trade.models.market import MarketLimits
 from quant.trade.models.session import BrokerSessionState
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,17 @@ class CcxtSessionConfig:
     preset: CcxtExchangePreset
     paper: bool = True
     demo: bool = False
+
+    @classmethod
+    def public(cls, preset: CcxtExchangePreset) -> "CcxtSessionConfig":
+        """Keyless session for what the venue publishes to everyone.
+
+        ``load_markets`` needs no credentials, which is what lets the API cache
+        order-size rules without a user's keys. Live venue rather than the
+        sandbox: the rules worth caching are the ones a real order is judged
+        against.
+        """
+        return cls(api_key="", api_secret="", preset=preset, paper=False)
 
 
 class CcxtTradeGateway:
@@ -125,6 +137,56 @@ class CcxtTradeGateway:
             return True
         except ccxt.BadSymbol:
             return False
+
+    def fetch_market_limits(self, vendor_symbol: str) -> MarketLimits:
+        """The venue's min lot and min notional for *vendor_symbol*.
+
+        Raw ``load_markets`` facts only — whether a given order is too small for
+        them is :class:`MarketLimits`' question, not the session's. Unknown
+        symbol, unlisted rule, or no session all yield empty limits, which
+        enforce nothing.
+        """
+        if self._exchange is None:
+            return MarketLimits(symbol=vendor_symbol)
+        try:
+            market = self.exchange.market(vendor_symbol)
+        except ccxt.BadSymbol:
+            return MarketLimits(symbol=vendor_symbol)
+        except ccxt.BaseError:
+            logger.debug("market limits lookup failed", exc_info=True)
+            return MarketLimits(symbol=vendor_symbol)
+
+        return self._limits_of(market, symbol=vendor_symbol)
+
+    def fetch_all_market_limits(self) -> dict[str, MarketLimits]:
+        """Limits for every symbol this session's category lists.
+
+        Keyed by both the venue's own id (``BTCUSDT``) and ccxt's unified symbol
+        (``BTC/USDT:USDT``), because ``INST.PRODUCT_XREF`` stores one or the
+        other depending on the venue and either must resolve.
+
+        A preset that pins ``default_type`` is filtered to it — Bybit prints
+        ``BTCUSDT`` for both the spot pair and the perpetual, and only the
+        perpetual is what a linear session trades.
+        """
+        default_type = self._config.preset.default_type
+        out: dict[str, MarketLimits] = {}
+        for market in self.exchange.markets.values():
+            if default_type and not market.get(default_type):
+                continue
+            for key in (market.get("id"), market.get("symbol")):
+                if key:
+                    out[key] = self._limits_of(market, symbol=key)
+        return out
+
+    @staticmethod
+    def _limits_of(market: dict, *, symbol: str) -> MarketLimits:
+        limits = market.get("limits") or {}
+        return MarketLimits(
+            symbol=symbol,
+            min_qty=_as_float((limits.get("amount") or {}).get("min")),
+            min_notional=_as_float((limits.get("cost") or {}).get("min")),
+        )
 
     def create_market_order(self, vendor_symbol: str, side: str, qty: float) -> dict:
         """Submit a market order. ``side`` is ``'buy'`` or ``'sell'`` (ccxt lowercase)."""

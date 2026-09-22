@@ -107,13 +107,20 @@ refusing its PATCH would be refusing to disable it.
 
 Pre-completion aborts (missing strategy, bars, credentials) still spend the in-memory attempt budget today — splitting those out of the budget remains open.
 
+**One exception skips the budget (decision #76):** a reject carrying an
+`OrderRejectReason` whose `requires_operator_fix` is true — today a qty under the
+venue's min lot or notional — pauses on the **first** failed pass. The remaining
+attempts would send the identical order and collect the identical reject, an hour
+apart, so the budget only delays the pause and repeats the alert. Everything the
+tick cannot classify keeps all 3 attempts.
+
 **What auto-pause resolves:**
 
 - After **exhausted retries**, set `IS_ENABLED_IND='N'` and `DEPLOYMENT_STATUS='PAUSED'`.
 - Removes deployment from missed-due proc (`IS_ENABLED_IND='Y'` / not-`PAUSED` filter).
 - Ops fixes config, dry-runs, re-enables manually.
 
-**Current state:** `ScheduleTickRunner` auto-pauses on the last failed attempt. It does **not** flatten the broker position — that is §6. Manual **Stop** remains a separate, explicit disable.
+**Current state:** `ScheduleTickRunner` auto-pauses on the last failed attempt, or on the first one when the broker rejected a size no retry can fix. It does **not** flatten the broker position — that is §6. Manual **Stop** remains a separate, explicit disable.
 
 ---
 
@@ -245,7 +252,7 @@ Pre-completion aborts do not call SP_INS — row stays due.
 | Cadence must match the fitted bars | — | Done — `quant/trade/schedule_policy.py` + `GET /trade/schedule-options` ([§3](#3-schedule_tm_interval_id-and-refdata-intervals)) |
 | Apply-time due gate | — | Pending |
 | In-flight lease | — | Pending |
-| Auto-pause on failure | — | Done — last failed attempt versions `PAUSED` + disabled ([#70](../decisions.md)) |
+| Auto-pause on failure | — | Done — last failed attempt versions `PAUSED` + disabled ([#70](../decisions.md)); a size reject pauses on the first ([#76](../decisions.md)) |
 | Align `SCHEDULED_TS` to bar close + exchange offset | `MARKET_CALENDAR` + `APP_APPLY_TIMING` + optional `IN_INITIAL_SCHEDULED_TS` | Done in code — prod needs TRADE `1.7.0` + app deploy + one-time backfill ([§10](#10-align-scheduled_ts-to-bar-close), [plan](ccxt-bar-timezones.md#plan-align-apply-clock-to-bar-close-asap)) |
 | Pause = flatten + disable | — | Pending |
 | One deployment per credential+product slot | — | Pending |

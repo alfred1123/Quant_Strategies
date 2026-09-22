@@ -43,13 +43,19 @@ class CreateDeploymentRequest(BaseModel):
 
 
 class UpdateDeploymentRequest(BaseModel):
-    """PATCH body for toggling deployment state (kill switch) and schedule."""
+    """PATCH body for kill switch, schedule, and quantity.
+
+    Omitted fields keep their stored value. Explicit null on
+    ``schedule_tm_interval_id`` clears the cadence (manual-only).
+    ``qty`` cannot be cleared — null is refused; the value must be > 0.
+    """
 
     enabled: bool | None = None
     deployment_status: DeploymentStatus | None = None
     # Explicit null clears the schedule (back to manual-only), so the service
     # distinguishes "omitted" from "set to null" via model_fields_set.
     schedule_tm_interval_id: int | None = Field(None, ge=1)
+    qty: Decimal | None = Field(None, gt=0)
 
 
 class ScheduleOptions(BaseModel):
@@ -83,3 +89,7 @@ class DeploymentRow(BaseModel):
     next_due_at: datetime | None = None
     transact_from_ts: datetime
     user_id: str
+    # Not a DEPLOYMENT column — the venue's smallest order for this instrument,
+    # cached from ccxt (``venue_limits:<app_id>``) and attached by the service so
+    # the qty editor can refuse what the venue would. None when nothing is cached.
+    min_qty: float | None = None

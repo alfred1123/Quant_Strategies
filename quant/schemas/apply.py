@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from quant.trade.models.order import IntendedAction
+from quant.trade.models.order import IntendedAction, OrderRejectReason
 
 
 class ApplyReport(BaseModel):
@@ -22,6 +22,10 @@ class ApplyReport(BaseModel):
     avg_price: float | None = None
     fee: float | None = None
     message: str
+    # Why the broker refused, when the refusal was classified rather than only
+    # described. The scheduler pauses instead of retrying a reason that no
+    # retry can clear (see OrderRejectReason.requires_operator_fix).
+    reject_reason: OrderRejectReason | None = None
     # Which price series produced `signal` — e.g. "price_bar:bybit" or
     # "provider". Strategy parameters are fitted on provider history, so a
     # scheduled apply trades on a different series than it was optimized on;

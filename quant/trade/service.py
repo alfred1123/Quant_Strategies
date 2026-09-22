@@ -2,6 +2,7 @@
 
 import logging
 import uuid
+from decimal import Decimal
 from uuid import UUID
 
 from quant.api.credentials.repo import ApiCredentialRepo
@@ -25,6 +26,7 @@ from quant.trade.db_repo import TradeRepo
 from quant.trade.dry_run import run_dry_run
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
 from quant.trade.live_apply import LiveApplyOrchestrator
+from quant.trade.models.market import MarketLimits
 from quant.trade.registry import AdapterRegistry
 from quant.trade.schedule_align import compute_initial_scheduled_ts, should_realign_schedule
 from quant.trade.schedule_policy import require_fitted_interval, schedulable_interval_ids
@@ -62,6 +64,45 @@ class TradeService:
             price_bars=price_bars,
         )
 
+    def _venue_limits(self, app_id: int, internal_cusip: str) -> MarketLimits:
+        """What the venue will accept for this instrument, as last cached.
+
+        Empty limits when the symbol has no xref or nothing is cached, so an
+        instrument the venue does not list is refused by the dry run (which asks
+        the broker directly) rather than here.
+        """
+        vendor_symbol = self._data_caches.instrument_cache.resolve_internal_cusip(
+            internal_cusip, app_id
+        )
+        if vendor_symbol is None:
+            return MarketLimits(symbol=internal_cusip)
+        return self._data_caches.venue_limits.get(app_id, vendor_symbol)
+
+    def _require_tradable_qty(
+        self, *, app_id: int, internal_cusip: str, qty: Decimal
+    ) -> None:
+        """Refuse a quantity the venue would never fill.
+
+        Enforced here as well as before submitting because this is the moment a
+        person can still fix it; at order time the only remaining move is to
+        pause the deployment. The notional rule needs a live price, so it stays
+        an order-time check — this is the lot size.
+        """
+        undersized = self._venue_limits(app_id, internal_cusip).undersized(float(qty))
+        if undersized is not None:
+            raise TradeValidationError(undersized)
+
+    def _row(self, raw: dict) -> DeploymentRow:
+        """A DEPLOYMENT row plus the venue's lot size for its instrument.
+
+        ``min_qty`` is not stored — it is the exchange's rule, carried on the row
+        so the qty editor can refuse a value the API would refuse anyway instead
+        of discovering it on the next tick.
+        """
+        row = DeploymentRow.model_validate(raw)
+        limits = self._venue_limits(row.app_id, row.internal_cusip)
+        return row.model_copy(update={"min_qty": limits.min_qty})
+
     def create_deployment(
         self,
         app_user_id: UUID,
@@ -70,6 +111,9 @@ class TradeService:
     ) -> DeploymentRow:
         require_fitted_interval(
             req.schedule_tm_interval_id, refdata=self._data_caches.refdata
+        )
+        self._require_tradable_qty(
+            app_id=req.app_id, internal_cusip=req.internal_cusip, qty=req.qty
         )
         deployment_id = req.deployment_id or uuid.uuid4()
         initial_ts = None
@@ -96,7 +140,7 @@ class TradeService:
             schedule_tm_interval_id=req.schedule_tm_interval_id,
             initial_scheduled_ts=initial_ts,
         )
-        return DeploymentRow.model_validate(row)
+        return self._row(row)
 
     def schedule_options(self) -> ScheduleOptions:
         """Cadences the schedule control may offer."""
@@ -113,11 +157,11 @@ class TradeService:
         )
         if not rows:
             raise DeploymentNotFound(str(deployment_id))
-        return DeploymentRow.model_validate(rows[0])
+        return self._row(rows[0])
 
     def list_deployments(self, app_user_id: UUID) -> list[DeploymentRow]:
         rows = self._repo.sp_get_deployment(app_user_id=app_user_id)
-        return [DeploymentRow.model_validate(r) for r in rows]
+        return [self._row(r) for r in rows]
 
     def update_deployment(
         self,
@@ -138,6 +182,17 @@ class TradeService:
             if "schedule_tm_interval_id" in req.model_fields_set
             else current.schedule_tm_interval_id
         )
+        if "qty" in req.model_fields_set:
+            if req.qty is None:
+                raise TradeValidationError("qty must be greater than 0")
+            self._require_tradable_qty(
+                app_id=current.app_id,
+                internal_cusip=current.internal_cusip,
+                qty=req.qty,
+            )
+            qty = req.qty
+        else:
+            qty = current.qty
         initial_ts = None
         if should_realign_schedule(current, req) and schedule_tm_interval_id is not None:
             initial_ts = compute_initial_scheduled_ts(
@@ -153,7 +208,7 @@ class TradeService:
             api_credential_id=current.api_credential_id,
             app_id=current.app_id,
             internal_cusip=current.internal_cusip,
-            qty=current.qty,
+            qty=qty,
             is_paper_ind=current.is_paper_ind,
             is_enabled_ind=(
                 ("Y" if req.enabled else "N")
@@ -165,7 +220,7 @@ class TradeService:
             schedule_tm_interval_id=schedule_tm_interval_id,
             initial_scheduled_ts=initial_ts,
         )
-        return DeploymentRow.model_validate(row)
+        return self._row(row)
 
     def stop_deployment(
         self, app_user_id: UUID, deployment_id: UUID
@@ -193,7 +248,7 @@ class TradeService:
             schedule_tm_interval_id=current.schedule_tm_interval_id,
         )
         logger.info("Deployment %s stopped by user %s", deployment_id, app_user_id)
-        return DeploymentRow.model_validate(row)
+        return self._row(row)
 
     def apply_deployment(
         self, app_user_id: UUID, deployment_id: UUID

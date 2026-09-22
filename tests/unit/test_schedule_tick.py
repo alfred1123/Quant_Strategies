@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 
 from quant.schemas.apply import ApplyReport
-from quant.trade.models.order import IntendedAction
+from quant.trade.models.order import IntendedAction, OrderRejectReason
 from quant.trade.scheduler.tick import ScheduleTickRunner, TickOutcome
 
 DUE_AT = datetime(2026, 8, 1, 9, 0, tzinfo=UTC)
@@ -39,7 +39,10 @@ def _due_row(**overrides):
 
 
 def _apply_report(
-    *, position_qty: float, order_success: bool | None = None
+    *,
+    position_qty: float,
+    order_success: bool | None = None,
+    reject_reason: OrderRejectReason | None = None,
 ) -> ApplyReport:
     """A real ApplyReport, so renaming ``position_qty`` fails here."""
     return ApplyReport(
@@ -50,6 +53,7 @@ def _apply_report(
         signal=1.0,
         position_qty=position_qty,
         order_success=order_success,
+        reject_reason=reject_reason,
         message=(
             "insufficient funds" if order_success is False else "no order needed (HOLD)"
         ),
@@ -246,6 +250,38 @@ class TestAttemptBudget:
 
         assert report.results[0].outcome is TickOutcome.PAUSED
         repo.write_deployment.assert_called_once()
+
+    def test_an_unclassified_reject_keeps_its_remaining_attempts(self, repo):
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(
+            return_value=_apply_report(position_qty=0.0, order_success=False)
+        )
+        runner = _runner(repo, apply_fn, max_attempts=3)
+
+        report = runner.run_interval(1)
+
+        assert report.results[0].outcome is TickOutcome.RETRYING
+        repo.write_deployment.assert_not_called()
+
+    def test_a_size_reject_pauses_without_spending_the_budget(self, repo):
+        """Every remaining tick would place the same doomed order."""
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(
+            return_value=_apply_report(
+                position_qty=0.0,
+                order_success=False,
+                reject_reason=OrderRejectReason.SIZE_BELOW_MINIMUM,
+            )
+        )
+        runner = _runner(repo, apply_fn, max_attempts=3)
+
+        report = runner.run_interval(1)
+
+        assert report.results[0].outcome is TickOutcome.PAUSED
+        assert report.results[0].attempt == 1
+        kwargs = repo.write_deployment.call_args.kwargs
+        assert kwargs["is_enabled_ind"] == "N"
+        assert kwargs["deployment_status"] == "PAUSED"
 
     def test_pause_write_failure_still_advances(self, repo):
         repo.sp_get_missed_due_deployments.return_value = [_due_row()]

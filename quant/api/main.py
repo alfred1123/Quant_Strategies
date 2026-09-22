@@ -81,6 +81,21 @@ async def lifespan(app: FastAPI):
             )
             app.state.adapter_registry = AdapterRegistry()
 
+        from quant.trade.venue_limits import VenueLimitsPublisher
+
+        try:
+            n = VenueLimitsPublisher(redis_url, refdata=caches.refdata).publish_all()
+            logger.info("Cached order-size limits for %d broker app(s)", n)
+        except Exception:
+            # One public load_markets per venue, so a slow or unreachable
+            # exchange delays boot; it must never prevent it. Without a snapshot
+            # a too-small qty is caught before the order instead of at edit time.
+            logger.warning(
+                "Venue order-size limits not cached — qty edits fall back to the "
+                "pre-submit check. Retry with POST /api/v1/trade/venue-limits/refresh",
+                exc_info=True,
+            )
+
         from quant.trade.bar_source import PriceBarServiceFactory
 
         app.state.price_bars = PriceBarServiceFactory(DB_CONNINFO, caches)

@@ -14,6 +14,26 @@ class OrderType(str, Enum):
     LIMIT = "LIMIT"
 
 
+class OrderRejectReason(StrEnum):
+    """Why an order was refused, typed where the refusal was decided.
+
+    Carried on :class:`OrderResult` so policy reads a value instead of grepping
+    the message text back apart — the message exists for humans.
+    """
+
+    SIZE_BELOW_MINIMUM = "SIZE_BELOW_MINIMUM"
+
+    @property
+    def requires_operator_fix(self) -> bool:
+        """True when no retry can succeed until someone edits the deployment.
+
+        Both the retry executor (give up after one attempt) and the scheduler
+        (pause rather than spend the tick budget) ask this, so the answer lives
+        with the reason instead of being decided twice.
+        """
+        return self is OrderRejectReason.SIZE_BELOW_MINIMUM
+
+
 class IntendedAction(StrEnum):
     """Position-aware action from ``TradeAdapter.intended_side``.
 
@@ -50,6 +70,9 @@ class OrderResult:
     success: bool
     vendor_order_id: str | None
     message: str
+    #: Set when the refusal was classified at its source; ``None`` for a broker
+    #: error we only have prose for.
+    reason: OrderRejectReason | None = None
     raw_status: str | None = None
     side: OrderSide | None = None
     requested_qty: float | None = None

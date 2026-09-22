@@ -9,6 +9,7 @@ import logging
 from quant.data.backtest_cache import BacktestCache
 from quant.data.instruments import InstrumentCache
 from quant.refdata.reader import RedisRefData
+from quant.trade.venue_limits import RedisVenueLimits
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,9 @@ class DataCaches:
         self.refdata = RedisRefData(redis_url)
         self.instrument_cache = InstrumentCache(conninfo)
         self.backtest_cache = BacktestCache(conninfo, refdata=self.refdata)
+        # Venue order-size rules, cached from ccxt rather than seeded in
+        # REFDATA — the exchange owns these, not a user picking from a list.
+        self.venue_limits = RedisVenueLimits(redis_url)
 
     @property
     def conninfo(self) -> str:

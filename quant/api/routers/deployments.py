@@ -7,7 +7,7 @@ Routes under ``/api/v1/trade/deployments/*``. All routes behind
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from quant.api.auth.dependencies import require_user
 from quant.api.auth.models import CurrentUser
@@ -23,8 +23,10 @@ from quant.schemas.deployments import (
 )
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
 from quant.schemas.execution import ExecutionEventRow, TransactionRow
+from quant.shared.config import get_redis_url
 from quant.trade.db_repo import TradeRepo
 from quant.trade.service import TradeService
+from quant.trade.venue_limits import VenueLimitsPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +79,28 @@ def schedule_options(
     of ``/deployments/{deployment_id}`` to avoid being read as an id.
     """
     return svc.schedule_options()
+
+
+@router.post("/venue-limits/refresh")
+def refresh_venue_limits(
+    request: Request,
+    _user: CurrentUser = Depends(require_user),
+):
+    """Re-read every broker's order-size rules from ccxt into Redis.
+
+    Startup does this too; the endpoint exists because an exchange that was
+    unreachable then leaves the cache empty until asked again, and because a
+    venue can change a lot size while the API stays up. Returns how many apps
+    were snapshotted.
+    """
+    try:
+        n = VenueLimitsPublisher(
+            get_redis_url(), refdata=request.app.state.data_caches.refdata
+        ).publish_all()
+    except Exception as exc:
+        logger.exception("venue limits refresh failed")
+        raise HTTPException(status_code=503, detail=f"refresh failed: {exc}") from exc
+    return {"apps": n}
 
 
 @router.get(

@@ -10,7 +10,12 @@ import pytest
 from quant.schemas.deployments import DeploymentRow
 from quant.trade.errors import AdapterNotFoundError, TradeValidationError
 from quant.trade.live_apply import LiveApplyOrchestrator
-from quant.trade.models.order import IntendedAction, OrderResult, OrderSide
+from quant.trade.models.order import (
+    IntendedAction,
+    OrderRejectReason,
+    OrderResult,
+    OrderSide,
+)
 
 
 def _deployment(**overrides) -> DeploymentRow:
@@ -216,6 +221,32 @@ class TestLiveApplyOrchestrator:
         alert_text = orch._notifier.send.call_args.args[0]
         assert "insufficient funds" in alert_text
         assert "permanent" in alert_text.lower()
+
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
+    def test_reject_reason_reaches_the_report(self, mock_signal, orchestrator):
+        """The scheduler pauses off this field, so it must survive the cycle."""
+        orch, _bt = orchestrator
+        dep = _deployment()
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = ("k", "s")
+        orch._adapter_registry.create.return_value = _adapter_mock(
+            apply_signal=MagicMock(
+                return_value=OrderResult(
+                    success=False,
+                    vendor_order_id=None,
+                    message="qty 0.0001 is below BTCUSDT min qty 0.001",
+                    reason=OrderRejectReason.SIZE_BELOW_MINIMUM,
+                    side=OrderSide.BUY,
+                    requested_qty=0.0001,
+                )
+            ),
+        )
+
+        report = orch.run(dep.app_user_id, dep, "alice")
+
+        assert report.order_success is False
+        assert report.reject_reason is OrderRejectReason.SIZE_BELOW_MINIMUM
+        assert "min qty 0.001" in report.message
 
     @patch("quant.trade.order_policy.time.sleep")
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))

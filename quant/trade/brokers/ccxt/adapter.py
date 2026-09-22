@@ -16,6 +16,7 @@ from quant.trade.errors import (
 )
 from quant.trade.models.order import (
     IntendedAction,
+    OrderRejectReason,
     OrderRequest,
     OrderResult,
     OrderSide,
@@ -130,12 +131,32 @@ class CcxtTradeAdapter(TradeAdapter):
         except BrokerConnectionError:
             return None
 
+    def _undersized(self, req: OrderRequest) -> str | None:
+        """Venue reject text when *req* is below the min lot or notional.
+
+        Asked before submitting, because the qty that trips this is a deployment
+        setting: every tick would place the same doomed order, and a reject
+        typed here is what pauses the schedule instead of retrying it.
+        """
+        limits = self._gateway.fetch_market_limits(req.symbol)
+        price = (
+            self.get_last_price(req.symbol) if limits.min_notional is not None else None
+        )
+        return limits.undersized(req.qty, price)
+
     def place_order(self, req: OrderRequest) -> OrderResult:
         if req.order_type is not OrderType.MARKET:
             raise TradeValidationError(
                 f"{req.order_type.value} orders not supported by the ccxt adapter — market only"
             )
         side = "buy" if req.side == OrderSide.BUY else "sell"
+        undersized = self._undersized(req)
+        if undersized is not None:
+            return OrderResult(
+                success=False, vendor_order_id=None, message=undersized,
+                reason=OrderRejectReason.SIZE_BELOW_MINIMUM,
+                side=req.side, requested_qty=req.qty,
+            )
         try:
             raw = self._gateway.create_market_order(req.symbol, side, req.qty)
         except BrokerConnectionError as exc:

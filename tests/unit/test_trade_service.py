@@ -10,6 +10,7 @@ import pytest
 from quant.schemas.deployments import CreateDeploymentRequest, UpdateDeploymentRequest
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
 from quant.trade.live_apply import LiveApplyOrchestrator
+from quant.trade.models.market import MarketLimits
 from quant.trade.service import TradeService
 from tests.conftest import StubRefData
 
@@ -35,15 +36,31 @@ def _sp_row(**overrides):
     return base
 
 
+class StubVenueLimits:
+    """Stands in for the Redis snapshot — real rules, no I/O.
+
+    Defaults to limits that enforce nothing, which is what an uncached venue
+    looks like; a test that cares sets :attr:`limits`.
+    """
+
+    def __init__(self) -> None:
+        self.limits: MarketLimits | None = None
+
+    def get(self, app_id: int, vendor_symbol: str) -> MarketLimits:
+        return self.limits or MarketLimits(symbol=vendor_symbol)
+
+
 @pytest.fixture
 def svc():
     data_caches = MagicMock()
     # Real reader over a fixed snapshot, so the cadence guard resolves ids the
     # way it does in production instead of against a mock that always agrees.
     data_caches.refdata = StubRefData()
+    data_caches.venue_limits = StubVenueLimits()
     data_caches.instrument_cache.get_product_by_cusip.return_value = {
         "exchange": None,
     }
+    data_caches.instrument_cache.resolve_internal_cusip.return_value = "BTCUSDT"
     return TradeService(
         repo=MagicMock(),
         bt=MagicMock(),
@@ -110,6 +127,63 @@ class TestCreateDeployment:
         kwargs = svc._repo.sp_ins_deployment.call_args.kwargs
         assert kwargs["schedule_tm_interval_id"] == 1
         assert kwargs["initial_scheduled_ts"] is not None
+
+    def test_a_qty_below_the_venue_minimum_never_reaches_the_db(self, svc):
+        app_user_id = uuid4()
+        svc._data_caches.venue_limits.limits = MarketLimits("BTCUSDT", min_qty=0.001)
+
+        req = CreateDeploymentRequest(
+            strategy_id=uuid4(),
+            strategy_vid=1,
+            api_credential_id=1,
+            app_id=10,
+            internal_cusip="btcusdt.crypto",
+            qty=Decimal("0.0001"),
+        )
+        with pytest.raises(TradeValidationError, match="min qty 0.001"):
+            svc.create_deployment(app_user_id, "alice", req)
+
+        svc._repo.sp_ins_deployment.assert_not_called()
+
+    def test_the_row_carries_the_venue_minimum(self, svc):
+        """The qty editor needs the rule to refuse a value before the API does."""
+        app_user_id = uuid4()
+        svc._repo.sp_ins_deployment.return_value = _sp_row(app_user_id=app_user_id)
+        svc._data_caches.venue_limits.limits = MarketLimits("BTCUSDT", min_qty=0.001)
+
+        result = svc.create_deployment(
+            app_user_id,
+            "alice",
+            CreateDeploymentRequest(
+                strategy_id=uuid4(),
+                strategy_vid=1,
+                api_credential_id=1,
+                app_id=10,
+                internal_cusip="btcusdt.crypto",
+                qty=Decimal("0.01"),
+            ),
+        )
+
+        assert result.min_qty == 0.001
+
+    def test_an_uncached_venue_leaves_the_minimum_unknown(self, svc):
+        app_user_id = uuid4()
+        svc._repo.sp_ins_deployment.return_value = _sp_row(app_user_id=app_user_id)
+
+        result = svc.create_deployment(
+            app_user_id,
+            "alice",
+            CreateDeploymentRequest(
+                strategy_id=uuid4(),
+                strategy_vid=1,
+                api_credential_id=1,
+                app_id=10,
+                internal_cusip="btcusdt.crypto",
+                qty=Decimal("0.0001"),
+            ),
+        )
+
+        assert result.min_qty is None
 
     def test_cadence_the_strategy_was_not_fitted_on_is_refused(self, svc):
         """Hourly bars through daily-fitted parameters would trade silently."""
@@ -310,6 +384,88 @@ class TestUpdateDeployment:
 
         kwargs = svc._repo.write_deployment.call_args.kwargs
         assert kwargs["is_enabled_ind"] == "Y"
+
+    def test_qty_preserved_when_not_in_body(self, svc):
+        """A kill-switch toggle must not silently resize the position."""
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        current = _sp_row(
+            deployment_id=dep_id, app_user_id=app_user_id, qty=Decimal("0.01")
+        )
+        svc._repo.sp_get_deployment.return_value = [current]
+        svc._repo.write_deployment.return_value = _sp_row(qty=Decimal("0.01"))
+
+        svc.update_deployment(app_user_id, dep_id, UpdateDeploymentRequest(enabled=False))
+
+        kwargs = svc._repo.write_deployment.call_args.kwargs
+        assert kwargs["qty"] == Decimal("0.01")
+
+    def test_qty_changed(self, svc):
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        current = _sp_row(
+            deployment_id=dep_id, app_user_id=app_user_id, qty=Decimal("0.01")
+        )
+        svc._repo.sp_get_deployment.return_value = [current]
+        svc._repo.write_deployment.return_value = _sp_row(qty=Decimal("0.002"))
+
+        result = svc.update_deployment(
+            app_user_id, dep_id, UpdateDeploymentRequest(qty=Decimal("0.002"))
+        )
+
+        assert result.qty == Decimal("0.002")
+        kwargs = svc._repo.write_deployment.call_args.kwargs
+        assert kwargs["qty"] == Decimal("0.002")
+        assert kwargs["is_enabled_ind"] == current["is_enabled_ind"]
+
+    def test_a_qty_below_the_venue_minimum_is_refused(self, svc):
+        """Caught where it can still be fixed, not on the next scheduled tick."""
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        svc._repo.sp_get_deployment.return_value = [
+            _sp_row(deployment_id=dep_id, app_user_id=app_user_id)
+        ]
+        svc._data_caches.venue_limits.limits = MarketLimits("BTCUSDT", min_qty=0.001)
+
+        with pytest.raises(TradeValidationError, match="min qty 0.001"):
+            svc.update_deployment(
+                app_user_id, dep_id, UpdateDeploymentRequest(qty=Decimal("0.0001"))
+            )
+
+        svc._repo.write_deployment.assert_not_called()
+
+    def test_an_unchanged_qty_is_not_re_validated(self, svc):
+        """A row saved before the venue raised its lot size must still be stoppable."""
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        current = _sp_row(
+            deployment_id=dep_id, app_user_id=app_user_id, qty=Decimal("0.0001")
+        )
+        svc._repo.sp_get_deployment.return_value = [current]
+        svc._repo.write_deployment.return_value = _sp_row(is_enabled_ind="N")
+        svc._data_caches.venue_limits.limits = MarketLimits("BTCUSDT", min_qty=0.001)
+
+        result = svc.update_deployment(
+            app_user_id, dep_id, UpdateDeploymentRequest(enabled=False)
+        )
+
+        assert result.is_enabled_ind == "N"
+
+    def test_explicit_null_qty_is_refused(self, svc):
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        svc._repo.sp_get_deployment.return_value = [
+            _sp_row(deployment_id=dep_id, app_user_id=app_user_id)
+        ]
+
+        with pytest.raises(TradeValidationError, match="qty must be greater than 0"):
+            svc.update_deployment(
+                app_user_id,
+                dep_id,
+                UpdateDeploymentRequest.model_validate({"qty": None}),
+            )
+
+        svc._repo.write_deployment.assert_not_called()
 
 
 class TestStopDeployment:

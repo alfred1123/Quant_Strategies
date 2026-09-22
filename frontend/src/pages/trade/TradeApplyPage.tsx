@@ -32,6 +32,7 @@ import AccountSnapshotPanel from '../../components/trade/AccountSnapshotPanel';
 import ApplyConfirmDialog from '../../components/trade/ApplyConfirmDialog';
 import DeploymentDialog, { type DeploymentSelection } from '../../components/trade/DeploymentDialog';
 import DryRunReportDialog from '../../components/trade/DryRunReportDialog';
+import QtyCell from '../../components/trade/QtyCell';
 import ScheduleCell from '../../components/trade/ScheduleCell';
 import StrategyPicker, { type StrategyPickerSelection } from '../../components/trade/StrategyPicker';
 
@@ -277,7 +278,9 @@ export default function TradeApplyPage() {
                       <TableCell>
                         <ScheduleCell row={row} onError={setActionError} />
                       </TableCell>
-                      <TableCell align="right">{row.qty}</TableCell>
+                      <TableCell align="right">
+                        <QtyCell row={row} onError={setActionError} />
+                      </TableCell>
                       <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
                         <Tooltip title="Dry run">
                           <IconButton

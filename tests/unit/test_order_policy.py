@@ -2,7 +2,12 @@
 
 from unittest.mock import MagicMock, patch
 
-from quant.trade.models.order import IntendedAction, OrderResult, OrderSide
+from quant.trade.models.order import (
+    IntendedAction,
+    OrderRejectReason,
+    OrderResult,
+    OrderSide,
+)
 from quant.trade.order_policy import (
     ApplyAttempt,
     OrderRetryExecutor,
@@ -10,11 +15,18 @@ from quant.trade.order_policy import (
 )
 
 
-def _result(message: str, *, success: bool = False, vendor_order_id: str | None = "1") -> OrderResult:
+def _result(
+    message: str,
+    *,
+    success: bool = False,
+    vendor_order_id: str | None = "1",
+    reason: OrderRejectReason | None = None,
+) -> OrderResult:
     return OrderResult(
         success=success,
         vendor_order_id=vendor_order_id,
         message=message,
+        reason=reason,
         side=OrderSide.BUY,
         requested_qty=0.01,
     )
@@ -46,6 +58,18 @@ class TestOrderRetryPolicy:
 
     def test_unreachable_retryable(self):
         assert self.policy.is_retryable(_result("broker unreachable: timeout"))
+
+    def test_a_reject_needing_an_operator_is_not_retryable(self):
+        """Classified at the source — the policy reads the reason, not the prose."""
+        assert not self.policy.is_retryable(
+            _result(
+                "qty 0.0001 is below BTCUSDT min qty 0.001",
+                reason=OrderRejectReason.SIZE_BELOW_MINIMUM,
+            )
+        )
+
+    def test_an_unclassified_timeout_stays_retryable(self):
+        assert self.policy.is_retryable(_result("fetch timeout"))
 
     def test_defaults(self):
         assert self.policy.max_attempts == 5
@@ -101,6 +125,20 @@ class TestOrderRetryExecutor:
         assert outcome.permanent_failure
         assert len(outcome.attempts) == 1
         adapter.cancel_order.assert_not_called()
+
+    def test_a_size_reject_is_submitted_once(self):
+        adapter = _adapter(
+            _result(
+                "qty 0.0001 is below BTCUSDT min qty 0.001",
+                vendor_order_id=None,
+                reason=OrderRejectReason.SIZE_BELOW_MINIMUM,
+            )
+        )
+        outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 1.0, 0.0001)
+        assert adapter.apply_signal.call_count == 1
+        assert outcome.permanent_failure
+        assert outcome.result is not None
+        assert outcome.result.reason is OrderRejectReason.SIZE_BELOW_MINIMUM
 
     @patch("quant.trade.order_policy.time.sleep")
     def test_unconfirmed_cancels_and_retries_to_exhaustion(self, mock_sleep):

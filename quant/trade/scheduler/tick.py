@@ -11,7 +11,9 @@ woken: EventBridge and the dev poller both land here. Each pass:
    off the missed-due list until someone re-enables it.
 
 A failure that still has attempts left writes nothing, so the row stays due
-and the next pass retries it against the same ``SCHEDULED_TS``. Advancing
+and the next pass retries it against the same ``SCHEDULED_TS`` — unless the
+broker refused for a reason no retry can clear (a qty under the venue's min
+lot, say), which pauses on the first pass. Advancing
 from the *stored* due time rather than from ``now()`` is what makes a backlog
 drain one interval per pass instead of collapsing into a single apply.
 """
@@ -28,6 +30,7 @@ from uuid import UUID
 from quant.schemas.apply import ApplyReport
 from quant.schemas.deployments import DeploymentStatus
 from quant.trade.db_repo import TradeRepo
+from quant.trade.models.order import OrderRejectReason
 
 logger = logging.getLogger(__name__)
 
@@ -53,15 +56,39 @@ def _position_of(report) -> float | None:
         return None
 
 
-def _completed_failure(report) -> str | None:
-    """Message when apply returned a failed order; ``None`` if it did not fail.
+def _reject_reason_of(report) -> OrderRejectReason | None:
+    """Typed reject reason off an :class:`ApplyReport`; None when unclassified.
+
+    ``apply_deployment`` is injected, so the field may arrive as a bare string
+    or not at all. Anything that is not a reason we know counts as unclassified
+    and takes the ordinary retry budget.
+    """
+    try:
+        return OrderRejectReason(getattr(report, "reject_reason", None))
+    except ValueError:
+        return None
+
+
+@dataclass(frozen=True)
+class _OrderFailure:
+    """A finished apply cycle whose order failed, as the tick reads it."""
+
+    message: str
+    reason: OrderRejectReason | None
+
+
+def _failed_order(report) -> _OrderFailure | None:
+    """The failure an apply came back with; ``None`` if the order did not fail.
 
     ``order_success is False`` is a finished cycle that rejected or never
     confirmed. ``None`` (HOLD / no order) and ``True`` (fill) are not failures.
     """
-    if getattr(report, "order_success", None) is False:
-        return getattr(report, "message", None) or "order failed"
-    return None
+    if getattr(report, "order_success", None) is not False:
+        return None
+    return _OrderFailure(
+        message=getattr(report, "message", None) or "order failed",
+        reason=_reject_reason_of(report),
+    )
 
 
 class TickOutcome(StrEnum):
@@ -114,7 +141,9 @@ class ScheduleTickRunner:
     ``OrderRetryExecutor``, which retries a broker order inside a single apply.
     Attempts are counted per ``(deployment, scheduled_ts)`` in memory, so a
     restart forgives earlier failures — acceptable because the budget only
-    bounds how long a broken deployment stalls its own schedule.
+    bounds how long a broken deployment stalls its own schedule. A reject
+    carrying :attr:`OrderRejectReason.requires_operator_fix` skips the budget
+    and pauses immediately; nothing about the next pass would be different.
     """
 
     def __init__(
@@ -161,19 +190,32 @@ class ScheduleTickRunner:
             # broker read at all.
             return self._on_failure(row, attempt, exc)
 
-        failed = _completed_failure(report)
-        if failed is not None:
-            return self._on_failure(row, attempt, RuntimeError(failed))
+        failure = _failed_order(report)
+        if failure is not None:
+            return self._on_failure(
+                row, attempt, RuntimeError(failure.message), reason=failure.reason
+            )
 
         self._attempts.pop(deployment_id, None)
         return self._advance(
             row, TickOutcome.APPLIED, attempt, position_qty=_position_of(report)
         )
 
-    def _on_failure(self, row: dict, attempt: int, exc: Exception) -> TickResult:
+    def _on_failure(
+        self,
+        row: dict,
+        attempt: int,
+        exc: Exception,
+        *,
+        reason: OrderRejectReason | None = None,
+    ) -> TickResult:
         deployment_id = row["deployment_id"]
+        # A reject the deployment itself causes (e.g. a qty under the venue's
+        # min lot) fails identically on every pass, so spending the budget just
+        # delays the pause by a few intervals and repeats the alert.
+        retry_is_futile = reason is not None and reason.requires_operator_fix
 
-        if attempt < self._max_attempts:
+        if not retry_is_futile and attempt < self._max_attempts:
             logger.warning(
                 "apply failed for deployment=%s attempt=%d/%d — staying due: %s",
                 deployment_id,
@@ -233,7 +275,7 @@ class ScheduleTickRunner:
         logger.error(
             "auto-paused deployment=%s after %d failed applies: %s",
             deployment_id,
-            self._max_attempts,
+            attempt,
             error,
         )
         return TickResult(

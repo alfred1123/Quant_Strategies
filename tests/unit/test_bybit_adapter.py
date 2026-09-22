@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+import ccxt
 import pytest
 
 from quant.trade.adapters.base import TradeAdapter
@@ -19,8 +20,10 @@ from quant.trade.errors import (
     SymbolMappingError,
     TradeValidationError,
 )
+from quant.trade.models.market import MarketLimits
 from quant.trade.models.order import (
     IntendedAction,
+    OrderRejectReason,
     OrderRequest,
     OrderResult,
     OrderSide,
@@ -289,6 +292,86 @@ class TestCcxtTradeGateway:
         assert exc_info.value.status_code == 400
         assert "testnet.bybit.com" in str(exc_info.value)
 
+    def _connected(self, exchange) -> CcxtTradeGateway:
+        gw = CcxtTradeGateway(
+            CcxtSessionConfig(
+                api_key="k", api_secret="s", preset=CCXT_PRESETS["bybit"],
+            )
+        )
+        gw._exchange = exchange
+        return gw
+
+    def test_market_limits_come_off_the_loaded_market(self):
+        exchange = MagicMock()
+        exchange.market.return_value = {
+            "limits": {"amount": {"min": "0.001"}, "cost": {"min": 5}}
+        }
+        limits = self._connected(exchange).fetch_market_limits("BTCUSDT")
+        assert limits == MarketLimits("BTCUSDT", min_qty=0.001, min_notional=5.0)
+
+    def test_a_market_that_publishes_no_limits_enforces_nothing(self):
+        exchange = MagicMock()
+        exchange.market.return_value = {"limits": {"amount": {}}}
+        limits = self._connected(exchange).fetch_market_limits("BTCUSDT")
+        assert limits == MarketLimits("BTCUSDT")
+
+    def test_an_unlisted_symbol_enforces_nothing(self):
+        exchange = MagicMock()
+        exchange.market.side_effect = ccxt.BadSymbol("nope")
+        assert self._connected(exchange).fetch_market_limits("NOPE").min_qty is None
+
+    def test_a_disconnected_session_enforces_nothing(self):
+        gw = CcxtTradeGateway(
+            CcxtSessionConfig(
+                api_key="k", api_secret="s", preset=CCXT_PRESETS["bybit"],
+            )
+        )
+        assert gw.fetch_market_limits("BTCUSDT") == MarketLimits("BTCUSDT")
+
+    def test_all_limits_are_keyed_by_venue_id_and_unified_symbol(self):
+        """INST.PRODUCT_XREF stores one or the other depending on the venue."""
+        exchange = MagicMock()
+        exchange.markets = {
+            "BTC/USDT:USDT": {
+                "id": "BTCUSDT",
+                "symbol": "BTC/USDT:USDT",
+                "linear": True,
+                "limits": {"amount": {"min": 0.001}},
+            }
+        }
+        limits = self._connected(exchange).fetch_all_market_limits()
+
+        assert limits["BTCUSDT"] == MarketLimits("BTCUSDT", min_qty=0.001)
+        assert limits["BTC/USDT:USDT"] == MarketLimits("BTC/USDT:USDT", min_qty=0.001)
+
+    def test_a_preset_category_excludes_the_other_markets(self):
+        """Bybit prints BTCUSDT for the spot pair too; a linear session is not it."""
+        exchange = MagicMock()
+        exchange.markets = {
+            "BTC/USDT:USDT": {
+                "id": "BTCUSDT",
+                "symbol": "BTC/USDT:USDT",
+                "linear": True,
+                "limits": {"amount": {"min": 0.001}},
+            },
+            "BTC/USDT": {
+                "id": "BTCUSDT",
+                "symbol": "BTC/USDT",
+                "linear": False,
+                "limits": {"amount": {"min": 0.000048}},
+            },
+        }
+        limits = self._connected(exchange).fetch_all_market_limits()
+
+        assert limits["BTCUSDT"].min_qty == 0.001
+        assert "BTC/USDT" not in limits
+
+    def test_a_public_session_carries_no_keys(self):
+        config = CcxtSessionConfig.public(CCXT_PRESETS["bybit"])
+        assert (config.api_key, config.api_secret) == ("", "")
+        # Live venue: the cached rules must be the ones a real order faces.
+        assert config.paper is False
+
 
 class TestCreateCcxtAdapter:
     @patch.object(CcxtTradeGateway, "validate_credentials")
@@ -419,6 +502,78 @@ class TestPlaceOrder:
 
         assert result.success is False
         assert "no order id" in result.message
+
+    def test_size_reject_never_reaches_the_venue(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(
+            adapter.gateway, "fetch_market_limits",
+            return_value=MarketLimits("BTCUSDT", min_qty=0.001),
+        ), patch.object(adapter.gateway, "create_market_order") as mock_create:
+            req = OrderRequest(symbol="BTCUSDT", qty=0.0001, side=OrderSide.BUY)
+            result = adapter.place_order(req)
+
+        mock_create.assert_not_called()
+        assert result.success is False
+        assert result.reason is OrderRejectReason.SIZE_BELOW_MINIMUM
+        assert "min qty 0.001" in result.message
+        assert result.side == OrderSide.BUY
+        assert result.requested_qty == 0.0001
+
+    def test_notional_check_prices_the_order(self, inst_cache):
+        adapter = self._adapter(inst_cache)
+        with patch.object(
+            adapter.gateway, "fetch_market_limits",
+            return_value=MarketLimits("BNBUSDT", min_notional=5.0),
+        ), patch.object(adapter.gateway, "fetch_last_price", return_value=350.0), \
+             patch.object(adapter.gateway, "create_market_order") as mock_create:
+            result = adapter.place_order(
+                OrderRequest(symbol="BNBUSDT", qty=0.001, side=OrderSide.BUY)
+            )
+
+        mock_create.assert_not_called()
+        assert result.reason is OrderRejectReason.SIZE_BELOW_MINIMUM
+        assert "min notional 5" in result.message
+
+    def test_an_unpriceable_symbol_still_goes_to_the_broker(self, inst_cache):
+        """No quote, no opinion — the venue's own reject text is what we record."""
+        adapter = self._adapter(inst_cache)
+        with patch.object(
+            adapter.gateway, "fetch_market_limits",
+            return_value=MarketLimits("BNBUSDT", min_notional=5.0),
+        ), patch.object(
+            adapter.gateway, "fetch_last_price",
+            side_effect=BrokerConnectionError("fetch_ticker failed"),
+        ), patch.object(
+            adapter.gateway, "create_market_order",
+            side_effect=BrokerConnectionError("invalid order: too small"),
+        ) as mock_create:
+            result = adapter.place_order(
+                OrderRequest(symbol="BNBUSDT", qty=0.001, side=OrderSide.BUY)
+            )
+
+        mock_create.assert_called_once()
+        assert result.reason is None
+        assert "too small" in result.message
+
+    @patch("quant.trade.brokers.ccxt.adapter.confirm_market_order")
+    def test_a_size_within_the_limits_is_submitted(self, mock_confirm, inst_cache):
+        adapter = self._adapter(inst_cache)
+        mock_confirm.return_value = OrderResult(
+            success=True, vendor_order_id="ok1", message="order filled",
+        )
+        with patch.object(
+            adapter.gateway, "fetch_market_limits",
+            return_value=MarketLimits("BTCUSDT", min_qty=0.001, min_notional=5.0),
+        ), patch.object(adapter.gateway, "fetch_last_price", return_value=64000.0), \
+             patch.object(
+                 adapter.gateway, "create_market_order", return_value={"id": "ok1"},
+             ) as mock_create:
+            result = adapter.place_order(
+                OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
+            )
+
+        mock_create.assert_called_once_with("BTCUSDT", "buy", 0.01)
+        assert result.success is True
 
     def test_cancel_order_success(self, inst_cache):
         adapter = self._adapter(inst_cache)

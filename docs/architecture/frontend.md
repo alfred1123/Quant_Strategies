@@ -97,6 +97,7 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 | `StrategyPicker` | Selectable caller-owned `BT.STRATEGY` catalog via `GET /api/v1/strategies` |
 | `DeploymentDialog` | Create deployment — strategy, account, qty, schedule dropdown; **mode defaults to live** and still requires `confirm_live` |
 | `ScheduleCell` | Cadence per deployment row, editable in place; `useTmIntervals()` + `PATCH /trade/deployments/{id}` |
+| `QtyCell` | Position size per deployment row, editable in place; `PATCH /trade/deployments/{id}` with `qty`, refusing anything under `row.min_qty` |
 | `ExecutionLogPanel` | Recent order attempts and fills across the session's deployments |
 | `AccountSnapshotPanel` | Live cash + open positions for the selected account via `useAccountSnapshot()`; read-only |
 | `TradeApplyPage` | Strategy picker + Deploy button + account snapshot + deployments table; `useDeployments()` |
@@ -135,6 +136,21 @@ Automating a **live** deployment asks a second time — its own checkbox in the
 dialog, a `window.confirm` on the inline edit — because the existing live
 confirmation covers one attended order, not an unattended hourly cadence.
 Switching Paper / Live re-arms it.
+
+**Quantity — editable in place**
+
+`DeploymentDialog` sets qty on create and the Qty column's `QtyCell` edits it
+afterwards via the same `PATCH /trade/deployments/{id}`. Commit on blur or
+Enter; Escape reverts. Values must be greater than 0. Changing qty on a **live**
+deployment asks `window.confirm`, because the next apply (manual or scheduled)
+will use the new size. The write is soft-versioned — it bumps `DEPLOYMENT_VID`.
+
+A value below the venue's lot size is refused inline, naming the minimum, rather
+than sent to be rejected: `DeploymentRow.min_qty` carries the exchange's rule as
+the API cached it, and the input's tooltip shows it. The API checks the same
+thing, so the cell is saving a round-trip and not being trusted with the rule —
+when nothing is cached `min_qty` is null and the cell imposes no minimum. See
+[api.md](api.md#a-qty-the-venue-would-refuse-is-refused-while-it-can-still-be-fixed).
 
 **Strategy picker — not Backtest config UI**
 
@@ -228,6 +244,7 @@ frontend/src/
 │       ├── DryRunReportDialog.tsx  # Dry-run report viewer
 │       ├── AccountSnapshotPanel.tsx # Live cash + open positions (Apply page)
 │       ├── ScheduleCell.tsx         # Per-deployment cadence, editable in place
+│       ├── QtyCell.tsx              # Per-deployment qty, editable in place
 │       └── ExecutionLogPanel.tsx    # Recent order attempts and fills
 │
 ├── layouts/
