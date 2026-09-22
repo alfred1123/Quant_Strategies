@@ -747,14 +747,23 @@ Each slice is independently shippable.
 
 ### Worker resource envelope
 
-Nothing constrains what a job consumes today. There is no `mem_limit`, `cpus`
-or `pids_limit` on the `worker` service, and `MAX_CONCURRENT_WORKERS=1` is the
-only throttle. On a shared t4g.medium (decision #34) that makes a runaway grid
-search a host-wide event: the kernel OOM killer picks its victim by badness
-score, which can be `quant-api` rather than the job that caused it. Once the
-TRADE executor shares the box (decision #35, through Phase 3.7) that is a
-missed trade — schedules run with `RetryPolicy.n = 0`, so a skipped tick waits
-a full interval rather than retrying.
+**Partly addressed (2026-09-22, decision #75.)** `docker-compose.prod.yml` now
+sets `mem_limit: 2g` and `cpu_shares: 512` on the `worker` service, with
+`MAX_CONCURRENT_WORKERS=2`. A runaway grid search is now bounded by its own
+cgroup, so the OOM killer acts inside the worker rather than scoring
+`quant-api`, which matters more than it used to: the host has **no swap**, so
+an overshoot is an instant kill rather than a slowdown. Measured cost per child
+is ~240 MiB steady / ~590 MiB peak, so `2g` bounds a pathological job without
+firing in normal use. There is still no `cpus` hard cap and no `pids_limit` —
+`cpu_shares` is a *relative weight* that binds only under contention, which is
+the case worth protecting (the `:05` apply tick needs a core), but it does not
+cap a single job's absolute CPU.
+
+The original concern, for context: on a shared t4g.medium (decision #34) an
+unconstrained job is a host-wide event, and once the TRADE executor shares the
+box (decision #35, through Phase 3.7) that becomes a missed trade — schedules
+run with `RetryPolicy.MaximumRetryAttempts = 0`, so a skipped tick waits a full
+interval rather than retrying.
 
 The choice is really about *where* a job runs, because per-job sizing is a
 property of the execution substrate:

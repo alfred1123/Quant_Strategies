@@ -85,11 +85,14 @@ Source: `aws/cfn/03-compute.yml`, `aws/params/prod.json`.
 
 ## Live capture
 
-*(Paste output of `bash aws/scripts/capacity_snapshot.sh` here after running on EC2.)*
-
-```
-# pending — run on quant-server
-```
+**Captured 2026-09-22** — see
+[Infrastructure Capacity Review §2.3](../../design/infra-capacity-review.md)
+for the full snapshot and `sar` history. It corrects the estimates above: a
+backtest child costs **~240 MiB steady / ~590 MiB peak**, not 0.5–1 GiB, and
+host memory peaked at **26 %** under a sustained 31-job batch. The
+"t4g.small is NO for +1 trade worker" conclusion was over-cautious, though the
+t4g.medium upgrade it triggered has already happened and remains right for
+other reasons (decision #75).
 
 ---
 

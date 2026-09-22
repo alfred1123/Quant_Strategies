@@ -23,8 +23,22 @@ services:
       - COOKIE_SECURE=0
   worker:
     image: ${APP_IMAGE:-quant-app:latest}
+    # Two children saturate the host's two cores; a third would only time-slice
+    # them while stealing one from the api at apply time. Raising this needs
+    # 4 vCPU, not more RAM — see docs/design/infra-capacity-review.md §3.2.
+    # Safe at >1 because one loop claims sequentially; the non-atomic claim
+    # only races across separate worker_loop replicas (backtest-queue.md §0).
     environment:
       - APP_ENV=prod
       - USE_SSM=1
+      - MAX_CONCURRENT_WORKERS=2
+    # Unbounded, a runaway grid search is a host-wide event: with no swap the
+    # OOM killer scores quant-api as readily as the job that caused it.
+    # This bounds the whole container -- loop plus BOTH children -- so the
+    # budget is 2 x 590 MiB peak + ~72 MiB loop = ~1.25 GiB measured worst
+    # case, and 2g leaves ~750 MiB of slack. Raise it with the worker count,
+    # or a third child would OOM at its peak rather than get a slot.
+    mem_limit: 2g
+    cpu_shares: 512
   nginx:
     image: ${NGINX_IMAGE:-quant-nginx:latest}

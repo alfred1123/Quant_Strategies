@@ -122,6 +122,7 @@ nav:
       - Market Data Capture: design/market-data-capture.md
       - Multi-Strategy Netting: design/multi-strategy-netting.md
       - Return Compounding (bug): design/return-compounding.md
+      - Infrastructure Capacity Review: design/infra-capacity-review.md
       - Frontend Code Audit: design/frontend-audit.md
       - Plan to Profit: design/plan-to-profit.md
   - Archive:

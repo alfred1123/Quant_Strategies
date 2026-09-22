@@ -619,6 +619,13 @@ Deploy script uses `--no-build` on all `compose up` commands so prod never build
 
 ## Future: ECS migration
 
+The 2026-09-22 [capacity review](../design/infra-capacity-review.md) found the
+single `t4g.medium` at 1.7 % average CPU with one core idle even under a
+31-job batch, and concluded that neither a larger instance nor a second host is
+warranted (decision #75). That page lists the metric triggers that would reopen
+the question. Until one fires, the work is memory limits on the `worker`
+service, CloudWatch alarms, and closing port 22 — not topology.
+
 When the workload outgrows a single EC2 (e.g. independent queue worker
 scaling), add an ECS stack:
 

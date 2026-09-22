@@ -48,7 +48,7 @@ code; see [Dev vs Prod](architecture/dev-vs-prod.md#where-local-and-prod-are-def
 | `LOCAL_DB_USER` | Optional | Overrides the `local` user (default `quant_admin`). |
 | `LOCAL_DB_PASSWORD` | Optional | Local user password (default `LetsGetRich888` — change for non-default installs). |
 | `PROD_DB_PORT` | Optional | Overrides the `prod` port ahead of `QUANTDB_PORT`. For a tunnel on a non-standard local port. |
-| `MAX_CONCURRENT_WORKERS` | Optional | Max concurrent backtest worker subprocesses spawned by one `quant.queue.worker_loop` (default `1`). Bump only after `SP_CLAIM_NEXT` becomes atomic — see `docs/design/backtest-queue.md` §0. |
+| `MAX_CONCURRENT_WORKERS` | Optional | Max concurrent backtest worker subprocesses spawned by one `quant.queue.worker_loop` (default `1`; prod sets `2`). Safe above 1 — one loop claims sequentially, so the non-atomic claim only races between **separate `worker_loop` replicas**, which is what `docs/design/backtest-queue.md` §0 defers. Bound by cores, not RAM: see [Infrastructure Capacity Review §3.2](design/infra-capacity-review.md#32-three-concurrent-workers-use-two). |
 | `DB_POOL_MIN` | Optional | Process Postgres pool floor (default `2`). |
 | `DB_POOL_MAX` | Optional | Process Postgres pool cap (default `10`). |
 | `DB_POOL_MAX_IDLE` | Optional | Seconds an extra connection may sit unused before the pool closes it (default `600`). |
