@@ -253,7 +253,7 @@ cd /opt/quant && APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
 
 Active changelogs have **no baseline includes** — prod data is not touched until you explicitly add a new `releases/X.Y.Z-*.xml` and `<include>` it.
 
-**RDS CloudFormation** (`aws/cfn/02-database.yml`) deploys only when that template or relevant `aws/params/prod.json` keys change — not on every app push. Use workflow_dispatch `deploy_database=true` only when intentionally changing Aurora infrastructure.
+**RDS CloudFormation** (`aws/cfn/database/aurora-cluster.yml`) deploys only when that template or relevant `aws/params/prod.json` keys change — not on every app push. Use workflow_dispatch `deploy_database=true` only when intentionally changing Aurora infrastructure.
 
 ### Manual (local)
 

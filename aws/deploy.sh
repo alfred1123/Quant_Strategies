@@ -3,14 +3,16 @@
 #
 # Usage:
 #   bash aws/deploy.sh                    # deploy all stacks
-#   bash aws/deploy.sh network            # deploy a single stack
-#   bash aws/deploy.sh compute --dry-run  # preview changes
+#   bash aws/deploy.sh vpc                # deploy a single stack
+#   bash aws/deploy.sh ec2 --dry-run      # preview changes
+#
+# Targets are named after the AWS service whose template they deploy (see
+# STACKS); the deployed stack keeps its original name (see STACK_SUFFIX).
 #
 # Requires: AWS CLI v2 with a valid SSO session or access keys.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CFN_DIR="${SCRIPT_DIR}/cfn"
 PARAMS_DIR="${SCRIPT_DIR}/params"
 
 PROJECT="${PROJECT:-quant}"
@@ -23,23 +25,43 @@ if [[ "${*}" == *"--dry-run"* ]]; then
   DRY_RUN=true
 fi
 
-# ── Stack definitions (order matters) ─────────────────────────────────
+# ── Stack definitions ─────────────────────────────────────────────────
+# Templates live under cfn/<service>/: the folder tells you what a template
+# creates without opening it, and CloudFormation input stays clear of params/
+# and scripts/, which are kinds of file rather than AWS services. Dependency
+# order is ORDERED below, not a filename prefix.
 declare -A STACKS=(
-  [ecr]="00-ecr.yml"
-  [network]="01-network.yml"
-  [database]="02-database.yml"
-  [compute]="03-compute.yml"
-  [scheduler]="04-scheduler.yml"
+  [ecr]="cfn/ecr/image-repositories.yml"
+  [vpc]="cfn/vpc/security-groups.yml"
+  [database]="cfn/database/aurora-cluster.yml"
+  [ec2]="cfn/ec2/app-host.yml"
+  [eventbridge]="cfn/eventbridge/scheduled-task.yml"
+  [uk-egress]="cfn/ec2/uk-egress-proxy.yml"
 )
-ORDERED=(ecr network database compute scheduler)
+
+# Target name → live CloudFormation stack suffix, where they differ. These
+# stacks exist in prod and CloudFormation identifies them **by name**: a stack
+# is not renamed by renaming it here, it is replaced by a new empty one while
+# the real resources are orphaned. So the folders follow AWS service names and
+# the deployed names stay frozen.
+declare -A STACK_SUFFIX=(
+  [vpc]="network"
+  [ec2]="compute"
+  [eventbridge]="scheduler"
+)
+
+# uk-egress is absent on purpose: it lives in eu-west-2, and a bare
+# `deploy.sh` runs everything against one REGION. Deploy it by name:
+#   AWS_REGION=eu-west-2 bash aws/deploy.sh uk-egress
+ORDERED=(ecr vpc database ec2 eventbridge)
 
 LAMBDA_SCHEDULED_TASK_DIR="${SCRIPT_DIR}/lambda/scheduled-task"
 LAMBDA_SCHEDULED_TASK_NAME="${PROJECT}-scheduled-task"
 
 deploy_stack() {
   local name="$1"
-  local template="${CFN_DIR}/${STACKS[$name]}"
-  local stack_name="${PROJECT}-${name}"
+  local template="${SCRIPT_DIR}/${STACKS[$name]}"
+  local stack_name="${PROJECT}-${STACK_SUFFIX[$name]:-$name}"
 
   echo ""
   echo "══════════════════════════════════════════════════════════"
@@ -117,7 +139,7 @@ print(matches[0] if matches else '', end='')
     fi
   fi
 
-  if [[ "$name" == "compute" ]]; then
+  if [[ "$name" == "ec2" ]]; then
     local ec2_sg ec2_rds_sg
     ec2_sg=$(aws cloudformation describe-stacks \
       --stack-name "${PROJECT}-network" \
@@ -128,7 +150,7 @@ print(matches[0] if matches else '', end='')
     fi
   fi
 
-  if [[ "$name" == "scheduler" ]]; then
+  if [[ "$name" == "eventbridge" ]]; then
     local token_path="/quant/${ENV}/TRADE_SERVICE_TOKEN"
     if ! aws ssm get-parameter --name "$token_path" --region "$REGION" \
          --no-cli-pager >/dev/null 2>&1; then
@@ -166,7 +188,7 @@ print(matches[0] if matches else '', end='')
 
   echo "  ✓ ${stack_name} deployed."
 
-  if [[ "$name" == "scheduler" ]]; then
+  if [[ "$name" == "eventbridge" ]]; then
     upload_scheduled_task_lambda
     sync_schedules
   fi
@@ -227,6 +249,10 @@ sync_schedules() {
 
 # ── Main ──────────────────────────────────────────────────────────────
 TARGET="${1:-all}"
+# A bare flag is not a stack name: `deploy.sh --dry-run` previews everything,
+# where treating the flag as the target strips it to "" and trips `set -u` on
+# the empty STACKS subscript.
+[[ "$TARGET" == --* ]] && TARGET="all"
 
 echo "Deploying project=${PROJECT}  env=${ENV}  region=${REGION}"
 echo "Params file: ${PARAMS_FILE}"
@@ -240,7 +266,7 @@ else
   TARGET="${TARGET/--dry-run/}"
   TARGET="${TARGET// /}"
   if [[ -z "${STACKS[$TARGET]+x}" ]]; then
-    echo "Unknown stack: ${TARGET}.  Available: ${ORDERED[*]}"
+    echo "Unknown stack: ${TARGET}.  Available: ${!STACKS[*]}"
     exit 1
   fi
   deploy_stack "$TARGET"

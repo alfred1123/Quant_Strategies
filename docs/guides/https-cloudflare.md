@@ -156,7 +156,7 @@ If you used `bash aws/scripts/cloudflare-origin-cert.sh --upload-ssm` in Step 2,
 this step is **already done** — skip to Step 4.
 
 Otherwise store both under `/quant/prod/*` (the EC2 IAM role already grants read access to
-this path — see [`aws/cfn/03-compute.yml`](https://github.com/alfred1123/Quant_Strategies/blob/main/aws/cfn/03-compute.yml)).
+this path — see [`aws/cfn/ec2/app-host.yml`](https://github.com/alfred1123/Quant_Strategies/blob/main/aws/cfn/ec2/app-host.yml)).
 
 ```bash
 # Certificate (not secret, but kept alongside the key for convenience)
@@ -223,7 +223,7 @@ HTTPS-aware redirects work once `COOKIE_SECURE=1`.
 
 ## Step 6 — Lock the origin to Cloudflare only
 
-Port `443` is already allowed in [`aws/cfn/01-network.yml`](https://github.com/alfred1123/Quant_Strategies/blob/main/aws/cfn/01-network.yml),
+Port `443` is already allowed in [`aws/cfn/vpc/security-groups.yml`](https://github.com/alfred1123/Quant_Strategies/blob/main/aws/cfn/vpc/security-groups.yml),
 but to `0.0.0.0/0`. With the orange cloud, restrict **80/443 ingress to
 Cloudflare's published IP ranges** so no one can bypass the proxy and hit the
 origin directly. Update the security group ingress rules and redeploy the

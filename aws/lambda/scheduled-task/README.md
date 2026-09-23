@@ -12,7 +12,7 @@ Authorization: Bearer {TRADE_SERVICE_TOKEN}
 ## Source of truth
 
 - Handler: [`handler.py`](handler.py) (stdlib + bundled boto3 — no layers)
-- Infra: [`../../cfn/04-scheduler.yml`](../../cfn/04-scheduler.yml)
+- Infra: [`../../cfn/eventbridge/scheduled-task.yml`](../../cfn/eventbridge/scheduled-task.yml)
 - Deploy: `bash aws/deploy.sh scheduler` packages this directory and runs
   `aws lambda update-function-code`
 

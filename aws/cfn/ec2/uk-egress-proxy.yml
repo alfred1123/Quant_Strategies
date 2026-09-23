@@ -1,0 +1,267 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Quant Strategies - UK (eu-west-2) egress proxy. Gives Bybit order traffic a
+  fixed London IP without moving the application out of ap-southeast-1.
+
+# ── Why this stack exists ─────────────────────────────────────────────────
+# The Bybit account is KYC'd in GBR and its API key is pinned to a single IP.
+# Orders must leave from an address the venue accepts, but market data, the
+# database, the SPA, and the queue have no such constraint and are ~35 ms from
+# Hong Kong where they are today. So only the authenticated exchange session is
+# routed through here; everything else keeps talking to the world directly.
+#
+# It is a CONNECT-only forward proxy, not a TLS terminator: squid opens a tunnel
+# and the client's TLS goes end-to-end to the venue. This host therefore never
+# holds, sees, or can log an API key or an order — it moves bytes it cannot read.
+# That is the whole reason to prefer it over relaying orders through a service
+# running here.
+#
+# Deploy (region matters — this is the only stack outside ap-southeast-1):
+#   AWS_REGION=eu-west-2 bash aws/deploy.sh uk-egress
+# ─────────────────────────────────────────────────────────────────────────
+
+Parameters:
+  Project:
+    Type: String
+    Default: quant
+
+  AppEnv:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, prod]
+
+  # Not `InstanceType`: aws/params/prod.json sets that to the application
+  # host's t4g.medium, and deploy.sh feeds every declared parameter from that
+  # one file. A distinct name keeps a 4 GiB box from being built to run a proxy.
+  ProxyInstanceType:
+    Type: String
+    Default: t4g.nano
+    AllowedValues: [t4g.nano, t4g.micro, t4g.small]
+    Description: >-
+      t4g.nano (2 vCPU burst, 0.5 GiB) is ample — squid tunnels a handful of
+      orders an hour and caches nothing.
+
+  ProxyPort:
+    Type: Number
+    Default: 3128
+    Description: Port squid listens on, reachable only from ProxyClientCidr.
+
+  ProxyClientCidr:
+    Type: String
+    Description: >-
+      The only source allowed to use the proxy — the application host's Elastic
+      IP as a /32. An open proxy would be abused within hours.
+    AllowedPattern: ^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$
+
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64
+    Description: SSM-resolved Amazon Linux 2023. Must be arm64 for t4g.
+
+  VpcCidr:
+    Type: String
+    Default: 10.90.0.0/16
+    Description: Self-contained CIDR — this VPC peers with nothing.
+
+  SubnetCidr:
+    Type: String
+    Default: 10.90.1.0/24
+
+Resources:
+  # ── Network ──────────────────────────────────────────────────────────
+  # Its own VPC rather than the region's default: the default VPC's subnets and
+  # ACLs are outside this repo, and an order path should not depend on state no
+  # template describes.
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-uk-egress-vpc"
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-uk-egress-igw"
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref SubnetCidr
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      # The instance gets a permanent Elastic IP; this only covers the boot
+      # window before association, when it still needs to reach dnf for squid.
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-uk-egress-subnet"
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-uk-egress-rt"
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # ── Access ───────────────────────────────────────────────────────────
+  ProxySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${Project} UK egress proxy — one client, one port"
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ProxyPort
+          ToPort: !Ref ProxyPort
+          CidrIp: !Ref ProxyClientCidr
+          Description: Application host only
+      # No port 22: management is Session Manager, so the box has no inbound
+      # SSH listener to reach at all (the same argument as §4.4 of the capacity
+      # review, applied from the start here).
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-uk-egress-sg"
+
+  # ── Identity ─────────────────────────────────────────────────────────
+  ProxyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${Project}-uk-egress-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      # SSM only. This host reads no parameters and touches no other service —
+      # it must not be able to, since it sits in the order path.
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  ProxyInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref ProxyRole
+
+  # ── Host ─────────────────────────────────────────────────────────────
+  ProxyInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref ProxyInstanceType
+      ImageId: !Ref AmiId
+      IamInstanceProfile: !Ref ProxyInstanceProfile
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds:
+        - !Ref ProxySecurityGroup
+      MetadataOptions:
+        HttpTokens: required
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 8
+            VolumeType: gp3
+            DeleteOnTermination: true
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-uk-egress"
+        - Key: Environment
+          Value: !Ref AppEnv
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          dnf -y update
+          dnf -y install squid
+
+          # CONNECT-only, Bybit-only. Anything else is denied, so a compromised
+          # application host cannot turn this into a general-purpose exit node.
+          cat >/etc/squid/squid.conf <<'CONF'
+          visible_hostname quant-uk-egress
+
+          acl venue dstdomain api.bybit.com api-testnet.bybit.com api-demo.bybit.com api.bytick.com
+          acl SSL_ports port 443
+          acl CONNECT method CONNECT
+
+          http_access deny !CONNECT
+          http_access deny CONNECT !SSL_ports
+          http_access allow CONNECT venue
+          http_access deny all
+
+          http_port ${ProxyPort}
+
+          # A tunnel is opaque, so there is nothing to cache and nothing to
+          # rewrite. Announcing neither the hop nor the client keeps the
+          # request Bybit sees identical to a direct one.
+          cache deny all
+          forwarded_for delete
+          via off
+
+          access_log /var/log/squid/access.log
+          shutdown_lifetime 5 seconds
+          CONF
+
+          systemctl enable --now squid
+          systemctl is-active squid
+
+  # ── Fixed address ────────────────────────────────────────────────────
+  # The point of the stack. Allocated separately from the instance so a rebuilt
+  # proxy keeps the address Bybit has whitelisted — replacing the instance must
+  # not mean re-editing the API key.
+  EgressIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-uk-egress-ip"
+
+  EgressIpAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt EgressIp.AllocationId
+      InstanceId: !Ref ProxyInstance
+
+Outputs:
+  EgressIpAddress:
+    Description: Whitelist this on the Bybit API key — it is what the venue sees.
+    Value: !Ref EgressIp
+    Export:
+      Name: !Sub "${Project}-uk-egress-ip"
+
+  ProxyUrl:
+    Description: Value for the CCXT_PROXY_BYBIT parameter on the application host.
+    Value: !Sub "http://${EgressIp}:${ProxyPort}"
+
+  InstanceId:
+    Description: Session Manager target for squid logs and restarts.
+    Value: !Ref ProxyInstance

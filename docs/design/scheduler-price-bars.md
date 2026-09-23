@@ -414,7 +414,7 @@ Lambda is a thin HTTP caller with a service auth token. All business logic stays
 
 ### 6.1 AWS resources (implemented)
 
-CloudFormation stack `quant-scheduler` — template `aws/cfn/04-scheduler.yml`. Ops detail: [Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge-lambda).
+CloudFormation stack `quant-scheduler` — template `aws/cfn/eventbridge/scheduled-task.yml`. Ops detail: [Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge-lambda).
 
 | Resource | Name |
 |----------|------|
@@ -426,7 +426,7 @@ CloudFormation stack `quant-scheduler` — template `aws/cfn/04-scheduler.yml`. 
 | Service token SSM | `/quant/prod/TRADE_SERVICE_TOKEN` — fetched by the Lambda at cold start (CloudFormation does not support `ssm-secure` in Lambda env vars) |
 
 The `deploy` workflow's `cfn` job runs this stack on pushes touching
-`aws/cfn/04-scheduler.yml`, `aws/lambda/scheduled-task/**`, or
+`aws/cfn/eventbridge/scheduled-task.yml`, `aws/lambda/scheduled-task/**`, or
 `config/scheduler/**`, and on a manual dispatch. Locally:
 
 ```bash
@@ -890,7 +890,7 @@ what every downstream "newest closed bar" derives from.
 
 | File | Content |
 |------|---------|
-| `aws/cfn/04-scheduler.yml` | Lambda + schedule group + IAM |
+| `aws/cfn/eventbridge/scheduled-task.yml` | Lambda + schedule group + IAM |
 | `aws/lambda/scheduled-task/handler.py` | Task-routed API bridge (`trade_apply` now, `price_bar_sync` later) |
 | `aws/deploy.sh` | `scheduler` stack + Lambda zip upload |
 

@@ -283,7 +283,7 @@ that nobody saw. Wire it:
 | DB connections | `AWS/RDS` `DatabaseConnections` | > 16 | 2 pools × 10 is the hard cap; 16 means something is leaking |
 
 One SNS topic with an e-mail subscription is enough. Add these to a new
-`aws/cfn/05-monitoring.yml` so they deploy with everything else; the CFN job in
+`aws/cfn/cloudwatch/alarms.yml` so they deploy with everything else; the CFN job in
 `deploy.yml` already handles per-stack path detection.
 
 ### 4.3 Docker log rotation — currently none

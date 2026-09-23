@@ -17,5 +17,7 @@
   { "ParameterKey": "AppEnv",               "ParameterValue": "prod" },
 
   { "ParameterKey": "ApiBaseUrl",           "ParameterValue": "https://algodaemon.com" },
-  { "ParameterKey": "Ec2RoleName",          "ParameterValue": "quant-ec2-role" }
+  { "ParameterKey": "Ec2RoleName",          "ParameterValue": "quant-ec2-role" },
+
+  { "ParameterKey": "ProxyClientCidr",      "ParameterValue": "52.221.3.230/32" }
 ]

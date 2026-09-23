@@ -76,7 +76,7 @@ quant/                          # Python package
 
 frontend/src/                   # React SPA
 db/liquidbase/                  # Liquibase DDL per schema
-aws/cfn/                        # CloudFormation
+aws/cfn/<service>/              # CloudFormation, one folder per AWS service
 docker-compose*.yml             # prod stack
 scripts/                        # appctl, dbctl, liquibase-deploy, sync_schedules
 ```

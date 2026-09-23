@@ -13,7 +13,7 @@ Copy **Aurora (prod)** into a **local Postgres 17** database for offline dev, fa
 |------|-------------------|
 | Work **offline** with real REFDATA + users + strategies | **Yes** — set `DB_TARGET=local` after restore |
 | Fresh empty schema only (no prod data) | **No** — use `./scripts/dbctl.sh reset` + `DB_TARGET=local ./scripts/liquibase-deploy.sh` |
-| Prod **backup** / disaster recovery | **No** — Aurora snapshots + `DeletionPolicy: Retain` (see [Infrastructure](../architecture/infrastructure.md)). `dbctl` is for **developer laptops**, not prod ops. |
+| Prod **backup** / disaster recovery | **Not with `dbctl`** — it is for **developer laptops**. Use an Aurora snapshot first, then [Prod backup to S3](#prod-backup-to-s3) if you want a copy off Aurora (see [Infrastructure](../architecture/infrastructure.md)). |
 | Apply DDL to prod | **No** — use `scripts/liquibase-deploy.sh` |
 
 ---
@@ -82,7 +82,51 @@ See [Dev vs Prod — local Postgres](../architecture/dev-vs-prod.md#optional-poi
 | `./scripts/dbctl.sh status` | Local cluster, schema table counts, latest dump path |
 | `./scripts/dbctl.sh psql` | Open `psql` on local `quantdb` |
 
-Dump format: **custom** (`-Fc`), compressed (`-Z 6`). Typical size ~3–5 MB.
+Dump format: **custom** (`-Fc`), compressed (`-Z 6`). **283 MiB** as of 2026-09-22
+— the ~3–5 MB this guide used to quote predates the `PRICE_BAR` history, so plan
+for minutes, not seconds, and expect the tunnel to be the limiting factor.
+
+---
+
+## Prod backup to S3
+
+A dump taken **for prod** does not go through the tunnel at all — it runs on the
+EC2 host, which reaches Aurora directly on `:5432`, and lands in
+`s3://quant-db-dumps-539163478329/dumps/`. The host has no Postgres 17 client,
+so `pg_dump` runs from the `postgres:17-alpine` image (16 refuses a 17.9 server),
+and the file is deleted from `/var/tmp` after upload — it carries password hashes
+and `API_CREDENTIAL` ciphertext.
+
+```bash
+aws ssm send-command --instance-ids "$(aws cloudformation describe-stacks \
+    --stack-name quant-compute \
+    --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)" \
+  --document-name AWS-RunShellScript --timeout-seconds 900 \
+  --parameters commands='["bash -s <<'\''EOS'\''
+set -euo pipefail
+gp() { aws ssm get-parameter --name /quant/prod/$1 --with-decryption \
+       --region ap-southeast-1 --query Parameter.Value --output text; }
+PGPASSWORD=$(gp QUANTDB_PASSWORD); export PGPASSWORD
+F=quantdb_$(date -u +%Y%m%dT%H%M%SZ).dump
+docker run --rm -e PGPASSWORD -e PGSSLMODE=require -v /var/tmp:/dump postgres:17-alpine \
+  pg_dump -h $(gp QUANTDB_HOST) -p $(gp QUANTDB_PORT) -U $(gp QUANTDB_USERNAME) \
+          -d quantdb -Fc -Z 6 -f /dump/$F
+aws s3 cp /var/tmp/$F s3://quant-db-dumps-539163478329/dumps/$F
+rm -f /var/tmp/$F
+EOS"]'
+```
+
+The bucket blocks all public access, encrypts with AES256, expires `dumps/`
+objects after **90 days**, and grants `PutObject` to `quant-ec2-role` through its
+bucket policy — the instance role itself was not changed. The object is an
+ordinary `-Fc` dump, so `./scripts/dbctl.sh restore <file>` consumes it after an
+`aws s3 cp` down.
+
+This is a **second** line of defence, not the first: Aurora keeps 7 days of
+automated backups, and a manual snapshot (`quantdb-pre-infra-reorg-20260923`) is
+the cheaper pre-change safety net because it needs no client, no transfer, and
+no bucket. Take the S3 dump when you want a copy that outlives the cluster or
+restores somewhere that is not Aurora.
 
 ---
 

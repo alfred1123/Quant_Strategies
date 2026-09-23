@@ -507,7 +507,7 @@ Paper trading (`TrdEnv.SIMULATE`) does **not** need the trade unlock password. T
 
 ### 10.2 Network topology (prod)
 
-OpenD listens on **`127.0.0.1:11111` only**. Port **11111 is never opened** in the EC2 security group (only 22 / 80 / 443 today — see `aws/cfn/01-network.yml`).
+OpenD listens on **`127.0.0.1:11111` only**. Port **11111 is never opened** in the EC2 security group (only 22 / 80 / 443 today — see `aws/cfn/vpc/security-groups.yml`).
 
 ```mermaid
 flowchart TB

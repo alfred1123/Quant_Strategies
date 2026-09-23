@@ -1,7 +1,7 @@
 # Infrastructure
 
 Infrastructure as Code for the Quant Strategies deployment.
-All resources are defined as CloudFormation templates under `aws/cfn/`
+All resources are defined as CloudFormation templates under `aws/cfn/<service>/`
 and deployed via the AWS CLI.
 
 See [System Overview](overview.md) for runtime topology and [Dev vs Prod](dev-vs-prod.md) for environment differences.
@@ -54,12 +54,18 @@ The base `docker-compose.yml` exposes nginx on **:80** (HTTP, using `nginx.dev.c
 aws/
 ├── import-db-resources.json   ← resource mapping used during Aurora import
 ├── deploy.sh                  ← deploy / update all stacks
-├── cfn/
-│   ├── 00-ecr.yml             ← ECR repos quant-app, quant-nginx
-│   ├── 01-network.yml         ← security groups (EC2 + RDS)
-│   ├── 02-database.yml        ← Aurora PostgreSQL Serverless v2
-│   ├── 03-compute.yml         ← EC2 + IAM role + EIP
-│   └── 04-scheduler.yml       ← EventBridge Scheduler + scheduled-task Lambda
+├── cfn/                       ← CloudFormation templates, one folder per service
+│   ├── ecr/
+│   │   └── image-repositories.yml ← ECR repos quant-app, quant-nginx
+│   ├── vpc/
+│   │   └── security-groups.yml    ← security groups (EC2 + RDS)
+│   ├── database/
+│   │   └── aurora-cluster.yml     ← Aurora PostgreSQL Serverless v2
+│   ├── ec2/
+│   │   ├── app-host.yml           ← EC2 + IAM role + EIP
+│   │   └── uk-egress-proxy.yml    ← eu-west-2 CONNECT proxy for Bybit orders
+│   └── eventbridge/
+│       └── scheduled-task.yml     ← EventBridge Scheduler + scheduled-task Lambda
 ├── lambda/
 │   └── scheduled-task/        ← Lambda handler (uploaded by deploy.sh)
 ├── params/
@@ -86,15 +92,27 @@ aws/
 
 ## Stacks (deployment order)
 
-Stacks must be deployed in order due to cross-stack references.
+Stacks must be deployed in order due to cross-stack references. Templates live
+under `aws/cfn/<service>/`, grouped by the **AWS service** that owns their
+resources, so the folder says what a template creates while `params/` and
+`scripts/` — kinds of file, not services — stay out of that namespace. The order
+lives in `deploy.sh`'s `ORDERED` array rather than in a filename prefix.
 
-| # | Stack | Template | Creates |
-|---|-------|----------|---------|
-| 0 | `quant-ecr` | `00-ecr.yml` | ECR repos `quant-app`, `quant-nginx` |
-| 1 | `quant-network` | `01-network.yml` | EC2 SG (22/80/443), RDS SG (5432 from EC2 only) |
-| 2 | `quant-database` | `02-database.yml` | Aurora cluster, serverless instance, DB subnet group |
-| 3 | `quant-compute` | `03-compute.yml` | EC2 instance, IAM role (SSM access), Elastic IP |
-| 4 | `quant-scheduler` | `04-scheduler.yml` | scheduled-task Lambda, EventBridge schedule group, invoke + EC2 manage IAM |
+**The deploy target is not always the stack name.** `deploy.sh` builds the stack
+name as `quant-<target>` unless `STACK_SUFFIX` overrides it, and three targets
+do override. CloudFormation identifies a stack **by name**: renaming one here
+would not rename the deployed stack, it would create a second empty one and
+orphan the live resources. So the folders were free to move and the deployed
+names are frozen.
+
+| # | Stack | Deploy target | Template | Creates |
+|---|-------|---------------|----------|---------|
+| 0 | `quant-ecr` | `ecr` | `cfn/ecr/image-repositories.yml` | ECR repos `quant-app`, `quant-nginx` |
+| 1 | `quant-network` | `vpc` | `cfn/vpc/security-groups.yml` | EC2 SG (22/80/443), RDS SG (5432 from EC2 only) |
+| 2 | `quant-database` | `database` | `cfn/database/aurora-cluster.yml` | Aurora cluster, serverless instance, DB subnet group |
+| 3 | `quant-compute` | `ec2` | `cfn/ec2/app-host.yml` | EC2 instance, IAM role (SSM access), Elastic IP |
+| 4 | `quant-scheduler` | `eventbridge` | `cfn/eventbridge/scheduled-task.yml` | scheduled-task Lambda, EventBridge schedule group, invoke + EC2 manage IAM |
+| — | `quant-uk-egress` | `uk-egress` | `cfn/ec2/uk-egress-proxy.yml` | **eu-west-2 only** — VPC, t4g.nano squid host, Elastic IP giving Bybit orders a London source address |
 
 ---
 
@@ -125,10 +143,13 @@ bash aws/deploy.sh
 ### Deploy a single stack
 
 ```bash
-bash aws/deploy.sh network
+bash aws/deploy.sh vpc
 bash aws/deploy.sh database
-bash aws/deploy.sh compute
-bash aws/deploy.sh scheduler   # normally CI; requires /quant/prod/TRADE_SERVICE_TOKEN in SSM
+bash aws/deploy.sh ec2
+bash aws/deploy.sh eventbridge   # normally CI; requires /quant/prod/TRADE_SERVICE_TOKEN in SSM
+
+# The one stack in another region — its whole purpose is the London IP
+AWS_REGION=eu-west-2 bash aws/deploy.sh uk-egress
 ```
 
 ### Updating
@@ -170,6 +191,7 @@ managed by CloudFormation:
 | `quant-compute` | IAM role | `quant-ec2-role` | SSM access |
 | `quant-compute` | EIP | *(resolve via CFN `PublicIp` output)* | Static public IP |
 | — | Key pair | `tradingServerKey` | SSH access (not managed by CFN) |
+| — | S3 bucket | `quant-db-dumps-539163478329` | Prod `pg_dump` archive under `dumps/` (not managed by CFN). Private, AES256, 90-day expiry; `quant-ec2-role` may `PutObject` via bucket policy. See [Database dump & restore](../guides/database-dump-restore.md#prod-backup-to-s3) |
 
 Instance and EIP IDs change when the compute stack replaces EC2 — resolve at
 runtime from `quant-compute` outputs (`InstanceId`, `PublicIp`). See
@@ -313,9 +335,9 @@ drivers run the identical pass (`ScheduleSweeper`). See
 ### Deploying
 
 The `deploy` workflow owns this stack, same as the other four. Its `cfn` job runs
-`bash aws/deploy.sh scheduler` — CFN, then the Lambda zip upload, then
+`bash aws/deploy.sh eventbridge` — CFN, then the Lambda zip upload, then
 `scripts/sync_schedules.py` — whenever a push to `main` touches
-`aws/cfn/04-scheduler.yml`, `aws/lambda/scheduled-task/**`, `aws/deploy.sh`, or
+`aws/cfn/eventbridge/scheduled-task.yml`, `aws/lambda/scheduled-task/**`, `aws/deploy.sh`, or
 `config/scheduler/**`. A manual **Run workflow** deploys it unconditionally,
 which is how you redeploy without an infra commit.
 
@@ -449,7 +471,7 @@ than `-->|authed| RedirectHome["Redirect /"]`).
    - **refdata** — `db/liquidbase/refdata/**` (gate for post-migrate Redis republish)
 2. **Test job** — runs `pytest tests/unit/` on GitHub's runner (Python 3.12)
 3. **Frontend job** — `npm ci`, `npm audit --audit-level=high`, `npm run build` (type-check + Vite build), `npm test` on Node 24. Gates **`build-nginx` only** — not `build-app`.
-4. **CFN job** — deploys infra stacks when the matching `aws/cfn/**` template or relevant `aws/params/prod.json` keys change (per-stack detection). The **database** stack only deploys when `02-database.yml` / DB params change and requires the `DB_MASTER_PASSWORD` secret (it is otherwise guarded by `DeletionPolicy=Retain`, `UpdateReplacePolicy=Snapshot`, `DeletionProtection=true`).
+4. **CFN job** — deploys infra stacks when the matching `aws/cfn/<service>/*.yml` template or relevant `aws/params/prod.json` keys change (per-stack detection). A template that git reports as a **pure rename** (`R100` — moved, not one byte changed) is dropped from the changed list before the per-stack checks, so moving templates between folders deploys nothing. The **database** stack only deploys when `cfn/database/aurora-cluster.yml` / DB params change and requires the `DB_MASTER_PASSWORD` secret (it is otherwise guarded by `DeletionPolicy=Retain`, `UpdateReplacePolicy=Snapshot`, `DeletionProtection=true`).
 5. **Build jobs** — `build-app` when `quant/**` (etc.) changed; `build-nginx` when `frontend/**` changed. Each pushes to ECR (git SHA + `latest`) on native arm64 — see [Why the build runs on arm64](#why-the-build-runs-on-arm64).
 6. **Migrate job** — skipped unless `db/liquidbase/**` changed; otherwise runs `aws/scripts/liquibase-ssm-run.sh deploy <sha>` on EC2 with `LIQUIBASE_CONTEXTS=prod-deploy`. Gated by the `production-db` environment (see [Approving a migration](#approving-a-migration)).
 7. **Deploy job** — skipped when no app/nginx/compose/db changes; SSM Run Command runs the inline deploy script (see [Deployment logic](#deployment-logic) below). Waits on `migrate`, so containers never restart ahead of the schema. Sets `REFRESH_REFDATA` after a REFDATA migrate when `quant-app` was not rebuilt.
@@ -623,7 +645,7 @@ aws ssm send-command \
   --region ap-southeast-1
 ```
 
-**Long-term:** CFN `03-compute.yml` sets **30 GiB gp3** root volume (`RootVolumeSize`). Update the live volume without replacing the instance:
+**Long-term:** CFN `cfn/ec2/app-host.yml` sets **30 GiB gp3** root volume (`RootVolumeSize`). Update the live volume without replacing the instance:
 
 ```bash
 # Find volume id for the instance root device, then:
@@ -648,7 +670,7 @@ service, CloudWatch alarms, and closing port 22 — not topology.
 When the workload outgrows a single EC2 (e.g. independent queue worker
 scaling), add an ECS stack:
 
-1. Reuse existing ECR repos (`00-ecr.yml` — `quant-app`, `quant-nginx`)
+1. Reuse existing ECR repos (`cfn/ecr/image-repositories.yml` — `quant-app`, `quant-nginx`)
 2. Create `05-ecs.yml` for ECS cluster, ALB, API service, worker service
 3. The same Docker images and SSM parameters work unchanged
-4. Remove the compute stack (`03-compute.yml`) when ready
+4. Remove the compute stack (`cfn/ec2/app-host.yml`) when ready
