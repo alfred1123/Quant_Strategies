@@ -26,6 +26,7 @@ from quant.trade.models.order import IntendedAction, OrderResult
 from quant.trade.db_repo import TradeRepo
 from quant.trade.order_policy import OrderRetryExecutor, OrderRetryResult
 from quant.trade.registry import AdapterRegistry
+from quant.trade.schedule_policy import fitted_interval_id
 
 logger = logging.getLogger(__name__)
 
@@ -138,10 +139,11 @@ class LiveApplyOrchestrator:
         result_payload = self._bt.fetch_result_payload(
             deployment.strategy_id, deployment.strategy_vid
         )
-        bar_loader, bar_source = self._resolve_signal_source(deployment)
+        config_json = strategy_rows[0]["config_json"]
+        bar_loader, bar_source = self._resolve_signal_source(deployment, config_json)
         try:
             signal, data_as_of = compute_latest_position(
-                strategy_rows[0]["config_json"],
+                config_json,
                 result_payload=result_payload,
                 caches=self._data_caches,
                 bar_loader=bar_loader,
@@ -157,17 +159,20 @@ class LiveApplyOrchestrator:
         return signal, bar_source
 
     def _resolve_signal_source(
-        self, deployment: DeploymentRow
+        self, deployment: DeploymentRow, config_json: dict
     ) -> tuple[BarLoader | None, str]:
         """Pick the price series for this deployment — see ``resolve_signal_source``.
 
         The rule lives in ``quant/trade/bar_source.py`` so the dry run resolves
         it identically; a preview computed from a different series than the
-        order that follows is worse than no preview.
+        order that follows is worse than no preview. The fitted interval comes
+        from the strategy's config so a manual apply (no schedule) still prices
+        the bars it was fitted on.
         """
         return resolve_signal_source(
             app_id=deployment.app_id,
             schedule_tm_interval_id=deployment.schedule_tm_interval_id,
+            fitted_interval_id=fitted_interval_id(config_json),
             data_caches=self._data_caches,
             price_bars=self._price_bars,
             what=f"deployment {deployment.deployment_id}",

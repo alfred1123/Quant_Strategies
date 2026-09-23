@@ -69,16 +69,20 @@ def dry_run_deployment(
 
 @router.get("/schedule-options", response_model=ScheduleOptions)
 def schedule_options(
-    _user: CurrentUser = Depends(require_user),
+    strategy_id: UUID,
+    strategy_vid: int,
+    user: CurrentUser = Depends(require_user),
     svc: TradeService = Depends(get_trade_service),
 ) -> ScheduleOptions:
-    """Cadences a deployment may be scheduled on.
+    """The cadence a deployment of this strategy may be scheduled on.
 
-    Not under ``/deployments`` because it describes the platform rather than
-    any one row — and a literal segment there would have to be declared ahead
-    of ``/deployments/{deployment_id}`` to avoid being read as an id.
+    Per strategy, not per platform: the allowed interval is the one the
+    strategy was fitted on, read from its backtest config. Not under
+    ``/deployments`` because it describes a strategy rather than any one row —
+    and a literal segment there would have to be declared ahead of
+    ``/deployments/{deployment_id}`` to avoid being read as an id.
     """
-    return svc.schedule_options()
+    return svc.schedule_options(user.app_user_id, strategy_id, strategy_vid)
 
 
 @router.post("/venue-limits/refresh")

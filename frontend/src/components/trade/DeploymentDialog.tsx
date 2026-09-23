@@ -74,7 +74,10 @@ function DeploymentDialogContent({
   const { data: accounts = [] } = useBrokerAccounts();
   const { data: apps = [] } = useApps();
   const { data: intervals = [] } = useTmIntervals();
-  const { data: scheduleOptions } = useScheduleOptions();
+  const { data: scheduleOptions } = useScheduleOptions(
+    selection?.strategyId,
+    selection?.strategyVid,
+  );
   const { data: products = [] } = useProducts();
   const create = useCreateDeployment();
   const dryRun = useDryRun();

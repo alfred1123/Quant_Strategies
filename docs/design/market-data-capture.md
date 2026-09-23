@@ -520,7 +520,8 @@ malfunctioning and nothing in either output to show why.
 `LiveApplyOrchestrator._resolve_signal_source` was the only place the venue rule
 lived, so it moved to `bar_source.resolve_signal_source` and both callers use it.
 A dry run predates its schedule, so it passes `schedule_tm_interval_id=None` and
-falls through to daily — the only cadence a deployment may run on anyway.
+falls through to the strategy's fitted interval (`fitted_interval_id`, read from
+`CONFIG_JSON.tm_interval_id`) — the cadence a deployment of it will run on.
 
 `DryRunReport.bar_source` carries the label to the UI, next to `ApplyReport`'s,
 for the same reason: two sources are two sets of numbers, and a divergence is

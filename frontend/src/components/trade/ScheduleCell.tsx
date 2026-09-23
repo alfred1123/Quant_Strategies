@@ -22,7 +22,7 @@ interface ScheduleCellProps {
  */
 export default function ScheduleCell({ row, onError }: ScheduleCellProps) {
   const { data: intervals = [] } = useTmIntervals();
-  const { data: scheduleOptions } = useScheduleOptions();
+  const { data: scheduleOptions } = useScheduleOptions(row.strategy_id, row.strategy_vid);
   const update = useUpdateDeployment();
 
   const sorted = useMemo(

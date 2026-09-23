@@ -16,6 +16,7 @@ from quant.trade.bar_source import PriceBarServiceFactory, resolve_signal_source
 from quant.trade.db_repo import TradeRepo
 from quant.trade.errors import AdapterNotFoundError, TradeValidationError
 from quant.trade.registry import AdapterRegistry
+from quant.trade.schedule_policy import fitted_interval_id
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +41,9 @@ def run_dry_run(
     another's. A dry run whose numbers do not match the thing it previews is
     worse than none, because it is trusted.
 
-    There is no schedule yet at dry-run time, so ``resolve_signal_source``
-    falls through to daily — the cadence a deployment is allowed to run on.
+    There is no schedule yet at dry-run time, so ``resolve_signal_source`` uses
+    the interval the strategy was fitted on — the cadence a deployment of it is
+    allowed to run on, and the one a manual apply prices off.
     """
     strategy_row = repo.validate_dry_run(
         app_user_id=app_user_id,
@@ -70,6 +72,7 @@ def run_dry_run(
     bar_loader, bar_source = resolve_signal_source(
         app_id=req.app_id,
         schedule_tm_interval_id=None,
+        fitted_interval_id=fitted_interval_id(strategy_row["config_json"]),
         data_caches=data_caches,
         price_bars=price_bars,
         what=f"dry run of strategy {req.strategy_id}",

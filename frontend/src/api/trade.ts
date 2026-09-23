@@ -86,8 +86,13 @@ async function listExecutionEvents(limit = 50): Promise<ExecutionEventRow[]> {
   return data;
 }
 
-async function fetchScheduleOptions(): Promise<ScheduleOptions> {
-  const { data } = await apiClient.get<ScheduleOptions>('/trade/schedule-options');
+async function fetchScheduleOptions(
+  strategyId: string,
+  strategyVid: number,
+): Promise<ScheduleOptions> {
+  const { data } = await apiClient.get<ScheduleOptions>('/trade/schedule-options', {
+    params: { strategy_id: strategyId, strategy_vid: strategyVid },
+  });
   return data;
 }
 
@@ -176,17 +181,23 @@ export function useAccountSnapshot(
 }
 
 /**
- * Cadences the schedule control may offer, from the API that enforces them.
+ * The cadence a deployment of this strategy may be scheduled on — the interval
+ * it was fitted on, from the API that enforces it.
  *
- * Fixed for the life of a deployed backend, so it is fetched once and never
- * refetched. Callers treat "not loaded" as "no restriction" — the API refuses
- * the write regardless, and greying out every option on a failed read would
- * be a worse lie than briefly offering one that gets rejected.
+ * Keyed per strategy so two rows of the same strategy share one fetch. Fixed
+ * for a given strategy version, so it never refetches. Callers treat "not
+ * loaded" as "no restriction" — the API refuses the write regardless, and
+ * greying out every option on a failed read would be a worse lie than briefly
+ * offering one that gets rejected. Disabled until a strategy is known.
  */
-export function useScheduleOptions() {
+export function useScheduleOptions(
+  strategyId: string | undefined,
+  strategyVid: number | undefined,
+) {
   return useQuery({
-    queryKey: SCHEDULE_OPTIONS_QUERY_KEY,
-    queryFn: fetchScheduleOptions,
+    queryKey: [...SCHEDULE_OPTIONS_QUERY_KEY, strategyId, strategyVid],
+    queryFn: () => fetchScheduleOptions(strategyId!, strategyVid!),
+    enabled: strategyId != null && strategyVid != null,
     staleTime: Infinity,
   });
 }

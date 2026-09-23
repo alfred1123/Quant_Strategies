@@ -142,9 +142,9 @@ one justified by arithmetic nobody fitted.
 
 | Piece | Behaviour |
 |---|---|
-| `schedulable_interval_ids(refdata)` | `RedisRefData.resolve_interval_id(FITTED_BAR_PERIOD)` — the module states the fitted **period** (`timedelta(days=1)`) and REFDATA owns what that period is numbered, exactly as an unscheduled apply resolves its cadence (decision #45). No interval id is hardcoded, so renumbering `DAILY` moves the guard with it |
-| `require_fitted_interval()` | **400** on create and on update, naming both the rejected and the fitted cadence via `RedisRefData.interval_label()`. `null` (manual) always passes — it prices off the fitted daily interval |
-| `GET /trade/schedule-options` | Publishes the same set so `DeploymentDialog` and `ScheduleCell` grey out what the API would refuse, instead of the frontend re-stating a backtest-side rule |
+| `fitted_interval_id(config_json)` | The interval the strategy was fitted on, read from its `CONFIG_JSON.tm_interval_id` (required since #57). No fallback: a config that names no interval is a data error and is refused, never silently defaulted to daily |
+| `require_fitted_interval()` | **400** on create and on update when `schedule_tm_interval_id` is anything but the strategy's fitted interval, naming both cadences via `RedisRefData.interval_label()`. `null` (manual) always passes — it prices off the same fitted interval |
+| `GET /trade/schedule-options?strategy_id=…&strategy_vid=…` | Returns that one interval so `DeploymentDialog` and `ScheduleCell` grey out every other cadence, instead of the frontend re-stating a backtest-side rule |
 
 `interval_label()` lives on `RedisRefData` beside `resolve_interval_id` and
 `get_interval_period`, not in the trade module: every `REFDATA.TM_INTERVAL`

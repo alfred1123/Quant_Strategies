@@ -1,6 +1,5 @@
 """Unit tests for deployment dry-run orchestration."""
 
-from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -34,7 +33,11 @@ def deps():
     repo = MagicMock()
     repo.validate_dry_run.return_value = {
         "strategy_nm": "test-strategy",
-        "config_json": {"internal_cusip": "btcusdt.crypto", "substrategies": []},
+        "config_json": {
+            "internal_cusip": "btcusdt.crypto",
+            "substrategies": [],
+            "tm_interval_id": 1,
+        },
     }
     bt = MagicMock()
     credential_service = MagicMock()
@@ -201,9 +204,9 @@ class TestPreviewReadsWhatTheApplyWillRead:
         )
 
     @patch("quant.trade.dry_run.compute_latest_position", return_value=(1.0, "2024-06-01"))
-    def test_no_schedule_yet_means_daily(self, _signal, deps):
-        """A dry run predates the schedule, and daily is the only cadence a
-        deployment may run on."""
+    def test_no_schedule_yet_means_the_fitted_cadence(self, mock_signal, deps):
+        """A dry run predates the schedule, so it reads the strategy's fitted
+        cadence (``tm_interval_id`` 1 here), not a hardcoded daily."""
         run_dry_run(
             app_user_id=deps["app_user_id"],
             req=_dry_run_request(),
@@ -216,8 +219,10 @@ class TestPreviewReadsWhatTheApplyWillRead:
             price_bars=deps["price_bars"],
         )
 
-        deps["data_caches"].refdata.resolve_interval_id.assert_called_once_with(
-            timedelta(days=1)
+        loader = mock_signal.call_args.kwargs["bar_loader"]
+        loader("btcusdt.crypto", 120)
+        deps["price_bars"].for_app.return_value.load_window.assert_called_once_with(
+            "btcusdt.crypto", 120, tm_interval_id=1, source_app_id=34
         )
 
     @patch("quant.trade.dry_run.compute_latest_position", return_value=(1.0, "2024-06-01"))

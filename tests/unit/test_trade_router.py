@@ -271,21 +271,30 @@ class TestUpdateDeployment:
 
 
 class TestScheduleOptions:
+    _PARAMS = {"strategy_id": str(uuid.uuid4()), "strategy_vid": 1}
+
     def test_lists_the_cadences_a_deployment_may_use(self, client_and_svc):
         client, svc, _ = client_and_svc
-        svc.schedule_options.return_value = ScheduleOptions(tm_interval_ids=[1])
+        svc.schedule_options.return_value = ScheduleOptions(tm_interval_ids=[2])
 
-        resp = client.get("/api/v1/trade/schedule-options")
+        resp = client.get("/api/v1/trade/schedule-options", params=self._PARAMS)
 
         assert resp.status_code == 200
-        assert resp.json() == {"tm_interval_ids": [1]}
+        assert resp.json() == {"tm_interval_ids": [2]}
+
+    def test_the_strategy_is_required(self, client_and_svc):
+        """Without a strategy there is no fitted interval to return."""
+        client, svc, _ = client_and_svc
+        assert client.get("/api/v1/trade/schedule-options").status_code == 422
+        svc.schedule_options.assert_not_called()
 
     def test_is_not_read_as_a_deployment_id(self, client_and_svc):
         """The literal segment must win over ``/deployments/{deployment_id}``."""
         client, svc, _ = client_and_svc
         svc.schedule_options.return_value = ScheduleOptions(tm_interval_ids=[1])
 
-        assert client.get("/api/v1/trade/schedule-options").status_code == 200
+        resp = client.get("/api/v1/trade/schedule-options", params=self._PARAMS)
+        assert resp.status_code == 200
         svc.get_deployment.assert_not_called()
 
 

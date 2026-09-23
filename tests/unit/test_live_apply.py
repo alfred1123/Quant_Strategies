@@ -44,7 +44,11 @@ def orchestrator():
     """LiveApplyOrchestrator with all dependencies mocked."""
     bt = MagicMock()
     bt.sp_get_strategy.return_value = [
-        {"config_json": {}, "strategy_nm": "test_strat", "user_id": "alice"}
+        {
+            "config_json": {"tm_interval_id": 1},
+            "strategy_nm": "test_strat",
+            "user_id": "alice",
+        }
     ]
     bt.fetch_result_payload.return_value = {"best": {"window": 20, "signal": 0.5}}
     data_caches = MagicMock()
@@ -374,24 +378,18 @@ class TestSignalDataSource:
 
     @patch("quant.trade.bar_source.exchange_id_for_app", return_value="bybit")
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
-    def test_manual_deployment_on_a_venue_defaults_to_daily_exchange_bars(
+    def test_manual_deployment_on_a_venue_defaults_to_the_fitted_exchange_bars(
         self, mock_signal, _mock_venue, orchestrator
     ):
-        """No schedule means daily, not 'fall back to the provider'."""
-        from datetime import timedelta
-
+        """No schedule means the strategy's fitted cadence, not the provider."""
         orch, _bt = orchestrator
         service = MagicMock()
         orch._price_bars = MagicMock()
         orch._price_bars.for_app.return_value = service
-        orch._data_caches.refdata.resolve_interval_id.return_value = 1
         dep = _deployment(app_id=34, schedule_tm_interval_id=None)
 
         _signal, source = orch._compute_signal(dep)
 
-        orch._data_caches.refdata.resolve_interval_id.assert_called_once_with(
-            timedelta(days=1)
-        )
         assert source == "price_bar:bybit"
         loader = mock_signal.call_args.kwargs["bar_loader"]
         loader("btcusdt.crypto", 120)

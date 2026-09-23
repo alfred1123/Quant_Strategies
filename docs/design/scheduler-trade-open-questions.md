@@ -57,21 +57,20 @@ Design questions raised while building Phase 1.9 (scheduler + due deployments). 
 **Resolved — the cadence is not free to choose.** A schedule does not only say
 *when* an apply runs; `LiveApplyOrchestrator` feeds the deployment's interval
 straight into the bar window, so it also decides *which bars the signal is
-computed from*. Every backtest fits on daily bars, so scheduling a strategy
-hourly would run daily-fitted parameters over hourly bars — a 20-bar band still
-returns a number, the order still places, and nothing anywhere reports a
-problem. `quant/trade/schedule_policy.py` refuses any cadence outside
-`schedulable_interval_ids(refdata)` on create and on update, and
-`GET /api/v1/trade/schedule-options` hands the same set to the two schedule
-controls so they grey out what the API would reject.
+computed from*. A strategy run on any interval but the one it was fitted on
+pushes the wrong series through its parameters — a 20-bar band still returns a
+number, the order still places, and nothing anywhere reports a problem.
+`quant/trade/schedule_policy.py` refuses any cadence but the strategy's own
+fitted interval (`fitted_interval_id`, read from `CONFIG_JSON.tm_interval_id`)
+on create and on update, and
+`GET /api/v1/trade/schedule-options?strategy_id=…&strategy_vid=…` hands that one
+interval to the two schedule controls so they grey out what the API would reject.
 
-Consistent with §3 itself and with decision #45, that set is **resolved from
-REFDATA, not hardcoded**: the module names the fitted *period*
-(`FITTED_BAR_PERIOD = timedelta(days=1)`) and `RedisRefData.resolve_interval_id`
-turns it into an id, so a reseeded or renumbered `TM_INTERVAL` moves the guard
-with it. Naming an interval in the rejection message goes through
-`RedisRefData.interval_label()` for the same reason — no `tm_interval` row is
-read outside the reader.
+The fitted interval is read straight from `CONFIG_JSON.tm_interval_id`; there is
+**no fallback**, so a strategy that names no interval is refused rather than
+silently defaulted to daily. Naming an interval in the rejection message goes
+through `RedisRefData.interval_label()` — no `tm_interval` row is read outside
+the reader.
 
 Validation is on what the caller *sets*, never on what is already stored: a row
 whose cadence predates the rule must stay reachable by the kill switch, and

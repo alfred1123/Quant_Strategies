@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import functools
 import logging
-from datetime import timedelta
 
 from quant.market_data.fetcher import CcxtBarFetcher
 from quant.market_data.repo import PriceBarRepo
@@ -63,6 +62,7 @@ def resolve_signal_source(
     *,
     app_id: int,
     schedule_tm_interval_id: int | None,
+    fitted_interval_id: int,
     data_caches: DataCaches,
     price_bars: PriceBarServiceFactory | None,
     what: str,
@@ -71,10 +71,11 @@ def resolve_signal_source(
 
     The rule is by venue, not by schedule: a signal reads the bars of the
     exchange it executes on whenever that exchange serves market data. The
-    schedule only sets the bar interval — without one the apply is assumed
-    daily. The provider path survives solely for brokers with no market-data
-    venue (e.g. Futu equities), where the provider series is the only one there
-    is.
+    schedule only sets the bar interval — without one (manual apply) the signal
+    is computed on the interval the strategy was *fitted* on, never a fixed
+    daily guess, so a manual apply and a scheduled one price the same bars. The
+    provider path survives solely for brokers with no market-data venue (e.g.
+    Futu equities), where the provider series is the only one there is.
 
     Shared by the live apply and the dry run **because they disagreed**: the
     dry run took the provider path unconditionally, so the preview a user
@@ -91,7 +92,7 @@ def resolve_signal_source(
     if interval_id is None:
         if venue is None:
             return None, "provider"
-        interval_id = data_caches.refdata.resolve_interval_id(timedelta(days=1))
+        interval_id = fitted_interval_id
     if price_bars is None:
         raise TradeValidationError(
             f"{what} needs exchange bars on interval {interval_id} but no price "

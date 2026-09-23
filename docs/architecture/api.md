@@ -80,27 +80,30 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `GET` | `/api/v1/trade/deployments/{id}/events` | Required | Execution diary for one deployment. |
 | `GET` | `/api/v1/trade/deployments/{id}/transactions` | Required | Fill history for one deployment. |
 | `GET` | `/api/v1/trade/accounts/{api_credential_id}/snapshot` | Required | Live balances and open positions for one broker account. Read-only. Query `paper` (default `true`). **404** if the credential is not owned. |
-| `GET` | `/api/v1/trade/schedule-options` | Required | `tm_interval_ids` a deployment may be scheduled on — see [the cadence guard](#the-schedule-cadence-must-match-the-fitted-bars) below. |
+| `GET` | `/api/v1/trade/schedule-options` | Required | `tm_interval_ids` a deployment of a given strategy (`strategy_id`, `strategy_vid` query params) may be scheduled on — the interval it was fitted on. See [the cadence guard](#the-schedule-cadence-must-match-the-fitted-bars) below. |
 | `POST` | `/api/v1/trade/venue-limits/refresh` | Required | Re-read every broker's min lot / min notional from ccxt into Redis. Returns `{"apps": n}`. |
 
 #### The schedule cadence must match the fitted bars
 
 A schedule decides more than *when* an apply runs. `LiveApplyOrchestrator`
 resolves the deployment's interval into the bar window it loads, so the cadence
-also decides **which bars the signal is computed from**. Every backtest fits on
-daily bars, so an hourly schedule would push hourly bars through daily-fitted
-parameters — which fails silently: the indicator still returns a number and the
-order still places.
+also decides **which bars the signal is computed from**. A strategy fitted on
+one bar length run on another pushes the wrong series through its parameters —
+which fails silently: the indicator still returns a number and the order still
+places.
 
-`POST /trade/deployments` and `PATCH /trade/deployments/{id}` therefore reject a
-`schedule_tm_interval_id` outside `schedulable_interval_ids()` with **400** and a
+The allowed cadence is therefore the interval the strategy was **fitted on**,
+read from its backtest config (`CONFIG_JSON.tm_interval_id`), not a platform-wide
+daily assumption — a strategy fitted hourly schedules hourly, a daily one daily.
+`POST /trade/deployments` and `PATCH /trade/deployments/{id}` reject any
+`schedule_tm_interval_id` other than the strategy's fitted one with **400** and a
 message naming both cadences. `null` (manual) is always accepted. A PATCH is
 checked only on the value it *sets*, so the kill switch still reaches a row
 whose cadence predates the rule.
 
-`GET /trade/schedule-options` publishes the same set, which is how
-`DeploymentDialog` and `ScheduleCell` grey out the cadences the API would refuse
-rather than keeping their own copy of the rule.
+`GET /trade/schedule-options?strategy_id=…&strategy_vid=…` returns that one
+interval, which is how `DeploymentDialog` and `ScheduleCell` grey out every other
+cadence rather than keeping their own copy of the rule.
 
 #### A qty the venue would refuse is refused while it can still be fixed
 

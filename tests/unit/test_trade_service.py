@@ -61,9 +61,16 @@ def svc():
         "exchange": None,
     }
     data_caches.instrument_cache.resolve_internal_cusip.return_value = "BTCUSDT"
+    bt = MagicMock()
+    # Every deployment's strategy is fitted on DAILY (interval 1) by default, so
+    # the cadence guard reads a real interval instead of a MagicMock. A test
+    # that cares about an hourly-fitted strategy overrides this return value.
+    bt.sp_get_strategy.return_value = [
+        {"config_json": {"tm_interval_id": 1}, "user_id": "alice"}
+    ]
     return TradeService(
         repo=MagicMock(),
-        bt=MagicMock(),
+        bt=bt,
         credential_service=MagicMock(),
         credential_repo=MagicMock(),
         adapter_registry=MagicMock(),
@@ -201,6 +208,72 @@ class TestCreateDeployment:
             svc.create_deployment(uuid4(), "alice", req)
 
         svc._repo.sp_ins_deployment.assert_not_called()
+
+    def test_an_hourly_fitted_strategy_may_be_scheduled_hourly(self, svc):
+        """The cadence is the strategy's own, not the platform's old daily guess."""
+        svc._bt.sp_get_strategy.return_value = [
+            {"config_json": {"tm_interval_id": 2}, "user_id": "alice"}
+        ]
+        app_user_id = uuid4()
+        svc._repo.sp_ins_deployment.return_value = _sp_row(
+            app_user_id=app_user_id, schedule_tm_interval_id=2
+        )
+        req = CreateDeploymentRequest(
+            strategy_id=uuid4(),
+            strategy_vid=1,
+            api_credential_id=1,
+            app_id=10,
+            internal_cusip="btcusdt.crypto",
+            qty=Decimal("0.01"),
+            schedule_tm_interval_id=2,
+        )
+
+        svc.create_deployment(app_user_id, "alice", req)
+
+        assert svc._repo.sp_ins_deployment.call_args.kwargs["schedule_tm_interval_id"] == 2
+
+    def test_daily_is_refused_for_an_hourly_fitted_strategy(self, svc):
+        svc._bt.sp_get_strategy.return_value = [
+            {"config_json": {"tm_interval_id": 2}, "user_id": "alice"}
+        ]
+        req = CreateDeploymentRequest(
+            strategy_id=uuid4(),
+            strategy_vid=1,
+            api_credential_id=1,
+            app_id=10,
+            internal_cusip="btcusdt.crypto",
+            qty=Decimal("0.01"),
+            schedule_tm_interval_id=1,
+        )
+
+        with pytest.raises(TradeValidationError, match="Daily"):
+            svc.create_deployment(uuid4(), "alice", req)
+
+        svc._repo.sp_ins_deployment.assert_not_called()
+
+
+class TestScheduleOptions:
+    def test_returns_the_strategy_fitted_interval(self, svc):
+        uid = uuid4()
+        svc._bt.sp_get_strategy.return_value = [
+            {"config_json": {"tm_interval_id": 2}, "user_id": str(uid)}
+        ]
+        options = svc.schedule_options(uid, uuid4(), 1)
+        assert options.tm_interval_ids == [2]
+
+    def test_unknown_strategy_is_404(self, svc):
+        svc._bt.sp_get_strategy.return_value = []
+        with pytest.raises(TradeValidationError) as exc:
+            svc.schedule_options(uuid4(), uuid4(), 1)
+        assert exc.value.status_code == 404
+
+    def test_another_users_strategy_is_403(self, svc):
+        svc._bt.sp_get_strategy.return_value = [
+            {"config_json": {"tm_interval_id": 1}, "user_id": "someone-else"}
+        ]
+        with pytest.raises(TradeValidationError) as exc:
+            svc.schedule_options(uuid4(), uuid4(), 1)
+        assert exc.value.status_code == 403
 
     def test_schedule_defaults_to_manual_only(self, svc):
         app_user_id = uuid4()

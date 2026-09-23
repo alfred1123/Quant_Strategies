@@ -29,7 +29,7 @@ from quant.trade.live_apply import LiveApplyOrchestrator
 from quant.trade.models.market import MarketLimits
 from quant.trade.registry import AdapterRegistry
 from quant.trade.schedule_align import compute_initial_scheduled_ts, should_realign_schedule
-from quant.trade.schedule_policy import require_fitted_interval, schedulable_interval_ids
+from quant.trade.schedule_policy import fitted_interval_id, require_fitted_interval
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,19 @@ class TradeService:
             return MarketLimits(symbol=internal_cusip)
         return self._data_caches.venue_limits.get(app_id, vendor_symbol)
 
+    def _fitted_interval_id(self, strategy_id: UUID, strategy_vid: int) -> int:
+        """The interval this strategy was fitted on — the only one it may schedule.
+
+        Read from the strategy's own ``CONFIG_JSON`` so an hourly-fitted
+        strategy is offered hourly, not the platform's old daily assumption.
+        """
+        rows = self._bt.sp_get_strategy(strategy_id, strategy_vid=strategy_vid)
+        if not rows:
+            raise TradeValidationError(
+                "strategy_id / strategy_vid not found", status_code=404
+            )
+        return fitted_interval_id(rows[0].get("config_json"))
+
     def _require_tradable_qty(
         self, *, app_id: int, internal_cusip: str, qty: Decimal
     ) -> None:
@@ -110,7 +123,11 @@ class TradeService:
         req: CreateDeploymentRequest,
     ) -> DeploymentRow:
         require_fitted_interval(
-            req.schedule_tm_interval_id, refdata=self._data_caches.refdata
+            req.schedule_tm_interval_id,
+            fitted_interval_id=self._fitted_interval_id(
+                req.strategy_id, req.strategy_vid
+            ),
+            refdata=self._data_caches.refdata,
         )
         self._require_tradable_qty(
             app_id=req.app_id, internal_cusip=req.internal_cusip, qty=req.qty
@@ -142,10 +159,25 @@ class TradeService:
         )
         return self._row(row)
 
-    def schedule_options(self) -> ScheduleOptions:
-        """Cadences the schedule control may offer."""
+    def schedule_options(
+        self, app_user_id: UUID, strategy_id: UUID, strategy_vid: int
+    ) -> ScheduleOptions:
+        """The one cadence a deployment of this strategy may be scheduled on.
+
+        Owner-checked: the reply is derived from someone's strategy, so it is
+        gated the same way every other strategy read is.
+        """
+        rows = self._bt.sp_get_strategy(strategy_id, strategy_vid=strategy_vid)
+        if not rows:
+            raise TradeValidationError(
+                "strategy_id / strategy_vid not found", status_code=404
+            )
+        if str(rows[0]["user_id"]) != str(app_user_id):
+            raise TradeValidationError(
+                "strategy does not belong to user", status_code=403
+            )
         return ScheduleOptions(
-            tm_interval_ids=schedulable_interval_ids(self._data_caches.refdata)
+            tm_interval_ids=[fitted_interval_id(rows[0].get("config_json"))]
         )
 
     def get_deployment(
@@ -175,7 +207,11 @@ class TradeService:
         # kill switch, and refusing the PATCH would be refusing to disable it.
         if "schedule_tm_interval_id" in req.model_fields_set:
             require_fitted_interval(
-                req.schedule_tm_interval_id, refdata=self._data_caches.refdata
+                req.schedule_tm_interval_id,
+                fitted_interval_id=self._fitted_interval_id(
+                    current.strategy_id, current.strategy_vid
+                ),
+                refdata=self._data_caches.refdata,
             )
         schedule_tm_interval_id = (
             req.schedule_tm_interval_id
