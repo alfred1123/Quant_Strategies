@@ -38,7 +38,7 @@ Parameters:
     Default: t4g.nano
     AllowedValues: [t4g.nano, t4g.micro, t4g.small]
     Description: >-
-      t4g.nano (2 vCPU burst, 0.5 GiB) is ample — squid tunnels a handful of
+      t4g.nano (2 vCPU burst, 0.5 GiB) is ample; squid tunnels a handful of
       orders an hour and caches nothing.
 
   ProxyPort:
@@ -49,7 +49,7 @@ Parameters:
   ProxyClientCidr:
     Type: String
     Description: >-
-      The only source allowed to use the proxy — the application host's Elastic
+      The only source allowed to use the proxy: the application host's Elastic
       IP as a /32. An open proxy would be abused within hours.
     AllowedPattern: ^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$
 
@@ -61,7 +61,7 @@ Parameters:
   VpcCidr:
     Type: String
     Default: 10.90.0.0/16
-    Description: Self-contained CIDR — this VPC peers with nothing.
+    Description: Self-contained CIDR; this VPC peers with nothing.
 
   SubnetCidr:
     Type: String
@@ -134,7 +134,8 @@ Resources:
   ProxySecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Sub "${Project} UK egress proxy — one client, one port"
+      # EC2 rejects non-ASCII in GroupDescription, so no em dash here.
+      GroupDescription: !Sub "${Project} UK egress proxy - one client, one port"
       VpcId: !Ref Vpc
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -253,7 +254,7 @@ Resources:
 
 Outputs:
   EgressIpAddress:
-    Description: Whitelist this on the Bybit API key — it is what the venue sees.
+    Description: Whitelist this on the Bybit API key; it is what the venue sees.
     Value: !Ref EgressIp
     Export:
       Name: !Sub "${Project}-uk-egress-ip"

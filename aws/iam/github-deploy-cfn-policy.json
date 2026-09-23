@@ -27,7 +27,9 @@
         "arn:aws:cloudformation:ap-southeast-1:539163478329:stack/quant-database/*",
         "arn:aws:cloudformation:ap-southeast-1:539163478329:stack/quant-compute/*",
         "arn:aws:cloudformation:ap-southeast-1:539163478329:stack/quant-scheduler/*",
-        "arn:aws:cloudformation:ap-southeast-1:539163478329:changeSet/*/*"
+        "arn:aws:cloudformation:ap-southeast-1:539163478329:changeSet/*/*",
+        "arn:aws:cloudformation:eu-west-2:539163478329:stack/quant-uk-egress/*",
+        "arn:aws:cloudformation:eu-west-2:539163478329:changeSet/*/*"
       ]
     },
     {
@@ -196,7 +198,10 @@
         "ssm:GetParameter",
         "ssm:GetParameters"
       ],
-      "Resource": "arn:aws:ssm:ap-southeast-1::parameter/aws/service/ami-amazon-linux-latest/*"
+      "Resource": [
+        "arn:aws:ssm:ap-southeast-1::parameter/aws/service/ami-amazon-linux-latest/*",
+        "arn:aws:ssm:eu-west-2::parameter/aws/service/ami-amazon-linux-latest/*"
+      ]
     },
     {
       "Sid": "EcrManageQuantRepos",
