@@ -193,6 +193,16 @@ class TradeService:
             qty = req.qty
         else:
             qty = current.qty
+        deployment_status = req.deployment_status or current.deployment_status
+        # An auto-pause writes PAUSED + disabled, and the due-list proc skips
+        # PAUSED rows whatever the kill switch says, so enabling one without
+        # resuming it would leave it enabled and never fired.
+        if (
+            req.enabled is True
+            and req.deployment_status is None
+            and deployment_status == DeploymentStatus.PAUSED
+        ):
+            deployment_status = DeploymentStatus.ACTIVE
         initial_ts = None
         if should_realign_schedule(current, req) and schedule_tm_interval_id is not None:
             initial_ts = compute_initial_scheduled_ts(
@@ -215,7 +225,7 @@ class TradeService:
                 if req.enabled is not None
                 else current.is_enabled_ind
             ),
-            deployment_status=req.deployment_status or current.deployment_status,
+            deployment_status=deployment_status,
             user_id=str(app_user_id),
             schedule_tm_interval_id=schedule_tm_interval_id,
             initial_scheduled_ts=initial_ts,

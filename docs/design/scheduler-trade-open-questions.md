@@ -118,7 +118,9 @@ tick cannot classify keeps all 3 attempts.
 
 - After **exhausted retries**, set `IS_ENABLED_IND='N'` and `DEPLOYMENT_STATUS='PAUSED'`.
 - Removes deployment from missed-due proc (`IS_ENABLED_IND='Y'` / not-`PAUSED` filter).
-- Ops fixes config, dry-runs, re-enables manually.
+- Ops fixes config, dry-runs, re-enables manually. Enabling a `PAUSED` row also
+  resumes it to `ACTIVE`, since the missed-due proc skips `PAUSED` whatever the
+  kill switch says.
 
 **Current state:** `ScheduleTickRunner` auto-pauses on the last failed attempt, or on the first one when the broker rejected a size no retry can fix. It does **not** flatten the broker position — that is §6. Manual **Stop** remains a separate, explicit disable.
 

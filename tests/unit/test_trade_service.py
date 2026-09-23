@@ -385,6 +385,54 @@ class TestUpdateDeployment:
         kwargs = svc._repo.write_deployment.call_args.kwargs
         assert kwargs["is_enabled_ind"] == "Y"
 
+    def test_enabling_an_auto_paused_deployment_resumes_it(self, svc):
+        """The due-list proc skips PAUSED, so enabled-but-PAUSED never fires."""
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        svc._repo.sp_get_deployment.return_value = [
+            _sp_row(
+                deployment_id=dep_id,
+                app_user_id=app_user_id,
+                is_enabled_ind="N",
+                deployment_status="PAUSED",
+            )
+        ]
+        svc._repo.write_deployment.return_value = _sp_row(deployment_status="ACTIVE")
+
+        svc.update_deployment(app_user_id, dep_id, UpdateDeploymentRequest(enabled=True))
+
+        kwargs = svc._repo.write_deployment.call_args.kwargs
+        assert kwargs["is_enabled_ind"] == "Y"
+        assert kwargs["deployment_status"] == "ACTIVE"
+
+    def test_disabling_keeps_the_status(self, svc):
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        svc._repo.sp_get_deployment.return_value = [
+            _sp_row(deployment_id=dep_id, app_user_id=app_user_id, deployment_status="PAUSED")
+        ]
+        svc._repo.write_deployment.return_value = _sp_row(deployment_status="PAUSED")
+
+        svc.update_deployment(app_user_id, dep_id, UpdateDeploymentRequest(enabled=False))
+
+        assert svc._repo.write_deployment.call_args.kwargs["deployment_status"] == "PAUSED"
+
+    def test_an_explicit_status_wins_over_the_resume(self, svc):
+        app_user_id = uuid4()
+        dep_id = uuid4()
+        svc._repo.sp_get_deployment.return_value = [
+            _sp_row(deployment_id=dep_id, app_user_id=app_user_id, deployment_status="PAUSED")
+        ]
+        svc._repo.write_deployment.return_value = _sp_row(deployment_status="PAUSED")
+
+        svc.update_deployment(
+            app_user_id,
+            dep_id,
+            UpdateDeploymentRequest(enabled=True, deployment_status="PAUSED"),
+        )
+
+        assert svc._repo.write_deployment.call_args.kwargs["deployment_status"] == "PAUSED"
+
     def test_qty_preserved_when_not_in_body(self, svc):
         """A kill-switch toggle must not silently resize the position."""
         app_user_id = uuid4()
