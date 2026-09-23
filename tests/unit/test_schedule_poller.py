@@ -97,11 +97,10 @@ class TestDrain:
         assert asyncio.run(_poller(runner, refdata).drain()) == 0
         assert runner.run_interval.call_count == 1
 
-    def test_a_retrying_row_does_not_keep_the_drain_spinning(self, runner, refdata):
-        """RETRYING leaves the row due; spending its budget here would burn all
-        three attempts in a tight loop instead of across poll cycles."""
+    def test_a_paused_row_does_not_keep_the_drain_spinning(self, runner, refdata):
+        """PAUSED moved nothing, and its retries were already spent in the pass."""
         refdata.interval_ids.return_value = [1]
-        runner.run_interval.return_value = _report(1, TickOutcome.RETRYING)
+        runner.run_interval.return_value = _report(1, TickOutcome.PAUSED)
 
         assert asyncio.run(_poller(runner, refdata).drain()) == 0
         assert runner.run_interval.call_count == 1

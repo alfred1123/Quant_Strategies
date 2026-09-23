@@ -103,9 +103,6 @@ async def lifespan(app: FastAPI):
 
         app.state.price_bars = PriceBarServiceFactory(DB_CONNINFO, caches)
 
-        # Application-scoped: the tick counts apply attempts per (deployment,
-        # due time) in memory. Rebuilt per request, the count would restart
-        # on every hourly wakeup and a broken deployment would retry forever.
         from quant.api.routers.deployments import build_trade_service
         from quant.queue.repo import BtQueueRepo
         from quant.trade.db_repo import TradeRepo

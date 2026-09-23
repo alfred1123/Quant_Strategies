@@ -5,25 +5,25 @@ woken: EventBridge and the dev poller both land here. Each pass:
 
 1. ``SP_GET_MISSED_DUE_DEPLOYMENTS`` — enabled, not paused, ``PENDING`` with
    ``SCHEDULED_TS <= NOW()``. Every row carries ``NEXT_SCHEDULED_TS``.
-2. Apply each row.
+2. Apply each row, retrying a failed apply a few seconds later within the pass.
 3. Advance the cursor to ``NEXT_SCHEDULED_TS`` once the interval is closed
    (applied). Exhausted retries auto-pause the deployment instead — it drops
    off the missed-due list until someone re-enables it.
 
-A failure that still has attempts left writes nothing, so the row stays due
-and the next pass retries it against the same ``SCHEDULED_TS`` — unless the
-broker refused for a reason no retry can clear (a qty under the venue's min
-lot, say), which pauses on the first pass. Advancing
-from the *stored* due time rather than from ``now()`` is what makes a backlog
-drain one interval per pass instead of collapsing into a single apply.
+Retries happen inside the pass, not on the next one: the next wakeup is an
+hour away, and a signal from the bar that just closed goes stale while it
+waits. A broker refusal no retry can clear (a qty under the venue's min lot,
+say) pauses on the first attempt. Advancing from the *stored* due time rather
+than from ``now()`` is what makes a backlog drain one interval per pass instead
+of collapsing into a single apply.
 """
 
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
@@ -39,6 +39,10 @@ logger = logging.getLogger(__name__)
 ApplyDeployment = Callable[[UUID, UUID], ApplyReport]
 
 DEFAULT_MAX_ATTEMPTS = 3
+#: Long enough for a dropped connection or a venue blip to clear, short enough
+#: that three attempts stay well inside the Lambda's 110 s HTTP timeout on top
+#: of the order executor's own retries.
+DEFAULT_RETRY_BACKOFF_S = 5.0
 
 
 def _position_of(report) -> float | None:
@@ -101,7 +105,6 @@ class TickOutcome(StrEnum):
     """What one due deployment did on this pass."""
 
     APPLIED = "APPLIED"      # traded; cursor moved to the next interval
-    RETRYING = "RETRYING"    # failed with budget left; still due
     PAUSED = "PAUSED"        # out of attempts; disabled so it drops off the due list
     ABANDONED = "ABANDONED"  # out of attempts; pause write failed, cursor moved on
     STUCK = "STUCK"          # applied but the cursor did not move — see below
@@ -142,14 +145,12 @@ class TickReport:
 class ScheduleTickRunner:
     """Applies the deployments due on one interval and advances their cursors.
 
-    ``max_attempts`` is spent across passes, not within one: a failure leaves
-    the row due so the *next* pass retries it. This is deliberately unlike
-    ``OrderRetryExecutor``, which retries a broker order inside a single apply.
-    Attempts are counted per ``(deployment, scheduled_ts)`` in memory, so a
-    restart forgives earlier failures — acceptable because the budget only
-    bounds how long a broken deployment stalls its own schedule. A reject
-    carrying :attr:`OrderRejectReason.requires_operator_fix` skips the budget
-    and pauses immediately; nothing about the next pass would be different.
+    ``max_attempts`` is spent within one pass, ``retry_backoff_s`` apart, and a
+    deployment still failing at the end is paused. This wraps the whole apply
+    (connect, bars, signal, order), where ``OrderRetryExecutor`` retries only
+    the broker order inside one. A reject carrying
+    :attr:`OrderRejectReason.requires_operator_fix` pauses on the first
+    attempt; nothing about a second one would be different.
     """
 
     def __init__(
@@ -158,12 +159,12 @@ class ScheduleTickRunner:
         apply_deployment: ApplyDeployment,
         *,
         max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+        retry_backoff_s: float = DEFAULT_RETRY_BACKOFF_S,
     ) -> None:
         self._repo = repo
         self._apply = apply_deployment
         self._max_attempts = max_attempts
-        # deployment_id -> (scheduled_ts it is failing against, attempts so far)
-        self._attempts: dict[UUID, tuple[datetime, int]] = {}
+        self._retry_backoff_s = retry_backoff_s
 
     def run_interval(self, tm_interval_id: int) -> TickReport:
         """One pass over the deployments due on *tm_interval_id*.
@@ -186,63 +187,35 @@ class ScheduleTickRunner:
 
     def _run_one(self, row: dict) -> TickResult:
         deployment_id = row["deployment_id"]
-        scheduled_ts = row["scheduled_ts"]
-        attempt = self._count_attempt(deployment_id, scheduled_ts)
+        for attempt in range(1, self._max_attempts + 1):
+            try:
+                report = self._apply(row["app_user_id"], deployment_id)
+            except Exception as exc:
+                # No position: the apply raised, so it may never have reached
+                # the broker read at all. A broker error still names its reason
+                # when the venue classified the refusal (e.g. the key admits
+                # none of our egress IPs), and that pauses like a reject would.
+                error, reason = str(exc), _reject_reason_of_exception(exc)
+            else:
+                failure = _failed_order(report)
+                if failure is None:
+                    return self._advance(
+                        row, TickOutcome.APPLIED, attempt,
+                        position_qty=_position_of(report),
+                    )
+                error, reason = failure.message, failure.reason
 
-        try:
-            report = self._apply(row["app_user_id"], deployment_id)
-        except Exception as exc:
-            # No position: the apply raised, so it may never have reached the
-            # broker read at all. A broker error still names its reason when
-            # the venue classified the refusal (e.g. the key admits none of
-            # our egress IPs), and that reason pauses the same way a reject
-            # in a finished cycle would.
-            return self._on_failure(
-                row, attempt, exc, reason=_reject_reason_of_exception(exc)
-            )
+            if reason is not None and reason.requires_operator_fix:
+                break
+            if attempt < self._max_attempts:
+                logger.warning(
+                    "apply failed for deployment=%s attempt=%d/%d — retrying in %.0fs: %s",
+                    deployment_id, attempt, self._max_attempts,
+                    self._retry_backoff_s, error,
+                )
+                time.sleep(self._retry_backoff_s)
 
-        failure = _failed_order(report)
-        if failure is not None:
-            return self._on_failure(
-                row, attempt, RuntimeError(failure.message), reason=failure.reason
-            )
-
-        self._attempts.pop(deployment_id, None)
-        return self._advance(
-            row, TickOutcome.APPLIED, attempt, position_qty=_position_of(report)
-        )
-
-    def _on_failure(
-        self,
-        row: dict,
-        attempt: int,
-        exc: Exception,
-        *,
-        reason: OrderRejectReason | None = None,
-    ) -> TickResult:
-        deployment_id = row["deployment_id"]
-        # A reject the deployment itself causes (e.g. a qty under the venue's
-        # min lot) fails identically on every pass, so spending the budget just
-        # delays the pause by a few intervals and repeats the alert.
-        retry_is_futile = reason is not None and reason.requires_operator_fix
-
-        if not retry_is_futile and attempt < self._max_attempts:
-            logger.warning(
-                "apply failed for deployment=%s attempt=%d/%d — staying due: %s",
-                deployment_id,
-                attempt,
-                self._max_attempts,
-                exc,
-            )
-            return TickResult(
-                deployment_id=deployment_id,
-                outcome=TickOutcome.RETRYING,
-                attempt=attempt,
-                error=str(exc),
-            )
-
-        self._attempts.pop(deployment_id, None)
-        return self._auto_pause(row, attempt, str(exc))
+        return self._auto_pause(row, attempt, error)
 
     def _auto_pause(self, row: dict, attempt: int, error: str) -> TickResult:
         """Disable the deployment so the next tick does not keep firing it.
@@ -346,10 +319,3 @@ class ScheduleTickRunner:
             error=error,
             position_qty=position_qty,
         )
-
-    def _count_attempt(self, deployment_id: UUID, scheduled_ts: datetime) -> int:
-        """Attempts spent on this due time; a new due time starts over."""
-        failing_ts, spent = self._attempts.get(deployment_id, (None, 0))
-        attempt = spent + 1 if failing_ts == scheduled_ts else 1
-        self._attempts[deployment_id] = (scheduled_ts, attempt)
-        return attempt

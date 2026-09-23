@@ -103,7 +103,7 @@ refusing its PATCH would be refusing to disable it.
 
 **Problem:** Order failures used to block schedule advance (when anchor lived on `EXECUTION_EVENT`). With `DEPLOYMENT_SCHEDULE_STATUS`, advance policy is separate — see §9.
 
-**Retry policy (app):** Same `SCHEDULED_TS`, retry up to **3 times** when apply raises or returns `order_success=False`. After 3 failures: auto-pause (decision #70) — `IS_ENABLED_IND='N'` and `DEPLOYMENT_STATUS='PAUSED'` via `SP_INS_DEPLOYMENT`. That write closes the schedule as `SUCCESS`, so the row leaves `SP_GET_MISSED_DUE_DEPLOYMENTS`. If the pause write itself fails, the cursor still advances to `NEXT_SCHEDULED_TS` so the slot is not wedged. Failures stay diary-only in `EXECUTION_EVENT`.
+**Retry policy (app):** Same `SCHEDULED_TS`, up to **3 attempts within the same pass**, 5 s apart, when apply raises or returns `order_success=False` (decision #79; the next pass is an hour away and would trade a stale signal). A reason with `requires_operator_fix` pauses on the first attempt. After 3 failures: auto-pause (decision #70) — `IS_ENABLED_IND='N'` and `DEPLOYMENT_STATUS='PAUSED'` via `SP_INS_DEPLOYMENT`. That write closes the schedule as `SUCCESS`, so the row leaves `SP_GET_MISSED_DUE_DEPLOYMENTS`. If the pause write itself fails, the cursor still advances to `NEXT_SCHEDULED_TS` so the slot is not wedged. Failures stay diary-only in `EXECUTION_EVENT`.
 
 Pre-completion aborts (missing strategy, bars, credentials) still spend the in-memory attempt budget today — splitting those out of the budget remains open.
 
@@ -208,7 +208,7 @@ netting lands.
 **Resolved:** No batch advance proc. Per interval tick:
 
 1. `SP_GET_MISSED_DUE_DEPLOYMENTS(IN_TM_INTERVAL_ID)` — enabled, not `PAUSED`/`STOPPED`, current `PENDING` due row; cursor includes `NEXT_SCHEDULED_TS`.
-2. Apply each row (retry up to 3× on failure — app counter, same `SCHEDULED_TS`).
+2. Apply each row (up to 3 attempts in the same pass, 5 s apart; then pause).
 3. On interval close (success or retries exhausted): `SP_INS_DEPLOYMENT_SCHEDULE_STATUS(deployment_id, deployment_id, vid, 'PENDING', next_scheduled_ts, user_id)`.
 
 Pre-completion aborts do not call SP_INS — row stays due.

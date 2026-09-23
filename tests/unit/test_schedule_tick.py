@@ -67,6 +67,7 @@ def repo():
 
 
 def _runner(repo, apply_fn=None, **kwargs):
+    kwargs.setdefault("retry_backoff_s", 0)
     return ScheduleTickRunner(repo, apply_fn or MagicMock(), **kwargs)
 
 
@@ -175,53 +176,57 @@ class TestPositionIsCarriedUp:
         assert report.results[0].outcome is TickOutcome.APPLIED
 
 
-class TestFailureKeepsTheRowDue:
-    def test_first_failure_does_not_advance(self, repo):
+class TestRetriesWithinThePass:
+    """The next pass is an hour away; the signal would be stale by then."""
+
+    def test_a_transient_failure_is_retried_in_the_same_pass(self, repo):
         repo.sp_get_missed_due_deployments.return_value = [_due_row()]
-        apply_fn = MagicMock(side_effect=RuntimeError("stale bars"))
+        apply_fn = MagicMock(side_effect=[RuntimeError("venue blip"), None])
 
-        report = _runner(repo, apply_fn).run_interval(1)
+        report = _runner(repo, apply_fn, max_attempts=3).run_interval(1)
 
-        repo.sp_ins_deployment_schedule_status.assert_not_called()
+        assert apply_fn.call_count == 2
+        assert report.results[0].outcome is TickOutcome.APPLIED
+        assert report.results[0].attempt == 2
         repo.write_deployment.assert_not_called()
-        assert report.results[0].outcome is TickOutcome.RETRYING
-        assert report.advanced == 0
+        repo.sp_ins_deployment_schedule_status.assert_called_once()
 
-    def test_failure_records_the_error(self, repo):
+    def test_the_budget_is_spent_in_one_pass_then_it_pauses(self, repo):
         repo.sp_get_missed_due_deployments.return_value = [_due_row()]
-        apply_fn = MagicMock(side_effect=RuntimeError("stale bars"))
+        apply_fn = MagicMock(side_effect=RuntimeError("boom"))
 
-        report = _runner(repo, apply_fn).run_interval(1)
+        report = _runner(repo, apply_fn, max_attempts=3).run_interval(1)
 
-        assert report.results[0].error == "stale bars"
+        assert apply_fn.call_count == 3
+        assert report.results[0].outcome is TickOutcome.PAUSED
+        assert report.results[0].attempt == 3
+        assert report.results[0].error == "boom"
+        repo.write_deployment.assert_called_once()
+        repo.sp_ins_deployment_schedule_status.assert_not_called()
+
+    def test_attempts_are_spaced_by_the_backoff(self, repo, monkeypatch):
+        sleeps = []
+        monkeypatch.setattr("quant.trade.scheduler.tick.time.sleep", sleeps.append)
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(side_effect=RuntimeError("boom"))
+
+        _runner(repo, apply_fn, max_attempts=3, retry_backoff_s=5.0).run_interval(1)
+
+        # Between attempts only: no wait after the last one, before the pause.
+        assert sleeps == [5.0, 5.0]
 
     def test_a_failing_row_does_not_stop_the_others(self, repo):
         good, bad = _due_row(), _due_row()
         repo.sp_get_missed_due_deployments.return_value = [bad, good]
         apply_fn = MagicMock(side_effect=[RuntimeError("boom"), None])
 
-        report = _runner(repo, apply_fn).run_interval(1)
+        report = _runner(repo, apply_fn, max_attempts=1).run_interval(1)
 
-        assert report.results[0].outcome is TickOutcome.RETRYING
+        assert report.results[0].outcome is TickOutcome.PAUSED
         assert report.results[1].outcome is TickOutcome.APPLIED
 
 
 class TestAttemptBudget:
-    def test_budget_is_spent_across_passes_then_the_interval_is_skipped(self, repo):
-        row = _due_row()
-        repo.sp_get_missed_due_deployments.return_value = [row]
-        apply_fn = MagicMock(side_effect=RuntimeError("boom"))
-        runner = _runner(repo, apply_fn, max_attempts=3)
-
-        outcomes = [runner.run_interval(1).results[0].outcome for _ in range(3)]
-
-        assert outcomes == [
-            TickOutcome.RETRYING,
-            TickOutcome.RETRYING,
-            TickOutcome.PAUSED,
-        ]
-        repo.write_deployment.assert_called_once()
-        repo.sp_ins_deployment_schedule_status.assert_not_called()
 
     def test_exhausted_retries_disable_and_pause(self, repo):
         row = _due_row()
@@ -252,7 +257,7 @@ class TestAttemptBudget:
         assert report.results[0].outcome is TickOutcome.PAUSED
         repo.write_deployment.assert_called_once()
 
-    def test_an_unclassified_reject_keeps_its_remaining_attempts(self, repo):
+    def test_an_unclassified_reject_spends_its_remaining_attempts(self, repo):
         repo.sp_get_missed_due_deployments.return_value = [_due_row()]
         apply_fn = MagicMock(
             return_value=_apply_report(position_qty=0.0, order_success=False)
@@ -261,8 +266,9 @@ class TestAttemptBudget:
 
         report = runner.run_interval(1)
 
-        assert report.results[0].outcome is TickOutcome.RETRYING
-        repo.write_deployment.assert_not_called()
+        assert apply_fn.call_count == 3
+        assert report.results[0].outcome is TickOutcome.PAUSED
+        assert report.results[0].error == "insufficient funds"
 
     def test_a_size_reject_pauses_without_spending_the_budget(self, repo):
         """Every remaining tick would place the same doomed order."""
@@ -278,6 +284,7 @@ class TestAttemptBudget:
 
         report = runner.run_interval(1)
 
+        apply_fn.assert_called_once()
         assert report.results[0].outcome is TickOutcome.PAUSED
         assert report.results[0].attempt == 1
         kwargs = repo.write_deployment.call_args.kwargs
@@ -301,15 +308,15 @@ class TestAttemptBudget:
         assert report.results[0].attempt == 1
         assert repo.write_deployment.call_args.kwargs["deployment_status"] == "PAUSED"
 
-    def test_an_untyped_broker_error_at_connect_keeps_its_attempts(self, repo):
+    def test_an_untyped_broker_error_at_connect_is_retried(self, repo):
         repo.sp_get_missed_due_deployments.return_value = [_due_row()]
-        apply_fn = MagicMock(side_effect=BrokerConnectionError("proxy down"))
+        apply_fn = MagicMock(side_effect=[BrokerConnectionError("proxy down"), None])
         runner = _runner(repo, apply_fn, max_attempts=3)
 
         report = runner.run_interval(1)
 
-        assert report.results[0].outcome is TickOutcome.RETRYING
-        repo.write_deployment.assert_not_called()
+        assert apply_fn.call_count == 2
+        assert report.results[0].outcome is TickOutcome.APPLIED
 
     def test_pause_write_failure_still_advances(self, repo):
         repo.sp_get_missed_due_deployments.return_value = [_due_row()]
@@ -324,38 +331,17 @@ class TestAttemptBudget:
         assert kwargs["scheduled_ts"] == NEXT_DUE_AT
         assert "pause failed" in report.results[0].error
 
-    def test_a_new_due_time_starts_the_budget_over(self, repo):
-        """Yesterday's failures must not spend today's attempts."""
-        row = _due_row()
-        apply_fn = MagicMock(side_effect=RuntimeError("boom"))
+    def test_each_pass_starts_a_fresh_budget(self, repo):
+        """Nothing carries between passes, so a restart cannot change the count."""
+        apply_fn = MagicMock(side_effect=[RuntimeError("boom"), None, None])
         runner = _runner(repo, apply_fn, max_attempts=2)
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
 
-        repo.sp_get_missed_due_deployments.return_value = [row]
-        runner.run_interval(1)
+        first = runner.run_interval(1)
+        second = runner.run_interval(1)
 
-        later = _due_row(
-            deployment_id=row["deployment_id"],
-            scheduled_ts=NEXT_DUE_AT,
-            next_scheduled_ts=NEXT_DUE_AT + timedelta(days=1),
-        )
-        repo.sp_get_missed_due_deployments.return_value = [later]
-        report = runner.run_interval(1)
-
-        assert report.results[0].outcome is TickOutcome.RETRYING
-        assert report.results[0].attempt == 1
-
-    def test_success_clears_the_budget(self, repo):
-        row = _due_row()
-        repo.sp_get_missed_due_deployments.return_value = [row]
-        apply_fn = MagicMock(side_effect=[RuntimeError("boom"), None, RuntimeError("boom")])
-        runner = _runner(repo, apply_fn, max_attempts=2)
-
-        runner.run_interval(1)
-        runner.run_interval(1)
-        report = runner.run_interval(1)
-
-        assert report.results[0].attempt == 1
-        assert report.results[0].outcome is TickOutcome.RETRYING
+        assert first.results[0].attempt == 2
+        assert second.results[0].attempt == 1
 
 
 class TestAdvanceFailure:

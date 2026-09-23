@@ -355,8 +355,8 @@ Same contract philosophy as `BacktestCache`: **reads may degrade loudly, writes 
 
 | Failure | Behaviour |
 |---------|-----------|
-| **Apply fails** (order rejected, broker error) after signal computed | Retry up to **3 times** same `SCHEDULED_TS` (app). Then auto-pause: `IS_ENABLED_IND='N'` + `PAUSED` via `SP_INS_DEPLOYMENT` so the row leaves the missed-due list (decision #70). Diary in `EXECUTION_EVENT`. Does not flatten. |
-| **Exchange fetch fails** (ccxt down, rate-limited, timeout) at scheduler tick | Do **not** compute a signal on stale bars. Abort the run, write `TRADE.EXECUTION_EVENT` row with `IS_SUCCESS_IND='N'` — schedule is **not** advanced (tick did not complete). Retry on next poll; does not consume the 3-attempt budget. |
+| **Apply fails** (order rejected, broker error) after signal computed | Up to **3 attempts in the same pass**, 5 s apart (decision #79). Then auto-pause: `IS_ENABLED_IND='N'` + `PAUSED` via `SP_INS_DEPLOYMENT` so the row leaves the missed-due list (decision #70). Diary in `EXECUTION_EVENT`. Does not flatten. |
+| **Exchange fetch fails** (ccxt down, rate-limited, timeout) at scheduler tick | Do **not** compute a signal on stale bars. Abort the run, write `TRADE.EXECUTION_EVENT` row with `IS_SUCCESS_IND='N'` — schedule is **not** advanced (tick did not complete). The apply raises, so it takes the same in-pass attempts as any other failure and pauses if the fetch is still failing after the third (decision #79). |
 | **Bars stale but within tolerance** (fetch OK, exchange lagging one bar) | Freshness rule (§4.4) decides: if `MAX_BAR_TIMESTAMP` is within one interval of now, proceed; otherwise treat as fetch failure above. |
 | **Gap in bars** (exchange downtime, missed ticks) | `SP_GET_PRICE_BAR` returns what exists; `PriceBarService` validates row count vs expected window and refetches the missing range (ccxt `fetch_ohlcv` accepts a `since` param). If the gap persists, fail closed as above. |
 | **Host down longer than the live lookback** | `ensure_fresh` refills the window and trading resumes on correct prices — a closed candle is immutable, so a bar fetched ten days late is identical to one fetched at the boundary. Bars *older* than the window are never requested again, so the table keeps a permanent hole (see [§4.6](#continuity-is-not-automatic-ensure_fresh-is-a-rolling-window)). Repair with `PriceBarService.backfill` over an explicit range; trading is unaffected either way. |
@@ -535,9 +535,9 @@ exactly one interval, so a three-day daily gap takes three passes and leaves a
 `DEPLOYMENT_SCHEDULE_STATUS` row per owed slot. That per-slot history is the
 record of what the downtime cost — see decision #46.
 
-The drain stops as soon as a pass moves nothing. A deployment that failed with
-attempts left reports `RETRYING` and is deliberately left due, so its budget is
-spent across poll cycles rather than burned in a tight loop. A pass reporting
+The drain stops as soon as a pass moves nothing. A failing deployment spends
+its attempts inside the pass and is paused there (decision #79), so another
+pass would have nothing to retry. A pass reporting
 `STUCK` — applied, but the cursor would not move — **aborts** the drain: another
 immediate pass would place a second order seconds later. `max_drain_passes`
 (default 2000) bounds the loop regardless.

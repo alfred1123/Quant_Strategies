@@ -81,9 +81,9 @@ class SchedulePoller:
         """Apply everything already overdue, one interval per pass.
 
         Returns the number of cursor advances. Stops as soon as a pass moves
-        nothing: a deployment that failed with attempts left is deliberately
-        left due, so the steady loop retries it on its own cadence instead of
-        burning its whole budget in a tight loop here.
+        nothing, which is also a pass whose only due deployments were paused:
+        the tick spends a deployment's retries inside the pass, so there is
+        nothing left for another pass to try.
         """
         advanced_total = 0
         for _ in range(self._max_drain_passes):

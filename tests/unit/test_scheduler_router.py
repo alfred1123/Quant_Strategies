@@ -40,16 +40,16 @@ class TestResponse:
                 TickReport(tm_interval_id=1, results=[_result()]),
                 TickReport(
                     tm_interval_id=2,
-                    results=[_result(), _result(TickOutcome.RETRYING)],
+                    results=[_result(), _result(TickOutcome.PAUSED)],
                 ),
             ),
         )
 
         assert body["intervals"] == 2
         assert body["due"] == 3
-        # RETRYING left the row due, so only the two applies advanced.
+        # PAUSED disables the row instead of moving its cursor.
         assert body["advanced"] == 2
-        assert body["outcomes"] == {TickOutcome.APPLIED: 2, TickOutcome.RETRYING: 1}
+        assert body["outcomes"] == {TickOutcome.APPLIED: 2, TickOutcome.PAUSED: 1}
 
     def test_carries_the_failure_reason_per_deployment(self):
         """The Lambda logs this body; a silent failure would be invisible."""
@@ -58,14 +58,14 @@ class TestResponse:
             sweeper=_sweeper(
                 TickReport(
                     tm_interval_id=1,
-                    results=[_result(TickOutcome.RETRYING, error="bybit 403")],
+                    results=[_result(TickOutcome.PAUSED, error="bybit 403")],
                 )
             ),
         )
 
         deployment = body["results"][0]["deployments"][0]
         assert deployment["error"] == "bybit 403"
-        assert deployment["outcome"] == TickOutcome.RETRYING
+        assert deployment["outcome"] == TickOutcome.PAUSED
         assert isinstance(deployment["deployment_id"], str)
 
     def test_a_failing_deployment_still_returns_a_body(self):

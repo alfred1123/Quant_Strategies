@@ -105,7 +105,7 @@ class TestHasStuck:
     def test_false_for_ordinary_outcomes(self):
         reports = [
             _report(1, TickOutcome.APPLIED),
-            _report(2, TickOutcome.RETRYING, TickOutcome.ABANDONED),
+            _report(2, TickOutcome.PAUSED, TickOutcome.ABANDONED),
         ]
         assert ScheduleSweeper.has_stuck(reports) is False
 
