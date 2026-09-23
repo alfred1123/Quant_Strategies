@@ -19,6 +19,7 @@ function report(overrides: Partial<DryRunReport> = {}): DryRunReport {
     data_as_of: '2026-08-29',
     notional: 600,
     bar_source: 'price_bar:bybit',
+    key_profile: null,
     ...overrides,
   };
 }
