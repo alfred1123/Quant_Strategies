@@ -9,10 +9,11 @@ from quant.trade.adapters.base import TradeAdapter
 from quant.trade.brokers.ccxt.adapter import CcxtTradeAdapter, create_ccxt_adapter
 from quant.trade.brokers.ccxt.config import (
     CCXT_PRESETS,
+    BybitVenue,
+    CcxtVenue,
     ConnectParams,
-    _wire_bybit,
-    _wire_paper_sandbox,
 )
+from quant.trade.brokers.ccxt.egress import DIRECT, EgressRoute, EgressRoutes
 from quant.trade.brokers.ccxt.gateway import CcxtSessionConfig, CcxtTradeGateway
 from quant.trade.errors import (
     BrokerAuthError,
@@ -20,6 +21,7 @@ from quant.trade.errors import (
     SymbolMappingError,
     TradeValidationError,
 )
+from quant.trade.models.key_profile import ApiKeyInfo, KeyProfile
 from quant.trade.models.market import MarketLimits
 from quant.trade.models.order import (
     IntendedAction,
@@ -45,18 +47,18 @@ def inst_cache():
 class TestExchangeWiring:
     def test_default_paper_enables_sandbox(self):
         exchange = MagicMock()
-        _wire_paper_sandbox(exchange, ConnectParams(paper=True))
+        CcxtVenue().wire(exchange, ConnectParams(paper=True))
         exchange.set_sandbox_mode.assert_called_once_with(True)
 
     def test_default_live_skips_sandbox(self):
         exchange = MagicMock()
-        _wire_paper_sandbox(exchange, ConnectParams(paper=False))
+        CcxtVenue().wire(exchange, ConnectParams(paper=False))
         exchange.set_sandbox_mode.assert_not_called()
 
     def test_bybit_demo_enables_demo_not_sandbox(self):
         exchange = MagicMock()
         exchange.has = {"fetchCurrencies": True}
-        _wire_bybit(exchange, ConnectParams(paper=True, demo=True))
+        BybitVenue().wire(exchange, ConnectParams(paper=True, demo=True))
         assert exchange.has["fetchCurrencies"] is False
         exchange.enable_demo_trading.assert_called_once_with(True)
         exchange.set_sandbox_mode.assert_not_called()
@@ -64,7 +66,7 @@ class TestExchangeWiring:
     def test_bybit_paper_enables_sandbox_not_demo(self):
         exchange = MagicMock()
         exchange.has = {"fetchCurrencies": True}
-        _wire_bybit(exchange, ConnectParams(paper=True, demo=False))
+        BybitVenue().wire(exchange, ConnectParams(paper=True, demo=False))
         assert exchange.has["fetchCurrencies"] is False
         exchange.set_sandbox_mode.assert_called_once_with(True)
         exchange.enable_demo_trading.assert_not_called()
@@ -72,9 +74,18 @@ class TestExchangeWiring:
     def test_bybit_live_skips_demo_and_sandbox(self):
         exchange = MagicMock()
         exchange.has = {"fetchCurrencies": True}
-        _wire_bybit(exchange, ConnectParams(paper=False, demo=False))
+        BybitVenue().wire(exchange, ConnectParams(paper=False, demo=False))
         exchange.set_sandbox_mode.assert_not_called()
         exchange.enable_demo_trading.assert_not_called()
+
+    def test_presets_carry_their_venue(self):
+        assert isinstance(CCXT_PRESETS["bybit"].venue, BybitVenue)
+        assert type(CCXT_PRESETS["binance"].venue) is CcxtVenue
+
+    def test_default_venue_adds_nothing_to_errors(self):
+        venue = CcxtVenue()
+        assert venue.auth_hint(ConnectParams(paper=True)) == ""
+        assert venue.classify_denial(ccxt.PermissionDenied('{"retCode":10010}')) is None
 
 
 class TestIntendedSide:
@@ -139,6 +150,272 @@ class TestSessionConfigRepr:
         )
         assert "AKIA-VISIBLE-KEY" not in repr(cfg)
         assert "super-secret-value" not in repr(cfg)
+
+
+class TestEgressRoutes:
+    """``CCXT_EGRESS_<EXCHANGE_ID>`` lists candidate routes; direct always comes first."""
+
+    PROXY = "http://13.43.55.53:3128"
+
+    def test_env_var_is_named_for_the_ccxt_exchange(self):
+        assert EgressRoutes.env_var("bybit") == "CCXT_EGRESS_BYBIT"
+        assert EgressRoutes.env_var("binanceusdm") == "CCXT_EGRESS_BINANCEUSDM"
+
+    @pytest.mark.parametrize("value", [None, "", "   "])
+    def test_unset_or_blank_is_direct_only(self, monkeypatch, value):
+        if value is None:
+            monkeypatch.delenv("CCXT_EGRESS_BYBIT", raising=False)
+        else:
+            monkeypatch.setenv("CCXT_EGRESS_BYBIT", value)
+        assert tuple(EgressRoutes.from_env("bybit")) == (DIRECT,)
+
+    def test_named_proxies_follow_direct(self, monkeypatch):
+        monkeypatch.setenv(
+            "CCXT_EGRESS_BYBIT", f" uk = {self.PROXY} , eu=http://10.0.0.2:3128"
+        )
+        assert tuple(EgressRoutes.from_env("bybit")) == (
+            DIRECT,
+            EgressRoute("uk", self.PROXY),
+            EgressRoute("eu", "http://10.0.0.2:3128"),
+        )
+
+    @pytest.mark.parametrize("entry", ["uk", "=http://x:1", "uk=", "direct=http://x:1"])
+    def test_malformed_entries_are_skipped(self, monkeypatch, entry):
+        monkeypatch.setenv("CCXT_EGRESS_BYBIT", f"{entry},uk={self.PROXY}")
+        assert tuple(EgressRoutes.from_env("bybit")) == (
+            DIRECT, EgressRoute("uk", self.PROXY),
+        )
+
+    def test_one_venue_routes_do_not_leak_to_another(self, monkeypatch):
+        monkeypatch.setenv("CCXT_EGRESS_BYBIT", f"uk={self.PROXY}")
+        monkeypatch.delenv("CCXT_EGRESS_BINANCEUSDM", raising=False)
+        assert tuple(EgressRoutes.from_env("binanceusdm")) == (DIRECT,)
+
+    def test_preferring_moves_one_route_to_the_front(self):
+        uk, eu = EgressRoute("uk", self.PROXY), EgressRoute("eu", "http://x:1")
+        routes = EgressRoutes((DIRECT, uk, eu))
+        assert routes.preferring("eu") == (eu, DIRECT, uk)
+        assert routes.preferring(None) == (DIRECT, uk, eu)
+        assert routes.preferring("gone") == (DIRECT, uk, eu)
+
+    def test_market_type_names_the_product_category(self):
+        assert CCXT_PRESETS["bybit"].market_type == "linear"
+        assert CCXT_PRESETS["binance"].market_type == "default"
+
+
+class TestBybitKeyIntrospection:
+    def test_denial_codes_are_told_apart(self):
+        venue = BybitVenue()
+        ip = ccxt.PermissionDenied('bybit {"retCode":10010,"retMsg":"Unmatched IP"}')
+        region = ccxt.PermissionDenied('bybit {"retCode": 10024, "retMsg":"regulatory"}')
+        revoked = ccxt.PermissionDenied('bybit {"retCode":10005,"retMsg":"denied"}')
+        assert venue.classify_denial(ip) is OrderRejectReason.IP_NOT_ALLOWED
+        assert venue.classify_denial(region) is OrderRejectReason.REGION_RESTRICTED
+        assert venue.classify_denial(revoked) is None
+        assert venue.classify_denial(ccxt.PermissionDenied("no json here")) is None
+
+    def test_query_api_is_read_into_api_key_info(self):
+        exchange = MagicMock()
+        exchange.private_get_v5_user_query_api.return_value = {
+            "result": {
+                "ips": ["13.43.55.53"], "kycRegion": "GBR",
+                "readOnly": 0, "expiredAt": "2027-01-01T00:00:00Z",
+            }
+        }
+        assert BybitVenue().fetch_api_key_info(exchange) == ApiKeyInfo(
+            ips=("13.43.55.53",), kyc_region="GBR",
+            read_only=False, expires_at="2027-01-01T00:00:00Z",
+        )
+
+    def test_read_only_flag_and_missing_fields(self):
+        exchange = MagicMock()
+        exchange.private_get_v5_user_query_api.return_value = {
+            "result": {"readOnly": "1"}
+        }
+        assert BybitVenue().fetch_api_key_info(exchange) == ApiKeyInfo(read_only=True)
+
+    def test_default_venue_has_no_key_information_call(self):
+        exchange = MagicMock()
+        assert CcxtVenue().fetch_api_key_info(exchange) is None
+        exchange.assert_not_called()
+        assert exchange.method_calls == []
+
+
+class TestGatewayRouting:
+    PROXY = "http://13.43.55.53:3128"
+    UK = EgressRoute("uk", PROXY)
+
+    @patch("quant.trade.brokers.ccxt.gateway.ccxt")
+    def test_gateway_hands_the_proxy_to_ccxt(self, mock_ccxt):
+        exchange = MagicMock()
+        exchange.markets = {}
+        exchange.has = {}
+        mock_ccxt.bybit.return_value = exchange
+
+        gateway = CcxtTradeGateway(
+            CcxtSessionConfig(
+                api_key="k", api_secret="s", preset=CCXT_PRESETS["bybit"], paper=False,
+            )
+        )
+        gateway.connect(self.UK)
+
+        assert mock_ccxt.bybit.call_args.args[0]["httpsProxy"] == self.PROXY
+        assert gateway.route == self.UK
+
+    @patch("quant.trade.brokers.ccxt.gateway.ccxt")
+    def test_gateway_without_route_goes_direct(self, mock_ccxt):
+        exchange = MagicMock()
+        exchange.markets = {}
+        exchange.has = {}
+        mock_ccxt.bybit.return_value = exchange
+
+        gateway = CcxtTradeGateway(
+            CcxtSessionConfig(
+                api_key="k", api_secret="s", preset=CCXT_PRESETS["bybit"]
+            )
+        )
+        gateway.connect()
+
+        assert "httpsProxy" not in mock_ccxt.bybit.call_args.args[0]
+        assert gateway.route == DIRECT
+
+    @staticmethod
+    def _connected(exchange, mock_ccxt):
+        mock_ccxt.AuthenticationError = ccxt.AuthenticationError
+        mock_ccxt.BaseError = ccxt.BaseError
+        exchange.markets = {}
+        exchange.has = {}
+        mock_ccxt.bybit.return_value = exchange
+        gateway = CcxtTradeGateway(
+            CcxtSessionConfig(
+                api_key="k", api_secret="s", preset=CCXT_PRESETS["bybit"], paper=False,
+            )
+        )
+        gateway.connect()
+        return gateway
+
+    @patch("quant.trade.brokers.ccxt.gateway.ccxt")
+    def test_api_key_info_is_read_on_the_live_session(self, mock_ccxt):
+        exchange = MagicMock()
+        exchange.private_get_v5_user_query_api.return_value = {
+            "result": {"ips": ["*"], "kycRegion": "HKG", "readOnly": 0}
+        }
+        gateway = self._connected(exchange, mock_ccxt)
+
+        assert gateway.fetch_api_key_info().kyc_region == "HKG"
+        assert mock_ccxt.bybit.call_count == 1
+
+    @patch("quant.trade.brokers.ccxt.gateway.ccxt")
+    def test_auth_error_carries_the_classified_reason(self, mock_ccxt):
+        exchange = MagicMock()
+        exchange.private_get_v5_user_query_api.side_effect = ccxt.PermissionDenied(
+            'bybit {"retCode":10010,"retMsg":"Unmatched IP"}'
+        )
+        gateway = self._connected(exchange, mock_ccxt)
+
+        with pytest.raises(BrokerAuthError) as info:
+            gateway.fetch_api_key_info()
+        assert info.value.reason is OrderRejectReason.IP_NOT_ALLOWED
+
+    @patch("quant.trade.brokers.ccxt.gateway.ccxt")
+    def test_venue_outage_is_a_connection_error(self, mock_ccxt):
+        exchange = MagicMock()
+        exchange.private_get_v5_user_query_api.side_effect = ccxt.NetworkError("timeout")
+        gateway = self._connected(exchange, mock_ccxt)
+
+        with pytest.raises(BrokerConnectionError) as info:
+            gateway.fetch_api_key_info()
+        assert not isinstance(info.value, BrokerAuthError)
+
+
+class TestAdapterKeyRouting:
+    """The adapter opens its session on the router's route and obeys the profile."""
+
+    PROXY = "http://13.43.55.53:3128"
+
+    def _adapter(self, inst_cache, router):
+        return create_ccxt_adapter(
+            preset=CCXT_PRESETS["bybit"], api_key="k", api_secret="s",
+            paper=False, inst_cache=inst_cache, key_router=router,
+        )
+
+    def _router(self, profile):
+        router = MagicMock()
+        router.connect.return_value = profile
+        return router
+
+    @patch.object(CcxtTradeGateway, "connect")
+    def test_connect_is_handed_to_the_router(self, connect, inst_cache):
+        router = self._router(KeyProfile(route="uk"))
+        adapter = self._adapter(inst_cache, router)
+        adapter.connect()
+        router.connect.assert_called_once_with(adapter.gateway)
+        connect.assert_not_called()
+        assert adapter.key_profile == KeyProfile(route="uk")
+
+    @patch.object(CcxtTradeGateway, "fetch_api_key_info", return_value=ApiKeyInfo())
+    @patch.object(CcxtTradeGateway, "connect")
+    def test_no_router_still_routes_without_a_cache(self, connect, _info, inst_cache, monkeypatch):
+        monkeypatch.delenv("CCXT_EGRESS_BYBIT", raising=False)
+        adapter = self._adapter(inst_cache, None)
+        adapter.connect()
+        connect.assert_called_once_with(DIRECT)
+        assert adapter.key_profile == KeyProfile(route="direct", info=ApiKeyInfo())
+
+    @patch.object(CcxtTradeGateway, "create_market_order")
+    @patch.object(CcxtTradeGateway, "connect")
+    def test_read_only_key_is_refused_before_submit(self, _connect, create, inst_cache):
+        profile = KeyProfile(route="direct", info=ApiKeyInfo(read_only=True))
+        adapter = self._adapter(inst_cache, self._router(profile))
+        adapter.connect()
+        result = adapter.place_order(OrderRequest("BTCUSDT", 0.001, OrderSide.BUY))
+        assert result.reason is OrderRejectReason.KEY_READ_ONLY
+        create.assert_not_called()
+
+    @patch.object(CcxtTradeGateway, "create_market_order")
+    @patch.object(CcxtTradeGateway, "connect")
+    def test_known_region_restriction_is_refused_before_submit(self, _connect, create, inst_cache):
+        profile = KeyProfile(
+            route="uk", info=ApiKeyInfo(kyc_region="GBR"),
+            restricted_market_types=frozenset({"linear"}),
+        )
+        adapter = self._adapter(inst_cache, self._router(profile))
+        adapter.connect()
+        result = adapter.place_order(OrderRequest("BTCUSDT", 0.001, OrderSide.BUY))
+        assert result.reason is OrderRejectReason.REGION_RESTRICTED
+        assert "GBR" in result.message
+        create.assert_not_called()
+
+    @patch.object(CcxtTradeGateway, "fetch_market_limits", return_value=MarketLimits(symbol="BTCUSDT"))
+    @patch.object(CcxtTradeGateway, "create_market_order")
+    @patch.object(CcxtTradeGateway, "connect")
+    def test_venue_region_refusal_is_typed_and_remembered(self, _connect, create, _limits, inst_cache):
+        create.side_effect = BrokerAuthError(
+            "authentication failed during create_order: 10024",
+            reason=OrderRejectReason.REGION_RESTRICTED,
+        )
+        router = self._router(KeyProfile(route="uk"))
+        router.record_restriction.return_value = KeyProfile(
+            route="uk", restricted_market_types=frozenset({"linear"})
+        )
+        adapter = self._adapter(inst_cache, router)
+        adapter.connect()
+
+        result = adapter.place_order(OrderRequest("BTCUSDT", 0.001, OrderSide.BUY))
+
+        assert result.success is False
+        assert result.reason is OrderRejectReason.REGION_RESTRICTED
+        session, profile, market_type = router.record_restriction.call_args.args
+        assert session.api_key == "k"
+        assert profile == KeyProfile(route="uk")
+        assert market_type == "linear"
+        # The in-memory profile follows the cache, so the next order in this
+        # session is refused before it is sent.
+        assert adapter.key_profile.restricted_market_types == {"linear"}
+        create.reset_mock()
+        again = adapter.place_order(OrderRequest("BTCUSDT", 0.001, OrderSide.BUY))
+        assert again.reason is OrderRejectReason.REGION_RESTRICTED
+        create.assert_not_called()
 
 
 class TestCcxtTradeGateway:

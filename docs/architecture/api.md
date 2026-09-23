@@ -147,6 +147,12 @@ matching `ApplyReport.bar_source`, and the report dialog shows it as **Price
 source**. Two sources are two sets of numbers, so a divergence is only
 diagnosable when the input is recorded next to the output.
 
+`DryRunReport.key_profile` states the other input the reader cannot otherwise
+see: which egress route the venue accepted the key from, the key's IP
+allowlist, KYC region, read-only flag, expiry, and any product the venue has
+refused the account. `null` for brokers that do not route keys. See
+[Infrastructure: Per-key routing](infrastructure.md#per-key-routing).
+
 #### Broker failures — status says whether to retry
 
 Anything that reaches an exchange (`dry-run`, `apply`, the account snapshot) can

@@ -9,6 +9,7 @@ import logging
 from quant.data.backtest_cache import BacktestCache
 from quant.data.instruments import InstrumentCache
 from quant.refdata.reader import RedisRefData
+from quant.trade.key_profiles import RedisKeyProfiles
 from quant.trade.venue_limits import RedisVenueLimits
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,9 @@ class DataCaches:
         # Venue order-size rules, cached from ccxt rather than seeded in
         # REFDATA — the exchange owns these, not a user picking from a list.
         self.venue_limits = RedisVenueLimits(redis_url)
+        # Per-API-key egress route and venue-reported key facts. Cache only:
+        # the user edits the key at the venue, so the venue stays the truth.
+        self.key_profiles = RedisKeyProfiles(redis_url)
 
     @property
     def conninfo(self) -> str:

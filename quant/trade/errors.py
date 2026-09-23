@@ -1,5 +1,7 @@
 """Trade domain errors — raised by :mod:`quant.trade.db_repo` before SP calls."""
 
+from quant.trade.models.order import OrderRejectReason
+
 
 class TradeValidationError(ValueError):
     """Invalid input or business rule violation (maps to HTTP 400/404/403 in API)."""
@@ -28,10 +30,22 @@ class BrokerConnectionError(TradeValidationError):
 
     503 rather than 502: the request was well formed and the caller should come
     back on the next tick, which is the same shape as ``StaleBarsError``.
+
+    ``reason`` is set when the venue's code says *which* refusal this is (an IP
+    the key does not allow, a product the account may not trade), so callers
+    act on a value rather than on the message. ``None`` when nothing more
+    specific than the class is known.
     """
 
-    def __init__(self, message: str, *, status_code: int = 503) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int = 503,
+        reason: OrderRejectReason | None = None,
+    ) -> None:
         super().__init__(message, status_code=status_code)
+        self.reason = reason
 
 
 class BrokerAuthError(BrokerConnectionError):
@@ -43,8 +57,8 @@ class BrokerAuthError(BrokerConnectionError):
     deployment points at the venue's testnet, so mainnet keys fail here.
     """
 
-    def __init__(self, message: str) -> None:
-        super().__init__(message, status_code=400)
+    def __init__(self, message: str, *, reason: OrderRejectReason | None = None) -> None:
+        super().__init__(message, status_code=400, reason=reason)
 
 
 class OrderNotFoundError(BrokerConnectionError):

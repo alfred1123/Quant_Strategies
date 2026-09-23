@@ -8,11 +8,13 @@ from dataclasses import dataclass, field
 import ccxt
 
 from quant.trade.brokers.ccxt.config import CcxtExchangePreset, ConnectParams
+from quant.trade.brokers.ccxt.egress import DIRECT, EgressRoute
 from quant.trade.errors import (
     BrokerAuthError,
     BrokerConnectionError,
     OrderNotFoundError,
 )
+from quant.trade.models.key_profile import ApiKeyInfo
 from quant.trade.models.market import MarketLimits
 from quant.trade.models.session import BrokerSessionState
 
@@ -42,6 +44,10 @@ class CcxtSessionConfig:
     paper: bool = True
     demo: bool = False
 
+    @property
+    def connect_params(self) -> ConnectParams:
+        return ConnectParams(paper=self.paper, demo=self.demo)
+
     @classmethod
     def public(cls, preset: CcxtExchangePreset) -> "CcxtSessionConfig":
         """Keyless session for what the venue publishes to everyone.
@@ -49,7 +55,8 @@ class CcxtSessionConfig:
         ``load_markets`` needs no credentials, which is what lets the API cache
         order-size rules without a user's keys. Live venue rather than the
         sandbox: the rules worth caching are the ones a real order is judged
-        against.
+        against. Connected direct: an IP allowlist binds a key, and this session
+        has none.
         """
         return cls(api_key="", api_secret="", preset=preset, paper=False)
 
@@ -60,6 +67,7 @@ class CcxtTradeGateway:
     def __init__(self, config: CcxtSessionConfig) -> None:
         self._config = config
         self._exchange: ccxt.Exchange | None = None
+        self._route: EgressRoute = DIRECT
 
     @property
     def exchange(self) -> ccxt.Exchange:
@@ -67,7 +75,16 @@ class CcxtTradeGateway:
             raise BrokerConnectionError("exchange not connected")
         return self._exchange
 
-    def connect(self) -> None:
+    @property
+    def session(self) -> CcxtSessionConfig:
+        return self._config
+
+    @property
+    def route(self) -> EgressRoute:
+        """The egress route of the current (or last) connection."""
+        return self._route
+
+    def _build_exchange(self, route: EgressRoute) -> ccxt.Exchange:
         preset = self._config.preset
         exchange_cls = getattr(ccxt, preset.exchange_id, None)
         if exchange_cls is None:
@@ -81,31 +98,45 @@ class CcxtTradeGateway:
         }
         if preset.default_type:
             params["options"] = {"defaultType": preset.default_type}
-        self._exchange = exchange_cls(params)
-        connect_params = ConnectParams(paper=self._config.paper, demo=self._config.demo)
-        preset.wire(self._exchange, connect_params)
+        if route.proxy_url:
+            params["httpsProxy"] = route.proxy_url
+        exchange = exchange_cls(params)
+        preset.venue.wire(exchange, self._config.connect_params)
+        return exchange
+
+    def connect(self, route: EgressRoute = DIRECT) -> None:
+        """Open a session on *route*; a failure leaves the gateway disconnected.
+
+        Cleaning up here matters because callers connect inside ``with`` —
+        an exception out of ``__enter__`` never reaches ``__exit__``.
+        """
+        preset = self._config.preset
+        self._route = route
+        self._exchange = self._build_exchange(route)
         try:
             self._exchange.load_markets()
         except ccxt.AuthenticationError as exc:
+            self.disconnect()
             raise self._auth_error(exc, phase="load_markets") from exc
         except ccxt.BaseError as exc:
+            self.disconnect()
             raise BrokerConnectionError(f"broker unreachable during load_markets: {exc}") from exc
         logger.info(
-            "ccxt %s connected (paper=%s, demo=%s, markets=%d)",
+            "ccxt %s connected (paper=%s, demo=%s, markets=%d, proxy=%s)",
             preset.exchange_id,
             self._config.paper,
             self._config.demo,
             len(self._exchange.markets),
+            route.proxy_url or route.name,
         )
 
     def _auth_error(self, exc: ccxt.AuthenticationError, *, phase: str) -> BrokerAuthError:
-        hint = ""
-        auth_hint = self._config.preset.auth_hint
-        if auth_hint is not None:
-            hint = auth_hint(
-                ConnectParams(paper=self._config.paper, demo=self._config.demo)
-            )
-        return BrokerAuthError(f"authentication failed during {phase}: {exc}.{hint}")
+        venue = self._config.preset.venue
+        hint = venue.auth_hint(self._config.connect_params)
+        return BrokerAuthError(
+            f"authentication failed during {phase}: {exc}.{hint}",
+            reason=venue.classify_denial(exc),
+        )
 
     def disconnect(self) -> None:
         if self._exchange is not None:
@@ -119,6 +150,15 @@ class CcxtTradeGateway:
         if self._exchange is None:
             return BrokerSessionState(connected=False, message="not connected")
         return BrokerSessionState(connected=True, message="ok")
+
+    def fetch_api_key_info(self) -> ApiKeyInfo | None:
+        """The venue's description of this session's key; ``None`` if it has no such call."""
+        try:
+            return self._config.preset.venue.fetch_api_key_info(self.exchange)
+        except ccxt.AuthenticationError as exc:
+            raise self._auth_error(exc, phase="fetch_api_key_info") from exc
+        except ccxt.BaseError as exc:
+            raise BrokerConnectionError(f"fetch_api_key_info failed: {exc}") from exc
 
     def validate_credentials(self) -> None:
         """Read-only check — load markets and fetch balance."""

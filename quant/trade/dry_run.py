@@ -134,4 +134,5 @@ def _broker_report(
         data_as_of=data_as_of,
         notional=notional,
         bar_source=bar_source,
+        key_profile=adapter.key_profile,
     )

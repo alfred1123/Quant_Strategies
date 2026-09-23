@@ -260,7 +260,7 @@ Outputs:
       Name: !Sub "${Project}-uk-egress-ip"
 
   ProxyUrl:
-    Description: Value for the CCXT_PROXY_BYBIT parameter on the application host.
+    Description: Proxy URL for the uk route in the CCXT_EGRESS_BYBIT parameter (uk=<url>).
     Value: !Sub "http://${EgressIp}:${ProxyPort}"
 
   InstanceId:

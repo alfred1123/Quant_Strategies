@@ -93,6 +93,25 @@ export interface DryRunReport {
   notional: number | null;
   /** `price_bar:<venue>` or `provider` — the series the signal was computed from. */
   bar_source: string;
+  /** What the venue said about the API key on this session; null for brokers that do not route keys. */
+  key_profile: KeyProfile | null;
+}
+
+/** The venue's own description of an API key (Bybit "Get API Key Information"). */
+export interface ApiKeyInfo {
+  ips: string[];
+  kyc_region: string | null;
+  read_only: boolean | null;
+  expires_at: string | null;
+}
+
+/** One API key as the venue sees it, cached per key by the backend. */
+export interface KeyProfile {
+  /** Egress route the venue accepted the key from: `direct` or a named proxy such as `uk`. */
+  route: string;
+  info: ApiKeyInfo | null;
+  /** Product categories the venue has refused this account (e.g. `linear` after Bybit 10024). */
+  restricted_market_types: string[];
 }
 
 export interface ApplyReport {

@@ -88,6 +88,12 @@ code; see [Dev vs Prod](architecture/dev-vs-prod.md#where-local-and-prod-are-def
 
 User accounts are admin-managed — there is no signup endpoint. See [Login & Authentication](design/login.md) for the provisioning flow.
 
+## Exchange egress
+
+| Variable | Required? | Description |
+|---|---|---|
+| `CCXT_EGRESS_<EXCHANGE_ID>` | Optional | Extra egress routes for **keyed** ccxt sessions to that venue, named for the ccxt exchange id (`CCXT_EGRESS_BYBIT`, `CCXT_EGRESS_BINANCEUSDM`). The format is comma-separated `name=proxy_url`, e.g. `uk=http://13.43.55.53:3128`. `direct` is always tried as well and cannot be redefined; malformed entries are logged and skipped. Each key is routed to whichever route the venue accepts, and the result is cached in Redis. Unset or blank means direct only. Keyless sessions (venue limits, market data) ignore it. Prod: `/quant/prod/CCXT_EGRESS_BYBIT`. See [Infrastructure: Per-key routing](architecture/infrastructure.md#per-key-routing). |
+
 ## Frontend (Vite dev server)
 
 | Variable | Required? | Description |

@@ -69,6 +69,12 @@ def _reject_reason_of(report) -> OrderRejectReason | None:
         return None
 
 
+def _reject_reason_of_exception(exc: Exception) -> OrderRejectReason | None:
+    """Typed reason off a raised :class:`BrokerConnectionError`; None otherwise."""
+    reason = getattr(exc, "reason", None)
+    return reason if isinstance(reason, OrderRejectReason) else None
+
+
 @dataclass(frozen=True)
 class _OrderFailure:
     """A finished apply cycle whose order failed, as the tick reads it."""
@@ -187,8 +193,13 @@ class ScheduleTickRunner:
             report = self._apply(row["app_user_id"], deployment_id)
         except Exception as exc:
             # No position: the apply raised, so it may never have reached the
-            # broker read at all.
-            return self._on_failure(row, attempt, exc)
+            # broker read at all. A broker error still names its reason when
+            # the venue classified the refusal (e.g. the key admits none of
+            # our egress IPs), and that reason pauses the same way a reject
+            # in a finished cycle would.
+            return self._on_failure(
+                row, attempt, exc, reason=_reject_reason_of_exception(exc)
+            )
 
         failure = _failed_order(report)
         if failure is not None:

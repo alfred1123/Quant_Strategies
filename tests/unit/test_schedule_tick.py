@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 
 from quant.schemas.apply import ApplyReport
+from quant.trade.errors import BrokerAuthError, BrokerConnectionError
 from quant.trade.models.order import IntendedAction, OrderRejectReason
 from quant.trade.scheduler.tick import ScheduleTickRunner, TickOutcome
 
@@ -282,6 +283,33 @@ class TestAttemptBudget:
         kwargs = repo.write_deployment.call_args.kwargs
         assert kwargs["is_enabled_ind"] == "N"
         assert kwargs["deployment_status"] == "PAUSED"
+
+    def test_a_typed_broker_error_at_connect_pauses_without_spending_the_budget(self, repo):
+        """A key that admits none of our egress IPs fails before any order exists."""
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(
+            side_effect=BrokerAuthError(
+                "Bybit refused this key's source IP on every egress route",
+                reason=OrderRejectReason.IP_NOT_ALLOWED,
+            )
+        )
+        runner = _runner(repo, apply_fn, max_attempts=3)
+
+        report = runner.run_interval(1)
+
+        assert report.results[0].outcome is TickOutcome.PAUSED
+        assert report.results[0].attempt == 1
+        assert repo.write_deployment.call_args.kwargs["deployment_status"] == "PAUSED"
+
+    def test_an_untyped_broker_error_at_connect_keeps_its_attempts(self, repo):
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(side_effect=BrokerConnectionError("proxy down"))
+        runner = _runner(repo, apply_fn, max_attempts=3)
+
+        report = runner.run_interval(1)
+
+        assert report.results[0].outcome is TickOutcome.RETRYING
+        repo.write_deployment.assert_not_called()
 
     def test_pause_write_failure_still_advances(self, repo):
         repo.sp_get_missed_due_deployments.return_value = [_due_row()]

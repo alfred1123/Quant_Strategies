@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
+from quant.trade.models.key_profile import KeyProfile
 from quant.trade.models.order import IntendedAction
 
 
@@ -49,3 +50,9 @@ class DryRunReport(BaseModel):
     #: of the live apply if both read the same bars, and the reader cannot
     #: check that unless the source is stated.
     bar_source: str
+    #: What the venue said about the key on this session — which egress route
+    #: it accepted, its IP allowlist, KYC region, read-only flag, expiry, and
+    #: any product it has refused. Stated for the same reason as ``bar_source``:
+    #: the reader cannot otherwise tell which IP an order will leave from.
+    #: ``None`` for adapters that do not route keys (Futu).
+    key_profile: KeyProfile | None = None

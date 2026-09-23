@@ -22,16 +22,23 @@ class OrderRejectReason(StrEnum):
     """
 
     SIZE_BELOW_MINIMUM = "SIZE_BELOW_MINIMUM"
+    #: The key's IP allowlist admits none of this platform's egress routes.
+    IP_NOT_ALLOWED = "IP_NOT_ALLOWED"
+    #: The venue will not offer this product to the account (e.g. Bybit 10024).
+    REGION_RESTRICTED = "REGION_RESTRICTED"
+    KEY_READ_ONLY = "KEY_READ_ONLY"
 
     @property
     def requires_operator_fix(self) -> bool:
-        """True when no retry can succeed until someone edits the deployment.
+        """True when no retry can succeed until someone changes something.
 
         Both the retry executor (give up after one attempt) and the scheduler
         (pause rather than spend the tick budget) ask this, so the answer lives
-        with the reason instead of being decided twice.
+        with the reason instead of being decided twice. Every reason so far is
+        a setting — a deployment's qty, or a key's allowlist, permissions, or
+        account region — that the next tick would meet unchanged.
         """
-        return self is OrderRejectReason.SIZE_BELOW_MINIMUM
+        return True
 
 
 class IntendedAction(StrEnum):

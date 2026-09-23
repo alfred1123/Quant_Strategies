@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 
+from quant.trade.models.key_profile import KeyProfile
 from quant.trade.models.order import IntendedAction, OrderRequest, OrderResult
 from quant.trade.models.session import BrokerSessionState
 
@@ -53,6 +54,16 @@ class TradeAdapter(BrokerSession):
 
     def get_last_price(self, symbol: str) -> float | None:
         """Best-effort last traded price for notional estimates; ``None`` if unavailable."""
+        return None
+
+    @property
+    def key_profile(self) -> KeyProfile | None:
+        """What the venue said about this session's API key, once connected.
+
+        ``None`` for brokers that do not route or introspect keys (Futu), and
+        before :meth:`connect`. Concrete rather than abstract for the same
+        reason as :meth:`get_balances`.
+        """
         return None
 
     def get_balances(self) -> list[dict]:

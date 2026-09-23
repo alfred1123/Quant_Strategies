@@ -12,6 +12,7 @@ from quant.trade.errors import AdapterNotFoundError
 
 if TYPE_CHECKING:
     from quant.refdata.reader import RedisRefData
+    from quant.trade.brokers.ccxt.routing import KeyRouter
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +39,13 @@ class AdapterRegistry:
         return app_id in self._by_app_id
 
 
-def _factory_for(preset: CcxtExchangePreset) -> AdapterFactory:
+def _factory_for(
+    preset: CcxtExchangePreset, key_router: KeyRouter | None
+) -> AdapterFactory:
     from quant.trade.brokers.ccxt.adapter import create_ccxt_adapter
 
     def factory(**kwargs: Any) -> TradeAdapter:
-        return create_ccxt_adapter(preset=preset, **kwargs)
+        return create_ccxt_adapter(preset=preset, key_router=key_router, **kwargs)
 
     return factory
 
@@ -64,11 +67,17 @@ def ccxt_apps(refdata: RedisRefData) -> list[tuple[int, CcxtExchangePreset]]:
     return apps
 
 
-def build_default_registry(refdata: RedisRefData) -> AdapterRegistry:
-    """Register built-in ccxt adapters. Called at API startup."""
+def build_default_registry(
+    refdata: RedisRefData, *, key_router: KeyRouter | None = None
+) -> AdapterRegistry:
+    """Register built-in ccxt adapters. Called at API startup.
+
+    ``key_router`` picks each keyed session's egress route; without one every
+    session goes direct.
+    """
     registry = AdapterRegistry()
     for app_id, preset in ccxt_apps(refdata):
-        registry.register(app_id, _factory_for(preset))
+        registry.register(app_id, _factory_for(preset, key_router))
     return registry
 
 

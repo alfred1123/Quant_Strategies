@@ -11,6 +11,7 @@ from quant.schemas.dry_run import DryRunReport, DryRunRequest
 from quant.trade.adapters.base import TradeAdapter
 from quant.trade.dry_run import run_dry_run
 from quant.trade.errors import SymbolMappingError, TradeValidationError
+from quant.trade.models.key_profile import ApiKeyInfo, KeyProfile
 
 
 def _dry_run_request(**overrides):
@@ -45,6 +46,7 @@ def deps():
     adapter.get_position_qty.return_value = 0.0
     adapter.get_last_price.return_value = 60000.0
     adapter.intended_side = TradeAdapter.intended_side
+    adapter.key_profile = KeyProfile(route="uk", info=ApiKeyInfo(kyc_region="GBR"))
     adapter.__enter__ = MagicMock(return_value=adapter)
     adapter.__exit__ = MagicMock(return_value=False)
     adapter_registry.has_adapter.return_value = True
@@ -92,6 +94,8 @@ class TestRunDryRun:
         assert report.intended_side == "BUY"
         assert report.position_qty == 0.0
         assert report.notional == 600.0  # 0.01 * 60000
+        assert report.key_profile.route == "uk"
+        assert report.model_dump()["key_profile"]["info"]["kyc_region"] == "GBR"
         deps["adapter"].__enter__.assert_called_once()
         deps["adapter"].__exit__.assert_called_once()
         deps["bt"].fetch_result_payload.assert_called_once()

@@ -70,10 +70,13 @@ async def lifespan(app: FastAPI):
         caches.load_instruments(soft_fail=False)
         app.state.data_caches = caches
 
+        from quant.trade.brokers.ccxt.routing import KeyRouter
         from quant.trade.registry import AdapterRegistry, build_default_registry
 
         try:
-            app.state.adapter_registry = build_default_registry(caches.refdata)
+            app.state.adapter_registry = build_default_registry(
+                caches.refdata, key_router=KeyRouter(caches.key_profiles)
+            )
             logger.info("Adapter registry ready for ccxt brokers")
         except Exception:
             logger.exception(

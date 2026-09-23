@@ -218,6 +218,7 @@ All app secrets live under `/quant/<env>/` in SSM Parameter Store.
 | `FUTU_HOST` | String | `127.0.0.1` |
 | `FUTU_PORT` | String | `11111` |
 | `TRADE_SERVICE_TOKEN` | SecureString | Shared secret for Lambda → API scheduled apply (auto-created by `init-ssm-params.sh`) |
+| `CCXT_EGRESS_BYBIT` | String | *Optional.* Extra egress routes for keyed Bybit sessions, `uk=<ProxyUrl of quant-uk-egress>`. Each key is routed to whichever one Bybit accepts. See [UK egress proxy](#uk-egress-proxy) |
 
 The app loads these at startup via `quant/shared/config.py` when `USE_SSM=1`.
 
@@ -225,6 +226,66 @@ The app loads these at startup via `quant/shared/config.py` when `USE_SSM=1`.
 a database — otherwise JWTs minted by one instance cannot be verified
 by another. `EXCHANGE_SECRETS_KEY` must also be stable — rotating it
 invalidates all stored credential ciphertext until users re-save keys.
+
+---
+
+## UK egress proxy
+
+`quant-uk-egress` (eu-west-2) is a t4g.nano running squid behind Elastic IP
+**`13.43.55.53`**. It accepts `CONNECT` on `:3128` only, only from the app host's
+EIP (`ProxyClientCidr`), and only to `api.bybit.com`, `api-testnet.bybit.com`,
+`api-demo.bybit.com` and `api.bytick.com`. The application stays in Singapore;
+only **keyed** Bybit traffic leaves from London.
+
+### Per-key routing
+
+The route is chosen **per API key**, not per venue, because each user pins
+their own key at Bybit and can change that pin without telling us.
+
+- **Candidates.** `EgressRoutes.from_env()` (`quant/trade/brokers/ccxt/egress.py`) returns `direct` (the
+  Singapore EIP) followed by the named routes in `CCXT_EGRESS_<EXCHANGE_ID>`,
+  e.g. `CCXT_EGRESS_BYBIT=uk=http://13.43.55.53:3128`. When the variable is unset,
+  every key goes direct.
+- **Connect.** `KeyRouter.connect(gateway)` (`quant/trade/brokers/ccxt/routing.py`)
+  connects the session's own gateway on the cached route first, then the rest.
+  `load_markets` is public and succeeds from anywhere, so the next call, Bybit
+  `GET /v5/user/query-api` (`fetch_api_key_info`), is the first one the
+  allowlist can refuse. `retCode 10010` (unmatched IP) disconnects and tries the
+  next route. Any other failure stops with no fallback: if the proxy is down,
+  the call fails as `BrokerConnectionError` rather than switching to an IP the
+  key may reject. Only venues whose `classify_denial` recognises an IP refusal
+  can be routed; others use their first route.
+- **Cache.** The accepted route, the key's allowlist, `kycRegion`, `readOnly`,
+  expiry, and any product the venue refused are stored as a `KeyProfile` in
+  Redis at `key_profile:<exchange>:<demo|paper|live>:<sha256(api_key)[:16]>`,
+  with a 1-day TTL. Nothing is written to the database. Every field can be
+  re-read from the venue, and a key the user edits is caught on the next connect.
+- **Refusals.** A read-only key (`KEY_READ_ONLY`), a product Bybit refused with
+  `retCode 10024` (`REGION_RESTRICTED`), and "no route accepted"
+  (`IP_NOT_ALLOWED`) all need an operator to fix them, so the scheduler pauses
+  the deployment instead of retrying, whether the refusal came back as a
+  rejected order or was raised while connecting. After one `10024`, later
+  orders for that market type are refused before they are sent, until the
+  cache entry expires.
+- **Visibility.** The dry-run report carries `key_profile` (route, allowlist,
+  KYC region, read-only, expiry, refused products), so the cutover can be
+  checked from the UI rather than from the connect log line.
+- Keyless sessions (`CcxtSessionConfig.public`, used for venue limits and market
+  data) always go direct, since an IP allowlist binds a key and they carry none.
+  Each keyed session logs `proxy=<url>` or `proxy=direct` on connect.
+
+**Cutover** (order matters, because a key rejects any IP it does not list):
+
+1. `aws ssm put-parameter --name /quant/prod/CCXT_EGRESS_BYBIT --type String --value uk=http://13.43.55.53:3128`
+2. Restart `api` + `worker`, since SSM is read once at startup. Keys still pinned
+   to Singapore keep going direct.
+3. Add `13.43.55.53` to the Bybit key's IP allowlist and remove the old IP. The
+   next session sees `10010` on direct and moves to `uk`, logging
+   `Bybit key moved egress route direct → uk`.
+4. Run a dry-run and confirm `proxy=http://13.43.55.53:3128` in the logs.
+
+**Rollback:** delete the parameter and restart. Keys that only list the London IP
+then fail as `IP_NOT_ALLOWED` and pause until the Singapore IP is added back.
 
 ---
 

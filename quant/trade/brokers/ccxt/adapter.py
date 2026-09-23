@@ -14,6 +14,8 @@ from quant.trade.errors import (
     SymbolMappingError,
     TradeValidationError,
 )
+from quant.trade.brokers.ccxt.routing import KeyRouter
+from quant.trade.models.key_profile import KeyProfile
 from quant.trade.models.order import (
     IntendedAction,
     OrderRejectReason,
@@ -38,8 +40,12 @@ def create_ccxt_adapter(
     paper: bool,
     inst_cache: InstrumentCache,
     demo: bool = False,
+    key_router: KeyRouter | None = None,
 ) -> CcxtTradeAdapter:
-    """Build a ccxt adapter from a REFDATA.APP preset."""
+    """Build a ccxt adapter from a REFDATA.APP preset.
+
+    ``key_router=None`` routes without a cache: every connect re-asks the venue.
+    """
     return CcxtTradeAdapter(
         api_key=api_key,
         api_secret=api_secret,
@@ -47,6 +53,7 @@ def create_ccxt_adapter(
         inst_cache=inst_cache,
         preset=preset,
         demo=demo,
+        key_router=key_router or KeyRouter(None),
     )
 
 
@@ -61,27 +68,36 @@ class CcxtTradeAdapter(TradeAdapter):
         paper: bool,
         inst_cache: InstrumentCache,
         preset: CcxtExchangePreset,
+        key_router: KeyRouter,
         demo: bool = False,
     ) -> None:
         self._inst = inst_cache
-        self._exchange_label = preset.exchange_label
-        self._gateway = CcxtTradeGateway(
-            CcxtSessionConfig(
-                api_key=api_key,
-                api_secret=api_secret,
-                preset=preset,
-                paper=paper,
-                demo=demo,
-            )
+        self._session = CcxtSessionConfig(
+            api_key=api_key,
+            api_secret=api_secret,
+            preset=preset,
+            paper=paper,
+            demo=demo,
         )
-        self._paper = paper
+        self._gateway = CcxtTradeGateway(self._session)
+        self._key_router = key_router
+        self._key_profile: KeyProfile | None = None
 
     @property
     def gateway(self) -> CcxtTradeGateway:
         return self._gateway
 
+    @property
+    def preset(self) -> CcxtExchangePreset:
+        return self._session.preset
+
+    @property
+    def key_profile(self) -> KeyProfile | None:
+        return self._key_profile
+
     def connect(self) -> None:
-        self._gateway.connect()
+        """Open the session on whichever egress route this key's allowlist accepts."""
+        self._key_profile = self._key_router.connect(self._gateway)
 
     def disconnect(self) -> None:
         self._gateway.disconnect()
@@ -90,8 +106,8 @@ class CcxtTradeAdapter(TradeAdapter):
         return self._gateway.health()
 
     def unlock_live_trading(self, trade_password: str) -> None:
-        if not self._paper and trade_password:
-            logger.debug("%s live unlock not required for ccxt v1", self._exchange_label)
+        if not self._session.paper and trade_password:
+            logger.debug("%s live unlock not required for ccxt v1", self.preset.exchange_label)
 
     def _require_vendor_symbol(self, internal_cusip: str, app_id: int) -> str:
         vendor_symbol = self._inst.resolve_internal_cusip(internal_cusip, app_id)
@@ -111,7 +127,7 @@ class CcxtTradeAdapter(TradeAdapter):
         self._gateway.validate_credentials()
         if not self._gateway.market_exists(vendor_symbol):
             raise SymbolMappingError(
-                f"vendor symbol {vendor_symbol!r} not listed on {self._exchange_label}"
+                f"vendor symbol {vendor_symbol!r} not listed on {self.preset.exchange_label}"
             )
         return vendor_symbol
 
@@ -144,26 +160,48 @@ class CcxtTradeAdapter(TradeAdapter):
         )
         return limits.undersized(req.qty, price)
 
+    def _key_refusal(self) -> tuple[OrderRejectReason, str] | None:
+        """What the key profile already says this order will meet.
+
+        A read-only key, or a product the venue has refused this account
+        before, fails the same way every tick; refusing here is what types the
+        failure so the scheduler pauses instead of retrying.
+        """
+        if self._key_profile is None:
+            return None
+        return self._key_profile.refusal(self.preset.market_type)
+
+    @staticmethod
+    def _rejected(
+        req: OrderRequest, message: str, reason: OrderRejectReason | None
+    ) -> OrderResult:
+        """An order that did not reach the book, typed when the cause is known."""
+        return OrderResult(
+            success=False, vendor_order_id=None, message=message,
+            reason=reason, side=req.side, requested_qty=req.qty,
+        )
+
     def place_order(self, req: OrderRequest) -> OrderResult:
         if req.order_type is not OrderType.MARKET:
             raise TradeValidationError(
                 f"{req.order_type.value} orders not supported by the ccxt adapter — market only"
             )
         side = "buy" if req.side == OrderSide.BUY else "sell"
+        refusal = self._key_refusal()
+        if refusal is not None:
+            reason, message = refusal
+            return self._rejected(req, message, reason)
         undersized = self._undersized(req)
         if undersized is not None:
-            return OrderResult(
-                success=False, vendor_order_id=None, message=undersized,
-                reason=OrderRejectReason.SIZE_BELOW_MINIMUM,
-                side=req.side, requested_qty=req.qty,
-            )
+            return self._rejected(req, undersized, OrderRejectReason.SIZE_BELOW_MINIMUM)
         try:
             raw = self._gateway.create_market_order(req.symbol, side, req.qty)
         except BrokerConnectionError as exc:
-            return OrderResult(
-                success=False, vendor_order_id=None, message=str(exc),
-                side=req.side, requested_qty=req.qty,
-            )
+            if exc.reason is OrderRejectReason.REGION_RESTRICTED and self._key_profile:
+                self._key_profile = self._key_router.record_restriction(
+                    self._session, self._key_profile, self.preset.market_type
+                )
+            return self._rejected(req, str(exc), exc.reason)
         order_id = raw.get("id")
         if order_id is None:
             return OrderResult(
