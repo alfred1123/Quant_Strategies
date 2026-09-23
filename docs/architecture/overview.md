@@ -28,6 +28,11 @@ flowchart TB
     AURORA[(Aurora — prod)]
   end
 
+  subgraph London["eu-west-2 (prod)"]
+    PROXY[squid CONNECT proxy]
+  end
+
+  LAMBDA[EventBridge + Lambda] -->|scheduler tick| NGINX
   SPA -->|HTTP /api/v1| NGINX
   NGINX --> API
   API --> REDIS
@@ -35,13 +40,17 @@ flowchart TB
   API --> PG
   WORKER --> PG
   PG --- AURORA
+  API -->|keyed, uk route| PROXY
+  PROXY --> BYBIT[Bybit]
+  API -->|keyless, direct| BYBIT
 ```
 
 | Layer | Technology | Role |
 |-------|------------|------|
 | **Frontend** | React 19, Vite, MUI, TanStack Query | Backtest UI + Trade UI (config, apply, deployments) |
-| **API** | FastAPI, uvicorn | Auth, backtest, jobs, REFDATA, instruments, trade, credentials |
-| **Worker** | `quant.queue.worker_loop` | Claims `BT.QUEUE` rows, runs optimize, writes `BT.RESULT` |
+| **API** | FastAPI, uvicorn | Auth, backtest, jobs, REFDATA, instruments, trade, credentials. The only process that talks to exchanges: dry-run, apply, and the scheduled tick the Lambda triggers |
+| **Worker** | `quant.queue.worker_loop` | Backtests only: claims `BT.QUEUE` rows, runs optimize, writes `BT.RESULT`. Opens no keyed exchange session |
+| **Egress proxy** | squid on EC2, eu-west-2 | Gives keyed Bybit calls a fixed London IP; a TLS tunnel only, no code or data. See [Infrastructure: UK egress proxy](infrastructure.md#uk-egress-proxy) |
 | **Cache** | Redis | REFDATA snapshots (`refdata:*`), queue wake channel |
 | **Database** | PostgreSQL 17 (Aurora prod) | REFDATA, BT, TRADE, MARKET_DATA, INST, CORE_ADMIN |
 | **Secrets** | SSM Parameter Store | JWT, DB creds, Fernet key for exchange API keys |
@@ -165,8 +174,8 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 | Container | Image | Notes |
 |-----------|-------|-------|
 | `quant-nginx` | ECR `quant-nginx` | Serves SPA; proxies `/api` → api |
-| `quant-api` | ECR `quant-app` | uvicorn, 2 workers; `/health/ready` = DB ping |
-| `quant-worker` | ECR `quant-app` | `python -m quant.queue.worker_loop`; starts after api healthy |
+| `quant-api` | ECR `quant-app` | uvicorn, 2 workers; `/health/ready` = DB ping. Runs all trading, including the scheduled tick |
+| `quant-worker` | ECR `quant-app` | `python -m quant.queue.worker_loop`; backtests only; starts after api healthy |
 | `quant-redis` | `redis:7-alpine` | REFDATA + queue wake |
 
 Liquibase runs in CI: a push touching `db/liquidbase/**` queues the **migrate database** job (Liquibase on EC2 via SSM, `prod-deploy` context), gated by a required reviewer on the `production-db` environment. Containers restart only after migration succeeds. See [Database § Deployment](database.md#deployment).

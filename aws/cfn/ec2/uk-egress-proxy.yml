@@ -201,7 +201,14 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           set -euxo pipefail
-          dnf -y update
+          # 0.5 GiB is enough for squid but not for dnf's repo metadata: a full
+          # `dnf -y update` was OOM-killed at boot and, under `set -e`, squid
+          # was never installed. Swap first, and install only what is needed.
+          dd if=/dev/zero of=/swapfile bs=1M count=1024
+          chmod 600 /swapfile
+          mkswap /swapfile
+          swapon /swapfile
+          echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
           dnf -y install squid
 
           # CONNECT-only, Bybit-only. Anything else is denied, so a compromised

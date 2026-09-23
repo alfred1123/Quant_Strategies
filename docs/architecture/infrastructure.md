@@ -11,35 +11,36 @@ See [System Overview](overview.md) for runtime topology and [Dev vs Prod](dev-vs
 ## Architecture
 
 ```
-                        ┌──────────────┐
-                        │   Internet   │
-                        └──────┬───────┘
-                               │  HTTP :80  (HTTPS :443 with TLS overlay)
-                               ▼
-                   ┌───────────────────────┐
-                   │   EC2  (t4g.medium)   │
-                   │                       │
-                   │  ┌─────────────────┐  │
-                   │  │  nginx          │  │  SPA (ECR quant-nginx)
-                   │  │  :80 → api:8000 │  │
-                   │  └────────┬────────┘  │
-                   │           │           │
-                   │  ┌────────▼────────┐  │
-                   │  │  api + worker   │  │  FastAPI + queue worker (ECR quant-app)
-                   │  │  redis          │  │
-                   │  └────────┬────────┘  │
-                   │           │           │
-                   └───────────┼───────────┘
-                               │  VPC direct :5432
-                               ▼
-                   ┌───────────────────────┐
-                   │  Aurora Serverless v2  │
-                   │  PostgreSQL 17.9       │
-                   │  0.5 – 2.0 ACU        │
-                   └───────────────────────┘
+   Browser (Cloudflare)          EventBridge → quant-scheduled-task Lambda
+            │ HTTPS :443                     │ POST /api/v1/scheduler/tick
+            ▼                                ▼
+ ┌─────────────────────── EC2 t4g.medium, ap-southeast-1 ───────────────────────┐
+ │  nginx :443 ──► api :8000 (FastAPI)            worker (quant.queue.worker_loop)│
+ │                 trade: dry-run, apply,         backtests only: claims BT.QUEUE,│
+ │                 scheduled tick                 writes BT.RESULT                │
+ │                   │         │                        │                        │
+ │                   │         └──── redis ◄────────────┤                        │
+ │                   │  EIP 52.221.3.230                 │                        │
+ └───────────────────┼───────────────────────────────────┼────────────────────────┘
+        keyless ccxt │ keyed ccxt                         │ VPC :5432
+       (limits, bars)│ (uk route)                         ▼
+            │        ▼                          ┌──────────────────────┐
+            │  ┌──────────────────────────┐     │ Aurora Serverless v2 │◄── api
+            │  │ squid, t4g.nano, London  │     │ PostgreSQL 17.9      │
+            │  │ EIP 13.43.55.53 :3128    │     │ 0.5 – 2.0 ACU        │
+            │  │ CONNECT to Bybit only    │     └──────────────────────┘
+            │  └────────────┬─────────────┘
+            ▼               ▼
+                api.bybit.com
 ```
 
-SSM Parameter Store supplies secrets (`JWT_SECRET`, `EXCHANGE_SECRETS_KEY`, DB credentials) at app startup.
+SSM Parameter Store supplies secrets (`JWT_SECRET`, `EXCHANGE_SECRETS_KEY`, DB credentials) and settings such as `CCXT_EGRESS_BYBIT` at app startup.
+
+Only `api` talks to exchanges. It serves the SPA's trade endpoints and runs the
+scheduled apply that the Lambda triggers, so every order, dry-run and key check
+leaves from the `api` container. `worker` runs backtests from `BT.QUEUE` and
+never opens a keyed exchange session, so an exchange or egress setting takes
+effect by restarting `api` alone.
 
 The base `docker-compose.yml` exposes nginx on **:80** (HTTP, using `nginx.dev.conf`). For HTTPS there are two overlays:
 
@@ -233,9 +234,73 @@ invalidates all stored credential ciphertext until users re-save keys.
 
 `quant-uk-egress` (eu-west-2) is a t4g.nano running squid behind Elastic IP
 **`13.43.55.53`**. It accepts `CONNECT` on `:3128` only, only from the app host's
-EIP (`ProxyClientCidr`), and only to `api.bybit.com`, `api-testnet.bybit.com`,
-`api-demo.bybit.com` and `api.bytick.com`. The application stays in Singapore;
-only **keyed** Bybit traffic leaves from London.
+EIP (`ProxyClientCidr`, `52.221.3.230/32`), and only to `api.bybit.com`,
+`api-testnet.bybit.com`, `api-demo.bybit.com` and `api.bytick.com`; any other
+destination gets `403`. The application stays in Singapore; only **keyed**
+Bybit traffic leaves from London. Live since 2026-09-23.
+
+`ProxyClientCidr` is a literal in `aws/params/prod.json`, not a cross-stack
+reference, because the stacks live in different regions. If `quant-compute`
+replaces its Elastic IP, update that value and redeploy `uk-egress`, or every
+keyed Bybit call times out at the proxy's security group.
+
+### Request path
+
+The proxy is a pipe, not a second site. squid opens a TCP tunnel and the TLS
+session runs end to end between the `api` container and Bybit, so the London
+host cannot read keys, orders or responses. It runs no application code, holds
+no credentials, reads no SSM parameters, and has no route to Aurora.
+
+```
+api (Singapore) ──TLS inside CONNECT──► squid (London) ──► api.bybit.com
+api (Singapore) ◄────── same tunnel ─── squid (London) ◄── response
+     │
+     └──► Aurora (Singapore): EXECUTION_EVENT, TRANSACTION, pause, schedule status
+```
+
+Every response, success or refusal, comes back to the Singapore process, which
+interprets it and writes the result over its existing Aurora connection. So the
+route needs no database configuration, and moving an order through London
+changes nothing about where results are stored. The cost is latency: each keyed
+call adds about one Singapore–London round trip (150–200 ms), which is
+negligible for a few market orders per interval.
+
+### Bootstrap
+
+The instance's user data adds a 1 GiB swap file, installs squid, writes
+`/etc/squid/squid.conf`, and enables the service. The swap is load-bearing.
+0.5 GiB is enough for squid but not for `dnf`'s repository metadata: the first
+boot ran `dnf -y update`, the kernel killed it for memory, and under `set -e`
+squid was never installed. The instance and IP looked healthy, and every
+connection to `:3128` was refused. The template no longer runs a full update.
+
+User data runs once, at first boot. Editing it updates the stack with a
+stop/start of the instance (about a minute without the `uk` route, same IP),
+but it does not re-run on that instance. A change to the squid config has to be
+applied by hand as well, or by replacing the instance.
+
+### Checking it
+
+From the app host (Session Manager on `quant-compute`'s `InstanceId`):
+
+```bash
+# 200 through the tunnel: squid is up and admits Bybit
+curl -sS -o /dev/null -w '%{http_code}\n' -x http://13.43.55.53:3128 \
+  https://api.bybit.com/v5/market/time
+# 403 on CONNECT: the destination allowlist holds
+curl -sS -o /dev/null -x http://13.43.55.53:3128 https://checkip.amazonaws.com
+```
+
+`Connection refused` on `:3128` means squid is not running (the packet reached
+the host); a timeout means the security group or `ProxyClientCidr` is wrong. On
+the proxy itself (Session Manager on `quant-uk-egress`'s `InstanceId`, region
+`eu-west-2`): `systemctl status squid`, `/var/log/squid/access.log`, and
+`/var/log/cloud-init-output.log` for boot failures.
+
+In the app, a dead proxy surfaces as
+`broker unreachable during load_markets: bybit GET …/instruments-info`, the
+first request `load_markets` sends on the `uk` route. The router does not fall
+back to `direct` from there (see *Connect* below).
 
 ### Per-key routing
 
@@ -274,18 +339,24 @@ their own key at Bybit and can change that pin without telling us.
   data) always go direct, since an IP allowlist binds a key and they carry none.
   Each keyed session logs `proxy=<url>` or `proxy=direct` on connect.
 
-**Cutover** (order matters, because a key rejects any IP it does not list):
+**Cutover** (done 2026-09-23; order matters, because a key rejects any IP it
+does not list):
 
 1. `aws ssm put-parameter --name /quant/prod/CCXT_EGRESS_BYBIT --type String --value uk=http://13.43.55.53:3128`
-2. Restart `api` + `worker`, since SSM is read once at startup. Keys still pinned
-   to Singapore keep going direct.
-3. Add `13.43.55.53` to the Bybit key's IP allowlist and remove the old IP. The
+2. Restart `api` (SSM is read once at process start; `worker` never trades).
+   Keys still pinned to Singapore keep going direct.
+3. Check the proxy from the app host (see [Checking it](#checking-it)).
+4. Add `13.43.55.53` to the Bybit key's IP allowlist and remove the old IP. The
    next session sees `10010` on direct and moves to `uk`, logging
    `Bybit key moved egress route direct → uk`.
-4. Run a dry-run and confirm `proxy=http://13.43.55.53:3128` in the logs.
+5. Run a dry-run and confirm `key_profile.route` is `uk` in the report.
 
-**Rollback:** delete the parameter and restart. Keys that only list the London IP
-then fail as `IP_NOT_ALLOWED` and pause until the Singapore IP is added back.
+Skipping step 1 leaves the key refused with `(direct)` as the only route tried;
+skipping step 3 hid a proxy that had never started.
+
+**Rollback:** delete the parameter and restart `api`. Keys that only list the
+London IP then fail as `IP_NOT_ALLOWED` and pause until the Singapore IP is
+added back.
 
 ---
 
