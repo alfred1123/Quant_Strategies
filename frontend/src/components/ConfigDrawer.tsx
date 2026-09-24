@@ -1,7 +1,7 @@
 import {
   Drawer, Box, Typography, TextField, Select, MenuItem, Autocomplete,
   FormControl, InputLabel, Button, Divider, IconButton, CircularProgress,
-  FormControlLabel, Checkbox, Slider, Alert,
+  FormControlLabel, Checkbox, Slider, Alert, Tooltip,
 } from '@mui/material';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
@@ -154,12 +154,6 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
     return (row && barsPerDay(row.period_length)) || 1;
   };
 
-  const dailyWindowRange = (ind?: { win_min?: number; win_max?: number; win_step?: number }) => ({
-    min: ind?.win_min ?? 5,
-    max: ind?.win_max ?? 100,
-    step: ind?.win_step ?? 5,
-  });
-
   const rangeOutsideCapture = captured !== null
     && !rangeFits(captured, config.start, config.end);
 
@@ -188,29 +182,6 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
       ...prev,
       factors: prev.factors.map((f, idx) => (idx === i ? { ...f, ...patch } : f)),
     }));
-
-  const addFactor = () => {
-    if (config.factors.length >= 2) return;
-    const first = indicators[0];
-    onChange(prev => {
-      const newFactor: FactorConfig = {
-        indicator: first?.method_name ?? '',
-        strategy: signalTypes[0]?.name ?? '',
-        data_column: 'price',
-        window_range: scaleWindowRange(dailyWindowRange(first), 1, cadenceBarsPerDay(prev.tmIntervalId)),
-        signal_range: { min: first?.sig_min ?? 0, max: first?.sig_max ?? 0, step: first?.sig_step ?? 1 },
-        symbol: prev.symbol,
-        vendor_symbol: prev.vendorSymbol || undefined,
-        data_source: prev.dataSource || undefined,
-      };
-      return {
-        ...prev,
-        factors: prev.conjunction === 'FILTER'
-          ? [newFactor, ...prev.factors]
-          : [...prev.factors, newFactor],
-      };
-    });
-  };
 
   const removeFactor = (i: number) =>
     onChange(prev => ({ ...prev, factors: prev.factors.filter((_, idx) => idx !== i) }));
@@ -545,9 +516,13 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
           </Box>
         ))}
         {config.factors.length < 2 && (
-          <Button variant="outlined" size="small" startIcon={<AddRoundedIcon />} onClick={addFactor} sx={{ alignSelf: 'flex-start' }}>
-            Add Factor
-          </Button>
+          <Tooltip title="Coming feature">
+            <span style={{ alignSelf: 'flex-start' }}>
+              <Button variant="outlined" size="small" disabled startIcon={<AddRoundedIcon />}>
+                Add Factor
+              </Button>
+            </span>
+          </Tooltip>
         )}
       </Box>
 
