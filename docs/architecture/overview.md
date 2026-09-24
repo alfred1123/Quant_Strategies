@@ -156,7 +156,7 @@ See [Login design](../design/login.md) and [Plan to Profit §5.5](../design/plan
 | 1.5 Exchange config UI | **done** | Accounts table, add/rotate/revoke |
 | 1.6 Strategy picker | **done** | `GET /api/v1/strategies` + `StrategyPicker` |
 | 1.7 Live apply | **done** | Dry-run → apply with ownership checks |
-| 1.8 Execution log | **done** (writes); read UI in release 1.8.0 | `EXECUTION_EVENT` / `TRANSACTION` writes; `ExecutionLogPanel` + GET routes in tree |
+| 1.8 Execution log | **done** | `EXECUTION_EVENT` / `TRANSACTION` writes and reads; `ExecutionLogPanel` (release `1.8.0`, applied) |
 | 1.9 Scheduler + price bars | **done** | EventBridge → Lambda → platform tick + bar warm |
 
 Roadmap: [Plan to Profit](../design/plan-to-profit.md)

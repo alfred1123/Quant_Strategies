@@ -60,9 +60,9 @@ Never use mainnet API keys in local `.env` or point dev failures at the prod ops
 
 ### 4.1 When to move
 
-Move **after** the full apply path is proven on **Bybit testnet** — manual apply and,
-once Phase 1.9 app work lands, at least a few **scheduled** testnet applies with alerts
-behaving correctly.
+Move **after** the full apply path is proven on **Bybit testnet** — manual apply and
+a few **scheduled** testnet applies with alerts behaving correctly. Phase 1.9
+(the platform tick) is already in prod.
 
 **Do not move yet if:**
 

@@ -163,9 +163,8 @@ The Backtest **Strategy** dropdown in `FactorCard` is a REFDATA `signal_type` (m
 | `POST /api/v1/backtest/jobs` | `GET /api/v1/strategies` |
 
 The picker lists only the caller's own `BT.STRATEGY` rows (`SP_GET_STRATEGY_LIST`
-filters by `IN_USER_ID`). [Decision #42](../decisions.md) describes a shared pool
-as the long-term intent; the current API and UI are owner-scoped. See
-[Best-VID Promotion §6](../design/best-vid-promotion.md#6-shared-strategy-pool).
+filters by `IN_USER_ID`). Decision #42's shared pool is superseded on this path.
+See [User isolation](../design/user-isolation.md).
 
 Dropdowns use MUI `size="small"` and fixed widths — not full-width form fields.
 

@@ -756,7 +756,7 @@ an overshoot is an instant kill rather than a slowdown. Measured cost per child
 is ~240 MiB steady / ~590 MiB peak, so `2g` bounds a pathological job without
 firing in normal use. There is still no `cpus` hard cap and no `pids_limit` —
 `cpu_shares` is a *relative weight* that binds only under contention, which is
-the case worth protecting (the `:05` apply tick needs a core), but it does not
+the case worth protecting (the `:55` apply tick needs a core), but it does not
 cap a single job's absolute CPU.
 
 The original concern, for context: on a shared t4g.medium (decision #34) an

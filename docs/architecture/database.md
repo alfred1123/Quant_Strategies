@@ -440,8 +440,8 @@ recording that it moved.
     signature change on a procedure owes the same three changesets: alter,
     replace, drop.
 
-The diary read path ships in release **`1.8.0-execution-log-reads`** (in the working
-tree, not yet deployed to prod): `TRADE.SP_GET_EXECUTION_EVENT` and
+The diary read path shipped in release **`1.8.0-execution-log-reads`** (applied;
+the changelog is archived): `TRADE.SP_GET_EXECUTION_EVENT` and
 `SP_GET_TRANSACTION`, exposed at `GET /api/v1/trade/execution-events` /
 `/trade/transactions`, rendered by `ExecutionLogPanel` in `TradeLayout`.
 

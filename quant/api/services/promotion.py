@@ -1,9 +1,8 @@
 """Service for ``/api/v1/backtest/promotions`` — read-only promotion log.
 
 HTTP-agnostic. All DB access is delegated to :class:`PromotionRepo`.
-Promotion records are a shared pool (strategies are shared across users;
-``USER_ID`` on ``BT.PROMOTION`` is audit-only), so listing is not
-user-scoped.
+The promotion log is not user-scoped (``USER_ID`` on ``BT.PROMOTION`` is
+audit-only). The Trade strategy picker is owner-scoped; this list is not.
 """
 
 import logging

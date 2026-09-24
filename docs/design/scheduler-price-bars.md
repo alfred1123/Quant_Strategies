@@ -735,25 +735,23 @@ per-broker, since it is one connection to one database and every venue's bars
 land in the same table. It is built once in the FastAPI lifespan and lives on
 `app.state.price_bars`, outliving the per-request `TradeService`.
 
-`LiveApplyOrchestrator` chooses the source **by venue, not by schedule**: a live
-signal reads the bars of the exchange it executes on whenever that exchange
-serves market data. The schedule only sets the bar interval — no schedule means
-**daily** (`resolve_interval_id(timedelta(days=1))`, id from REFDATA, never
-hardcoded). The provider path survives solely for brokers with no market-data
-venue, where the provider series is the only series that exists.
+`LiveApplyOrchestrator` and the dry run both call `resolve_signal_source`. A
+venue that serves market data is priced from `PRICE_BAR`. The interval is the
+strategy's fitted `tm_interval_id`; a schedule is accepted only when it is that
+same id (decision #80). There is no daily fallback. The provider path survives
+solely for brokers with no market-data venue (Futu equities). The loader passes
+`include_forming=True` (decision #81).
 
 | Deployment | Source |
 |---|---|
 | App has no ccxt venue (e.g. Futu equities) | Provider path (`fetch_df`, by date) |
-| Venue, no schedule (manual apply) | `PRICE_BAR` via `load_window`, daily interval |
-| Venue, scheduled | `PRICE_BAR` via `load_window`, schedule's interval |
+| Venue, manual or scheduled | `PRICE_BAR` via `load_window`, fitted interval, forming candle appended |
 | Venue, factory missing | `TradeValidationError` — refuses rather than pricing a venue-bound strategy off the provider feed |
 
-This means manual and scheduled applies of the same deployment read the **same
-series** — attaching a schedule changes cadence, never the input data. Research
-(backtest, dry-run) keeps the provider: daily 10-year history is what providers
-are for, and the split matches how the data is used, not how the apply was
-triggered.
+Manual and scheduled applies of the same deployment therefore read the **same
+interval**. A backtest follows the data source on the request: an exchange
+source reads `PRICE_BAR` (decision #51), a provider source reads that provider.
+Dry-run does not take the provider path when the deployment's venue serves bars.
 
 `StaleBarsError` propagates out of the apply before an adapter is even
 constructed, so no order can be placed on an incomplete window. The API maps it
@@ -933,7 +931,7 @@ what every downstream "newest closed bar" derives from.
 | `quant/api/market_data/router.py` | `POST /api/v1/market-data/price-bars/sync` — service-token gated |
 | `quant/api/scheduler/router.py` | `POST /api/v1/scheduler/tick` — service-token gated; the platform's own wakeup |
 | `config/scheduler/price_bar_sync.yml` | Hourly warm schedule, on the boundary |
-| `config/scheduler/trade_apply_tick.yml` | Hourly apply sweep at :05 UTC, 10s settle |
+| `config/scheduler/trade_apply_tick.yml` | Hourly apply sweep at :55 UTC, 10s settle |
 
 ### Modified (Python)
 
@@ -985,7 +983,7 @@ UTC with a 10s in-process settle.
 **The scheduled apply is done**, as one platform tick rather than the
 `ScheduleTrigger` seam this section used to be waiting on — see §6.2 for why the
 per-deployment design was dropped. `POST /api/v1/scheduler/tick` is served and
-`config/scheduler/trade_apply_tick.yml` schedules it at `:05` UTC.
+`config/scheduler/trade_apply_tick.yml` schedules it at `:55` UTC.
 
 **The §3.1 UI has shipped**, which closes the last gap in this phase: a
 deployment can now be put on a schedule from the product. `DeploymentDialog`

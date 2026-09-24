@@ -415,23 +415,25 @@ with the properties above.
     The handler still rejects a `path` that is a URL rather than an absolute
     path, so an event cannot redirect the token to another host.
 
-!!! note "`price_bar_sync` at :00; `trade_apply_tick` at :05"
-    The two jobs are staggered on purpose. Summarisation runs at `:15` on
-    Saturdays to stay clear of deployments and container restarts. The bar warmer
-    fires at `:00` and `BarWarmer` sleeps `DEFAULT_SETTLE_S` (10s) before reading
-    the clock — that pause lets the exchange finish publishing the candle that
-    just closed and keeps an early delivery from making `floor_to_period` land a
-    period back on a bar already stored.
+!!! note "`price_bar_sync` at :00; `trade_apply_tick` at :55"
+    The two jobs are staggered on purpose ([decision #81](../decisions.md)).
+    Summarisation runs at `:15` past 23:00 UTC to stay clear of deployments and
+    container restarts. The bar warmer fires at `:00` and `BarWarmer` sleeps
+    `DEFAULT_SETTLE_S` (10s) before reading the clock — that pause lets the
+    exchange finish publishing the candle that just closed and keeps an early
+    delivery from making `floor_to_period` land a period back on a bar already
+    stored. The warmer writes **closed** bars only.
 
-    Apply runs at `:05` so the warm usually finishes first. A pass that runs
-    after applies have fetched their own bars has done nothing for warming, but
-    overlap is safe — the bar insert treats a unique violation as a concurrent
-    write. Hourly cadence serves the `1H` interval; `DAILY` instruments are
-    swept on every warm pass too and cost one coverage read each, returning
-    immediately once the bar is stored.
+    Apply runs at `:55`, five minutes **before** the next bar close, on the
+    still-forming candle (`load_window(..., include_forming=True)`). That
+    candle is not inserted into `PRICE_BAR`. Overlap with the warmer is safe —
+    the bar insert treats a unique violation as a concurrent write. Hourly
+    cadence serves the `1H` interval; `DAILY` instruments are swept on every
+    warm pass too and cost one coverage read each, returning immediately once
+    the bar is stored.
 
 `trade_apply_tick` waits `ScheduleSweeper.DEFAULT_SETTLE_S` (10s) after the
-`:05` delivery before asking what is due — a cursor sitting exactly on the
+`:55` delivery before asking what is due — a cursor sitting exactly on the
 boundary would answer "not yet" to a delivery a few milliseconds early and then
 wait a whole interval.
 

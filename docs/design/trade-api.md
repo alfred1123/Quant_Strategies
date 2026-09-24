@@ -204,7 +204,7 @@ DELETE /api/v1/strategies/{id}           → Soft-delete
 
 Create/update remain on the jobs/backtest path until a dedicated editor is needed.
 
-**Ownership:** v1 list may return all strategies (globally readable). Phase **1.7** deployment create must verify `BT.STRATEGY.USER_ID` matches caller — see [User isolation](user-isolation.md) and [plan-to-profit §5.5](plan-to-profit.md#55-auth-security-guardrails).
+**Ownership:** the list is caller-owned (`SP_GET_STRATEGY_LIST` filters `USER_ID`). Deployment create and dry-run call `_assert_strategy_owned` and return **403** for another user's strategy. See [User isolation](user-isolation.md).
 
 ### 2.2 Deployment (one-click deploy)
 
@@ -248,7 +248,7 @@ GET    /api/v1/trade/deployments/{id}/transactions → Fills for one deployment 
 
 Writes happen on every apply via `LiveApplyOrchestrator` → `SP_INS_EXECUTION_EVENT` /
 `SP_INS_TRANSACTION`. The Trade UI **`ExecutionLogPanel`** renders the list endpoints
-(release **1.8.0** — in tree, not yet on prod).
+(release **1.8.0**, applied and archived).
 
 ### 2.5 Backtest Results — planned
 

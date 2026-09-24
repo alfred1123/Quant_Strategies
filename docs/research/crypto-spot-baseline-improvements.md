@@ -93,7 +93,7 @@ These points apply to any number quoted above:
 | 4h bars | No | `REFDATA.TM_INTERVAL` has only `DAILY` and `1H`. A 4h row would be needed, and the deployment schedule would follow it, since schedule is locked to the fitted cadence (decision #80). |
 | Squeeze (bandwidth or BB-inside-Keltner) | No | No bandwidth, ATR, or Keltner indicator. |
 | ATR volatility targeting | No | Signals are discrete {−1, 0, 1}; there is no position-sizing layer. |
-| Volume filter | No | `REFDATA.DATA_COLUMN` only offers `price` (close). |
+| Volume as the factor input | Yes | `REFDATA.DATA_COLUMN` includes `volume` (`COLUMN_NAME = Volume`), and a factor can set `data_column` to it. That is the indicator input, not a filter that drops thin bars. |
 | Pairs / stat-arb | No | Single-instrument signals only; needs a spread input and a short leg. |
 | Sortino | No | Not in `Performance`. |
 

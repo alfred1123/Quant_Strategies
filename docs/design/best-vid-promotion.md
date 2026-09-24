@@ -283,12 +283,13 @@ Each tab answers a different question at a different stage. Adding a tab is just
 
 Flipped in place by `SP_UPD_STRATEGY_LOGICAL_DELETE` (one VID, or the whole `STRATEGY_ID` when VID is omitted). `UPDATED_AT` stamps the write; GET procedures do not return it. New inserts are `'N'`. `SP_GET_STRATEGY_LIST` omits `'Y'` rows so the Trade picker cannot offer them. `SP_GET_PROMOTION` still returns them so the tab can show history and Restore.
 
-## 6. Shared Strategy Pool
+## 6. Who can see a strategy
 
-Strategies are a **shared pool** — any authenticated user can read, browse, and deploy any strategy (decision #42). `USER_ID` on `BT.STRATEGY` is audit-only. Capital safety comes from credential ownership.
+Decision #42 described a shared pool. The Trade path does not do that:
 
-- The Promotion tab shows all strategies across all users
-- The Trade tab filters to the caller's deployments (scoped by `APP_USER_ID`)
+- `SP_GET_STRATEGY_LIST` and `_assert_strategy_owned` keep the picker and deploy on the caller's `BT.STRATEGY` rows.
+- The promotion **log** is not owner-filtered (`SP_GET_PROMOTION`).
+- Deployments stay scoped by `APP_USER_ID`. Credentials stay the caller's.
 
 ## 7. Promotion Outcome Persistence — Implemented
 

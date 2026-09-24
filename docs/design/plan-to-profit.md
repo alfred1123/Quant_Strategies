@@ -471,11 +471,11 @@ See [Scheduler & Price Bars](scheduler-price-bars.md) for the full design.
 - [x] DDL: `TRADE.DEPLOYMENT` schedule column, `DEPLOYMENT_SCHEDULE_STATUS` + `SP_INS_DEPLOYMENT` / `SP_GET_DEPLOYMENT` / `SP_GET_MISSED_DUE_DEPLOYMENTS` — `db/liquidbase/trade/releases/1.4.0-deployment-scheduler.xml`.
 - [x] ~~DDL: `BT.SP_CONSOLIDATE_API_REQUEST`~~ removed — `BacktestCache.refresh_payload` closes the prior VID and inserts the merged range; no scheduled DB purge.
 - [x] Python: `quant/market_data/` — `PriceBarRepo` (SP wrappers), `CcxtBarFetcher` (public `fetch_ohlcv`), `PriceBarService` (freshness check + gap fill + `read_bars`); interval math in `quant/shared/intervals.py` resolved from `REFDATA.TM_INTERVAL` via `RedisRefData`, no hardcoded enum.
-- [x] Integration: price bar refresh wired into live apply — venue-bound deployments (e.g. Bybit) compute signals from `PRICE_BAR` via `PriceBarService.load_window` (daily when unscheduled; schedule sets interval only), provider-only brokers (e.g. Futu) keep the provider path, and a missing bar source is refused rather than silently priced off the daily feed ([§7.6–7.7](scheduler-price-bars.md#76-signal-source-selection-quantstrategylive_servicepy)).
-- [ ] Integration: expose `POST /api/v1/market-data/price-bars/sync` (calls `PriceBarService.sync`) + the `price_bar_sync` Lambda task, so bars are warmed **once per interval** rather than once per deployment ([§6.2](scheduler-price-bars.md#bar-sync-is-one-schedule-per-interval-not-one-per-deployment)).
-- [ ] UI: Schedule interval dropdown (from `REFDATA.TM_INTERVAL`) in deployment dialog; show `last_run_at` in deployments table (optional computed next run for display).
+- [x] Integration: price bar refresh wired into live apply — venue-bound deployments (e.g. Bybit) compute signals from `PRICE_BAR` via `PriceBarService.load_window` (the strategy's fitted interval when unscheduled; a schedule must be that same interval, decision #80), appending the still-forming candle (`include_forming=True`). Provider-only brokers (e.g. Futu) keep the provider path, and a missing bar source is refused rather than silently priced off another feed ([§7.6–7.7](scheduler-price-bars.md#76-signal-source-selection-quantstrategylive_servicepy)).
+- [x] Integration: `POST /api/v1/market-data/price-bars/sync` (calls `PriceBarService.sync`) + the `price_bar_sync` task, so closed bars are warmed once per pass rather than once per deployment ([§6.2](scheduler-price-bars.md#bar-sync-is-one-schedule-per-interval-not-one-per-deployment)).
+- [x] UI: Schedule interval dropdown (from `REFDATA.TM_INTERVAL`, limited to the fitted cadence) in the deployment dialog; `ScheduleCell` edits it in place.
 - [x] AWS infra: EventBridge schedule group + `quant-scheduled-task` Lambda + IAM (`aws/cfn/eventbridge/scheduled-task.yml`); deploy via `bash aws/deploy.sh eventbridge`.
-- [x] AWS/app: service auth on `/apply` (`TRADE_SERVICE_TOKEN`) + **one platform tick** instead of per-deployment boto3 schedules. The boundary race (firing at `:00` before the exchange publishes the bar that just closed) is handled by timing, not by avoiding the boundary: bar sync fires on `:00` and sleeps 10 s before reading the clock, the apply tick runs at `:05` ([§6.2](scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)).
+- [x] AWS/app: service auth on `/api/v1/scheduler/tick` (`TRADE_SERVICE_TOKEN`) + **one platform tick** instead of per-deployment boto3 schedules. Bar sync fires on `:00` and sleeps 10 s before reading the clock (closed bars only). The apply tick runs at `:55`, five minutes before the next close, on the still-forming candle ([decision #81](../decisions.md), [§6.2](scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)).
 
 **Exit criteria:** A deployment scheduled `DAILY` executes automatically via EventBridge without manual intervention. `MARKET_DATA.PRICE_BAR` contains fresh bars for active products.
 
@@ -485,7 +485,7 @@ See [Scheduler & Price Bars](scheduler-price-bars.md) for the full design.
 
 **Depends on:** 1.9 (scheduler + price bars). **Blocks:** trustworthy daily live runs at bar close (2.2 Sharpe comparisons assume the apply uses the bar that just closed, not a random wall-clock phase).
 
-Cron is already correct (`price_bar_sync` at `:00`, `trade_apply_tick` at `:05` UTC). The gap is **`SCHEDULED_TS` phase**: deploy time seeds the cursor, so dailies can fire mid-session while ccxt dailies close at UTC midnight. See [ccxt bar timezones — Plan](ccxt-bar-timezones.md#plan-align-apply-clock-to-bar-close-asap).
+Cron and the cursor now agree ([decision #81](../decisions.md)): `price_bar_sync` at `:00` stores the bar that just closed; `trade_apply_tick` at `:55` UTC applies five minutes before the next close. `SCHEDULED_TS` is seeded from `next_apply_slot` (crypto daily `23:55` UTC), not from deploy time. See [ccxt bar timezones](ccxt-bar-timezones.md#when-we-apply-today-platform-schedule).
 
 **Tasks**
 
@@ -494,9 +494,9 @@ Cron is already correct (`price_bar_sync` at `:00`, `trade_apply_tick` at `:05` 
 - [x] DDL: optional `IN_INITIAL_SCHEDULED_TS` on `SP_INS_DEPLOYMENT` (Liquibase `1.7.0`, `context="trade,prod-deploy"`).
 - [x] App: pass aligned slot on create, schedule change, and unpause (`TradeRepo` / `TradeService`) using deployment `APP_ID`.
 - [x] Ops: one-time backfill for existing `PENDING` schedules (`scripts/realign_schedule_phase.sql` — `UPDATE` current row).
-- [x] Decision **#71**; prod: approve TRADE `1.7.0` migrate, deploy `quant-app`, refresh Redis, run backfill script (REFDATA `1.25.0` + `prod-deploy` when not yet live).
+- [x] Decision **#71**, later amended by **#81** (apply before close). TRADE `1.7.0`, REFDATA `1.25.0`, the app deploy, and `scripts/realign_schedule_phase.sql` have been applied in prod.
 
-**Exit criteria:** A `DAILY` deployment created at any wall time shows `next_due_at` at the next `00:05 UTC`; prod applies for dailies cluster on the `00:05` tick pass, not deploy-phase hours.
+**Exit criteria:** A `DAILY` crypto deployment created at any wall time shows `next_due_at` at the next `23:55 UTC`; prod applies for those dailies cluster on the `23:55` tick, not deploy-phase hours. A listed daily uses that venue's session close minus the same offset.
 
 ---
 
@@ -1085,8 +1085,8 @@ Full matrix, phased backlog, and Futu/Bybit split: **[User isolation requirement
 | Topic | v1 behaviour | When to revisit |
 |-------|--------------|-----------------|
 | RBAC | **None** — any logged-in user can save credentials, create deployments, and (1.7) live apply | Second user who is not fully trusted |
-| Strategy visibility | `BT.STRATEGY` / results are **globally readable** to any logged-in user (`USER_ID` audit-only today) | login.md Phase 2 multi-user isolation |
-| Strategy deploy | Must validate strategy **ownership** before 1.7 — `_strategy_exists` alone is insufficient |
+| Strategy visibility (Trade) | Picker returns the caller's rows only (`SP_GET_STRATEGY_LIST`) | Promotion log is still unscoped |
+| Strategy deploy | Ownership is checked (`_assert_strategy_owned`, 403) | |
 | Paper vs live | **`is_paper_ind` on server** — client toolbar filter is UX only |
 
 #### Secrets at rest and in transit

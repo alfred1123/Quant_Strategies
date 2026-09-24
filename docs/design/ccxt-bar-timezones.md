@@ -104,27 +104,17 @@ Trading on the open of bar *D* while still inside *D−1* would use stale closes
 
 ## When we apply today (platform schedule)
 
-EventBridge tasks (UTC):
+EventBridge tasks (UTC), [decision #81](../decisions.md):
 
 | Task | Cron | In-process settle | Effective ~time |
 |------|------|-------------------|-----------------|
-| `price_bar_sync` | `0 * * * ? *` | 10s (`BarWarmer`) | `:00:10` each hour |
-| `trade_apply_tick` | `5 * * * ? *` | 10s (`ScheduleSweeper`) | `:05:10` each hour |
+| `price_bar_sync` | `0 * * * ? *` | 10s (`BarWarmer`) | `:00:10` each hour — **closed** bars only |
+| `trade_apply_tick` | `55 * * * ? *` | 10s (`ScheduleSweeper`) | `:55:10` each hour — five minutes **before** the next close |
 
-Design intent ([Scheduler & Price Bars §6.2](scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment)):
+1. **Warm on the boundary** — give the exchange a few seconds after the hour/day turns to publish the candle that just closed, and store that finished bar.
+2. **Apply five minutes before the next close** — the signal calls `load_window(..., include_forming=True)`, which appends the still-open ccxt candle and does **not** insert it into `PRICE_BAR`. `ensure_fresh` still fail-closes if the newest **closed** bar is missing.
 
-1. **Warm on the boundary** — give the exchange a few seconds after the hour/day turns to publish the candle that just closed.
-2. **Apply five minutes later** — bar sync usually finishes first; every apply still runs `ensure_fresh` and **fail-closed** if the newest closed bar is missing.
-
-For **hourly** deployments, this is aligned: the 1H bar that closed at `:00` is targeted by `last_closed_bar` on the `:05` pass.
-
-For **daily** deployments:
-
-- The closed daily bar appears at **`00:00 UTC`** each day.
-- `price_bar_sync` at **`00:00:10 UTC`** warms it; `trade_apply_tick` at **`00:05:10 UTC`** is the first apply pass after close — **if** the deployment’s `SCHEDULED_TS` cursor says it is due.
-- The tick runs **every hour**, but a daily deployment only appears in `SP_GET_MISSED_DUE_DEPLOYMENTS` when its stored `SCHEDULED_TS <= now()`. In practice the first due pass after midnight is usually the **`00:05`** one, not a random hour — unless the cursor phase or backlog says otherwise.
-
-Within the same closed interval, `last_closed_bar(now, period)` is identical whether you ask at `00:05` or `00:55` — the target bar does not change until the **next** boundary. The `:05` offset is about **publish latency and ordering**, not picking a different candle.
+A crypto **daily** deployment is due at **`23:55` UTC** (the bar that opened at `00:00` UTC that morning closes at the next midnight). An **hourly** deployment is due at **`:55`**. The tick runs every hour; a deployment is applied only when `SCHEDULED_TS <= now()`. New and rescheduled rows seed that cursor from `next_apply_slot` (or the listing session's close, for a non-24/7 daily), not from the wall time of the click.
 
 ```mermaid
 sequenceDiagram
@@ -140,26 +130,14 @@ sequenceDiagram
     UTC->>Warm: 00:00:10 cron + settle
     Warm->>Ex: fetch_ohlcv 1d
     Warm->>DB: INSERT BAR_TIMESTAMP=2026-09-18 00:00 UTC
-    UTC->>Tick: 00:05:10 cron + settle
-    Tick->>DB: ensure_fresh / load_window
-    Tick->>Tick: signal from CLOSE through 2026-09-18
+    Note over UTC: 2026-09-19 23:55 — five minutes before bar 2026-09-19 closes
+    UTC->>Tick: 23:55:10 cron + settle
+    Tick->>Ex: forming candle, open 2026-09-19 00:00 UTC
+    Tick->>Tick: signal on closed bars plus that forming candle
     Tick->>Ord: apply if due and enabled
 ```
 
----
-
-## Ideal execution rule (product)
-
-> **Apply only after the newest closed bar’s close is final — as soon as practical after the interval end, never before.**
-
-Operational checklist:
-
-| Interval | Bar closes at (UTC) | Earliest safe apply (current design) | What goes wrong if too early |
-|----------|---------------------|--------------------------------------|------------------------------|
-| **1H** | Top of each hour | ~`:05` past the hour | Signal uses prior hour; may store forming bar |
-| **1D** | `00:00` each day | ~`00:05` UTC | Signal uses prior day; may store forming daily |
-
-Manual **Apply** in the UI follows the same bar rules: `ensure_fresh` + `load_window` use `last_closed_bar(now, period)` at click time. Clicking apply **before** the daily close uses yesterday’s bar — same as scheduled apply would.
+Manual **Apply** uses the same loader, including the forming candle. Clicking at `15:00` UTC on a daily deployment therefore prices the day's still-open candle, not only yesterday's close.
 
 ---
 
@@ -169,15 +147,7 @@ Manual **Apply** in the UI follows the same bar rules: `ensure_fresh` + `load_wi
 
 Yahoo, Glassnode, and other **provider** dailies often use **exchange session** or **calendar** conventions that are **not** UTC midnight — e.g. US equity close, or “UTC date” with different adjustment rules.
 
-That is why decision #51 requires backtests that will trade on Bybit to read `PRICE_BAR` for that venue, not a provider series. A strategy fitted on Yahoo `BTC-USD` dailies is fitted on **different days** than Bybit `BTCUSDT` `1d` candles even when both are called “daily”.
-
-### Manual apply mid-session
-
-A user clicking Apply at `2026-09-18 15:00 UTC` on a **daily** deployment correctly sees the last closed bar **`2026-09-18 00:00 UTC`** (yesterday’s close in wall-clock terms — the bar that opened at midnight **that morning** is still forming). That is correct behaviour but easy to misread as “stale data”.
-
-### Phase offset from deploy time
-
-`SP_INS_DEPLOYMENT` seeds `SCHEDULED_TS` from deploy time. A deployment created at `14:37 UTC` keeps that phase until each successful advance adds `PERIOD_LENGTH`. Daily deployments can become due at **`14:37 UTC`**, not at **`00:05 UTC`**, even though the **bar** they trade on is still the UTC-midnight daily candle. The signal is aligned to **bars**; the **clock** that triggers apply is separate. Fix: [Plan — align apply clock to bar close](#plan-align-apply-clock-to-bar-close-asap). See also [Scheduler & Trade Open Questions §4](scheduler-trade-open-questions.md#4-double-apply-poller-eventbridge-or-overlapping-polls).
+That is why decision #51 requires backtests that will trade on Bybit to read `PRICE_BAR` for that venue, not a provider series. A strategy fitted on Yahoo `BTC-USD` dailies is fitted on **different days** than Bybit `BTCUSDT` `1d` candles even when both are called “daily”. Live apply does not write the forming candle into `PRICE_BAR`, so a backtest of stored bars and a live signal taken five minutes before close are not the same series — backtest PnL is unchanged on purpose ([decision #81](../decisions.md)).
 
 ---
 
@@ -226,7 +196,7 @@ Compare with `MARKET_DATA.PRICE_BAR` for the same product:
 
 ## Plan — align apply clock to bar close (ASAP)
 
-**Status:** amended by [decision #81](../decisions.md). Apply is five minutes **before** close (`:55`), not five minutes after (`:05`). Existing cursors need `scripts/realign_schedule_phase.sql`.
+**Status:** done, amended by [decision #81](../decisions.md). Apply is five minutes **before** close (`:55`). Prod `PENDING` cursors were realigned with `scripts/realign_schedule_phase.sql`.
 
 ### Problem
 
@@ -239,7 +209,7 @@ EventBridge and `ScheduleSweeper` are already timed correctly:
 
 A **daily** crypto deployment becomes due at **`23:55` UTC** (five minutes before the midnight close). `SCHEDULED_TS` sits on **bar close minus `EXECUTE_OFFSET`**.
 
-Today `SP_INS_DEPLOYMENT` seeds `SCHEDULED_TS := V_START_TS` (deploy time). A deployment created at `14:37 UTC` stays due at **`14:37`** every day — signal bars are still UTC-midnight dailies, but the **clock** fires mid-session.
+Create, cadence change, re-enable, and unpause pass `compute_initial_scheduled_ts()` into `SP_INS_DEPLOYMENT` as `IN_INITIAL_SCHEDULED_TS`. A deployment created at `14:37 UTC` is due at the next **`23:55` UTC** (crypto daily), not at `14:37`. Rows created before that seed were moved once with `scripts/realign_schedule_phase.sql`.
 
 ### Target rule
 
@@ -323,7 +293,7 @@ Examples (`EXECUTE_OFFSET = 5 min` from REFDATA, continuous market):
 | **5** | Same alignment on **schedule change** and **re-enable** (`IS_ENABLED_IND` flip back to `Y`, unpause): if the new row arms a `PENDING` schedule, seed with `next_apply_slot(now(), period, offset)` — not the prior deploy-phase cursor | Update path |
 | **6** | **Backfill** existing enabled, scheduled deployments: one-shot `UPDATE` in `scripts/realign_schedule_phase.sql` (sets `SCHEDULED_TS` on current `PENDING` rows). Not in Liquibase deploy — run once per env after REFDATA 1.25.0. | Ops SQL |
 | **7** | Log decision **#71** in `decisions.md` when step 4 ships | Docs |
-| **8** | (Optional, later) Dedicated daily EventBridge rule at `00:05` — cosmetic; hourly sweep is sufficient once phase is aligned | AWS config |
+| **8** | (Optional, later) Dedicated daily EventBridge rule at `23:55` — cosmetic; the hourly `:55` sweep is sufficient once phase is aligned | AWS config |
 
 `config/scheduler/trade_apply_tick.yml` is `cron(55 * * * ? *)`, matching the seeded **5 minute** lead before close ([decision #81](../decisions.md)).
 
@@ -335,21 +305,21 @@ For each deployment that is enabled, not `PAUSED`/`STOPPED`, has `schedule_tm_in
 2. If `aligned == scheduled_ts` to the second (already on slot), skip.
 3. Else `UPDATE` the current row's `SCHEDULED_TS` in place — this corrects a cursor rather than recording a new decision, so it does not append a version and leaves `USER_ID` untouched.
 
-**Effect:** phase jumps to the **next** aligned slot from “now” — e.g. a daily row due at `14:37` at `10:00 UTC` moves to **`00:05` tomorrow**, not `14:37` today. That is intentional for “shift ASAP to bar close.” Ops should announce before running in prod.
+**Effect:** phase jumps to the **next** aligned slot from “now” — e.g. a crypto daily row due at `14:37`, read at `10:00 UTC`, moves to **`23:55` that day**, not `14:37`. Prod cursors were realigned this way after decision #81.
 
 Deployments mid-backlog (due `SCHEDULED_TS` in the past) keep catching up one interval per tick (decision #46); realigning the cursor does not replay missed bars.
 
 ### Verification
 
-1. Unit: `next_apply_slot` cases above + advance arithmetic (`scheduled + period` stays on `:05`).
-2. Integration: create daily deployment at arbitrary wall time → `NEXT_DUE_AT` is next `00:05 UTC`.
-3. Manual: after backfill, confirm prod daily deployments appear in `SP_GET_MISSED_DUE_DEPLOYMENTS` only on the `00:05` tick pass (CloudWatch / `EXECUTION_EVENT.TRANSACT_AT`).
+1. Unit: `next_apply_slot` cases above + advance arithmetic (`scheduled + period` stays on `:55`).
+2. Integration: create a crypto daily deployment at an arbitrary wall time → `NEXT_DUE_AT` is the next `23:55 UTC`.
+3. Manual: after backfill, confirm prod daily deployments appear in `SP_GET_MISSED_DUE_DEPLOYMENTS` on the `23:55` tick (CloudWatch / `EXECUTION_EVENT.TRANSACT_AT`).
 
 ### Later (not blocking the shift)
 
 | Idea | Why defer |
 |------|-----------|
-| **Daily-only tick at `00:05 UTC`** | Hourly sweep + aligned phase is enough; separate rule is ops clarity only. |
+| **Daily-only tick at `23:55 UTC`** | Hourly `:55` sweep + aligned phase is enough; a separate rule is ops clarity only. |
 | **Per-venue boundary probe** | ccxt alignment is already documented; add when a non-UTC-midnight venue ships. |
 | **Exchange holiday calendar** | `MARKET_CALENDAR.MARKET_OPEN/CLOSE` is Mon–Fri-style wall clock only. Listed venues need a holiday table or feed before skipping apply on closed days. Crypto uses the `''` row and never needs holidays. Likely `REFDATA.MARKET_HOLIDAY` keyed by `LISTING_EXCHANGE` + date — not in `1.25.0`. |
 

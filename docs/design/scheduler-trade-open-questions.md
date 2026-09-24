@@ -1,6 +1,6 @@
 # Scheduler & trade execution — open questions
 
-Design questions raised while building Phase 1.9 (scheduler + due deployments). Each section states the **problem**, **what a resolution would achieve**, and **current state** (DB vs app). No Python implementation is committed for the app-layer items below — DDL/procs may already exist.
+Design questions raised while building Phase 1.9 (scheduler + due deployments). Each section states the **problem**, **what a resolution would achieve**, and **current state** (DB vs app). The [summary](#summary-implemented-vs-pending) is the status; several items below are already shipped.
 
 ---
 
@@ -220,7 +220,7 @@ Pre-completion aborts do not call SP_INS — row stays due.
 
 **Question:** Scheduled apply should run shortly **before** the bar closes — for ccxt dailies, `23:55 UTC` — but deployments used to seed `SCHEDULED_TS` from deploy time. How do we shift the cursor without breaking advance math?
 
-**Problem:** Signal computation already uses `last_closed_bar()` and UTC-midnight boundaries ([ccxt bar timezones](ccxt-bar-timezones.md)). The **trigger clock** does not: a daily deployment created at `14:37 UTC` is due at `14:37` every day while bars roll at `00:00 UTC`.
+**Problem (historical):** Signal computation used `last_closed_bar()` and UTC-midnight boundaries ([ccxt bar timezones](ccxt-bar-timezones.md)) while the trigger clock did not: a daily deployment created at `14:37 UTC` stayed due at `14:37` every day.
 
 **What resolving it achieves:**
 
@@ -234,7 +234,7 @@ Pre-completion aborts do not call SP_INS — row stays due.
 | **Advance unchanged** | `NEXT_SCHEDULED_TS = SCHEDULED_TS + PERIOD_LENGTH` keeps execute phase forever. |
 | **One-time backfill** | Ops run `scripts/realign_schedule_phase.sql` (`UPDATE` current `PENDING` cursor); not embedded in Liquibase `prod-deploy`. |
 
-**Current state:** REFDATA `1.25.0` + app wiring (`next_apply_slot`, `IN_INITIAL_SCHEDULED_TS`, `TradeService`) ship with TRADE `1.7.0`. After deploy, run `scripts/realign_schedule_phase.sql` once per env to `UPDATE` existing cursors. EventBridge cron and `DEFAULT_SETTLE_S` need no change while offsets stay ≤ 5 minutes.
+**Current state:** Done. Create and reschedule seed `SCHEDULED_TS` from bar close minus `EXECUTE_OFFSET` (crypto daily `23:55` UTC, hourly `:55`). `trade_apply_tick` is `cron(55 * * * ? *)`. Prod `PENDING` cursors were realigned with `scripts/realign_schedule_phase.sql`. The signal reads the still-forming candle and does not store it ([decision #81](../decisions.md)).
 
 **Not in scope here:** Daily-only EventBridge rule (optional later); per-venue boundary probe test.
 
@@ -254,7 +254,7 @@ Pre-completion aborts do not call SP_INS — row stays due.
 | Apply-time due gate | — | Pending |
 | In-flight lease | — | Pending |
 | Auto-pause on failure | — | Done — last failed attempt versions `PAUSED` + disabled ([#70](../decisions.md)); a size reject pauses on the first ([#76](../decisions.md)) |
-| Align `SCHEDULED_TS` to bar close + exchange offset | `MARKET_CALENDAR` + `APP_APPLY_TIMING` + optional `IN_INITIAL_SCHEDULED_TS` | Done in code — prod needs TRADE `1.7.0` + app deploy + one-time backfill ([§10](#10-align-scheduled_ts-to-bar-close), [plan](ccxt-bar-timezones.md#plan-align-apply-clock-to-bar-close-asap)) |
+| Align `SCHEDULED_TS` to bar close + exchange offset | `MARKET_CALENDAR` + `APP_APPLY_TIMING` + optional `IN_INITIAL_SCHEDULED_TS` | Done — `:55` cron, seed on write, prod cursors realigned ([§10](#10-align-scheduled_ts-to-bar-close), [decision #81](../decisions.md)) |
 | Pause = flatten + disable | — | Pending |
 | One deployment per credential+product slot | — | Pending |
 | `ScheduleTrigger` / EventBridge sync | Dropped | Replaced by one platform tick — [design §6.2](scheduler-price-bars.md#62-schedule-management-one-platform-tick-not-a-schedule-per-deployment). Application code creates no AWS schedules |

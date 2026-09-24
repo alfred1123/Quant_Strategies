@@ -78,21 +78,21 @@ Implementation: `quant/api/routers/jobs.py`, `quant/api/services/jobs.py`.
 
 | Check | Rule |
 |-------|------|
-| ~~**Strategy ownership**~~ | ~~`BT.STRATEGY.USER_ID` must match caller~~ — **Removed** (decision #42: shared strategy pool) |
+| **Strategy ownership** | `BT.STRATEGY.USER_ID` must match the caller. `_assert_strategy_owned` on dry-run and deploy (403 otherwise). Decision #42's shared pool is not what the picker does. |
 | **Credential ownership** | Already enforced |
 | **Deployment ownership** | Already enforced on get/list |
 | **Paper vs live** | `is_paper_ind` enforced on server — `confirm_live=true` required for live deployments |
 | **Live apply step-up** | Dry-run first + explicit confirm ([Trade API §4.1](trade-api.md#41-confirmation-flow-for-live-trading)) |
 
-Strategies are a shared pool — any authenticated user can deploy any strategy using their own exchange credentials. `USER_ID` on `BT.STRATEGY` is **audit-only** (who created the config). Capital safety comes from credential ownership (user can only trade with their own keys) and the paper-vs-live gate.
+Credential ownership and the paper-vs-live gate are enforced. Strategy ownership is enforced too: the caller cannot deploy another user's `BT.STRATEGY` row.
 
-**Exit criteria (1.7):** deployment create validates credential ownership (done) + paper/live gate (done — `confirm_live` required); see [plan-to-profit §1.7](plan-to-profit.md#phase-17-live-apply).
+**Exit criteria (1.7):** deployment create validates credential ownership (done) + paper/live gate (done — `confirm_live` required) + strategy ownership (done); see [plan-to-profit §1.7](plan-to-profit.md#phase-17-live-apply).
 
 ---
 
 ## Phase 1.6 — strategy picker (read path) — Done
 
-All strategies are visible to all authenticated users (shared pool). Catalog via **`BT.SP_GET_STRATEGY_LIST`** + `GET /api/v1/strategies`. `IS_BEST_IND` marks the best-performing VID per strategy — see [Best-VID Promotion](best-vid-promotion.md).
+The Trade catalog is the caller's own rows. **`BT.SP_GET_STRATEGY_LIST`** filters `USER_ID`, and `GET /api/v1/strategies` passes the caller. `IS_BEST_IND` marks the best-performing VID per strategy — see [Best-VID Promotion](best-vid-promotion.md). The promotion **log** (`SP_GET_PROMOTION`) is not filtered by owner.
 
 ---
 
@@ -100,7 +100,7 @@ All strategies are visible to all authenticated users (shared pool). Catalog via
 
 From [Login §14](login.md#14-phased-plan):
 
-- Add `USER_ID` / owner filter to `BT.STRATEGY`, `BT.RESULT`, and sync backtest read paths.
+- The Trade picker and deploy already filter `BT.STRATEGY.USER_ID`. Still unscoped: the promotion log, and backtest artifact reads that are not the Trade catalog.
 - Per-user result lists in the SPA.
 - Optional `ROLE` column — admin sees all runs.
 
