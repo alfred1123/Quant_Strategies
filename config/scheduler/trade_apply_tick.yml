@@ -22,21 +22,18 @@ description: Apply all due trade deployments across every interval
 enabled: true
 
 schedule:
-  # Five minutes past the hour — after price_bar_sync at :00 (which sleeps
-  # DEFAULT_SETTLE_S before fetching). ScheduleSweeper also waits
-  # DEFAULT_SETTLE_S before asking what is due:
-  #
-  #   - A cursor sits exactly on the boundary and the tick asks for
-  #     SCHEDULED_TS <= NOW(). Delivery a few milliseconds early answers "not
-  #     yet", and the deployment would then wait a whole hour for the next pass.
-  #   - The :05 fire plus settle gives the warm several minutes to finish; overlap
-  #     is safe either way — the bar insert treats a unique violation as a
-  #     concurrent write — so this only saves a refetch.
+  # Five minutes before the hour — EXECUTE_OFFSET before bar close, so a
+  # daily deployment is due at 23:55 UTC and an hourly one at :55. Applying
+  # after the close (the old :05 pass) fills on the next session for any
+  # market that is not 24/7. ScheduleSweeper still waits DEFAULT_SETTLE_S so a
+  # delivery a few milliseconds early does not answer "not yet" and skip the
+  # slot for a whole period. The forming candle is fetched at apply time and
+  # is not what price_bar_sync stores.
   #
   # scripts/sync_schedules.py sets RetryPolicy.MaximumRetryAttempts = 0 on every
   # schedule it creates, which is what makes this safe for a route that places
   # orders: the Scheduler default of 185 retries over 24h must never re-invoke a
   # failing apply. The tick's own attempt budget decides when to retry, and it
   # retries on the next wakeup rather than seconds later.
-  expression: "cron(5 * * * ? *)"
+  expression: "cron(55 * * * ? *)"
   timezone: UTC

@@ -26,6 +26,6 @@
       stays in git and prod keeps the old definition.
     -->
 
-    <include file="releases/1.7.0-schedule-initial-ts.xml" relativeToChangelogFile="true"/>
+    <!-- 1.7.0-schedule-initial-ts applied on prod 2026-09-21 and archived. -->
 
 </databaseChangeLog>

@@ -895,6 +895,43 @@ class TestLoadWindow:
         kwargs = repo.get_bars.call_args.kwargs
         assert kwargs["range_start"] == kwargs["range_end"] == _ts(9)
 
+    def test_include_forming_appends_the_open_bar_without_storing_it(self):
+        """Trade reads the candle ccxt is still building; PRICE_BAR stays closed-only."""
+        service, repo, fetcher = build_service(
+            coverage_max=_ts(9),
+            exchange_bars=[_bar(10, close=111.0)],
+        )
+        repo.get_bars.return_value = self._rows([8, 9])
+
+        df = service.load_window(
+            CUSIP,
+            3,
+            tm_interval_id=INTERVAL_1H,
+            source_app_id=APP_ID,
+            now=NOW,
+            include_forming=True,
+        )
+
+        assert list(df.index) == [_ts(8), _ts(9), _ts(10)]
+        assert df["price"].iloc[-1] == 111.0
+        repo.ins_bar.assert_not_called()
+        assert fetcher.calls[-1]["since"] == _ts(10)
+        assert fetcher.calls[-1]["until"] == _ts(10)
+
+    def test_include_forming_refuses_when_the_exchange_has_no_open_bar(self):
+        service, repo, _fetcher = build_service(coverage_max=_ts(9), exchange_bars=[])
+        repo.get_bars.return_value = self._rows([8, 9])
+
+        with pytest.raises(StaleBarsError, match="still-forming"):
+            service.load_window(
+                CUSIP,
+                3,
+                tm_interval_id=INTERVAL_1H,
+                source_app_id=APP_ID,
+                now=NOW,
+                include_forming=True,
+            )
+
 
 class TestIntervalResolution:
     def test_daily_window_uses_the_refdata_period(self):

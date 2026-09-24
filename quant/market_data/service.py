@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
@@ -29,7 +29,7 @@ import pandas as pd
 from quant.market_data.fetcher import BarFetcher, VenueMarket
 from quant.market_data.repo import PriceBarRepo
 from quant.shared.db import ProcedureError
-from quant.shared.intervals import as_utc, bar_starts, last_closed_bar
+from quant.shared.intervals import as_utc, bar_starts, floor_to_period, last_closed_bar
 
 logger = logging.getLogger(__name__)
 
@@ -636,13 +636,19 @@ class PriceBarService:
         tm_interval_id: int,
         source_app_id: int,
         now: datetime | None = None,
+        include_forming: bool = False,
     ) -> pd.DataFrame:
-        """The newest ``lookback`` closed bars, fetching whatever is missing.
+        """The newest ``lookback`` bars, fetching whatever closed history is missing.
 
         The entry point for live signal computation: one call that leaves the
         window complete or raises. Positional ``(internal_cusip, lookback)``
         so the caller can bind the interval and app once and pass the rest
         per symbol.
+
+        ``include_forming`` appends the still-open candle from the exchange and
+        does **not** store it. Scheduled apply runs before the bar closes, so
+        the signal has to see that candle; writing it would freeze a partial
+        high/low under the natural primary key.
         """
         self.ensure_fresh(
             internal_cusip=internal_cusip,
@@ -652,14 +658,30 @@ class PriceBarService:
             now=now,
         )
         period = self._refdata.get_interval_period(tm_interval_id)
-        newest = last_closed_bar(now or datetime.now(UTC), period)
-        bars = self.read_bars(
-            internal_cusip=internal_cusip,
-            tm_interval_id=tm_interval_id,
-            source_app_id=source_app_id,
-            start=newest - period * (lookback - 1),
-            end=newest,
+        moment = now or datetime.now(UTC)
+        newest = last_closed_bar(moment, period)
+        # The forming candle takes one of the lookback slots, so read one fewer
+        # closed bar and let the exchange supply the open one.
+        n_closed = lookback - 1 if include_forming else lookback
+        bars = (
+            self.read_bars(
+                internal_cusip=internal_cusip,
+                tm_interval_id=tm_interval_id,
+                source_app_id=source_app_id,
+                start=newest - period * (n_closed - 1),
+                end=newest,
+            )
+            if n_closed >= 1
+            else pd.DataFrame()
         )
+        if include_forming:
+            bars = self._append_forming(
+                bars,
+                internal_cusip=internal_cusip,
+                source_app_id=source_app_id,
+                period=period,
+                forming_open=floor_to_period(moment, period),
+            )
 
         # ensure_fresh tolerates bars older than the exchange's earliest — that
         # is listing history, not a gap. It stays tolerant because a short
@@ -674,6 +696,63 @@ class PriceBarService:
                 f"{required}) — too little history to compute a comparable signal"
             )
         return bars
+
+    def _append_forming(
+        self,
+        bars: pd.DataFrame,
+        *,
+        internal_cusip: str,
+        source_app_id: int,
+        period: timedelta,
+        forming_open: datetime,
+    ) -> pd.DataFrame:
+        """Live candle for the open bar. Read from the exchange; never written."""
+        fetched = self._fetch(
+            internal_cusip=internal_cusip,
+            source_app_id=source_app_id,
+            period=period,
+            since=forming_open,
+            until=forming_open,
+        )
+        bar = fetched.get(forming_open)
+        if bar is None:
+            raise StaleBarsError(
+                f"exchange did not return the still-forming bar at {forming_open} "
+                f"for {internal_cusip!r} — refusing to trade on the previous close"
+            )
+        frame = self._ohlcv_frame([asdict(bar)])
+        if bars.empty:
+            return frame
+        return pd.concat([bars, frame]).sort_index()
+
+    @staticmethod
+    def _ohlcv_frame(records: list[dict]) -> pd.DataFrame:
+        """The canonical pipeline frame — one schema, built in one place.
+
+        Same columns as ``fetch_df`` / ``BacktestCache._payload_to_df``: a UTC
+        ``datetime`` index plus ``price``, ``factor`` and the
+        ``Open``/``High``/``Low``/``Close``/``Volume`` set. Stored rows and the
+        still-forming candle both pass through here (``OhlcvBar`` fields match
+        the repo row keys), so the shape cannot drift between them.
+        """
+        if not records:
+            return pd.DataFrame()
+        close = [float(r["close_px"]) for r in records]
+        df = pd.DataFrame(
+            {
+                "datetime": pd.to_datetime(
+                    [r["bar_timestamp"] for r in records], utc=True
+                ),
+                "price": close,
+                "factor": close,
+                "Open": [float(r["open_px"]) for r in records],
+                "High": [float(r["high_px"]) for r in records],
+                "Low": [float(r["low_px"]) for r in records],
+                "Close": close,
+                "Volume": [float(r["volume"]) for r in records],
+            }
+        )
+        return df.set_index("datetime").sort_index()
 
     def read_bars(
         self,
@@ -702,20 +781,4 @@ class PriceBarService:
             range_start=start,
             range_end=end,
         )
-        if not rows:
-            return pd.DataFrame()
-
-        close = [float(r["close_px"]) for r in rows]
-        df = pd.DataFrame(
-            {
-                "datetime": pd.to_datetime([r["bar_timestamp"] for r in rows], utc=True),
-                "price": close,
-                "factor": close,
-                "Open": [float(r["open_px"]) for r in rows],
-                "High": [float(r["high_px"]) for r in rows],
-                "Low": [float(r["low_px"]) for r in rows],
-                "Close": close,
-                "Volume": [float(r["volume"]) for r in rows],
-            }
-        )
-        return df.set_index("datetime").sort_index()
+        return self._ohlcv_frame(rows)

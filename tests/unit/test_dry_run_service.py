@@ -200,7 +200,11 @@ class TestPreviewReadsWhatTheApplyWillRead:
         assert loader is not None
         loader("btcusdt.crypto", 120)
         deps["price_bars"].for_app.return_value.load_window.assert_called_once_with(
-            "btcusdt.crypto", 120, tm_interval_id=1, source_app_id=34
+            "btcusdt.crypto",
+            120,
+            tm_interval_id=1,
+            source_app_id=34,
+            include_forming=True,
         )
 
     @patch("quant.trade.dry_run.compute_latest_position", return_value=(1.0, "2024-06-01"))
@@ -222,7 +226,11 @@ class TestPreviewReadsWhatTheApplyWillRead:
         loader = mock_signal.call_args.kwargs["bar_loader"]
         loader("btcusdt.crypto", 120)
         deps["price_bars"].for_app.return_value.load_window.assert_called_once_with(
-            "btcusdt.crypto", 120, tm_interval_id=1, source_app_id=34
+            "btcusdt.crypto",
+            120,
+            tm_interval_id=1,
+            source_app_id=34,
+            include_forming=True,
         )
 
     @patch("quant.trade.dry_run.compute_latest_position", return_value=(1.0, "2024-06-01"))

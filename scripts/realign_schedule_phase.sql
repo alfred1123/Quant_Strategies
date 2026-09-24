@@ -45,9 +45,9 @@ BEGIN
             d.deployment_id,
             ss.scheduled_ts AS old_ts,
             CASE
-                WHEN (b.boundary + aat.execute_offset) > v_after
-                THEN b.boundary + aat.execute_offset
-                ELSE b.boundary + ti.period_length + aat.execute_offset
+                WHEN (b.boundary + ti.period_length - aat.execute_offset) > v_after
+                THEN b.boundary + ti.period_length - aat.execute_offset
+                ELSE b.boundary + (2 * ti.period_length) - aat.execute_offset
             END AS new_ts
         FROM trade.deployment d
         JOIN trade.deployment_schedule_status ss

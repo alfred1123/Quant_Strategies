@@ -12,7 +12,8 @@ Pure arithmetic, no I/O: the REFDATA lookup itself is
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
@@ -86,20 +87,52 @@ def next_run_at(after: datetime, period: timedelta) -> datetime:
 
 
 def next_apply_slot(after: datetime, period: timedelta, offset: timedelta) -> datetime:
-    """Next scheduled apply: bar boundary in ``after``'s period, plus ``offset``.
+    """Next scheduled apply: ``offset`` before the bar that contains ``after`` closes.
 
-    ``offset`` comes from ``REFDATA.APP_APPLY_TIMING`` (typically 5 minutes after
-    bar close). If the candidate slot in the current period is still in the
-    future, use it; otherwise use the next period's slot.
+    Continuous markets (crypto) close on the epoch boundary — midnight UTC for
+    a daily bar. Applying after that close is the next session on a listed
+    market, so the fill is no longer the bar the signal was read from.
+    ``offset`` comes from ``REFDATA.APP_APPLY_TIMING`` (typically 5 minutes
+    *before* close). If that instant is still ahead, use it; otherwise the
+    same lead on the following bar.
     """
     if not timedelta(0) <= offset < period:
         raise ValueError(f"EXECUTE_OFFSET must be in [0, {period}), got {offset}")
     after = as_utc(after)
-    boundary = floor_to_period(after, period)
-    candidate = boundary + offset
+    close = floor_to_period(after, period) + period
+    candidate = close - offset
     if candidate > after:
         return candidate
-    return boundary + period + offset
+    return candidate + period
+
+
+def next_session_apply_slot(
+    after: datetime,
+    *,
+    close_time: time,
+    timezone: str,
+    offset: timedelta,
+) -> datetime:
+    """Next apply before a listed session's close, skipping Saturday and Sunday.
+
+    ``close_time`` is wall-clock in ``timezone`` (``REFDATA.MARKET_CALENDAR``).
+    Holidays are not on that table, so a holiday still produces a slot.
+    """
+    if offset < timedelta(0):
+        raise ValueError(f"EXECUTE_OFFSET must be >= 0, got {offset}")
+    zone = ZoneInfo(timezone)
+    cursor = as_utc(after).astimezone(zone)
+    day = cursor.date()
+    for _ in range(10):
+        if day.weekday() >= 5:
+            day += timedelta(days=1)
+            continue
+        close_local = datetime.combine(day, close_time, tzinfo=zone)
+        candidate = close_local - offset
+        if candidate > cursor:
+            return candidate.astimezone(UTC)
+        day += timedelta(days=1)
+    raise ValueError(f"no session close within 10 days of {after} in {timezone}")
 
 
 def bar_starts(start: datetime, end: datetime, period: timedelta) -> list[datetime]:

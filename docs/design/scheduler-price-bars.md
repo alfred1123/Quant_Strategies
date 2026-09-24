@@ -361,7 +361,7 @@ Same contract philosophy as `BacktestCache`: **reads may degrade loudly, writes 
 | **Gap in bars** (exchange downtime, missed ticks) | `SP_GET_PRICE_BAR` returns what exists; `PriceBarService` validates row count vs expected window and refetches the missing range (ccxt `fetch_ohlcv` accepts a `since` param). If the gap persists, fail closed as above. |
 | **Host down longer than the live lookback** | `ensure_fresh` refills the window and trading resumes on correct prices — a closed candle is immutable, so a bar fetched ten days late is identical to one fetched at the boundary. Bars *older* than the window are never requested again, so the table keeps a permanent hole (see [§4.6](#continuity-is-not-automatic-ensure_fresh-is-a-rolling-window)). Repair with `PriceBarService.backfill` over an explicit range; trading is unaffected either way. |
 | **Instrument listed more recently than the lookback** | `ensure_fresh` tolerates it (warns, treats as pre-listing history) so warming still works; `load_window` refuses below **80% coverage** of the requested lookback, because an indicator computes happily on a short window and would return a plausible number off statistics the strategy was never fitted on. See [§7.3](#73-price-bar-service-quantmarket_dataservicepy). |
-| **Partial (still-forming) bar** | Never inserted, and guarded twice: `ensure_fresh` never requests past `last_closed_bar`, and the fetcher discards any row with `ts > until` — the exchange *does* return the current candle when the window includes it. This matters because `PRICE_BAR` is append-only with a natural PK: a forming bar's high/low reflect only the elapsed portion, so storing one would freeze wrong values permanently and the corrected bar would later hit `unique_violation` instead of replacing it. Requires the newest-closed-bar decision to happen *after* the boundary settles — the sync fires on it and sleeps 10 s before reading the clock; see [Schedule timing](#schedule-timing-warm-at-00-apply-at-05). |
+| **Partial (still-forming) bar** | Never inserted, and guarded twice: `ensure_fresh` never requests past `last_closed_bar`, and the fetcher discards any row with `ts > until` — the exchange *does* return the current candle when the window includes it. This matters because `PRICE_BAR` is append-only with a natural PK: a forming bar's high/low reflect only the elapsed portion, so storing one would freeze wrong values permanently and the corrected bar would later hit `unique_violation` instead of replacing it. Requires the newest-closed-bar decision to happen *after* the boundary settles — the sync fires on it and sleeps 10 s before reading the clock; see [Schedule timing](#schedule-timing-warm-at-00-apply-at-55). |
 | **Crash before insert commits** | `SP_GET_PRICE_BAR_COVERAGE` unchanged — refetch missing range, `SP_INS_PRICE_BAR` per bar. |
 | **Crash after insert, before apply** | Coverage shows new bars — skip fetch/insert, re-run apply. |
 | **Duplicate insert** | `SP_INS_PRICE_BAR` stays a plain INSERT and reports `unique_violation` — the SP does not hide it. `PriceBarService` treats **that one SQLSTATE (23505)** as a lost race and moves on; any other `ProcedureError` propagates. Deployments sharing an instrument and interval fire at the same boundary, so several legitimately decide the same bar is missing before any of them writes; the winner stored the same bar the losers fetched. That last clause only holds because `SOURCE_APP_ID` is in the key (decision #47) — a conflict therefore means the *same venue's* same bar. Venue-blind, this same swallow would quietly adopt another exchange's print. A genuine double-insert is already ruled out by the missing-set calculation, so absorbing it here costs no real safety. |
@@ -497,15 +497,15 @@ on most passes.
 
 `ScheduleSweeper.settle_s` (`DEFAULT_SETTLE_S = 10s`, used by the endpoint and
 not by the poller) waits before asking what is due. The apply schedule fires at
-`:05` UTC (`cron(5 * * * ? *)`), five minutes after `price_bar_sync` at `:00`,
-so the warm usually finishes first. The settle still clears a cursor standing
+`:55` UTC (`cron(55 * * * ? *)`), five minutes before the next bar close. `price_bar_sync` stays at `:00`,
+which has already stored the last closed bar. The apply fetches the open candle itself. The settle still clears a cursor standing
 exactly on the boundary: delivery a few milliseconds early would answer "not yet"
 and wait a whole interval. Overlap is safe regardless — the bar insert treats a
 unique violation as a concurrent write.
 
 !!! note "Cursor phase vs cron"
-    Cron and settle target **`:05` after each bar close**, and `SCHEDULED_TS` now
-    seeds to match: `next_apply_slot()` returns `floor_to_period + EXECUTE_OFFSET`
+    Cron and settle target **`:55`, five minutes before each bar close**, and `SCHEDULED_TS` now
+    seeds to match: `next_apply_slot()` returns the bar close minus `EXECUTE_OFFSET`
     from `REFDATA.APP_APPLY_TIMING`, passed into `SP_INS_DEPLOYMENT` as
     `IN_INITIAL_SCHEDULED_TS` on create, cadence change, re-enable, and unpause
     ([decision #71](../decisions.md)). Before this, a deployment created at
@@ -564,26 +564,20 @@ It is **best effort and not a correctness dependency.** One unreachable symbol i
 
 All of that wiring is now in place: `POST /api/v1/market-data/price-bars/sync` is served, and `config/scheduler/price_bar_sync.yml` declares the task, its path and an hourly expression. One schedule covers every interval rather than one per `TM_INTERVAL_ID` — the warmer sweeps them all, so an interval with no deployments contributes no rows (§7.8).
 
-#### Schedule timing — warm at :00, apply at :05
+#### Schedule timing — warm at :00, apply at :55
 
 Two platform schedules, staggered:
 
 | Task | Expression | In-process settle | Effective start |
 |------|------------|-------------------|-----------------|
 | `price_bar_sync` | `cron(0 * * * ? *)` | `BarWarmer.DEFAULT_SETTLE_S` = 10s | ~`:00:10` UTC |
-| `trade_apply_tick` | `cron(5 * * * ? *)` | `ScheduleSweeper.DEFAULT_SETTLE_S` = 10s | ~`:05:10` UTC |
+| `trade_apply_tick` | `cron(55 * * * ? *)` | `ScheduleSweeper.DEFAULT_SETTLE_S` = 10s | ~`:55:10` UTC |
 
-**Warm on the boundary, apply five minutes later.** `price_bar_sync` fires at
-`:00` and sleeps before reading the clock so the exchange can publish the candle
-that just closed. `trade_apply_tick` at `:05` gives the warm several minutes to
-finish; every apply still calls `ensure_fresh` and fails closed on its own, so a
-slow warm costs a redundant fetch, never a bad trade.
-
-`PriceBarService` computes its target as `last_closed_bar(now, period)`, so any
-firing time within the same closed interval resolves to the same bar. The 10s
-warm settle and the `:05` apply offset are about exchange publish latency and
-ordering, not changing which bar is targeted. Why that matches “trade after the
-bar closes” is spelled out in [ccxt bar timezones](ccxt-bar-timezones.md).
+**Store closed bars on the boundary; trade five minutes before the next close.**
+`price_bar_sync` still persists only finished candles. `trade_apply_tick` at
+`:55` is `EXECUTE_OFFSET` before the bar ends (crypto daily `23:55` UTC). The
+signal appends the still-forming ccxt candle and does not write it. A listed
+daily session uses `MARKET_CLOSE_TIME` instead of midnight ([decision #81](../decisions.md)).
 
 This applies to the EventBridge path. The local poller's ~60s cycle is naturally
 offset; `ScheduleSweeper` uses `settle_s=0` there.

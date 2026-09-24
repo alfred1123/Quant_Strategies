@@ -27,7 +27,6 @@
       stays in git and prod keeps the old definition.
     -->
 
-    <include file="releases/1.24.0-signal-type-long-only.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.25.0-app-apply-timing.xml" relativeToChangelogFile="true"/>
+    <!-- 1.24.0 and 1.25.0 applied on prod (2026-09-13, 2026-09-19) and archived. -->
 
 </databaseChangeLog>

@@ -19,7 +19,7 @@ Behaviour notes
 
 import json
 import logging
-from datetime import timedelta
+from datetime import time, timedelta
 
 import redis
 
@@ -132,12 +132,30 @@ class RedisRefData:
         return (listing_exchange or "").strip()
 
     @staticmethod
-    def _format_market_calendar(row: dict) -> dict:
+    def _parse_clock(value: time | str | None) -> time | None:
+        """A ``MARKET_*_TIME`` as a ``time``. Parsed here, not handed to callers as text.
+
+        psycopg returns a ``time``; the Redis snapshot serialises it to
+        ``"HH:MM:SS"`` (``json.dumps(default=str)``), so accept both — the same
+        dual-shape ``get_interval_period`` handles for ``PERIOD_LENGTH``.
+        """
+        if value is None or value == "":
+            return None
+        if isinstance(value, time):
+            return value
+        parts = str(value).split(":")
+        if len(parts) < 2:
+            raise ValueError(f"unrecognised MARKET time: {value!r}")
+        seconds = int(float(parts[2])) if len(parts) > 2 else 0
+        return time(int(parts[0]), int(parts[1]), seconds)
+
+    @classmethod
+    def _format_market_calendar(cls, row: dict) -> dict:
         return {
             "listing_exchange": str(row.get("listing_exchange") or ""),
             "bar_timezone": str(row["bar_timezone"]),
-            "market_open_time": row.get("market_open_time"),
-            "market_close_time": row.get("market_close_time"),
+            "market_open_time": cls._parse_clock(row.get("market_open_time")),
+            "market_close_time": cls._parse_clock(row.get("market_close_time")),
         }
 
     def get_market_calendar(self, *, listing_exchange: str | None = None) -> dict:
@@ -155,7 +173,7 @@ class RedisRefData:
         )
 
     def get_execute_offset(self, app_id: int, tm_interval_id: int) -> timedelta:
-        """Delay after bar close for broker + schedule cadence."""
+        """Lead time before bar close for broker + schedule cadence."""
         for r in self.get("app_apply_timing"):
             if int(r["app_id"]) == int(app_id) and int(r["tm_interval_id"]) == int(
                 tm_interval_id

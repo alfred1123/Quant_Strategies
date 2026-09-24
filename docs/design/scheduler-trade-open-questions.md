@@ -218,7 +218,7 @@ Pre-completion aborts do not call SP_INS — row stays due.
 
 ## 10. Align `SCHEDULED_TS` to bar close
 
-**Question:** Scheduled apply should run shortly after the newest closed bar’s close — for ccxt dailies, ~`00:05 UTC` — but deployments seed `SCHEDULED_TS` from deploy time. How do we shift the cursor without breaking advance math?
+**Question:** Scheduled apply should run shortly **before** the bar closes — for ccxt dailies, `23:55 UTC` — but deployments used to seed `SCHEDULED_TS` from deploy time. How do we shift the cursor without breaking advance math?
 
 **Problem:** Signal computation already uses `last_closed_bar()` and UTC-midnight boundaries ([ccxt bar timezones](ccxt-bar-timezones.md)). The **trigger clock** does not: a daily deployment created at `14:37 UTC` is due at `14:37` every day while bars roll at `00:00 UTC`.
 
@@ -229,7 +229,7 @@ Pre-completion aborts do not call SP_INS — row stays due.
 | **`REFDATA.MARKET_CALENDAR`** | Listing venue (`LISTING_EXCHANGE`) → timezone, session. Default `''` row for crypto. |
 | **`REFDATA.APP_APPLY_TIMING`** | Broker × cadence → `EXECUTE_OFFSET` (5 min seeded for Bybit/Binance). |
 | **`RedisRefData.get_market_calendar()` / `get_execute_offset()`** | Reader lookups — no hardcoded session or offset in Python. |
-| **`next_apply_slot()` in `quant/shared/intervals.py`** | `floor_to_period + execute_offset` from REFDATA. |
+| **`next_apply_slot()` in `quant/shared/intervals.py`** | Bar close minus `EXECUTE_OFFSET` ([decision #81](../decisions.md)). Listed dailies use session close. |
 | **Seed on create / reschedule / unpause** | `SP_INS_DEPLOYMENT` accepts optional `IN_INITIAL_SCHEDULED_TS`; Python passes aligned slot using deployment `APP_ID` + schedule interval. |
 | **Advance unchanged** | `NEXT_SCHEDULED_TS = SCHEDULED_TS + PERIOD_LENGTH` keeps execute phase forever. |
 | **One-time backfill** | Ops run `scripts/realign_schedule_phase.sql` (`UPDATE` current `PENDING` cursor); not embedded in Liquibase `prod-deploy`. |

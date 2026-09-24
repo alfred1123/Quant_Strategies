@@ -91,6 +91,14 @@ class TradeService:
             )
         return fitted_interval_id(rows[0].get("config_json"))
 
+    def _listing_exchange(self, internal_cusip: str) -> str | None:
+        """``INST.PRODUCT.EXCHANGE`` — empty for ``.crypto``, which uses the 24/7 calendar."""
+        product = self._data_caches.instrument_cache.get_product_by_cusip(internal_cusip)
+        if not isinstance(product, dict):
+            return None
+        exchange = product.get("exchange")
+        return str(exchange) if exchange else None
+
     def _require_tradable_qty(
         self, *, app_id: int, internal_cusip: str, qty: Decimal
     ) -> None:
@@ -139,6 +147,7 @@ class TradeService:
                 refdata=self._data_caches.refdata,
                 app_id=req.app_id,
                 schedule_tm_interval_id=req.schedule_tm_interval_id,
+                listing_exchange=self._listing_exchange(req.internal_cusip),
             )
         row = self._repo.sp_ins_deployment(
             deployment_id=deployment_id,
@@ -245,6 +254,7 @@ class TradeService:
                 refdata=self._data_caches.refdata,
                 app_id=current.app_id,
                 schedule_tm_interval_id=schedule_tm_interval_id,
+                listing_exchange=self._listing_exchange(current.internal_cusip),
             )
         row = self._repo.write_deployment(
             deployment_id=deployment_id,

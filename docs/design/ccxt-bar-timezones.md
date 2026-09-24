@@ -22,7 +22,7 @@ This page answers two questions that sound like one but are not:
 | **This platform (`MARKET_DATA.PRICE_BAR`)** | Same as ccxt after fetch | `BAR_TIMESTAMP` = **open** time, stored `TIMESTAMPTZ` UTC |
 | **Our interval math (`quant/shared/intervals.py`)** | Binned from the Unix epoch | Daily → midnight UTC; hourly → top of the hour UTC |
 
-A daily bar is **usable for trading only after it has closed**. The close price is final at the **next** boundary (for daily: **00:00 UTC** on the following calendar day). Scheduled apply should therefore run **shortly after that close**, not at the open.
+A stored bar is final only after it has closed. Scheduled apply does not wait for that: it runs **`EXECUTE_OFFSET` before the close** (five minutes) and reads the still-forming candle from ccxt, so a listed market is traded in the same session. Waiting until after the close fills on the next session.
 
 ---
 
@@ -226,7 +226,7 @@ Compare with `MARKET_DATA.PRICE_BAR` for the same product:
 
 ## Plan — align apply clock to bar close (ASAP)
 
-**Status:** implemented in code ([decision #71](../decisions.md)); prod still needs the TRADE `1.7.0` migrate, a `quant-app` deploy, and the one-time backfill. A daily-only EventBridge rule remains unnecessary — the hourly `:05` sweep works now that the cursor phase matches.
+**Status:** amended by [decision #81](../decisions.md). Apply is five minutes **before** close (`:55`), not five minutes after (`:05`). Existing cursors need `scripts/realign_schedule_phase.sql`.
 
 ### Problem
 
@@ -235,9 +235,9 @@ EventBridge and `ScheduleSweeper` are already timed correctly:
 | Task | Cron (UTC) | Settle | Effective read |
 |------|------------|--------|----------------|
 | `price_bar_sync` | `:00` | 10 s | ~`:00:10` |
-| `trade_apply_tick` | `:05` | 10 s | ~`:05:10` |
+| `trade_apply_tick` | `:55` | 10 s | ~`:55:10` |
 
-A **daily** deployment should become due on the **`00:05`** pass (first apply after the UTC-midnight close). That only happens when `DEPLOYMENT_SCHEDULE_STATUS.SCHEDULED_TS` sits on **`bar_boundary + 5 minutes`**, not on the deploy instant.
+A **daily** crypto deployment becomes due at **`23:55` UTC** (five minutes before the midnight close). `SCHEDULED_TS` sits on **bar close minus `EXECUTE_OFFSET`**.
 
 Today `SP_INS_DEPLOYMENT` seeds `SCHEDULED_TS := V_START_TS` (deploy time). A deployment created at `14:37 UTC` stays due at **`14:37`** every day — signal bars are still UTC-midnight dailies, but the **clock** fires mid-session.
 
@@ -261,7 +261,7 @@ Bybit and Binance share the same **`''`** row — the calendar describes the **i
 |--------|------|
 | `APP_ID` | `TRADE.DEPLOYMENT.APP_ID` |
 | `TM_INTERVAL_ID` | Schedule cadence (`DAILY`, `1H`, …) |
-| `EXECUTE_OFFSET` | `INTERVAL` after bar **close** before apply |
+| `EXECUTE_OFFSET` | `INTERVAL` **before** bar close (or session close) to apply |
 
 Seeded in release `1.25.0-app-apply-timing` (`context="refdata"`):
 
@@ -279,7 +279,7 @@ Three layers — do not conflate them:
 
 1. **ccxt bar timestamp** — always UTC ms at **candle open**; Bybit/Binance dailies at **00:00 UTC** regardless of NULL session columns.
 2. **Regular session** (`MARKET_OPEN_TIME` / `MARKET_CLOSE_TIME`) — **weekly** template for when the order book is open. NULL/NULL means the venue trades continuously; it does **not** change the UTC daily bar boundary on crypto. **Exchange holidays are not modeled here** — see [Later § holiday calendar](#later-not-blocking-the-shift).
-3. **Apply clock** (`EXECUTE_OFFSET` on ``APP_APPLY_TIMING``) — how long after bar **close** the scheduler arms `SCHEDULED_TS`. The shipped path uses ``floor_to_period(..., PERIOD_LENGTH)`` from the Unix epoch (UTC midnight dailies), which is correct for 24/7 crypto and is why only crypto apps are scheduled today. Listed equity will need ``MARKET_CALENDAR`` keyed by the product's ``INST.PRODUCT.EXCHANGE``; the table and its reader exist, but nothing in the deployment path consults them yet.
+3. **Apply clock** (`EXECUTE_OFFSET` on ``APP_APPLY_TIMING``) — how long **before** bar close the scheduler arms `SCHEDULED_TS`. Continuous markets (NULL session) use the epoch boundary, so a crypto daily is `23:55` UTC. A listed daily uses `MARKET_CLOSE_TIME` in `BAR_TIMEZONE` ([decision #81](../decisions.md)).
 
 ``INST.PRODUCT.EXCHANGE`` selects the **calendar row**; ``DEPLOYMENT.APP_ID`` selects the **execute offset row**.
 
@@ -288,30 +288,27 @@ Pure interval math (offset passed in from REFDATA):
 ```python
 # quant/shared/intervals.py
 def next_apply_slot(after: datetime, period: timedelta, offset: timedelta) -> datetime:
-    """Next scheduled apply: bar boundary + exchange-specific execute offset."""
-    boundary = floor_to_period(after, period)
-    candidate = boundary + offset
+    """Next scheduled apply: this bar's close minus the execute offset."""
+    close = floor_to_period(after, period) + period
+    candidate = close - offset
     if candidate > after:
         return candidate
-    return boundary + period + offset
+    return candidate + period
 ```
 
-**Platform cron constraint:** `trade_apply_tick` fires at **`:05` UTC** hourly.
-``EXECUTE_OFFSET`` for hourly cadences should stay **≤ 5 minutes** unless the
-cron is tightened — a `10 minute` offset on `1H` would not become due until the
-**next** hour's tick (up to ~55 minutes late). Daily offsets above 5 minutes
-only slip within the same hour (e.g. `00:10` picked up at `01:05`).
+**Platform cron constraint:** `trade_apply_tick` fires at **`:55` UTC** hourly,
+matching the seeded 5-minute lead.
 
-Examples (`EXECUTE_OFFSET = 5 min` from REFDATA):
+Examples (`EXECUTE_OFFSET = 5 min` from REFDATA, continuous market):
 
 | Interval | Deploy / now | `next_apply_slot` |
 |----------|--------------|-------------------|
-| DAILY | `2026-09-18 14:37 UTC` | `2026-09-19 00:05 UTC` |
-| DAILY | `2026-09-19 00:03 UTC` | `2026-09-19 00:05 UTC` (same-night pass) |
-| 1H | `2026-09-18 11:03 UTC` | `2026-09-18 11:05 UTC` |
-| 1H | `2026-09-18 11:06 UTC` | `2026-09-18 12:05 UTC` |
+| DAILY | `2026-09-18 14:37 UTC` | `2026-09-18 23:55 UTC` |
+| DAILY | `2026-09-18 23:56 UTC` | `2026-09-19 23:55 UTC` |
+| 1H | `2026-09-18 11:03 UTC` | `2026-09-18 11:55 UTC` |
+| 1H | `2026-09-18 11:56 UTC` | `2026-09-18 12:55 UTC` |
 
-**Advance stays unchanged:** `SP_GET_MISSED_DUE_DEPLOYMENTS` returns `NEXT_SCHEDULED_TS = SCHEDULED_TS + PERIOD_LENGTH`. With `SCHEDULED_TS` on `:05`, every advance stays on `:05` (daily `00:05 → 00:05`, hourly `11:05 → 12:05`).
+**Advance stays unchanged:** `SP_GET_MISSED_DUE_DEPLOYMENTS` returns `NEXT_SCHEDULED_TS = SCHEDULED_TS + PERIOD_LENGTH`. With `SCHEDULED_TS` on `:55`, every advance stays on `:55` (daily `23:55 → 23:55`, hourly `11:55 → 12:55`).
 
 **UI:** `SP_GET_DEPLOYMENT.NEXT_DUE_AT` is already `SCHEDULED_TS` — no separate `next_run_at()` for the poller. Update the docstring on `next_run_at()` to say it is **boundary-only** (no offset); display should use `SCHEDULED_TS` once aligned.
 
@@ -328,7 +325,7 @@ Examples (`EXECUTE_OFFSET = 5 min` from REFDATA):
 | **7** | Log decision **#71** in `decisions.md` when step 4 ships | Docs |
 | **8** | (Optional, later) Dedicated daily EventBridge rule at `00:05` — cosmetic; hourly sweep is sufficient once phase is aligned | AWS config |
 
-**Do not change** `config/scheduler/trade_apply_tick.yml` for the first cut — `cron(5 * * * ? *)` matches the seeded **5 minute** `EXECUTE_OFFSET`. If ops raises an exchange offset above 5 minutes, update the cron or accept hourly slip.
+`config/scheduler/trade_apply_tick.yml` is `cron(55 * * * ? *)`, matching the seeded **5 minute** lead before close ([decision #81](../decisions.md)).
 
 ### Backfill policy (step 6)
 

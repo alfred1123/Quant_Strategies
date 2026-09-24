@@ -303,7 +303,7 @@ Active changelogs are short manifests — see XML comments in each `db/liquidbas
 
 **Release lifecycle:** once a release is applied to prod, drop its `<include>` and `git mv` the file into `releases/archive/`. Archived files are outside the include graph — neither `liquibase validate` nor the tests resolve their `<sqlFile path="...">` — so **do not edit them on the way in**; the move is the whole operation and the file stays as it shipped. `git log` has the history. Applied status comes from each schema's `DATABASECHANGELOG`, not from age: a release that looks old may simply never have run.
 
-`releases/` therefore holds what is pending: `bt` 1.18.0, 1.19.0 and 1.20.0, `inst` 1.4.0, `market_data` 1.4.0, and `core_admin` 1.3.0 — the last being `runAlways`, so it never leaves.
+`releases/` therefore holds what is pending. As of the 2026-09-25 prod check, every included release through `refdata` 1.25.0, `trade` 1.7.0, `bt` 1.23.0, `inst` 1.4.0, `market_data` 1.4.0 and `core_admin` 1.6.0 was already `EXECUTED` and is archived. The one that stays included is `core_admin` 1.3.0 — `runAlways`, so it never leaves.
 
 **Editing a procedure body is a migration you have to write.** A `runOnChange` changeset re-applies a body when the `.sql` changes, but only while its release is still included — and releases get archived as soon as they are applied. There is no standing changeset waiting to pick up an edit. Change `SP_GET_QUEUE.sql` without adding a changeset that deploys it and the edit lands in git, the deploy goes green, and prod keeps the old definition.
 

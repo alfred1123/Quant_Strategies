@@ -103,6 +103,7 @@ def resolve_signal_source(
         price_bars.for_app(app_id).load_window,
         tm_interval_id=interval_id,
         source_app_id=app_id,
+        include_forming=True,
     )
     return loader, f"price_bar:{venue}"
 

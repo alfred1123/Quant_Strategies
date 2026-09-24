@@ -26,12 +26,6 @@
       stays in git and prod keeps the old definition.
     -->
 
-    <include file="releases/1.18.0-strategy-config-bar-interval.xml" relativeToChangelogFile="true"/>
-    <!-- 1.19 reads CONFIG_JSON.tm_interval_id, which 1.18 is what backfills -->
-    <include file="releases/1.19.0-strategy-nm-cadence.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.20.0-queue-poll-no-audit.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.21.0-strategy-logical-delete.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.22.0-promotion-buy-hold.xml" relativeToChangelogFile="true"/>
-    <include file="releases/1.23.0-result-metrics-from-app.xml" relativeToChangelogFile="true"/>
+    <!-- 1.18.0–1.23.0 applied on prod (through 2026-09-13) and archived. -->
 
 </databaseChangeLog>

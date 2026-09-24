@@ -1,4 +1,4 @@
--- Bybit/Binance × DAILY/1H — 5 min after bar close (matches trade_apply_tick :05 UTC).
+-- Bybit/Binance × DAILY/1H — 5 min before bar close (matches trade_apply_tick :55 UTC).
 INSERT INTO REFDATA.APP_APPLY_TIMING (
     APP_ID,
     TM_INTERVAL_ID,

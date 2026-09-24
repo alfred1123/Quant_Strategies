@@ -394,7 +394,11 @@ class TestSignalDataSource:
         loader = mock_signal.call_args.kwargs["bar_loader"]
         loader("btcusdt.crypto", 120)
         service.load_window.assert_called_once_with(
-            "btcusdt.crypto", 120, tm_interval_id=1, source_app_id=34
+            "btcusdt.crypto",
+            120,
+            tm_interval_id=1,
+            source_app_id=34,
+            include_forming=True,
         )
 
     @patch("quant.trade.bar_source.exchange_id_for_app", return_value="bybit")
@@ -426,7 +430,11 @@ class TestSignalDataSource:
         loader = mock_signal.call_args.kwargs["bar_loader"]
         loader("btcusdt.crypto", 120)
         service.load_window.assert_called_once_with(
-            "btcusdt.crypto", 120, tm_interval_id=2, source_app_id=34
+            "btcusdt.crypto",
+            120,
+            tm_interval_id=2,
+            source_app_id=34,
+            include_forming=True,
         )
 
     @patch("quant.trade.bar_source.exchange_id_for_app", return_value="bybit")

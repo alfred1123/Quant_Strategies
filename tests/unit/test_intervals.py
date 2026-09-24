@@ -1,6 +1,6 @@
 """Unit tests for :mod:`quant.shared.intervals`."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 
 import pytest
 
@@ -12,6 +12,7 @@ from quant.shared.intervals import (
     last_closed_bar,
     next_apply_slot,
     next_run_at,
+    next_session_apply_slot,
     parse_period,
 )
 
@@ -97,30 +98,51 @@ class TestBoundaries:
 
 
 class TestNextApplySlot:
-    def test_daily_deploy_mid_day_targets_next_midnight_plus_offset(self):
+    def test_daily_deploy_mid_day_targets_five_minutes_before_midnight(self):
         after = datetime(2026, 9, 18, 14, 37, tzinfo=UTC)
         assert next_apply_slot(after, DAY, timedelta(minutes=5)) == datetime(
-            2026, 9, 19, 0, 5, tzinfo=UTC
+            2026, 9, 18, 23, 55, tzinfo=UTC
         )
 
     def test_hourly_uses_this_hour_when_the_slot_is_still_ahead(self):
         after = datetime(2026, 9, 18, 11, 3, tzinfo=UTC)
         assert next_apply_slot(after, HOUR, timedelta(minutes=5)) == datetime(
-            2026, 9, 18, 11, 5, tzinfo=UTC
+            2026, 9, 18, 11, 55, tzinfo=UTC
         )
 
     def test_hourly_rolls_forward_once_the_slot_has_passed(self):
-        after = datetime(2026, 9, 18, 11, 6, tzinfo=UTC)
+        after = datetime(2026, 9, 18, 11, 56, tzinfo=UTC)
         assert next_apply_slot(after, HOUR, timedelta(minutes=5)) == datetime(
-            2026, 9, 18, 12, 5, tzinfo=UTC
+            2026, 9, 18, 12, 55, tzinfo=UTC
         )
 
     def test_slot_is_strictly_after(self):
         """Landing exactly on the slot must advance, or the cursor never moves."""
-        after = datetime(2026, 9, 18, 11, 5, tzinfo=UTC)
+        after = datetime(2026, 9, 18, 11, 55, tzinfo=UTC)
         assert next_apply_slot(after, HOUR, timedelta(minutes=5)) == datetime(
-            2026, 9, 18, 12, 5, tzinfo=UTC
+            2026, 9, 18, 12, 55, tzinfo=UTC
         )
+
+    def test_listed_daily_is_five_minutes_before_the_session_close(self):
+        """NYSE 16:00 America/New_York, not UTC midnight — winter is 20:55 UTC."""
+        after = datetime(2026, 1, 14, 15, 0, tzinfo=UTC)  # Wednesday
+        slot = next_session_apply_slot(
+            after,
+            close_time=time(16, 0),
+            timezone="America/New_York",
+            offset=timedelta(minutes=5),
+        )
+        assert slot == datetime(2026, 1, 14, 20, 55, tzinfo=UTC)
+
+    def test_listed_daily_skips_the_weekend(self):
+        after = datetime(2026, 1, 16, 22, 0, tzinfo=UTC)  # Friday after the close
+        slot = next_session_apply_slot(
+            after,
+            close_time=time(16, 0),
+            timezone="America/New_York",
+            offset=timedelta(minutes=5),
+        )
+        assert slot == datetime(2026, 1, 19, 20, 55, tzinfo=UTC)  # Monday
 
     @pytest.mark.parametrize("offset", [timedelta(minutes=-1), HOUR, timedelta(hours=2)])
     def test_rejects_offset_outside_the_period(self, offset):
