@@ -125,6 +125,7 @@ nav:
       - Infrastructure Capacity Review: design/infra-capacity-review.md
       - Frontend Code Audit: design/frontend-audit.md
       - Plan to Profit: design/plan-to-profit.md
+      - Crypto Spot Strategy Research: design/crypto-spot-strategy-research.md
   - Archive:
       - Overview: archive/README.md
       - TypeScript Migration: archive/ts-migration.md
