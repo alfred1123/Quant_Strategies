@@ -74,6 +74,10 @@ or link a design doc — do not turn the research page into a spec.
 | [Funding, basis, and carry](funding-basis-carry.md) | Funding as a filter, 8-hour normalization, perp-spot convergence |
 | [Microstructure, on-chain, and unusual](microstructure-onchain-unusual.md) | 24h roll-out, clock-time flow, attention, on-chain value |
 
+Before treating a Sharpe from these pages as a result, read the
+[backtest review (2026-09-25)](../design/2026-09-25-backtest-review.md). It records
+how this engine annualizes, promotes, and costs a backtest.
+
 ## AlgoDaemon hand-off
 
 The bot is Bybit spot only, BTC/ETH/BNB only, 10 bps per trade, daily bars preferred, backtests only. No perps, so funding and basis cannot be *traded*. Full rules, indicators, and sweep grids are in [AlgoDaemon hand-off](sharpe-ideas-index.md#algodaemon-hand-off). Most promising first:
