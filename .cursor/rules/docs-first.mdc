@@ -12,7 +12,8 @@ why. Consult it **before** designing, implementing, or answering questions:
 |---|---|
 | Has this been decided already? | `docs/decisions.md` (numbered log — never re-litigate silently) |
 | How does X work today? | `docs/architecture/` |
-| Why is X shaped this way? What was rejected? | `docs/design/` |
+| Why is X shaped this way? What was rejected? | `docs/design/` (platform engineering) |
+| Strategy / alpha ideas to backtest? | `docs/research/` |
 | How do I run / deploy / test? | `docs/getting-started.md`, `docs/guides/` |
 
 When answering a user, point them at the specific page (and section) that covers

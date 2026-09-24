@@ -1,6 +1,7 @@
-# Crypto Spot Strategy Research
+# Crypto spot — baseline improvements
 
-**Status:** research notes, not a plan. Nothing here is implemented or scheduled.
+**Doc type:** strategy research  
+**Status:** hypothesis — not backtested on-platform for the variants below. Nothing here is scheduled for live.
 
 This page condenses an external research thread about raising the risk-adjusted return of a
 **BTC daily, Bollinger momentum, long-only** strategy. That baseline had a backtest Sharpe of

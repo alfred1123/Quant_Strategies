@@ -33,4 +33,5 @@ Backtesting and trading framework for crypto and equity markets. Strategies are 
 - [Pipeline Architecture](architecture/pipeline.md) — backtest + worker data flow
 - [API Reference](architecture/api.md) — endpoints and project structure
 - [Frontend Code Audit](design/frontend-audit.md) — known frontend issues + remediation directions
-- [Decisions Log](decisions.md) — all agreed design decisions
+- [Decisions Log](decisions.md) — all agreed platform decisions
+- [Strategy research](research/README.md) — alpha hypotheses (separate from platform design)

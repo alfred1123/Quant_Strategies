@@ -100,7 +100,7 @@ nav:
       - Database Dump & Restore: guides/database-dump-restore.md
       - Production Rollout: guides/prod-rollout.md
       - HTTPS via Cloudflare: guides/https-cloudflare.md
-  - Design Docs:
+  - Platform design:
       - Backtest Queue: design/backtest-queue.md
       - Backtest Queue JSON Viewer: design/backtest-queue-json-viewer.md
       - Jobs Table Detail UX: design/jobs-table-detail-ux.md
@@ -125,7 +125,9 @@ nav:
       - Infrastructure Capacity Review: design/infra-capacity-review.md
       - Frontend Code Audit: design/frontend-audit.md
       - Plan to Profit: design/plan-to-profit.md
-      - Crypto Spot Strategy Research: design/crypto-spot-strategy-research.md
+  - Strategy research:
+      - Overview: research/README.md
+      - Crypto spot — baseline improvements: research/crypto-spot-baseline-improvements.md
   - Archive:
       - Overview: archive/README.md
       - TypeScript Migration: archive/ts-migration.md
