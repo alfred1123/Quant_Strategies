@@ -43,6 +43,8 @@ A one-standard-deviation increase in the current week's Bitcoin return "leads to
 
 **Fit here.** The sign-of-trend gate is expressible now. `get_bollinger_band` at window 200 and threshold 0 is positive exactly when price is above its 200-day average; use it as the FILTER gate with `momentum_long`, and keep the existing Bollinger momentum recipe as the signal. A literal "past one-week return" indicator does not exist. `get_sma` returns a price level, so a threshold on SMA is not a return. Long-only signal types (`momentum_long`) already clip shorts, which matches a spot account. Walk-forward is `python -m quant.cli --walk-forward`.
 
+**AlgoDaemon testability:** As-is. Daily Bybit spot, long or flat, BTC then ETH then BNB. Fee 10 bps per trade. Hourly is allowed and not the run to trust. Hand-off rows 1 and 2.
+
 ---
 
 ## 2. Cross-product regime gate
@@ -70,6 +72,8 @@ position_BTC = signal if gate_z > 0 else 0
 
 **Fit here.** Expressible now. Set the gate factor's `symbol` to the second coin and `conjunction` to `FILTER`. The traded venue stays on the request, not on the factor ([the name records which venue was traded](../architecture/api.md#the-traded-venue-is-required-and-the-name-says-which-one)).
 
+**AlgoDaemon testability:** As-is, but only among BTC, ETH, and BNB. One spot position; the gate is another of those three. No other coin. Hand-off row 3.
+
 ---
 
 ## 3. A published non-result
@@ -85,6 +89,8 @@ position_BTC = signal if gate_z > 0 else 0
 **Why it is here.** It is the check on section 1 and on the cross-sectional factors on the [next page](volatility-and-cross-section.md). Momentum is not a settled fact across samples and constructions. A FILTER that helps on 2017–2021 and fails on a later bear market should be rejected, not re-tuned.
 
 **Fit here.** No new rule. Use their sample split as a reason to insist on walk-forward before trusting a trend gate.
+
+**AlgoDaemon testability:** Not a strategy. It is the reason to walk-forward rows 1 and 2 on each of the three coins instead of trusting one in-sample window.
 
 ---
 
@@ -118,6 +124,8 @@ score = return_1d
 
 **Fit here.** Not expressible. There is no cross-sectional rank, no liquidity sort, and no basket. A one-day RSI reversion on BTC alone would be the wrong translation of this paper. Ranked off the [try-first list](sharpe-ideas-index.md#try-these-first) for that reason.
 
+**AlgoDaemon testability:** Can't be tested as published (thousands of coins, a short leg, an illiquid book). The liquid-name conclusion is already rows 2 and 5: daily momentum on BTC, ETH, and BNB, long or flat. A one-day reversal on those three is the wrong translation, and an hourly version fights the 10 bp fee.
+
 ---
 
 ## 5. What not to copy from a trend-following preprint
@@ -133,3 +141,5 @@ score = return_1d
 Those figures are the authors' claim. They are not reproduced here, and a drawdown of −12.7% on a 70/30 crypto book over 2022 is an extraordinary path. Treat the paper as a description of ingredients (trailing stop, vol regime, rolling-Sharpe selection), not as a target.
 
 **Fit here.** 6-hour bars, a trailing stop, and a 150-name long-short book are all outside the engine. The ingredient we can test without new code is still the trend gate in section 1.
+
+**AlgoDaemon testability:** Can't be tested as published. Six-hour bars, a 150-pair long-short book, and a trailing stop are outside the bot. The trend gate in row 1 is the piece that can be tested. Do not target the abstract's Sharpe of 2.41.

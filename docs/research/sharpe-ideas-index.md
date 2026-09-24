@@ -3,7 +3,7 @@
 **Doc type:** strategy research  
 **Status:** hypothesis — not backtested here. Nothing on these pages is scheduled for live.
 
-This note ranks outside ideas that might raise the **Sharpe ratio** of a crypto book, and says which of them this platform can express today. It sits next to [Crypto spot — baseline improvements](crypto-spot-baseline-improvements.md), which already covers a BTC daily Bollinger momentum long (reported Sharpe about 1.48 in that thread) and three variants of it. These pages do not repeat that recipe. They add cross-sectional evidence, carry and basis, volatility scaling, and a few unusual effects, then map each one onto the current engine.
+This note ranks outside ideas that might raise the **Sharpe ratio** of a crypto book, and says which of them this platform can express today. The same pages stay broad: a perp arbitrage is still written up. Separately, the [AlgoDaemon hand-off](#algodaemon-hand-off) lists only what a Bybit spot backtest on BTC, ETH, and BNB can run, most promising first. This note sits next to [Crypto spot — baseline improvements](crypto-spot-baseline-improvements.md), which already covers a BTC daily Bollinger momentum long (reported Sharpe about 1.48 in that thread) and three variants of it. These pages do not repeat that recipe. They add cross-sectional evidence, carry and basis, volatility scaling, and a few unusual effects, then map each one onto the current engine.
 
 !!! warning "Figures below are other people's results"
     Every number is quoted from the named source, with the sample and cost assumption that source states. They have not been reproduced in this repository. Do not read them as expected live performance. Measurement rules that already apply here (crypto annualization with √365, the 10 bp default taker haircut, the 60-bar floor) are in [Measurement hygiene](crypto-spot-baseline-improvements.md#4-measurement-hygiene).
@@ -38,6 +38,118 @@ Do **not** schedule these as the next backtest, even though the write-ups are mo
 - Cross-sectional long-short books (size, momentum, low-volume). The large weekly spreads in [Liu, Tsyvinski, and Wu](volatility-and-cross-section.md#2-cross-sectional-size-momentum-volume-volatility) are zero-investment portfolios across hundreds of coins. This engine holds one name. The same literature says the **liquid** names, which are the ones we trade, behave differently from the small-coin leg.
 - Perpetual-versus-spot "random maturity" arbitrage. [He, Manela, Ross, and von Wachter](funding-basis-carry.md#3-random-maturity-arbitrage-around-the-no-arbitrage-bound) report a Bitcoin Sharpe of 3.35 under retail trading costs. The trade is two legs plus a convergence exit. We cannot mark funding or a hedge.
 - The 24-hour roll-out scalp. The public replication finds an annualized Sharpe near 2.1 **before costs**, then a **negative** per-trade result at a 10 bp taker round trip — which is this platform's default haircut. See [microstructure](microstructure-onchain-unusual.md#1-the-24-hour-roll-out-effect).
+
+## AlgoDaemon hand-off
+
+These candidates are for a backtesting bot on AlgoDaemon. Limits, as given for that bot:
+
+| Limit | Consequence |
+|-------|-------------|
+| Bybit **spot** only | Long or flat. No short leg, no perpetual, no basis hedge, no funding payment in the PnL. |
+| **BTC, ETH, BNB** only | No other coin, listed or delisted. |
+| **10 bps per trade** | Entry and exit each cost 10 bps unless the bot defines "per trade" as a round trip. Prefer rules that do not flip every bar. |
+| **Daily** bars, hourly allowed | Daily is the run to trust. Use hourly only as a check, and not for a one-bar scalp. |
+| Backtests only | No live orders. |
+
+"As-is" means spot OHLCV of those three coins is enough. "Needs adapting" means the bot still trades that spot book, but some other series is only a signal. Sweep grids below are **proposed for the bot**. They are not optima published by the sources. Fix one coin at a time unless the rule is the three-coin rank. Report Sharpe with √365 and with the 10 bp cost on, not a pre-cost figure.
+
+### 1. Trend-gated Bollinger momentum (as-is)
+
+Best first job: low turnover, daily, one coin, no extra data. Run BTC, then ETH, then BNB.
+
+| | |
+|--|--|
+| Rules | `z` = Bollinger z-score of close. Signal is long when `z > threshold`, else flat. Gate is on when `close > SMA(gate)`. Position is the signal when the gate is on, else flat. No shorts. |
+| Indicators | Bollinger z-score `(close − SMA) / rolling stdev`. SMA on close. |
+| Sweep | Signal window 10, 20, 40. Threshold 0.5, 1.0, 1.5, 2.0. Gate window 50, 100, 200. |
+| Bars | Daily. |
+| Source | Gate: [baseline §2.2](crypto-spot-baseline-improvements.md#22-macro-trend-filter-50-200-day-sma). Why a trend gate can raise Sharpe: [Liu and Tsyvinski, NBER WP 24877](https://www.nber.org/papers/w24877). |
+
+### 2. Time-series momentum, long or flat (as-is)
+
+The same evidence, without a Bollinger threshold. One coin at a time.
+
+| | |
+|--|--|
+| Rules | `r(N) = close / close[N] − 1`. Long when `r(N) > 0`, else flat. |
+| Indicators | N-day simple return. |
+| Sweep | N = 7, 14, 21, 28 (the paper's 1- to 4-week horizons, on daily bars). Add 60 and 120 only as a longer check the paper did not run. |
+| Bars | Daily. |
+| Source | [Liu and Tsyvinski, NBER WP 24877](https://www.nber.org/papers/w24877). Their weekly Sharpe of 0.45 is **not** annualized; do not target it. |
+
+### 3. Cross-asset regime gate (as-is)
+
+Same position rule as candidate 1, with the SMA gate read off a **second** allowed coin. Still one spot position.
+
+| | |
+|--|--|
+| Rules | Signal from candidate 1 on the traded coin. Gate is on when the other coin's `close > SMA(gate)`. Flat when the gate is off. |
+| Indicators | Bollinger z-score on the traded coin. SMA on the gate coin. |
+| Sweep | Pairs: trade BTC / gate ETH, trade ETH / gate BTC, trade BNB / gate BTC. Fix signal window 20 and threshold 1.0. Gate window 100 and 200. |
+| Bars | Daily. |
+| Source | Adaptation of candidate 1 to a second symbol. No published Sharpe for this pair list. Write-up: [cross-product regime gate](momentum-reversal-filters.md#2-cross-product-regime-gate). |
+
+### 4. Realized-volatility flat gate (as-is)
+
+Price-only version of volatility timing. Do not scale size above 1. Continuous sizing is optional and only if the bot already accepts a weight in `(0, 1]`; otherwise use this binary gate.
+
+| | |
+|--|--|
+| Rules | Fix the inner book at candidate 1 with window 20, threshold 1.0, gate 200. `rv` = standard deviation of daily log returns over L days. Flat when `rv > k × median(rv over the trailing 180 sessions)`. Otherwise take the inner position. |
+| Indicators | Trailing standard deviation of log returns. Median of that series. The inner Bollinger z-score and SMA. |
+| Sweep | L = 14, 20, 30. k = 1.0, 1.5, 2.0. Keep 180 fixed. |
+| Bars | Daily. |
+| Source | Mechanism, not a crypto result: [Moreira and Muir, JF 2017](https://doi.org/10.1111/jofi.12513). Mapping: [volatility-managed portfolios](volatility-and-cross-section.md#1-volatility-managed-portfolios-the-mechanism). |
+
+### 5. Three-coin relative momentum, long only (as-is)
+
+Adaptation of cross-sectional momentum to the only universe the bot has. Not the paper's hundred-coin long-short.
+
+| | |
+|--|--|
+| Rules | Each rebalance, `r_i(N) = close_i / close_i[N] − 1` for BTC, ETH, and BNB. Hold the highest `r` if it is positive, in equal notional, one coin. If the highest `r` is negative, hold cash. No shorts. |
+| Indicators | N-day return on each of the three closes. |
+| Sweep | N = 7, 14, 28, 60. Rebalance every day, and again every 7 daily bars (the weekly variant is the one that respects 10 bps). |
+| Bars | Daily. |
+| Source | [Liu, Tsyvinski, and Wu, NBER WP 25882](https://www.nber.org/papers/w25882) for the cross-sectional momentum fact. [Zaremba et al., IRFA 2021](https://doi.org/10.1016/j.irfa.2021.101908) for momentum in liquid names rather than reversal. The three-name long-only rule is ours. |
+
+### 6. Bandwidth-squeeze breakout (as-is)
+
+Only after 1–4. Still daily OHLC. Skip it if the bot cannot add an indicator beyond a z-score and an SMA.
+
+| | |
+|--|--|
+| Rules | Bollinger bandwidth `(upper − lower) / middle` at 2 standard deviations. Long on the first bar where bandwidth is no longer the lowest of the last X bars **and** close is above SMA(50) **and** the z-score is positive. Flat otherwise. |
+| Indicators | Bollinger bandwidth, Bollinger z-score, SMA(50). |
+| Sweep | Band window 15, 20, 30. X = 60, 120, 180. SMA fixed at 50. |
+| Bars | Daily. |
+| Source | [Baseline §2.1](crypto-spot-baseline-improvements.md#21-squeeze-bandwidth-breakout). No Sharpe was stated for this variant. |
+
+### 7. Funding-rate veto (needs adapting)
+
+Trade spot only. Funding is a signal, not a position and not a cashflow. Skip the whole candidate if the series is not already available. Do not fetch a perp book.
+
+| | |
+|--|--|
+| Rules | Inner book fixed as in candidate 4 (trend-gated Bollinger, 20 / 1.0 / 200). At each settlement, `fund_8h = funding_rate × (8 / interval_hours)`. The daily value is the **last settlement at or before that day's close**. `z` is the trailing z-score of `fund_8h`. If the inner signal is long and `z > z_hi`, stay flat. Never short. |
+| Indicators | 8-hour-normalized funding z-score, joined to the spot close. Inner Bollinger z-score and SMA. |
+| Sweep | z window 30 and 60 daily values. `z_hi` = 1.0, 1.5, 2.0. One coin at a time, and only coins whose funding you actually have. |
+| Bars | Daily. |
+| Source | Interval normalization and the "high funding is crowded" hypothesis: [FMZ, 31 Aug 2026](https://www.fmz.com/digest-topic/11029) and [FMZ APFF, 7 Sep 2026](https://www.fmz.com/digest-topic/11035). The author of the first post reports the factor's sign flipping across nearby samples. Write-up: [normalize the clock](funding-basis-carry.md#2-normalize-the-clock-before-you-rank-funding). |
+
+### 8. Attention or on-chain gate (needs adapting)
+
+Last. BTC only for the Google result. ETH or BNB only if that coin has its own series. The series is a signal; the fill is Bybit spot.
+
+| | |
+|--|--|
+| Rules | Inner book as in candidate 4. Let `a` be a weekly attention or on-chain reading known before the week's trades (Google searches for "Bitcoin", or one level such as MVRV or SOPR). Long only when the inner signal is long and the trailing z-score of `a` is above the threshold. Flat otherwise. |
+| Indicators | Trailing z-score of the external series. Inner Bollinger z-score and SMA. |
+| Sweep | z window 4, 8, 12 weeks. Threshold 0 and 1.0. These cutoffs are a translation of the paper's quintile sort, not the sort itself. |
+| Bars | Daily positions, weekly signal updates. |
+| Source | Attention magnitudes: [NBER WP 24877](https://www.nber.org/papers/w24877). On-chain shape, with no Sharpe stated: [arXiv:2308.00013](https://arxiv.org/abs/2308.00013). |
+
+Not handed to the bot: perp-versus-spot convergence, cash-and-carry, any short basket, the 24-hour roll-out (hourly and negative at 10 bps), quarter-hour order flow, and books that need coins other than BTC, ETH, and BNB. Reasons are on each strategy's AlgoDaemon note.
 
 ## Page map
 
@@ -116,4 +228,4 @@ No citable primary write-up was retrieved. note.com's search page loaded but art
 
 ## How to use a page
 
-Each strategy section has the same fields: name, sources and language, mechanism, data, rough rules, why it might change Sharpe, reported performance (or an explicit "not stated"), risks, and fit. Agreeing to **try** one of them is research. Agreeing to **add** an indicator, a funding series, or a position-size layer is platform design and belongs under `docs/design/` plus `docs/decisions.md` when it is built.
+Each strategy section has the same fields: name, sources and language, mechanism, data, rough rules, why it might change Sharpe, reported performance (or an explicit "not stated"), risks, fit, and an AlgoDaemon testability line (as-is, needs adapting, or can't be tested). The runs to give the bot are [AlgoDaemon hand-off](#algodaemon-hand-off), not every section. Agreeing to **try** one of them is research. Agreeing to **add** an indicator, a funding series, or a position-size layer is platform design and belongs under `docs/design/` plus `docs/decisions.md` when it is built.

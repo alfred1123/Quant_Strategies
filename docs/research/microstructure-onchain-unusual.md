@@ -73,6 +73,8 @@ And, because their build is TradFi rather than the crypto universe in the README
 
 **Fit here.** Poor. The hold is one hour, the edge dies at the default 10 bp taker round trip, and we do not have a "largest candle 24 hours ago" feature or delisted-contract history. 1-hour bars exist, but a signal that enters on the open and exits one bar later is mostly a cost test. Not a first backtest. If it is ever tried, the README's lesson for the job is the placebo (the effect should vanish at ages other than 24) and a maker fee assumption, not the 2.38 Sharpe path.
 
+**AlgoDaemon testability:** Can't be tested as published (788 perpetuals, a one-hour hold). Daily bars cannot see a candle falling out of a 24-hour window. An hourly spot test on BTC, ETH, and BNB would be a different market, and the same README finds the edge **negative** at a 10 bp taker round trip, which matches the bot's fee. Not in the hand-off.
+
 ---
 
 ## 2. Clock-time bursts and order-book features
@@ -103,6 +105,8 @@ hold on the order of 4–12 hours for the imbalance forecast
 **Risks.** Six contracts, one venue, one clock. Algo participation can move the burst earlier once the effect is known (the roll-out README makes the same capacity point). Taker costs of a few basis points erase it, by analogy with section 1, until someone shows otherwise. A flash-crash split between maker and taker is adverse selection: the fill you want is the fill that is toxic. No 1-second data is stored here.
 
 **Fit here.** Not expressible. Noted as a reason not to expect 1-hour OHLC momentum to capture "order flow."
+
+**AlgoDaemon testability:** Can't be tested. The signal is the order book or the trade print at a quarter-hour, and the bot has daily and hourly bars only. Hourly OHLC does not contain opening imbalance.
 
 ---
 
@@ -136,6 +140,8 @@ A one-standard-deviation increase in Twitter posts for "Bitcoin" "yields a 2.50 
 
 **Fit here.** Only after a series is loaded as a column on the traded coin. Ranked fifth and last on the [try-first list](sharpe-ideas-index.md#try-these-first) for that reason: one series, as a FILTER, compared with the plain trend gate, and dropped if it does not help out of sample. Glassnode is the on-chain path and is a different dataset; see section 4 and [Alternative data sources](../design/alt-data-sources.md).
 
+**AlgoDaemon testability:** Needs adapting. Trade Bybit spot BTC. Google searches for "Bitcoin", or Twitter counts, are a signal only; nothing but spot is filled. ETH and BNB were not the paper's search term, so they need their own series or they stay out. Daily bars. Hand-off row 8, after the price-only rules, and only if the series is already available. The weekly Sharpe of 0.48 is not annualized and not a target.
+
 ---
 
 ## 4. On-chain value: spent coins and a price-to-utility ratio
@@ -163,6 +169,8 @@ A concrete cousin that **is** standard in this literature, but was not given a p
 **Risks.** On-chain metrics are revised as the chain is re-indexed, and several vendors' "realized price" definitions differ. Entity-adjusted series (removing internal exchange shuffles) are a different signal from raw ones, and the adjustment is a vendor model. Daily publication lag can be a full bar. The Professional Glassnode tier was deferred as too expensive for the current stage. Overfitting a threshold on MVRV is as easy as overfitting a Bollinger width, with less history of independent replications that we were able to read.
 
 **Fit here.** Not until one series is in the cache as a factor column. The right experiment, if a series is ever licensed, is a FILTER gate on the existing baseline, not a new signal type. That matches rank 5 on the try-first list and should not jump ahead of the trend gate, which needs no vendor.
+
+**AlgoDaemon testability:** Needs adapting, and only for a coin whose series you have. The position is Bybit spot. The abstract's Litecoin comparison is outside the universe. No chain transaction is executed. Same hand-off row as attention (row 8), and skip it when the file is missing. No Sharpe was stated.
 
 ---
 

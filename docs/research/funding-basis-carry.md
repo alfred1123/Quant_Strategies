@@ -27,6 +27,8 @@ The platform already records that funding is not in the backtest. See [Transacti
 
 **Fit here.** Background. No code change follows from the pricing papers alone.
 
+**AlgoDaemon testability:** Can't be tested. These papers price a perpetual. The bot cannot trade one.
+
 ---
 
 ## 2. Normalize the clock before you rank funding
@@ -61,6 +63,8 @@ APFF's cross-sectional version flips the sign on purpose (`−Z`): high funding 
 **Risks.** Sign instability is the main one, and it is reported by the person trading it. Interval metadata can be wrong or can change mid-sample; a backtest that assumes 8 hours for every contract is a biased rank. Funding is a price of leverage, so it spikes in the same crashes a trend filter would also flat — the two gates can be the same trade counted twice. Exchange outages and premium-index definition changes break the series. Capacity of a crowded-funding fade is limited because everyone sees the same print.
 
 **Fit here.** Not yet. Nothing in `REFDATA.DATA_COLUMN` is a funding rate, and the PnL line does not add funding. Ranked fourth on the [try-first list](sharpe-ideas-index.md#try-these-first) because the *signal* is a filter we already understand: store `fund_8h` (or its z-score) as a series on the traded coin, point a factor at that column, and FILTER the baseline. That is a data task plus an indicator if the z-score is not precomputed. It is not a new position algebra, and it is not a hedge.
+
+**AlgoDaemon testability:** Needs adapting. The bot trades Bybit spot BTC, ETH, or BNB and must not book a funding cashflow or a perp. A veto that stays flat when that coin's 8-hour-normalized funding z-score is extremely high is hand-off row 7, and only if the series is already available. The cross-sectional short book cannot be tested.
 
 ---
 
@@ -108,6 +112,8 @@ A Sharpe of 37 in one calendar year, on a zero-cost assumption, is a reason to r
 
 **Fit here.** Not expressible, and not on the first-five list. A research spike would be a new backtest object (two series, a spread, an exit on convergence, funding cashflows), which is platform design, not a FILTER. Until that exists, quoting 3.35 as a goal for the Bollinger baseline is a category error.
 
+**AlgoDaemon testability:** Can't be tested. The trade is long spot and short the perpetual (or the reverse), held until the gap closes. Spot-only BTC/ETH/BNB cannot do the second leg. The Sharpe of 3.35 is not a target for the hand-off.
+
 ---
 
 ## 4. Cash-and-carry as a holding strategy
@@ -133,6 +139,8 @@ exit when fund_8h < exit or the basis inverts through the cost
 
 **Fit here.** Not expressible. Same gap as section 3: one position, no funding cashflow.
 
+**AlgoDaemon testability:** Can't be tested. Cash-and-carry is the perp hedge itself. There is no published spot-only Sharpe to fall back on.
+
 ---
 
 ## 5. Two practitioner warnings
@@ -147,3 +155,5 @@ exit when fund_8h < exit or the basis inverts through the cost
 **Why it is here.** Carry and "arbitrage" are the words those channels use. A reported Sharpe from an anonymous screenshot is not a source. The fee point matches a result we *can* cite with a number, from the [roll-out replication](microstructure-onchain-unusual.md#1-the-24-hour-roll-out-effect): the same hourly signal is positive before costs and negative at a 10 bp taker round trip.
 
 **Fit here.** No strategy to add. Keep the default 10 bp taker haircut honest when anyone proposes a hold shorter than a day. Live apply is a market order (decision #38), so the haircut is taker, not maker.
+
+**AlgoDaemon testability:** Not a strategy. The bot's 10 bps per trade is already the cost. Ignore Telegram "arbitrage" profit screenshots; the Habr post says those channels are often scams.
