@@ -64,3 +64,8 @@ or link a design doc — do not turn the research page into a spec.
 | Page | Topic |
 |------|--------|
 | [Crypto spot — baseline improvements](crypto-spot-baseline-improvements.md) | BB momentum long, squeeze, trend filter, external Sharpe claims |
+| [Sharpe ideas — where to start](sharpe-ideas-index.md) | Ranked shortlist, source log, sites that were blocked or paywalled |
+| [Momentum, reversal, and filters](momentum-reversal-filters.md) | Time-series momentum, liquid vs illiquid reversal, cross-product gate |
+| [Volatility and the cross-section](volatility-and-cross-section.md) | Vol targeting, size/momentum factors, risk-balanced baskets |
+| [Funding, basis, and carry](funding-basis-carry.md) | Funding as a filter, 8-hour normalization, perp-spot convergence |
+| [Microstructure, on-chain, and unusual](microstructure-onchain-unusual.md) | 24h roll-out, clock-time flow, attention, on-chain value |

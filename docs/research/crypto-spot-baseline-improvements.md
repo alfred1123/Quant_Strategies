@@ -3,6 +3,8 @@
 **Doc type:** strategy research  
 **Status:** hypothesis — not backtested on-platform for the variants below. Nothing here is scheduled for live.
 
+A later pass ranks a wider set of Sharpe ideas (momentum evidence, funding, cross-section, microstructure) and says which to try first: [Sharpe ideas — where to start](sharpe-ideas-index.md). This page stays the write-up of the BTC daily Bollinger baseline.
+
 This page condenses an external research thread about raising the risk-adjusted return of a
 **BTC daily, Bollinger momentum, long-only** strategy. That baseline had a backtest Sharpe of
 about **1.48**. The page also records which ideas the platform can already express and which
