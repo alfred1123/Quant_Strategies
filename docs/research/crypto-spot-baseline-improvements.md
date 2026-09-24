@@ -3,6 +3,8 @@
 **Doc type:** strategy research  
 **Status:** hypothesis — not backtested on-platform for the variants below. Nothing here is scheduled for live.
 
+A later pass ranks a wider set of Sharpe ideas (momentum evidence, funding, cross-section, microstructure) and says which to try first: [Sharpe ideas — where to start](sharpe-ideas-index.md). This page stays the write-up of the BTC daily Bollinger baseline.
+
 This page condenses an external research thread about raising the risk-adjusted return of a
 **BTC daily, Bollinger momentum, long-only** strategy. That baseline had a backtest Sharpe of
 about **1.48**. The page also records which ideas the platform can already express and which
@@ -113,7 +115,20 @@ Ordered by value per unit of effort:
 5. **Pairs trading.** This needs multi-instrument signals and short capability, so it is out
    of scope for spot-only deployment.
 
-## 7. Venue note: Bybit error 10024
+## 7. AlgoDaemon testability
+
+The hand-off bot is Bybit spot, BTC/ETH/BNB only, 10 bps per trade, daily bars preferred, hourly allowed, backtests only. No derivatives. Sweep grids are in [AlgoDaemon hand-off](sharpe-ideas-index.md#algodaemon-hand-off).
+
+| Idea on this page | AlgoDaemon |
+|-------------------|------------|
+| Baseline Bollinger momentum, long only | **As-is**, daily, each of the three coins. It is the inner signal of hand-off row 1. |
+| 200-day trend filter | **As-is**. Hand-off row 1. |
+| Squeeze / bandwidth breakout | **As-is** from daily OHLC if the bot can compute bandwidth. Hand-off row 6, after the simpler gates. |
+| ATR volatility targeting, continuous size | **As-is** only as a weight in `(0, 1]` from daily ATR or realized vol. Spot cannot lever. Prefer the binary flat gate, hand-off row 4, if the bot has no size input. |
+| StochRSI exhaustion, 4h | **Can't** be tested on 4-hour bars. Hourly is allowed and is a poor match for 10 bps. Not in the hand-off. |
+| Pairs / stat-arb | **Can't** be tested with a short leg. Long-the-cheap / flat-the-rich among these three coins would be an adaptation, and the thread did not state the pair, hedge ratio, or window, so it is not in the hand-off. |
+
+## 8. Venue note: Bybit error 10024
 
 The thread also surfaced a Bybit `retCode 10024` ("regulatory restriction"). Bybit returns this
 when the account's jurisdiction is not allowed to trade the product or the request originates

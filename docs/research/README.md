@@ -31,6 +31,10 @@ Every file under `docs/research/` should start with:
 **Status:** …
 ```
 
+Each strategy section should also include a short **AlgoDaemon testability** note:
+as-is, needs adapting, or can't be tested under the bot limits in
+[AlgoDaemon hand-off](sharpe-ideas-index.md#algodaemon-hand-off).
+
 Use **Status** honestly, for example:
 
 - `hypothesis — not backtested here`
@@ -64,3 +68,23 @@ or link a design doc — do not turn the research page into a spec.
 | Page | Topic |
 |------|--------|
 | [Crypto spot — baseline improvements](crypto-spot-baseline-improvements.md) | BB momentum long, squeeze, trend filter, external Sharpe claims |
+| [Sharpe ideas — where to start](sharpe-ideas-index.md) | Ranked shortlist, [AlgoDaemon hand-off](sharpe-ideas-index.md#algodaemon-hand-off), source log |
+| [Momentum, reversal, and filters](momentum-reversal-filters.md) | Time-series momentum, liquid vs illiquid reversal, cross-product gate |
+| [Volatility and the cross-section](volatility-and-cross-section.md) | Vol targeting, size/momentum factors, risk-balanced baskets |
+| [Funding, basis, and carry](funding-basis-carry.md) | Funding as a filter, 8-hour normalization, perp-spot convergence |
+| [Microstructure, on-chain, and unusual](microstructure-onchain-unusual.md) | 24h roll-out, clock-time flow, attention, on-chain value |
+
+## AlgoDaemon hand-off
+
+The bot is Bybit spot only, BTC/ETH/BNB only, 10 bps per trade, daily bars preferred, backtests only. No perps, so funding and basis cannot be *traded*. Full rules, indicators, and sweep grids are in [AlgoDaemon hand-off](sharpe-ideas-index.md#algodaemon-hand-off). Most promising first:
+
+1. Trend-gated Bollinger momentum, long or flat, daily, each coin.
+2. Time-series momentum: long when the N-day return is positive.
+3. Cross-asset SMA gate among the three coins.
+4. Flat when realized volatility is high.
+5. Long-only rank of BTC vs ETH vs BNB.
+6. Bandwidth-squeeze breakout (still daily OHLC).
+7. Funding z-score as a veto only (needs a funding file; do not trade the perp).
+8. One attention or on-chain series as a veto (needs that file; BTC first).
+
+Perp basis, cash-and-carry, the 24-hour roll-out, and any book that needs another coin are written up and marked **can't be tested**.
