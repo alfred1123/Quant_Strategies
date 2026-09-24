@@ -1,5 +1,8 @@
 # Return Compounding — `cumu` summed simple returns instead of compounding
 
+!!! note "Archived"
+    Bug **fixed** in `quant/strategy/performance.py`. Old `BT.RESULT` rows may still use the pre-fix convention.
+
 !!! success "Fixed in `quant/strategy/performance.py`"
     `_compound()` builds an equity curve with `cumprod` and reads drawdown off
     it; `_cagr()` replaces the arithmetic annualisation. `Total Return`,
@@ -9,8 +12,8 @@
     `BT.RESULT` are on the old convention and are being re-run (see
     [Stored results](#stored-results-still-on-the-old-convention)).
 
-**Related:** [Plan to Profit](plan-to-profit.md), [Best-VID Promotion](best-vid-promotion.md),
-[Backtest Queue](backtest-queue.md)
+**Related:** [Plan to Profit](../design/plan-to-profit.md), [Best-VID Promotion](../design/best-vid-promotion.md),
+[Backtest Queue](../design/backtest-queue.md)
 
 ---
 

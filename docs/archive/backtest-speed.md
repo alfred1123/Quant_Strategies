@@ -1,5 +1,8 @@
 # Design: Backtest Speed
 
+!!! note "Archived"
+    Optimization paths are implemented. See [Pipeline](../architecture/pipeline.md) and `quant/strategy/optimizer.py`.
+
 **Status:** Implemented (2026-09-06)
 **Dates:** 2026-04-15 (first analysis) · 2026-09-05 (re-profiled) · 2026-09-06 (landed)
 **Scope:** `quant/strategy/optimizer.py`, `quant/strategy/objective.py`, `tests/unit/test_objective.py`, `tests/unit/test_param_opt.py`

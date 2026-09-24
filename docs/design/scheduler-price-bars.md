@@ -4,7 +4,7 @@
     **Design — Phase 1.9.** Covers automated trade scheduling via EventBridge and normalized price bars for live signal computation. Backtest cache versioning stays in the application layer (`BacktestCache.refresh_payload`).
 
 **Parent:** [Plan to Profit](plan-to-profit.md) Phase 1.9  
-**Related:** [Trade Deployment Rollout](trade-deployment-rollout.md), [Live Order Execution](live-order-execution.md), [Separate Underlying & Cache](separate-underlying.md), [Open questions (scheduler & trade)](scheduler-trade-open-questions.md), [ccxt bar timezones & apply timing](ccxt-bar-timezones.md)
+**Related:** [Trade Deployment Rollout](../archive/trade-deployment-rollout.md), [Live Order Execution](../archive/live-order-execution.md), [Separate Underlying & Cache](separate-underlying.md), [Open questions (scheduler & trade)](scheduler-trade-open-questions.md), [ccxt bar timezones & apply timing](ccxt-bar-timezones.md)
 
 ---
 

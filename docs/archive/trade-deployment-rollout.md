@@ -1,8 +1,11 @@
 # Trade Deployment Rollout (Queue-free path)
 
+!!! note "Archived"
+    Phases **1.6 → 1.9 shipped.** For current behavior see [Trade API](../design/trade-api.md) and [Archive overview](README.md#shipped-platform-designs-2026-09-cleanup).
+
 **Status:** Phases **1.6 → 1.9 shipped** (picker, dry-run/apply, execution writes, scheduler
 tick + price bars, schedule UI). This doc records the rollout design; see
-[Plan to Profit](plan-to-profit.md) for current phase status.
+[Plan to Profit](../design/plan-to-profit.md) for current phase status.
 
 ## Why this path first
 
@@ -16,11 +19,11 @@ STRATEGY_VID)` from `BT.STRATEGY` and writes to the **`TRADE`** schema.
 | `TRADE.EXECUTION_EVENT` / `TRANSACTION` | **Yes** (1.8) | append-only logs |
 | `BT.SP_GET_STRATEGY` | **Read only** | list + exact VID lookup for picker |
 | `BT.QUEUE` | **No** | frozen — others changing enqueue |
-| `BT.SP_INS_STRATEGY` | **Yes** (1.10.0) | Resolves identity by `(USER_ID, STRATEGY_NM)` — see [Strategy VID Versioning](../archive/strategy-vid-versioning.md) |
+| `BT.SP_INS_STRATEGY` | **Yes** (1.10.0) | Resolves identity by `(USER_ID, STRATEGY_NM)` — see [Strategy VID Versioning](strategy-vid-versioning.md) |
 | `BT.PROMOTION` | **No** | UI already navigates to Trade with `{ strategy_id, strategy_vid }` |
 
 !!! note "Duplicate v1 rows — resolved in `1.10.0`"
-    Before [Strategy VID Versioning](../archive/strategy-vid-versioning.md) landed, the same
+    Before [Strategy VID Versioning](strategy-vid-versioning.md) landed, the same
     `STRATEGY_NM` could appear as multiple `STRATEGY_ID`s each at `VID=1`. It now
     resolves to one `STRATEGY_ID` per `(USER_ID, STRATEGY_NM)` with an
     incrementing VID. The Trade picker still shows **`strategy_nm` +
@@ -289,7 +292,7 @@ sequenceDiagram
 
 ### Security (server-side — non-negotiable)
 
-From [Plan to Profit §5.5](plan-to-profit.md#55-auth-security-guardrails):
+From [Plan to Profit §5.5](../design/plan-to-profit.md#55-auth-security-guardrails):
 
 1. **Ownership:** `BT.STRATEGY.USER_ID` must match caller (or shared-read policy
    documented) before create.
@@ -377,11 +380,11 @@ Attempts / Fills tabs over the two GET endpoints, polled on refresh.
 
 | Item | Doc | Outcome |
 |------|-----|---------|
-| VID increment by `strategy_nm` | [strategy-vid-versioning.md](../archive/strategy-vid-versioning.md) | **Shipped** in release `1.10.0` |
+| VID increment by `strategy_nm` | [strategy-vid-versioning.md](strategy-vid-versioning.md) | **Shipped** in release `1.10.0` |
 | `UNIQUE (USER_ID, STRATEGY_NM, STRATEGY_VID)` | same | **Shipped** in release `1.10.0` |
-| Jobs table UX / shared queue | [Jobs Table Detail UX](jobs-table-detail-ux.md) | Still proposed |
-| Live scheduler (EventBridge one-shot) | [scheduler-price-bars.md](scheduler-price-bars.md) | **Shipped** in Phase 1.9 |
-| Reconciliation | [plan-to-profit.md](plan-to-profit.md) Phase 2 | Still pending |
+| Jobs table UX / shared queue | [Jobs Table Detail UX](../design/jobs-table-detail-ux.md) | Still proposed |
+| Live scheduler (EventBridge one-shot) | [scheduler-price-bars.md](../design/scheduler-price-bars.md) | **Shipped** in Phase 1.9 |
+| Reconciliation | [plan-to-profit.md](../design/plan-to-profit.md) Phase 2 | Still pending |
 
 ## Suggested implementation order
 
@@ -394,8 +397,8 @@ Attempts / Fills tabs over the two GET endpoints, polled on refresh.
 
 ## Related docs
 
-- [Trade API](trade-api.md) — full API + schema reference (§7 = DDL truth)
-- [Plan to Profit](plan-to-profit.md) — phases 1.2–1.8, M1 milestone
-- [Best-VID Promotion](best-vid-promotion.md) — where Deploy button comes from
-- [Strategy VID Versioning](../archive/strategy-vid-versioning.md) — queue/BT track, shipped in `1.10.0` (archived)
-- [User isolation](user-isolation.md) — ownership rules for deploy create
+- [Trade API](../design/trade-api.md) — full API + schema reference (§7 = DDL truth)
+- [Plan to Profit](../design/plan-to-profit.md) — phases 1.2–1.8, M1 milestone
+- [Best-VID Promotion](../design/best-vid-promotion.md) — where Deploy button comes from
+- [Strategy VID Versioning](strategy-vid-versioning.md) — queue/BT track, shipped in `1.10.0` (archived)
+- [User isolation](../design/user-isolation.md) — ownership rules for deploy create

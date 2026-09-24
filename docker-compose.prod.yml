@@ -25,7 +25,7 @@ services:
     image: ${APP_IMAGE:-quant-app:latest}
     # Two children saturate the host's two cores; a third would only time-slice
     # them while stealing one from the api at apply time. Raising this needs
-    # 4 vCPU, not more RAM — see docs/design/infra-capacity-review.md §3.2.
+    # 4 vCPU, not more RAM — see docs/archive/infra-capacity-review.md §3.2.
     # Safe at >1 because one loop claims sequentially; the non-atomic claim
     # only races across separate worker_loop replicas (backtest-queue.md §0).
     environment:

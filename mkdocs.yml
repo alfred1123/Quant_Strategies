@@ -101,35 +101,36 @@ nav:
       - Production Rollout: guides/prod-rollout.md
       - HTTPS via Cloudflare: guides/https-cloudflare.md
   - Platform design:
+      - Overview: design/README.md
       - Backtest Queue: design/backtest-queue.md
-      - Backtest Queue JSON Viewer: design/backtest-queue-json-viewer.md
-      - Jobs Table Detail UX: design/jobs-table-detail-ux.md
       - Trade API: design/trade-api.md
-      - Futu Trading (OOP): design/futu-trading.md
-      - Backtest Speed: design/backtest-speed.md
-      - Alternative Data Sources: design/alt-data-sources.md
-      - Separate Underlying & Cache: design/separate-underlying.md
-      - Login & Authentication: design/login.md
-      - Database Connections: design/db-connections.md
-      - User Isolation: design/user-isolation.md
+      - Plan to Profit: design/plan-to-profit.md
       - Best-VID Promotion: design/best-vid-promotion.md
-      - Trade Deployment Rollout: design/trade-deployment-rollout.md
-      - ccxt Trade & XREF Validation: design/ccxt-trade-and-xref-validation.md
-      - ccxt Bar Timezones & Apply Timing: design/ccxt-bar-timezones.md
-      - Live Order Execution: design/live-order-execution.md
       - Scheduler, Price Bars & Consolidation: design/scheduler-price-bars.md
       - Scheduler & Trade Open Questions: design/scheduler-trade-open-questions.md
+      - ccxt Bar Timezones & Apply Timing: design/ccxt-bar-timezones.md
+      - ccxt Trade & XREF Validation: design/ccxt-trade-and-xref-validation.md
       - Market Data Capture: design/market-data-capture.md
+      - Database Connections: design/db-connections.md
+      - Login & Authentication: design/login.md
+      - User Isolation: design/user-isolation.md
+      - Jobs Table Detail UX: design/jobs-table-detail-ux.md
       - Multi-Strategy Netting: design/multi-strategy-netting.md
-      - Return Compounding (bug): design/return-compounding.md
-      - Infrastructure Capacity Review: design/infra-capacity-review.md
+      - Separate Underlying & Cache: design/separate-underlying.md
+      - Alternative Data Sources: design/alt-data-sources.md
+      - Futu Trading (OOP): design/futu-trading.md
       - Frontend Code Audit: design/frontend-audit.md
-      - Plan to Profit: design/plan-to-profit.md
   - Strategy research:
       - Overview: research/README.md
       - Crypto spot — baseline improvements: research/crypto-spot-baseline-improvements.md
   - Archive:
       - Overview: archive/README.md
+      - Trade Deployment Rollout: archive/trade-deployment-rollout.md
+      - Live Order Execution: archive/live-order-execution.md
+      - Backtest Speed: archive/backtest-speed.md
+      - Return Compounding (bug): archive/return-compounding.md
+      - Infrastructure Capacity Review (2026-09): archive/infra-capacity-review.md
+      - Backtest Queue JSON Viewer (abandoned): archive/backtest-queue-json-viewer.md
       - TypeScript Migration: archive/ts-migration.md
       - Deploy Build Pipeline: archive/deploy-build-pipeline.md
       - Backtest API (concepts): archive/backtest-api.md

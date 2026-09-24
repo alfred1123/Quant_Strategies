@@ -1,5 +1,8 @@
 # Infrastructure Capacity Review — 2026-09-22
 
+!!! note "Archived"
+    Point-in-time snapshot. For live topology and alarms see [Infrastructure](../architecture/infrastructure.md) and [decision #74](../decisions.md).
+
 **Question asked:** do we need a bigger EC2, or a separate host for the queue
 worker / live trading? What else in the infrastructure should change?
 
@@ -15,7 +18,7 @@ Docker daemon has **no log rotation configured**, which is a slow disk leak on a
 box with a disk-full history.
 
 This page supersedes the capacity questions left open in the Phase 0 archive
-(`docs/archive/phase-0/phase-0.2-capacity.md`, `phase-0.3-topology.md`), which
+([phase-0.2 capacity](phase-0/phase-0.2-capacity.md), [phase-0.3 topology](phase-0/phase-0.3-topology.md)), which
 deferred "separate TRADE host" to "Phase 3.7 if t4g.medium proves tight". It has
 not.
 
@@ -205,7 +208,7 @@ images with `command: worker_loop` only — or ECS, per
   the hourly crons and the two `DB_POOL_MIN=2` pools would keep it awake, so the
   pause would never engage. No saving available without restructuring the
   pools, and the pools are there for a reason
-  ([Database Connections](db-connections.md)).
+  ([Database Connections](../design/db-connections.md)).
 - **Max 2.0 ACU** is hit only in sub-minute spikes. Raising it to 4 costs
   nothing at rest (you pay per ACU-second used) and would shorten the spikes;
   do it **only if** `MAX_CONCURRENT_WORKERS` goes to 2 and batches feel
@@ -339,7 +342,7 @@ not atomic, but `WorkerLoop.tick` fills capacity in a **single-threaded `while`
 loop**: each claim flips its row to `RUNNING` before the next read, so the
 second read cannot see the first job. The race needs two `worker_loop` processes
 reading the same head concurrently — which is what
-[backtest-queue §0](backtest-queue.md#0-v6-migration-done) defers, and we
+[backtest-queue §0](../design/backtest-queue.md#0-v6-migration-done) defers, and we
 still run one replica. `recover_stale()` keeps its single-replica assumption
 untouched.
 

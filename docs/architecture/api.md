@@ -124,7 +124,7 @@ a cache:
 - **An empty or stale snapshot enforces nothing.** A venue unreachable at boot,
   or Redis down, leaves the edit unchecked rather than blocked; the pre-submit
   check in `CcxtTradeAdapter` is the authority either way
-  ([live order execution](../design/live-order-execution.md#order-size-is-checked-before-the-order-not-discovered-by-it)).
+  ([live order execution](../archive/live-order-execution.md#order-size-is-checked-before-the-order-not-discovered-by-it)).
 - **Only the lot size is checked here.** The notional floor needs a live price,
   which is an exchange round-trip per edit, so it stays an order-time rule.
 - **A PATCH is checked only on the qty it sets**, the same exception the cadence

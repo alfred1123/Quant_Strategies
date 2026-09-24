@@ -1,14 +1,17 @@
 # Design: Live Order Execution — Fill Confirmation, Retry, Alerting
 
+!!! note "Archived"
+    Phase **1.7 shipped.** See `quant/trade/live_apply.py` and [Live trading promotion](../guides/live-trading-promotion.md).
+
 !!! info "Status"
     **Implemented.** Golden-harness manual testing against Bybit testnet validated order
     submission. `quant/trade/live_apply.py` (`LiveApplyOrchestrator`) orchestrates signal
     computation, order retry, execution diary writes, and Slack alerting via
     `quant/shared/notify.py`.
 
-**Related:** [Plan to Profit §1.7](plan-to-profit.md#phase-17-live-apply),
+**Related:** [Plan to Profit §1.7](../design/plan-to-profit.md#phase-17-live-apply),
 [Trade Deployment Rollout](trade-deployment-rollout.md),
-[ccxt Trade & XREF Validation](ccxt-trade-and-xref-validation.md) (dry-run — out of scope there,
+[ccxt Trade & XREF Validation](../design/ccxt-trade-and-xref-validation.md) (dry-run — out of scope there,
 in scope here).
 
 ---
@@ -229,7 +232,7 @@ flowchart TD
 
 ### Relation to the existing Telegram decision
 
-[Plan to Profit §5.6](plan-to-profit.md#56-review-outcomes-2026-06-20) already
+[Plan to Profit §5.6](../design/plan-to-profit.md#56-review-outcomes-2026-06-20) already
 established: *"Keep Telegram in 2.4 as the first target; implement a notifier interface so Slack
 can be added without rewiring trade logic."* That decision is about **user-facing** alerts (a
 per-user Telegram chat id, notified on their own deployment's apply failures) — Phase 2.4, not
@@ -311,7 +314,7 @@ preset's settlement currency). This should be resolved during `live_apply.py` im
 
 Manual lifecycle test via `scripts/bybit_local_testnet.py --apply-signal {signal} --confirm`,
 human-verified against `testnet.bybit.com` after each step (see
-[Plan to Profit §1.7](plan-to-profit.md#phase-17-live-apply) for the running log).
+[Plan to Profit §1.7](../design/plan-to-profit.md#phase-17-live-apply) for the running log).
 
 | Step | Result |
 |------|--------|
@@ -370,7 +373,7 @@ authoring.
 
 ## Related docs
 
-- [Plan to Profit §1.7](plan-to-profit.md#phase-17-live-apply) — phase tracking, exit criteria
+- [Plan to Profit §1.7](../design/plan-to-profit.md#phase-17-live-apply) — phase tracking, exit criteria
 - [Trade Deployment Rollout](trade-deployment-rollout.md) — Phase 1.6-1.8 rollout plan, worker options
-- [ccxt Trade & XREF Validation](ccxt-trade-and-xref-validation.md) — dry-run design (Phase 1.3); explicitly out-of-scopes live order placement to this doc
-- [Trade API](trade-api.md) — full API + schema reference
+- [ccxt Trade & XREF Validation](../design/ccxt-trade-and-xref-validation.md) — dry-run design (Phase 1.3); explicitly out-of-scopes live order placement to this doc
+- [Trade API](../design/trade-api.md) — full API + schema reference

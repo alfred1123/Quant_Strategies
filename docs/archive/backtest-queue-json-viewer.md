@@ -1,5 +1,8 @@
 # Plan: Read-Only JSON Viewer for Backtest Queue Tab
 
+!!! note "Archived"
+    **Not built.** The jobs table reuses [ConfigDrawer](../architecture/frontend.md) with the job's `config_json` instead of a dedicated read-only dialog.
+
 ## Overview
 
 Add a **"Config"** button to the Backtest Queue table that opens a dialog showing the strategy configuration in a readable JSON format.

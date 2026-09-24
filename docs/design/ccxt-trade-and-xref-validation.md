@@ -9,7 +9,7 @@
     dry-run button, and ProductSelector — implement per phases below.
 
 **Related:** [Plan to Profit §1.3](plan-to-profit.md#phase-13-bybit-adapter-dry-run),
-[Trade API](trade-api.md), [Trade Deployment Rollout](trade-deployment-rollout.md),
+[Trade API](trade-api.md), [Trade Deployment Rollout](../archive/trade-deployment-rollout.md),
 [Separate Underlying §3a.1](separate-underlying.md#3a1-product_xref-population-model).
 
 ---
@@ -303,7 +303,7 @@ DDL xref seeds ship in **F** (or later), not before **B**/**F** verification.
 
 ## Out of scope (this design)
 
-- Live order placement (Phase 1.7) — see [Live Order Execution](live-order-execution.md)
+- Live order placement (Phase 1.7) — see [Live Order Execution](../archive/live-order-execution.md)
 - Futu adapter (separate [Futu Trading](futu-trading.md))
 - `INST.PRODUCT_XREF_PROPOSAL` table (future; see separate-underlying)
 - Automatic xref discovery from exchange feeds without approval

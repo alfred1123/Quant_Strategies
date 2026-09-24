@@ -6,7 +6,7 @@
     Phase 1.7 (live apply) and Phase 1.9 (scheduler).
 
 **Related:** [Plan to Profit §1.7](../design/plan-to-profit.md#phase-17-live-apply),
-[Live Order Execution](../design/live-order-execution.md),
+[Live Order Execution](../archive/live-order-execution.md),
 [Scheduler & Price Bars](../design/scheduler-price-bars.md),
 [Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge-lambda),
 [Phase 0.1 signoff](../archive/phase-0/phase-0.1-signoff.md)

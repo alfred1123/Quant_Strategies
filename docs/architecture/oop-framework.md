@@ -4,7 +4,7 @@ Target architecture for turning the backtest and trade pipeline into a composabl
 quant framework. Maps lecture-note abstractions to concrete modules in this repo.
 
 See also: [Comparison to Pro Quant Firms](comparison.md) · [Pipeline](pipeline.md) ·
-[Adding Strategies](../guides/adding-strategies.md) · [Trade Deployment Rollout](../design/trade-deployment-rollout.md)
+[Adding Strategies](../guides/adding-strategies.md) · [Trade Deployment Rollout](../archive/trade-deployment-rollout.md)
 
 !!! note "Target design — not fully implemented"
     Procedural paths (`signals.py`, `optimizer.py`, `TechnicalAnalysis`) remain
@@ -341,7 +341,7 @@ Realistic phases with effort estimates. Items marked **parallel** do not block P
 These can ship while Phase 1 is in progress:
 
 - **Phase 3** walk-forward gate — uses existing `walk_forward.py` + promotion evaluator
-- **Trade 1.6–1.7** — strategy picker + live apply (**shipped** — see [rollout doc](../design/trade-deployment-rollout.md))
+- **Trade 1.6–1.7** — strategy picker + live apply (**shipped** — see [rollout doc](../archive/trade-deployment-rollout.md))
 - **Phase 5 (procedural)** — new `SIGNAL_TYPE` rows + `signals.py` functions
 
 ---
@@ -384,5 +384,5 @@ smaller scale.
 |-------|------|
 | Gap analysis vs pro firms | [Comparison](comparison.md) |
 | Promotion HARD/SOFT gates | [Best-VID Promotion](../design/best-vid-promotion.md) |
-| Trade apply without queue changes | [Trade Deployment Rollout](../design/trade-deployment-rollout.md) |
+| Trade apply without queue changes | [Trade Deployment Rollout](../archive/trade-deployment-rollout.md) |
 | Futu OOP adapter (today) | [Futu Trading](../design/futu-trading.md) |

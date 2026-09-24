@@ -134,7 +134,7 @@ class TestComputeLatestPositionParity:
 
 
 class TestCompound:
-    """Returns must compound, not sum — see docs/design/return-compounding.md."""
+    """Returns must compound, not sum — see docs/archive/return-compounding.md."""
 
     def test_gain_then_equal_loss_ends_down(self):
         cumu, _ = _compound(pd.Series([0.5, -0.5]))
@@ -178,7 +178,7 @@ class TestCompound:
 
 
 class TestCagr:
-    """Annualised return is geometric — see docs/design/return-compounding.md."""
+    """Annualised return is geometric — see docs/archive/return-compounding.md."""
 
     def test_constant_rate_annualizes_to_itself(self):
         # One full year of a flat 0.1%/bar compounds to exactly that year's growth

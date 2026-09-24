@@ -144,5 +144,5 @@ It returns `None` when the credential is not found or not owned by the caller.
 
 - [FastAPI Backend](api.md) — full endpoint catalogue
 - [Login & Authentication](../design/login.md) — session/auth gating these routes
-- [Trade Deployment Rollout](../design/trade-deployment-rollout.md) — where decrypted keys are consumed
+- [Trade Deployment Rollout](../archive/trade-deployment-rollout.md) — where decrypted keys are consumed
 - [Infrastructure](infrastructure.md#ssm-parameters) — `EXCHANGE_SECRETS_KEY` in SSM

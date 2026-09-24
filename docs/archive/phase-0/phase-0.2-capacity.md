@@ -86,7 +86,7 @@ Source: `aws/cfn/03-compute.yml`, `aws/params/prod.json`.
 ## Live capture
 
 **Captured 2026-09-22** — see
-[Infrastructure Capacity Review §2.3](../../design/infra-capacity-review.md)
+[Infrastructure Capacity Review §2.3](../infra-capacity-review.md)
 for the full snapshot and `sar` history. It corrects the estimates above: a
 backtest child costs **~240 MiB steady / ~590 MiB peak**, not 0.5–1 GiB, and
 host memory peaked at **26 %** under a sustained 31-job batch. The

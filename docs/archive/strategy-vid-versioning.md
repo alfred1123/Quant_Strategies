@@ -1159,6 +1159,6 @@ owner**, not opaque UUIDs.
 - `BT.STRATEGY` table (`db/liquidbase/bt/tables/STRATEGY.sql`)
 - `BT.SP_INS_STRATEGY` (`db/liquidbase/bt/procedures/SP_INS_STRATEGY.sql`)
 - [Separate underlying & cache](../design/separate-underlying.md) — trade vs indicator product
-- [Trade Deployment Rollout](../design/trade-deployment-rollout.md) — **parallel track** (no queue changes; deploy pins explicit `(STRATEGY_ID, STRATEGY_VID)`)
+- [Trade Deployment Rollout](trade-deployment-rollout.md) — **parallel track** (no queue changes; deploy pins explicit `(STRATEGY_ID, STRATEGY_VID)`)
 - [Best-VID Promotion](../design/best-vid-promotion.md) — `IS_BEST_IND` semantics (orthogonal to VID increment)
 - [User isolation](../design/user-isolation.md) — why scoping is per-`USER_ID`

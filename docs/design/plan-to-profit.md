@@ -368,7 +368,7 @@ Local validation script — **source of truth** for Bybit testnet + dry-run beha
 | **Depends on** | 1.2, 1.4, 0.1 (recommended) |
 | **Blocks** | 1.7 |
 
-**Track:** [Trade Deployment Rollout](trade-deployment-rollout.md) — queue-free path; no `BT.QUEUE` / `SP_INS_STRATEGY` changes.
+**Track:** [Trade Deployment Rollout](../archive/trade-deployment-rollout.md) — queue-free path; no `BT.QUEUE` / `SP_INS_STRATEGY` changes.
 
 **Scope:** Pick an **existing** `BT.STRATEGY` row for deployment — not build a new backtest config. Do **not** reuse Backtest `ConfigDrawer` / `FactorCard` (those edit REFDATA signal types for optimize requests). See [Trade API §2.1](trade-api.md#21-strategy-catalog-phase-16).
 
@@ -401,7 +401,7 @@ Local validation script — **source of truth** for Bybit testnet + dry-run beha
 | **Depends on** | 1.2, 1.3, 1.5, 1.6 |
 | **Blocks** | 1.8, 2.x |
 
-See [Live Order Execution](live-order-execution.md) for the fill-confirmation, retry/cancel, and
+See [Live Order Execution](../archive/live-order-execution.md) for the fill-confirmation, retry/cancel, and
 alerting design for the live order path itself.
 
 **Tasks**
@@ -431,7 +431,7 @@ explicit trade permission (was read-only), and a one-time derivatives risk-discl
 (`10024`) had to be accepted via Bybit's UI before API orders would go through. Unit suite green:
 `test_bybit_adapter.py` 34 passed, `test_trade*.py` 72 passed. Remaining for Phase 1.7: UI wiring,
 ownership/kill-switch security tasks above, and the poll-to-confirm + retry/alert robustness layer
-— see [Live Order Execution](live-order-execution.md) for that design (Slack alerting explicitly
+— see [Live Order Execution](../archive/live-order-execution.md) for that design (Slack alerting explicitly
 deferred pending further detail).
 
 ---

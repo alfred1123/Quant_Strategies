@@ -127,4 +127,4 @@ reader is the speculative generality this document is arguing against.
 
 - [Two deployments, same asset §7](scheduler-trade-open-questions.md#7-two-deployments-same-asset-how-to-detect-position) — the same conflict, and why the one-slot guard recommended there is **superseded** by netting
 - [Recording the position an apply saw](../architecture/database.md#recording-the-position-an-apply-saw) — what `POSITION_QTY` is and why `0` differs from `NULL`
-- [Live order execution](live-order-execution.md) — the single-deployment order path as it stands
+- [Live order execution](../archive/live-order-execution.md) — the single-deployment order path as it stands

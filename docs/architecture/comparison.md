@@ -210,7 +210,7 @@ Distilled, actionable backlog mapped to this repo. Status reflects the codebase
 | 1 | Strategy OOP framework | 🟡 | **Large** | Nothing — unlocks 6–9 |
 | 2 | Walk-forward HARD gate | 🟡 | **Small** | OOS metrics in `BT.RESULT` payload |
 | 3 | Multi-asset | 🟡 | **Medium** | `INST.PRODUCT`, per-factor symbol in config |
-| 4 | Paper trading loop | 🟡 | **Medium** | [Trade Deployment Rollout](../design/trade-deployment-rollout.md) 1.7 |
+| 4 | Paper trading loop | 🟡 | **Medium** | [Trade Deployment Rollout](../archive/trade-deployment-rollout.md) 1.7 |
 | 5 | More strategies | 🟡 | **Small each** | REFDATA seeds + `signals.py` |
 | 6 | Indicator library (OOP) | 🟡 | **Medium** | #1 or incremental wrap of `TechnicalAnalysis` |
 | 7 | Execution models | ⬜ | **Medium → Large** | #1, trade worker |
@@ -301,7 +301,7 @@ Unlocks 5–10 crypto pairs without full OOP refactor if signals stay procedural
 | `EXECUTION_EVENT` writes | ✅ | `live_apply.py` → `SP_INS_EXECUTION_EVENT`; read UI in release 1.8.0 |
 | Promotion rule: paper before live | ⬜ | REFDATA or deployment status check |
 
-**Implementation steps:** follow [Trade Deployment Rollout](../design/trade-deployment-rollout.md) (picker → dry-run → apply → execution log). Add promotion HARD gate: “must have paper deployment with N days / M fills” later.
+**Implementation steps:** follow [Trade Deployment Rollout](../archive/trade-deployment-rollout.md) (picker → dry-run → apply → execution log). Add promotion HARD gate: “must have paper deployment with N days / M fills” later.
 
 ---
 
@@ -433,7 +433,7 @@ mean reversion, breakout, volatility breakout, trend following, multi-asset vari
 Ship alongside Phase 1 without blocking the framework:
 
 - **Phase 3** walk-forward gate (2–3 days, high impact)
-- **Trade 1.6–1.7** strategy picker + paper apply ([rollout](../design/trade-deployment-rollout.md))
+- **Trade 1.6–1.7** strategy picker + paper apply ([rollout](../archive/trade-deployment-rollout.md))
 - **Procedural strategies** — REFDATA + `signals.py` ([Adding Strategies](../guides/adding-strategies.md))
 
 ```mermaid
@@ -574,7 +574,7 @@ classDiagram
 
 - Add 2–3 more strategies via existing REFDATA + grid search path (#5)
 - Enforce walk-forward as a promotion HARD gate (#2)
-- [Trade Deployment Rollout](../design/trade-deployment-rollout.md): strategy picker → paper apply (#4)
+- [Trade Deployment Rollout](../archive/trade-deployment-rollout.md): strategy picker → paper apply (#4)
 - Expand to multi-asset via `INST.PRODUCT` / per-factor symbol (#3)
 
 ### Medium term
@@ -597,7 +597,7 @@ classDiagram
 |-------|------|
 | Live trading OOP (Futu) | [Futu Trading](../design/futu-trading.md) |
 | OOP framework (target) | [OOP Strategy Framework](oop-framework.md) |
-| Trade apply pipeline | [Trade Deployment Rollout](../design/trade-deployment-rollout.md) |
+| Trade apply pipeline | [Trade Deployment Rollout](../archive/trade-deployment-rollout.md) |
 | Promotion gates | [Best-VID Promotion](../design/best-vid-promotion.md) |
 | Adding strategies (today) | [Adding Strategies](../guides/adding-strategies.md) |
 | Product roadmap | [Plan to Profit](../design/plan-to-profit.md) |
