@@ -82,6 +82,7 @@ export interface ProductRow {
   /** Nullable on the column, and nothing guaranteed it before the create form. */
   ccy: string | null;
   description: string | null;
+  issue_type?: string | null;
 }
 
 /** A product as one venue lists it: the product, plus the ticker it prints. */
@@ -128,6 +129,7 @@ export interface CreateInstrumentRequest {
   /** Quote currency of the pair traded, e.g. `USDT`. */
   ccy: string | null;
   description: string | null;
+  issue_type?: string | null;
   app_id: number;
   vendor_symbol: string;
 }
@@ -143,6 +145,7 @@ export interface CreatedInstrument {
   exchange: string | null;
   ccy: string | null;
   description: string | null;
+  issue_type?: string | null;
   app_id: number;
   vendor_symbol: string;
   product_xref_id: number;

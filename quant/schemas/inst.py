@@ -60,6 +60,9 @@ class CreateInstrumentRequest(BaseModel):
     #: on a research vendor does not, and the difference is a real basis.
     ccy: str | None = None
     description: str | None = None
+    #: What kind of issue this is — common stock, ETF, perpetual. Free text.
+    #: Not a reference table: the instrument row is where it is stored.
+    issue_type: str | None = None
     #: ``REFDATA.APP`` — the venue this first mapping is for. One venue, one
     #: symbol: the same instrument on two exchanges is one product with two
     #: xrefs, so listing it elsewhere is a second write, not a second product.
@@ -90,7 +93,7 @@ class CreateInstrumentRequest(BaseModel):
             raise ValueError("must not be blank")
         return stripped
 
-    @field_validator("exchange", "ccy", "description")
+    @field_validator("exchange", "ccy", "description", "issue_type")
     @classmethod
     def _blank_is_absent(cls, value: str | None) -> str | None:
         """An empty form field means "not set", not an empty string.
@@ -142,6 +145,7 @@ class CreatedInstrument(BaseModel):
     exchange: str | None = None
     ccy: str | None = None
     description: str | None = None
+    issue_type: str | None = None
     #: The first venue mapping, so the response proves the product is visible
     #: to that venue's list rather than leaving the caller to check.
     app_id: int

@@ -85,7 +85,7 @@ Current operating model:
 
 | Table | Versioned? | Rationale |
 |---|---|---|
-| `PRODUCT` | **Yes** — `PRODUCT_VID` + `IS_CURRENT_IND` | Product attributes (CCY, description, asset type) can change |
+| `PRODUCT` | **Yes** — `PRODUCT_VID` + `IS_CURRENT_IND` | Product attributes (CCY, description, asset type, `ISSUE_TYPE`) can change. `ISSUE_TYPE` is free text, nullable; release `inst/1.5.0` adds it and stamps the current rows |
 | `PRODUCT_XREF` | **Yes** — `PRODUCT_XREF_VID` + `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` | Vendor symbols can change; current row is the open-ended transaction-time record |
 | `PRODUCT_GRP` | **No** — uses `UPDATED_AT` | Hierarchy versioning is impractical; rare admin-only edits |
 | `PRODUCT_GRP_MEMBER` | **No** — add/remove only | Junction table; `CREATED_AT` audit is sufficient |

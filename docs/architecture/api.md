@@ -306,6 +306,7 @@ request carries both, so the body is a product plus a single
   "exchange": null,
   "ccy": "USDT",
   "description": null,
+  "issue_type": null,
   "app_id": 34,
   "vendor_symbol": "SOLUSDT"
 }
@@ -327,7 +328,9 @@ in is the whole check on the write.
 with no whitespace — the rule decision #21 sets, enforced here because
 `UQ_PRODUCT_CUSIP_CURRENT` is case-sensitive and `SOLUSDT.crypto` would
 otherwise be accepted as a second, unrelated instrument. Blank `exchange`,
-`ccy` and `description` are stored as `NULL`; `EXCHANGE` is for an equity's
+`ccy`, `description` and `issue_type` are stored as `NULL`. `ISSUE_TYPE` is
+free text on the product (common stock, ETF, perpetual) — not a reference
+table. `EXCHANGE` is for an equity's
 listing venue and stays `NULL` on `.crypto` spot, since the broker belongs in
 the xref.
 

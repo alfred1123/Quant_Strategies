@@ -205,6 +205,7 @@ class TestCreateInstrument:
             exchange=None,
             ccy="USDT",
             description=None,
+            issue_type=None,
             app_id=BYBIT,
             vendor_symbol="SOLUSDT",
         )
@@ -307,6 +308,7 @@ class TestOptionalFieldsAndRequirements:
         kwargs = cache.create_instrument.call_args.kwargs
         assert kwargs["exchange"] is None
         assert kwargs["description"] is None
+        assert kwargs["issue_type"] is None
 
     @pytest.mark.parametrize(
         "field",

@@ -125,6 +125,7 @@ def create_product(
         exchange=req.exchange,
         ccy=req.ccy,
         description=req.description,
+        issue_type=req.issue_type,
         app_id=req.app_id,
         vendor_symbol=req.vendor_symbol,
     )

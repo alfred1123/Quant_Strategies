@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      ISSUE_TYPE on INST.PRODUCT. Nullable: rows already stored have none.
+      context is inst,prod-deploy. The owner asked to push this release.
+
+      The insert gains an IN argument, which is a new procedure signature.
+      CREATE OR REPLACE would leave the old one in place, so the current
+      signature is dropped first.
+    -->
+
+    <changeSet id="1.5.0-001-product-issue-type" author="alfcheun" context="inst,prod-deploy">
+        <comment>INST.PRODUCT.ISSUE_TYPE — nullable, no default</comment>
+        <sql>
+            ALTER TABLE INST.PRODUCT ADD COLUMN IF NOT EXISTS ISSUE_TYPE TEXT;
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.5.0-002-drop-sp-ins-product-old-signature" author="alfcheun" context="inst,prod-deploy">
+        <comment>Drop the pre-issue-type SP_INS_PRODUCT signature</comment>
+        <sql splitStatements="true" stripComments="true">
+            DROP PROCEDURE IF EXISTS INST.SP_INS_PRODUCT(INTEGER, TEXT, TEXT, INTEGER, TEXT, TEXT, TEXT, TEXT, OUT TEXT, OUT TEXT, OUT TEXT, OUT INTEGER, OUT INTEGER);
+        </sql>
+    </changeSet>
+
+    <changeSet id="1.5.0-003-sp-ins-product-issue-type" author="alfcheun" context="inst,prod-deploy">
+        <comment>SP_INS_PRODUCT writes ISSUE_TYPE</comment>
+        <sqlFile path="../procedures/SP_INS_PRODUCT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="1.5.0-004-sp-get-product-issue-type" author="alfcheun" context="inst,prod-deploy">
+        <comment>SP_GET_PRODUCT returns ISSUE_TYPE</comment>
+        <sqlFile path="../procedures/SP_GET_PRODUCT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="1.5.0-005-stamp-issue-type" author="alfcheun" context="inst,prod-deploy">
+        <comment>Version each current product with spot, etf, or stock</comment>
+        <sqlFile path="../data/PRODUCT_ISSUE_TYPE.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+    </changeSet>
+
+</databaseChangeLog>

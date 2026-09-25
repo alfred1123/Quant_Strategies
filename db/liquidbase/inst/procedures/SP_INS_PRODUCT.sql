@@ -23,6 +23,7 @@ CREATE OR REPLACE PROCEDURE INST.SP_INS_PRODUCT(
     IN  IN_EXCHANGE       TEXT,
     IN  IN_CCY            TEXT,
     IN  IN_DESCRIPTION    TEXT,
+    IN  IN_ISSUE_TYPE     TEXT,
     IN  IN_USER_ID        TEXT,
     OUT OUT_SQLSTATE      TEXT,
     OUT OUT_SQLMSG        TEXT,
@@ -85,6 +86,7 @@ BEGIN
         EXCHANGE,
         CCY,
         DESCRIPTION,
+        ISSUE_TYPE,
         USER_ID,
         CREATED_AT
     ) VALUES (
@@ -97,6 +99,7 @@ BEGIN
         IN_EXCHANGE,
         IN_CCY,
         IN_DESCRIPTION,
+        IN_ISSUE_TYPE,
         IN_USER_ID,
         NOW() AT TIME ZONE 'UTC'
     );

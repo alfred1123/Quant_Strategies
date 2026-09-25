@@ -115,6 +115,7 @@ class InstrumentCache(DbGateway):
         exchange: str | None = None,
         ccy: str | None = None,
         description: str | None = None,
+        issue_type: str | None = None,
         product_id: int | None = None,
     ) -> tuple[int, int]:
         """Append a product version and return the ``(id, vid)`` written.
@@ -129,7 +130,7 @@ class InstrumentCache(DbGateway):
         out = self._call_write(
             "CALL INST.SP_INS_PRODUCT("
             "%s::integer, %s::text, %s::text, %s::integer,"
-            " %s::text, %s::text, %s::text, %s::text,"
+            " %s::text, %s::text, %s::text, %s::text, %s::text,"
             " NULL::text, NULL::text, NULL::text,"
             " NULL::integer, NULL::integer)",
             (
@@ -140,6 +141,7 @@ class InstrumentCache(DbGateway):
                 exchange,
                 ccy,
                 description,
+                issue_type,
                 self.user_id,
             ),
         )
@@ -188,6 +190,7 @@ class InstrumentCache(DbGateway):
         exchange: str | None = None,
         ccy: str | None = None,
         description: str | None = None,
+        issue_type: str | None = None,
     ) -> dict:
         """Create a product and the first venue symbol for it, as one action.
 
@@ -224,6 +227,7 @@ class InstrumentCache(DbGateway):
             exchange=exchange,
             ccy=ccy,
             description=description,
+            issue_type=issue_type,
         )
         try:
             xref_id, xref_vid = self.sp_ins_product_xref(

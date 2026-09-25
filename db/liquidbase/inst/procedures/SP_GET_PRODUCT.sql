@@ -37,7 +37,8 @@ BEGIN
                 p.ASSET_TYPE_ID,
                 p.EXCHANGE,
                 p.CCY,
-                p.DESCRIPTION
+                p.DESCRIPTION,
+                p.ISSUE_TYPE
             FROM INST.PRODUCT p
             WHERE p.IS_CURRENT_IND = 'Y';
 
@@ -52,7 +53,8 @@ BEGIN
                 p.ASSET_TYPE_ID,
                 p.EXCHANGE,
                 p.CCY,
-                p.DESCRIPTION
+                p.DESCRIPTION,
+                p.ISSUE_TYPE
             FROM INST.PRODUCT p
             WHERE p.IS_CURRENT_IND = 'Y'
               AND p.PRODUCT_ID = IN_PRODUCT_ID;
@@ -68,7 +70,8 @@ BEGIN
                 p.ASSET_TYPE_ID,
                 p.EXCHANGE,
                 p.CCY,
-                p.DESCRIPTION
+                p.DESCRIPTION,
+                p.ISSUE_TYPE
             FROM INST.PRODUCT p
             WHERE p.IS_CURRENT_IND = 'Y'
               AND p.INTERNAL_CUSIP = IN_INTERNAL_CUSIP;
@@ -84,7 +87,8 @@ BEGIN
                                 p.ASSET_TYPE_ID,
                                 p.EXCHANGE,
                                 p.CCY,
-                                p.DESCRIPTION
+                                p.DESCRIPTION,
+                                p.ISSUE_TYPE
                         FROM INST.PRODUCT p
                         WHERE p.IS_CURRENT_IND = 'Y'
                             AND p.PRODUCT_ID = IN_PRODUCT_ID

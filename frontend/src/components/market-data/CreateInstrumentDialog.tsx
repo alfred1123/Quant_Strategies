@@ -151,6 +151,7 @@ function CreateInstrumentDialogContent({
   const [ccy, setCcy] = useState('');
   const [exchange, setExchange] = useState('');
   const [description, setDescription] = useState('');
+  const [issueType, setIssueType] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
   // The cusip is an identifier, so what is stored is the normalised form
@@ -175,6 +176,7 @@ function CreateInstrumentDialogContent({
         exchange: exchange.trim() || null,
         ccy: ccy.trim() || null,
         description: description.trim() || null,
+        issue_type: issueType.trim() || null,
         app_id: Number(appId),
         vendor_symbol: vendorSymbol.trim(),
       });
@@ -315,6 +317,14 @@ function CreateInstrumentDialogContent({
             value={exchange}
             onChange={e => setExchange(e.target.value)}
             helperText={exchangeHelp()}
+            fullWidth
+          />
+
+          <TextField
+            label="Issue type"
+            value={issueType}
+            onChange={e => setIssueType(e.target.value)}
+            helperText="What kind of issue this is — common stock, ETF, perpetual."
             fullWidth
           />
 
