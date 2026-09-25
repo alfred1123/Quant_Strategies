@@ -17,7 +17,7 @@ The latest product work moves scheduled apply to five minutes before the bar clo
 Two things in the engine are already in good shape, and the review does not reopen them:
 
 - **Next-bar fill on a finished close.** A position decided on bar *t* earns the return from *t* to *t+1*. Confirmed on a five-bar series that rises 10% every day: the signal on the first close earns the next bar’s 10%. See `quant/strategy/performance.py` lines 270–274.
-- **Compounded equity.** Simple returns compound with `(1 + pnl).cumprod()`, and drawdown is read off that curve. The unit tests in `tests/unit/test_perf.py` cover the cases that used to report drawdowns above 100%.
+- **Compounded equity.** Simple returns compound with `(1 + pnl).cumprod()`, and drawdown is read off that curve. The unit tests in `tests/unit/test_perf.py` cover the cases that used to report drawdowns above 100%. Rows stored before that worker was deployed still carry the old figures. The cleanup is proposed in [Backtest data hygiene](2026-09-25-backtest-data-hygiene-proposal.md).
 
 ## What I ran
 

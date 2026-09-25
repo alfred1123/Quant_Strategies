@@ -9,11 +9,13 @@
     `Annualized Return`, `Max Drawdown`, `Calmar Ratio` and the equity-curve
     chart are now real capital growth. **Sharpe never changed** — it reads the
     per-bar series and was correct throughout. The 36 rows already in
-    `BT.RESULT` are on the old convention and are being re-run (see
-    [Stored results](#stored-results-still-on-the-old-convention)).
+    `BT.RESULT` at the time of this write-up were on the old convention.
+    Whether every current row has since been replayed is answered by the
+    SQL in [Backtest data hygiene](../design/2026-09-25-backtest-data-hygiene-proposal.md#how-to-find-every-affected-row).
 
 **Related:** [Plan to Profit](../design/plan-to-profit.md), [Best-VID Promotion](../design/best-vid-promotion.md),
-[Backtest Queue](../design/backtest-queue.md)
+[Backtest Queue](../design/backtest-queue.md),
+[Backtest data hygiene](../design/2026-09-25-backtest-data-hygiene-proposal.md)
 
 ---
 
