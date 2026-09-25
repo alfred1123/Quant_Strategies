@@ -624,12 +624,27 @@ describe('ConfigDrawer — the bar interval', () => {
     expect(last.factors[0].window_range).toEqual({ min: 5, max: 100, step: 5 });
   });
 
-  it('shows Add Factor disabled, with a coming-feature hint', async () => {
-    renderWithProviders(<Host initial={bybitCfg} observer={vi.fn()} />);
-    const button = screen.getByRole('button', { name: /Add Factor/ });
-    expect(button).toBeDisabled();
-    fireEvent.mouseOver(button.parentElement!);
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Coming feature');
+  it('applies scaled REFDATA window defaults when a factor is added on hourly', () => {
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host
+        initial={{
+          ...bybitCfg,
+          tmIntervalId: 2,
+          tradingPeriod: 8_760,
+          factors: [{
+            ...bybitCfg.factors[0],
+            window_range: { min: 120, max: 2_400, step: 120 },
+          }],
+        }}
+        observer={observer}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Add Factor/ }));
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.factors[1].window_range).toEqual({ min: 120, max: 2_400, step: 120 });
   });
 
   it('keeps the asset type as the base when rescaling, not the scaled value', () => {
@@ -718,14 +733,20 @@ describe('ConfigDrawer — FILTER gate vs signal', () => {
     expect(last.factors[1].data_column).toBe('price');
   });
 
-  it('leaves Add Factor disabled when conjunction is already FILTER', () => {
+  it('inserts Add Factor as the gate when conjunction is already FILTER', () => {
+    const observer = vi.fn();
     renderWithProviders(
       <Host
         initial={{ ...baseCfg, conjunction: 'FILTER', factors: [priceFactor] }}
-        observer={vi.fn()}
+        observer={observer}
       />,
     );
-    expect(screen.getByRole('button', { name: /Add Factor/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /Add Factor/ }));
+
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.factors).toHaveLength(2);
+    expect(last.factors[1].data_column).toBe('price');
+    expect(last.factors[0].indicator).toBe('sma');
   });
 });
 

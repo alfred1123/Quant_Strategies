@@ -10,3 +10,4 @@ alwaysApply: true
 - Change the class or function the relevant page already names. Do not add a class, hook, or wrapper the page does not ask for.
 - A new helper is justified only when it removes a real second copy or makes the existing policy readable. Cutting lines is not a reason.
 - One owner for a fact: the stored-procedure wrapper, the REFDATA parser (`RedisRefData`), the frame builder. Call it. Do not reimplement it beside it.
+- A control that is already on the page stays that control. A `disabled` prop or a "Coming feature" tooltip is the feature, turned off. Re-enable it there. If the click handler was deleted in the same change, restore that handler from git as it was. Do not add a component, dialog, or hook for the same job. Add Factor is the `Button` in `ConfigDrawer`; turning it back on is that button plus its old `addFactor`.
