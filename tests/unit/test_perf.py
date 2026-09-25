@@ -246,6 +246,24 @@ class TestPerformanceInit:
         perf = _make_performance(sample_ohlc_df)
         assert (perf.data["trade"].dropna() >= 0).all()
 
+    def test_fee_is_charged_only_when_the_position_changes(self, sample_ohlc_df):
+        perf = _make_performance(sample_ohlc_df)
+        pos = pd.Series(np.nan, index=perf.data.index)
+        pos.iloc[10] = 1.0
+        pos.iloc[11] = 1.0
+        pos.iloc[12] = -1.0
+        perf.data["FinalPosition"] = pos
+        perf._compute_pnl_columns()
+        fee = perf.transaction_cost
+        assert perf.data["trade"].iloc[10] == pytest.approx(0.0)
+        assert np.isnan(perf.data["pnl"].iloc[10])
+        assert perf.data["trade"].iloc[11] == pytest.approx(0.0)
+        assert perf.data["pnl"].iloc[11] == pytest.approx(perf.data["chg"].iloc[11])
+        assert perf.data["trade"].iloc[12] == pytest.approx(2.0)
+        assert perf.data["pnl"].iloc[12] == pytest.approx(
+            perf.data["chg"].iloc[12] - 2.0 * fee
+        )
+
 
 class TestStrategyMetrics:
     def test_total_return_is_scalar(self, sample_ohlc_df):

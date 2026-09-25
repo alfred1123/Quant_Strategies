@@ -269,14 +269,19 @@ class Performance:
             )
 
     def _compute_pnl_columns(self):
-        self.data['FinalPosition_x1'] = self.data['FinalPosition'].shift(1)
-        self.data['trade'] = abs(self.data['FinalPosition'] - self.data['FinalPosition_x1'])
+        prior = self.data['FinalPosition'].shift(1)
+        self.data['FinalPosition_x1'] = prior
+        # Fee only on a change between two known positions. A missing prior
+        # is not a trade: the series is still warming up, or a gap just ended.
+        changed = self.data['FinalPosition'].notna() & prior.notna()
+        self.data['trade'] = abs(self.data['FinalPosition'] - prior).where(changed, 0.0)
+        self.data.loc[~changed & self.data['FinalPosition'].isna(), 'trade'] = np.nan
         self.data['pnl'] = (self.data['FinalPosition_x1'] * self.data['chg']
                             - self.data['trade'] * self.transaction_cost)
         self.data['cumu'], self.data['dd'] = _compound(self.data['pnl'])
 
         self.data['buy_hold'] = self.data['chg']
-        self.data.loc[self.data['FinalPosition_x1'].isnull(), 'buy_hold'] = np.nan
+        self.data.loc[prior.isna(), 'buy_hold'] = np.nan
         self.data['buy_hold_cumu'], self.data['buy_hold_dd'] = _compound(self.data['buy_hold'])
 
 

@@ -77,7 +77,11 @@ class Objective(ABC):
         pos_x1 = np.empty_like(pos)
         pos_x1[0] = np.nan
         pos_x1[1:] = pos[:-1]
-        trade = np.abs(pos - pos_x1)
+        # Same rule as Performance._compute_pnl_columns: a fee needs two
+        # known positions. A missing prior contributes no turnover.
+        both = ~np.isnan(pos) & ~np.isnan(pos_x1)
+        trade = np.where(both, np.abs(pos - pos_x1), 0.0)
+        trade = np.where(np.isnan(pos), np.nan, trade)
         pnl = pos_x1 * self.chg - trade * self.transaction_cost
         sl = pnl[int(metric_window):]
         finite = sl[~np.isnan(sl)]

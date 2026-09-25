@@ -100,6 +100,8 @@ Why it matters: scheduled apply now uses this path. A Sharpe measured on spot cl
 
 ### 5. The first entry after a NaN position is free
 
+Left as it is. The fee is charged only when the position changes between two known values. A missing prior is not a trade, so the first bar of a position and the bar after a gap pay nothing.
+
 | | |
 |---|---|
 | Where | `quant/strategy/performance.py` lines 270–274 |
