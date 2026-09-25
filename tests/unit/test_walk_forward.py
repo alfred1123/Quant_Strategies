@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from quant.strategy.backtest_service import _build_wf_response
 from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, SignalDirection
 from quant.strategy.walk_forward import WalkForward, WalkForwardResult
 
@@ -75,6 +76,14 @@ class TestWalkForwardRun:
         wf = WalkForward({"test": df}, 0.5, _BOLLINGER_CONFIG)
         result = wf.run((20,), (0.5, 1.0, 1.5))
         assert result.best_signal in (0.5, 1.0, 1.5)
+
+    def test_split_date_is_the_price_frame_cut(self):
+        df = _make_synthetic_data(n=200)
+        resp = _build_wf_response(
+            {"test": df}, _BOLLINGER_CONFIG, (20,), (1.0,), 0.7, None,
+        )
+        cut = df.index[int(len(df) * 0.7)]
+        assert resp.split_date == str(cut)
 
     def test_is_metrics_is_series(self):
         df = _make_synthetic_data()

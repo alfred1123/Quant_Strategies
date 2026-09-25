@@ -128,6 +128,8 @@ Why it matters: the objective and the wealth curve answer different questions af
 
 ### 7. The walk-forward chart marks the split one warmup late
 
+Fixed. The marker uses the price frame's date at `split_idx`. The chart still drops the warmup rows.
+
 | | |
 |---|---|
 | Where | `quant/strategy/backtest_service.py` lines 502–506 |

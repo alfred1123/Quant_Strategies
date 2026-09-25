@@ -502,8 +502,10 @@ def _build_wf_response(data_dict, config, window_list, signal_list,
     chart_df = (result.full_equity_df.dropna(subset=["cumu"])
                 if result.full_equity_df is not None else pd.DataFrame())
 
-    split_date = (str(chart_df.index[wf.split_idx])
-                  if len(chart_df) > wf.split_idx else "")
+    # split_idx addresses the price frame. The chart has already dropped the
+    # warmup rows, so indexing it with that number lands one warmup later.
+    split_date = (str(wf.data.index[wf.split_idx])
+                  if wf.split_idx < len(wf.data.index) else "")
 
     equity_curve = [
         EquityPoint(
