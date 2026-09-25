@@ -19,7 +19,7 @@ Completed migrations, Phase 0 signoffs, and historical design docs. Kept for ref
 | [trade-deployment-rollout.md](trade-deployment-rollout.md) | Phases 1.6–1.9 rollout (picker → apply → scheduler) | [Trade API](../design/trade-api.md), [API](../architecture/api.md), [Plan to Profit](../design/plan-to-profit.md) |
 | [live-order-execution.md](live-order-execution.md) | Fill confirmation, retry, Slack alerting (Phase 1.7) | `quant/trade/live_apply.py`, [Live trading promotion](../guides/live-trading-promotion.md) |
 | [backtest-speed.md](backtest-speed.md) | Optuna / exhaustive grid search optimization | [Pipeline](../architecture/pipeline.md), `quant/strategy/optimizer.py` |
-| [return-compounding.md](return-compounding.md) | `cumu` compounding bug write-up (fixed) | `quant/strategy/performance.py` |
+| [return-compounding.md](return-compounding.md) | `cumu` compounding bug write-up (fixed) | `quant/strategy/performance.py`, [data hygiene proposal](../design/2026-09-25-backtest-data-hygiene-proposal.md) |
 | [infra-capacity-review.md](infra-capacity-review.md) | Point-in-time EC2/Aurora snapshot (2026-09-22) | [Infrastructure](../architecture/infrastructure.md), [decision #75](../decisions.md) |
 | [backtest-queue-json-viewer.md](backtest-queue-json-viewer.md) | Abandoned read-only JSON dialog plan | Jobs table opens [ConfigDrawer](../architecture/frontend.md) with job config instead |
 

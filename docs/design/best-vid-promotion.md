@@ -241,7 +241,7 @@ The Promotion tab is the **strategy improvement loop** — users iterate there u
 
 - **VID column** in `JobsTable`: displays `v{strategy_vid}` with a green "Best" chip when `is_best_ind === 'Y'`
 - **Actions column**: "View" (load result), "Clone" (opens enqueue form pre-filled with config), "Promote" (calls `POST /strategies/{id}/promote`)
-- `EnqueueRequest` does **not** include `strategy_id` — clone always creates a new strategy (new `strategy_id`, VID 1)
+- `EnqueueRequest` does **not** include `strategy_id`. The server resolves the lineage from `(USER_ID, STRATEGY_NM)`. A clone whose rebuilt name matches is the next VID. A name that differs (interval, venue, or factor list) is a new `STRATEGY_ID` at VID 1. See [Backtest data hygiene](2026-09-25-backtest-data-hygiene-proposal.md#strategy-identity).
 
 ### 5b. Promotion tab (implemented)
 
@@ -315,6 +315,6 @@ Metric values (Sharpe, Calmar, etc.) are **not duplicated** here — they live a
 
 ## Resolved Questions
 
-- **Calmar / Max Drawdown**: Fixed in `quant/strategy/performance.py`. The Calmar formula was corrected first; `cumu = cumsum()` was kept at the time and has since been replaced by a compounded equity curve — see [Return Compounding](../archive/return-compounding.md). `max_dd_gate` at `0.40` now bounds a real 40% drawdown rather than an overstated additive one, which makes it looser than it was.
-- **Re-versioning flow**: `EnqueueRequest` does not include `strategy_id`. Clone always creates a new strategy. Re-versioning (VID 2+ under same strategy) deferred.
-- **VID 1 fails hard gates**: Fine to set `IS_BEST_IND='Y'` at insert. Worker demotes via `SP_UPD_PROMOTE_STRATEGY(vid=NULL)` if hard gates fail.
+- **Calmar / Max Drawdown**: Fixed in `quant/strategy/performance.py`. The Calmar formula was corrected first; `cumu = cumsum()` was kept at the time and has since been replaced by a compounded equity curve — see [Return Compounding](../archive/return-compounding.md). `max_dd_gate` at `0.40` now bounds a real 40% drawdown rather than an overstated additive one, which makes it looser than it was. Current rows written before that deploy are still on the old numbers; the census is in [Backtest data hygiene](2026-09-25-backtest-data-hygiene-proposal.md#promotion-and-best).
+- **Re-versioning flow**: `EnqueueRequest` does not include `strategy_id`. The server resolves `(USER_ID, STRATEGY_NM)` and bumps `STRATEGY_VID` when the name matches. A clone that changes the name starts VID 1 of a new id. See [Backtest data hygiene](2026-09-25-backtest-data-hygiene-proposal.md#strategy-identity).
+- **VID 1 fails hard gates**: VID 1 is inserted with `IS_BEST_IND = 'Y'` and stays Best when the gates fail (decision #63). Demote-only restores VID 1; it does not clear a VID-1 Best. `LOGICAL_DELETE_IND` is what takes that lineage off the picker (decision #66).
