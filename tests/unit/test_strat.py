@@ -519,52 +519,63 @@ class TestCombinePositions:
     # to distinguish extreme from moderate readings.
 
     def test_and_disagree_strength_wins(self):
-        """AND + strengths: disagreement resolved by strongest factor."""
-        # Rows 0-1 disagree; rows 2-9 are filler (both flat)
-        a = np.array([1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        b = np.array([-1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        # sa: readings near the middle of distribution → low conviction
-        sa = np.array([50, 50, 48, 52, 49, 51, 48, 52, 49, 51])
-        # sb: extreme readings on rows 0/1 → high conviction → b wins
-        sb = np.array([99, 1, 50, 50, 50, 50, 50, 50, 50, 50])
+        """AND + strengths: disagreement resolved by the more extreme past reading."""
+        a = np.zeros(10)
+        b = np.zeros(10)
+        a[-2], a[-1] = 1.0, -1.0
+        b[-2], b[-1] = -1.0, 1.0
+        sa = np.array([10, 20, 30, 40, 50, 60, 70, 80, 50, 50], dtype=float)
+        sb = np.array([10, 20, 30, 40, 50, 60, 70, 80, 99, 1], dtype=float)
         result = combine_positions([a, b], "AND", strengths=[sa, sb])
-        assert result[0] == -1.0  # b wins (99 = extreme high percentile)
-        assert result[1] == 1.0   # b wins (1 = extreme low percentile)
+        assert result[-2] == -1.0
+        assert result[-1] == 1.0
 
     def test_or_conflict_strength_wins(self):
-        """OR + strengths: conflict resolved by strongest factor."""
-        a = np.array([1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        b = np.array([-1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        # a extreme on row 0, b extreme on row 1
-        sa = np.array([99, 50, 50, 50, 50, 50, 50, 50, 50, 50])
-        sb = np.array([50, 99, 50, 50, 50, 50, 50, 50, 50, 50])
+        """OR + strengths: conflict resolved by the more extreme past reading."""
+        a = np.zeros(10)
+        b = np.zeros(10)
+        a[-2], a[-1] = 1.0, -1.0
+        b[-2], b[-1] = -1.0, 1.0
+        sa = np.array([10, 20, 30, 40, 50, 60, 70, 80, 99, 50], dtype=float)
+        sb = np.array([10, 20, 30, 40, 50, 60, 70, 80, 50, 99], dtype=float)
         result = combine_positions([a, b], "OR", strengths=[sa, sb])
-        assert result[0] == 1.0   # a wins row 0 (a more extreme)
-        assert result[1] == 1.0   # b wins row 1 (b more extreme)
+        assert result[-2] == 1.0
+        assert result[-1] == 1.0
 
     def test_and_strength_ignores_flat_factors(self):
         """Flat (0) factors don't compete in strength tiebreak."""
-        a = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        b = np.array([0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        sa = np.array([50, 50, 48, 52, 49, 51, 48, 52, 49, 51])
-        sb = np.array([50, 50, 48, 52, 49, 51, 48, 52, 49, 51])
+        a = np.zeros(10)
+        b = np.zeros(10)
+        a[-2] = 1.0
+        b[-1] = -1.0
+        sa = np.full(10, 50.0)
+        sb = np.full(10, 50.0)
         result = combine_positions([a, b], "AND", strengths=[sa, sb])
-        # Row 0: a=+1 b=0 → only a has signal → a wins (+1)
-        # Row 1: a=0 b=-1 → only b has signal → b wins (-1)
-        assert result[0] == 1.0
-        assert result[1] == -1.0
+        assert result[-2] == 1.0
+        assert result[-1] == -1.0
 
     def test_three_factors_strength_tiebreak(self):
-        """Three factors disagree, percentile rank picks the winner."""
-        a = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        b = np.array([-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        c = np.array([-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        # b has the most extreme reading on row 0 → b wins
-        sa = np.array([50, 48, 52, 49, 51, 50, 48, 52, 49, 51])
-        sb = np.array([99, 48, 52, 49, 51, 50, 48, 52, 49, 51])
-        sc = np.array([50, 48, 52, 49, 51, 50, 48, 52, 49, 51])
+        """Three factors disagree, the more extreme past reading wins."""
+        a = np.zeros(10)
+        b = np.zeros(10)
+        c = np.zeros(10)
+        a[-1], b[-1], c[-1] = 1.0, -1.0, -1.0
+        sa = np.array([10, 20, 30, 40, 50, 60, 70, 80, 50, 50], dtype=float)
+        sb = np.array([10, 20, 30, 40, 50, 60, 70, 80, 50, 99], dtype=float)
+        sc = np.array([10, 20, 30, 40, 50, 60, 70, 80, 50, 50], dtype=float)
         result = combine_positions([a, b, c], "AND", strengths=[sa, sb, sc])
-        assert result[0] == -1.0  # b wins (most extreme)
+        assert result[-1] == -1.0
+
+    def test_later_spike_does_not_change_an_earlier_tiebreak(self):
+        a = np.zeros(10)
+        b = np.zeros(10)
+        a[0], b[0] = 1.0, -1.0
+        sa = np.full(10, 50.0)
+        sb = np.full(10, 50.0)
+        before = combine_positions([a, b], "AND", strengths=[sa, sb.copy()])
+        sb[5:] = 99.0
+        after = combine_positions([a, b], "AND", strengths=[sa, sb])
+        assert before[0] == after[0]
 
     def test_strengths_none_preserves_legacy(self):
         """Without strengths, AND disagree stays flat, OR conflict positive wins."""

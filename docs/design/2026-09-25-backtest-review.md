@@ -70,19 +70,7 @@ Why it matters: the research notes tell a reader they can point a factor at volu
 
 ### 3. Multi-factor tie-breaks use the future
 
-| | |
-|---|---|
-| Where | `quant/strategy/signals.py` lines 99–116, called from `quant/strategy/performance.py` lines 225–228 and `quant/strategy/objective.py` lines 159–161 |
-| Evidence | Confirmed by running |
-| Effort | Small |
-
-When factors disagree, the winner is whichever reading is further from the median of its **full-sample** percentile. `_conviction` sorts the whole column, including bars after the one being decided.
-
-On a 30-bar series the two factors conflicted only on bar 0. That bar’s combined position was **+1**. Adding two later spikes to factor A, and changing nothing about bar 0, flipped the same bar to **−1**. The same flip showed up for both OR and AND. FILTER disagreements go through the same rank. Bars where every factor already agrees are unaffected.
-
-Live evaluation ranks inside the lookback window only, so a tie-break at apply time will not match the backtest that promoted the strategy.
-
-Why it matters: any multi-factor recipe that spends time in conflict — the FILTER gates in the new research notes included — is scored with a look at the future, and the live order will not reproduce that score.
+Fixed. `_conviction` in `quant/strategy/signals.py` ranks each bar against earlier bars of the same factor. A later spike cannot flip an earlier bar. Bars where every factor already agrees are unchanged.
 
 ### 4. Live orders are not the fill the backtest measures
 
@@ -226,4 +214,4 @@ The CLI run also showed Yahoo’s `end` date is exclusive: `--end 2024-01-01` st
 
 1. **Gate promotion on the out-of-sample result, and on beating buy-and-hold.** The walk-forward block is already produced. Promotion throws it away and can mark a full-sample Sharpe winner as best when the held-out window fails. That is the number that becomes a live order. The Phase 0.1 sign-off on the BTC candidate already failed this test. **Medium.**
 2. **Make the backtest describe the order that actually goes out.** Charge funding and the perp fee, and fill on the pre-close price, or keep the spot close-to-close research backtest and stop treating a linear-perp, pre-close fill as the same experiment. This is the gap that matters now that apply runs before the bar closes. **Medium.**
-3. **Fix the one-factor column bug and the full-sample tie-break.** Both are small. Both make an experiment answer a different question from the one that was asked, and the volume case contradicts the research note that says it already works. **Small.**
+3. **One-factor column and the full-sample tie-break are fixed.** A one-factor run now reads `data_column`, and a multi-factor disagreement is ranked on bars up to the one being decided. Stochastic still scores High, Low, and Close.

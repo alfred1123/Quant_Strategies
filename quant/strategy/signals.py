@@ -6,6 +6,7 @@ that link to ``BT.STRATEGY``, the four ``SignalDirection`` static methods
 and JSON serialisation entry points.
 """
 
+import bisect
 import logging
 from dataclasses import dataclass, field
 from typing import Callable
@@ -99,20 +100,22 @@ class StrategyConfig:
 def _conviction(strengths: list) -> np.ndarray:
     """Per-factor conviction from raw indicator strengths.
 
-    Percentile-ranks each factor's raw values, then measures distance from
-    the median (0.5) — the more extreme the reading, the higher the conviction.
+    Percentile-ranks each reading against earlier bars of the same factor,
+    then measures distance from the median (0.5). A later bar cannot change
+    an earlier rank.
     """
     raw = np.column_stack(strengths).astype(float)
     pctile = np.full_like(raw, 0.5)
     for j in range(raw.shape[1]):
+        seen: list[float] = []
         col = raw[:, j]
-        valid_mask = ~np.isnan(col)
-        valid_count = valid_mask.sum()
-        if valid_count <= 1:
-            continue
-        sorted_vals = np.sort(col[valid_mask])
-        ranks = np.searchsorted(sorted_vals, col[valid_mask], side='right')
-        pctile[valid_mask, j] = ranks / valid_count
+        for i, value in enumerate(col):
+            if np.isnan(value):
+                continue
+            bisect.insort(seen, value)
+            if len(seen) <= 1:
+                continue
+            pctile[i, j] = bisect.bisect_right(seen, value) / len(seen)
     return np.abs(pctile - 0.5)
 
 

@@ -123,7 +123,7 @@ For multi-factor backtests, the pipeline computes each factor independently, the
      - Set `data['factor'] = data[sub.data_column]` (e.g. price or volume)
      - Compute indicator → position array
 2. Call `combine_positions(positions, conjunction)`:
-     - **AND** — position taken only when all factors agree; strength-based tiebreak via `np.searchsorted` percentile rank
+     - **AND** — position taken only when all factors agree; strength-based tiebreak via a percentile rank of bars up to the current one
      - **OR** — position taken when any factor signals; strongest signal wins
      - **FILTER** — factor 1 is the **Gate** (must be non-zero); factor 2 is the **Signal** (direction). The drawer labels the cards Gate / Signal; adding a second factor under FILTER inserts it as the gate.
 3. Compute PnL from the combined `FinalPosition` column
