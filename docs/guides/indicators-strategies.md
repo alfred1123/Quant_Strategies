@@ -52,7 +52,7 @@ The `trading_period` parameter controls Sharpe ratio annualization:
 - **Crypto**: `365` — markets trade 24/7/365
 - **Equity**: `252` — NYSE/NASDAQ trading days per year
 
-Sharpe and annualized return are **undefined** (`NaN`) when `Performance.get_metric_n_obs()` is below 60 finite PnL bars after indicator warmup. The optimizer does not re-count bars; it already maps a non-finite Sharpe to `-inf`, so a short sample cannot win the grid.
+Sharpe and annualized return are **undefined** (`NaN`) when `Performance.get_metric_n_obs()` is below 60 finite PnL bars after indicator warmup. The optimizer does not re-count bars; it already maps a non-finite Sharpe to `-inf`, so a short sample cannot win the grid. A search whose loaded series is shorter than the longest `window_range.max` plus those 60 bars fails before the first trial, and the job error names the bar count, the window, and the interval (decision #82).
 
 The drawer also scales `trading_period` by the selected bar interval's bars-per-day (365 daily → 8,760 hourly). See [Window grid](#window-grid) for the matching lookback scale.
 

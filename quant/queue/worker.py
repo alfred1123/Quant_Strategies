@@ -35,7 +35,7 @@ import uuid
 from quant.shared.config import load_config, get_redis_url
 from quant.shared.db import close_pools, open_pool
 from quant.schemas.backtest import OptimizeRequest
-from quant.strategy.backtest_service import run_optimize
+from quant.strategy.backtest_service import BacktestError, run_optimize
 
 from quant.promotion.repo import PromotionRepo
 from quant.queue.repo import BtQueueRepo
@@ -137,8 +137,8 @@ class BacktestWorker:
                 # single-job and short-lived, so it builds its own.
                 bar_services=PriceBarServiceFactory(self._db_url, caches),
             )
-        except Exception:
-            err = traceback.format_exc()
+        except Exception as exc:
+            err = exc.detail if isinstance(exc, BacktestError) else traceback.format_exc()
             logger.error("optimize failed for queue_id=%s\n%s", queue_id, err)
             repo.sp_ins_queue(
                 queue_id=queue_id,

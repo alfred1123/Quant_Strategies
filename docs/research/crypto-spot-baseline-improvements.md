@@ -81,8 +81,10 @@ These points apply to any number quoted above:
   volume filter and maker (limit) orders are the usual mitigations; apply is a market order
   today (decision #38).
 - **Sample size.** Short histories inflate Sharpe. Metrics are `NaN` below
-  `MIN_METRIC_OBS` finite PnL bars, but clearing that floor is not proof of robustness.
-  Check out-of-sample periods and more than one coin.
+  `MIN_METRIC_OBS` finite PnL bars. A search whose loaded series is shorter than
+  the longest window plus that floor fails before the first trial (decision #82).
+  Clearing the floor is not proof of robustness. Check out-of-sample periods and
+  more than one coin.
 
 ## 5. What the platform can express today
 

@@ -158,6 +158,36 @@ class TestOptimizeEndpoint:
         assert body["valid"] == 2
         assert body["best"]["sharpe"] == 1.8
 
+    @patch("quant.strategy.backtest_service.fetch_df")
+    def test_a_grid_the_series_cannot_score_is_refused(self, mock_fetch, client):
+        client.app.state.data_caches.refdata.interval_name.return_value = "DAILY"
+        mock_fetch.return_value = pd.DataFrame({
+            "price": np.linspace(100, 200, 70),
+            "factor": np.linspace(100, 200, 70),
+        }, index=pd.date_range("2024-01-01", periods=70, freq="D", name="datetime"))
+
+        resp = client.post("/api/v1/backtest/optimize", json={
+            "symbol": "btc-usd",
+            "start": "2024-01-01",
+            "end": "2024-12-31",
+            "data_source": "yahoo",
+            "tm_interval_id": 1,
+            "trading_period": 365,
+            "factors": [
+                {
+                    "indicator": "get_bollinger_band",
+                    "strategy": "momentum",
+                    "data_column": "price",
+                    "window_range": {"min": 10, "max": 20, "step": 10},
+                    "signal_range": {"min": 0.01, "max": 0.02, "step": 0.01},
+                },
+            ],
+        })
+        assert resp.status_code == 400
+        detail = resp.json()["detail"]
+        assert "70 DAILY bars" in detail
+        assert "window 20" in detail
+
     def test_optimize_invalid_strategy(self, client):
         resp = client.post("/api/v1/backtest/optimize", json={
             "symbol": "btc-usd",

@@ -1,7 +1,7 @@
 # Backtest data hygiene — proposal
 
-**Doc type:** proposal. Nothing here is adopted.
-**Status:** open. This page does not change the engine, the schema, or any stored row.
+**Doc type:** proposal. The short-sample refusal is adopted ([decision #82](../decisions.md)). Stale-row cleanup, recipe identity, and catalog visibility are not.
+**Status:** open except the short-sample rule. That rule changes no schema and rewrites no stored row.
 **Reviewed against:** `main` at `85fa94409` (2026-09-25), including the [backtest review](2026-09-25-backtest-review.md).
 
 The engine now compounds simple returns and reads drawdown off that equity curve. Rows written before the worker that does this came up still store the old annual return, total return, max drawdown, and Calmar. Sharpe, on a long enough sample, is the same number either way. Strategy identity is still the full display name, so a change of bar interval starts a new lineage. The catalog still shows every Best version, including ones a user would not want to trade.
@@ -471,7 +471,7 @@ The 2026-09-04 volume-filter job is a different defect that shares the cleanup. 
 
 The floor that exists today nulls Sharpe inside a trial and maps a non-finite Sharpe to `-inf` in the objective. The job can still complete. The grid is still allowed to contain a window longer than the series. `live_lookback_bars` (`window * 3 + 60`) is the history a live signal fetches. It is not a backtest validity rule.
 
-**Proposed rule.** Before the search starts, refuse the run when the loaded series cannot score the top of the grid. Let `W` be the maximum `window_range.max` across factors, and let `N` be the number of bars actually loaded (the series the worker is about to optimise, not the calendar span). Require:
+**Adopted rule** ([decision #82](../decisions.md)). Before the search starts, refuse the run when the loaded series cannot score the top of the grid. Let `W` be the maximum `window_range.max` across factors, and let `N` be the number of bars actually loaded (the series the worker is about to optimise, not the calendar span). Require:
 
 ```text
 N >= W + MIN_METRIC_OBS
@@ -479,7 +479,7 @@ N >= W + MIN_METRIC_OBS
 
 `W` bars are the rolling warmup (`_metric_window`, and `rolling(window=period)` on SMA, RSI, and Bollinger). Stochastic smooths a second rolling window of the same length, so its warmup is `2W`. The first cut can use `W + 60` for every indicator and tighten stochastic when that indicator is in the request. `MIN_METRIC_OBS` stays the constant in `Performance`. The threshold is not a new magic number, and it is not a REFDATA row: it is the same floor the Sharpe already uses.
 
-Apply it in the worker, before `ParametersOptimization.run`, and fail the queue row with the bar count, `W`, and the interval in the error text. Failing at enqueue is worse: the API does not hold the bars. An exchange run already knows coverage; the check belongs next to the frame that will be scored.
+`require_scoreable_sample` in `quant/strategy/backtest_service.py` runs after the frame is loaded and before `ParametersOptimization.run`, on both the worker and the SSE stream. The worker stores the sentence (bar count, `W`, interval name) as `ERROR_TEXT`. Enqueue stays open: the API does not hold the bars. A drawer warning before the click is still open.
 
 A grid the series can only partly score should fail, not silently drop the long windows. Dropping them searches a different strategy than the one the user configured. The drawer can warn from coverage before the click. The worker is the guarantee.
 
@@ -784,14 +784,14 @@ These are the choices this page does not make.
 
 ## What shipping this would touch
 
-Not in this change. Listed so the blast radius is visible before anyone writes a changeset.
+Short-sample refusal is adopted. The other rows are not in this change. They are listed so the blast radius is visible before anyone writes a changeset.
 
 | Piece | Schemas | Procedure bodies |
 |---|---|---|
 | Catalog floor | `refdata` — one new table and a seed | None. `SP_GET_ENUM` already reads any REFDATA table |
 | Stale chip and `in_catalog` | None, if staleness is the cutover timestamp | `SP_GET_STRATEGY_LIST` if the filter is pushed into the procedure. It can also sit in `StrategiesService` over the columns the procedure already returns |
 | Recent panel | None | `SP_GET_QUEUE`, to return `SHARPE_RATIO` |
-| Short-sample refusal | None | None. Worker code, plus a test |
+| Short-sample refusal | None | Adopted — [decision #82](../decisions.md). Worker stores the sentence; no procedure body |
 | Replay | None | None. `scripts/rerun_results.py` already enqueues |
 | Identity | `bt` — `RECIPE_KEY`, the merge, repointing queue, result, promotion. `trade` — deployment pins | `SP_INS_STRATEGY`, `SP_UPD_PROMOTE_STRATEGY` |
 

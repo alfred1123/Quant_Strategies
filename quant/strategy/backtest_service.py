@@ -539,8 +539,29 @@ def _build_wf_response(data_dict, config, window_list, signal_list,
 
 # ── Optimize ─────────────────────────────────────────────────────────────────
 
+def require_scoreable_sample(data_dict: dict[str, pd.DataFrame], req: OptimizeRequest, cache) -> None:
+    """Refuse a search the loaded series cannot score.
+
+    ``W`` is the longest ``window_range.max``. ``N`` is the traded series
+    length after the fetch. The first ``W`` bars warm the indicator, and
+    Sharpe is undefined below ``Performance.MIN_METRIC_OBS`` (decision #63).
+    Decision #82 requires ``N >= W + MIN_METRIC_OBS``.
+    """
+    n = len(data_dict[req.symbol])
+    w = max(int(f.window_range.max) for f in req.factors)
+    need = w + Performance.MIN_METRIC_OBS
+    if n >= need:
+        return
+    interval = cache.interval_name(int(req.tm_interval_id))
+    raise BacktestError(
+        f"series has {n} {interval} bars; the grid needs at least {need} "
+        f"(window {w} + {Performance.MIN_METRIC_OBS} finite pnl bars)"
+    )
+
+
 def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None, bt_cache=None, bar_services=None) -> OptimizeResponse:
     data_dict = _build_data_dict(req, cache, inst_cache, bt_cache, bar_services)
+    require_scoreable_sample(data_dict, req, cache)
     callbacks = [callback] if callback else []
     config = build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
@@ -608,6 +629,7 @@ async def stream_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache
     def _run():
         try:
             data_dict = _build_data_dict(req, cache, inst_cache, bt_cache, bar_services)
+            require_scoreable_sample(data_dict, req, cache)
             config = build_config(req, cache)
             window_list, signal_list = _build_param_ranges(req)
 

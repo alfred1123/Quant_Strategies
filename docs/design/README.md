@@ -31,7 +31,7 @@ today see [Architecture](../architecture/overview.md).
 | [Login & authentication](login.md) | Phase 1 done; phases 2–3 proposed |
 | [Futu trading (OOP)](futu-trading.md) | Design only |
 | [Frontend code audit](frontend-audit.md) | Hardening done; follow-ups open |
-| [Backtest data hygiene](2026-09-25-backtest-data-hygiene-proposal.md) | Proposed — stale results, strategy identity, catalog visibility |
+| [Backtest data hygiene](2026-09-25-backtest-data-hygiene-proposal.md) | Short-sample refusal adopted (#82); stale results, identity, and catalog still proposed |
 
 ## Reviews
 
