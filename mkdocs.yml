@@ -120,6 +120,7 @@ nav:
       - Alternative Data Sources: design/alt-data-sources.md
       - Futu Trading (OOP): design/futu-trading.md
       - Frontend Code Audit: design/frontend-audit.md
+      - Backtest review (2026-09-25): design/2026-09-25-backtest-review.md
   - Strategy research:
       - Overview: research/README.md
       - Crypto spot — baseline improvements: research/crypto-spot-baseline-improvements.md

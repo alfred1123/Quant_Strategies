@@ -32,6 +32,12 @@ today see [Architecture](../architecture/overview.md).
 | [Futu trading (OOP)](futu-trading.md) | Design only |
 | [Frontend code audit](frontend-audit.md) | Hardening done; follow-ups open |
 
+## Reviews
+
+| Doc | Status |
+|-----|--------|
+| [Backtest review (2026-09-25)](2026-09-25-backtest-review.md) | Open findings — measurement, promotion, and live fill |
+
 ## Shipped or historical → [Archive](../archive/README.md)
 
 Rollout playbooks, one-off bug write-ups, point-in-time capacity snapshots, and
