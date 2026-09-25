@@ -82,6 +82,8 @@ Override via `--fee` in the CLI or **Fee (bps)** in the drawer. Stored `BT.STRAT
 
 Documented so a perp or limit-order run can set `--fee` honestly. The engine still takes one scalar.
 
+Filling **Fee (bps)** from the venue and the instrument is not built. Bybit spot would be 10 bps, from `ISSUE_TYPE = spot` on the product and the broker on the xref. Futures stay out of that fill. The rate itself is reference data — broker, issue type, maker or taker — so it belongs in a `REFDATA` table the drawer reads, not a hardcoded 10 next to the fee box. That is a schema change, and it waits.
+
 | Venue / product | Maker | Taker | Use when |
 |---|---|---|---|
 | Bybit spot, crypto-crypto, VIP 0 | 10.0 bps | **10.0 bps** | Default. `*.crypto` + market apply |
