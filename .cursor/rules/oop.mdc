@@ -1,0 +1,12 @@
+---
+description: Prefer the small fix the docs already name — do not add a class the page does not ask for
+alwaysApply: true
+---
+
+# Simple fix, on the owner the docs name
+
+`AGENTS.md` (Code Quality) is the standard. `docs/architecture/oop-framework.md` is a **target**. Its production path is still the procedural modules (`signals.py`, `optimizer.py`, `TechnicalAnalysis`). A bugfix does not migrate them.
+
+- Change the class or function the relevant page already names. Do not add a class, hook, or wrapper the page does not ask for.
+- A new helper is justified only when it removes a real second copy or makes the existing policy readable. Cutting lines is not a reason.
+- One owner for a fact: the stored-procedure wrapper, the REFDATA parser (`RedisRefData`), the frame builder. Call it. Do not reimplement it beside it.
