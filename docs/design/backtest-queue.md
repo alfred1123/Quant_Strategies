@@ -890,7 +890,7 @@ This slice introduces the coordinator and proves the polyglot boundary. Once it 
 | `quant/api/auth/router.py` | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | No — bcrypt/argon2 verify + JWT sign | **Port to coordinator.** Use `argon2` (Node) and `jose` for JWT. Removes the need to share `JWT_SECRET` across runtimes. | 3 |
 | `quant/api/routers/backtest.py — /performance` | `POST /backtest/performance` | **Yes** — runs `perf.py` (single backtest, returns equity curve + metrics) | **Move to a dedicated Python service** invoked by the coordinator over HTTP, **or** queue it through the existing job system as a "single-trial" job. Recommendation: queue route — reuses the worker. | 4 |
 | `quant/api/routers/backtest.py — /walk-forward` | `POST /backtest/walk-forward` | **Yes** — runs `walk_forward.py` | Same as `/performance`: queue as a single-trial job. The frontend already accepts async job results. | 4 |
-| `quant/api/routers/backtest.py — /optimize` + `/optimize/stream` | Synchronous + SSE | **Yes** — runs `param_opt.py` | **Retire** once the queue is fully wired. Every optimization becomes a queued job. The legacy sync path can stay as an admin-only fallback. | 5 |
+| `quant/api/routers/backtest.py — /optimize` | Synchronous | **Yes** — runs `param_opt.py` | **Retire** once nothing calls it. The page already enqueues, and the worker calls `run_optimize`. `/optimize/stream` is removed. The sync path can stay as an admin-only fallback. | 5 |
 | `quant/api/services/backtest.py` | Internal | **Yes** — orchestrates `data → strat → perf → param_opt` | **Stays in Python.** Becomes the worker entry point that `src/worker.py` calls into. Nothing to port. | n/a |
 | `src/data.py`, `strat.py`, `perf.py`, `param_opt.py`, `walk_forward.py` | Library modules | **Yes** | **Stay in Python forever.** Library ecosystem reasons (§19.3). | n/a |
 
@@ -902,7 +902,7 @@ Once the queue (Slices A–F) is stable:
 2. **Inst port** — same pattern. Delete `quant/api/routers/inst.py`.
 3. **Auth port** — port `qs_token` issue/verify into TS. Frontend unaffected (still sets `HttpOnly` cookie). FastAPI loses its auth middleware. Coordinator becomes the only origin issuing the cookie.
 4. **`/performance` and `/walk-forward` queueing** — extend `BT.QUEUE` with a `JOB_KIND` column (`'OPTIMIZE' | 'PERFORMANCE' | 'WALK_FORWARD'`). Worker dispatches on kind. Frontend submits these as ordinary queue jobs.
-5. **Retire `/optimize` (sync) and `/optimize/stream`** — once all callers are queued. Phase out FastAPI.
+5. **Retire `/optimize` (sync)** — `/optimize/stream` is already removed. The sync route stays until its remaining callers are gone. Phase out FastAPI.
 
 After step 5, the FastAPI deployment unit can be removed entirely. The coordinator handles all HTTP. Python only ever runs as a child process under coordinator supervision.
 

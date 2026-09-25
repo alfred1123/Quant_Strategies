@@ -47,17 +47,17 @@ flowchart LR
 ## Critical issues — likely bug source / runtime risk
 
 - ✅ **`Top10Row` index signature hides shape** *(was `frontend/src/types/backtest.ts` lines 120–125)* — Replaced with a discriminated union `SingleFactorRow | MultiFactorRow` and a `utils/top10.ts` accessor module (`isSingleFactorRow`, `readNumber`, `multiFactorParams`). All call sites (`requestBuilders.ts`, `Top10Table.tsx`, `HeatmapChart.tsx`, `format.ts`) read window/signal through these helpers — no `as number` casts remain.
-- ✅ **SSE payload not validated** *(was `frontend/src/api/backtest.ts` lines 59–63)* — `runOptimizeStream` now hand-parses each event (`init`, `progress`, `result`, `error`) via dedicated narrowers. Malformed JSON or wrong-shape payloads reject with a precise error rather than crashing inside `processChunk`. (Zod was deliberately not added — see Decision below.)
-- ✅ **`response.body!` non-null assertion** *(was `frontend/src/api/backtest.ts` line 37)* — Replaced with an explicit `if (!response.body) reject(...)` plus a `settled`/`reader.cancel()` guard so the loop can't double-resolve.
+- ✅ **SSE payload not validated** *(was `frontend/src/api/backtest.ts`)* — the optimize stream client was later removed. A search is a queued job. The page does not open `POST /backtest/optimize/stream`.
+- ✅ **`response.body!` non-null assertion** *(was `frontend/src/api/backtest.ts`)* — the optimize stream client that held this assertion was removed with the stream.
 - ✅ **Concurrent `loadPerf` race** *(was `frontend/src/pages/BacktestPage.tsx` lines 67–81)* — Per-request `AbortController` plus a monotonic `perfReqId` counter. Late responses from a previous selection are dropped.
-- ✅ **Optimize stream not aborted on unmount or new run** — `BacktestPage` owns an `optimizeAbort` ref. `handleRun` aborts any in-flight stream before starting a new one; an unmount effect aborts on navigation away. `AbortError`s are silently ignored downstream.
+- ✅ **Optimize stream not aborted on unmount or new run** — the stream client and its abort ref were removed. A run is a queued job. Per-row performance requests still abort on a newer selection and on unmount.
 
 ## High-priority issues — maintainability / change risk
 
 - ✅ **TypeScript `strict` mode is OFF** — Enabled in `frontend/tsconfig.app.json` along with `noImplicitOverride`. Build is clean under strict rules.
 - ✅ **Validation duplicated and divergent** — Consolidated into `frontend/src/utils/validate.ts` (`validateBacktestConfig`, `firstValidationError`). `BacktestPage.handleRun` and `ConfigDrawer` both consume it, so the missing-field list cannot drift.
 - ✅ **`analysisTab` not reset on new run** — `handleRun` now sets `setAnalysisTab(0)` alongside the other state resets.
-- ⏳ **SSE uses `fetch`, REST uses `axios`** — Not yet unified (would change call shape across the codebase). Mitigated for now: the SSE `fetch` was given `credentials: 'include'` so the auth cookie travels the same way as `axios.withCredentials`. A single transport facade is captured in **Open follow-ups** below.
+- ✅ **SSE uses `fetch`, REST uses `axios`** — the optimize stream `fetch` was removed. Backtest calls go through the axios client.
 - ✅ **`Plot.ts` interop relies on `any`** — Refactored to a typed `unknown` narrowing pattern (`hasDefault`). No `// eslint-disable @typescript-eslint/no-explicit-any` directive is needed anymore.
 - ✅ **Fragile auth error string match** — `client.ts` now throws a typed `ApiError` carrying `status: number | null`. `fetchMe` checks `err instanceof ApiError && err.status === 401` instead of comparing `err.message === 'Not authenticated'`.
 
@@ -111,16 +111,16 @@ Three options in increasing scope:
 
 Items deferred from the hardening pass, ordered by approximate impact:
 
-1. **Single transport facade** — Wrap axios + streaming `fetch` so headers, credentials, error normalisation and `ApiError` shape live in one file. Today the SSE `fetch` mirrors the axios policy by hand (`credentials: 'include'`).
+1. **Single transport facade** — The optimize stream `fetch` is gone. Remaining HTTP goes through the axios client.
 2. **Drop legacy top-level config fields** — `BacktestConfig.indicator/strategy/windowRange/signalRange` are no longer edited by the UI; the form drives `factors[]` exclusively. Removing them is a typed refactor and an opportunity to formalise the request contract.
-3. **Backtest feature module + run-state hook** — Extract `useBacktestRun()` (or a small Zustand store) that owns the optimize stream, abort plumbing, perf load, derived flags and tab state. Removes the remaining god-component pressure in `BacktestPage.tsx`.
+3. **Backtest feature module + run-state hook** — Extract the enqueue, perf load, and tab state out of `BacktestPage.tsx`.
 4. **REFDATA-driven metric formatting** — Replace `MetricsCards.PERCENT_KEYS` and `FactorCard`'s nullable `sig_min/max` defaults with values fetched from REFDATA (per the workspace's "REFDATA as Single Source of Truth" decision).
 5. **Bundle/codesplitting** — `react-plotly.js` is now lazy-loaded via `lib/Plot.tsx`, which moved plotly.js into its own 4.7 MB async chunk and cut the entry bundle from 5.9 MB to 1.24 MB (1.68 MB → 376 kB gzipped). `@mui/x-data-grid` is still in the entry chunk and is the next candidate.
 6. **Tooling debt** — Either adopt Tailwind or remove it (zero `className=` usage today). Move `@rolldown/binding-linux-x64-gnu` out of `dependencies` once the Node 20 / rolldown native binding bug is resolved upstream.
 
 ## Decisions made during the hardening pass
 
-- **No Zod** — SSE payloads are validated with hand-written narrowers. Adding a runtime-schema dependency is overkill for four event shapes; if a fifth or sixth event type appears the calculus may flip.
+- **No Zod** — The optimize stream that was going to need payload parsers was removed. A search is a queued job.
 - **`ApiError` over status codes only** — `apiClient` throws `ApiError(message, status)` so callers can branch on either `instanceof ApiError` or `err.status === 401`. Keeps backward-compat with consumers that just want `err.message` for display.
 - **Discriminated union over Zod-style parser for `Top10Row`** — The shape is fixed by the backend; a TypeScript discriminated union plus `utils/top10.ts` accessors gives compile-time safety without runtime overhead.
 - **`react-router` for route separation** — Login (`/login`) and backtest (`/`) now live at distinct URLs via `BrowserRouter`. `RequireAuth` and `GuestOnly` route wrappers handle redirects. `BacktestPage` reads `currentUser` from `useMe()` directly (no prop drilling). Logout and 401 interceptor both navigate to `/login`. Nginx `try_files` already covers client-side routing fallback.

@@ -157,3 +157,7 @@ class OptimizeResponse(BaseModel):
     performance: PerformanceResponse | None = None
     # Inline walk-forward (when walk_forward=True in request)
     walk_forward: WalkForwardResponse | None = None
+    # Set when that inline run was requested and threw. Null means it was
+    # not run (the flag was off, or the search had no valid cell) or it
+    # finished. The search result is still returned either way.
+    walk_forward_error: str | None = None

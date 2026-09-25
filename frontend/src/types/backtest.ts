@@ -153,12 +153,8 @@ export interface OptimizeResponse {
   grid: Top10Row[];
   performance?: PerformanceResponse;
   walk_forward?: WalkForwardResponse;
-}
-
-export interface OptimizeProgress {
-  trial: number;
-  total: number;
-  best_sharpe: number | null;
+  /** Set when the inline split was requested and threw. Absent or null means it was not run, or it finished. */
+  walk_forward_error?: string | null;
 }
 
 export interface EquityPoint {

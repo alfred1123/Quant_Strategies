@@ -4,12 +4,7 @@ Shared by the FastAPI layer and the queue worker. Raises ``BacktestError``
 for client-facing validation and data issues (HTTP layer maps status codes).
 """
 
-import asyncio
-import json
 import logging
-import math
-import queue
-import threading
 from datetime import timedelta
 
 import numpy as np
@@ -26,7 +21,7 @@ from quant.schemas.backtest import (
     WalkForwardRequest,
     WalkForwardResponse,
 )
-from quant.strategy.optimizer import OPTUNA_MAX_TRIALS, ParametersOptimization
+from quant.strategy.optimizer import ParametersOptimization
 from quant.strategy.performance import Performance
 from quant.strategy.signals import StrategyConfig, SubStrategy, resolve_signal_func
 from quant.strategy.walk_forward import WalkForward
@@ -352,7 +347,7 @@ def _build_param_ranges(req):
     )
 
 
-# ── Inline result builders (shared by stream_optimize and standalone endpoints) ──
+# ── Inline result builders ──
 
 
 def _build_data_dict(req, cache, inst_cache=None, bt_cache=None, bar_services=None) -> dict[str, pd.DataFrame]:
@@ -561,14 +556,13 @@ def require_scoreable_sample(data_dict: dict[str, pd.DataFrame], req: OptimizeRe
     )
 
 
-def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None, bt_cache=None, bar_services=None) -> OptimizeResponse:
+def run_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache=None, bar_services=None) -> OptimizeResponse:
     data_dict = _build_data_dict(req, cache, inst_cache, bt_cache, bar_services)
     require_scoreable_sample(data_dict, req, cache)
-    callbacks = [callback] if callback else []
     config = build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
     opt = ParametersOptimization(data_dict, config, fee_bps=req.fee_bps)
-    result = opt.run(window_list, signal_list, callbacks=callbacks)
+    result = opt.run(window_list, signal_list)
 
     # ── Inline performance for best params ──
     perf_resp = None
@@ -582,14 +576,16 @@ def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None, bt
 
     # ── Inline walk-forward ──
     wf_resp = None
+    wf_error = None
     if req.walk_forward and result.n_valid > 0:
         try:
             wf_resp = _build_wf_response(
                 data_dict, config, window_list, signal_list,
                 req.split_ratio, req.fee_bps,
             )
-        except Exception:
+        except Exception as exc:
             logger.warning("Inline walk-forward failed", exc_info=True)
+            wf_error = str(exc).strip() or type(exc).__name__
 
     return OptimizeResponse(
         total_trials=len(result.grid_df),
@@ -600,104 +596,8 @@ def run_optimize(req: OptimizeRequest, cache, inst_cache=None, callback=None, bt
         optuna_plots=result.extract_plots(),
         performance=perf_resp,
         walk_forward=wf_resp,
+        walk_forward_error=wf_error,
     )
-
-
-def _compute_total_trials(req: OptimizeRequest) -> int:
-    """Pre-compute the number of trials that optuna will run."""
-    total = math.prod(
-        len(f.window_range.to_values(as_int=True)) * len(f.signal_range.to_values())
-        for f in req.factors
-    )
-    return min(total, OPTUNA_MAX_TRIALS)
-
-
-def _sse_event(event: str, data: dict) -> str:
-    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
-
-
-async def stream_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache=None, bar_services=None):
-    """Async generator yielding SSE events for optimization progress.
-
-    Events:
-        init     — {total: int}                           (before first trial)
-        progress — {trial, total, best_sharpe}             (after each trial)
-        result   — full OptimizeResponse dict               (on completion)
-        error    — {detail: str}                            (on failure)
-    """
-    progress_q: queue.Queue = queue.Queue()
-    total = _compute_total_trials(req)
-
-    def _run():
-        try:
-            data_dict = _build_data_dict(req, cache, inst_cache, bt_cache, bar_services)
-            require_scoreable_sample(data_dict, req, cache)
-            config = build_config(req, cache)
-            window_list, signal_list = _build_param_ranges(req)
-
-            def on_trial(study, trial):
-                best = study.best_value if study.best_value > float("-inf") else None
-                progress_q.put(("progress", {
-                    "trial": trial.number + 1,
-                    "total": total,
-                    "best_sharpe": round(best, 4) if best is not None else None,
-                }))
-
-            opt = ParametersOptimization(data_dict, config, fee_bps=req.fee_bps)
-            result = opt.run(window_list, signal_list, callbacks=[on_trial])
-
-            # ── Inline performance for best params ──
-            perf_resp = None
-            if result.n_valid > 0 and result.best:
-                try:
-                    perf_resp = _build_perf_response(
-                        data_dict, config, result.best, req.fee_bps,
-                    )
-                except Exception:
-                    logger.warning("Inline performance failed", exc_info=True)
-
-            # ── Inline walk-forward ──
-            wf_resp = None
-            if req.walk_forward and result.n_valid > 0:
-                try:
-                    wf_resp = _build_wf_response(
-                        data_dict, config, window_list, signal_list,
-                        req.split_ratio, req.fee_bps,
-                    )
-                except Exception:
-                    logger.warning("Inline walk-forward failed", exc_info=True)
-
-            resp = OptimizeResponse(
-                total_trials=len(result.grid_df),
-                valid=result.n_valid,
-                best=result.best,
-                top10=result.top10,
-                grid=result.grid,
-                optuna_plots=result.extract_plots(),
-                performance=perf_resp,
-                walk_forward=wf_resp,
-            )
-            progress_q.put(("result", resp.model_dump()))
-        except Exception as exc:
-            logger.exception("Streaming optimization failed")
-            progress_q.put(("error", {"detail": str(exc)}))
-
-    thread = threading.Thread(target=_run, daemon=True)
-    thread.start()
-
-    yield _sse_event("init", {"total": total})
-
-    while True:
-        try:
-            event_type, data = await asyncio.to_thread(progress_q.get, timeout=600)
-        except Exception:
-            yield _sse_event("error", {"detail": "Optimization timed out"})
-            return
-
-        yield _sse_event(event_type, data)
-
-        if event_type in ("result", "error"):
-            return
 
 
 # ── Performance ───────────────────────────────────────────────────────────────

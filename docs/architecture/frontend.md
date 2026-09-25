@@ -59,7 +59,7 @@ See [Best-VID Promotion §5](../design/best-vid-promotion.md#5-ui-pipeline-tab-m
 - **Factor list** — add up to 2 factors per run (1 = single factor, 2 = multi factor); the request always serializes as a `factors: [...]` list, never with separate top-level indicator/window fields
 - **Conjunction** selector (AND / OR / FILTER) — surfaced only when there are 2+ factors. FILTER labels the cards **Gate / Signal** (factor 1 gates, factor 2 directs; Decision #6)
 - **Trial count** shown before running — displays actual trial count with cap awareness (max 10,000)
-- On **Run**: drawer closes, **SSE progress bar** streams real-time trial progress
+- On **Run**: the drawer closes and the run is enqueued. The Queue tab shows the job.
 - **Top-10 results table** (MUI DataGrid) — best row highlighted; each row has a **View Analysis** button
 - Analysis panel: side-by-side metrics cards + Sharpe heatmap + equity curve + drawdown chart
 - **Walk-forward analysis** — in-sample vs out-of-sample comparison with overfitting ratio
@@ -190,7 +190,7 @@ frontend/src/
 │   ├── client.ts         # Axios instance (baseURL, credentials, 401 interceptor)
 │   ├── refdata.ts        # React Query hooks: useIndicators(), useAssetTypes(), etc.
 │   ├── inst.ts           # useProducts() hook
-│   ├── backtest.ts       # runOptimizeStream() (SSE), runPerformance(), runWalkForward()
+│   ├── backtest.ts       # runPerformance(), runWalkForward()
 │   ├── auth.ts           # useMe(), login(), logout()
 │   ├── jobs.ts           # useJobs(), useEnqueueJob(), useCancelJob(), usePromoteStrategy(), fetchJob()
 │   ├── promotion.ts      # usePromotions() — Promotion tab
@@ -275,7 +275,7 @@ Once you know these shapes, every function signature and component prop makes se
 - **`client.ts`** — Creates an Axios instance with `baseURL: '/api/v1'` and `withCredentials: true`. The response interceptor normalises errors and evicts the auth cache on 401.
 - **`refdata.ts`** — One React Query hook per REFDATA table. Each hook calls `GET /api/v1/refdata/{table}` and caches forever (`staleTime: Infinity`).
 - **`inst.ts`** — `useProducts()` — same pattern for the product list.
-- **`backtest.ts`** — `runOptimizeStream()` opens an SSE stream (`POST /backtest/optimize/stream`), calls `onProgress` per trial, and resolves with the final result. `runPerformance()` and `runWalkForward()` are simple POST calls.
+- **`backtest.ts`** — `runPerformance()` and `runWalkForward()` are POST calls. A search is enqueued through `jobs.ts`, and the worker runs `run_optimize`.
 - **`auth.ts`** — `useMe()` probes `GET /auth/me` on mount. `login()` / `logout()` hit POST endpoints.
 
 ### Layer 3: Utilities (`lib/`, `utils/`)
@@ -298,7 +298,7 @@ Once you know these shapes, every function signature and component prop makes se
 
 ### Layer 5: Pages (`pages/`) — orchestration
 
-- **`BacktestPage.tsx`** — The main page. Owns all state (`useState` for config, results, progress, errors). Wires `ConfigDrawer` → `buildOptimizeRequest()` → enqueue. Re-backtest, Clone, and View hydrate the drawer through `configFromOptimizeRequest` so the stored snake_case `CONFIG_JSON` becomes the camelCase form (venue, cadence, window grid, walk-forward) rather than `DEFAULT_CONFIG`. Reads `currentUser` from `useMe()` hook directly.
+- **`BacktestPage.tsx`** — The main page. Owns all state (`useState` for config, results, progress, errors). Wires `ConfigDrawer` → `buildOptimizeRequest()` → enqueue. Re-backtest, Clone, and View hydrate the drawer through `configFromOptimizeRequest` so the stored snake_case `CONFIG_JSON` becomes the camelCase form (venue, cadence, window grid, walk-forward) rather than `DEFAULT_CONFIG`. A stored result whose inline walk-forward threw shows `walk_forward_error` above the analysis panel. A missing block with no message means the split was off, or the search had no valid cell. Reads `currentUser` from `useMe()` hook directly.
 - **`App.tsx`** — Sets up `BrowserRouter`, the shared MUI dark theme (`theme.ts`), and `ErrorBoundary`. Routes: `/login`, `/backtest`, `/trade/config`, `/trade/apply` (nested under `TradeLayout`). `RequireAuth` / `GuestOnly` wrappers gate auth.
 - **`LoginPage.tsx`** — Login form. On success, navigates to `/` (or the page that triggered the auth redirect via `location.state.from`).
 - **`main.tsx`** — Mounts `<App />` inside `<QueryClientProvider>` and `<StrictMode>`.
@@ -322,13 +322,9 @@ const set = (patch: Partial<BacktestConfig>) =>
 
 `set({ feeBps: 10 })` merges `{ feeBps: 10 }` into the existing config, leaving all other fields untouched. The same pattern applies to `updateFactor()` for nested factor updates.
 
-### SSE streaming for optimization progress
+### A run is a queued job
 
-`runOptimizeStream()` in `api/backtest.ts` uses the Fetch API's `ReadableStream` to parse Server-Sent Events. The stream emits three event types:
-
-1. `init` / `progress` → updates the progress bar
-2. `result` → resolves the promise with the final `OptimizeResponse`
-3. `error` → rejects with an error message
+Run enqueues through `useEnqueueJob()` and switches to the Queue tab. The worker calls `run_optimize`. The page reads the stored result when the user opens the job.
 
 ### Auth via cookie + interceptor + routing
 

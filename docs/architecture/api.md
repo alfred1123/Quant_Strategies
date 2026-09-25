@@ -50,8 +50,7 @@ All endpoints below are mounted under the `/api/v1` prefix.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/v1/backtest/optimize` | Run parameter grid search over a list of factors. Returns top-10 results, grid, and best params. |
-| `POST` | `/api/v1/backtest/optimize/stream` | SSE-streamed optimization — sends `init`, `progress`, `result`, and `error` events in real time. |
+| `POST` | `/api/v1/backtest/optimize` | Run parameter grid search over a list of factors. Returns top-10 results, grid, and best params. When walk-forward was requested and threw, the search result is still returned and `walk_forward_error` holds the message; `walk_forward` stays null. The page does not call this. A run is a queued job, and the worker calls `run_optimize`. |
 | `POST` | `/api/v1/backtest/performance` | Run a single backtest at fixed params. Returns equity curve, metrics, and daily P&L. |
 | `POST` | `/api/v1/backtest/walk-forward` | Walk-forward overfitting test. Returns IS/OOS metrics, overfitting ratio, and full equity curve. |
 | `POST` | `/api/v1/backtest/jobs` | Enqueue a backtest job (202 Accepted). |
@@ -545,17 +544,6 @@ The first fix rounded the head *up* to the next whole day. That was accepted by 
 **The server refuses a name that disagrees with its config.** `STRATEGY_NM` is the lineage key `SP_INS_STRATEGY` resolves, and it was stored exactly as the client sent it — which made identity a client-side construction. After `1.19.0` renamed every stored row to carry its cadence, a browser still holding a bundle from before that change enqueued `btcusdt.crypto@bybit ← …` and forked a second lineage beside the `:DAILY` one it belonged to. Fixing the frontend cannot prevent that recurring, because the guarantee has to hold where the row is written, and the fork cannot be repaired afterwards: `UNIQUE (USER_ID, STRATEGY_NM, STRATEGY_VID)` means renaming the stray lineage onto the real one collides at VID 1. `JobsService.enqueue` now checks the traded leg ends `:<REFDATA.TM_INTERVAL.NAME>` for the request's own `tm_interval_id` and returns **400** otherwise, so the two halves of one request cannot describe different series.
 
 Three things follow for callers. `BT.STRATEGY.CONFIG_JSON` stores the request verbatim and `live_service` replays it through `OptimizeRequest.model_validate`, so rows written before the field existed were backfilled to DAILY — what they always were. `trading_period` is the annualisation scalar (365 daily, 8,760 hourly): the config drawer scales `REFDATA.ASSET_TYPE.TRADING_PERIOD` by the interval's bars-per-day, because annualised return scales by that number and Sharpe by its square root, so a daily figure left on an hourly run understates both. The same factor scales the factor `window_range` grid: `REFDATA.INDICATOR.WIN_*` are daily-bar counts, so hourly defaults are 120 / 2,400 / 120 rather than 5 / 100 / 5 (decision #67). And because that annualisation scalar moves, the cadence is part of the [strategy's identity](#the-traded-venue-is-required-and-the-name-says-which-one) — two runs whose Sharpe is annualised differently must not share a `STRATEGY_ID`, where promotion would compare them bare.
-
-## SSE Streaming (`/optimize/stream`)
-
-The streaming endpoint uses `StreamingResponse` with Server-Sent Events:
-
-1. **`init`** — sent once with `{ "total": <total_trials> }` before optimization starts
-2. **`progress`** — sent per trial with `{ "trial": ..., "total": ..., "best_sharpe": ... }`
-3. **`result`** — sent once with the full optimization result (same shape as `/optimize`)
-4. **`error`** — sent if optimization fails; payload contains `{ "detail": "..." }`
-
-Backend implementation: `queue.Queue` + `threading.Thread` + `asyncio.to_thread` so the worker can stream progress without blocking the event loop.
 
 ## Caches: REFDATA, INST, BT
 

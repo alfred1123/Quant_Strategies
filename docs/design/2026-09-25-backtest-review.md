@@ -158,17 +158,19 @@ Why it matters: a backtest re-run months later, or a container rebuild, can move
 
 ### 9. CI skips the pipeline test, and a failed walk-forward is dropped
 
+The inline walk-forward failure is fixed. `run_optimize` catches a thrown split in place. The search still completes, and `OptimizeResponse.walk_forward_error` carries the exception text. The results page shows that text. An empty `walk_forward` with no error means the request left the split off, or the search had no valid cell.
+
 | | |
 |---|---|
-| Where | `.github/workflows/tests.yml` lines 28–29 run `tests/unit/` only. The swallow is `quant/strategy/backtest_service.py` lines 562–569. Per-trial failures become −∞ in `quant/strategy/optimizer.py` lines 184–191. |
-| Evidence | The unit-test CI scope was read from the workflow. The pipeline file was run by hand (54 passed). The swallow was read. |
+| Where | `.github/workflows/tests.yml` lines 28–29 run `tests/unit/` only. Per-trial failures become −∞ in `quant/strategy/optimizer.py` lines 184–191. |
+| Evidence | The unit-test CI scope was read from the workflow. The pipeline file was run by hand (54 passed). |
 | Effort | Small |
 
 `tests/integration/test_backtest_pipeline.py` is the test that drives fetch-shaped frames through `Performance`, the optimizer, and `WalkForward`. It is green and unrun in CI. Database integration tests skip cleanly when `QUANTDB_URL` is unset; this file does not need a database.
 
-`run_optimize` logs and swallows an exception from the inline walk-forward, then returns `walk_forward` empty. The job can still complete. The UI treats a missing block as “walk-forward was off,” including when it was on and threw. Inside the search, an exception on one cell is stored as Sharpe −∞, so a broken indicator looks like a bad parameter.
+Inside the search, an exception on one cell is stored as Sharpe −∞, so a broken indicator looks like a bad parameter.
 
-Why it matters: the check that would have caught a regression in the full pipeline is optional, and a walk-forward crash is easy to miss because the optimize job still succeeds.
+Why it matters: the check that would have caught a regression in the full pipeline is optional.
 
 ### 10. The CLI year length is a separate constant
 

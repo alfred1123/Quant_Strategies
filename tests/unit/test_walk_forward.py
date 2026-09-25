@@ -1,8 +1,11 @@
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pandas as pd
 import pytest
 
-from quant.strategy.backtest_service import _build_wf_response
+from quant.schemas.backtest import OptimizeRequest
+from quant.strategy.backtest_service import _build_wf_response, run_optimize
 from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, SignalDirection
 from quant.strategy.walk_forward import WalkForward, WalkForwardResult
 
@@ -251,3 +254,72 @@ class TestWalkForwardMultiFactor:
         assert isinstance(summary, pd.DataFrame)
         assert "In-Sample" in summary.columns
         assert "Overfitting Ratio" in summary.index
+
+
+def _optimize_request(*, walk_forward: bool) -> OptimizeRequest:
+    return OptimizeRequest(
+        symbol="btcusdt.crypto",
+        start="2024-01-01",
+        end="2024-12-31",
+        trading_period=365,
+        data_source="bybit",
+        tm_interval_id=1,
+        walk_forward=walk_forward,
+        factors=[{
+            "indicator": "get_sma",
+            "strategy": "momentum",
+            "window_range": {"min": 10, "max": 10, "step": 10},
+            "signal_range": {"min": 0.0, "max": 0.0, "step": 1.0},
+        }],
+    )
+
+
+def _search_result(*, n_valid: int) -> MagicMock:
+    result = MagicMock()
+    result.n_valid = n_valid
+    result.best = {"sharpe": 1.2} if n_valid else {}
+    result.grid_df = [0]
+    result.top10 = []
+    result.grid = []
+    result.extract_plots.return_value = None
+    return result
+
+
+class TestInlineWalkForward:
+    def test_a_thrown_split_stays_on_the_search_result(self):
+        result = _search_result(n_valid=2)
+        with (
+            patch("quant.strategy.backtest_service._build_data_dict", return_value={}),
+            patch("quant.strategy.backtest_service.require_scoreable_sample"),
+            patch("quant.strategy.backtest_service.build_config"),
+            patch("quant.strategy.backtest_service._build_param_ranges", return_value=([], [])),
+            patch("quant.strategy.backtest_service.ParametersOptimization") as opt_cls,
+            patch("quant.strategy.backtest_service._build_perf_response", return_value=None),
+            patch(
+                "quant.strategy.backtest_service._build_wf_response",
+                side_effect=RuntimeError("oos window is empty"),
+            ),
+        ):
+            opt_cls.return_value.run.return_value = result
+            resp = run_optimize(_optimize_request(walk_forward=True), cache=None)
+        assert resp.best["sharpe"] == 1.2
+        assert resp.walk_forward is None
+        assert resp.walk_forward_error == "oos window is empty"
+
+    def test_an_unrun_split_is_not_a_failure(self):
+        with (
+            patch("quant.strategy.backtest_service._build_data_dict", return_value={}),
+            patch("quant.strategy.backtest_service.require_scoreable_sample"),
+            patch("quant.strategy.backtest_service.build_config"),
+            patch("quant.strategy.backtest_service._build_param_ranges", return_value=([], [])),
+            patch("quant.strategy.backtest_service.ParametersOptimization") as opt_cls,
+            patch("quant.strategy.backtest_service._build_perf_response", return_value=None),
+            patch("quant.strategy.backtest_service._build_wf_response") as build_wf,
+        ):
+            opt_cls.return_value.run.return_value = _search_result(n_valid=2)
+            off = run_optimize(_optimize_request(walk_forward=False), cache=None)
+            opt_cls.return_value.run.return_value = _search_result(n_valid=0)
+            empty = run_optimize(_optimize_request(walk_forward=True), cache=None)
+        build_wf.assert_not_called()
+        assert off.walk_forward is None and off.walk_forward_error is None
+        assert empty.walk_forward is None and empty.walk_forward_error is None

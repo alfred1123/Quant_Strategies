@@ -25,7 +25,7 @@ import { useAssetTypes, useTmIntervals } from '../api/refdata';
 import { useProducts } from '../api/inst';
 import type {
   BacktestConfig, OptimizeResponse, PerformanceResponse, Top10Row,
-  WalkForwardResponse, OptimizeProgress,
+  WalkForwardResponse,
 } from '../types/backtest';
 import { effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest, configFromOptimizeRequest } from '../utils/requestBuilders';
 import { buildStrategyNm } from '../utils/strategyIdentity';
@@ -77,7 +77,6 @@ export default function BacktestPage() {
   const enqueue = useEnqueueJob();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [config, setConfig] = useState<BacktestConfig>(DEFAULT_CONFIG);
-  const [isOptimizing] = useState(false);
   const [isLoadingPerf, setIsLoadingPerf] = useState(false);
   const [optimizeResult, setOptimizeResult] = useState<OptimizeResponse | null>(null);
   const [perfResult, setPerfResult] = useState<PerformanceResponse | null>(null);
@@ -87,13 +86,11 @@ export default function BacktestPage() {
   const [analysisTab, setAnalysisTab] = useState(0);
   const [pageTab, setPageTab] = useState(0);
   const [wfResult, setWfResult] = useState<WalkForwardResponse | null>(null);
-  const [optProgress] = useState<OptimizeProgress | null>(null);
 
   // ── Lifecycle: cancel any in-flight async work on unmount or new run ──
-  // optimizeAbort tears down the SSE fetch; perfAbort tears down the per-row
-  // POST. perfReqId protects against the late-arriving-response race
-  // (click row A, click row B before A returns: A's response is dropped).
-  const optimizeAbort = useRef<AbortController | null>(null);
+  // perfAbort tears down the per-row POST. perfReqId protects against the
+  // late-arriving-response race (click row A, click row B before A returns:
+  // A's response is dropped).
   const perfAbort = useRef<AbortController | null>(null);
   const perfReqId = useRef(0);
   /** Queue id from the latest Run — auto-open Promotion when it completes. */
@@ -110,11 +107,9 @@ export default function BacktestPage() {
 
   useEffect(() => {
     // Cancel anything still running when the page unmounts. Copy the ref
-    // containers (not .current) so the cleanup reads the latest controllers.
-    const optAbort = optimizeAbort;
+    // container (not .current) so the cleanup reads the latest controller.
     const prfAbort = perfAbort;
     return () => {
-      optAbort.current?.abort();
       prfAbort.current?.abort();
     };
   }, []);
@@ -306,29 +301,13 @@ export default function BacktestPage() {
         {pageTab === 2 && <PromotionTab onReBacktest={handleReBacktest} />}
         {pageTab === 0 && (
           <>
-        {/* Running state */}
-        {isOptimizing && (
-          <Box sx={{ my: 8, textAlign: 'center' }}>
-            <LinearProgress
-              variant={optProgress?.trial ? 'determinate' : 'indeterminate'}
-              value={optProgress?.trial ? (optProgress.trial / optProgress.total) * 100 : undefined}
-              sx={{ mb: 2, maxWidth: 420, mx: 'auto' }}
-            />
-            <Typography sx={{ color: 'text.secondary' }}>
-              {optProgress?.trial
-                ? `Trial ${optProgress.trial} / ${optProgress.total}${optProgress.best_sharpe != null ? ` · Best Sharpe: ${formatDecimal(optProgress.best_sharpe)}` : ''}`
-                : 'Running optimization…'}
-            </Typography>
-          </Box>
-        )}
-
         {/* Error */}
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>
         )}
 
         {/* Empty state */}
-        {!isOptimizing && !optimizeResult && !error && (
+        {!optimizeResult && !error && (
           <Box sx={{ textAlign: 'center', py: 14 }}>
             <Box
               aria-hidden
@@ -360,7 +339,7 @@ export default function BacktestPage() {
         )}
 
         {/* Results */}
-        {optimizeResult && !isOptimizing && (
+        {optimizeResult && (
           <>
             {/* Run summary bar */}
             <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
@@ -390,6 +369,12 @@ export default function BacktestPage() {
                 isLoadingPerf={isLoadingPerf}
               />
             </Paper>
+
+            {optimizeResult.walk_forward_error && (
+              <Alert severity="warning" sx={{ mb: 3 }}>
+                Walk-forward did not finish: {optimizeResult.walk_forward_error}
+              </Alert>
+            )}
 
             {/* Analysis panel */}
             {(isLoadingPerf || perfResult) && (
