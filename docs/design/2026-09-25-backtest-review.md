@@ -52,6 +52,8 @@ Why it matters: this is the number that becomes a live order. A strategy can cle
 
 ### 2. A one-factor volume strategy is silently a price strategy
 
+Fixed. The single-factor path now reads `SubStrategy.data_column` the same way the multi-factor path does. Stochastic still scores High, Low, and Close.
+
 | | |
 |---|---|
 | Where | `quant/strategy/performance.py` lines 190–205; `quant/strategy/objective.py` lines 121–128. The multi-factor path that does honour the column is `performance.py` lines 168–174. |

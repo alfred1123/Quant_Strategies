@@ -119,11 +119,11 @@ class SingleFactorObjective(Objective):
         super().__init__(data, config, fee_bps=fee_bps)
         sub = config.get_substrategies()[0]
         sub_cusip = sub.internal_cusip or config.internal_cusip
-        if sub_cusip != config.internal_cusip:
+        source = self._all_data[sub_cusip]
+        if sub_cusip != config.internal_cusip or sub.data_column in source.columns:
             frame = self._main.copy()
             frame["factor"] = self._factor_series_for_sub(sub)
         else:
-            # data_column is ignored on the same-cusip path — Performance does too.
             frame = self._main
         self._cache = IndicatorCache(frame, config.indicator_name, windows)
         self._signal_func = config.signal_func

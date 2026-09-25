@@ -192,7 +192,8 @@ class Performance:
         sub = self._subs[0]
         sub_cusip = sub.internal_cusip or self.config.internal_cusip
         data = self.data.copy()
-        if sub_cusip != self.config.internal_cusip:
+        source = self.all_data[sub_cusip]
+        if sub_cusip != self.config.internal_cusip or sub.data_column in source.columns:
             data["factor"] = self._factor_series_for_sub(sub, data.index)
         ta = TechnicalAnalysis(data)
         data = ta.data

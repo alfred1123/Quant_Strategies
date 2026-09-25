@@ -182,6 +182,24 @@ class TestObjectiveEquivalence:
         expected = _perf_sharpe(data, config, 5, 1.0, fee_bps=20.0)
         _assert_sharpe_equal(obj((5,), (1.0,)), expected)
 
+    def test_one_factor_uses_its_data_column(self, sample_ohlc_df):
+        frame = sample_ohlc_df.copy()
+        frame["Volume"] = np.linspace(1000, 2000, len(frame))
+        config = StrategyConfig.single(
+            "test", "get_sma", SignalDirection.momentum_band_signal, 252,
+            window=5, signal=1.0, data_column="Volume",
+        )
+        data = {"test": frame}
+        perf = Performance(data, config, 5, 1.0)
+        perf.enrich_performance()
+        volume_sma = frame["Volume"].rolling(5).mean()
+        close_sma = frame["factor"].rolling(5).mean()
+        got = perf.data["indicator1"].dropna()
+        assert got.equals(volume_sma.loc[got.index])
+        assert not got.equals(close_sma.loc[got.index])
+        obj = SingleFactorObjective(data, config, (5,))
+        _assert_sharpe_equal(obj((5,), (1.0,)), perf.get_sharpe_ratio())
+
     def test_for_config_picks_subclass(self, sample_ohlc_df, multi_factor_df):
         single = StrategyConfig(
             "test", "get_sma", SignalDirection.momentum_band_signal, 252,
