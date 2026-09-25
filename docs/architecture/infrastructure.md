@@ -603,7 +603,7 @@ than `-->|authed| RedirectHome["Redirect /"]`).
    - **deploy** — true when any of app / nginx / compose changed (gate for the deploy job)
    - **db** — `db/liquidbase/**` (gate for the migrate job)
    - **refdata** — `db/liquidbase/refdata/**` (gate for post-migrate Redis republish)
-2. **Test job** — runs `pytest tests/unit/` on GitHub's runner (Python 3.12)
+2. **Test job** — runs `pytest tests/unit/` and `tests/integration/test_backtest_pipeline.py` on GitHub's runner (Python 3.12). The same command is the `pytest` job in `.github/workflows/tests.yml`.
 3. **Frontend job** — `npm ci`, `npm audit --audit-level=high`, `npm run build` (type-check + Vite build), `npm test` on Node 24. Gates **`build-nginx` only** — not `build-app`.
 4. **CFN job** — deploys infra stacks when the matching `aws/cfn/<service>/*.yml` template or relevant `aws/params/prod.json` keys change (per-stack detection). A template that git reports as a **pure rename** (`R100` — moved, not one byte changed) is dropped from the changed list before the per-stack checks, so moving templates between folders deploys nothing. The **database** stack only deploys when `cfn/database/aurora-cluster.yml` / DB params change and requires the `DB_MASTER_PASSWORD` secret (it is otherwise guarded by `DeletionPolicy=Retain`, `UpdateReplacePolicy=Snapshot`, `DeletionProtection=true`).
 5. **Build jobs** — `build-app` when `quant/**` (etc.) changed; `build-nginx` when `frontend/**` changed. Each pushes to ECR (git SHA + `latest`) on native arm64 — see [Why the build runs on arm64](#why-the-build-runs-on-arm64).

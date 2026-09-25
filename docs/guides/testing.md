@@ -9,6 +9,9 @@ python -m pytest tests/ -v
 # Unit tests only
 python -m pytest tests/unit/ -v
 
+# What CI runs: unit tests plus the synthetic backtest pipeline
+python -m pytest tests/unit/ tests/integration/test_backtest_pipeline.py -v
+
 # Specific test file
 python -m pytest tests/unit/test_strat.py -v
 

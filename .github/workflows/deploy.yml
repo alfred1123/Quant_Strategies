@@ -116,8 +116,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Run unit tests
-        run: python -m pytest tests/unit/ -v
+      - name: Run unit and pipeline tests
+        run: python -m pytest tests/unit/ tests/integration/test_backtest_pipeline.py -v
 
   frontend:
     name: frontend (build + audit)

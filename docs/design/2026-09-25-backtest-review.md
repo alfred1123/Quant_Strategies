@@ -26,7 +26,7 @@ Dependencies came from `requirements-dev.txt`. No local Postgres was available, 
 | Check | Result |
 |---|---|
 | `python -m pytest tests/unit/` | **1610 passed**, 8 skipped. Two skips are the disabled `/backtest/data` route (`tests/unit/test_api.py`). Six are Liquibase baselines marked reference-only (`tests/unit/test_liquibase_changelogs.py`). |
-| `python -m pytest tests/integration/test_backtest_pipeline.py` | **54 passed** on synthetic data. CI does not run this file. |
+| `python -m pytest tests/integration/test_backtest_pipeline.py` | **54 passed** on synthetic data. CI runs this file with `tests/unit/`. |
 | `python -m quant.cli --symbol BTC-USD --start 2023-01-01 --end 2024-01-01 --window 20 --signal 1.0 --no-grid` | Yahoo returned 365 daily bars. The last bar is **2023-12-31**. Bollinger momentum 20 / 1.0: total return **−14.9%**, Sharpe **−0.40**, max drawdown **26.9%**. Buy-and-hold on the same window: **+86%**, Sharpe **1.74**. |
 | Small scripts against `Performance` and `combine_positions` | Confirmed the volume, opening-fee, tie-break, chart-split, SMA-always-long, and short-ruin cases below. |
 
@@ -158,19 +158,17 @@ Why it matters: a backtest re-run months later, or a container rebuild, can move
 
 ### 9. CI skips the pipeline test, and a failed walk-forward is dropped
 
-The inline walk-forward failure is fixed. `run_optimize` catches a thrown split in place. The search still completes, and `OptimizeResponse.walk_forward_error` carries the exception text. The results page shows that text. An empty `walk_forward` with no error means the request left the split off, or the search had no valid cell.
+The pipeline file is in CI. `.github/workflows/tests.yml` and the test job in `.github/workflows/deploy.yml` run `tests/integration/test_backtest_pipeline.py` with `tests/unit/`. It needs no database. The inline walk-forward failure is already fixed above.
 
 | | |
 |---|---|
-| Where | `.github/workflows/tests.yml` lines 28–29 run `tests/unit/` only. Per-trial failures become −∞ in `quant/strategy/optimizer.py` lines 184–191. |
-| Evidence | The unit-test CI scope was read from the workflow. The pipeline file was run by hand (54 passed). |
+| Where | Per-trial failures become −∞ in `quant/strategy/optimizer.py`. |
+| Evidence | Found by reading. |
 | Effort | Small |
-
-`tests/integration/test_backtest_pipeline.py` is the test that drives fetch-shaped frames through `Performance`, the optimizer, and `WalkForward`. It is green and unrun in CI. Database integration tests skip cleanly when `QUANTDB_URL` is unset; this file does not need a database.
 
 Inside the search, an exception on one cell is stored as Sharpe −∞, so a broken indicator looks like a bad parameter.
 
-Why it matters: the check that would have caught a regression in the full pipeline is optional.
+Why it matters: a cell that throws is stored as Sharpe −∞, so the search ranks it as a bad parameter.
 
 ### 10. The CLI year length is a separate constant
 
