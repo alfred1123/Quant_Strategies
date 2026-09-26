@@ -2,7 +2,7 @@
 
 **Doc type:** platform review
 **Status:** open findings. This page records the review. It does not change the engine.
-**Reviewed:** `main` at `731a93487` (2026-09-25), including the Sharpe-ideas research pages that had just landed.
+**Reviewed:** `main` at `731a93487` (2026-09-25), including the Sharpe-ideas research pages that had just landed. Later API measurements are in the [AlgoDaemon bug report (2026-09-27)](2026-09-27-algodaemon-bug-report.md).
 
 A read of the backtest and live-apply path, plus the unit tests and one Yahoo backtest. Correctness items come first, then engineering, then nice-to-haves. Each item names the file, why it matters, a rough effort (small, medium, or large), and whether it was confirmed by running code or found by reading it.
 
