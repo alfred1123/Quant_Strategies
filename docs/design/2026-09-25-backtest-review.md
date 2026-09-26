@@ -36,6 +36,8 @@ The CLI run is a real 2023 path, not a synthetic one. A plain Bollinger band on 
 
 ### 1. Promotion trades the full-sample best Sharpe
 
+The evaluator now reads `OOS Sharpe Ratio` and `Sharpe Excess` when those HARD rows are present (decision #83). Release `1.26.0` also raises the existing full-sample Sharpe gate from 0 to 1. Context is `refdata` only, so production keeps Sharpe above 0 and the 40% drawdown gate until that release is deployed. The hold-out figure is the inline walk-forward already on the result.
+
 | | |
 |---|---|
 | Where | `quant/strategy/backtest_service.py` lines 550–569; `quant/queue/worker.py` lines 158–166; `quant/promotion/evaluate.py` lines 39–40; seed in `db/liquidbase/refdata/releases/archive/1.3.0-promotion-metric.xml` lines 17–21 |
@@ -212,6 +214,6 @@ The CLI run also showed Yahoo’s `end` date is exclusive: `--end 2024-01-01` st
 
 ## What to do first
 
-1. **Gate promotion on the out-of-sample result, and on beating buy-and-hold.** The walk-forward block is already produced. Promotion throws it away and can mark a full-sample Sharpe winner as best when the held-out window fails. That is the number that becomes a live order. The Phase 0.1 sign-off on the BTC candidate already failed this test. **Medium.**
+1. **Hold-out, buy-and-hold, and a full-sample Sharpe of at least 1 are in the evaluator.** They take effect when release `1.26.0` is deployed. Until then promotion still uses Sharpe above 0 and the 40% drawdown gate. **Medium, staged.**
 2. **Make the backtest describe the order that actually goes out.** Charge funding and the perp fee, and fill on the pre-close price, or keep the spot close-to-close research backtest and stop treating a linear-perp, pre-close fill as the same experiment. This is the gap that matters now that apply runs before the bar closes. **Medium.**
 3. **One-factor column and the full-sample tie-break are fixed.** A one-factor run now reads `data_column`, and a multi-factor disagreement is ranked on bars up to the one being decided. Stochastic still scores High, Low, and Close.

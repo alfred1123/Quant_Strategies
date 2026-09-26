@@ -250,16 +250,11 @@ Distilled, actionable backlog mapped to this repo. Status reflects the codebase
 |-------|--------|-------|
 | Walk-forward math | ✅ | `quant/strategy/walk_forward.py`, API `/backtest/walk-forward` |
 | Inline WF on optimize | ✅ | `walk_forward=True` in optimize request (`backtest_service.py`) |
-| WF in queue worker | ⬜ | Worker optimize path may not persist WF/OOS into `PAYLOAD_JSON` |
-| Promotion reads OOS | ⬜ | `_extract_metric` only reads `performance.strategy_metrics` |
-| REFDATA gate row | ⬜ | Add e.g. `oos_sharpe_gate` to `REFDATA.PROMOTION_METRIC` |
+| WF in queue worker | ✅ | `worker` stores `OptimizeResponse.model_dump()`, which includes `walk_forward.oos_metrics` |
+| Promotion reads OOS | ✅ | `_extract_metric` reads `OOS Sharpe Ratio` and `Sharpe Excess` (decision #83) |
+| REFDATA gate row | staged | `1.26.0` seeds the two HARD rows; context is `refdata` only |
 
-**Implementation steps (small, high impact):**
-
-1. **Worker:** after optimize, run walk-forward (or reuse inline WF) and attach `walk_forward.oos_metrics` to result payload written by `SP_INS_RESULT`.
-2. **Promotion:** extend `_extract_metric` to read `walk_forward.oos_metrics["Sharpe Ratio"]` (or normalized key).
-3. **REFDATA:** Liquibase seed — HARD metric `oos_sharpe_gt_0` with threshold (configurable).
-4. **UI:** show WF gate in Promotion comparison panel (already shows HARD gates from snapshot).
+The worker already stores the inline walk-forward. `_extract_metric` reads `OOS Sharpe Ratio` and `Sharpe Excess`. The Promotion panel already lists whatever HARD gates the snapshot returns. The rows land when `1.26.0` is deployed, then `POST /api/v1/refdata/refresh`.
 
 No queue schema change. No OOP required.
 
@@ -357,7 +352,7 @@ Start with `MarketExecutionModel` in backtest (wrap current fill logic), then sa
 | Rule | Promotion (HARD) | Live pre-trade |
 |------|------------------|----------------|
 | Max drawdown | ✅ HARD gate in `REFDATA.PROMOTION_METRIC` ("Max DD LTE 40%") | ⬜ |
-| Sharpe &gt; 0 | ✅ HARD gate in `REFDATA.PROMOTION_METRIC` ("Sharpe GT 0") | ⬜ |
+| Sharpe &gt; 1 | staged — `1.26.0` raises `sharpe_gate` from 0 to 1; production still has 0 | ⬜ |
 | Max position size | ⬜ | ⬜ |
 | Max leverage | ⬜ | ⬜ |
 | Correlation / factor exposure | ⬜ | ⬜ |

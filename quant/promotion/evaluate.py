@@ -36,11 +36,36 @@ class PromotionDecision:
 
 # ── helpers ──────────────────────────────────────────────────────────────
 
-def _extract_metric(payload: dict, metric_key: str) -> float | None:
-    val = (payload.get("performance") or {}).get("strategy_metrics", {}).get(metric_key)
-    if val is None or (isinstance(val, float) and not math.isfinite(val)):
+def _finite(val) -> float | None:
+    if isinstance(val, bool) or val is None:
         return None
-    return float(val)
+    try:
+        number = float(val)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _extract_metric(payload: dict, metric_key: str) -> float | None:
+    """Read one promotion metric off the stored result.
+
+    ``Sharpe Ratio`` and the other full-sample keys stay on
+    ``performance.strategy_metrics``. ``OOS Sharpe Ratio`` is the hold-out
+    Sharpe already stored on ``walk_forward.oos_metrics``. ``Sharpe Excess``
+    is strategy Sharpe minus buy-and-hold Sharpe. A missing piece is ``None``,
+    and a HARD gate treats that as a fail.
+    """
+    perf = payload.get("performance") or {}
+    if metric_key == "OOS Sharpe Ratio":
+        wf = payload.get("walk_forward") or {}
+        return _finite((wf.get("oos_metrics") or {}).get("Sharpe Ratio"))
+    if metric_key == "Sharpe Excess":
+        strategy = _finite((perf.get("strategy_metrics") or {}).get("Sharpe Ratio"))
+        buy_hold = _finite((perf.get("buy_hold_metrics") or {}).get("Sharpe Ratio"))
+        if strategy is None or buy_hold is None:
+            return None
+        return strategy - buy_hold
+    return _finite((perf.get("strategy_metrics") or {}).get(metric_key))
 
 
 def _compare(a: float, b: float, direction: str) -> int:

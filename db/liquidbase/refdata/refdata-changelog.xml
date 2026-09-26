@@ -29,4 +29,6 @@
 
     <!-- 1.24.0 and 1.25.0 applied on prod (2026-09-13, 2026-09-19) and archived. -->
 
+    <include file="releases/1.26.0-promotion-holdout-gates.xml" relativeToChangelogFile="true"/>
+
 </databaseChangeLog>

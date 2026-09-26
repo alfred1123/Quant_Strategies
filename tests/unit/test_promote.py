@@ -44,6 +44,12 @@ class TestHardGates:
     def test_passes_when_sharpe_at_zero(self):
         assert _is_promoted(_payload(sharpe=0.0), None, _metrics()) is True
 
+    def test_sharpe_gate_at_one_rejects_below_and_passes_at_one(self):
+        metrics = _metrics()
+        metrics[0]["threshold"] = 1
+        assert passes_hard_gates(_payload(sharpe=0.5), metrics) is False
+        assert passes_hard_gates(_payload(sharpe=1.0), metrics) is True
+
     def test_passes_when_sharpe_positive(self):
         assert _is_promoted(_payload(sharpe=1.5), None, _metrics()) is True
 
@@ -77,6 +83,37 @@ class TestSoftComparison:
     def test_all_tied_no_promote(self):
         p = _payload()
         assert _is_promoted(p, p, _metrics()) is False
+
+
+def _holdout_metrics():
+    return _metrics() + [
+        {"metric_key": "OOS Sharpe Ratio", "direction": "higher_is_better", "requirement_type": "HARD", "priority": 5, "threshold": 0, "name": "oos_sharpe_gate"},
+        {"metric_key": "Sharpe Excess", "direction": "higher_is_better", "requirement_type": "HARD", "priority": 15, "threshold": 0, "name": "sharpe_excess_gate"},
+    ]
+
+
+def _held_out(sharpe=1.0, oos=0.4, buy_hold=0.2):
+    payload = _payload(sharpe=sharpe)
+    payload["performance"]["buy_hold_metrics"] = {"Sharpe Ratio": buy_hold}
+    payload["walk_forward"] = {"oos_metrics": {"Sharpe Ratio": oos}}
+    return payload
+
+
+class TestHoldoutGates:
+    def test_promotes_when_holdout_and_buy_hold_clear(self):
+        assert _is_promoted(_held_out(), None, _holdout_metrics()) is True
+
+    def test_rejects_a_negative_holdout_sharpe(self):
+        assert passes_hard_gates(_held_out(oos=-0.2), _holdout_metrics()) is False
+
+    def test_rejects_when_the_holdout_was_not_run(self):
+        assert passes_hard_gates(_payload(sharpe=1.0), _holdout_metrics()) is False
+
+    def test_rejects_when_buy_hold_sharpe_is_higher(self):
+        assert passes_hard_gates(_held_out(sharpe=0.4, buy_hold=1.7), _holdout_metrics()) is False
+
+    def test_a_tie_with_buy_hold_passes(self):
+        assert passes_hard_gates(_held_out(sharpe=1.0, buy_hold=1.0), _holdout_metrics()) is True
 
 
 class TestPassesHardGates:

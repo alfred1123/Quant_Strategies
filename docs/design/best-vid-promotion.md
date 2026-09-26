@@ -143,8 +143,10 @@ Priority follows the same convention as `BT.QUEUE`: **lower number = higher prio
 
 | NAME | DISPLAY_NAME | TYPE | PRIORITY | THRESHOLD | METRIC_KEY | DIRECTION |
 |---|---|---|---|---|---|---|
-| sharpe_gate | Sharpe GT 0 | HARD | 0 | 0 | Sharpe Ratio | higher_is_better |
+| sharpe_gate | Sharpe GT 1 | HARD | 0 | 1 | Sharpe Ratio | higher_is_better |
 | max_dd_gate | Max DD LTE 40% | HARD | 10 | 0.40 | Max Drawdown | lower_is_better |
+| oos_sharpe_gate | OOS Sharpe GT 0 | HARD | 5 | 0 | OOS Sharpe Ratio | higher_is_better |
+| sharpe_excess_gate | Sharpe GTE buy-hold | HARD | 15 | 0 | Sharpe Excess | higher_is_better |
 | sharpe_compare | Sharpe Ratio | SOFT | 0 | — | Sharpe Ratio | higher_is_better |
 | calmar_compare | Calmar Ratio | SOFT | 20 | — | Calmar Ratio | higher_is_better |
 | total_return | Total Return | SOFT | 40 | — | Total Return | higher_is_better |

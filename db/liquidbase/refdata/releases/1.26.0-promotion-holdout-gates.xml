@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.26.0-001-seed-holdout-gates" author="alfcheun" context="refdata">
+        <comment>HARD gates: hold-out Sharpe, strategy Sharpe at least buy-and-hold, and the existing full-sample Sharpe gate raised from 0 to 1. Context is refdata only — not applied on a main push until prod-deploy is added.</comment>
+        <sql splitStatements="true" stripComments="true"><![CDATA[
+            INSERT INTO REFDATA.PROMOTION_METRIC (NAME, DISPLAY_NAME, METRIC_KEY, DIRECTION, REQUIREMENT_TYPE, PRIORITY, THRESHOLD, DESCRIPTION, USER_ID, UPDATED_AT)
+            VALUES
+                ('oos_sharpe_gate',    'OOS Sharpe GT 0',       'OOS Sharpe Ratio', 'higher_is_better', 'HARD',  5, 0, 'Hold-out Sharpe must be at least zero. A result with no walk-forward block fails.', 'system', NOW() AT TIME ZONE 'UTC'),
+                ('sharpe_excess_gate', 'Sharpe GTE buy-hold',   'Sharpe Excess',    'higher_is_better', 'HARD', 15, 0, 'Full-sample strategy Sharpe must be at least the buy-and-hold Sharpe.', 'system', NOW() AT TIME ZONE 'UTC');
+
+            UPDATE REFDATA.PROMOTION_METRIC
+               SET DISPLAY_NAME = 'Sharpe GT 1',
+                   THRESHOLD = 1,
+                   DESCRIPTION = 'Full-sample Sharpe must be at least 1',
+                   UPDATED_AT = NOW() AT TIME ZONE 'UTC'
+             WHERE NAME = 'sharpe_gate';
+        ]]></sql>
+    </changeSet>
+
+</databaseChangeLog>
