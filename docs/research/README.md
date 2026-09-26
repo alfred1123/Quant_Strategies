@@ -76,8 +76,11 @@ or link a design doc — do not turn the research page into a spec.
 | [Microstructure, on-chain, and unusual](microstructure-onchain-unusual.md) | 24h roll-out, clock-time flow, attention, on-chain value |
 
 Before treating a Sharpe from these pages as a result, read the
-[backtest review (2026-09-25)](../design/2026-09-25-backtest-review.md). It records
-how this engine annualizes, promotes, and costs a backtest. Engineering quality
+[backtest review (2026-09-25)](../design/2026-09-25-backtest-review.md) and the
+[AlgoDaemon bug report (2026-09-27)](../design/2026-09-27-algodaemon-bug-report.md).
+The review records how this engine annualizes, promotes, and costs a backtest.
+The bug report records measurements on top of that, including a long-only AND
+that currently scores as an OR. Engineering quality
 of the same tree — the worker, the scheduler, typing, and the session cookie —
 is in the [code quality review (2026-09-26)](../design/2026-09-26-code-quality-review.md).
 
