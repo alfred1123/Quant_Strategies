@@ -1,0 +1,4112 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/archive/infra-capacity-review/">
+      
+      
+        <link rel="prev" href="../return-compounding/">
+      
+      
+        <link rel="next" href="../backtest-queue-json-viewer/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Infrastructure Capacity Review (2026-09) - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#infrastructure-capacity-review-2026-09-22" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Infrastructure Capacity Review (2026-09)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../design/" class="md-tabs__link">
+          
+  
+  
+  Platform design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../research/" class="md-tabs__link">
+          
+  
+  
+  Strategy research
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/prod-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/plan-to-profit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/best-vid-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/ccxt-bar-timezones/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Bar Timezones & Apply Timing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/market-data-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/db-connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-25-backtest-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest review (2026-09-25)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-25-backtest-data-hygiene-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest data hygiene (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-26-fractional-sizing-stateful-exits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fractional sizing and stateful exits (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-26-code-quality-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code quality review (2026-09-26)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-27-algodaemon-bug-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AlgoDaemon bug report (2026-09-27)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy research
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Strategy research
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/crypto-spot-baseline-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crypto spot — baseline improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/sharpe-ideas-index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharpe ideas — where to start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/momentum-reversal-filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum, reversal, and filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/catching-crypto-trends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catching crypto trends
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/volatility-and-cross-section/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Volatility and the cross-section
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/funding-basis-carry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Funding, basis, and carry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/microstructure-onchain-unusual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Microstructure, on-chain, and unusual
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/polyu-quant-course-methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods from the PolyU quantitative trading course
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/dutch-algotrading-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dutch Algotrading Patreon review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-order-execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../return-compounding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Return Compounding (bug)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure Capacity Review (2026-09)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure Capacity Review (2026-09)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-what-is-running" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. What is running
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Evidence
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Evidence">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-seven-day-baseline-2026-09-15-09-22-hourly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Seven-day baseline (2026-09-15 → 09-22, hourly)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-load-event-31-backtest-replay-2026-09-22-1005-1042-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Load event — 31-backtest replay (2026-09-22 10:05 → 10:42 UTC)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-live-host-capture-2026-09-22-1105-utc-one-backtest-child-running" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Live host capture (2026-09-22 11:05 UTC, one backtest child running)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The questions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The questions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-bigger-ec2-no" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Bigger EC2? — No
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-three-concurrent-workers-use-two" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Three concurrent workers? — Use two
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-separate-host-for-the-worker-or-for-live-trading-no" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Separate host for the worker or for live trading? — No
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-aurora-sizing-leave-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Aurora sizing? — Leave it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-what-should-actually-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. What should actually change
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. What should actually change">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-memory-limits-and-a-memory-metric-compose-cw-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Memory limits and a memory metric (compose + CW agent)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-alarms-there-are-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Alarms — there are none
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-docker-log-rotation-currently-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Docker log rotation — currently none
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-close-port-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Close port 22
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-max_concurrent_workers2-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 MAX_CONCURRENT_WORKERS=2 — done
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-do-not-do-yet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 Do not do yet
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Decision
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#re-running-this-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-running this review
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer (abandoned)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-what-is-running" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. What is running
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Evidence
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Evidence">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-seven-day-baseline-2026-09-15-09-22-hourly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Seven-day baseline (2026-09-15 → 09-22, hourly)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-load-event-31-backtest-replay-2026-09-22-1005-1042-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Load event — 31-backtest replay (2026-09-22 10:05 → 10:42 UTC)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-live-host-capture-2026-09-22-1105-utc-one-backtest-child-running" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Live host capture (2026-09-22 11:05 UTC, one backtest child running)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The questions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The questions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-bigger-ec2-no" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Bigger EC2? — No
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-three-concurrent-workers-use-two" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Three concurrent workers? — Use two
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-separate-host-for-the-worker-or-for-live-trading-no" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Separate host for the worker or for live trading? — No
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-aurora-sizing-leave-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Aurora sizing? — Leave it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-what-should-actually-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. What should actually change
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. What should actually change">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-memory-limits-and-a-memory-metric-compose-cw-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Memory limits and a memory metric (compose + CW agent)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-alarms-there-are-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Alarms — there are none
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-docker-log-rotation-currently-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Docker log rotation — currently none
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-close-port-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Close port 22
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-max_concurrent_workers2-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 MAX_CONCURRENT_WORKERS=2 — done
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-do-not-do-yet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 Do not do yet
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Decision
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#re-running-this-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-running this review
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="infrastructure-capacity-review-2026-09-22">Infrastructure Capacity Review — 2026-09-22<a class="headerlink" href="#infrastructure-capacity-review-2026-09-22" title="Permanent link">&para;</a></h1>
+<div class="admonition note">
+<p class="admonition-title">Archived</p>
+<p>Point-in-time snapshot. For live topology and alarms see <a href="../../architecture/infrastructure/">Infrastructure</a> and <a href="../../decisions/">decision #74</a>.</p>
+</div>
+<p><strong>Question asked:</strong> do we need a bigger EC2, or a separate host for the queue
+worker / live trading? What else in the infrastructure should change?</p>
+<p><strong>Answer:</strong> neither. The host runs at <strong>1.7 % CPU averaged over seven days</strong> and
+the one real load event this week — a 31-job backtest replay — used <strong>one of the
+two cores</strong> and about seven CPU credits out of a full balance of 576. A live
+capture during that batch (§2.3) puts host memory at <strong>26 % peak, 2.6 GiB still
+available, zero swap used, and no OOM kill in the machine's history</strong>. The part
+of the stack that needs attention is not capacity at all: <strong>there are zero
+CloudWatch alarms and zero SNS topics</strong>, which is how a broken job-submission
+path went unnoticed for five days (<a href="../../decisions/">decision #74</a>), and the
+Docker daemon has <strong>no log rotation configured</strong>, which is a slow disk leak on a
+box with a disk-full history.</p>
+<p>This page supersedes the capacity questions left open in the Phase 0 archive
+(<a href="../phase-0/phase-0.2-capacity/">phase-0.2 capacity</a>, <a href="../phase-0/phase-0.3-topology/">phase-0.3 topology</a>), which
+deferred "separate TRADE host" to "Phase 3.7 if t4g.medium proves tight". It has
+not.</p>
+<hr />
+<h2 id="1-what-is-running">1. What is running<a class="headerlink" href="#1-what-is-running" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Resource</th>
+<th>Size</th>
+<th>Last-30-day cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Compute</td>
+<td>EC2 <code>quant-server</code> <code>i-009ba73f3ad3ce9c6</code></td>
+<td><strong>t4g.medium</strong> — 2 vCPU Graviton, 4 GiB, <code>unlimited</code> credit mode, 30 GiB gp3</td>
+<td>$10.18</td>
+</tr>
+<tr>
+<td>Database</td>
+<td>Aurora Serverless v2 <code>quantdb-cluster</code> / <code>quantdb-instance-1</code></td>
+<td>PostgreSQL 17.9, <strong>0.5 – 2.0 ACU</strong></td>
+<td>$25.10</td>
+</tr>
+<tr>
+<td>Network</td>
+<td>Elastic IP (public IPv4)</td>
+<td>—</td>
+<td>$3.60</td>
+</tr>
+<tr>
+<td>Other</td>
+<td>EBS, data transfer</td>
+<td>—</td>
+<td>$1.68</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td><strong>Total</strong></td>
+<td><strong>≈ $40.6 / month</strong></td>
+</tr>
+</tbody>
+</table>
+<p>On the host, one <code>docker compose</code> stack: <code>nginx</code>, <code>api</code> (FastAPI), <code>worker</code>
+(<code>worker_loop</code>, <code>MAX_CONCURRENT_WORKERS=1</code>), <code>redis</code> (128 MiB cap). No service
+declares a CPU or memory limit. See
+<a href="../../architecture/infrastructure/">Infrastructure</a> for the topology.</p>
+<p>The database is <strong>62 % of the bill</strong>, and its cost is the 0.5 ACU floor running
+24 h, not usage.</p>
+<hr />
+<h2 id="2-evidence">2. Evidence<a class="headerlink" href="#2-evidence" title="Permanent link">&para;</a></h2>
+<p>All figures from CloudWatch, region <code>ap-southeast-1</code>. Timestamps UTC.</p>
+<h3 id="21-seven-day-baseline-2026-09-15-09-22-hourly">2.1 Seven-day baseline (2026-09-15 → 09-22, hourly)<a class="headerlink" href="#21-seven-day-baseline-2026-09-15-09-22-hourly" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Average</th>
+<th>Max (any hour)</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>EC2 <code>CPUUtilization</code></td>
+<td><strong>1.7 %</strong></td>
+<td>59.9 %</td>
+<td>Only <strong>1 of 179 hours</strong> averaged above 5 %</td>
+</tr>
+<tr>
+<td>EC2 <code>CPUCreditBalance</code></td>
+<td>576</td>
+<td>576</td>
+<td>Full — the instance never spends what it earns</td>
+</tr>
+<tr>
+<td>Aurora <code>ServerlessDatabaseCapacity</code></td>
+<td><strong>0.500 ACU</strong></td>
+<td>2.0</td>
+<td>At the floor; 28 hours contained a <em>brief</em> spike to the 2.0 ceiling (hourly crons, the 09-19/20 <code>pg_dump</code>, user backtests)</td>
+</tr>
+<tr>
+<td>Aurora <code>CPUUtilization</code></td>
+<td>22 %</td>
+<td>100 %</td>
+<td>22 % <em>of 0.5 ACU</em> — idle chatter from the hourly <code>price_bar_sync</code> / <code>trade_apply_tick</code> / <code>term_stale_connections</code></td>
+</tr>
+<tr>
+<td>Aurora <code>DatabaseConnections</code></td>
+<td>3.9</td>
+<td>10</td>
+<td>3.9 ≈ two pools × <code>DB_POOL_MIN=2</code>; 10 under load, well under the 2 × <code>DB_POOL_MAX=10</code> ceiling</td>
+</tr>
+<tr>
+<td>Aurora storage</td>
+<td>0.37 GiB</td>
+<td>—</td>
+<td>Trivial</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-load-event-31-backtest-replay-2026-09-22-1005-1042-utc">2.2 Load event — 31-backtest replay (2026-09-22 10:05 → 10:42 UTC)<a class="headerlink" href="#22-load-event-31-backtest-replay-2026-09-22-1005-1042-utc" title="Permanent link">&para;</a></h3>
+<p><code>scripts/rerun_results.py</code> enqueued 31 grid-search jobs; the single worker
+drained them in ~30 minutes (~1 min/job). This is the heaviest sustained load
+the platform has seen and a fair proxy for a user submitting a batch.</p>
+<table>
+<thead>
+<tr>
+<th>Metric (5-min buckets)</th>
+<th>Peak avg</th>
+<th>Peak max</th>
+<th>Reading</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>EC2 <code>CPUUtilization</code></td>
+<td>51.3 %</td>
+<td><strong>51.8 %</strong></td>
+<td><strong>One core saturated, one idle.</strong> The worker is one process; 50 % of a 2-vCPU box is its ceiling by construction.</td>
+</tr>
+<tr>
+<td>EC2 <code>CPUCreditUsage</code></td>
+<td>4.9 / 5 min</td>
+<td>—</td>
+<td>t4g.medium earns 2 credits / 5 min. Net drain ≈ 3 / 5 min → balance 576 → 569 over the batch. A batch would have to run <strong>~15 hours</strong> to exhaust it; <code>unlimited</code> mode means it would then cost a few cents, not throttle.</td>
+</tr>
+<tr>
+<td>EC2 <code>NetworkIn</code> + <code>Out</code></td>
+<td>~60 MB / 5 min each</td>
+<td>—</td>
+<td>≈ 200 KB/s. Not a factor.</td>
+</tr>
+<tr>
+<td>Aurora <code>ServerlessDatabaseCapacity</code></td>
+<td>0.56 ACU</td>
+<td><strong>2.0</strong></td>
+<td>Spiky: mostly at the floor, brief bursts to the ceiling at each job's bar fetch / result write.</td>
+</tr>
+<tr>
+<td>Aurora <code>CPUUtilization</code></td>
+<td>25.7 %</td>
+<td><strong>100 %</strong></td>
+<td>Same shape — short 100 % spikes, ~25 % average. The database was <strong>not</strong> the steady-state bottleneck; compute on one core was.</td>
+</tr>
+<tr>
+<td>Aurora <code>FreeableMemory</code></td>
+<td>2.5 GB</td>
+<td>—</td>
+<td>No pressure.</td>
+</tr>
+</tbody>
+</table>
+<p>Memory during this batch is covered by §2.3 — it was not visible in CloudWatch,
+but <code>sysstat</code> had been recording it on the host all along.</p>
+<h3 id="23-live-host-capture-2026-09-22-1105-utc-one-backtest-child-running">2.3 Live host capture (2026-09-22 11:05 UTC, one backtest child running)<a class="headerlink" href="#23-live-host-capture-2026-09-22-1105-utc-one-backtest-child-running" title="Permanent link">&para;</a></h3>
+<p><code>bash aws/scripts/capacity_snapshot.sh</code> via SSM, plus <code>sar</code> history. This is the
+"live capture" that Phase 0.2 left pending.</p>
+<p><strong>Host</strong></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OS / kernel</td>
+<td>Amazon Linux 2023.12.20260909, <code>6.18.44-99.149.amzn2023.aarch64</code></td>
+</tr>
+<tr>
+<td>CPU / RAM</td>
+<td>2 vCPU aarch64 / <strong>3.7 GiB</strong> usable</td>
+</tr>
+<tr>
+<td>Docker / Compose</td>
+<td>25.0.16 / 5.5.1</td>
+</tr>
+<tr>
+<td>Root disk</td>
+<td>30 GiB gp3 — <strong>4.4 GiB used (15 %)</strong></td>
+</tr>
+<tr>
+<td>Uptime</td>
+<td>8 days</td>
+</tr>
+<tr>
+<td>Swap</td>
+<td><strong>none</strong> (<code>swapon</code> empty); <code>vm.overcommit_memory=0</code>, <code>vm.swappiness=60</code></td>
+</tr>
+<tr>
+<td>CloudWatch agent</td>
+<td><strong>not installed</strong></td>
+</tr>
+<tr>
+<td><code>sysstat</code></td>
+<td><strong>installed and collecting every 10 min</strong> — <code>sar -r</code> / <code>sar -q</code> hold host history</td>
+</tr>
+<tr>
+<td>Root crontab</td>
+<td>empty</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Memory — <code>sar -r</code>, 2026-09-22, spanning the batch</strong></p>
+<table>
+<thead>
+<tr>
+<th>Time (UTC)</th>
+<th><code>%memused</code></th>
+<th><code>kbavail</code></th>
+<th><code>%commit</code></th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10:00</td>
+<td>8.7 %</td>
+<td>3.25 GiB</td>
+<td>55 %</td>
+<td>pre-batch idle</td>
+</tr>
+<tr>
+<td>10:10</td>
+<td>19.5 %</td>
+<td>2.83 GiB</td>
+<td>78 %</td>
+<td>batch running</td>
+</tr>
+<tr>
+<td><strong>10:20</strong></td>
+<td><strong>26.3 %</strong></td>
+<td>2.56 GiB</td>
+<td>82 %</td>
+<td><strong>peak of the day</strong></td>
+</tr>
+<tr>
+<td>10:30</td>
+<td>19.1 %</td>
+<td>2.85 GiB</td>
+<td>72 %</td>
+<td>between jobs</td>
+</tr>
+<tr>
+<td>10:40</td>
+<td>24.0 %</td>
+<td>2.66 GiB</td>
+<td>84 %</td>
+<td></td>
+</tr>
+<tr>
+<td>11:00</td>
+<td>25.4 %</td>
+<td>2.60 GiB</td>
+<td>87 %</td>
+<td>one child running</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Peak host memory use all day: 26.3 % — about 1.0 GiB of 3.7 GiB.</strong> Swap used:
+<strong>0</strong> throughout (<code>sar -S</code>). Load average peaked at <strong>1.29</strong> on 2 CPUs, i.e. a
+little over one core — consistent with the CloudWatch 51 % reading.</p>
+<p><strong>Per-container, cgroup v2 <code>memory.peak</code> (since the 10:27 deploy, covering
+several batch jobs)</strong></p>
+<table>
+<thead>
+<tr>
+<th>Container</th>
+<th>Current</th>
+<th><strong>Peak</strong></th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>quant-worker</code> (loop + child)</td>
+<td>350 MiB</td>
+<td><strong>661 MiB</strong></td>
+<td><code>max</code> — unlimited</td>
+</tr>
+<tr>
+<td><code>quant-api</code> (<code>uvicorn --workers 2</code>)</td>
+<td>391 MiB</td>
+<td><strong>414 MiB</strong></td>
+<td><code>max</code> — unlimited</td>
+</tr>
+<tr>
+<td><code>quant-redis</code></td>
+<td>4.5 MiB</td>
+<td>8 MiB</td>
+<td><code>max</code> (128 MiB internal cap)</td>
+</tr>
+<tr>
+<td><code>quant-nginx</code></td>
+<td>4.4 MiB</td>
+<td>6 MiB</td>
+<td><code>max</code> — unlimited</td>
+</tr>
+</tbody>
+</table>
+<p>The running child measured <strong>239 MiB RSS</strong> steady-state at 99.4 % CPU. The
+worker container's 661 MiB peak against a ~72 MiB loop implies a child
+<strong>transiently reaching ~590 MiB</strong> during grid search, so both numbers matter: a
+child costs ~240 MiB most of the time and ~590 MiB at its worst moment.</p>
+<p><strong>No OOM kill has ever occurred</strong> — the kernel log is clean. With no swap, an
+OOM would be an instant kill rather than a slowdown, which is the argument for
+§4.1's <code>mem_limit</code> regardless of how much headroom exists.</p>
+<hr />
+<h2 id="3-the-questions">3. The questions<a class="headerlink" href="#3-the-questions" title="Permanent link">&para;</a></h2>
+<h3 id="31-bigger-ec2-no">3.1 Bigger EC2? — No<a class="headerlink" href="#31-bigger-ec2-no" title="Permanent link">&para;</a></h3>
+<p>A t4g.large doubles RAM and the compute line (~$20/mo). Against that:</p>
+<ul>
+<li>Average CPU is 1.7 %. Peak is one core, capped there by the worker's design,
+  not by the instance.</li>
+<li>The idle second core is already the "bigger host" — <code>MAX_CONCURRENT_WORKERS=2</code>
+  roughly doubles batch throughput on the <em>same</em> instance for free. See §3.2.</li>
+<li>Memory peaked at <strong>26 %</strong> under batch load (§2.3). RAM is not the constraint.</li>
+<li>CPU credits are irrelevant at this duty cycle.</li>
+</ul>
+<p><strong>Neither capacity signal points at a larger instance.</strong> The binding limit is
+2 cores, and the worker is not yet using both.</p>
+<h3 id="32-three-concurrent-workers-use-two">3.2 Three concurrent workers? — Use two<a class="headerlink" href="#32-three-concurrent-workers-use-two" title="Permanent link">&para;</a></h3>
+<p>The knob is <code>MAX_CONCURRENT_WORKERS</code> (<code>docker-compose.yml</code>, default <code>1</code>);
+<code>worker_loop</code> spawns one <code>subprocess.Popen</code> per claimed job up to that number,
+each child a separate process with its own Postgres pool. Raising it is a
+one-line compose change.</p>
+<p><strong>Two is the right number on this host, and the reason is cores, not memory.</strong>
+Measured per-child cost is ~240 MiB steady / ~590 MiB peak (§2.3), so three
+children worst-case lands around 2.2 GiB of 3.7 GiB — comfortable. But a
+backtest child runs at ~100 % of one core for its whole life:</p>
+<table>
+<thead>
+<tr>
+<th><code>MAX_CONCURRENT_WORKERS</code></th>
+<th>Throughput</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 (today)</td>
+<td>1×</td>
+<td>One core busy, one idle</td>
+</tr>
+<tr>
+<td><strong>2</strong></td>
+<td><strong>≈ 2×</strong></td>
+<td>Both cores busy — the free win</td>
+</tr>
+<tr>
+<td>3</td>
+<td>still ≈ 2×</td>
+<td>Three CPU-bound processes time-slice 2 cores. No extra throughput, and <code>quant-api</code> — itself <code>uvicorn --workers 2</code> — now contends for a core when the <code>:05</code> apply tick fires</td>
+</tr>
+</tbody>
+</table>
+<p>Going past 2 needs 4 vCPU. The whole <code>t4g</code> line is 2 vCPU through <code>large</code>, so
+that means <code>t4g.xlarge</code> (4 vCPU / 16 GiB) at roughly 4× the current compute
+cost — unjustifiable at a 1.7 % duty cycle. Set 2, and pair it with the
+<code>mem_limit</code> / <code>cpu_shares</code> guardrails in §4.1 so a second child cannot take the
+API down with it.</p>
+<h3 id="33-separate-host-for-the-worker-or-for-live-trading-no">3.3 Separate host for the worker or for live trading? — No<a class="headerlink" href="#33-separate-host-for-the-worker-or-for-live-trading-no" title="Permanent link">&para;</a></h3>
+<p>The case for a second box is isolation: a backtest batch saturating CPU at
+<code>:05</code> past the hour would slow <code>trade_apply_tick</code>, and a runaway backtest child
+could OOM the API. Both are real. Neither needs a second host:</p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Second EC2 (t4g.small + EIP ≈ <strong>$16/mo, +40 %</strong>)</th>
+<th>Same host, compose limits (<strong>$0</strong>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Batch steals CPU from the apply tick</td>
+<td>Solved</td>
+<td><code>cpu_shares: 512</code> on <code>worker</code> (API keeps default 1024). Docker only enforces shares <strong>under contention</strong>, which is exactly and only when it matters. With one worker process there is a free core anyway.</td>
+</tr>
+<tr>
+<td>Backtest child OOMs the API</td>
+<td>Solved</td>
+<td><code>mem_limit</code> on <code>worker</code> so the kernel kills the child inside its cgroup, not <code>quant-api</code>.</td>
+</tr>
+<tr>
+<td>Deploy blast radius</td>
+<td>Two SSM targets, two <code>git reset --hard</code>, two compose files, cross-host Redis</td>
+<td>Unchanged</td>
+</tr>
+<tr>
+<td>Observability</td>
+<td>Twice as little as now (§4.2)</td>
+<td>Unchanged</td>
+</tr>
+</tbody>
+</table>
+<p>Paying 40 % more to isolate a workload that is active <strong>&lt; 1 % of the time</strong>, on
+a host with a spare core, is not a good trade. The isolation we want is a cgroup
+setting away.</p>
+<p><strong>Revisit when any of these is true</strong>, and not before:</p>
+<ul>
+<li>Sustained (not peak) EC2 CPU above 60 % for an hour with the compose limits in
+  place — meaning both cores are genuinely busy.</li>
+<li>Host memory above 85 % at the trough between batches.</li>
+<li>More than one live-trading account whose apply latency has a hard SLA.</li>
+<li>The queue runs <code>MAX_CONCURRENT_WORKERS ≥ 3</code> and batch throughput is an
+  explicit product goal.</li>
+</ul>
+<p>Then the path is the one already sketched: a second EC2 pulling the same ECR
+images with <code>command: worker_loop</code> only — or ECS, per
+<a href="../../architecture/infrastructure/#future-ecs-migration">Infrastructure › Future: ECS migration</a>.</p>
+<h3 id="34-aurora-sizing-leave-it">3.4 Aurora sizing? — Leave it<a class="headerlink" href="#34-aurora-sizing-leave-it" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Min 0.5 ACU</strong> is the floor. Aurora now allows min 0 (scale-to-zero), but
+  the hourly crons and the two <code>DB_POOL_MIN=2</code> pools would keep it awake, so the
+  pause would never engage. No saving available without restructuring the
+  pools, and the pools are there for a reason
+  (<a href="../../design/db-connections/">Database Connections</a>).</li>
+<li><strong>Max 2.0 ACU</strong> is hit only in sub-minute spikes. Raising it to 4 costs
+  nothing at rest (you pay per ACU-second used) and would shorten the spikes;
+  do it <strong>only if</strong> <code>MAX_CONCURRENT_WORKERS</code> goes to 2 and batches feel
+  DB-bound. Not needed today.</li>
+<li>A provisioned <code>db.t4g.micro</code> RDS Postgres would be ~$12/mo cheaper. Same
+  1 GiB as 0.5 ACU but with no burst to 4 GiB, a migration, and no Aurora
+  storage/backup behaviour. <strong>Not recommended</strong> — $12 is not worth a database
+  move.</li>
+</ul>
+<hr />
+<h2 id="4-what-should-actually-change">4. What should actually change<a class="headerlink" href="#4-what-should-actually-change" title="Permanent link">&para;</a></h2>
+<p>Ordered by value per unit of effort.</p>
+<h3 id="41-memory-limits-and-a-memory-metric-compose-cw-agent">4.1 Memory limits and a memory metric (compose + CW agent)<a class="headerlink" href="#41-memory-limits-and-a-memory-metric-compose-cw-agent" title="Permanent link">&para;</a></h3>
+<p>Not a capacity problem — a blast-radius one. Every container runs with
+<code>memory.max = max</code> (§2.3), so a runaway backtest child competes with
+<code>quant-api</code> for the same 3.7 GiB and, with <strong>no swap</strong>, the kernel's OOM killer
+picks a victim by score rather than by whose fault it is. Bound the worker:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">worker</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">mem_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2g</span><span class="w">          </span><span class="c1"># a child dies inside its own cgroup, not the API's</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">cpu_shares</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span><span class="w">        </span><span class="c1"># api/nginx keep the default 1024</span>
+</code></pre></div>
+<p><code>mem_limit</code> bounds <strong>the whole container</strong> — the loop and every child it
+spawns — not each child. At <code>MAX_CONCURRENT_WORKERS=2</code> the budget is therefore
+2 × 590 MiB peak + ~72 MiB loop ≈ <strong>1.25 GiB</strong> measured worst case, so <code>2g</code>
+carries ~750 MiB of slack and will not fire in normal operation. <strong>It scales
+with the worker count:</strong> a third child at peak would breach 2 GiB and be OOM-killed
+rather than simply queued, so <code>mem_limit</code> has to rise with any increase to
+<code>MAX_CONCURRENT_WORKERS</code>. <code>cpu_shares</code> only binds <strong>under contention</strong>, which
+is exactly when the <code>:05</code> apply tick matters and <code>quant-api</code>
+(<code>uvicorn --workers 2</code>) wants a core.</p>
+<p><strong>Setting up ongoing memory visibility.</strong> The host already records it —
+<code>sysstat</code> collects every 10 minutes, so <code>sar -r</code> / <code>sar -q</code> answer "what did
+memory do during that batch?" retroactively, which is how §2.3 was assembled
+with no agent installed:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># via SSM, no agent, no cost — history for today</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>aws<span class="w"> </span>ssm<span class="w"> </span>send-command<span class="w"> </span>--instance-ids<span class="w"> </span><span class="s2">"</span><span class="nv">$INSTANCE_ID</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--document-name<span class="w"> </span>AWS-RunShellScript<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>--parameters<span class="w"> </span><span class="s1">'commands=["sar -r","sar -q","sar -S"]'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>--region<span class="w"> </span>ap-southeast-1
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># yesterday and earlier: sar -r -f /var/log/sa/sa&lt;DD&gt;</span>
+</code></pre></div>
+<p>That is sufficient for <strong>investigation</strong> and it is already running. What
+<code>sysstat</code> cannot do is <strong>alert</strong> — its data never reaches CloudWatch, so no
+alarm can read it. If we want a memory alarm (§4.2), that needs the CloudWatch
+agent publishing <code>mem_used_percent</code>, which stays inside the 10-free-custom-metric
+tier. Given the measured 26 % peak, memory is the <em>least</em> likely thing to page
+us; install the agent for <code>disk_used_percent</code> first and take <code>mem_used_percent</code>
+as a free passenger on the same config.</p>
+<h3 id="42-alarms-there-are-none">4.2 Alarms — there are none<a class="headerlink" href="#42-alarms-there-are-none" title="Permanent link">&para;</a></h3>
+<p>Zero <code>MetricAlarms</code>, zero SNS topics. The <code>quant-scheduled-task</code> Lambda already
+raises on any non-2xx from the API (<code>handler.py</code> re-raises <code>HTTPError</code> and
+<code>URLError</code>), which makes its <code>Errors</code> metric a <strong>free synthetic uptime check
+firing four times an hour</strong> — and it logged one error in the last seven days
+that nobody saw. Wire it:</p>
+<table>
+<thead>
+<tr>
+<th>Alarm</th>
+<th>Metric</th>
+<th>Threshold</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>API down / erroring</strong></td>
+<td><code>AWS/Lambda</code> <code>Errors</code> on <code>quant-scheduled-task</code></td>
+<td>≥ 1 in 1 h</td>
+<td>Catches 5xx, timeouts, and a dead container — the class of failure in #74</td>
+</tr>
+<tr>
+<td>Host gone</td>
+<td><code>AWS/EC2</code> <code>StatusCheckFailed</code></td>
+<td>≥ 1</td>
+<td>Hardware / network</td>
+</tr>
+<tr>
+<td>Host disk</td>
+<td><code>disk_used_percent</code> (needs CW agent)</td>
+<td>&gt; 80 %</td>
+<td>The 8 → 30 GiB history says this will recur</td>
+</tr>
+<tr>
+<td>DB pinned</td>
+<td><code>AWS/RDS</code> <code>ACUUtilization</code></td>
+<td>avg &gt; 90 % for 15 min</td>
+<td>Distinguishes a runaway query from a normal spike</td>
+</tr>
+<tr>
+<td>DB connections</td>
+<td><code>AWS/RDS</code> <code>DatabaseConnections</code></td>
+<td>&gt; 16</td>
+<td>2 pools × 10 is the hard cap; 16 means something is leaking</td>
+</tr>
+</tbody>
+</table>
+<p>One SNS topic with an e-mail subscription is enough. Add these to a new
+<code>aws/cfn/cloudwatch/alarms.yml</code> so they deploy with everything else; the CFN job in
+<code>deploy.yml</code> already handles per-stack path detection.</p>
+<h3 id="43-docker-log-rotation-currently-none">4.3 Docker log rotation — currently none<a class="headerlink" href="#43-docker-log-rotation-currently-none" title="Permanent link">&para;</a></h3>
+<p>There is <strong>no <code>/etc/docker/daemon.json</code></strong> on the host, so the default
+<code>json-file</code> driver runs with no <code>max-size</code> or <code>max-file</code>: container stdout grows
+without bound until the container is recreated. Today it is harmless
+(<code>/var/lib/docker/containers</code> is 860 KiB, root disk 15 % full) because deploys
+recreate containers often enough to truncate it — but <code>quant-redis</code> has been up
+8 days and a long-lived container between deploys is the leak. On a box whose
+<a href="../../architecture/infrastructure/#troubleshooting-disk-full-on-deploy">disk-full incident</a>
+already forced an 8 → 30 GiB volume growth, this is worth closing:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"log-driver"</span><span class="p">:</span><span class="w"> </span><span class="s2">"json-file"</span><span class="p">,</span><span class="w"> </span><span class="nt">"log-opts"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"max-size"</span><span class="p">:</span><span class="w"> </span><span class="s2">"20m"</span><span class="p">,</span><span class="w"> </span><span class="nt">"max-file"</span><span class="p">:</span><span class="w"> </span><span class="s2">"3"</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>Add it to <code>aws/scripts/bootstrap-ec2.sh</code> (so a rebuilt host inherits it) and
+apply once by hand; it takes effect for containers created after a
+<code>systemctl restart docker</code>. Caps total container logs at ~240 MiB.</p>
+<p><code>/var/log</code> is 114 MiB and <code>logrotate.timer</code> is active, so the OS side is fine.</p>
+<h3 id="44-close-port-22">4.4 Close port 22<a class="headerlink" href="#44-close-port-22" title="Permanent link">&para;</a></h3>
+<p><code>aws/params/prod.json</code> still has <code>SshCidr: 0.0.0.0/0</code>. Every deploy, migration,
+and recovery already goes through SSM Run Command / Session Manager, which needs
+no inbound port. Set <code>SshCidr</code> to a single admin <code>/32</code> or remove the rule. Zero
+cost, removes a permanently open SSH listener from a box that holds exchange
+credentials in memory.</p>
+<h3 id="45-max_concurrent_workers2-done">4.5 <code>MAX_CONCURRENT_WORKERS=2</code> — done<a class="headerlink" href="#45-max_concurrent_workers2-done" title="Permanent link">&para;</a></h3>
+<p>Applied 2026-09-22 in <code>docker-compose.prod.yml</code>, together with the §4.1
+guardrails so the second child is bounded from its first run:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">worker</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MAX_CONCURRENT_WORKERS=2</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">mem_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2g</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">cpu_shares</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span>
+</code></pre></div>
+<p>Roughly doubles batch throughput at no cost. Not 3 — see §3.2. If batches then
+feel DB-bound, <code>MaxACU: 4</code> is the next lever (§3.4).</p>
+<p><strong>Why &gt;1 is safe despite the deferred <code>SP_CLAIM_NEXT</code>.</strong>
+<code>docs/env-vars.md</code> used to say to bump this "only after <code>SP_CLAIM_NEXT</code> becomes
+atomic", which overstated the constraint by conflating <em>children</em> with
+<em>replicas</em>. <code>WorkerLoopRepo.claim_next</code> is a read-then-write pair and is indeed
+not atomic, but <code>WorkerLoop.tick</code> fills capacity in a <strong>single-threaded <code>while</code>
+loop</strong>: each claim flips its row to <code>RUNNING</code> before the next read, so the
+second read cannot see the first job. The race needs two <code>worker_loop</code> processes
+reading the same head concurrently — which is what
+<a href="../../design/backtest-queue/#0-v6-migration-done">backtest-queue §0</a> defers, and we
+still run one replica. <code>recover_stale()</code> keeps its single-replica assumption
+untouched.</p>
+<p><strong>Residual risk accepted.</strong> Two jobs for the <em>same</em> <code>STRATEGY_ID</code> finishing at
+the same instant both run promotion. <code>SP_UPD_PROMOTE_STRATEGY</code> demotes and
+promotes in one transaction, so Postgres row locks serialise them and the
+outcome is last-writer-wins on <code>IS_BEST_IND</code> rather than two rows marked <code>Y</code>.
+Last-writer-wins is a legitimate outcome of two near-simultaneous runs, so this
+is not a correctness bug — but if concurrency goes higher, add an advisory lock
+per <code>STRATEGY_ID</code> the way <code>SP_INS_STRATEGY_VID_BY_NM</code> already does.</p>
+<h3 id="46-do-not-do-yet">4.6 Do not do yet<a class="headerlink" href="#46-do-not-do-yet" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Second host / ECS — triggers in §3.3.</li>
+<li>Instance resize — no evidence; and 3 workers is the wrong reason (§3.2).</li>
+<li>Database engine change — §3.4.</li>
+</ul>
+<hr />
+<h2 id="5-decision">5. Decision<a class="headerlink" href="#5-decision" title="Permanent link">&para;</a></h2>
+<p>Recorded as <a href="../../decisions/">decision #75</a>. Summary: <strong>t4g.medium stays; no
+second host; the host is over-provisioned on both CPU and memory. Raise the
+worker to two — not three, because there are two cores — and bound it with
+<code>mem_limit</code> / <code>cpu_shares</code>. The missing pieces are alarms, Docker log rotation,
+and a closed port 22 — none of them capacity.</strong></p>
+<h3 id="re-running-this-review">Re-running this review<a class="headerlink" href="#re-running-this-review" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># host setup, per-container memory peaks, live docker stats</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>aws<span class="w"> </span>ssm<span class="w"> </span>send-command<span class="w"> </span>--instance-ids<span class="w"> </span><span class="s2">"</span><span class="nv">$INSTANCE_ID</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--document-name<span class="w"> </span>AWS-RunShellScript<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>--parameters<span class="w"> </span><span class="s1">'commands=["cd /opt/quant &amp;&amp; bash aws/scripts/capacity_snapshot.sh"]'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>--region<span class="w"> </span>ap-southeast-1
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># host memory / load history (sysstat, already collecting)</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1">#   sar -r | sar -q | sar -S      today</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1">#   sar -r -f /var/log/sa/sa&lt;DD&gt;  a previous day</span>
+</code></pre></div>
+<p>Resolve <code>$INSTANCE_ID</code> from the <code>quant-compute</code> stack output — it changes when
+the instance is replaced. CloudWatch supplies EC2 CPU / credits / network and
+all Aurora metrics; <code>sysstat</code> supplies host memory; cgroup <code>memory.peak</code>
+supplies the per-container high-water marks.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>

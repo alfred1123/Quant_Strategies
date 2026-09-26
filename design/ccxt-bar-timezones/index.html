@@ -1,0 +1,3979 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/design/ccxt-bar-timezones/">
+      
+      
+        <link rel="prev" href="../scheduler-trade-open-questions/">
+      
+      
+        <link rel="next" href="../ccxt-trade-and-xref-validation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>ccxt Bar Timezones & Apply Timing - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#ccxt-bar-timezones-and-when-to-apply" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ccxt Bar Timezones & Apply Timing
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Platform design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../research/" class="md-tabs__link">
+          
+  
+  
+  Strategy research
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../archive/" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/prod-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plan-to-profit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best-vid-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Bar Timezones & Apply Timing
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Bar Timezones & Apply Timing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#short-answer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Short answer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-ccxt-returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What ccxt returns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What ccxt returns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#exchange-specific-notes-venues-we-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exchange-specific notes (venues we use)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-we-store-and-name-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How we store and name bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-signal-actually-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the signal actually reads
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-we-apply-today-platform-schedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When we apply today (platform schedule)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-timezone-mismatches-still-hurt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where timezone mismatches still hurt
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where timezone mismatches still hurt">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#exchange-bars-vs-provider-bars-backtest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exchange bars vs provider bars (backtest)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-on-a-venue-bybit-testnet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify on a venue (Bybit testnet)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#code-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plan-align-apply-clock-to-bar-close-asap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plan — align apply clock to bar close (ASAP)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plan — align apply clock to bar close (ASAP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target rule
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Target rule">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-refdata-session-times-relate-to-ccxt-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How REFDATA session times relate to ccxt bars
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation steps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backfill-policy-step-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backfill policy (step 6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#later-not-blocking-the-shift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Later (not blocking the shift)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-data-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../db-connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-25-backtest-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest review (2026-09-25)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-25-backtest-data-hygiene-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest data hygiene (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-26-fractional-sizing-stateful-exits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fractional sizing and stateful exits (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-26-code-quality-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code quality review (2026-09-26)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-27-algodaemon-bug-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AlgoDaemon bug report (2026-09-27)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy research
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Strategy research
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/crypto-spot-baseline-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crypto spot — baseline improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/sharpe-ideas-index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharpe ideas — where to start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/momentum-reversal-filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum, reversal, and filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/catching-crypto-trends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catching crypto trends
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/volatility-and-cross-section/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Volatility and the cross-section
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/funding-basis-carry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Funding, basis, and carry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/microstructure-onchain-unusual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Microstructure, on-chain, and unusual
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/polyu-quant-course-methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods from the PolyU quantitative trading course
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/dutch-algotrading-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dutch Algotrading Patreon review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/live-order-execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/return-compounding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Return Compounding (bug)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/infra-capacity-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure Capacity Review (2026-09)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer (abandoned)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#short-answer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Short answer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-ccxt-returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What ccxt returns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What ccxt returns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#exchange-specific-notes-venues-we-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exchange-specific notes (venues we use)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-we-store-and-name-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How we store and name bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-signal-actually-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the signal actually reads
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-we-apply-today-platform-schedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When we apply today (platform schedule)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-timezone-mismatches-still-hurt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where timezone mismatches still hurt
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where timezone mismatches still hurt">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#exchange-bars-vs-provider-bars-backtest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exchange bars vs provider bars (backtest)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-on-a-venue-bybit-testnet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify on a venue (Bybit testnet)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#code-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plan-align-apply-clock-to-bar-close-asap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plan — align apply clock to bar close (ASAP)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plan — align apply clock to bar close (ASAP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target rule
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Target rule">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-refdata-session-times-relate-to-ccxt-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How REFDATA session times relate to ccxt bars
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation steps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backfill-policy-step-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backfill policy (step 6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#later-not-blocking-the-shift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Later (not blocking the shift)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="ccxt-bar-timezones-and-when-to-apply">ccxt bar timezones and when to apply<a class="headerlink" href="#ccxt-bar-timezones-and-when-to-apply" title="Permanent link">&para;</a></h1>
+<p><strong>Related:</strong> <a href="../scheduler-price-bars/">Scheduler &amp; Price Bars</a>,
+<a href="../ccxt-trade-and-xref-validation/">ccxt Trade &amp; XREF Validation</a>,
+<a href="../market-data-capture/">Market Data Capture</a>,
+decisions <a href="../../decisions/">#45</a> (venue bars for live apply),
+<a href="../../decisions/">#51</a> (backtest on the same series you trade).</p>
+<p>This page answers two questions that sound like one but are not:</p>
+<ol>
+<li><strong>Which timezone does ccxt use for a daily candle?</strong></li>
+<li><strong>When should a scheduled apply run so the order matches the bar that just closed?</strong></li>
+</ol>
+<hr />
+<h2 id="short-answer">Short answer<a class="headerlink" href="#short-answer" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Daily bar boundary</th>
+<th>Timestamp meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ccxt (unified API)</strong></td>
+<td>Milliseconds since Unix epoch, interpreted as <strong>UTC</strong></td>
+<td>Candle <strong>open</strong> time — not close</td>
+</tr>
+<tr>
+<td><strong>Bybit / Binance (crypto spot &amp; perp)</strong></td>
+<td><strong>00:00 UTC</strong> calendar days</td>
+<td>Same as ccxt: open time of the interval</td>
+</tr>
+<tr>
+<td><strong>This platform (<code>MARKET_DATA.PRICE_BAR</code>)</strong></td>
+<td>Same as ccxt after fetch</td>
+<td><code>BAR_TIMESTAMP</code> = <strong>open</strong> time, stored <code>TIMESTAMPTZ</code> UTC</td>
+</tr>
+<tr>
+<td><strong>Our interval math (<code>quant/shared/intervals.py</code>)</strong></td>
+<td>Binned from the Unix epoch</td>
+<td>Daily → midnight UTC; hourly → top of the hour UTC</td>
+</tr>
+</tbody>
+</table>
+<p>A stored bar is final only after it has closed. Scheduled apply does not wait for that: it runs <strong><code>EXECUTE_OFFSET</code> before the close</strong> (five minutes) and reads the still-forming candle from ccxt, so a listed market is traded in the same session. Waiting until after the close fills on the next session.</p>
+<hr />
+<h2 id="what-ccxt-returns">What ccxt returns<a class="headerlink" href="#what-ccxt-returns" title="Permanent link">&para;</a></h2>
+<p><code>exchange.fetch_ohlcv(symbol, timeframe, since, limit)</code> returns rows:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[timestamp_ms, open, high, low, close, volume]
+</code></pre></div>
+<p><strong>Convention (Binance, Bybit, and most ccxt exchanges):</strong> <code>timestamp_ms</code> is the <strong>opening time</strong> of the candle in <strong>UTC</strong>. ccxt documents this explicitly for Binance; community issues treat open-time as the interoperability baseline (<a href="https://github.com/ccxt/ccxt/issues/15010">ccxt #15010</a>, <a href="https://github.com/ccxt/ccxt/issues/21783">#21783</a>).</p>
+<p>Implications:</p>
+<ul>
+<li>The <strong>last row</strong> in a response is often the <strong>still-forming</strong> candle. Its timestamp is the <strong>start</strong> of the current interval; OHLCV values keep updating until the interval ends.</li>
+<li><strong><code>since</code></strong> is also in UTC milliseconds and selects candles by <strong>open</strong> time.</li>
+<li>ccxt does <strong>not</strong> apply your local timezone. Display with <code>exchange.iso8601(ts)</code> or <code>datetime.fromtimestamp(ms/1000, tz=UTC)</code>.</li>
+</ul>
+<p>Our fetcher does exactly that in <code>quant/market_data/fetcher.py</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">bar_timestamp</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">ts_ms</span> <span class="o">/</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">tz</span><span class="o">=</span><span class="n">UTC</span><span class="p">)</span>
+</code></pre></div>
+<p>and maps <code>REFDATA.TM_INTERVAL.PERIOD_LENGTH</code> → ccxt strings via <code>ccxt_timeframe()</code> (<code>1d</code>, <code>1h</code>, …).</p>
+<h3 id="exchange-specific-notes-venues-we-use">Exchange-specific notes (venues we use)<a class="headerlink" href="#exchange-specific-notes-venues-we-use" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Venue</th>
+<th>ccxt class</th>
+<th>Daily timeframe</th>
+<th>Boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bybit</td>
+<td><code>bybit</code></td>
+<td><code>1d</code> → API interval <code>D</code></td>
+<td>UTC midnight</td>
+</tr>
+<tr>
+<td>Binance (USDM etc.)</td>
+<td><code>binanceusdm</code> / <code>binance</code></td>
+<td><code>1d</code></td>
+<td>UTC midnight</td>
+</tr>
+</tbody>
+</table>
+<p>Crypto markets are 24/7; there is no “US equity session close” on these daily candles. Both venues align multi-day candles to <strong>UTC calendar days</strong>, which matches our epoch-based <code>floor_to_period(..., timedelta(days=1))</code>. REFDATA records that on <code>MARKET_CALENDAR</code> where <code>LISTING_EXCHANGE = ''</code> (default for <code>.crypto</code> products — see <a href="#plan-align-apply-clock-to-bar-close-asap">Plan § REFDATA</a>).</p>
+<p><strong>Not used on our REST bar path:</strong> Binance’s optional <code>timezone</code> parameter on <strong>spot websocket</strong> kline streams (<a href="https://github.com/ccxt/ccxt/pull/23252">ccxt #23252</a>). <code>CcxtBarFetcher</code> calls REST <code>fetch_ohlcv</code> only — no timezone offset is passed.</p>
+<p><strong>Watch for outliers:</strong> Some newer or thinly supported exchanges have returned <strong>close</strong> time instead of open time in ccxt parsers. Before adding a venue, fetch one daily candle and confirm the timestamp is midnight UTC for the expected <strong>open</strong>, not 23:59:59 for the <strong>close</strong>.</p>
+<hr />
+<h2 id="how-we-store-and-name-bars">How we store and name bars<a class="headerlink" href="#how-we-store-and-name-bars" title="Permanent link">&para;</a></h2>
+<p><code>MARKET_DATA.PRICE_BAR.BAR_TIMESTAMP</code> is the <strong>open</strong> instant of the bar, always UTC. The row’s <code>CLOSE_PX</code> is the price at the <strong>end</strong> of that interval — i.e. at the next boundary.</p>
+<p>Example (daily, Bybit BTCUSDT):</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BAR_TIMESTAMP</code></td>
+<td><code>2026-09-18 00:00:00+00</code> (open)</td>
+</tr>
+<tr>
+<td>Interval covers</td>
+<td><code>[2026-09-18 00:00 UTC, 2026-09-19 00:00 UTC)</code></td>
+</tr>
+<tr>
+<td><code>CLOSE_PX</code></td>
+<td>Last trade in that window — final only after <code>2026-09-19 00:00 UTC</code></td>
+</tr>
+<tr>
+<td>Forming bar (must not store)</td>
+<td><code>BAR_TIMESTAMP = 2026-09-19 00:00:00+00</code> while <code>now</code> is still before <code>2026-09-20 00:00 UTC</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>PriceBarService</code> never persists the forming bar:</p>
+<ul>
+<li><code>last_closed_bar(now, period)</code> = open time of the newest <strong>fully closed</strong> candle</li>
+<li><code>ensure_fresh</code> / <code>fetch_bars</code> drop any row with <code>ts &gt; until</code> where <code>until</code> is that closed boundary</li>
+</ul>
+<p>See <a href="../scheduler-price-bars/#47-failure-modes-and-error-handling">Scheduler &amp; Price Bars §4.7</a> (partial / forming bar row).</p>
+<hr />
+<h2 id="what-the-signal-actually-reads">What the signal actually reads<a class="headerlink" href="#what-the-signal-actually-reads" title="Permanent link">&para;</a></h2>
+<p>Live apply loads the rolling window from <code>PRICE_BAR</code>, builds a DataFrame (<code>datetime</code>, <code>price</code>, …), and runs the same indicator / position logic as backtest. Indicators consume the <strong>close</strong> column; <code>data_as_of</code> on the apply report is the timestamp of the bar that produced the latest position — i.e. the <strong>open</strong> time of the last <strong>closed</strong> bar in the series.</p>
+<p>So the decision chain is:</p>
+<ol>
+<li>Wait until daily bar <em>D</em> has <strong>closed</strong> (UTC boundary passed).</li>
+<li>Store bar <em>D</em> with <code>BAR_TIMESTAMP = D 00:00 UTC</code> and its final <code>CLOSE_PX</code>.</li>
+<li>Compute signal from that close (and prior closes).</li>
+<li><strong>Then</strong> place the market order.</li>
+</ol>
+<p>Trading on the open of bar <em>D</em> while still inside <em>D−1</em> would use stale closes and wrong signals.</p>
+<hr />
+<h2 id="when-we-apply-today-platform-schedule">When we apply today (platform schedule)<a class="headerlink" href="#when-we-apply-today-platform-schedule" title="Permanent link">&para;</a></h2>
+<p>EventBridge tasks (UTC), <a href="../../decisions/">decision #81</a>:</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Cron</th>
+<th>In-process settle</th>
+<th>Effective ~time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>price_bar_sync</code></td>
+<td><code>0 * * * ? *</code></td>
+<td>10s (<code>BarWarmer</code>)</td>
+<td><code>:00:10</code> each hour — <strong>closed</strong> bars only</td>
+</tr>
+<tr>
+<td><code>trade_apply_tick</code></td>
+<td><code>55 * * * ? *</code></td>
+<td>10s (<code>ScheduleSweeper</code>)</td>
+<td><code>:55:10</code> each hour — five minutes <strong>before</strong> the next close</td>
+</tr>
+</tbody>
+</table>
+<ol>
+<li><strong>Warm on the boundary</strong> — give the exchange a few seconds after the hour/day turns to publish the candle that just closed, and store that finished bar.</li>
+<li><strong>Apply five minutes before the next close</strong> — the signal calls <code>load_window(..., include_forming=True)</code>, which appends the still-open ccxt candle and does <strong>not</strong> insert it into <code>PRICE_BAR</code>. <code>ensure_fresh</code> still fail-closes if the newest <strong>closed</strong> bar is missing.</li>
+</ol>
+<p>A crypto <strong>daily</strong> deployment is due at <strong><code>23:55</code> UTC</strong> (the bar that opened at <code>00:00</code> UTC that morning closes at the next midnight). An <strong>hourly</strong> deployment is due at <strong><code>:55</code></strong>. The tick runs every hour; a deployment is applied only when <code>SCHEDULED_TS &lt;= now()</code>. New and rescheduled rows seed that cursor from <code>next_apply_slot</code> (or the listing session's close, for a non-24/7 daily), not from the wall time of the click.</p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant UTC as UTC clock
+    participant Ex as Bybit
+    participant Warm as price_bar_sync
+    participant DB as PRICE_BAR
+    participant Tick as trade_apply_tick
+    participant Ord as Market order
+
+    Note over UTC: 2026-09-19 00:00 — daily bar 2026-09-18 closes
+    Ex--&gt;&gt;Ex: Final OHLC for bar open 2026-09-18 00:00 UTC
+    UTC-&gt;&gt;Warm: 00:00:10 cron + settle
+    Warm-&gt;&gt;Ex: fetch_ohlcv 1d
+    Warm-&gt;&gt;DB: INSERT BAR_TIMESTAMP=2026-09-18 00:00 UTC
+    Note over UTC: 2026-09-19 23:55 — five minutes before bar 2026-09-19 closes
+    UTC-&gt;&gt;Tick: 23:55:10 cron + settle
+    Tick-&gt;&gt;Ex: forming candle, open 2026-09-19 00:00 UTC
+    Tick-&gt;&gt;Tick: signal on closed bars plus that forming candle
+    Tick-&gt;&gt;Ord: apply if due and enabled</code></pre>
+<p>Manual <strong>Apply</strong> uses the same loader, including the forming candle. Clicking at <code>15:00</code> UTC on a daily deployment therefore prices the day's still-open candle, not only yesterday's close.</p>
+<hr />
+<h2 id="where-timezone-mismatches-still-hurt">Where timezone mismatches still hurt<a class="headerlink" href="#where-timezone-mismatches-still-hurt" title="Permanent link">&para;</a></h2>
+<h3 id="exchange-bars-vs-provider-bars-backtest">Exchange bars vs provider bars (backtest)<a class="headerlink" href="#exchange-bars-vs-provider-bars-backtest" title="Permanent link">&para;</a></h3>
+<p>Yahoo, Glassnode, and other <strong>provider</strong> dailies often use <strong>exchange session</strong> or <strong>calendar</strong> conventions that are <strong>not</strong> UTC midnight — e.g. US equity close, or “UTC date” with different adjustment rules.</p>
+<p>That is why decision #51 requires backtests that will trade on Bybit to read <code>PRICE_BAR</code> for that venue, not a provider series. A strategy fitted on Yahoo <code>BTC-USD</code> dailies is fitted on <strong>different days</strong> than Bybit <code>BTCUSDT</code> <code>1d</code> candles even when both are called “daily”. Live apply does not write the forming candle into <code>PRICE_BAR</code>, so a backtest of stored bars and a live signal taken five minutes before close are not the same series — backtest PnL is unchanged on purpose (<a href="../../decisions/">decision #81</a>).</p>
+<hr />
+<h2 id="verify-on-a-venue-bybit-testnet">Verify on a venue (Bybit testnet)<a class="headerlink" href="#verify-on-a-venue-bybit-testnet" title="Permanent link">&para;</a></h2>
+<p>From the repo root with network access:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">ccxt</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">UTC</span><span class="p">,</span> <span class="n">datetime</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">ex</span> <span class="o">=</span> <span class="n">ccxt</span><span class="o">.</span><span class="n">bybit</span><span class="p">({</span><span class="s2">"enableRateLimit"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"options"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"defaultType"</span><span class="p">:</span> <span class="s2">"spot"</span><span class="p">}})</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">ex</span><span class="o">.</span><span class="n">set_sandbox_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># testnet</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">rows</span> <span class="o">=</span> <span class="n">ex</span><span class="o">.</span><span class="n">fetch_ohlcv</span><span class="p">(</span><span class="s2">"BTCUSDT"</span><span class="p">,</span> <span class="s2">"1d"</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="k">for</span> <span class="n">ts</span><span class="p">,</span> <span class="n">o</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">:</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">open_utc</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">ts</span> <span class="o">/</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">tz</span><span class="o">=</span><span class="n">UTC</span><span class="p">)</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">open_utc</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span> <span class="s2">"O"</span><span class="p">,</span> <span class="n">o</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="c1"># Expect: timestamps on 00:00:00+00:00 calendar days.</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="c1"># Last row may be today's forming candle — do not persist it as closed.</span>
+</code></pre></div>
+<p>Compare with <code>MARKET_DATA.PRICE_BAR</code> for the same product:</p>
+<ul>
+<li><code>BAR_TIMESTAMP</code> should match ccxt’s <strong>open</strong> times.</li>
+<li><code>max_bar_timestamp</code> from coverage should equal <code>last_closed_bar(now, timedelta(days=1))</code> in Python.</li>
+</ul>
+<hr />
+<h2 id="code-map">Code map<a class="headerlink" href="#code-map" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Module</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ccxt fetch + UTC parse</td>
+<td><code>quant/market_data/fetcher.py</code></td>
+</tr>
+<tr>
+<td>Closed-bar boundary</td>
+<td><code>quant/shared/intervals.py</code> — <code>last_closed_bar</code>, <code>floor_to_period</code></td>
+</tr>
+<tr>
+<td>Persist / read bars</td>
+<td><code>quant/market_data/service.py</code>, <code>quant/market_data/repo.py</code></td>
+</tr>
+<tr>
+<td>Live signal</td>
+<td><code>quant/strategy/live_service.py</code>, <code>quant/trade/live_apply.py</code></td>
+</tr>
+<tr>
+<td>When cron fires</td>
+<td><code>config/scheduler/price_bar_sync.yml</code>, <code>config/scheduler/trade_apply_tick.yml</code></td>
+</tr>
+<tr>
+<td>Listing session calendar</td>
+<td><code>REFDATA.MARKET_CALENDAR</code>, <code>RedisRefData.get_market_calendar(listing_exchange=...)</code></td>
+</tr>
+<tr>
+<td>Apply offset (broker × cadence)</td>
+<td><code>CONFIG.APP_APPLY_TIMING</code>, <code>RedisRefData.get_execute_offset()</code></td>
+</tr>
+<tr>
+<td>Both merged</td>
+<td><code>RedisRefData.get_apply_timing(app_id, interval, listing_exchange=...)</code></td>
+</tr>
+<tr>
+<td>Due deployments</td>
+<td><code>quant/trade/scheduler/tick.py</code>, <code>SP_GET_MISSED_DUE_DEPLOYMENTS</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="plan-align-apply-clock-to-bar-close-asap">Plan — align apply clock to bar close (ASAP)<a class="headerlink" href="#plan-align-apply-clock-to-bar-close-asap" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> done, amended by <a href="../../decisions/">decision #81</a>. Apply is five minutes <strong>before</strong> close (<code>:55</code>). Prod <code>PENDING</code> cursors were realigned with <code>scripts/realign_schedule_phase.sql</code>.</p>
+<h3 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h3>
+<p>EventBridge and <code>ScheduleSweeper</code> are already timed correctly:</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Cron (UTC)</th>
+<th>Settle</th>
+<th>Effective read</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>price_bar_sync</code></td>
+<td><code>:00</code></td>
+<td>10 s</td>
+<td>~<code>:00:10</code></td>
+</tr>
+<tr>
+<td><code>trade_apply_tick</code></td>
+<td><code>:55</code></td>
+<td>10 s</td>
+<td>~<code>:55:10</code></td>
+</tr>
+</tbody>
+</table>
+<p>A <strong>daily</strong> crypto deployment becomes due at <strong><code>23:55</code> UTC</strong> (five minutes before the midnight close). <code>SCHEDULED_TS</code> sits on <strong>bar close minus <code>EXECUTE_OFFSET</code></strong>.</p>
+<p>Create, cadence change, re-enable, and unpause pass <code>compute_initial_scheduled_ts()</code> into <code>SP_INS_DEPLOYMENT</code> as <code>IN_INITIAL_SCHEDULED_TS</code>. A deployment created at <code>14:37 UTC</code> is due at the next <strong><code>23:55</code> UTC</strong> (crypto daily), not at <code>14:37</code>. Rows created before that seed were moved once with <code>scripts/realign_schedule_phase.sql</code>.</p>
+<h3 id="target-rule">Target rule<a class="headerlink" href="#target-rule" title="Permanent link">&para;</a></h3>
+<p><strong>Calendar and offset come from REFDATA</strong>, not Python constants — <strong>two tables, two concerns</strong>:</p>
+<p><strong><code>REFDATA.MARKET_CALENDAR</code></strong> — session calendar by <strong>listing venue</strong>, not broker:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LISTING_EXCHANGE</code></td>
+<td><code>INST.PRODUCT.EXCHANGE</code> (unique). <code>''</code> = default for <code>EXCHANGE IS NULL</code> (<code>.crypto</code> spot): UTC 24/7, ccxt midnight dailies</td>
+</tr>
+<tr>
+<td><code>BAR_TIMEZONE</code></td>
+<td>IANA zone for <code>MARKET_*</code> wall-clock times</td>
+</tr>
+<tr>
+<td><code>MARKET_OPEN_TIME</code> / <code>MARKET_CLOSE_TIME</code></td>
+<td>Regular session local to <code>BAR_TIMEZONE</code>. <strong>NULL</strong> = continuous (24/7)</td>
+</tr>
+</tbody>
+</table>
+<p>Bybit and Binance share the same <strong><code>''</code></strong> row — the calendar describes the <strong>instrument's market</strong>, not which API routes the order.</p>
+<p><strong><code>CONFIG.APP_APPLY_TIMING</code></strong> — execute delay by <strong>broker × cadence</strong> (ops / API settle tuning):</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>APP_ID</code></td>
+<td><code>TRADE.DEPLOYMENT.APP_ID</code></td>
+</tr>
+<tr>
+<td><code>TM_INTERVAL_ID</code></td>
+<td>Schedule cadence (<code>DAILY</code>, <code>1H</code>, …)</td>
+</tr>
+<tr>
+<td><code>EXECUTE_OFFSET</code></td>
+<td><code>INTERVAL</code> <strong>before</strong> bar close (or session close) to apply</td>
+</tr>
+</tbody>
+</table>
+<p>Seeded in release <code>1.25.0-app-apply-timing</code> (<code>context="refdata"</code>):</p>
+<table>
+<thead>
+<tr>
+<th><code>LISTING_EXCHANGE</code></th>
+<th>Calendar</th>
+<th><code>APP_APPLY_TIMING</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>''</code> (default)</td>
+<td>UTC, NULL session (24/7)</td>
+<td>Bybit + Binance × DAILY, 1H @ 5 min</td>
+</tr>
+</tbody>
+</table>
+<p>Add <code>MARKET_CALENDAR</code> rows for <code>HKEX</code>, <code>NYSE</code>, etc. when listed products schedule; add <code>APP_APPLY_TIMING</code> rows when a new <strong>broker</strong> ships. Refresh Redis after migrate.</p>
+<p>Lookup: <code>get_market_calendar(listing_exchange=...)</code> from the deployment's product; <code>get_execute_offset(app_id, tm_interval_id)</code>; or <code>get_apply_timing()</code> (merged).</p>
+<h4 id="how-refdata-session-times-relate-to-ccxt-bars">How REFDATA session times relate to ccxt bars<a class="headerlink" href="#how-refdata-session-times-relate-to-ccxt-bars" title="Permanent link">&para;</a></h4>
+<p>Three layers — do not conflate them:</p>
+<ol>
+<li><strong>ccxt bar timestamp</strong> — always UTC ms at <strong>candle open</strong>; Bybit/Binance dailies at <strong>00:00 UTC</strong> regardless of NULL session columns.</li>
+<li><strong>Regular session</strong> (<code>MARKET_OPEN_TIME</code> / <code>MARKET_CLOSE_TIME</code>) — <strong>weekly</strong> template for when the order book is open. NULL/NULL means the venue trades continuously; it does <strong>not</strong> change the UTC daily bar boundary on crypto. <strong>Exchange holidays are not modeled here</strong> — see <a href="#later-not-blocking-the-shift">Later § holiday calendar</a>.</li>
+<li><strong>Apply clock</strong> (<code>EXECUTE_OFFSET</code> on <code>APP_APPLY_TIMING</code>) — how long <strong>before</strong> bar close the scheduler arms <code>SCHEDULED_TS</code>. Continuous markets (NULL session) use the epoch boundary, so a crypto daily is <code>23:55</code> UTC. A listed daily uses <code>MARKET_CLOSE_TIME</code> in <code>BAR_TIMEZONE</code> (<a href="../../decisions/">decision #81</a>).</li>
+</ol>
+<p><code>INST.PRODUCT.EXCHANGE</code> selects the <strong>calendar row</strong>; <code>DEPLOYMENT.APP_ID</code> selects the <strong>execute offset row</strong>.</p>
+<p>Pure interval math (offset passed in from REFDATA):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># quant/shared/intervals.py</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">next_apply_slot</span><span class="p">(</span><span class="n">after</span><span class="p">:</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">period</span><span class="p">:</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="n">timedelta</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">datetime</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="sd">"""Next scheduled apply: this bar's close minus the execute offset."""</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">close</span> <span class="o">=</span> <span class="n">floor_to_period</span><span class="p">(</span><span class="n">after</span><span class="p">,</span> <span class="n">period</span><span class="p">)</span> <span class="o">+</span> <span class="n">period</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">candidate</span> <span class="o">=</span> <span class="n">close</span> <span class="o">-</span> <span class="n">offset</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="k">if</span> <span class="n">candidate</span> <span class="o">&gt;</span> <span class="n">after</span><span class="p">:</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="k">return</span> <span class="n">candidate</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="k">return</span> <span class="n">candidate</span> <span class="o">+</span> <span class="n">period</span>
+</code></pre></div>
+<p><strong>Platform cron constraint:</strong> <code>trade_apply_tick</code> fires at <strong><code>:55</code> UTC</strong> hourly,
+matching the seeded 5-minute lead.</p>
+<p>Examples (<code>EXECUTE_OFFSET = 5 min</code> from REFDATA, continuous market):</p>
+<table>
+<thead>
+<tr>
+<th>Interval</th>
+<th>Deploy / now</th>
+<th><code>next_apply_slot</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DAILY</td>
+<td><code>2026-09-18 14:37 UTC</code></td>
+<td><code>2026-09-18 23:55 UTC</code></td>
+</tr>
+<tr>
+<td>DAILY</td>
+<td><code>2026-09-18 23:56 UTC</code></td>
+<td><code>2026-09-19 23:55 UTC</code></td>
+</tr>
+<tr>
+<td>1H</td>
+<td><code>2026-09-18 11:03 UTC</code></td>
+<td><code>2026-09-18 11:55 UTC</code></td>
+</tr>
+<tr>
+<td>1H</td>
+<td><code>2026-09-18 11:56 UTC</code></td>
+<td><code>2026-09-18 12:55 UTC</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Advance stays unchanged:</strong> <code>SP_GET_MISSED_DUE_DEPLOYMENTS</code> returns <code>NEXT_SCHEDULED_TS = SCHEDULED_TS + PERIOD_LENGTH</code>. With <code>SCHEDULED_TS</code> on <code>:55</code>, every advance stays on <code>:55</code> (daily <code>23:55 → 23:55</code>, hourly <code>11:55 → 12:55</code>).</p>
+<p><strong>UI:</strong> <code>SP_GET_DEPLOYMENT.NEXT_DUE_AT</code> is already <code>SCHEDULED_TS</code> — no separate <code>next_run_at()</code> for the poller. Update the docstring on <code>next_run_at()</code> to say it is <strong>boundary-only</strong> (no offset); display should use <code>SCHEDULED_TS</code> once aligned.</p>
+<h3 id="implementation-steps">Implementation steps<a class="headerlink" href="#implementation-steps" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Work</th>
+<th>Blast radius</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1</strong></td>
+<td>DDL + seed <code>REFDATA.MARKET_CALENDAR</code> + <code>APP_APPLY_TIMING</code>; reader resolvers</td>
+<td>REFDATA release <code>1.25.0</code> (<code>context="refdata"</code>) + Python reader</td>
+</tr>
+<tr>
+<td><strong>2</strong></td>
+<td>Add <code>next_apply_slot()</code> + unit tests in <code>tests/unit/test_intervals.py</code></td>
+<td>Python only</td>
+</tr>
+<tr>
+<td><strong>3</strong></td>
+<td>Extend <code>SP_INS_DEPLOYMENT</code> with optional <code>IN_INITIAL_SCHEDULED_TS TIMESTAMPTZ</code> — when set and <code>VID = 1</code> with a schedule, use it instead of <code>V_START_TS</code>. Liquibase <code>1.7.0</code> (<code>context="trade,prod-deploy"</code> — replaces a procedure body, so the push queues the gated <code>migrate</code> job).</td>
+<td>One proc body</td>
+</tr>
+<tr>
+<td><strong>4</strong></td>
+<td><code>TradeRepo.write_deployment</code> / <code>TradeService.create_deployment</code>: when <code>schedule_tm_interval_id</code> is set, resolve <code>period</code> + <code>offset</code> from <code>RedisRefData</code>, pass <code>next_apply_slot(now(), period, offset)</code> into the SP</td>
+<td>Create path</td>
+</tr>
+<tr>
+<td><strong>5</strong></td>
+<td>Same alignment on <strong>schedule change</strong> and <strong>re-enable</strong> (<code>IS_ENABLED_IND</code> flip back to <code>Y</code>, unpause): if the new row arms a <code>PENDING</code> schedule, seed with <code>next_apply_slot(now(), period, offset)</code> — not the prior deploy-phase cursor</td>
+<td>Update path</td>
+</tr>
+<tr>
+<td><strong>6</strong></td>
+<td><strong>Backfill</strong> existing enabled, scheduled deployments: one-shot <code>UPDATE</code> in <code>scripts/realign_schedule_phase.sql</code> (sets <code>SCHEDULED_TS</code> on current <code>PENDING</code> rows). Not in Liquibase deploy — run once per env after REFDATA 1.25.0.</td>
+<td>Ops SQL</td>
+</tr>
+<tr>
+<td><strong>7</strong></td>
+<td>Log decision <strong>#71</strong> in <code>decisions.md</code> when step 4 ships</td>
+<td>Docs</td>
+</tr>
+<tr>
+<td><strong>8</strong></td>
+<td>(Optional, later) Dedicated daily EventBridge rule at <code>23:55</code> — cosmetic; the hourly <code>:55</code> sweep is sufficient once phase is aligned</td>
+<td>AWS config</td>
+</tr>
+</tbody>
+</table>
+<p><code>config/scheduler/trade_apply_tick.yml</code> is <code>cron(55 * * * ? *)</code>, matching the seeded <strong>5 minute</strong> lead before close (<a href="../../decisions/">decision #81</a>).</p>
+<h3 id="backfill-policy-step-6">Backfill policy (step 6)<a class="headerlink" href="#backfill-policy-step-6" title="Permanent link">&para;</a></h3>
+<p>For each deployment that is enabled, not <code>PAUSED</code>/<code>STOPPED</code>, has <code>schedule_tm_interval_id</code>, and current <code>STATUS = 'PENDING'</code>:</p>
+<ol>
+<li>Compute <code>offset = refdata.get_execute_offset(app_id, schedule_tm_interval_id)</code> and <code>aligned = next_apply_slot(now(), period, offset)</code>.</li>
+<li>If <code>aligned == scheduled_ts</code> to the second (already on slot), skip.</li>
+<li>Else <code>UPDATE</code> the current row's <code>SCHEDULED_TS</code> in place — this corrects a cursor rather than recording a new decision, so it does not append a version and leaves <code>USER_ID</code> untouched.</li>
+</ol>
+<p><strong>Effect:</strong> phase jumps to the <strong>next</strong> aligned slot from “now” — e.g. a crypto daily row due at <code>14:37</code>, read at <code>10:00 UTC</code>, moves to <strong><code>23:55</code> that day</strong>, not <code>14:37</code>. Prod cursors were realigned this way after decision #81.</p>
+<p>Deployments mid-backlog (due <code>SCHEDULED_TS</code> in the past) keep catching up one interval per tick (decision #46); realigning the cursor does not replay missed bars.</p>
+<h3 id="verification">Verification<a class="headerlink" href="#verification" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Unit: <code>next_apply_slot</code> cases above + advance arithmetic (<code>scheduled + period</code> stays on <code>:55</code>).</li>
+<li>Integration: create a crypto daily deployment at an arbitrary wall time → <code>NEXT_DUE_AT</code> is the next <code>23:55 UTC</code>.</li>
+<li>Manual: after backfill, confirm prod daily deployments appear in <code>SP_GET_MISSED_DUE_DEPLOYMENTS</code> on the <code>23:55</code> tick (CloudWatch / <code>EXECUTION_EVENT.TRANSACT_AT</code>).</li>
+</ol>
+<h3 id="later-not-blocking-the-shift">Later (not blocking the shift)<a class="headerlink" href="#later-not-blocking-the-shift" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Idea</th>
+<th>Why defer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Daily-only tick at <code>23:55 UTC</code></strong></td>
+<td>Hourly <code>:55</code> sweep + aligned phase is enough; a separate rule is ops clarity only.</td>
+</tr>
+<tr>
+<td><strong>Per-venue boundary probe</strong></td>
+<td>ccxt alignment is already documented; add when a non-UTC-midnight venue ships.</td>
+</tr>
+<tr>
+<td><strong>Exchange holiday calendar</strong></td>
+<td><code>MARKET_CALENDAR.MARKET_OPEN/CLOSE</code> is Mon–Fri-style wall clock only. Listed venues need a holiday table or feed before skipping apply on closed days. Crypto uses the <code>''</code> row and never needs holidays. Likely <code>REFDATA.MARKET_HOLIDAY</code> keyed by <code>LISTING_EXCHANGE</code> + date — not in <code>1.25.0</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="../scheduler-trade-open-questions/#10-align-scheduled_ts-to-bar-close">Scheduler open questions §10</a> and <a href="../plan-to-profit/#191-align-apply-clock-to-bar-close">Plan to Profit §1.9 follow-on</a>.</p>
+<p>Flatten-on-pause and in-flight lease are unrelated; see <a href="../scheduler-trade-open-questions/">Scheduler &amp; Trade Open Questions</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>
