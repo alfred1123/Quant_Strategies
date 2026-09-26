@@ -134,6 +134,8 @@ nav:
       - Volatility and the cross-section: research/volatility-and-cross-section.md
       - Funding, basis, and carry: research/funding-basis-carry.md
       - Microstructure, on-chain, and unusual: research/microstructure-onchain-unusual.md
+      - Methods from the PolyU quantitative trading course: research/polyu-quant-course-methods.md
+      - Dutch Algotrading Patreon review: research/dutch-algotrading-review.md
   - Archive:
       - Overview: archive/README.md
       - Trade Deployment Rollout: archive/trade-deployment-rollout.md
