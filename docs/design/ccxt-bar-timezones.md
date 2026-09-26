@@ -159,10 +159,10 @@ From the repo root with network access:
 import ccxt
 from datetime import UTC, datetime
 
-ex = ccxt.bybit({"enableRateLimit": True, "options": {"defaultType": "spot"}})
+ex = ccxt.bybit({"enableRateLimit": True, "options": {"defaultType": "linear"}})
 ex.set_sandbox_mode(True)  # testnet
 
-rows = ex.fetch_ohlcv("BTC/USDT", "1d", limit=3)
+rows = ex.fetch_ohlcv("BTCUSDT", "1d", limit=3)
 for ts, o, h, l, c, v in rows:
     open_utc = datetime.fromtimestamp(ts / 1000, tz=UTC)
     print(open_utc.isoformat(), "O", o, "C", c)

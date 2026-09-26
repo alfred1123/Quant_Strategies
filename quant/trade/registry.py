@@ -81,14 +81,20 @@ def build_default_registry(
     return registry
 
 
-def exchange_id_for_app(app_id: int, *, refdata: RedisRefData) -> str | None:
-    """ccxt exchange id behind a ``REFDATA.APP`` id, or ``None`` if not a broker.
+def preset_for_app(app_id: int, *, refdata: RedisRefData) -> CcxtExchangePreset | None:
+    """Preset behind a ``REFDATA.APP`` id, or ``None`` if that app is not a broker.
 
-    Market data has to reach the same venue the orders go to, so the mapping is
-    read back out of ``CCXT_PRESETS`` rather than restated next to the price-bar
-    code where it could drift.
+    Market data has to reach the same venue and the same product category the
+    orders go to, so both are read out of ``CCXT_PRESETS`` rather than restated
+    next to the price-bar code where they could drift.
     """
     for candidate_id, preset in ccxt_apps(refdata):
         if candidate_id == app_id:
-            return preset.exchange_id
+            return preset
     return None
+
+
+def exchange_id_for_app(app_id: int, *, refdata: RedisRefData) -> str | None:
+    """ccxt exchange id behind a ``REFDATA.APP`` id, or ``None`` if not a broker."""
+    preset = preset_for_app(app_id, refdata=refdata)
+    return None if preset is None else preset.exchange_id

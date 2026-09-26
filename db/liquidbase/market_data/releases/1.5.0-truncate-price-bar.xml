@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Empty MARKET_DATA.PRICE_BAR so the next backfill reloads every series
+      through the bar client that now pins defaultType from the order preset.
+
+      BAR_SUBSCRIPTION is not touched. A backfill only inserts timestamps that
+      are missing, so the rows have to be gone before that pass can replace them.
+      There is nothing to roll back to: the candles are fetched again from the venue.
+    -->
+
+    <changeSet id="1.5.0-001-truncate-price-bar" author="alfcheun" context="market_data,prod-deploy">
+        <comment>Truncate MARKET_DATA.PRICE_BAR — reload under the pinned category</comment>
+        <sql>TRUNCATE TABLE MARKET_DATA.PRICE_BAR;</sql>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

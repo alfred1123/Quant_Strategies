@@ -16,7 +16,7 @@ from quant.market_data.service import PriceBarService
 from quant.refdata.bundle import DataCaches
 from quant.trade.db_repo import TradeRepo
 from quant.trade.errors import TradeValidationError
-from quant.trade.registry import exchange_id_for_app
+from quant.trade.registry import exchange_id_for_app, preset_for_app
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +41,8 @@ class PriceBarServiceFactory:
         if service is not None:
             return service
 
-        exchange_id = exchange_id_for_app(app_id, refdata=self._caches.refdata)
-        if exchange_id is None:
+        preset = preset_for_app(app_id, refdata=self._caches.refdata)
+        if preset is None:
             raise TradeValidationError(
                 f"no market data venue for app_id={app_id} — cannot price a "
                 f"scheduled deployment without bars from the exchange it trades on"
@@ -51,10 +51,13 @@ class PriceBarServiceFactory:
             self._repo,
             self._caches.refdata,
             self._caches.instrument_cache,
-            CcxtBarFetcher(exchange_id),
+            CcxtBarFetcher(preset.exchange_id, default_type=preset.default_type),
         )
         self._by_app_id[app_id] = service
-        logger.info("price bar service ready for app_id=%s via %s", app_id, exchange_id)
+        logger.info(
+            "price bar service ready for app_id=%s via %s default_type=%s",
+            app_id, preset.exchange_id, preset.default_type,
+        )
         return service
 
 

@@ -88,9 +88,12 @@ class BarFetcher(Protocol):
 class CcxtBarFetcher:
     """Public OHLCV reads over ccxt, paginated across the requested window."""
 
-    def __init__(self, exchange_id: str, *, exchange=None) -> None:
+    def __init__(
+        self, exchange_id: str, *, exchange=None, default_type: str | None = None
+    ) -> None:
         self._exchange_id = exchange_id
         self._exchange = exchange
+        self._default_type = default_type
 
     @property
     def exchange(self):
@@ -98,7 +101,13 @@ class CcxtBarFetcher:
             exchange_cls = getattr(ccxt, self._exchange_id, None)
             if exchange_cls is None:
                 raise BarFetchError(f"ccxt has no exchange class {self._exchange_id!r}")
-            self._exchange = exchange_cls({"enableRateLimit": True})
+            params: dict = {"enableRateLimit": True}
+            # The same category the order preset trades. Bybit prints one id
+            # for the spot pair and the perpetual; ccxt's own default would
+            # pick one of them, and a later release can pick the other.
+            if self._default_type:
+                params["options"] = {"defaultType": self._default_type}
+            self._exchange = exchange_cls(params)
         return self._exchange
 
     def venue_symbols(self) -> list[VenueMarket]:

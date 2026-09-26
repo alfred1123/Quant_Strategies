@@ -7,6 +7,7 @@ from quant.trade.registry import (
     AdapterRegistry,
     build_default_registry,
     exchange_id_for_app,
+    preset_for_app,
 )
 
 
@@ -88,8 +89,10 @@ class TestExchangeIdForApp:
         refdata = self._refdata()
 
         assert exchange_id_for_app(34, refdata=refdata) == "bybit"
+        assert preset_for_app(34, refdata=refdata).default_type == "linear"
         # Binance trades under a different ccxt class than its REFDATA name.
         assert exchange_id_for_app(35, refdata=refdata) == "binanceusdm"
+        assert preset_for_app(35, refdata=refdata).default_type is None
 
     def test_non_broker_app_returns_none(self):
         # e.g. the glassnode data app — it has an APP_ID but no venue.

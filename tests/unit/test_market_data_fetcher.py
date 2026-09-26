@@ -294,3 +294,17 @@ class TestExchangeConstruction:
         monkeypatch.setattr(ccxt, "bybit", fake_exchange, raising=False)
         CcxtBarFetcher("bybit").exchange
         assert built == {"enableRateLimit": True}
+        assert "apiKey" not in built
+
+    def test_a_preset_category_is_pinned_on_the_client(self, monkeypatch):
+        """Bybit prints one id for two markets. The preset says which one."""
+        built = {}
+
+        def fake_exchange(params):
+            built.update(params)
+            return MagicMock()
+
+        monkeypatch.setattr(ccxt, "bybit", fake_exchange, raising=False)
+        CcxtBarFetcher("bybit", default_type="linear").exchange
+        assert built["options"] == {"defaultType": "linear"}
+        assert "apiKey" not in built
