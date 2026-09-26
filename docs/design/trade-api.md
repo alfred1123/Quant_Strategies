@@ -449,7 +449,7 @@ def execute_deployment(deployment, strategy):
 
 Database: **Quant**. Tables use `SCHEMA.TABLE` naming:
 - `BT.` — backtest artifacts and strategy definitions
-- `TRADE.` — live execution records (`DEPLOYMENT`, `EXECUTION_EVENT`, `TRANSACTION` only — no `INTENT`; decision #38)
+- `TRADE.` — live execution records (`DEPLOYMENT`, `EXECUTION_EVENT`, `TRANSACTION` only — no `INTENT`; decision #38, amended by #90)
 - `CORE_ADMIN.` — user accounts, API credentials
 - `INST.` — instrument reference (product cross-reference)
 - `REFDATA.` — reference/lookup data

@@ -511,6 +511,8 @@ Cron and the cursor now agree ([decision #81](../decisions.md)): `price_bar_sync
 | **Depends on** | 1.2, 1.8 |
 | **Blocks** | 2.2, 2.3 |
 
+**Design:** [Deployment performance reconcile](deployment-performance-reconcile.md) (proposed) — per-bar live and backtest returns, ratios derived on read so a paused deployment still reconciles. Strategy and account levels; each strategy's position comes from `TRADE.INTENT` ([Multi-strategy netting §5](multi-strategy-netting.md#5-intent-first), decision #90), which is built first.
+
 **Tasks**
 
 - [ ] Design table(s) for daily deployment snapshots (live Sharpe, cumulative return, vs backtest expectation).
@@ -1190,7 +1192,7 @@ Detailed tasks and exit criteria for each row are in [§2 Phased Roadmap](#2-pha
 |---|----------|-----------------|
 | 1 | **Backtest side nav taxonomy** | See §4.1 options A/B/C |
 | 2 | **What to store per optimization** | Full equity curve vs summary stats only |
-| 3 | **Sharpe reconcile storage** | Daily snapshot table vs rolling window materialized view |
+| 3 | **Sharpe reconcile storage** | Daily snapshot table vs rolling window materialized view. **Proposed:** per-bar snapshot tables — see [Deployment performance reconcile §5.4](deployment-performance-reconcile.md#54-snapshot-table-vs-materialized-view-open-decision-3). |
 | 4 | **ECR cutover for TRADE** | **Resolved (0.3):** **ECR now** — see [infrastructure.md § CI/CD](../architecture/infrastructure.md#cicd-github-actions). |
 | 5 | **Silent failure policy** | Heartbeat table, external uptime, exchange position reconcile |
 | 6 | **Exchange limit detection** | Post-MVP per exchange |

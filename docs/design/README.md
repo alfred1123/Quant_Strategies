@@ -24,7 +24,8 @@ today see [Architecture](../architecture/overview.md).
 | Doc | Status |
 |-----|--------|
 | [Jobs table detail UX](jobs-table-detail-ux.md) | Proposed |
-| [Multi-strategy netting](multi-strategy-netting.md) | Recorded, not built |
+| [Deployment performance reconcile](deployment-performance-reconcile.md) | Proposed — Phase 2.1–2.3 |
+| [Multi-strategy netting](multi-strategy-netting.md) | `TRADE.INTENT` adopted (#90), not built; order side recorded |
 | [Separate underlying & cache](separate-underlying.md) | Partial (cusip/xref only) |
 | [Alternative data sources](alt-data-sources.md) | Partial (Glassnode, Nasdaq) |
 | [User isolation](user-isolation.md) | v1 partial — shared strategy pool |

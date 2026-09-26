@@ -105,6 +105,7 @@ nav:
       - Backtest Queue: design/backtest-queue.md
       - Trade API: design/trade-api.md
       - Plan to Profit: design/plan-to-profit.md
+      - Deployment Performance Reconcile: design/deployment-performance-reconcile.md
       - Best-VID Promotion: design/best-vid-promotion.md
       - Scheduler, Price Bars & Consolidation: design/scheduler-price-bars.md
       - Scheduler & Trade Open Questions: design/scheduler-trade-open-questions.md

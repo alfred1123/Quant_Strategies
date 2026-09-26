@@ -12,7 +12,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `CONFIG` | Policy (`APP_ISSUE_FEE`, `APP_APPLY_TIMING`, `API_LIMIT`, `PROMOTION_METRIC`) and `CONFIG.SP_GET_ENUM`, which reads only this schema. Redis prefix `config:<table>` and stamp `config:version`. |
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `MARKET_CALENDAR`, …) and `REFDATA.SP_GET_ENUM`, which reads only this schema. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `MARKET_CALENDAR` is session/timezone by **`LISTING_EXCHANGE`** (`INST.PRODUCT.EXCHANGE`; `''` = default crypto). |
 | `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `PROMOTION`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert/get procedures |
-| `TRADE` | Live trading: `DEPLOYMENT`, `DEPLOYMENT_SCHEDULE_STATUS`, `EXECUTION_EVENT`, `TRANSACTION` + SPs (no `INTENT` — decision #38) |
+| `TRADE` | Live trading: `DEPLOYMENT`, `DEPLOYMENT_SCHEDULE_STATUS`, `EXECUTION_EVENT`, `TRANSACTION` + SPs (`INTENT` adopted by decision #90, not built) |
 | `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows) — see [Scheduler & Price Bars](../design/scheduler-price-bars.md) — plus `BAR_SUBSCRIPTION`, standing capture requests with no deployment behind them ([Market data capture](../design/market-data-capture.md)) |
 | `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) — `REFDATA.TICKER_MAPPING` has been dropped |
 
@@ -156,7 +156,7 @@ attempt under the same cusip is a 409 from `UQ_PRODUCT_CUSIP_CURRENT`.
 
 PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, APP_ID)` allowed (multiple accounts on same broker).
 
-**No `TRADE.CONNECTION` table** — runtime broker sessions are ephemeral. Trade audit = `TRADE.EXECUTION_EVENT` + `TRADE.TRANSACTION`. `TRADE.DEPLOYMENT` (Phase 1.2) references `API_CREDENTIAL_ID` only. **No `TRADE.INTENT`** — current signal lives in the worker for one tick; see decision #38.
+**No `TRADE.CONNECTION` table** — runtime broker sessions are ephemeral. Trade audit = `TRADE.EXECUTION_EVENT` + `TRADE.TRANSACTION`. `TRADE.DEPLOYMENT` (Phase 1.2) references `API_CREDENTIAL_ID` only. **No `TRADE.INTENT` yet** — current signal lives in the worker for one tick (decision #38). Decision #90 adopts it; see [Multi-strategy netting §5](../design/multi-strategy-netting.md#5-intent-first).
 
 ### TRADE — live execution (Phase 1.2)
 
@@ -167,7 +167,7 @@ PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, 
 | `EXECUTION_EVENT` | Append-only submit / error diary; `TRANSACT_AT` = tick time, `CREATED_AT` = audit insert, `POSITION_QTY` = signed broker position the attempt decided against |
 | `TRANSACTION` | Append-only broker-confirmed fills |
 
-**Not stored:** current signal / target position between ticks (`TRADE.INTENT` rejected — decision #38).
+**Not stored yet:** current signal / target position between ticks. `TRADE.INTENT` is adopted by decision #90 (amends #38) and not built.
 
 | Procedure | Purpose |
 |-----------|---------|
