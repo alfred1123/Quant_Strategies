@@ -140,7 +140,7 @@ A one-standard-deviation increase in Twitter posts for "Bitcoin" "yields a 2.50 
 
 **Fit here.** Only after a series is loaded as a column on the traded coin. Ranked fifth and last on the [try-first list](sharpe-ideas-index.md#try-these-first) for that reason: one series, as a FILTER, compared with the plain trend gate, and dropped if it does not help out of sample. Glassnode is the on-chain path and is a different dataset; see section 4 and [Alternative data sources](../design/alt-data-sources.md).
 
-**AlgoDaemon testability:** Needs adapting. Trade Bybit spot BTC. Google searches for "Bitcoin", or Twitter counts, are a signal only; nothing but spot is filled. ETH and BNB were not the paper's search term, so they need their own series or they stay out. Daily bars. Hand-off row 8, after the price-only rules, and only if the series is already available. The weekly Sharpe of 0.48 is not annualized and not a target.
+**AlgoDaemon testability:** Needs adapting. Trade Bybit spot BTC. Google searches for "Bitcoin", or Twitter counts, are a signal only; nothing but spot is filled. ETH and BNB were not the paper's search term, so they need their own series or they stay out. Daily bars. Hand-off row 9, after the price-only rules, and only if the series is already available. The weekly Sharpe of 0.48 is not annualized and not a target.
 
 ---
 
@@ -170,7 +170,7 @@ A concrete cousin that **is** standard in this literature, but was not given a p
 
 **Fit here.** Not until one series is in the cache as a factor column. The right experiment, if a series is ever licensed, is a FILTER gate on the existing baseline, not a new signal type. That matches rank 5 on the try-first list and should not jump ahead of the trend gate, which needs no vendor.
 
-**AlgoDaemon testability:** Needs adapting, and only for a coin whose series you have. The position is Bybit spot. The abstract's Litecoin comparison is outside the universe. No chain transaction is executed. Same hand-off row as attention (row 8), and skip it when the file is missing. No Sharpe was stated.
+**AlgoDaemon testability:** Needs adapting, and only for a coin whose series you have. The position is Bybit spot. The abstract's Litecoin comparison is outside the universe. No chain transaction is executed. Same hand-off row as attention (row 9), and skip it when the file is missing. No Sharpe was stated.
 
 ---
 
