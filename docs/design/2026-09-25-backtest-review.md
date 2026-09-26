@@ -198,7 +198,7 @@ One 50/50 or 70/30 cut still leaves the in-sample winner chosen from about 200 t
 
 Signals are fully in or fully out. Fees are `|Δposition| × fee` on a unit position. ATR volatility targeting, which the research notes ask for next, needs a sized position in both the pnl line and the live order.
 
-**Effort:** large. **Evidence:** found by reading. The [Sharpe ideas index](../research/sharpe-ideas-index.md) states the same limit.
+**Effort:** large. **Evidence:** found by reading. The [Sharpe ideas index](../research/sharpe-ideas-index.md) states the same limit. The Concretum ensemble that needs a fractional weight, an average of sub-model weights, and a ratcheting stop is proposed in [Fractional sizing and stateful exits](2026-09-26-fractional-sizing-stateful-exits.md).
 
 ### Point-in-time equity data
 

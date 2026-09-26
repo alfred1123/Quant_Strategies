@@ -17,6 +17,8 @@ The engine trades **one product** with a position in {−1, 0, +1}. A second fac
 - see 4-hour bars (`REFDATA.TM_INTERVAL` is daily and 1-hour), order-book events, or a funding-rate history,
 - path-depend (no trailing stop inside the signal).
 
+The Concretum trend ensemble needs a weight between 0 and 1, and a stop that depends on the previous stop. That upgrade is proposed in [Fractional sizing and stateful exits](../design/2026-09-26-fractional-sizing-stateful-exits.md). What can be run before it lands is [the interim on that page](../design/2026-09-26-fractional-sizing-stateful-exits.md#what-can-be-run-before-the-upgrade). The hand-off below stays inside the engine as it is.
+
 Indicators today are SMA, EMA, RSI, Bollinger z-score, and stochastic %D (`quant/strategy/indicators.py`). `Ryan/` has no strategy research. There is no `results/` tree of external backtests. On-chain access is the Glassnode client; most useful metrics are deferred on cost grounds in [Alternative data sources](../design/alt-data-sources.md).
 
 `docs/design/multi-strategy-netting.md` is about **netting orders** when several strategies trade the same asset. It is not a cross-sectional portfolio.
