@@ -1,7 +1,7 @@
 # Crypto spot — baseline improvements
 
 **Doc type:** strategy research  
-**Status:** hypothesis — not backtested on-platform for the variants below. Nothing here is scheduled for live.
+**Status:** the 200-day gate has been run on the stored BTC book. The other variants below have not. Nothing here is scheduled for live.
 
 A later pass ranks a wider set of Sharpe ideas (momentum evidence, funding, cross-section, microstructure) and says which to try first: [Sharpe ideas — where to start](sharpe-ideas-index.md). This page stays the write-up of the BTC daily Bollinger baseline.
 
@@ -46,6 +46,15 @@ filter.
 Only allow longs when price is above the 200-day SMA (or when the 50-day SMA is above the
 200-day SMA). The aim is to sit out long bear phases, which cuts max drawdown and usually
 raises Sharpe more than it lowers return.
+
+Run on the stored Bybit daily `btcusdt.crypto` book (2020-03-25 to 2026-09-12, 10 bps, √365).
+The deployed cell is Bollinger `momentum_long`, window 55, threshold 1.75. Adding the gate
+(Bollinger window 200, threshold 0, `momentum_long`, `FILTER`) changes that cell from Sharpe
+**1.481** and max drawdown **0.194** to Sharpe **1.391** and max drawdown **0.303**. A 50/50
+walk-forward that re-picks the signal window and threshold, with the gate fixed at 200 / 0,
+picks window 60 and threshold 0.5 in sample and scores **0.964** out of sample. The same
+search without the gate scores **1.185** out of sample, which is the number already stored on
+the result. The gate lowers both the full-sample Sharpe and the hold-out Sharpe.
 
 ### 2.3 Volatility targeting (14-day ATR)
 
@@ -108,7 +117,7 @@ Conjunction semantics are documented under
 
 Ordered by value per unit of effort:
 
-1. **Backtest the 200-day FILTER gate now.** It needs no code, only a second factor.
+1. **200-day FILTER gate — run, and it lost.** See [§2.2](#22-macro-trend-filter-50-200-day-sma). No code change. The next item is still Sortino.
 2. **Add Sortino** to `Performance`, next to Sharpe and Calmar.
 3. **Add a bandwidth indicator** (and optionally ATR/Keltner), so the squeeze variant can be
    tested as a FILTER gate.

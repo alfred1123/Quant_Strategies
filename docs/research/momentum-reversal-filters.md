@@ -1,11 +1,11 @@
 # Momentum, reversal, and regime filters
 
 **Doc type:** strategy research  
-**Status:** hypothesis — not backtested here.
+**Status:** the 200-day gate has been run on the BTC book and lost. The other ideas on this page have not.
 
 Time-series momentum and a trend gate are the ideas on this page that match a single-coin book. Cross-sectional reversal is included because it is often confused with momentum, and because the liquid coins this platform trades do **not** follow the same pattern as the long tail of small coins.
 
-The practical first test is still the 200-day FILTER already written up under [baseline improvements](crypto-spot-baseline-improvements.md#22-macro-trend-filter-50-200-day-sma). This page is the evidence for why that test is worth running, plus a second gate that uses another coin.
+The 200-day FILTER written up under [baseline improvements](crypto-spot-baseline-improvements.md#22-macro-trend-filter-50-200-day-sma) has been run. It lowered the hold-out Sharpe. This page is the evidence that motivated that test, plus a second gate that uses another coin.
 
 ---
 
