@@ -252,7 +252,7 @@ Distilled, actionable backlog mapped to this repo. Status reflects the codebase
 | Inline WF on optimize | ✅ | `walk_forward=True` in optimize request (`backtest_service.py`) |
 | WF in queue worker | ✅ | `worker` stores `OptimizeResponse.model_dump()`, which includes `walk_forward.oos_metrics` |
 | Promotion reads OOS | ✅ | `_extract_metric` reads `OOS Sharpe Ratio` and `Sharpe Excess` (decision #83) |
-| REFDATA gate row | staged | `1.26.0` seeds the two HARD rows; context is `refdata` only |
+| REFDATA gate row | queued | `1.26.0` seeds the two HARD rows; context `refdata,prod-deploy` |
 
 The worker already stores the inline walk-forward. `_extract_metric` reads `OOS Sharpe Ratio` and `Sharpe Excess`. The Promotion panel already lists whatever HARD gates the snapshot returns. The rows land when `1.26.0` is deployed, then `POST /api/v1/refdata/refresh`.
 
@@ -352,7 +352,7 @@ Start with `MarketExecutionModel` in backtest (wrap current fill logic), then sa
 | Rule | Promotion (HARD) | Live pre-trade |
 |------|------------------|----------------|
 | Max drawdown | ✅ HARD gate in `REFDATA.PROMOTION_METRIC` ("Max DD LTE 40%") | ⬜ |
-| Sharpe &gt; 1 | staged — `1.26.0` raises `sharpe_gate` from 0 to 1; production still has 0 | ⬜ |
+| Sharpe &gt; 1 | queued — `1.26.0` raises `sharpe_gate` from 0 to 1 on migrate approval | ⬜ |
 | Max position size | ⬜ | ⬜ |
 | Max leverage | ⬜ | ⬜ |
 | Correlation / factor exposure | ⬜ | ⬜ |

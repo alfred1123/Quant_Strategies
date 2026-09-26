@@ -5,8 +5,8 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <changeSet id="1.26.0-001-seed-holdout-gates" author="alfcheun" context="refdata">
-        <comment>HARD gates: hold-out Sharpe, strategy Sharpe at least buy-and-hold, and the existing full-sample Sharpe gate raised from 0 to 1. Context is refdata only — not applied on a main push until prod-deploy is added.</comment>
+    <changeSet id="1.26.0-001-seed-holdout-gates" author="alfcheun" context="refdata,prod-deploy">
+        <comment>HARD gates: hold-out Sharpe, strategy Sharpe at least buy-and-hold, and the existing full-sample Sharpe gate raised from 0 to 1.</comment>
         <sql splitStatements="true" stripComments="true"><![CDATA[
             INSERT INTO REFDATA.PROMOTION_METRIC (NAME, DISPLAY_NAME, METRIC_KEY, DIRECTION, REQUIREMENT_TYPE, PRIORITY, THRESHOLD, DESCRIPTION, USER_ID, UPDATED_AT)
             VALUES

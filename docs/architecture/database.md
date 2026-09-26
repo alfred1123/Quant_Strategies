@@ -214,7 +214,7 @@ Persisted strategies (`BT.STRATEGY`) are created when backtest jobs complete —
 
 `REFDATA.PROMOTION_METRIC` stores configurable auto-promote rules. Two types:
 
-- **HARD** — threshold gates (e.g. Sharpe GT 1, Max DD LTE 40%). Must all pass to be eligible. The Sharpe threshold is 1 once release `1.26.0` is deployed; production still has 0 until then.
+- **HARD** — threshold gates (e.g. Sharpe GT 1, Max DD LTE 40%). Must all pass to be eligible. The Sharpe threshold becomes 1 when release `1.26.0` (`refdata,prod-deploy`) is approved.
 - **SOFT** — comparison metrics evaluated in priority order against the current best VID.
 
 Loaded at runtime via `RedisRefData.get_promotion_metrics()`. See [Best-VID Promotion §2](../design/best-vid-promotion.md#2-promotion-metric-configuration-refdata-driven).

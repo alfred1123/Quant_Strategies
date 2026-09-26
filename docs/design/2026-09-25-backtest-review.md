@@ -36,7 +36,7 @@ The CLI run is a real 2023 path, not a synthetic one. A plain Bollinger band on 
 
 ### 1. Promotion trades the full-sample best Sharpe
 
-The evaluator now reads `OOS Sharpe Ratio` and `Sharpe Excess` when those HARD rows are present (decision #83). Release `1.26.0` also raises the existing full-sample Sharpe gate from 0 to 1. Context is `refdata` only, so production keeps Sharpe above 0 and the 40% drawdown gate until that release is deployed. The hold-out figure is the inline walk-forward already on the result.
+The evaluator now reads `OOS Sharpe Ratio` and `Sharpe Excess` when those HARD rows are present (decision #83). Release `1.26.0` also raises the existing full-sample Sharpe gate from 0 to 1, with context `refdata,prod-deploy`. Production keeps Sharpe above 0 until that migrate job is approved. The hold-out figure is the inline walk-forward already on the result.
 
 | | |
 |---|---|
@@ -214,6 +214,6 @@ The CLI run also showed Yahoo’s `end` date is exclusive: `--end 2024-01-01` st
 
 ## What to do first
 
-1. **Hold-out, buy-and-hold, and a full-sample Sharpe of at least 1 are in the evaluator.** They take effect when release `1.26.0` is deployed. Until then promotion still uses Sharpe above 0 and the 40% drawdown gate. **Medium, staged.**
+1. **Hold-out, buy-and-hold, and a full-sample Sharpe of at least 1 are in the evaluator.** They take effect when the `1.26.0` migrate job is approved. Until then promotion still uses Sharpe above 0 and the 40% drawdown gate. **Medium, queued.**
 2. **Make the backtest describe the order that actually goes out.** Charge funding and the perp fee, and fill on the pre-close price, or keep the spot close-to-close research backtest and stop treating a linear-perp, pre-close fill as the same experiment. This is the gap that matters now that apply runs before the bar closes. **Medium.**
 3. **One-factor column and the full-sample tie-break are fixed.** A one-factor run now reads `data_column`, and a multi-factor disagreement is ranked on bars up to the one being decided. Stochastic still scores High, Low, and Close.
