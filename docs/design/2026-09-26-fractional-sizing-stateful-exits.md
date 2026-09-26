@@ -4,9 +4,9 @@
 **Status:** proposed.
 **Read against:** `main` at `9c1af3619` (2026-09-26).
 
-The strongest published crypto trend rule we have a reproduction spec for — Zarattini, Pagani, and Barbon, *Catching Crypto Trends* ([SSRN 5209907](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5209907)) — does not fit this engine. Positions are −1, 0, or +1, so a volatility-targeted fraction and an average of nine sub-model weights cannot be stored. Signals are a function of the current indicator only, so a stop that ratchets up and resets on the next entry cannot be stored either.
+The strongest published crypto trend rule we have a reproduction spec for — Zarattini, Pagani, and Barbon, *Catching Crypto Trends* ([SSRN 5209907](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5209907)) — does not fit this engine. Positions are −1, 0, or +1, so a volatility-targeted fraction and an average of nine sub-model weights cannot be stored. Signals are a function of the current indicator only, so the book cannot enter on one condition and hold until a different exit. A stop that ratchets up and resets on the next entry is a second piece of memory, on top of that hold. There is also no Donchian channel.
 
-This page proposes three backtest slices (A, B, C) and says what has to be true before any of them may send a live order. Adopting one is a later decision-log entry. A Liquibase changeset that seeds a new indicator or conjunction takes the schema context only, until the owner asks for `prod-deploy`.
+This page proposes four backtest slices (A, B, C, D) and says what has to be true before any of them may send a live order. Adopting one is a later decision-log entry. A Liquibase changeset that seeds a new indicator or conjunction takes the schema context only, until the owner asks for `prod-deploy`.
 
 Related pages, linked so they are not repeated:
 
@@ -24,6 +24,7 @@ PR #58 is merged. It does not describe the long-only AND result. That result is 
 | **Inferred** | Follows from those facts, and was not executed as a backtest |
 | **Spec** | Taken from the reproduction note for SSRN 5209907, which quotes the paper. Not a result this repository has run |
 | **Proposal** | A choice this page recommends. The paper leaves it unstated, or the code does not do it yet |
+| **Researcher** | Reported by the AlgoDaemon researcher with this update. Not read from the engine, the docs, or the paper spec |
 
 No Concretum backtest was run for this page. No database was queried.
 
@@ -59,7 +60,7 @@ Gross of costs, their Table 1 Combo on BTC is CAGR 30%, vol 17%, Sharpe 1.58, So
 
 **Read.** `SignalDirection` in `quant/strategy/signals.py` (`momentum_band_signal`, `reversion_band_signal`, `momentum_bounded_signal`, `reversion_bounded_signal`, and the four `*_long_only` wrappers) writes 1, −1, or 0 from the current indicator value and a threshold. `_long_only` clips negatives to 0 and leaves +1 in place. Nothing in those methods reads the previous position.
 
-**Read.** `TechnicalAnalysis` in `quant/strategy/indicators.py` is SMA, EMA, RSI, Bollinger z-score, and stochastic %D. Stochastic uses High, Low, and Close. There is no close-only Donchian channel, no rolling max of the close, and no realized-volatility series.
+**Read.** `TechnicalAnalysis` in `quant/strategy/indicators.py` has five methods and no others: `get_sma`, `get_ema`, `get_rsi`, `get_bollinger_band`, `get_stochastic_oscillator`. The seed in `db/liquidbase/refdata/data/INDICATOR.sql` inserts those same five `METHOD_NAME` values. The CLI registry in `quant/cli.py` is a subset (Bollinger, SMA, EMA, RSI). Nothing in either list is a Donchian, a rolling max or min of the close, or a realized-volatility series. Stochastic is the only range calculation, and it uses High and Low; [What can be run before the upgrade](#what-can-be-run-before-the-upgrade) says what a threshold on it actually does. The channel to add is [Proposal D](#proposal-d-a-donchian-on-the-close).
 
 **Read.** The drawer stops at two factors. `addFactor` in `frontend/src/components/ConfigDrawer.tsx` returns when `factors.length >= 2`, and the Add Factor button renders only while `factors.length < 2`. `OptimizeRequest.factors` in `quant/schemas/backtest.py` has a minimum length of 1 and no maximum. `combine_positions` stacks however many arrays it is given; `tests/unit/test_strat.py` already calls it with three. Decision #2 recorded "max 2 substrategies initially." The Python path can hold nine. The page that submits a backtest cannot.
 
@@ -108,15 +109,26 @@ The [indicators guide](../guides/indicators-strategies.md#conjunction-modes-mult
 
 ## What can be run before the upgrade
 
-**Read.** A single long-only threshold rule is expressible today: one indicator, `momentum_long` (or another `*_long_only` function), position +1 or 0, fee on unit turnover, next-bar return. That is the BTC daily Bollinger book already written up in [Crypto spot — baseline improvements](../research/crypto-spot-baseline-improvements.md). It is the right thing to run while this proposal is open. It is a different rule from a Donchian.
+**Read.** The closest single-factor approximation already in the engine is stochastic, held long while the oscillator is above a threshold.
 
-**Read.** A 1× Donchian with one lookback and a plain mid-line exit is not expressible, ratchet or not.
+`get_stochastic_oscillator` builds a raw %K and then smooths it:
 
-- The entry is "close equals the max of the last `n` closes, including today." No indicator returns that max. Stochastic %D is a smoothed position inside the High/Low range, and a bounded momentum signal is long only while %D stays above the threshold. It does not stay long after the breakout bar until a mid-line is hit.
-- The bars between entry and exit are `Pos(t) = Pos(t−1)`. Every `SignalDirection` method ignores `Pos(t−1)`. The [adding-strategies guide](../guides/adding-strategies.md) shows the same signature: `(indicator, threshold) → {−1, 0, 1}`.
-- A non-ratcheting exit ("flat when close ≤ today's mid, and only if we were already long") is the same memory. "Long whenever close > mid" would be stateless, and it is still not the paper: it is long through the upper half of the channel without a breakout, and it needs a mid-line we do not compute. Bollinger `z > 0` is close above the SMA, which is a third rule.
+```text
+%K = 100 * (Close − min(Low, n)) / (max(High, n) − min(Low, n))
+%D = rolling mean of %K over the same n
+```
 
-**Proposal.** Do not grid-search a Bollinger stand-in and compare the Sharpe to the table above. The comparison would treat two strategies as one. The slice that unblocks a real single-lookback Donchian, plain exit or ratchet, is [Proposal C](#proposal-c-a-stop-that-remembers) at weight 1, before A and B.
+%K is 100 when Close equals the highest High in the window, and 50 when Close sits halfway between that High and the lowest Low. The method returns %D (`return d` in `quant/strategy/indicators.py`). The REFDATA seed describes the row as "Stochastic Oscillator (%K)". The method docstring and the [indicators guide](../guides/indicators-strategies.md) call the returned series %D. A backtest scores the series the method returns. `momentum_bounded_signal_long_only` is then long while that value is above the threshold and flat otherwise. It does not read the previous position.
+
+That run is one factor, all-in or all-out, long while the stochastic is above a threshold. It is the interim a researcher can submit today. It is not an enter-at-the-high, hold-until-the-mid rule:
+
+- The window is High and Low, not the max and min of closes. A new closing high can sit under an older bar's high, so raw %K is not 100 on that bar. The 50 level is the mid of the high/low range, not `(max close + min close) / 2`.
+- What the signal sees is the smoothed %D, not the raw %K.
+- "Long while above a threshold" uses one line for entry and exit. The paper enters only on a new high, then stays long on later bars that are not the high, until a different exit. That hold is [hysteresis in Proposal C](#proposal-c-hysteresis-and-a-stop-that-remembers). The channel it would need is [Proposal D](#proposal-d-a-donchian-on-the-close).
+
+**Read.** A 1× Donchian with one lookback and a plain mid-line exit is not expressible. The entry needs a max of closes, which no method returns. The bars between entry and exit are `Pos(t) = Pos(t−1)`, and every `SignalDirection` method ignores `Pos(t−1)`. The [adding-strategies guide](../guides/adding-strategies.md) shows the same signature: `(indicator, threshold) → {−1, 0, 1}`. Turning the ratchet off does not remove that hold. "Long whenever close is above the mid" would be stateless, and it would be long through the upper half of the channel without a breakout.
+
+**Proposal.** Do not compare a stochastic-threshold Sharpe to the table above. The slice that unblocks a real single-lookback Donchian, plain exit, is D plus the hysteresis half of C, at weight 1. The ratchet is a flag on that same step, not a requirement for the first check.
 
 ## Proposal A — fractional weights
 
@@ -159,12 +171,13 @@ w_n = min(target_vol / σ_t, cap) × Pos_n
 
 The UI change is the factor cap in `ConfigDrawer`: a fixed ensemble of nine is a recipe, not nine clicks on Add Factor. How that recipe is selected (a REFDATA strategy template versus raising the cap to nine) can wait until C and A score one lookback. Raising the cap without a template would invite a nine-axis grid.
 
-## Proposal C — a stop that remembers
+## Proposal C — hysteresis, and a stop that remembers
 
-**Proposal.** A Donchian on the close, not on High/Low:
+Two gaps. They are not the same gap.
 
-- `up[t] = max(price[t−n+1 : t])`, `down[t] = min(...)`, `mid[t] = (up[t] + down[t]) / 2`. Today is inside the window.
-- Entry when `price[t]` is that max. Computing `up` from the same closes makes `price[t] == up[t]` the same test as `price[t]` being the max; do not compare against a separately rounded band.
+**Hysteresis.** The position on bar `t` depends on the position on bar `t−1`. Entry is one condition: the close is the `n`-day closing high from [Proposal D](#proposal-d-a-donchian-on-the-close). Exit is a different condition: the close is at or below the exit line. On every other bar the position stays. A threshold rule cannot do this. It is long on every bar the indicator is above one line, including bars that never made a new high, and it leaves on that same line. The stochastic interim above is that threshold rule. The plain mid-line exit the paper can be compared against — enter on the high, hold, leave when the close crosses the mid, no ratchet — is hysteresis with the exit line set to today's mid. It still needs `Pos(t−1)`. Shipping only a Donchian indicator does not create it.
+
+**The ratchet, on top of the hold.** While the trade is open, the exit line used tomorrow is `max(the stop carried in, today's mid)`, and a new entry resets the stop to that bar's mid. Hysteresis remembers in or out. The ratchet remembers a level. The paper uses both. A first backtest can turn the ratchet off and still be a different strategy from "long while above the mid."
 
 State per lookback, one row per bar:
 
@@ -186,15 +199,31 @@ Step at bar `t`, using the stop carried in from `t−1`. The paper compares toda
 
 **Read.** Live today replays indicators on a finite lookback and keeps the last value. A stop replay that starts flat at the first bar of that window is wrong when the open trade began earlier. **Spec** Table 2: the 360-day BTC model has 5 trades from 2015 to March 2025, so a trade can last longer than `live_lookback_bars` (1,140 days for window 360). **Proposal.** For a stateful rule, replay from the first stored bar of the fitted series, not from `live_lookback_bars`. The bars are the state. A stop saved on the deployment would be a second copy, free to disagree with a fresh replay after a restart. Daily BTC, ETH, and BNB are small enough that replaying the stored history on each apply is the consistent choice.
 
-The plain single-lookback exit is this step with `ratchet_on` false and the sizer left at 1. That is the interim research can run once C is in the backtest. It is still one lookback, all-in or all-out, and it will not match Table 3.
+The plain single-lookback exit is this step with `ratchet_on` false and the sizer left at 1. That is the first Donchian a researcher can run once D and this stepper are in the backtest. It is still one lookback, all-in or all-out, and it will not match Table 3. The stochastic threshold remains the only stand-in until then.
 
-C does not fit the guide's "add a method to `SignalDirection`" step. That method never receives the prior stop. The indicator can still be a `TechnicalAnalysis` method, seeded through [Adding indicators](../guides/adding-indicators.md), returning the mid (and the entry flag) for the chart. The position has to be produced by the stepper, then optionally scaled by B and held by A.
+C does not fit the guide's "add a method to `SignalDirection`" step. That method never receives the previous position or the previous stop. The channel is Proposal D. The position is this stepper, then optionally scaled by B and held by A.
+
+## Proposal D — a Donchian on the close
+
+**Read.** Confirmed in [What the engine does today](#what-the-engine-does-today): the indicator class, the REFDATA seed, and the CLI registry are SMA, EMA, RSI, Bollinger, and stochastic. No method returns a channel of closes.
+
+**Proposal.** Add one `TechnicalAnalysis` method and seed it in `REFDATA.INDICATOR` the way [Adding indicators](../guides/adding-indicators.md) describes. The changeset context is the schema only, until the owner asks for `prod-deploy`. On the close, for a window of `n` bars that includes today:
+
+```text
+up[t]   = max(close[t−n+1 : t])
+down[t] = min(close[t−n+1 : t])
+mid[t]  = (up[t] + down[t]) / 2
+```
+
+The close is the traded frame's `price` column (the backtest already sets that from the close). Do not use High and Low. That range is what stochastic already computes, and it is the wrong one for this paper.
+
+Every current method returns one Series, and `Performance` passes that series to a signal function of `(indicator, threshold)`. This channel is three numbers. **Proposal.** The method writes `up`, `down`, and `mid` onto the frame and returns `mid`, so a one-series caller still receives a Series. A band threshold on that mid is not the strategy: the mid is a price, and the review already shows that a price-level indicator against a small threshold stays long after warmup. Entry and exit stay in Proposal C, which reads all three columns. D does not remember a position. A chart can draw the channel as soon as D exists. The trades wait on C.
 
 ## Impact
 
 ### Live order generation
 
-**Proposal.** Ship A, B, and C in the backtest first. A binary C signal (exactly 0 or exactly 1) may use the current apply path: `intended_side` and a fixed `deployment.qty` already mean all-in or all-out.
+**Proposal.** Ship A, B, C, and D in the backtest first. A binary C signal (exactly 0 or exactly 1) may use the current apply path: `intended_side` and a fixed `deployment.qty` already mean all-in or all-out.
 
 A fractional last position must not be applied until the order is a delta. **Proposal.** Until then, refuse the apply when the latest position is not within `_FLAT_EPS` of −1, 0, or +1 (`quant/trade/adapters/base.py` defines that epsilon for the broker quantity; the signal path today uses `int(round(signal))` instead). Rounding 0.4 to flat or 0.6 to a full `deployment.qty` would report a live fill the backtest did not score.
 
@@ -210,7 +239,7 @@ The in-sample search, if it runs at all, still sees only the in-sample bars. A f
 
 ### Stored metrics
 
-**Read.** `extract_shredded_metrics` in `quant/queue/result_metrics.py` stores five strategy numbers and five buy-and-hold numbers: total return, annualized return, Sharpe, max drawdown, Calmar. They are defined on a simple-return pnl series. A, B, and C can keep that contract if they only change how `pnl` is built.
+**Read.** `extract_shredded_metrics` in `quant/queue/result_metrics.py` stores five strategy numbers and five buy-and-hold numbers: total return, annualized return, Sharpe, max drawdown, Calmar. They are defined on a simple-return pnl series. A, B, and C can keep that contract if they only change how `pnl` is built. D does not change pnl on its own.
 
 **Inferred.** A book that is typically 0.3× to 0.5× invested can post a Sharpe that ranks above a 1× book with a larger payoff. Promotion compares Sharpe across current rows of one strategy lineage. A new conjunction is a new `STRATEGY_NM` and, by decision #63, a new `STRATEGY_ID`. Leave it that way so a vol-targeted ensemble is not a later VID of a unit Bollinger lineage.
 
@@ -231,26 +260,29 @@ Backtest parity first, in `tests/unit/test_perf.py`, `tests/unit/test_objective.
 | Spot clip | A negative target becomes 0. A target above 1 becomes 1. Signed mode still allows −0.4 |
 | Two weights 1 and 0, average combiner | 0.5. The strengths-based AND of the same long-only pair stays +1, so the new combiner is what changed |
 | Shared `σ`, cap not binding, four of nine sub-models long | Combined weight `(4/9) × (target_vol / σ)` |
+| Hysteresis, distinct from the ratchet | Flat, and close above the mid but not the `n`-day high: stay flat. Long, and close no longer the high but still above the exit: stay long. A threshold on the mid would take the first bar; a "long only on the high" rule would leave the second |
 | Ratchet | While long, stop is non-decreasing. A new entry sets stop to that bar's mid, even if an older stop was higher. Flat carries no stop |
-| Plain exit | Stop equals today's mid, and a later lower mid exits |
+| Plain exit | Stop equals today's mid, and a later lower mid exits. The hold in the row above still applies with the ratchet off |
+| Donchian on closes | `up` / `down` / `mid` match max, min, and the halfway point of the last `n` closes, today included. A higher High with a lower close does not move `up` |
 | Exit and a new high on the same bar | Exit-first default, and one test of the other order |
 | Live replay | Last state of a full-history replay equals the backtest's last state on the same bars |
 | Lookback shorter than the open trade | A replay that starts flat inside an old trade does **not** equal the full-history state. This is the regression the short window must fail |
 | Fractional position offered to apply, before delta sizing exists | Apply is refused. `int(round(0.4))` must not be the order |
 
-`tests/unit/test_ta.py` covers the Donchian window: today included, mid halfway between max and min of closes, NaN until `n` closes exist.
+`tests/unit/test_ta.py` covers the Donchian window: today included, mid halfway between max and min of closes, NaN until `n` closes exist. The hysteresis cases belong next to the signal tests in `tests/unit/test_strat.py`, not only inside the indicator test: an indicator test cannot see `Pos(t−1)`.
 
 ## Effort and risks
 
 | Slice | Work | Effort | Biggest risk |
 |------|------|--------|----------------|
-| C, backtest, one lookback, weight 1, plain exit and ratchet | Stepper, Donchian on `price`, REFDATA indicator seed, tests. No live qty change | Medium | Out-of-sample scored on a sliced frame, so the stop resets at the cut |
+| D, indicator only | Donchian up/down/mid on the close, REFDATA seed, `tests/unit/test_ta.py` | Small | Returning only the mid, then treating a threshold on that mid as the strategy |
+| C, backtest, one lookback, weight 1 | Stepper: hysteresis first, ratchet as a flag. No live qty change | Medium | Implementing the ratchet and still entering on every bar the close is above the mid |
 | A, backtest | Held weight, drift, threshold, spot clip. Unit path bit-for-bit when the weight is −1/0/1 and the threshold is off | Medium | Implementing A as "put a float in `FinalPosition`" and charging a fee on every vol twitch, with free rebalance in between |
 | B, backtest | Average combiner, shared `σ`, fixed lookback list | Medium | Someone points the existing Cartesian search at nine windows |
 | Live delta to a target weight | NAV, base balance, min lot, refuse-or-replace `int(round(signal))` | Large | A rounded fraction sent as a full `deployment.qty` on a live account |
 | Guard | Refuse apply unless the signal is −1, 0, or +1, until the delta path exists | Small | Shipping A or B to a deployment that still uses `intended_side` |
 
-Recommended order: C at 1× so a single-lookback Donchian can be checked by hand; then A so the fee and the band are real; then B with the lookbacks fixed; live sizing last, and not in the same release. The guard ships with the first build that can emit a non-unit position, even if that build is backtest-only, so a saved config cannot be applied by the scheduler.
+Recommended order: D and the hysteresis half of C together, at weight 1, so a single-lookback Donchian with a plain mid exit can be checked by hand. The ratchet is the same stepper with the flag on. Then A, so the fee and the band are real. Then B, with the lookbacks fixed. Live sizing last, and not in the same release. The guard ships with the first build that can emit a non-unit position, even if that build is backtest-only, so a saved config cannot be applied by the scheduler.
 
 ### Risks that are easy to miss
 
@@ -260,9 +292,20 @@ Recommended order: C at 1× so a single-lookback Donchian can be checked by hand
 - **AND left as it is.** Long-only AND on the strengths path behaves as OR. FILTER is the AND that works. Fixing AND is a separate decision; doing it inside B would move every stored two-factor long-only result.
 - **Identity and promotion.** New combiner, new name, new `STRATEGY_ID`. Do not replay old unit-position rows through the drift formula.
 
+## Limitations
+
+The authors' Table 3 cannot be matched on the Bybit spot bars this platform stores. Their BTC sample starts 1 Jan 2015, ETH in Aug 2015, BNB in Jul 2017. The venue's own history starts later.
+
+**Read.** Bybit's first daily `BTCUSDT` bar is 2020-03-25. `quant/market_data/fetcher.py` records the listing at 2020-03-15 and the first daily print on 2020-03-25. Decision #52 says the same thing: a capture aimed at 2017-01-01 was a shortfall against bars that were never printed. Decision #68 and [the API page](../architecture/api.md#the-range-comes-from-what-is-captured) name the first `ethusdt.crypto` bar as 2021-03-15.
+
+**Researcher.** Bybit spot BNB history available for this work starts in June 2021. That month is not in this tree. This page did not query `PRICE_BAR`.
+
+The missing stretch is the start of each published sample, including the quieter BTC years where a 200% cap might have bound. A run should say the overlap that was actually stored. A Sharpe from 2020 or 2021 onward is not the 1.56 in the table.
+
 ## What this page did not read
 
 - The paper PDF itself. Figures and rules are from the reproduction spec, which cites the paper's sections and tables. Where that spec says the paper is silent, this page says **Spec** unstated.
 - Production rows, broker balances, and a live apply. The order path is from the source, not from a fill.
 - Whether `live_lookback_bars` on a deployed strategy has ever truncated a multi-year trade. The formula was read. The Concretum trade count was not run here.
+- The first stored BNB bar. June 2021 is the researcher's report, not a row this page read. BTC's 2020-03-25 and ETH's 2021-03-15 are the dates the docs already state.
 - PR #58's branch as an unmerged review. The PR is merged; the long-only AND behavior was read from `combine_positions` and `tests/unit/test_strat.py` on `9c1af3619`.

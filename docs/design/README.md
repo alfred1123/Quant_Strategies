@@ -32,7 +32,7 @@ today see [Architecture](../architecture/overview.md).
 | [Futu trading (OOP)](futu-trading.md) | Design only |
 | [Frontend code audit](frontend-audit.md) | Hardening done; follow-ups open |
 | [Backtest data hygiene](2026-09-25-backtest-data-hygiene-proposal.md) | Short-sample refusal adopted (#82); stale results, identity, and catalog still proposed |
-| [Fractional sizing and stateful exits](2026-09-26-fractional-sizing-stateful-exits.md) | Proposed — weights in [0, 1], averaged ensemble, ratcheting stop |
+| [Fractional sizing and stateful exits](2026-09-26-fractional-sizing-stateful-exits.md) | Proposed — Donchian on closes, hysteresis, weights, averaged ensemble |
 
 ## Reviews
 
