@@ -123,11 +123,13 @@ nav:
       - Backtest review (2026-09-25): design/2026-09-25-backtest-review.md
       - Backtest data hygiene (proposal): design/2026-09-25-backtest-data-hygiene-proposal.md
       - Fractional sizing and stateful exits (proposal): design/2026-09-26-fractional-sizing-stateful-exits.md
+      - Code quality review (2026-09-26): design/2026-09-26-code-quality-review.md
   - Strategy research:
       - Overview: research/README.md
       - Crypto spot — baseline improvements: research/crypto-spot-baseline-improvements.md
       - Sharpe ideas — where to start: research/sharpe-ideas-index.md
       - Momentum, reversal, and filters: research/momentum-reversal-filters.md
+      - Catching crypto trends: research/catching-crypto-trends.md
       - Volatility and the cross-section: research/volatility-and-cross-section.md
       - Funding, basis, and carry: research/funding-basis-carry.md
       - Microstructure, on-chain, and unusual: research/microstructure-onchain-unusual.md

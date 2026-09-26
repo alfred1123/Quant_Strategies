@@ -70,25 +70,29 @@ or link a design doc — do not turn the research page into a spec.
 | [Crypto spot — baseline improvements](crypto-spot-baseline-improvements.md) | BB momentum long, squeeze, trend filter, external Sharpe claims |
 | [Sharpe ideas — where to start](sharpe-ideas-index.md) | Ranked shortlist, [AlgoDaemon hand-off](sharpe-ideas-index.md#algodaemon-hand-off), source log |
 | [Momentum, reversal, and filters](momentum-reversal-filters.md) | Time-series momentum, liquid vs illiquid reversal, cross-product gate |
+| [Catching crypto trends](catching-crypto-trends.md) | Donchian ensemble, 10 bp net results on BTC/ETH/BNB, 1× cap |
 | [Volatility and the cross-section](volatility-and-cross-section.md) | Vol targeting, size/momentum factors, risk-balanced baskets |
 | [Funding, basis, and carry](funding-basis-carry.md) | Funding as a filter, 8-hour normalization, perp-spot convergence |
 | [Microstructure, on-chain, and unusual](microstructure-onchain-unusual.md) | 24h roll-out, clock-time flow, attention, on-chain value |
 
 Before treating a Sharpe from these pages as a result, read the
 [backtest review (2026-09-25)](../design/2026-09-25-backtest-review.md). It records
-how this engine annualizes, promotes, and costs a backtest.
+how this engine annualizes, promotes, and costs a backtest. Engineering quality
+of the same tree — the worker, the scheduler, typing, and the session cookie —
+is in the [code quality review (2026-09-26)](../design/2026-09-26-code-quality-review.md).
 
 ## AlgoDaemon hand-off
 
 The bot is Bybit spot only, BTC/ETH/BNB only, 10 bps per trade, daily bars preferred, backtests only. No perps, so funding and basis cannot be *traded*. Full rules, indicators, and sweep grids are in [AlgoDaemon hand-off](sharpe-ideas-index.md#algodaemon-hand-off). Most promising first:
 
-1. Trend-gated Bollinger momentum, long or flat, daily, each coin.
-2. Time-series momentum: long when the N-day return is positive.
-3. Cross-asset SMA gate among the three coins.
-4. Flat when realized volatility is high.
-5. Long-only rank of BTC vs ETH vs BNB.
-6. Bandwidth-squeeze breakout (still daily OHLC).
-7. Funding z-score as a veto only (needs a funding file; do not trade the perp).
-8. One attention or on-chain series as a veto (needs that file; BTC first).
+1. Donchian ensemble with a ratcheting mid-line stop and a 25% vol target, long or flat, daily, cap 1×. BTC, ETH, BNB. Net-of-10 bp figures are the paper's, not ours.
+2. Trend-gated Bollinger momentum, long or flat, daily, each coin.
+3. Time-series momentum: long when the N-day return is positive.
+4. Cross-asset SMA gate among the three coins.
+5. Flat when realized volatility is high.
+6. Long-only rank of BTC vs ETH vs BNB.
+7. Bandwidth-squeeze breakout (still daily OHLC).
+8. Funding z-score as a veto only (needs a funding file; do not trade the perp).
+9. One attention or on-chain series as a veto (needs that file; BTC first).
 
 Perp basis, cash-and-carry, the 24-hour roll-out, and any book that needs another coin are written up and marked **can't be tested**.

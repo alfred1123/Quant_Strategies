@@ -12,6 +12,7 @@ Related pages, linked so they are not repeated:
 
 - [Backtest review (2026-09-25)](2026-09-25-backtest-review.md) — [PR #58](https://github.com/alfred1123/Quant_Strategies/pull/58). Next-bar fill, the promotion gates, the free first entry, and the one-line note that position size is a large change.
 - [Backtest data hygiene](2026-09-25-backtest-data-hygiene-proposal.md) — [PR #59](https://github.com/alfred1123/Quant_Strategies/pull/59). Stale stored metrics, strategy identity, and the fact that no column stores an engine version.
+- [Code quality review (2026-09-26)](2026-09-26-code-quality-review.md#refactor-roadmap) — [PR #62](https://github.com/alfred1123/Quant_Strategies/pull/62). Its build order is indicators, then stateful signals, then sizing. That matches Proposals D, C, and A/B.
 
 PR #58 is merged. It does not describe the long-only AND result. That result is read from the combiner in [The long-only AND path](#the-long-only-and-path).
 
@@ -282,7 +283,7 @@ Backtest parity first, in `tests/unit/test_perf.py`, `tests/unit/test_objective.
 | Live delta to a target weight | NAV, base balance, min lot, refuse-or-replace `int(round(signal))` | Large | A rounded fraction sent as a full `deployment.qty` on a live account |
 | Guard | Refuse apply unless the signal is −1, 0, or +1, until the delta path exists | Small | Shipping A or B to a deployment that still uses `intended_side` |
 
-Recommended order: D and the hysteresis half of C together, at weight 1, so a single-lookback Donchian with a plain mid exit can be checked by hand. The ratchet is the same stepper with the flag on. Then A, so the fee and the band are real. Then B, with the lookbacks fixed. Live sizing last, and not in the same release. The guard ships with the first build that can emit a non-unit position, even if that build is backtest-only, so a saved config cannot be applied by the scheduler.
+Recommended order: D and the hysteresis half of C together, at weight 1, so a single-lookback Donchian with a plain mid exit can be checked by hand. The ratchet is the same stepper with the flag on. Then A, so the fee and the band are real. Then B, with the lookbacks fixed. Live sizing last, and not in the same release. The guard ships with the first build that can emit a non-unit position, even if that build is backtest-only, so a saved config cannot be applied by the scheduler. The [code quality review](2026-09-26-code-quality-review.md#refactor-roadmap) uses the same build order: indicators, then stateful signals, then sizing, which is D, then C, then A/B.
 
 ### Risks that are easy to miss
 

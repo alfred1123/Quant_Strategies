@@ -39,6 +39,7 @@ today see [Architecture](../architecture/overview.md).
 | Doc | Status |
 |-----|--------|
 | [Backtest review (2026-09-25)](2026-09-25-backtest-review.md) | Open findings — measurement, promotion, and live fill |
+| [Code quality review (2026-09-26)](2026-09-26-code-quality-review.md) | Open findings — scheduler replay, worker reap, and how indicators and signals are modelled |
 
 ## Shipped or historical → [Archive](../archive/README.md)
 

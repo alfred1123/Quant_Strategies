@@ -64,7 +64,7 @@ APFF's cross-sectional version flips the sign on purpose (`−Z`): high funding 
 
 **Fit here.** Not yet. Nothing in `REFDATA.DATA_COLUMN` is a funding rate, and the PnL line does not add funding. Ranked fourth on the [try-first list](sharpe-ideas-index.md#try-these-first) because the *signal* is a filter we already understand: store `fund_8h` (or its z-score) as a series on the traded coin, point a factor at that column, and FILTER the baseline. That is a data task plus an indicator if the z-score is not precomputed. It is not a new position algebra, and it is not a hedge.
 
-**AlgoDaemon testability:** Needs adapting. The bot trades Bybit spot BTC, ETH, or BNB and must not book a funding cashflow or a perp. A veto that stays flat when that coin's 8-hour-normalized funding z-score is extremely high is hand-off row 7, and only if the series is already available. The cross-sectional short book cannot be tested.
+**AlgoDaemon testability:** Needs adapting. The bot trades Bybit spot BTC, ETH, or BNB and must not book a funding cashflow or a perp. A veto that stays flat when that coin's 8-hour-normalized funding z-score is extremely high is hand-off row 8, and only if the series is already available. The cross-sectional short book cannot be tested.
 
 ---
 
