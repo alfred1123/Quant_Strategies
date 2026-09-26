@@ -29,5 +29,6 @@
     <!-- 1.18.0–1.23.0 applied on prod (through 2026-09-13) and archived. -->
 
     <include file="releases/1.24.0-api-limit-config-schema.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.25.0-sp-get-queue-newest-first.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

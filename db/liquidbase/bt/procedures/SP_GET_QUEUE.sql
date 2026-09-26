@@ -80,14 +80,14 @@ BEGIN
     END IF;
 
     -- History view (single QUEUE_ID) → chronological by VID.
-    -- Active-row view → FIFO-by-priority per docs/design/backtest-queue.md
-    -- §6.1 ("Dequeue order: PRIORITY ASC, CREATED_AT ASC"). Backed by the
-    -- BT_QUEUE_STATUS_PRIORITY_IDX btree on (QUEUE_STATUS_ID, PRIORITY,
-    -- CREATED_AT) so worker `LIMIT 1` is an index lookup.
+    -- Active rows → newest CREATED_AT first. The jobs list applies LIMIT
+    -- to this result, so an ascending scan was keeping the oldest 50 and
+    -- dropping a job submitted today. IX_QUEUE_USER_CURRENT leads with
+    -- (USER_ID, CREATED_AT DESC).
     IF IN_QUEUE_ID IS NOT NULL THEN
         V_SQL := V_SQL || ' ORDER BY q.QUEUE_ID, q.QUEUE_VID ASC';
     ELSE
-        V_SQL := V_SQL || ' ORDER BY q.PRIORITY ASC, q.CREATED_AT ASC';
+        V_SQL := V_SQL || ' ORDER BY q.CREATED_AT DESC';
     END IF;
     V_SQL := V_SQL || format(' LIMIT %s', V_LIMIT);
 

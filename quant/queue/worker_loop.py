@@ -40,7 +40,7 @@ import redis
 
 from quant.shared.config import get_redis_url, load_config
 from quant.shared.db import close_pools, open_pool
-from quant.queue.repo import BtQueueRepo
+from quant.queue.repo import BtQueueRepo, in_run_order
 from quant.queue.wake import wait_for_wake
 from quant.refdata.reader import RedisRefData
 
@@ -51,11 +51,10 @@ class WorkerLoopRepo(BtQueueRepo):
     """DB calls used by the loop: claim head, list-by-status, mark FAILED."""
 
     def list_by_status(self, queue_status_id: int, *, limit: int = 1000) -> list[dict]:
-        """Active QUEUE rows with the given status, dequeue-ordered.
+        """Active QUEUE rows with the given status, newest ``CREATED_AT`` first.
 
-        Wraps :meth:`BtQueueRepo.sp_get_queue` with ``queue_id=None`` so the
-        SP scopes to active rows ordered ``(PRIORITY ASC, CREATED_AT ASC)``
-        — the dequeue ranking per ``docs/design/backtest-queue.md`` §6.1.
+        ``BT.SP_GET_QUEUE`` returns that order. Callers that pop the queue
+        pass the rows through :func:`quant.queue.repo.in_run_order`.
         """
         return self.sp_get_queue(queue_status_id=queue_status_id, limit=limit)
 
@@ -68,10 +67,10 @@ class WorkerLoopRepo(BtQueueRepo):
         future ``BT.SP_CLAIM_NEXT`` that does both inside one SP.
 
         Returns the claimed job row (dict) or ``None`` when the queue is
-        empty. ``BT.FN_GET_QUEUE_FOR_TERMINAL`` is reserved for UI display
-        — the worker uses ``BT.SP_GET_QUEUE`` (REFCURSOR) instead.
+        empty. ``SP_GET_QUEUE`` lists newest first; the head is the row
+        :func:`in_run_order` puts first.
         """
-        rows = self.list_by_status(queued_status_id, limit=1)
+        rows = in_run_order(self.list_by_status(queued_status_id))
         if not rows:
             return None
         row = rows[0]

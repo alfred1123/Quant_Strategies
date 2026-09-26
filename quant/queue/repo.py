@@ -19,6 +19,16 @@ def _opt(cast: type[T], v: object) -> T | None:
     return None if v is None else cast(v)  # type: ignore[call-arg]
 
 
+def in_run_order(rows: list[dict]) -> list[dict]:
+    """Jobs that should run sooner come first.
+
+    Lower ``PRIORITY``, then earlier ``TRANSACT_FROM_TS``. ``SP_GET_QUEUE``
+    returns active rows newest ``CREATED_AT`` first; this is the run order
+    on top of that list. A QUEUED row's ``TRANSACT_FROM_TS`` is its enqueue time.
+    """
+    return sorted(rows, key=lambda r: (int(r["priority"]), r["transact_from_ts"]))
+
+
 class BtQueueRepo(DbGateway):
     """All ``BT.QUEUE`` / ``BT.RESULT`` reads + writes for FastAPI and the worker."""
 
@@ -35,10 +45,8 @@ class BtQueueRepo(DbGateway):
     ) -> list[dict]:
         """Wrap ``BT.SP_GET_QUEUE``.
 
-        ``queue_id=None`` returns active rows ordered by
-        ``(PRIORITY ASC, CREATED_AT ASC)`` — the dequeue ranking. Pass
-        ``queue_id`` to get the full version history of one job ordered
-        by ``QUEUE_VID``.
+        ``queue_id`` set → full version history of one job, ``QUEUE_VID``
+        ascending. Otherwise active rows, newest ``CREATED_AT`` first.
         """
         return self._call_get(
             "CALL bt.sp_get_queue("
@@ -151,15 +159,18 @@ class BtQueueRepo(DbGateway):
         return self._run(work)
 
     def list_for_user(self, user_id: str, limit: int = 50) -> list[dict]:
-        """Active rows for one user via ``SP_GET_QUEUE`` (includes STRATEGY join)."""
+        """Active rows for one user, newest ``CREATED_AT`` first."""
         return self.sp_get_queue(user_id=user_id, limit=limit)
 
     def queued_position(self, queue_id: uuid.UUID | str, queued_status_id: int) -> int:
-        """1-indexed position in the QUEUED ranking (0 if not found).
+        """1-indexed position in run order (0 if not found).
 
-        Derived from ``sp_get_queue`` result order (PRIORITY ASC, CREATED_AT ASC).
+        ``SP_GET_QUEUE`` returns newest first. Position counts jobs that
+        should run before this one: lower priority, then earlier enqueue.
         """
-        rows = self.sp_get_queue(queue_status_id=queued_status_id, limit=500)
+        rows = in_run_order(
+            self.sp_get_queue(queue_status_id=queued_status_id, limit=500)
+        )
         qid = str(queue_id)
         for i, row in enumerate(rows, 1):
             if str(row["queue_id"]) == qid:

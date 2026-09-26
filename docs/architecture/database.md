@@ -339,7 +339,7 @@ Neither the retention window nor the dump was touched to achieve this. `LOG_PROC
 | `SP_GET_ENUM` | `CONFIG` | Generic REFCURSOR select for one `CONFIG` table |
 | `SP_INS_STRATEGY` | `BT` | Resolves `STRATEGY_ID` from `(USER_ID, STRATEGY_NM)`; bumps VID; returns `OUT_STRATEGY_ID` + `OUT_STRATEGY_VID`. Advisory lock per identity. See [strategy-vid-versioning.md](../archive/strategy-vid-versioning.md). |
 | `SP_INS_QUEUE` | `BT` | **Unified queue state machine**: `IN_ACTION` = **`ENQUEUE`**, **`CLAIM_NEXT`**, **`TERMINAL`**, **`CANCEL`** — all **`BT.QUEUE`** transitions |
-| `SP_GET_QUEUE` | `BT` | Flexible queue reader (REFCURSOR); FastAPI jobs list/detail + the worker's claim poll. **Writes no audit row** — the poll ran ~2,870×/day into `LOG_PROC_DETAIL` |
+| `SP_GET_QUEUE` | `BT` | Flexible queue reader (REFCURSOR). Active rows come back newest `CREATED_AT` first (the My Jobs list). One job's history is `QUEUE_VID` order. **Writes no audit row** — the poll ran ~2,870×/day into `LOG_PROC_DETAIL` |
 | `SP_GET_QUEUE_FOR_TERMINAL` | `BT` | Active rows + strategy metadata (REFCURSOR) |
 | `FN_GET_QUEUE_FOR_TERMINAL` | `BT` | **Function** — UI terminal lookup (`RETURNS TABLE`); worker uses `SP_GET_QUEUE_LATEST` |
 | `SP_GET_QUEUE_LATEST` | `BT` | **Queue worker**: active row for one **`QUEUE_ID`** + frozen **`CONFIG_JSON`** (`QUEUE` ⋈ **`STRATEGY`** on **`STRATEGY_VID`**) |

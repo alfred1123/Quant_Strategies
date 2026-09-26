@@ -178,7 +178,7 @@ Soft-versioned queue table. **One row per state transition** — old rows are cl
 | `TRANSACT_FROM_TS` | `TIMESTAMPTZ` | Row effective from. |
 | `TRANSACT_TO_TS` | `TIMESTAMPTZ` | `'9999-12-31'` = active row. Set to `now()` on transition. |
 | `QUEUE_STATUS_ID` | `INTEGER` | FK → `REFDATA.QUEUE_STATUS`. |
-| `PRIORITY` | `INTEGER` | Default `100`. Lower = higher priority. `0` = "Run Now". Dequeue order: `(PRIORITY ASC, CREATED_AT ASC)`. |
+| `PRIORITY` | `INTEGER` | Default `100`. Lower = higher priority. `0` = "Run Now". The worker claims lowest `PRIORITY`, then earliest `TRANSACT_FROM_TS`. |
 | `ERROR_TEXT` | `TEXT` | Error message on FAILED / CANCELLED. |
 | `USER_ID` | `TEXT` | Submitting user. |
 | `CREATED_AT` | `TIMESTAMPTZ` | Row insert time. |
@@ -256,8 +256,8 @@ Called for every state transition: QUEUED → RUNNING → COMPLETED/FAILED/CANCE
 
 Coordinator `queryQueue()` uses `CALL bt.sp_get_queue(...)` + `FETCH` on the OUT refcursor (not a table function).
 
-- If `IN_QUEUE_ID` provided → returns all VIDs for that job (full history).
-- Otherwise → active rows only (`TRANSACT_TO_TS` sentinel); other params are optional filters.
+- If `IN_QUEUE_ID` provided → returns all VIDs for that job (full history), ordered by `QUEUE_VID`.
+- Otherwise → active rows only (`TRANSACT_TO_TS` sentinel), **newest `CREATED_AT` first**. `LIMIT` applies after that sort, so My Jobs keeps the latest submissions. The worker's claim still runs the oldest queued job: it reads this list and picks the head itself (`PRIORITY` ascending, then earliest `TRANSACT_FROM_TS`). Release `bt/1.25.0` replaces this procedure body, context `bt,prod-deploy`.
 
 `BT.FN_GET_QUEUE` is not deployed; any prior function with that name is dropped by `bt-000-precleanup`.
 
@@ -441,21 +441,9 @@ async function tick() {
 }
 ```
 
-### 9.4 Claim (`_claimNext`)
+### 9.4 Claim (`claim_next`)
 
-```sql
--- Phase 1: two-statement, single coordinator (safe)
-SELECT q.queue_id, q.strategy_id, q.strategy_vid, q.priority, q.user_id
-  FROM bt.queue q
-  JOIN refdata.queue_status rs ON q.queue_status_id = rs.queue_status_id
- WHERE rs.name = 'QUEUED'
-   AND q.transact_to_ts = TIMESTAMPTZ '9999-12-31'
- ORDER BY q.priority ASC, q.created_at ASC
- LIMIT 1;
-
-CALL bt.sp_ins_queue(:queue_id, :strategy_id, :strategy_vid, 2 /* RUNNING */,
-                     :priority, NULL, :user_id, ...);
-```
+`SP_GET_QUEUE` returns the QUEUED rows newest `CREATED_AT` first. The loop reorders them (lowest `PRIORITY`, then earliest `TRANSACT_FROM_TS`) and claims that head with `SP_INS_QUEUE` → RUNNING. Two statements, single replica.
 
 When `SP_CLAIM_NEXT` is added (Phase 2) this collapses to one atomic call.
 
