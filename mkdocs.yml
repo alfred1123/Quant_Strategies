@@ -122,6 +122,7 @@ nav:
       - Frontend Code Audit: design/frontend-audit.md
       - Backtest review (2026-09-25): design/2026-09-25-backtest-review.md
       - Backtest data hygiene (proposal): design/2026-09-25-backtest-data-hygiene-proposal.md
+      - Fractional sizing and stateful exits (proposal): design/2026-09-26-fractional-sizing-stateful-exits.md
       - Code quality review (2026-09-26): design/2026-09-26-code-quality-review.md
       - AlgoDaemon bug report (2026-09-27): design/2026-09-27-algodaemon-bug-report.md
   - Strategy research:
