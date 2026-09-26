@@ -51,9 +51,14 @@ function MetricCard({ title, metrics, highlight }: CardProps) {
 
 export default function MetricsCards({ result }: { result: PerformanceResponse }) {
   return (
-    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-      <MetricCard title="Strategy" metrics={result.strategy_metrics} highlight />
-      <MetricCard title="Buy & Hold" metrics={result.buy_hold_metrics} />
+    <div>
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <MetricCard title="Strategy" metrics={result.strategy_metrics} highlight />
+        <MetricCard title="Buy & Hold" metrics={result.buy_hold_metrics} />
+      </div>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+        Spot close-to-close, one fee, no funding. A linear-perp order sent before the close is not this result.
+      </Typography>
     </div>
   );
 }

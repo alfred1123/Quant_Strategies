@@ -153,6 +153,7 @@ main() {
   # Schema DDL/procs (core_admin first pass — grants changeset may run before BT/INST exist)
   run_update core_admin "CORE_ADMIN (tables + procedures)"
   run_update refdata "REFDATA"
+  run_update config "CONFIG"
   run_update bt "BT"
   run_update trade "TRADE"
   run_update market_data "MARKET_DATA"

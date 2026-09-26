@@ -110,9 +110,9 @@ Updated to derive `STRAT_CURRENT_IND` from `TRANSACT_TO_TS` (instead of the drop
 
 ## 2. Promotion Metric Configuration — REFDATA-driven
 
-Promotion criteria are **not hardcoded** in Python. They are stored in `REFDATA.PROMOTION_METRIC` and loaded at runtime via `RedisRefData.get_promotion_metrics()`.
+Promotion criteria are **not hardcoded** in Python. They are stored in `CONFIG.PROMOTION_METRIC` and loaded at runtime via `RedisRefData.get_promotion_metrics()`. The Redis key is `config:promotion_metric`.
 
-### REFDATA.PROMOTION_METRIC table
+### CONFIG.PROMOTION_METRIC table
 
 | Column | Type | Description |
 |---|---|---|
@@ -257,8 +257,8 @@ Content:
 
 - **Recommended strategy banner** — the overall best strategy across all `strategy_id`s (highest Sharpe among rows with `IS_BEST_IND = 'Y'` and `LOGICAL_DELETE_IND <> 'Y'`)
 - **Strategy list** — accordions grouped by `strategy_id`, showing all VIDs with their promotion outcome chip (PROMOTED / KEPT / DEMOTED / REJECTED, label from `REFDATA.PROMOTION_STATE`), Sharpe/Calmar, a "Best" chip on the current best VID, and a "Removed" chip when `LOGICAL_DELETE_IND = 'Y'`
-- **VID comparison panel** — click a VID to see hard gate results (pass/fail per gate with value + threshold from the `GATE_RESULTS` snapshot) and a soft-metric comparison vs the `COMPARED_VID` baseline; the first decisive soft metric (walked in `REFDATA.PROMOTION_METRIC` priority order) is highlighted. **VID 1 and any current-best re-run write `compared_vid = NULL`** — they have no opponent, and the panel says “Baseline VID — no other version to compare” rather than mirroring this row against itself. Legacy rows that stored `compared_vid` equal to this VID are treated the same. Below that, a **buy & hold (trade asset)** table compares the same SOFT metrics against shredded `BUY_HOLD_*` columns on `BT.RESULT` (joined on `QUEUE_ID` in `SP_GET_PROMOTION`, release `1.22.0`); the trade asset label is parsed from the `STRATEGY_NM` prefix before `@`.
-- **Promotion rules card** — read-only display of `REFDATA.PROMOTION_METRIC` (hard gates with thresholds, then soft metrics in priority order)
+- **VID comparison panel** — click a VID to see hard gate results (pass/fail per gate with value + threshold from the `GATE_RESULTS` snapshot) and a soft-metric comparison vs the `COMPARED_VID` baseline; the first decisive soft metric (walked in `CONFIG.PROMOTION_METRIC` priority order) is highlighted. **VID 1 and any current-best re-run write `compared_vid = NULL`** — they have no opponent, and the panel says “Baseline VID — no other version to compare” rather than mirroring this row against itself. Legacy rows that stored `compared_vid` equal to this VID are treated the same. Below that, a **buy & hold (trade asset)** table compares the same SOFT metrics against shredded `BUY_HOLD_*` columns on `BT.RESULT` (joined on `QUEUE_ID` in `SP_GET_PROMOTION`, release `1.22.0`); the trade asset label is parsed from the `STRATEGY_NM` prefix before `@`.
+- **Promotion rules card** — read-only display of `CONFIG.PROMOTION_METRIC` (hard gates with thresholds, then soft metrics in priority order)
 - **"Re-backtest" button** — fetches the decision's frozen `config_json` via its `QUEUE_ID`, maps that wire payload (`data_source`, `tm_interval_id`, `trading_period`, …) back onto drawer state, fills Asset Type from `INST.PRODUCT` (it is not on the JSON), prefills the Backtest drawer, and switches to the Backtest tab. Spreading the JSON onto `BacktestConfig` is wrong — the keys do not match, and the form fell back to Yahoo / daily / 365.
 - **"Deploy" button** — navigates to the Trade tab (`/trade/apply`) carrying `strategyId` + `strategyVid` in router state, ready for the Phase 1.7 apply form
 - **"Remove" / "Restore"** — flips `LOGICAL_DELETE_IND` on the lineage (`POST /backtest/jobs/strategies/{id}/logical-delete`). Remove drops the card from Recommended and the Trade picker; Restore puts it back. The decision log still lists it.
@@ -309,7 +309,7 @@ Decision #42 described a shared pool. The Trade path does not do that:
 | USER_ID | TEXT | Audit |
 | CREATED_AT | TIMESTAMPTZ | When decision was made |
 
-Metric values (Sharpe, Calmar, etc.) are **not duplicated** here — they live as shredded columns on `BT.RESULT` (`SHARPE_RATIO`, `MAX_DRAWDOWN`, `CALMAR_RATIO`, `TOTAL_RETURN`, `ANNUALIZED_RETURN`). The UI derives the decisive soft metric by joining both results (candidate via `QUEUE_ID`, best via `COMPARED_VID`'s queue) and walking `REFDATA.PROMOTION_METRIC` in priority order. `GATE_RESULTS` is a snapshot because REFDATA thresholds may change after the decision.
+Metric values (Sharpe, Calmar, etc.) are **not duplicated** here — they live as shredded columns on `BT.RESULT` (`SHARPE_RATIO`, `MAX_DRAWDOWN`, `CALMAR_RATIO`, `TOTAL_RETURN`, `ANNUALIZED_RETURN`). The UI derives the decisive soft metric by joining both results (candidate via `QUEUE_ID`, best via `COMPARED_VID`'s queue) and walking `CONFIG.PROMOTION_METRIC` in priority order. `GATE_RESULTS` is a snapshot because thresholds may change after the decision.
 
 - **SP:** `BT.SP_INS_PROMOTION` — simple insert + audit log
 - **Liquibase:** `bt/releases/1.8.0-promotion.xml`

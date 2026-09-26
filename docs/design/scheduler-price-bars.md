@@ -506,7 +506,7 @@ unique violation as a concurrent write.
 !!! note "Cursor phase vs cron"
     Cron and settle target **`:55`, five minutes before each bar close**, and `SCHEDULED_TS` now
     seeds to match: `next_apply_slot()` returns the bar close minus `EXECUTE_OFFSET`
-    from `REFDATA.APP_APPLY_TIMING`, passed into `SP_INS_DEPLOYMENT` as
+    from `CONFIG.APP_APPLY_TIMING`, passed into `SP_INS_DEPLOYMENT` as
     `IN_INITIAL_SCHEDULED_TS` on create, cadence change, re-enable, and unpause
     ([decision #71](../decisions.md)). Before this, a deployment created at
     `14:37 UTC` stayed due at `14:37` daily while its bars closed at `00:00`.

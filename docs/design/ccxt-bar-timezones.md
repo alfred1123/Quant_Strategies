@@ -188,7 +188,7 @@ Compare with `MARKET_DATA.PRICE_BAR` for the same product:
 | Live signal | `quant/strategy/live_service.py`, `quant/trade/live_apply.py` |
 | When cron fires | `config/scheduler/price_bar_sync.yml`, `config/scheduler/trade_apply_tick.yml` |
 | Listing session calendar | `REFDATA.MARKET_CALENDAR`, `RedisRefData.get_market_calendar(listing_exchange=...)` |
-| Apply offset (broker × cadence) | `REFDATA.APP_APPLY_TIMING`, `RedisRefData.get_execute_offset()` |
+| Apply offset (broker × cadence) | `CONFIG.APP_APPLY_TIMING`, `RedisRefData.get_execute_offset()` |
 | Both merged | `RedisRefData.get_apply_timing(app_id, interval, listing_exchange=...)` |
 | Due deployments | `quant/trade/scheduler/tick.py`, `SP_GET_MISSED_DUE_DEPLOYMENTS` |
 
@@ -225,7 +225,7 @@ Create, cadence change, re-enable, and unpause pass `compute_initial_scheduled_t
 
 Bybit and Binance share the same **`''`** row — the calendar describes the **instrument's market**, not which API routes the order.
 
-**``REFDATA.APP_APPLY_TIMING``** — execute delay by **broker × cadence** (ops / API settle tuning):
+**``CONFIG.APP_APPLY_TIMING``** — execute delay by **broker × cadence** (ops / API settle tuning):
 
 | Column | Role |
 |--------|------|

@@ -27,12 +27,12 @@ function metricKeyToField(
   return fields.has(field) ? field : null;
 }
 
-/** Map REFDATA.PROMOTION_METRIC.metric_key → strategy shredded field. */
+/** Map CONFIG.PROMOTION_METRIC.metric_key → strategy shredded field. */
 export function metricKeyToResultField(metricKey: string): keyof PromotionRow | null {
   return metricKeyToField(metricKey, STRATEGY_METRIC_FIELDS);
 }
 
-/** Map REFDATA.PROMOTION_METRIC.metric_key → buy-and-hold shredded field. */
+/** Map CONFIG.PROMOTION_METRIC.metric_key → buy-and-hold shredded field. */
 export function metricKeyToBuyHoldField(metricKey: string): keyof PromotionRow | null {
   const base = metricKeyToField(metricKey, STRATEGY_METRIC_FIELDS);
   if (!base) return null;

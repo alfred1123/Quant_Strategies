@@ -33,7 +33,7 @@ log() { echo "[liquibase-verify] $*"; }
 die() { echo "[liquibase-verify] ERROR: $*" >&2; exit 1; }
 
 # Same schema order as liquibase-deploy.sh
-SCHEMA_DIRS=(core_admin refdata bt trade market_data inst)
+SCHEMA_DIRS=(core_admin refdata config bt trade market_data inst)
 
 ensure_prereqs() {
   bash "${ROOT_DIR}/aws/scripts/install-liquibase.sh"

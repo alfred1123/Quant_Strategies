@@ -18,6 +18,7 @@ describe('MetricsCards', () => {
     render(<MetricsCards result={makeResult()} />);
     expect(screen.getByText('Strategy')).toBeInTheDocument();
     expect(screen.getByText('Buy & Hold')).toBeInTheDocument();
+    expect(screen.getByText(/Spot close-to-close, one fee, no funding/)).toBeInTheDocument();
   });
 
   it('formats percent keys with % suffix', () => {

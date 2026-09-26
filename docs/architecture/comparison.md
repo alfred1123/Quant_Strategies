@@ -66,7 +66,7 @@ of clarity that even larger firms often lack.
 |------|------------|-------------------|-----|
 | **Alpha research** | Single grid search + walk-forward | Multi-stage pipeline: universe screening, factor modelling, portfolio construction | **Large** |
 | **Data pipeline** | Yahoo / Glassnode, single-asset | Tick data, order book, alt-data, QA, point-in-time correctness | **Medium** |
-| **Risk management** | Max DD + Sharpe gates (`REFDATA.PROMOTION_METRIC`) | Exposure limits, correlation monitoring, VaR/CVaR, margin | **Large** |
+| **Risk management** | Max DD + Sharpe gates (`CONFIG.PROMOTION_METRIC`) | Exposure limits, correlation monitoring, VaR/CVaR, margin | **Large** |
 | **Execution** | Market orders, simple fills (planned) | Smart routing, TWAP/VWAP, slippage models, TCA | **Medium** |
 | **Strategy count** | Handful of signal types | Hundreds of signals, portfolio optimisation | **Large** |
 | **Backtesting realism** | Fee-adjusted returns | Bias checks, market impact, PnL attribution | **Medium** |
@@ -308,7 +308,7 @@ Unlocks 5–10 crypto pairs without full OOP refactor if signals stay procedural
 |----------|--------|------|
 | New REFDATA `SIGNAL_TYPE` + signal func | **Small each** | [Adding Strategies](../guides/adding-strategies.md) |
 | Grid search over params | ✅ | Already works |
-| Auto-promotion | ✅ | Worker + `REFDATA.PROMOTION_METRIC` |
+| Auto-promotion | ✅ | Worker + `CONFIG.PROMOTION_METRIC` |
 
 **Candidates from notes:** mean reversion, breakout, vol breakout, trend following — many map to existing indicators (RSI, Bollinger, SMA/EMA cross) in `quant/strategy/indicators.py` + new rows in `signals.py`.
 
@@ -351,7 +351,7 @@ Start with `MarketExecutionModel` in backtest (wrap current fill logic), then sa
 
 | Rule | Promotion (HARD) | Live pre-trade |
 |------|------------------|----------------|
-| Max drawdown | ✅ HARD gate in `REFDATA.PROMOTION_METRIC` ("Max DD LTE 40%") | ⬜ |
+| Max drawdown | ✅ HARD gate in `CONFIG.PROMOTION_METRIC` ("Max DD LTE 40%") | ⬜ |
 | Sharpe &gt; 1 | queued — `1.26.0` raises `sharpe_gate` from 0 to 1 on migrate approval | ⬜ |
 | Max position size | ⬜ | ⬜ |
 | Max leverage | ⬜ | ⬜ |

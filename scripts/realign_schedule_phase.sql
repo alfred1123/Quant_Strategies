@@ -1,7 +1,7 @@
 -- One-off DML: UPDATE current PENDING schedule cursors to bar-close phase.
 --
 -- Matches quant.shared.intervals.next_apply_slot using REFDATA.TM_INTERVAL +
--- REFDATA.APP_APPLY_TIMING (requires REFDATA 1.25.0+). Does not append a new
+-- CONFIG.APP_APPLY_TIMING (requires the policy-table move). Does not append a new
 -- schedule version — only fixes SCHEDULED_TS on IS_CURRENT_IND = 'Y' rows.
 --
 -- Deliberate exception to the "no direct DML" rule: a one-off correction of a

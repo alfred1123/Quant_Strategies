@@ -51,7 +51,7 @@ flowchart TB
 | **API** | FastAPI, uvicorn | Auth, backtest, jobs, REFDATA, instruments, trade, credentials. The only process that talks to exchanges: dry-run, apply, and the scheduled tick the Lambda triggers |
 | **Worker** | `quant.queue.worker_loop` | Backtests only: claims `BT.QUEUE` rows, runs optimize, writes `BT.RESULT`. Opens no keyed exchange session |
 | **Egress proxy** | squid on EC2, eu-west-2 | Gives keyed Bybit calls a fixed London IP; a TLS tunnel only, no code or data. See [Infrastructure: UK egress proxy](infrastructure.md#uk-egress-proxy) |
-| **Cache** | Redis | REFDATA snapshots (`refdata:*`), queue wake channel |
+| **Cache** | Redis | Catalog snapshots (`refdata:*`), policy snapshots (`config:*`), queue wake channel |
 | **Database** | PostgreSQL 17 (Aurora prod) | REFDATA, BT, TRADE, MARKET_DATA, INST, CORE_ADMIN |
 | **Secrets** | SSM Parameter Store | JWT, DB creds, Fernet key for exchange API keys |
 | **Deploy** | Docker Compose + ECR + GitHub Actions | `quant-app`, `quant-nginx` images on EC2 |
@@ -99,7 +99,7 @@ scripts/                        # appctl, dbctl, liquibase-deploy, sync_schedule
 | **Backtest** | `/backtest` | `/api/v1/backtest/*`, `/api/v1/backtest/jobs/*` |
 | **Trade — Config** | `/trade/config` | `/api/v1/credentials` |
 | **Trade — Apply** | `/trade/apply` | `/api/v1/trade/deployments`, `/api/v1/strategies` |
-| **Shared** | all authenticated pages | `/api/v1/refdata/*`, `/api/v1/inst/*` |
+| **Shared** | all authenticated pages | `/api/v1/refdata/*`, `/api/v1/config/*`, `/api/v1/inst/*` |
 
 UI mode does **not** change URL prefixes — each page calls the appropriate API.
 

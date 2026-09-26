@@ -13,11 +13,15 @@ def _timing_reader(calendar_rows, timing_rows):
     def get(table):
         if table == "market_calendar":
             return calendar_rows
-        if table == "app_apply_timing":
-            return timing_rows
         raise AssertionError(f"unexpected table {table!r}")
 
+    def get_config(table):
+        if table == "app_apply_timing":
+            return timing_rows
+        raise AssertionError(f"unexpected CONFIG table {table!r}")
+
     instance.get = get
+    instance.get_config = get_config
     return instance
 
 
@@ -153,3 +157,119 @@ class TestIntervalIds:
     def test_ids_come_back_as_ints(self):
         reader = _reader([{"tm_interval_id": "7", "period_length": "1:00:00"}])
         assert reader.interval_ids() == [7]
+
+
+class _FakeRedis:
+    def __init__(self, **values: str) -> None:
+        self.store: dict[str, str] = dict(values)
+        self.deleted: list[str] = []
+
+    def get(self, key: str):
+        return self.store.get(key)
+
+    def set(self, key: str, value: str) -> None:
+        self.store[key] = value
+
+    def incr(self, key: str) -> None:
+        self.store[key] = str(int(self.store.get(key, 0)) + 1)
+
+    def pipeline(self, transaction: bool = True):
+        return self
+
+    def execute(self) -> None:
+        return None
+
+    def publish(self, channel: str, message: str) -> None:
+        return None
+
+    def scan_iter(self, match: str):
+        prefix = match.removesuffix("*")
+        return [key for key in self.store if key.startswith(prefix)]
+
+    def delete(self, *keys: str) -> None:
+        self.deleted.extend(keys)
+        for key in keys:
+            self.store.pop(key, None)
+
+
+class TestSchemaCaches:
+    def test_get_reads_the_schema_prefix(self):
+        fake = _FakeRedis(**{
+            "refdata:version": "3",
+            "refdata:indicator": '[{"method_name": "sma"}]',
+            "config:version": "1",
+            "config:promotion_metric": '[{"name": "sharpe_gate"}]',
+        })
+        reader = RedisRefData.__new__(RedisRefData)
+        reader._r = fake
+        reader._store = {}
+        reader._versions = {}
+        assert reader.get("indicator") == [{"method_name": "sma"}]
+        assert reader.get_config("promotion_metric") == [{"name": "sharpe_gate"}]
+
+    def test_a_config_bump_does_not_drop_refdata_rows(self):
+        fake = _FakeRedis(**{
+            "refdata:version": "1",
+            "refdata:indicator": '[{"method_name": "sma"}]',
+            "config:version": "1",
+            "config:promotion_metric": '[{"name": "sharpe_gate"}]',
+        })
+        reader = RedisRefData.__new__(RedisRefData)
+        reader._r = fake
+        reader._store = {}
+        reader._versions = {}
+        reader.get("indicator")
+        reader.get_config("promotion_metric")
+        fake.store["config:version"] = "2"
+        fake.store["config:promotion_metric"] = '[{"name": "oos_sharpe_gate"}]'
+        assert reader.get("indicator") == [{"method_name": "sma"}]
+        assert reader.get_config("promotion_metric") == [{"name": "oos_sharpe_gate"}]
+
+    def test_a_catalog_read_does_not_use_the_policy_snapshot(self):
+        fake = _FakeRedis(**{
+            "refdata:version": "1",
+            "config:version": "1",
+            "config:promotion_metric": '[{"name": "sharpe_gate"}]',
+            "refdata:indicator": '[{"method_name": "sma"}]',
+        })
+        reader = RedisRefData.__new__(RedisRefData)
+        reader._r = fake
+        reader._store = {}
+        reader._versions = {}
+        with pytest.raises(ValueError, match="refdata.promotion_metric"):
+            reader.get("promotion_metric")
+        with pytest.raises(ValueError, match="config.indicator"):
+            reader.get_config("indicator")
+
+    def test_publish_keeps_each_prefix_to_its_own_tables(self):
+        from quant.refdata.publisher import RefDataPublisher
+
+        fake = _FakeRedis(**{
+            "refdata:promotion_metric": "[]",
+            "config:indicator": "[]",
+        })
+        publisher = RefDataPublisher.__new__(RefDataPublisher)
+        publisher._redis = fake
+        publisher._discover_tables = lambda schema: {
+            "refdata": ["indicator"],
+            "config": ["promotion_metric"],
+        }[schema]
+        calls: list[tuple[str, str]] = []
+
+        def fetch(schema: str, table: str) -> list[dict]:
+            calls.append((schema, table))
+            return [{"name": table}]
+
+        publisher._fetch_enum = fetch
+
+        assert publisher.publish_all() == 2
+        assert fake.store["refdata:indicator"] == '[{"name": "indicator"}]'
+        assert fake.store["config:promotion_metric"] == '[{"name": "promotion_metric"}]'
+        assert fake.store["refdata:version"] == "1"
+        assert fake.store["config:version"] == "1"
+        assert "refdata:promotion_metric" not in fake.store
+        assert "config:indicator" not in fake.store
+        assert calls == [
+            ("refdata", "indicator"),
+            ("config", "promotion_metric"),
+        ]

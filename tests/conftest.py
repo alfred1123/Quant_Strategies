@@ -53,9 +53,12 @@ class StubRefData(RedisRefData):
             return self._rows
         if table == "market_calendar":
             return MARKET_CALENDAR_ROWS
+        raise AssertionError(f"unexpected REFDATA table {table!r}")
+
+    def get_config(self, table: str) -> list[dict]:
         if table == "app_apply_timing":
             return APP_APPLY_TIMING_ROWS
-        raise AssertionError(f"unexpected REFDATA table {table!r}")
+        raise AssertionError(f"unexpected CONFIG table {table!r}")
 
 
 @pytest.fixture

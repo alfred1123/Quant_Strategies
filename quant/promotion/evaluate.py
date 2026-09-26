@@ -1,7 +1,7 @@
 """Pure promotion evaluation — no DB, no side effects.
 
 Metric configuration (direction, thresholds, priority) comes from
-REFDATA.PROMOTION_METRIC via RedisRefData — nothing is hardcoded here.
+REFDATA and CONFIG via RedisRefData — nothing is hardcoded here.
 """
 
 from __future__ import annotations
@@ -151,7 +151,7 @@ def evaluate_promotion(
     or when there is no baseline to rank against.
     """
     if not promotion_metrics:
-        logger.warning("No REFDATA.PROMOTION_METRIC rows — rejecting")
+        logger.warning("No CONFIG.PROMOTION_METRIC rows — rejecting")
         return PromotionDecision(outcome=REJECTED, compared_vid=best_vid)
 
     by_type = _group_by_type(promotion_metrics)

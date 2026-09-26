@@ -63,6 +63,12 @@ def client():
             ],
         }.get(table, [])
 
+        ref.get_config.side_effect = lambda table: {
+            "promotion_metric": [
+                {"name": "sharpe_gate", "display_name": "Sharpe GT 1"},
+            ],
+        }.get(table, [])
+
         fake_user = CurrentUser(app_user_id=uuid4(), username="test", session_gen=1)
         app.dependency_overrides[require_user] = lambda: fake_user
         try:
@@ -372,15 +378,44 @@ class TestRefDataEndpoint:
 
     def test_post_refdata_refresh_ok(self, client):
         with patch("quant.api.routers.refdata.RefDataPublisher") as pub_cls:
-            pub_cls.return_value.publish_all.return_value = 5
+            pub_cls.return_value.publish.return_value = 5
             resp = client.post("/api/v1/refdata/refresh")
         assert resp.status_code == 200
         assert resp.json() == {"tables": 5}
-        pub_cls.return_value.publish_all.assert_called_once()
+        pub_cls.return_value.publish.assert_called_once_with("refdata")
 
     def test_post_refdata_refresh_failure_503(self, client):
         with patch("quant.api.routers.refdata.RefDataPublisher") as pub_cls:
-            pub_cls.return_value.publish_all.side_effect = RuntimeError("redis down")
+            pub_cls.return_value.publish.side_effect = RuntimeError("redis down")
             resp = client.post("/api/v1/refdata/refresh")
+        assert resp.status_code == 503
+        assert "redis down" in resp.json()["detail"]
+
+
+class TestConfigEndpoint:
+    def test_get_config_promotion_metric(self, client):
+        resp = client.get("/api/v1/config/promotion_metric")
+        assert resp.status_code == 200
+        assert resp.json()[0]["name"] == "sharpe_gate"
+
+    def test_get_config_unknown_table(self, client):
+        client.app.state.data_caches.refdata.get_config.side_effect = ValueError(
+            "config.foo not in Redis"
+        )
+        resp = client.get("/api/v1/config/foo")
+        assert resp.status_code == 404
+
+    def test_post_config_refresh_ok(self, client):
+        with patch("quant.api.routers.config.RefDataPublisher") as pub_cls:
+            pub_cls.return_value.publish.return_value = 4
+            resp = client.post("/api/v1/config/refresh")
+        assert resp.status_code == 200
+        assert resp.json() == {"tables": 4}
+        pub_cls.return_value.publish.assert_called_once_with("config")
+
+    def test_post_config_refresh_failure_503(self, client):
+        with patch("quant.api.routers.config.RefDataPublisher") as pub_cls:
+            pub_cls.return_value.publish.side_effect = RuntimeError("redis down")
+            resp = client.post("/api/v1/config/refresh")
         assert resp.status_code == 503
         assert "redis down" in resp.json()["detail"]

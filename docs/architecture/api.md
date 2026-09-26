@@ -14,7 +14,7 @@ See [System Overview](overview.md) for the full stack.
 | **Auth** | `/api/v1/auth/*` | Session cookie |
 | **Backtest** | `/api/v1/backtest/*` | Sync optimize / performance / walk-forward |
 | **Backtest queue** | `/api/v1/backtest/jobs/*` | Async `BT.QUEUE` jobs |
-| **Shared config** | `/api/v1/refdata/*`, `/api/v1/inst/*` | Used by Backtest and Trade UIs |
+| **Shared config** | `/api/v1/refdata/*`, `/api/v1/config/*`, `/api/v1/inst/*` | Catalogs, policy rows, and instruments. Used by Backtest and Trade UIs |
 | **Trade — deployments** | `/api/v1/trade/deployments/*` | **Done** (Phase 1.2) |
 | **Trade — credentials** | `/api/v1/credentials/*` | **Done** (Phase 1.1) |
 | **Trade — strategies** | `/api/v1/strategies` | **Done** (Phase 1.6) — `?versions=best\|all`, `?limit=` |
@@ -254,8 +254,10 @@ How the cache is published and read: [REFDATA Cache](refdata-cache.md).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET`  | `/api/v1/refdata/{table_name}` | Fetch a cached REFDATA table (e.g. `indicator`, `signal_type`, `asset_type`, `app`). |
-| `POST` | `/api/v1/refdata/refresh` | Reload all REFDATA tables from the database without restarting the server. Returns `{"tables": n}`. |
+| `GET`  | `/api/v1/refdata/{table_name}` | Fetch a cached REFDATA catalog (e.g. `indicator`, `signal_type`, `asset_type`, `app`). |
+| `GET`  | `/api/v1/config/{table_name}` | Fetch a cached CONFIG policy table (e.g. `promotion_metric`). |
+| `POST` | `/api/v1/refdata/refresh` | Reload the REFDATA catalog snapshot. Returns `{"tables": n}`. |
+| `POST` | `/api/v1/config/refresh` | Reload the CONFIG policy snapshot. Returns `{"tables": n}`. |
 | `GET`  | `/api/v1/inst/products` | List products (cached `InstrumentCache`). |
 | `GET`  | `/api/v1/inst/products/{id}/xrefs` | Vendor-symbol cross-references for a product. |
 | `GET`  | `/api/v1/inst/apps/{app_id}/products` | Only the products that app lists, each with the `vendor_symbol` it prints. |
@@ -549,8 +551,8 @@ Three things follow for callers. `BT.STRATEGY.CONFIG_JSON` stores the request ve
 
 At startup the FastAPI lifespan hook also builds `CredentialCrypto` (Fernet key from `EXCHANGE_SECRETS_KEY` — prod fail-fast) and a `DataCaches` bundle wired to Postgres + Redis:
 
-- **`RefDataPublisher`** (`quant/refdata/publisher.py`) — first runs `publish_all()`, which discovers every `REFDATA.*` table via `information_schema`, calls `REFDATA.SP_GET_ENUM`, and writes JSON snapshots under `refdata:<table>` plus a bumped `refdata:version` key in Redis. The same call is exposed at `POST /api/v1/refdata/refresh` for ad-hoc reseeding.
-- **`RedisRefData`** (`quant/refdata/reader.py`) — read-only accessor used by request handlers and the worker. Checks `refdata:version` on every `get()` and rebuilds its local snapshot lazily on bump, so long-lived processes always see the current REFDATA without pub/sub.
+- **`RefDataPublisher`** (`quant/refdata/publisher.py`) — first runs `publish_all()`, which discovers every `REFDATA` and `CONFIG` table via `information_schema`, calls `REFDATA.SP_GET_ENUM` for catalogs and `CONFIG.SP_GET_ENUM` for policy tables, and writes JSON snapshots under `refdata:<table>` or `config:<table>`, bumping that schema's version. `POST /api/v1/refdata/refresh` republishes catalogs. `POST /api/v1/config/refresh` republishes policy rows. Startup calls `publish_all()`, which runs both.
+- **`RedisRefData`** (`quant/refdata/reader.py`) — read-only accessor used by request handlers and the worker. Checks `refdata:version` or `config:version` on `get()` and drops only that schema's rows, so long-lived processes see the current snapshot without pub/sub.
 - **`InstrumentCache`** (`quant/data/instruments.py`) — products + xrefs from the INST schema; loaded at startup and refreshable via `POST /api/v1/inst/refresh`.
 - **`BacktestCache`** (`quant/data/backtest_cache.py`) — BT schema read/write used by the optimize/performance services for the dataset cache.
 
@@ -587,7 +589,8 @@ quant/api/
 │   ├── jobs.py          # /api/v1/backtest/jobs/* + manual promote
 │   ├── promotion.py     # /api/v1/backtest/promotions
 │   ├── strategies.py    # /api/v1/strategies (Phase 1.6)
-│   ├── refdata.py       # /api/v1/refdata/* endpoints
+│   ├── refdata.py       # /api/v1/refdata/* catalogs
+│   ├── config.py        # /api/v1/config/* policy rows
 │   └── inst.py          # /api/v1/inst/* endpoints
 ├── schemas/
 │   ├── jobs.py

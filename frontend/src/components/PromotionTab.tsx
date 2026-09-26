@@ -7,12 +7,13 @@ import {
 } from '@mui/material';
 import { usePromotions } from '../api/promotion';
 import { useMe } from '../api/auth';
-import { usePromotionMetrics, usePromotionStates } from '../api/refdata';
+import { usePromotionStates } from '../api/refdata';
+import { usePromotionMetrics } from '../api/config';
 import { formatMetric, toFiniteNumber } from '../utils/format';
 import { hasBuyHoldBenchmark, readBuyHoldMetric, readPromotionMetric } from '../utils/promotionMetric';
 import { strategyGroupKey, tradeAssetFromStrategyNm } from '../utils/strategyIdentity';
 import type { PromotionRow } from '../types/promotion';
-import type { PromotionMetricRow } from '../types/refdata';
+import type { PromotionMetricRow } from '../types/config';
 import DeploymentDialog, { type DeploymentSelection } from './trade/DeploymentDialog';
 import { useSetStrategyLogicalDelete } from '../api/jobs';
 
@@ -710,7 +711,7 @@ function PromotionRulesFlyout({
           )}
           {!isLoading && !isError && sorted.length === 0 && (
             <Alert severity="warning">
-              No rows in REFDATA.PROMOTION_METRIC — refresh refdata or check the database seed.
+              No rows in CONFIG.PROMOTION_METRIC — refresh refdata or check the database seed.
             </Alert>
           )}
           {!isLoading && !isError && sorted.length > 0 && (

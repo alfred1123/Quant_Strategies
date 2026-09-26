@@ -1,7 +1,7 @@
-"""REFDATA catalog snapshot.
+"""CONFIG policy snapshot.
 
-``GET /refdata/{table}`` reads ``refdata:<table>``.
-``POST /refdata/refresh`` rewrites that snapshot only.
+``GET /config/{table}`` reads ``config:<table>``.
+``POST /config/refresh`` rewrites that snapshot only.
 """
 
 import logging
@@ -15,28 +15,28 @@ from quant.refdata.publisher import RefDataPublisher
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/refdata", tags=["refdata"])
+router = APIRouter(prefix="/config", tags=["config"])
 
 
 @router.get("/{table_name}")
-def get_refdata(table_name: str, caches: DataCaches = Depends(get_data_caches)):
+def get_config(table_name: str, caches: DataCaches = Depends(get_data_caches)):
     try:
-        return caches.refdata.get(table_name)
+        return caches.refdata.get_config(table_name)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/refresh")
-def refresh_refdata(request: Request):
-    """Re-publish REFDATA catalogs from Postgres into Redis.
+def refresh_config(request: Request):
+    """Re-publish CONFIG policy rows from Postgres into Redis.
 
     Any authenticated user may trigger a refresh today — there is no
     admin role yet. Returns the number of tables published.
     """
     conninfo = request.app.state.db_conninfo
     try:
-        n = RefDataPublisher(conninfo, get_redis_url()).publish("refdata")
+        n = RefDataPublisher(conninfo, get_redis_url()).publish("config")
     except Exception as exc:
-        logger.exception("REFDATA refresh failed")
+        logger.exception("CONFIG refresh failed")
         raise HTTPException(status_code=503, detail=f"refresh failed: {exc}") from exc
     return {"tables": n}

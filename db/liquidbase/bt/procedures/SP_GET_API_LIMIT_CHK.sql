@@ -35,7 +35,7 @@ BEGIN
     OUT_SQLMSG := '10';
     FOR R_LIMIT IN
         SELECT LIMIT_TYPE, MAX_VALUE, TIME_WINDOW_SEC
-          FROM REFDATA.API_LIMIT
+          FROM CONFIG.API_LIMIT
          WHERE APP_ID = IN_APP_ID
     LOOP
         -- Step 20: Count API_REQUEST rows within the time window

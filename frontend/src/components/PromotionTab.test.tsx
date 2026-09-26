@@ -6,19 +6,22 @@ import { renderWithProviders } from '../test/wrapper';
 import { usePromotions } from '../api/promotion';
 import { useMe } from '../api/auth';
 import { useSetStrategyLogicalDelete } from '../api/jobs';
-import { usePromotionMetrics, usePromotionStates } from '../api/refdata';
+import { usePromotionStates } from '../api/refdata';
+import { usePromotionMetrics } from '../api/config';
 import type { PromotionRow } from '../types/promotion';
-import type { PromotionMetricRow, PromotionStateRow } from '../types/refdata';
+import type { PromotionStateRow } from '../types/refdata';
+import type { PromotionMetricRow } from '../types/config';
 
 vi.mock('../api/promotion', () => ({ usePromotions: vi.fn() }));
 vi.mock('../api/auth', () => ({ useMe: vi.fn() }));
 vi.mock('../api/jobs', () => ({
   useSetStrategyLogicalDelete: vi.fn(),
 }));
-vi.mock('../api/refdata', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../api/refdata')>()),
-  usePromotionMetrics: vi.fn(),
+vi.mock('../api/refdata', () => ({
   usePromotionStates: vi.fn(),
+}));
+vi.mock('../api/config', () => ({
+  usePromotionMetrics: vi.fn(),
 }));
 vi.mock('./trade/DeploymentDialog', () => ({
   default: () => null,

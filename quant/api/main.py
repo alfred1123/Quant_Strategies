@@ -29,7 +29,7 @@ from quant.api.admin.router import router as admin_router  # noqa: E402
 from quant.api.market_data.router import router as market_data_router  # noqa: E402
 from quant.api.scheduler.router import router as scheduler_router  # noqa: E402
 from quant.api.exception_handlers import register as register_exception_handlers  # noqa: E402
-from quant.api.routers import backtest, deployments, inst, jobs, promotion, refdata, strategies  # noqa: E402
+from quant.api.routers import backtest, config, deployments, inst, jobs, promotion, refdata, strategies  # noqa: E402
 from quant.refdata.bundle import DataCaches  # noqa: E402
 from quant.refdata.publisher import RefDataPublisher  # noqa: E402
 from quant.shared.db import DbGateway, close_pools, open_pool  # noqa: E402
@@ -41,11 +41,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Startup: open the DB pool, publish REFDATA → Redis, build caches.
 
-    Order matters: the publisher seeds ``refdata:<table>`` keys from
-    Postgres so the bundle's ``RedisRefData`` reader (and the worker's)
-    can resolve enums immediately. If Redis is unreachable, REFDATA
-    endpoints will 503 but the server still boots so ``/health`` remains
-    useful for diagnosis.
+    Order matters: the publisher seeds ``refdata:<table>`` and ``config:<table>``
+    so the bundle's ``RedisRefData`` reader (and the worker's) can resolve
+    rows immediately. If Redis is unreachable, those endpoints will 503 but
+    the server still boots so ``/health`` remains useful for diagnosis.
     """
     open_pool(DB_CONNINFO)
     try:
@@ -59,11 +58,11 @@ async def lifespan(app: FastAPI):
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
         try:
             n = RefDataPublisher(DB_CONNINFO, redis_url).publish_all()
-            logger.info("Published %d REFDATA tables to Redis", n)
+            logger.info("Published %d tables to Redis", n)
         except Exception:
             logger.exception(
-                "RefDataPublisher.publish_all() failed — REFDATA endpoints will 503 "
-                "until POST /api/v1/refdata/refresh succeeds",
+                "RefDataPublisher.publish_all() failed — catalog and policy endpoints will 503 "
+                "until POST /api/v1/refdata/refresh and POST /api/v1/config/refresh succeed",
             )
 
         caches = DataCaches(DB_CONNINFO, redis_url)
@@ -159,6 +158,7 @@ app.include_router(jobs.router, prefix="/api/v1", dependencies=[Depends(require_
 app.include_router(strategies.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(promotion.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(refdata.router, prefix="/api/v1", dependencies=[Depends(require_user)])
+app.include_router(config.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(deployments.router, prefix="/api/v1", dependencies=[Depends(require_user)])
 app.include_router(credentials_router, prefix="/api/v1", dependencies=[Depends(require_user)])
 # The routers the scheduler Lambda drives, so their gates also admit the

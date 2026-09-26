@@ -27,7 +27,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-SCHEMAS=(refdata bt trade core_admin inst)
+SCHEMAS=(refdata config bt trade core_admin inst)
 DB_NAME="quantdb"
 HOST="${QUANTDB_HOST:-localhost}"
 PORT="${QUANTDB_PORT:-5433}"

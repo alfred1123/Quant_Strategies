@@ -105,7 +105,7 @@ pg_dump "host=${QUANTDB_HOST} port=${QUANTDB_PORT} dbname=quantdb user=${QUANTDB
   -f /tmp/refdata_ddl.sql
 
 # All project schemas at once
-for SCHEMA in refdata bt trade core_admin; do
+for SCHEMA in refdata config bt trade core_admin; do
   pg_dump "host=${QUANTDB_HOST} port=${QUANTDB_PORT} dbname=quantdb user=${QUANTDB_USERNAME}" \
     --schema-only --schema="${SCHEMA}" --no-owner --no-privileges \
     --exclude-table="${SCHEMA}.databasechangelog*" \

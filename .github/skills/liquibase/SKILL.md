@@ -26,8 +26,14 @@ db/liquidbase/
 │   └── procedures/
 ├── refdata/
 │   ├── liquibase.properties           # liquibase-schema-name=refdata
-│   ├── refdata-changelog.xml          # REFDATA tables + seed data
+│   ├── refdata-changelog.xml          # REFDATA catalogs + seed data
 │   ├── tables/
+│   └── data/
+├── config/
+│   ├── liquibase.properties           # liquibase-schema-name=config
+│   ├── config-changelog.xml           # CONFIG policy tables + SP_GET_ENUM
+│   ├── tables/
+│   ├── procedures/
 │   └── data/
 ├── bt/
 │   ├── liquibase.properties           # liquibase-schema-name=bt
@@ -55,7 +61,8 @@ Each schema has its own `databasechangelog` and `databasechangeloglock` tables, 
 |--------|--------|
 | `public` | Schema creation + extensions (`000-schemas`) |
 | `core_admin` | CORE_ADMIN tables + procedures |
-| `refdata` | REFDATA tables + seed data |
+| `refdata` | REFDATA catalogs + seed data |
+| `config` | CONFIG policy tables and `SP_GET_ENUM` |
 | `bt` | BT tables + procedures |
 | `trade` | TRADE tables |
 

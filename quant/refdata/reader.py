@@ -1,17 +1,13 @@
-"""Read-only REFDATA accessor backed by Redis.
+"""Read-only accessor for the REFDATA and CONFIG snapshots in Redis.
 
-REFDATA enums (config dimensions like ``queue_status``, ``indicator``,
-``app``) are loaded into Redis by :mod:`quant.refdata.publisher`. This
-module exposes them to FastAPI request handlers and worker processes.
-
-A version stamp at ``refdata:version`` is checked on every ``get()``; if
-the publisher has bumped the version, the local snapshot is dropped and
-rebuilt lazily. That keeps long-lived processes in sync without pub/sub.
+Catalogs live under ``refdata:<table>`` with stamp ``refdata:version``.
+Policy rows live under ``config:<table>`` with stamp ``config:version``.
+A bump drops only that schema's local rows, so a gate change does not
+reload the indicator list.
 
 Behaviour notes
 ---------------
-* If Redis returns no rows for a table, ``get()`` raises ``ValueError``
-  (an empty REFDATA table is a config bug).
+* If Redis returns no rows for a table, ``get()`` raises ``ValueError``.
 * If Redis is unreachable, the constructor does not fail; the first
   ``get()`` raises ``RuntimeError`` so partial outages surface at the
   right log line, not at boot.
@@ -28,11 +24,16 @@ from quant.shared.intervals import parse_period
 logger = logging.getLogger(__name__)
 
 
-def _key(table: str) -> str:
-    return f"refdata:{table}"
+def cache_key(schema: str, table: str) -> str:
+    return f"{schema}:{table}"
 
 
-_VERSION_KEY = "refdata:version"
+def version_key(schema: str) -> str:
+    return f"{schema}:version"
+
+
+def invalidate_channel(schema: str) -> str:
+    return f"{schema}:invalidate"
 
 
 class RedisRefData:
@@ -51,41 +52,46 @@ class RedisRefData:
             socket_connect_timeout=2,
             socket_timeout=2,
         )
-        self._store: dict[str, list[dict]] = {}
-        self._version: str | None = None
+        self._store: dict[tuple[str, str], list[dict]] = {}
+        self._versions: dict[str, str | None] = {}
 
-    # ── internal cache management ───────────────────────────────────────
-
-    def _check_version(self) -> None:
-        """Drop the local snapshot if the publisher has bumped the version."""
+    def _check_version(self, schema: str) -> None:
+        """Drop this schema's local rows if its publisher stamp moved."""
         try:
-            current = self._r.get(_VERSION_KEY)
+            current = self._r.get(version_key(schema))
         except redis.RedisError as exc:
             raise RuntimeError(f"Redis unavailable: {exc}") from exc
-        if current != self._version:
-            self._store.clear()
-            self._version = current
+        if current != self._versions.get(schema):
+            for key in [k for k in self._store if k[0] == schema]:
+                del self._store[key]
+            self._versions[schema] = current
 
-    def _load_table(self, table: str) -> list[dict]:
+    def _load_table(self, schema: str, table: str) -> list[dict]:
         try:
-            raw = self._r.get(_key(table))
+            raw = self._r.get(cache_key(schema, table))
         except redis.RedisError as exc:
             raise RuntimeError(f"Redis unavailable: {exc}") from exc
         if raw is None:
             raise ValueError(
-                f"REFDATA.{table.upper()} not in Redis — publisher may not have run yet"
+                f"{schema}.{table} not in Redis — publisher may not have run yet"
             )
         rows = json.loads(raw)
-        self._store[table] = rows
+        self._store[(schema, table)] = rows
         return rows
 
-    # ── public read API ─────────────────────────────────────────────────
-
     def get(self, table: str) -> list[dict]:
-        self._check_version()
-        rows = self._store.get(table) or self._load_table(table)
+        """Rows from the REFDATA catalog snapshot."""
+        return self._get("refdata", table)
+
+    def get_config(self, table: str) -> list[dict]:
+        """Rows from the CONFIG policy snapshot."""
+        return self._get("config", table)
+
+    def _get(self, schema: str, table: str) -> list[dict]:
+        self._check_version(schema)
+        rows = self._store.get((schema, table)) or self._load_table(schema, table)
         if not rows:
-            raise ValueError(f"REFDATA.{table.upper()} is empty")
+            raise ValueError(f"{schema}.{table} is empty")
         return rows
 
     def get_indicator_defaults(self) -> dict[str, dict]:
@@ -123,7 +129,7 @@ class RedisRefData:
 
         Each row has: metric_key, direction, requirement_type, priority, threshold.
         """
-        rows = self.get("promotion_metric")
+        rows = self.get_config("promotion_metric")
         return sorted(rows, key=lambda r: int(r.get("priority", 999)))
 
     @staticmethod
@@ -174,13 +180,13 @@ class RedisRefData:
 
     def get_execute_offset(self, app_id: int, tm_interval_id: int) -> timedelta:
         """Lead time before bar close for broker + schedule cadence."""
-        for r in self.get("app_apply_timing"):
+        for r in self.get_config("app_apply_timing"):
             if int(r["app_id"]) == int(app_id) and int(r["tm_interval_id"]) == int(
                 tm_interval_id
             ):
                 return parse_period(r["execute_offset"])
         raise RuntimeError(
-            "REFDATA.APP_APPLY_TIMING missing "
+            "CONFIG.APP_APPLY_TIMING missing "
             f"APP_ID={app_id} TM_INTERVAL_ID={tm_interval_id}"
         )
 

@@ -18,7 +18,7 @@
 |-------|---------------|------------------|
 | **Aurora** | Tables, seeds, procedure bodies | Liquibase `migrate` job (`production-db` approval when `context` includes `prod-deploy`) |
 | **`quant-app`** (`api`, `worker`) | Python under `quant/` — signal funcs, repos, worker logic | ECR image built in CI, pulled on EC2 when `DEPLOY_APP=true` |
-| **Redis** | REFDATA JSON snapshots (`refdata:*`) | API startup `publish_all()`, `POST /api/v1/refdata/refresh`, or publisher CLI on EC2 |
+| **Redis** | Catalog snapshots (`refdata:*`) and policy snapshots (`config:*`) | API startup `publish_all()`, `POST /api/v1/refdata/refresh`, or publisher CLI on EC2 |
 | **`quant-nginx`** | Built React SPA | ECR nginx image when `DEPLOY_NGINX=true` |
 | **Browser** | TanStack Query client cache | Hard refresh after backend layers match |
 
@@ -112,7 +112,7 @@ restarts all services). Do not assume REFDATA refresh alone fixes a Python skew.
 3. **Containers restarted** — deploy job `deploy to EC2` succeeded; on the instance
    `docker compose ps` shows recent `Up` times for `quant-api` and `quant-worker`.
 4. **REFDATA** (if seeds changed) — refresh prod Redis or rely on post-migrate
-   container restart; verify with `refdata:version` and table payload (below).
+   container restart; verify with `refdata:version` and `config:version` (below).
 5. **Browser** — hard refresh the prod site.
 
 ### Verify `quant-app` matches git

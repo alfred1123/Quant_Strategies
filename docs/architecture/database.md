@@ -9,7 +9,8 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | Schema | Purpose |
 |--------|---------|
 | `CORE_ADMIN` | App users (`APP_USER`), proc audit log (`LOG_PROC_DETAIL`), exchange API credentials (`API_CREDENTIAL`) |
-| `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `MARKET_CALENDAR`, `APP_APPLY_TIMING`, `PROMOTION_METRIC`, …) + `SP_GET_ENUM` procedure for cache loading. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `MARKET_CALENDAR` is session/timezone by **`LISTING_EXCHANGE`** (`INST.PRODUCT.EXCHANGE`; `''` = default crypto). `APP_APPLY_TIMING` is execute offset by broker × `TM_INTERVAL` — see [ccxt bar timezones](../design/ccxt-bar-timezones.md). `REFDATA.PROMOTION_METRIC` stores auto-promote rules (HARD gates + SOFT comparison metrics). |
+| `CONFIG` | Policy (`APP_ISSUE_FEE`, `APP_APPLY_TIMING`, `API_LIMIT`, `PROMOTION_METRIC`) and `CONFIG.SP_GET_ENUM`, which reads only this schema. Redis prefix `config:<table>` and stamp `config:version`. |
+| `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `MARKET_CALENDAR`, …) and `REFDATA.SP_GET_ENUM`, which reads only this schema. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `MARKET_CALENDAR` is session/timezone by **`LISTING_EXCHANGE`** (`INST.PRODUCT.EXCHANGE`; `''` = default crypto). |
 | `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `PROMOTION`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert/get procedures |
 | `TRADE` | Live trading: `DEPLOYMENT`, `DEPLOYMENT_SCHEDULE_STATUS`, `EXECUTION_EVENT`, `TRANSACTION` + SPs (no `INTENT` — decision #38) |
 | `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows) — see [Scheduler & Price Bars](../design/scheduler-price-bars.md) — plus `BAR_SUBSCRIPTION`, standing capture requests with no deployment behind them ([Market data capture](../design/market-data-capture.md)) |
@@ -20,7 +21,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 !!! danger "No Direct SQL in Application Code"
     **All** database access from Python/FastAPI goes through **`CALL schema.procedure(...)`** — both reads (`SP_GET_*`) and writes (`SP_INS_*`, `SP_UPD_*`). No raw `SELECT`, `INSERT`, `UPDATE`, or `DELETE` in Python code. Exceptions: **`BT.QUEUE`** mutations use **`BT.SP_INS_QUEUE`** only (**`IN_ACTION`** discriminates enqueue / claim / terminal / cancel). Liquibase seed changesets may use direct SQL. `information_schema` catalog queries (e.g. REFDATA table discovery) are permitted.
 
-    - **REFDATA reads** — application code reads REFDATA via the Redis-backed `RedisRefData` reader (`quant/refdata/reader.py`). Postgres is hit only by the publisher (`quant/refdata/publisher.py`) at startup and on `POST /api/v1/refdata/refresh`, which runs `CALL REFDATA.SP_GET_ENUM(table_name, ...)` per table. Never query REFDATA tables directly from application code.
+    - **REFDATA reads** — application code reads catalogs and policy rows via the Redis-backed `RedisRefData` reader (`quant/refdata/reader.py`). Postgres is hit only by the publisher (`quant/refdata/publisher.py`) at startup and on `POST /api/v1/refdata/refresh` (catalogs) or `POST /api/v1/config/refresh` (policy), which runs `CALL REFDATA.SP_GET_ENUM` for a catalog and `CALL CONFIG.SP_GET_ENUM` for a policy table. Never query those tables directly from application code.
     - If a required procedure does not exist yet, create it first.
 
 ### Column Naming
@@ -210,9 +211,9 @@ See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11-user-secrets) an
 
 Persisted strategies (`BT.STRATEGY`) are created when backtest jobs complete — distinct from REFDATA `SIGNAL_TYPE`. Jobs store owner as `USER_ID = str(app_user_id)` (UUID text).
 
-### REFDATA — promotion metrics
+### CONFIG — promotion metrics
 
-`REFDATA.PROMOTION_METRIC` stores configurable auto-promote rules. Two types:
+`CONFIG.PROMOTION_METRIC` stores configurable auto-promote rules. Two types:
 
 - **HARD** — threshold gates (e.g. Sharpe GT 1, Max DD LTE 40%). Must all pass to be eligible. The Sharpe threshold becomes 1 when release `1.26.0` (`refdata,prod-deploy`) is approved.
 - **SOFT** — comparison metrics evaluated in priority order against the current best VID.
@@ -334,7 +335,8 @@ Neither the retention window nor the dump was touched to achieve this. `LOG_PROC
 | Procedure | Schema | Type |
 |-----------|--------|------|
 | `CORE_INS_LOG_PROC` | `CORE_ADMIN` | Central logging — measures with `clock_timestamp()`. Called by every SP except the two loop-called ones above |
-| `SP_GET_ENUM` | `REFDATA` | Generic REFCURSOR select for any REFDATA table |
+| `SP_GET_ENUM` | `REFDATA` | Generic REFCURSOR select for one `REFDATA` table |
+| `SP_GET_ENUM` | `CONFIG` | Generic REFCURSOR select for one `CONFIG` table |
 | `SP_INS_STRATEGY` | `BT` | Resolves `STRATEGY_ID` from `(USER_ID, STRATEGY_NM)`; bumps VID; returns `OUT_STRATEGY_ID` + `OUT_STRATEGY_VID`. Advisory lock per identity. See [strategy-vid-versioning.md](../archive/strategy-vid-versioning.md). |
 | `SP_INS_QUEUE` | `BT` | **Unified queue state machine**: `IN_ACTION` = **`ENQUEUE`**, **`CLAIM_NEXT`**, **`TERMINAL`**, **`CANCEL`** — all **`BT.QUEUE`** transitions |
 | `SP_GET_QUEUE` | `BT` | Flexible queue reader (REFCURSOR); FastAPI jobs list/detail + the worker's claim poll. **Writes no audit row** — the poll ran ~2,870×/day into `LOG_PROC_DETAIL` |
@@ -464,11 +466,12 @@ the changelog is archived): `TRADE.SP_GET_EXECUTION_EVENT` and
 ```
 db/
 ├── liquidbase/                    # Liquibase changelogs
-│   ├── quantdb-changelog.xml     # Master manifest (comments only until new release)
-│   ├── releases/                 # TEMPLATE.xml + archive/ (baseline reference)
+│   ├── quantdb-changelog.xml     # Master manifest (CONFIG schema)
+│   ├── releases/                 # 1.2.0 CONFIG schema + archive/
 │   ├── liquibase.properties      # Master properties
 │   ├── core_admin/               # *-changelog.xml + releases/archive/
-│   ├── refdata/                  # REFDATA + releases/
+│   ├── refdata/                  # REFDATA catalogs + releases/
+│   ├── config/                   # CONFIG policy tables, SP_GET_ENUM, releases/
 │   ├── bt/                       # BT + releases/
 │   ├── trade/                    # TRADE + releases/
 │   ├── market_data/              # MARKET_DATA price bars + releases/

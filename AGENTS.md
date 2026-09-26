@@ -107,19 +107,19 @@ All UI dropdown, radio, and selectbox values must come from `REFDATA` tables in 
 | Conjunction | `REFDATA.CONJUNCTION` | `DISPLAY_NAME` | `NAME` |
 | Grid defaults | `REFDATA.INDICATOR` | — | `WIN_MIN`, `WIN_MAX`, `WIN_STEP`, `SIG_MIN`, `SIG_MAX`, `SIG_STEP` (same table). `WIN_*` are daily-bar counts; the drawer scales them by the interval's bars-per-day. |
 | Promotion state | `REFDATA.PROMOTION_STATE` | `DISPLAY_NAME` | `NAME` |
-| Promotion rules (gates + soft metrics) | `REFDATA.PROMOTION_METRIC` | `DISPLAY_NAME` | `NAME` (also `METRIC_KEY`, `REQUIREMENT_TYPE`, `PRIORITY`, `THRESHOLD`) |
+| Promotion rules (gates + soft metrics) | `CONFIG.PROMOTION_METRIC` | `DISPLAY_NAME` | `NAME` (also `METRIC_KEY`, `REQUIREMENT_TYPE`, `PRIORITY`, `THRESHOLD`) |
 | Listing session calendar | `REFDATA.MARKET_CALENDAR` | — | `LISTING_EXCHANGE`, `BAR_TIMEZONE`, `MARKET_*` (via `get_market_calendar()`; `''` = default crypto; not a UI dropdown) |
-| Scheduled apply offset (broker × cadence) | `REFDATA.APP_APPLY_TIMING` | — | `EXECUTE_OFFSET` (via `get_execute_offset()` / `get_apply_timing()`) |
+| Scheduled apply offset (broker × cadence) | `CONFIG.APP_APPLY_TIMING` | — | `EXECUTE_OFFSET` (via `get_execute_offset()` / `get_apply_timing()`) |
 
 The `INDICATOR_DEFAULTS` dict in `quant/strategy/signals.py` is a **legacy fallback** — grid defaults should come from `REFDATA.INDICATOR` via `RedisRefData.get_indicator_defaults()`.
 
 ### REFDATA Caching
 
-- **`RefDataPublisher`** (`quant/refdata/publisher.py`) loads REFDATA from Postgres via `REFDATA.SP_GET_ENUM` and writes JSON snapshots to Redis (`refdata:<table>` keys). Invoked at FastAPI startup and on `POST /api/v1/refdata/refresh`.
-- **`RedisRefData`** (`quant/refdata/reader.py`) is the read-only accessor for API handlers and the worker. Checks `refdata:version` on every `get()` and rebuilds its local snapshot when bumped.
-- No TTL — REFDATA changes are rare, admin-only. Refresh via `POST /api/v1/refdata/refresh`.
+- **`RefDataPublisher`** (`quant/refdata/publisher.py`) loads REFDATA through `REFDATA.SP_GET_ENUM` and CONFIG through `CONFIG.SP_GET_ENUM`, and writes JSON snapshots to Redis (`refdata:<table>` and `config:<table>`). Invoked at FastAPI startup (`publish_all`) and on `POST /api/v1/refdata/refresh` or `POST /api/v1/config/refresh` for one snapshot.
+- **`RedisRefData`** (`quant/refdata/reader.py`) is the read-only accessor for API handlers and the worker. `get()` reads catalogs. `get_config()` reads policy rows. Each checks its own version stamp and drops only that snapshot.
+- No TTL — changes are rare and admin-only. Catalogs: `POST /api/v1/refdata/refresh`. Policy rows: `POST /api/v1/config/refresh`.
 - **Prod rollout is not “refresh REFDATA” alone.** Aurora migrate, `quant-app` image (`api`+`worker`), Redis, and nginx update independently; partial deploys (e.g. frontend-only push after a failed `quant/**` build) leave stale workers. See `docs/guides/prod-rollout.md`. Before SSM/ECR/prod mutations, ensure the user has run `aws sso login` and approved prod access in the IDE.
-- Frontend fetches REFDATA via `GET /api/v1/refdata/{table_name}` and caches client-side with TanStack Query (stale-while-revalidate).
+- Frontend fetches catalogs via `GET /api/v1/refdata/{table_name}` and policy rows via `GET /api/v1/config/{table_name}`, and caches client-side with TanStack Query (stale-while-revalidate).
 - DB connection: `localhost:5432` when `DB_TARGET=local`; `localhost:5433` is prod Aurora via `./scripts/appctl.sh prod tunnel start`.
 - If DB is unreachable at startup, the backend fails fast — REFDATA is required.
 

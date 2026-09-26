@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.1.0-001-sp-get-enum" author="alfcheun" context="config">
+        <comment>CONFIG.SP_GET_ENUM reads policy tables. REFDATA.SP_GET_ENUM stays on catalogs.</comment>
+        <sqlFile path="../procedures/SP_GET_ENUM.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="1.1.0-002-grant-sp-get-enum" author="alfcheun" context="config">
+        <comment>quant_app may call the procedure once the role exists. USAGE on the schema is granted by 1.0.0.</comment>
+        <sql splitStatements="false" stripComments="false">
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
+                    GRANT EXECUTE ON PROCEDURE CONFIG.SP_GET_ENUM(TEXT, OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT) TO quant_app;
+                END IF;
+            END $$;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

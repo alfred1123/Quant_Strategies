@@ -82,12 +82,12 @@ Override via `--fee` in the CLI or **Fee (bps)** in the drawer. Stored `BT.STRAT
 
 Documented so a perp or limit-order run can set `--fee` honestly. The engine still takes one scalar.
 
-Filling **Fee (bps)** from the venue and the instrument is not built. Bybit spot would be 10 bps, from `ISSUE_TYPE = spot` on the product and the broker on the xref. Futures stay out of that fill. The rate itself is reference data — broker, issue type, maker or taker — so it belongs in a `REFDATA` table the drawer reads, not a hardcoded 10 next to the fee box. That is a schema change, and it waits.
+`CONFIG.APP_ISSUE_FEE` records the rate by broker and `ISSUE_TYPE`. Every Bybit future shares one row, `ISSUE_TYPE = future`: maker 2.0 bps, taker 5.5 bps (VIP 0). The drawer does not fill **Fee (bps)** from that row yet. Spot stays the 10 bps default until a `spot` row is recorded the same way.
 
 | Venue / product | Maker | Taker | Use when |
 |---|---|---|---|
 | Bybit spot, crypto-crypto, VIP 0 | 10.0 bps | **10.0 bps** | Default. `*.crypto` + market apply |
-| Bybit USDT / USDC perpetual, VIP 0 | 2.0 bps | **5.5 bps** | Linear perp (`default_type="linear"`). Set **5.5** — do not leave 10 |
+| Bybit USDT / USDC perpetual, VIP 0 | 2.0 bps | **5.5 bps** | `CONFIG.APP_ISSUE_FEE`, Bybit, `ISSUE_TYPE = future` |
 | Bybit fiat-crypto spot | 15–25 bps | 15–25 bps | Regional; check the account fee page |
 | VIP / MNT discount | lower | lower | Only if the live account actually has it |
 
@@ -98,7 +98,7 @@ Official schedule: [Bybit Trading Fees](https://www.bybit.com/en-GB/announcement
 - **Funding** on perps (typically every 8 hours). Daily bars hide most of it; hourly hold-through-funding does not.
 - **Slippage** and partial fills — backtest assumes the close.
 - **Maker / taker split** — one `fee_bps`, and apply is taker.
-- Live Bybit wiring is still `default_type="linear"` (perp) while the fitted cusip is spot. That product mismatch is separate from the fee default; a perp backtest needs both a perp product (#21) and `fee_bps=5.5`.
+- Live Bybit wiring is still `default_type="linear"` (perp) while the fitted cusip is spot. That product mismatch is separate from the fee default; a perp backtest needs both a perp product (#21) and `fee_bps=5.5`. The Analysis cards say the score is a spot close-to-close result with one fee and no funding.
 
 ## Data Source Behaviour
 

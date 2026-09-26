@@ -20,8 +20,8 @@ without polling the DB.
 
 ```mermaid
 flowchart LR
-  PG[(Postgres<br/>refdata schema)] -->|SP_GET_ENUM per table| PUB[RefDataPublisher]
-  PUB -->|SET refdata:&lt;table&gt;<br/>INCR refdata:version| REDIS[(Redis)]
+  PG[(Postgres<br/>refdata and config)] -->|that schema's SP_GET_ENUM| PUB[RefDataPublisher]
+  PUB -->|SET refdata:&lt;table&gt; or config:&lt;table&gt;<br/>INCR that schema's version| REDIS[(Redis)]
   REDIS -->|GET + version check| RD[RedisRefData reader]
   RD --> API[FastAPI handlers]
   RD --> WK[Queue worker]
@@ -34,10 +34,10 @@ flowchart LR
 
 | Component | File | Role |
 |-----------|------|------|
-| Publisher | `quant/refdata/publisher.py` (`RefDataPublisher`) | Discovers tables, calls `SP_GET_ENUM`, writes JSON to Redis, bumps version |
+| Publisher | `quant/refdata/publisher.py` (`RefDataPublisher`) | Discovers tables, calls `REFDATA.SP_GET_ENUM` or `CONFIG.SP_GET_ENUM`, writes JSON to Redis, bumps version |
 | Reader | `quant/refdata/reader.py` (`RedisRefData`) | Read-only accessor; version-checked local snapshot |
 | Bundle | `quant/refdata/bundle.py` (`DataCaches`) | Wires `RedisRefData` + instrument/backtest caches for handlers |
-| Router | `quant/api/routers/refdata.py` | `GET /api/v1/refdata/{table}` + `POST /api/v1/refdata/refresh` |
+| Router | `quant/api/routers/refdata.py`, `quant/api/routers/config.py` | `GET /api/v1/refdata/{table}` and `POST /api/v1/refdata/refresh` for catalogs. `GET /api/v1/config/{table}` and `POST /api/v1/config/refresh` for policy rows. |
 
 ---
 
@@ -45,30 +45,36 @@ flowchart LR
 
 | Key | Contents |
 |-----|----------|
-| `refdata:<table>` | JSON array of rows for that REFDATA table (e.g. `refdata:indicator`) |
-| `refdata:version` | Integer bumped on every publish; readers compare against it |
-| `refdata:invalidate` | Pub/sub channel — best-effort fan-out notification (optional) |
+| `refdata:<table>` | JSON array of rows for that REFDATA catalog (e.g. `refdata:indicator`) |
+| `refdata:version` | Integer bumped when REFDATA is published; readers drop only catalog rows |
+| `refdata:invalidate` | Pub/sub channel for the catalog snapshot |
+| `config:<table>` | JSON array of rows for that CONFIG policy table (e.g. `config:promotion_metric`) |
+| `config:version` | Integer bumped when CONFIG is published; readers drop only policy rows |
+| `config:invalidate` | Pub/sub channel for the policy snapshot |
 
 ---
 
 ## Publish (`RefDataPublisher.publish_all`)
 
-1. **Discover** every base table in the `refdata` schema via `information_schema`
+1. **Discover** every base table in the `refdata` and `config` schemas via `information_schema`
    (excluding the two Liquibase bookkeeping tables). This is the one place raw
    `SELECT` on a catalog is allowed.
-2. **Fetch** each table through `CALL refdata.sp_get_enum(<table>)`. A failing
+2. **Fetch** each catalog through `CALL refdata.sp_get_enum(<table>)` and each
+   policy table through `CALL config.sp_get_enum(<table>)`. A failing
    table logs a warning and is published as an empty list rather than aborting
    the whole snapshot.
 3. **Write atomically** in a single Redis `MULTI` pipeline: `SET refdata:<table>`
-   for every table, then `INCR refdata:version` last — so all data lands before
-   the version bump that triggers reader refresh.
-4. **Fan-out** a best-effort `PUBLISH refdata:invalidate *` (non-fatal if it
-   fails).
+   or `SET config:<table>` for every table in that schema, drop any other key
+   under the same prefix, then `INCR` that schema's version — so the snapshot
+   is exactly the tables in the schema before the stamp that drops it.
+4. **Fan-out** a best-effort `PUBLISH` on `refdata:invalidate` and
+   `config:invalidate` (non-fatal if it fails).
 
 **When it runs:**
 
 - FastAPI **startup** (`lifespan` in `quant/api/main.py`) — seeds Redis before handlers serve.
-- `POST /api/v1/refdata/refresh` — admin re-publish (any authenticated user today; no admin role yet).
+- `POST /api/v1/refdata/refresh` — rewrites the catalog snapshot.
+- `POST /api/v1/config/refresh` — rewrites the policy snapshot.
 - CLI: `python -m quant.refdata.publisher` for ad-hoc reseeding.
 
 If Redis is unreachable at startup the publisher logs the failure but the server
@@ -81,10 +87,11 @@ still boots — REFDATA endpoints return **503** until a refresh succeeds, keepi
 
 `get(table)` is the core accessor:
 
-1. **`_check_version()`** — read `refdata:version`. If it differs from the
-   locally cached version, **drop the local snapshot** so the next read rebuilds
-   it lazily. This keeps long-lived API/worker processes in sync without pub/sub.
-2. Return the cached rows, or **lazily load** the table from `refdata:<table>`.
+1. **`_check_version(schema)`** — read `refdata:version` or `config:version`.
+   If it differs from the locally cached stamp, **drop that schema's rows**
+   so the next read rebuilds them. The other schema's rows stay.
+2. Return the cached rows, or **lazily load** the table from `refdata:<table>`
+   or `config:<table>`.
 
 Failure modes are deliberate and fail-fast (short 2s socket timeouts):
 
@@ -109,9 +116,11 @@ Beyond raw `get(table)`, the reader exposes domain helpers used across the app:
 
 ## Frontend
 
-The SPA fetches `GET /api/v1/refdata/{table}` and caches client-side with
-TanStack Query (stale-while-revalidate). There is **no TTL** server-side —
-changes are rare and admin-triggered via the refresh endpoint.
+The SPA fetches catalogs with `GET /api/v1/refdata/{table}` and policy rows
+with `GET /api/v1/config/{table}` (`usePromotionMetrics` calls
+`promotion_metric`). TanStack Query keys are `['refdata', …]` and
+`['config', …]`. There is **no TTL** server-side. `POST /api/v1/refdata/refresh`
+rewrites catalogs. `POST /api/v1/config/refresh` rewrites policy rows.
 
 ---
 
@@ -125,6 +134,14 @@ changes are rare and admin-triggered via the refresh endpoint.
    automatically on the next startup or `POST /api/v1/refdata/refresh`.
 4. Consume it via `caches.refdata.get("<table>")` in a handler, or add a typed
    resolver to `RedisRefData` if it needs domain logic.
+
+## Adding a CONFIG policy table
+
+1. Create the table under the `config` schema. `CONFIG.SP_GET_ENUM` returns
+   its rows.
+2. `POST /api/v1/config/refresh` publishes it. Startup `publish_all()` does too.
+3. Read it with `caches.refdata.get_config("<table>")` or
+   `GET /api/v1/config/{table}`.
 
 ---
 
@@ -148,7 +165,7 @@ curl -X POST "https://<your-domain>/api/v1/refdata/refresh" -b "qs_token=…"
 docker exec quant-api python -m quant.refdata.publisher
 ```
 
-Verify: `refdata:version` incremented and `GET refdata:<table>` matches Aurora.
+Verify: `refdata:version` and `config:version` incremented, and `GET refdata:<table>` or `GET config:<table>` matches Aurora.
 
 ---
 

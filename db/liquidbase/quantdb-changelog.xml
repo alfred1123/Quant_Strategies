@@ -23,4 +23,6 @@
          app that needs it; leave it off to keep the change manual.
     -->
 
+    <include file="releases/1.2.0-config-schema.xml" relativeToChangelogFile="true"/>
+
 </databaseChangeLog>

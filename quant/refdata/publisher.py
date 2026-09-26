@@ -1,23 +1,18 @@
-"""Publish REFDATA tables from Postgres into Redis.
+"""Publish REFDATA and CONFIG tables from Postgres into Redis.
 
-Replaces ``coordinator/src/refdata/cache.ts``. Discovers every table in the
-``refdata`` schema, calls ``REFDATA.SP_GET_ENUM`` for each, and writes the
-JSON-serialised rows under ``refdata:<table>``. Bumps ``refdata:version`` so
-long-lived ``RedisRefData`` readers in FastAPI / workers see the change on
-their next ``get()``.
+Discovers every table in the ``refdata`` and ``config`` schemas, calls
+that schema's ``SP_GET_ENUM``, and writes the rows under its own prefix:
+``refdata:<table>`` or ``config:<table>``. Each schema has its own version
+stamp, so a reader drops only the snapshot that changed.
 
 Run modes
 ---------
 * As a library — call ``RefDataPublisher(conninfo, redis_url).publish_all()``
-  from FastAPI's ``lifespan`` hook so REFDATA is always populated when the
+  from FastAPI's ``lifespan`` hook so both snapshots are populated when the
   API process boots.
-* As a CLI — ``python -m src.refdata_publisher`` for ad-hoc reseeding (the
-  ``POST /api/v1/refdata/refresh`` admin endpoint also calls into the same
-  ``publish_all()``).
-
-Key shape exactly matches the legacy TS coordinator (``refdata:<table>``,
-``refdata:version``, ``refdata:invalidate``) so ``RedisRefData`` reads
-unchanged.
+* As a CLI — ``python -m quant.refdata.publisher`` publishes both snapshots.
+  ``POST /api/v1/refdata/refresh`` publishes catalogs only.
+  ``POST /api/v1/config/refresh`` publishes policy rows only.
 """
 
 import json
@@ -27,22 +22,19 @@ import sys
 
 import redis
 
+from quant.refdata.reader import cache_key, invalidate_channel, version_key
 from quant.shared.db import DbGateway, close_pools, open_pool
 
 logger = logging.getLogger(__name__)
 
-
-REFDATA_KEY_PREFIX = "refdata:"
-REFDATA_VERSION_KEY = "refdata:version"
-REFDATA_INVALIDATE_CHANNEL = "refdata:invalidate"
-
-
-def _key(table: str) -> str:
-    return f"{REFDATA_KEY_PREFIX}{table}"
+_ENUM_SQL = {
+    "refdata": "CALL refdata.sp_get_enum(%s, NULL, NULL, NULL, NULL)",
+    "config": "CALL config.sp_get_enum(%s, NULL, NULL, NULL, NULL)",
+}
 
 
 class RefDataPublisher(DbGateway):
-    """Loads all REFDATA tables and publishes them atomically to Redis."""
+    """Loads REFDATA and CONFIG tables and publishes them atomically to Redis."""
 
     def __init__(self, conninfo: str, redis_url: str) -> None:
         super().__init__(conninfo)
@@ -55,62 +47,65 @@ class RefDataPublisher(DbGateway):
 
     # ── load ────────────────────────────────────────────────────────────
 
-    def _discover_tables(self) -> list[str]:
+    def _discover_tables(self, schema: str) -> list[str]:
         rows = self._query(
             """
             SELECT table_name
               FROM information_schema.tables
-             WHERE table_schema = 'refdata'
+             WHERE table_schema = %s
                AND table_type   = 'BASE TABLE'
                AND table_name NOT IN ('databasechangelog', 'databasechangeloglock')
              ORDER BY table_name
-            """
+            """,
+            (schema,),
         )
         return [r["table_name"] for r in rows]
 
-    def _fetch_enum(self, table: str) -> list[dict]:
-        """CALL REFDATA.SP_GET_ENUM(table) → list[dict]."""
-        return self._call_get(
-            "CALL refdata.sp_get_enum(%s, NULL, NULL, NULL, NULL)",
-            (table,),
-        )
+    def _fetch_enum(self, schema: str, table: str) -> list[dict]:
+        """CALL that schema's SP_GET_ENUM(table) → list[dict]."""
+        return self._call_get(_ENUM_SQL[schema], (table,))
 
     # ── publish ─────────────────────────────────────────────────────────
 
     def publish_all(self) -> int:
-        """Load every REFDATA table and atomically publish to Redis.
+        """Publish both snapshots. Startup and the CLI use this."""
+        return self.publish("refdata") + self.publish("config")
 
-        Returns the number of tables published. Raises ``redis.RedisError``
-        if Redis is unreachable — REFDATA is required for both the API and
-        worker, so the caller (FastAPI lifespan) should fail fast.
-        """
-        tables = self._discover_tables()
+    def publish(self, schema: str) -> int:
+        """Publish one schema under its own Redis prefix and version stamp."""
+        if schema not in ("refdata", "config"):
+            raise ValueError(f"unknown snapshot schema {schema!r}")
+        tables = self._discover_tables(schema)
         snapshot: dict[str, list[dict]] = {}
-        for t in tables:
+        for table in tables:
             try:
-                snapshot[t] = self._fetch_enum(t)
+                snapshot[table] = self._fetch_enum(schema, table)
             except Exception:
-                logger.warning("refdata: failed to load %s", t, exc_info=True)
-                snapshot[t] = []
+                logger.warning("%s: failed to load %s", schema, table, exc_info=True)
+                snapshot[table] = []
 
-        # Atomic from the writer's perspective: one round-trip, all keys
-        # land before the version bump that triggers reader refresh.
         pipe = self._redis.pipeline(transaction=True)
+        owned = set(snapshot)
         for table, rows in snapshot.items():
-            pipe.set(_key(table), json.dumps(rows, default=str))
-        pipe.incr(REFDATA_VERSION_KEY)
+            pipe.set(cache_key(schema, table), json.dumps(rows, default=str))
+        for key in self._redis.scan_iter(match=f"{schema}:*"):
+            table = key.removeprefix(f"{schema}:")
+            if table in owned or table in ("version", "invalidate"):
+                continue
+            pipe.delete(key)
+        pipe.incr(version_key(schema))
         pipe.execute()
 
-        # Best-effort fan-out for any subscribers that want push notification.
         try:
-            self._redis.publish(REFDATA_INVALIDATE_CHANNEL, "*")
+            self._redis.publish(invalidate_channel(schema), "*")
         except redis.RedisError:
-            logger.debug("refdata: invalidate publish failed (non-fatal)", exc_info=True)
+            logger.debug("%s: invalidate publish failed (non-fatal)", schema, exc_info=True)
 
         logger.info(
-            "refdata: published %d tables (%s)",
+            "%s: published %d tables (%s)",
+            schema,
             len(snapshot),
-            ", ".join(sorted(snapshot.keys())),
+            ", ".join(sorted(snapshot)),
         )
         return len(snapshot)
 

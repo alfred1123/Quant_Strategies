@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      CONFIG schema (config.databasechangelog).
+
+      Policy tables: fees, apply timing, API limits, promotion gates.
+      Catalogs stay in REFDATA.
+
+      PRODUCTION SAFETY
+      - Deploy applies ONLY changesets whose context includes prod-deploy.
+        Anything else is manual: APP_ENV=prod USE_SSM=1 ./scripts/liquibase-deploy.sh
+
+      NEW MIGRATION
+      1. Add SQL under tables/, data/, or procedures/.
+      2. Create releases/X.Y.Z-name.xml
+      3. Add:
+           <include file="releases/X.Y.Z-name.xml" relativeToChangelogFile="true"/>
+    -->
+
+    <include file="releases/1.0.0-move-policy-tables.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.1.0-sp-get-enum.xml" relativeToChangelogFile="true"/>
+
+</databaseChangeLog>

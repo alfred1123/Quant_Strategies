@@ -227,7 +227,7 @@ Pre-completion aborts do not call SP_INS — row stays due.
 | Piece | Outcome |
 |-------|---------|
 | **`REFDATA.MARKET_CALENDAR`** | Listing venue (`LISTING_EXCHANGE`) → timezone, session. Default `''` row for crypto. |
-| **`REFDATA.APP_APPLY_TIMING`** | Broker × cadence → `EXECUTE_OFFSET` (5 min seeded for Bybit/Binance). |
+| **`CONFIG.APP_APPLY_TIMING`** | Broker × cadence → `EXECUTE_OFFSET` (5 min seeded for Bybit/Binance). |
 | **`RedisRefData.get_market_calendar()` / `get_execute_offset()`** | Reader lookups — no hardcoded session or offset in Python. |
 | **`next_apply_slot()` in `quant/shared/intervals.py`** | Bar close minus `EXECUTE_OFFSET` ([decision #81](../decisions.md)). Listed dailies use session close. |
 | **Seed on create / reschedule / unpause** | `SP_INS_DEPLOYMENT` accepts optional `IN_INITIAL_SCHEDULED_TS`; Python passes aligned slot using deployment `APP_ID` + schedule interval. |

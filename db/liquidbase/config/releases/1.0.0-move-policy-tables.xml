@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.0.0-001-move-policy-tables" author="alfcheun" context="config">
+        <comment>Move the three policy tables that already live in REFDATA. APP_ISSUE_FEE is created in CONFIG by refdata 1.27.0, which runs first.</comment>
+        <sql splitStatements="false" stripComments="false">
+            DO $$
+            BEGIN
+                ALTER TABLE REFDATA.APP_APPLY_TIMING SET SCHEMA CONFIG;
+                ALTER TABLE REFDATA.API_LIMIT SET SCHEMA CONFIG;
+                ALTER TABLE REFDATA.PROMOTION_METRIC SET SCHEMA CONFIG;
+                IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
+                    GRANT USAGE ON SCHEMA CONFIG TO quant_app;
+                END IF;
+            END $$;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

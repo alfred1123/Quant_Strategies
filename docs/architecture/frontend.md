@@ -225,7 +225,7 @@ frontend/src/
 │   │   ├── FactorCard.tsx       # Indicator/strategy/ranges for one factor
 │   │   └── RangeFields.tsx      # Min/max/step input group
 │   ├── Top10Table.tsx    # MUI DataGrid for top-10 results
-│   ├── MetricsCards.tsx  # Strategy vs buy-hold metric cards
+│   ├── MetricsCards.tsx  # Strategy vs buy-hold. Caption: spot close, one fee, no funding
 │   ├── HeatmapChart.tsx  # Plotly Sharpe heatmap (window × signal)
 │   ├── EquityCurveChart.tsx  # Plotly equity + drawdown chart
 │   ├── JobsTable.tsx     # Queue tab — MUI DataGrid with VID/Best chip, status filters, actions
@@ -273,7 +273,8 @@ Once you know these shapes, every function signature and component prop makes se
 ### Layer 2: API (`api/`) — how data is fetched
 
 - **`client.ts`** — Creates an Axios instance with `baseURL: '/api/v1'` and `withCredentials: true`. The response interceptor normalises errors and evicts the auth cache on 401.
-- **`refdata.ts`** — One React Query hook per REFDATA table. Each hook calls `GET /api/v1/refdata/{table}` and caches forever (`staleTime: Infinity`).
+- **`refdata.ts`** — One React Query hook per catalog table (`GET /api/v1/refdata/{table}`), cached forever (`staleTime: Infinity`).
+- **`config.ts`** — `usePromotionMetrics` (`GET /api/v1/config/promotion_metric`), cached the same way.
 - **`inst.ts`** — `useProducts()` — same pattern for the product list.
 - **`backtest.ts`** — `runPerformance()` and `runWalkForward()` are POST calls. A search is enqueued through `jobs.ts`, and the worker runs `run_optimize`.
 - **`auth.ts`** — `useMe()` probes `GET /auth/me` on mount. `login()` / `logout()` hit POST endpoints.

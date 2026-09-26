@@ -7,7 +7,7 @@
 -- Metric values (Sharpe, Calmar, etc.) live in BT.RESULT.PAYLOAD_JSON —
 -- the UI derives the decisive metric by joining both payloads (candidate
 -- via QUEUE_ID, best via COMPARED_VID's queue) and walking
--- REFDATA.PROMOTION_METRIC in priority order.
+-- CONFIG.PROMOTION_METRIC in priority order.
 --
 -- GATE_RESULTS is a point-in-time snapshot because REFDATA thresholds
 -- may change after the decision was made.

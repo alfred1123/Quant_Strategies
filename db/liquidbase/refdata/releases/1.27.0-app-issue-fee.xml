@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.27.0-001-create-app-issue-fee" author="alfcheun" context="refdata">
+        <comment>CONFIG.APP_ISSUE_FEE — taker and maker bps by broker and issue type</comment>
+        <sqlFile path="../../config/tables/APP_ISSUE_FEE.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="1.27.0-002-seed-bybit-future-fee" author="alfcheun" context="refdata">
+        <comment>Bybit VIP-0 perpetual: maker 2.0 bps, taker 5.5 bps, ISSUE_TYPE future</comment>
+        <sqlFile path="../../config/data/APP_ISSUE_FEE.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+</databaseChangeLog>

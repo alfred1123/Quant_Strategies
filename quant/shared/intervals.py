@@ -92,7 +92,7 @@ def next_apply_slot(after: datetime, period: timedelta, offset: timedelta) -> da
     Continuous markets (crypto) close on the epoch boundary — midnight UTC for
     a daily bar. Applying after that close is the next session on a listed
     market, so the fill is no longer the bar the signal was read from.
-    ``offset`` comes from ``REFDATA.APP_APPLY_TIMING`` (typically 5 minutes
+    ``offset`` comes from ``CONFIG.APP_APPLY_TIMING`` (typically 5 minutes
     *before* close). If that instant is still ahead, use it; otherwise the
     same lead on the following bar.
     """

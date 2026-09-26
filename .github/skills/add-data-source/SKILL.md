@@ -194,7 +194,7 @@ UI request \u2014\u2192 BacktestCache.read_payload | refresh_payload(fetcher=...
 | `REFDATA.APP` | REFDATA | Provider registry (`APP_ID`). Add seed row. |
 | `REFDATA.APP_METRIC` | REFDATA | Metric per provider (`APP_METRIC_ID`). Add seed row. |
 | `REFDATA.TM_INTERVAL` | REFDATA | Time interval (e.g. `daily`). |
-| `REFDATA.API_LIMIT` | REFDATA | Rate limits per provider. Add seed row. |
+| `CONFIG.API_LIMIT` | CONFIG | Rate limits per provider. Add seed row. |
 | `BT.API_REQUEST` | BT | Subscription metadata — one row per (symbol, source, interval). Soft-versioned via `API_REQ_VID`. |
 | `BT.API_REQUEST_PAYLOAD` | BT | Full merged history as JSONB. Append-only, yearly-partitioned. |
 
@@ -203,7 +203,7 @@ UI request \u2014\u2192 BacktestCache.read_payload | refresh_payload(fetcher=...
 | Procedure | Direction | Purpose |
 |-----------|-----------|---------|
 | `BT.SP_GET_API_REQUEST` | **Read** | Returns the current `API_REQUEST` row joined with its JSONB payload, filtered by `(APP_ID, APP_METRIC_ID, TM_INTERVAL_ID, INTERNAL_CUSIP)`. |
-| `BT.SP_GET_API_LIMIT_CHK(IN_APP_ID)` | **Read** | Check all `REFDATA.API_LIMIT` rules for the provider. Returns `OUT_ALLOWED='Y'` if safe to call, `'N'` with breach details if any limit is exceeded. **Must be called before every provider API request.** |
+| `BT.SP_GET_API_LIMIT_CHK(IN_APP_ID)` | **Read** | Check all `CONFIG.API_LIMIT` rules for the provider. Returns `OUT_ALLOWED='Y'` if safe to call, `'N'` with breach details if any limit is exceeded. **Must be called before every provider API request.** |
 | `BT.SP_INS_API_REQUEST` | **Write** | Combined header + JSONB payload insert. Bumps `API_REQ_VID` and closes the prior current row in one call. |
 
 ### Implementation pattern

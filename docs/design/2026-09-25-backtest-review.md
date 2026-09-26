@@ -76,6 +76,8 @@ Fixed. `_conviction` in `quant/strategy/signals.py` ranks each bar against earli
 
 ### 4. Live orders are not the fill the backtest measures
 
+The Analysis cards now say the score is a spot close-to-close result: one fee, no funding, and not the linear-perp order sent before the close. The Bybit perpetual taker and maker rates are recorded on `CONFIG.APP_ISSUE_FEE` for `ISSUE_TYPE = future` (decision #84). The backtest still uses the fee on the request. Funding and the pre-close fill are still unmodelled.
+
 | | |
 |---|---|
 | Where | `quant/trade/brokers/ccxt/config.py` lines 134–138; `quant/trade/bar_source.py` lines 102–107; `quant/market_data/service.py` lines 648–651; fee and pnl in `quant/strategy/performance.py` lines 101 and 270–274 |
@@ -215,5 +217,5 @@ The CLI run also showed Yahoo’s `end` date is exclusive: `--end 2024-01-01` st
 ## What to do first
 
 1. **Hold-out, buy-and-hold, and a full-sample Sharpe of at least 1 are in the evaluator.** They take effect when the `1.26.0` migrate job is approved. Until then promotion still uses Sharpe above 0 and the 40% drawdown gate. **Medium, queued.**
-2. **Make the backtest describe the order that actually goes out.** Charge funding and the perp fee, and fill on the pre-close price, or keep the spot close-to-close research backtest and stop treating a linear-perp, pre-close fill as the same experiment. This is the gap that matters now that apply runs before the bar closes. **Medium.**
+2. **The Analysis cards name the spot close.** Funding, the perp fee, and the pre-close fill are still unmodelled, so the scored Sharpe is still not the order that goes out. **Medium.**
 3. **One-factor column and the full-sample tie-break are fixed.** A one-factor run now reads `data_column`, and a multi-factor disagreement is ranked on bars up to the one being decided. Stochastic still scores High, Low, and Close.

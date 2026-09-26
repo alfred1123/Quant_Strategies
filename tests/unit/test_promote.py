@@ -23,7 +23,7 @@ def _payload(sharpe: float = 1.0, calmar: float = 0.5, max_dd: float = -0.1, tot
 
 
 def _metrics():
-    """Minimal REFDATA.PROMOTION_METRIC rows: two hard gates + three soft."""
+    """Minimal CONFIG.PROMOTION_METRIC rows: two hard gates + three soft."""
     return [
         {"metric_key": "Sharpe Ratio", "direction": "higher_is_better", "requirement_type": "HARD", "priority": 0,  "threshold": 0},
         {"metric_key": "Max Drawdown", "direction": "lower_is_better",  "requirement_type": "HARD", "priority": 10, "threshold": 0.40},
