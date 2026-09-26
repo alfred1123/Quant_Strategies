@@ -76,7 +76,9 @@ or link a design doc — do not turn the research page into a spec.
 
 Before treating a Sharpe from these pages as a result, read the
 [backtest review (2026-09-25)](../design/2026-09-25-backtest-review.md). It records
-how this engine annualizes, promotes, and costs a backtest.
+how this engine annualizes, promotes, and costs a backtest. Engineering quality
+of the same tree — the worker, the scheduler, typing, and the session cookie —
+is in the [code quality review (2026-09-26)](../design/2026-09-26-code-quality-review.md).
 
 ## AlgoDaemon hand-off
 
