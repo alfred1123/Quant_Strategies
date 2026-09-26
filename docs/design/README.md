@@ -38,6 +38,7 @@ today see [Architecture](../architecture/overview.md).
 | Doc | Status |
 |-----|--------|
 | [Backtest review (2026-09-25)](2026-09-25-backtest-review.md) | Open findings — measurement, promotion, and live fill |
+| [AlgoDaemon bug report (2026-09-27)](2026-09-27-algodaemon-bug-report.md) | 21 items from the API review. Open high: AND-as-OR, stochastic, walk-forward warmup, cross-range promotion |
 
 ## Shipped or historical → [Archive](../archive/README.md)
 

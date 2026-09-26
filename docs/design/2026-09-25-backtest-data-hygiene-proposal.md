@@ -2,7 +2,7 @@
 
 **Doc type:** proposal. The short-sample refusal is adopted ([decision #82](../decisions.md)). Stale-row cleanup, recipe identity, and catalog visibility are not.
 **Status:** open except the short-sample rule. That rule changes no schema and rewrites no stored row.
-**Reviewed against:** `main` at `85fa94409` (2026-09-25), including the [backtest review](2026-09-25-backtest-review.md).
+**Reviewed against:** `main` at `85fa94409` (2026-09-25), including the [backtest review](2026-09-25-backtest-review.md). The [AlgoDaemon bug report (2026-09-27)](2026-09-27-algodaemon-bug-report.md) is the later measurement pass; it links here instead of repeating the stale-row, short-sample, and identity analysis.
 
 The engine now compounds simple returns and reads drawdown off that equity curve. Rows written before the worker that does this came up still store the old annual return, total return, max drawdown, and Calmar. Sharpe, on a long enough sample, is the same number either way. Strategy identity is still the full display name, so a change of bar interval starts a new lineage. The catalog still shows every Best version, including ones a user would not want to trade.
 
