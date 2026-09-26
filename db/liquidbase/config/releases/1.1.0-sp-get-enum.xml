@@ -5,7 +5,7 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <changeSet id="1.1.0-001-sp-get-enum" author="alfcheun" context="config">
+    <changeSet id="1.1.0-001-sp-get-enum" author="alfcheun" context="config,prod-deploy">
         <comment>CONFIG.SP_GET_ENUM reads policy tables. REFDATA.SP_GET_ENUM stays on catalogs.</comment>
         <sqlFile path="../procedures/SP_GET_ENUM.sql"
                  relativeToChangelogFile="true"
@@ -13,7 +13,7 @@
                  stripComments="false"/>
     </changeSet>
 
-    <changeSet id="1.1.0-002-grant-sp-get-enum" author="alfcheun" context="config">
+    <changeSet id="1.1.0-002-grant-sp-get-enum" author="alfcheun" context="config,prod-deploy">
         <comment>quant_app may call the procedure once the role exists. USAGE on the schema is granted by 1.0.0.</comment>
         <sql splitStatements="false" stripComments="false">
             DO $$

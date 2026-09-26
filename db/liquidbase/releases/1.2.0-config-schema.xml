@@ -5,8 +5,8 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <changeSet id="1.2.0-001-create-config-schema" author="alfcheun" context="schema">
-        <comment>CONFIG schema for policy tables. Context is schema only — a main push does not create it until prod-deploy is added.</comment>
+    <changeSet id="1.2.0-001-create-config-schema" author="alfcheun" context="schema,prod-deploy">
+        <comment>CONFIG schema for policy tables. Ships with the refdata 1.27, config 1.0.0/1.1.0, and bt 1.24.0 releases.</comment>
         <sql splitStatements="true" stripComments="true">
             CREATE SCHEMA IF NOT EXISTS CONFIG;
         </sql>

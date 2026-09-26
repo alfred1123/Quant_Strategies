@@ -5,7 +5,7 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <changeSet id="1.24.0-001-api-limit-config-schema" author="alfcheun" context="bt">
+    <changeSet id="1.24.0-001-api-limit-config-schema" author="alfcheun" context="bt,prod-deploy">
         <comment>SP_GET_API_LIMIT_CHK reads CONFIG.API_LIMIT after the policy-table move.</comment>
         <sqlFile path="../procedures/SP_GET_API_LIMIT_CHK.sql"
                  relativeToChangelogFile="true"

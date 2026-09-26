@@ -28,10 +28,11 @@
 -- quant_app : the runtime application
 --   USAGE on schemas + EXECUTE on app-facing procs only. No table access.
 -- ---------------------------------------------------------------------------
-GRANT USAGE ON SCHEMA CORE_ADMIN, REFDATA, BT, INST, TRADE, MARKET_DATA TO quant_app;
+GRANT USAGE ON SCHEMA CORE_ADMIN, REFDATA, CONFIG, BT, INST, TRADE, MARKET_DATA TO quant_app;
 
 -- EXECUTE on every business-schema routine.
 GRANT EXECUTE ON ALL ROUTINES IN SCHEMA REFDATA TO quant_app;
+GRANT EXECUTE ON ALL ROUTINES IN SCHEMA CONFIG   TO quant_app;
 GRANT EXECUTE ON ALL ROUTINES IN SCHEMA BT      TO quant_app;
 GRANT EXECUTE ON ALL ROUTINES IN SCHEMA INST    TO quant_app;
 GRANT EXECUTE ON ALL ROUTINES IN SCHEMA TRADE   TO quant_app;
