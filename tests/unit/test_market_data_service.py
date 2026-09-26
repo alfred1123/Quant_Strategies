@@ -49,13 +49,13 @@ class FakeFetcher:
         self.bars = bars
         self.calls = []
 
-    def fetch_bars(self, *, vendor_symbol, period, since, until):
+    def fetch_bars(self, *, vendor_symbol, period, since, until, default_type=None):
         self.calls.append(
             {"vendor_symbol": vendor_symbol, "period": period, "since": since, "until": until}
         )
         return [b for b in self.bars if since <= b.bar_timestamp <= until]
 
-    def earliest_bar(self, *, vendor_symbol, period):
+    def earliest_bar(self, *, vendor_symbol, period, default_type=None):
         self.earliest_calls = getattr(self, "earliest_calls", [])
         self.earliest_calls.append({"vendor_symbol": vendor_symbol, "period": period})
         return self.bars[0].bar_timestamp if self.bars else None

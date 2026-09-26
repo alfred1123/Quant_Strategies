@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
@@ -154,11 +154,13 @@ class PriceBarService:
         refdata,
         instruments,
         fetcher: BarFetcher,
+        default_type_for: Callable[[str], str | None] | None = None,
     ) -> None:
         self._repo = repo
         self._refdata = refdata
         self._instruments = instruments
         self._fetcher = fetcher
+        self._default_type_for = default_type_for
 
     # ── population ───────────────────────────────────────────────────────
 
@@ -465,6 +467,7 @@ class PriceBarService:
         earliest = self._fetcher.earliest_bar(
             vendor_symbol=self._vendor_symbol(internal_cusip, source_app_id),
             period=period,
+            default_type=self._default_type(internal_cusip),
         )
         if earliest is None:
             return None, None
@@ -588,8 +591,15 @@ class PriceBarService:
             period=period,
             since=since,
             until=until,
+            default_type=self._default_type(internal_cusip),
         )
         return {bar.bar_timestamp: bar for bar in bars}
+
+    def _default_type(self, internal_cusip: str) -> str | None:
+        """ccxt default type for this instrument, when the venue maps ``ISSUE_TYPE``."""
+        if self._default_type_for is None:
+            return None
+        return self._default_type_for(internal_cusip)
 
     def _vendor_symbol(self, internal_cusip: str, source_app_id: int) -> str:
         """What this venue calls the instrument, or refuse to ask it anything."""

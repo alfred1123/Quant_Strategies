@@ -159,7 +159,7 @@ From the repo root with network access:
 import ccxt
 from datetime import UTC, datetime
 
-ex = ccxt.bybit({"enableRateLimit": True, "options": {"defaultType": "linear"}})
+ex = ccxt.bybit({"enableRateLimit": True, "options": {"defaultType": "spot"}})
 ex.set_sandbox_mode(True)  # testnet
 
 rows = ex.fetch_ohlcv("BTCUSDT", "1d", limit=3)

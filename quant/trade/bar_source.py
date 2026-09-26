@@ -47,16 +47,29 @@ class PriceBarServiceFactory:
                 f"no market data venue for app_id={app_id} — cannot price a "
                 f"scheduled deployment without bars from the exchange it trades on"
             )
+        instruments = self._caches.instrument_cache
+
+        def default_type_for(internal_cusip: str) -> str | None:
+            if not preset.default_type_by_issue:
+                return None
+            product = instruments.get_product_by_cusip(internal_cusip)
+            issue_type = product.get("issue_type") if isinstance(product, dict) else None
+            try:
+                return preset.default_type_for(issue_type)
+            except ValueError as exc:
+                raise TradeValidationError(str(exc)) from exc
+
         service = PriceBarService(
             self._repo,
             self._caches.refdata,
-            self._caches.instrument_cache,
-            CcxtBarFetcher(preset.exchange_id, default_type=preset.default_type),
+            instruments,
+            CcxtBarFetcher(preset.exchange_id),
+            default_type_for=default_type_for,
         )
         self._by_app_id[app_id] = service
         logger.info(
-            "price bar service ready for app_id=%s via %s default_type=%s",
-            app_id, preset.exchange_id, preset.default_type,
+            "price bar service ready for app_id=%s via %s",
+            app_id, preset.exchange_id,
         )
         return service
 

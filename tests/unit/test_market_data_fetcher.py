@@ -296,8 +296,8 @@ class TestExchangeConstruction:
         assert built == {"enableRateLimit": True}
         assert "apiKey" not in built
 
-    def test_a_preset_category_is_pinned_on_the_client(self, monkeypatch):
-        """Bybit prints one id for two markets. The preset says which one."""
+    def test_a_fixed_default_type_is_pinned_on_the_client(self, monkeypatch):
+        """Bybit prints one id for two markets. The default type says which one."""
         built = {}
 
         def fake_exchange(params):

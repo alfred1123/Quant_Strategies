@@ -820,7 +820,7 @@ class PriceBarRepo(DbGateway):
 
 ### 7.5 Bar fetcher — `quant/market_data/fetcher.py`
 
-`CcxtBarFetcher` paginates `fetch_ohlcv` across the requested window and drops anything past the last closed boundary. It builds a **keyless** ccxt client rather than reusing `CcxtTradeGateway`: bars are public data, and market data must not depend on a user's API credentials or on a trading session being up. When the order preset sets `default_type`, the bar client sets the same `defaultType`, so a symbol the venue prints twice (`BTCUSDT` on Bybit) is the category the orders use. Bybit's preset is `linear`. `PriceBarService` depends on the `BarFetcher` protocol, not on ccxt.
+`CcxtBarFetcher` paginates `fetch_ohlcv` across the requested window and drops anything past the last closed boundary. It builds a **keyless** ccxt client rather than reusing `CcxtTradeGateway`: bars are public data, and market data must not depend on a user's API credentials or on a trading session being up. The ccxt `defaultType` is the instrument's `ISSUE_TYPE`, read from `InstrumentCache` (decision #89). Bybit maps `spot` to `spot` and `future` to `linear`, and both the order and the bar fetch set that before resolving an id the venue prints twice (`BTCUSDT`). `PriceBarService` depends on the `BarFetcher` protocol, not on ccxt.
 
 ### 7.8 Scheduled bar warming — `quant/market_data/warm.py`
 

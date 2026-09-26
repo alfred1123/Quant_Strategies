@@ -76,10 +76,11 @@ class BarFetcher(Protocol):
         period: timedelta,
         since: datetime,
         until: datetime,
+        default_type: str | None = None,
     ) -> list[OhlcvBar]: ...
 
     def earliest_bar(
-        self, *, vendor_symbol: str, period: timedelta
+        self, *, vendor_symbol: str, period: timedelta, default_type: str | None = None
     ) -> datetime | None: ...
 
     def venue_symbols(self) -> list[VenueMarket]: ...
@@ -102,13 +103,23 @@ class CcxtBarFetcher:
             if exchange_cls is None:
                 raise BarFetchError(f"ccxt has no exchange class {self._exchange_id!r}")
             params: dict = {"enableRateLimit": True}
-            # The same category the order preset trades. Bybit prints one id
-            # for the spot pair and the perpetual; ccxt's own default would
-            # pick one of them, and a later release can pick the other.
+            # A fixed default type, when the caller has one instrument for the
+            # life of the client. A shared client sets the default type per fetch
+            # instead: Bybit prints one id for the spot pair and the perpetual.
             if self._default_type:
                 params["options"] = {"defaultType": self._default_type}
             self._exchange = exchange_cls(params)
         return self._exchange
+
+    def _apply_default_type(self, default_type: str | None) -> None:
+        """Select which market a shared id resolves to, for this call."""
+        if not default_type:
+            return
+        options = getattr(self.exchange, "options", None)
+        if not isinstance(options, dict):
+            self.exchange.options = {"defaultType": default_type}
+        else:
+            options["defaultType"] = default_type
 
     def venue_symbols(self) -> list[VenueMarket]:
         """Every ticker this venue currently prints, so a form can offer them.
@@ -171,6 +182,7 @@ class CcxtBarFetcher:
         period: timedelta,
         since: datetime,
         until: datetime,
+        default_type: str | None = None,
     ) -> list[OhlcvBar]:
         """Bars with an open time in ``[since, until]``, oldest first.
 
@@ -188,7 +200,9 @@ class CcxtBarFetcher:
 
         bars: list[OhlcvBar] = []
         while cursor_ms <= until_ms:
-            batch = self._fetch_page(vendor_symbol, timeframe, cursor_ms)
+            batch = self._fetch_page(
+                vendor_symbol, timeframe, cursor_ms, default_type=default_type
+            )
             if not batch:
                 break
 
@@ -226,7 +240,7 @@ class CcxtBarFetcher:
         return bars
 
     def earliest_bar(
-        self, *, vendor_symbol: str, period: timedelta
+        self, *, vendor_symbol: str, period: timedelta, default_type: str | None = None
     ) -> datetime | None:
         """Open time of the oldest bar this venue still serves, or ``None``.
 
@@ -254,7 +268,7 @@ class CcxtBarFetcher:
         a date in front of the user carrying none of the authority the rest of
         this answer has. Callers treat ``None`` as "unknown", not "no bars".
         """
-        listing_ms = self._listing_ms(vendor_symbol)
+        listing_ms = self._listing_ms(vendor_symbol, default_type=default_type)
         if listing_ms is None:
             logger.warning(
                 "%s publishes no listing time for %s — cannot read its earliest bar",
@@ -263,7 +277,9 @@ class CcxtBarFetcher:
             return None
 
         timeframe = ccxt_timeframe(period)
-        batch = self._fetch_page(vendor_symbol, timeframe, listing_ms, limit=1)
+        batch = self._fetch_page(
+            vendor_symbol, timeframe, listing_ms, limit=1, default_type=default_type
+        )
         if not batch:
             logger.warning(
                 "%s served no %s bars at all for %s",
@@ -272,7 +288,7 @@ class CcxtBarFetcher:
             return None
         return datetime.fromtimestamp(int(batch[0][0]) / 1000, tz=UTC)
 
-    def _listing_ms(self, vendor_symbol: str) -> int | None:
+    def _listing_ms(self, vendor_symbol: str, default_type: str | None = None) -> int | None:
         """When the venue says this pair listed, in epoch ms.
 
         ``load_markets`` first because ``market()`` raises until the symbol
@@ -281,6 +297,7 @@ class CcxtBarFetcher:
         """
         try:
             self.exchange.load_markets()
+            self._apply_default_type(default_type)
             created = self.exchange.market(vendor_symbol).get("created")
         except Exception as exc:
             logger.debug("no listing time for %s: %s", vendor_symbol, exc)
@@ -288,8 +305,10 @@ class CcxtBarFetcher:
         return int(created) if created else None
 
     def _fetch_page(
-        self, vendor_symbol: str, timeframe: str, since_ms: int, *, limit: int = _PAGE_LIMIT
+        self, vendor_symbol: str, timeframe: str, since_ms: int, *,
+        limit: int = _PAGE_LIMIT, default_type: str | None = None,
     ) -> list:
+        self._apply_default_type(default_type)
         try:
             return self.exchange.fetch_ohlcv(
                 vendor_symbol, timeframe, since=since_ms, limit=limit

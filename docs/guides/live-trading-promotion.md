@@ -160,11 +160,11 @@ Use a **new deployment** — do not flip an existing testnet row to live in plac
    Confirm with `--diagnose`.
 2. **Bybit account prep** (same blockers hit on testnet):
    - API key has **trade** permission (not read-only).
-   - Derivatives / risk disclosure accepted (error `10024` gate).
+   - The instrument's `ISSUE_TYPE` is one this account can trade. `10024` is Bybit refusing the product; a spot row is the spot pair, and a `future` row is the USDT perpetual.
    - IP whitelist on key if you use it in prod.
 3. **Create deployment** with:
    - `paper: false`, `confirm_live: true`
-   - **Minimum qty** (smallest allowed `BTCUSDT` linear size you can tolerate)
+   - **Minimum qty** (the venue's minimum for that instrument's default type)
    - `enabled: false` initially
 4. **Dry-run** → review report (symbol, signal, intended action, qty).
 5. **Enable deployment** → **one manual Apply** → verify fill on Bybit mainnet UI +

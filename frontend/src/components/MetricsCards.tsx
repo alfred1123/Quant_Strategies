@@ -57,7 +57,7 @@ export default function MetricsCards({ result }: { result: PerformanceResponse }
         <MetricCard title="Buy & Hold" metrics={result.buy_hold_metrics} />
       </div>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-        Spot close-to-close, one fee, no funding. A linear-perp order sent before the close is not this result.
+        Spot close-to-close, one fee, no funding. The live order goes out before the bar closes, so it is not this result.
       </Typography>
     </div>
   );

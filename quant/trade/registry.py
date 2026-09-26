@@ -84,9 +84,10 @@ def build_default_registry(
 def preset_for_app(app_id: int, *, refdata: RedisRefData) -> CcxtExchangePreset | None:
     """Preset behind a ``REFDATA.APP`` id, or ``None`` if that app is not a broker.
 
-    Market data has to reach the same venue and the same product category the
-    orders go to, so both are read out of ``CCXT_PRESETS`` rather than restated
-    next to the price-bar code where they could drift.
+    Market data has to reach the same venue the orders go to. The ccxt
+    default type is the instrument's ``ISSUE_TYPE``, read from the instrument
+    cache when the bars are fetched, through the same preset map the order
+    session uses.
     """
     for candidate_id, preset in ccxt_apps(refdata):
         if candidate_id == app_id:

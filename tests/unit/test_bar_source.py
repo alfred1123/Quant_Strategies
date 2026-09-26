@@ -26,7 +26,11 @@ class TestPriceBarServiceFactory:
         service = fac.for_app(34)
 
         assert service._fetcher._exchange_id == "bybit"
-        assert service._fetcher._default_type == "linear"
+        assert service._fetcher._default_type is None
+        fac._caches.instrument_cache.get_product_by_cusip.return_value = {
+            "issue_type": "spot",
+        }
+        assert service._default_type_for("btcusdt.crypto") == "spot"
 
     def test_same_app_reuses_one_service(self, factory):
         """A scheduled apply runs every boundary — don't rebuild the ccxt client."""
@@ -40,6 +44,7 @@ class TestPriceBarServiceFactory:
         assert fac.for_app(34) is not fac.for_app(35)
         assert fac.for_app(35)._fetcher._exchange_id == "binanceusdm"
         assert fac.for_app(35)._fetcher._default_type is None
+        assert fac.for_app(35)._default_type_for("btcusdt.crypto") is None
 
     def test_one_repo_shared_across_venues(self, factory):
         """Bars for every venue land in the same table, on one connection."""

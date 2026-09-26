@@ -76,7 +76,7 @@ Fixed. `_conviction` in `quant/strategy/signals.py` ranks each bar against earli
 
 ### 4. Live orders are not the fill the backtest measures
 
-The Analysis cards now say the score is a spot close-to-close result: one fee, no funding, and not the linear-perp order sent before the close. The Bybit perpetual taker and maker rates are recorded on `CONFIG.APP_ISSUE_FEE` for `ISSUE_TYPE = future` (decision #84). The backtest still uses the fee on the request. Funding and the pre-close fill are still unmodelled.
+The Analysis cards now say the score is a spot close-to-close result: one fee, no funding, and not the live order sent before the close. The Bybit perpetual taker and maker rates are recorded on `CONFIG.APP_ISSUE_FEE` for `ISSUE_TYPE = future` (decision #84). The backtest still uses the fee on the request. Funding and the pre-close fill are still unmodelled.
 
 | | |
 |---|---|
@@ -84,7 +84,7 @@ The Analysis cards now say the score is a spot close-to-close result: one fee, n
 | Evidence | Found by reading. [Decision #65](../decisions.md) and [decision #81](../decisions.md) already name the gap. [ccxt bar timezones](ccxt-bar-timezones.md) says backtest PnL was left unchanged on purpose. |
 | Effort | Medium |
 
-Bybit is wired as `default_type="linear"` (USDT perpetuals). The research product and the default fee of 10 bps are Bybit spot taker, documented under [Transaction costs](../guides/indicators-strategies.md#transaction-costs). The backtest charges that one fee on close-to-close turnover. It does not charge funding, borrow, or slippage. A perp long held through a positive funding regime pays a cost the Sharpe never saw. The new [funding and basis](../research/funding-basis-carry.md) notes describe that cashflow as a research input. The live adapter can already be on the perp while the backtest is still the spot close.
+Bybit's default type comes from the instrument's `ISSUE_TYPE` (decision #89): `spot` is the spot pair, `future` is the USDT perpetual. The stored crypto rows are `spot`. The default fee of 10 bps is Bybit spot taker, documented under [Transaction costs](../guides/indicators-strategies.md#transaction-costs). The backtest charges that one fee on close-to-close turnover. It does not charge funding, borrow, or slippage. A future held through a positive funding regime pays a cost the Sharpe never saw. The new [funding and basis](../research/funding-basis-carry.md) notes describe that cashflow as a research input.
 
 Separately, scheduled apply runs five minutes before the close and appends the still-forming candle (`include_forming=True`) before sending the order. The backtest enters on the finished close and earns the next bar only. Five minutes is a small slice of a daily candle and about eight percent of an hourly one. A manual Apply in the middle of the day uses a half-built daily candle. The signal inputs (high, low, close, volume) are not the values the completed bar will have, and the fill happens before the close the backtest assumed.
 

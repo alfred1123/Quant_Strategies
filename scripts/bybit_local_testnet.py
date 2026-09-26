@@ -274,7 +274,7 @@ def diagnose_bybit_keys(api_key: str, api_secret: str) -> None:
                 "apiKey": api_key,
                 "secret": api_secret,
                 "enableRateLimit": True,
-                "options": {"defaultType": "linear"},
+                "options": {"defaultType": "spot"},
             }
         )
         ex.has["fetchCurrencies"] = False

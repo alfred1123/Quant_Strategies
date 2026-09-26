@@ -53,6 +53,8 @@ class StubRefData(RedisRefData):
             return self._rows
         if table == "market_calendar":
             return MARKET_CALENDAR_ROWS
+        if table == "app":
+            return []
         raise AssertionError(f"unexpected REFDATA table {table!r}")
 
     def get_config(self, table: str) -> list[dict]:

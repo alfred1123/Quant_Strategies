@@ -82,6 +82,7 @@ class CcxtTradeAdapter(TradeAdapter):
         self._gateway = CcxtTradeGateway(self._session)
         self._key_router = key_router
         self._key_profile: KeyProfile | None = None
+        self._default_type: str | None = None
 
     @property
     def gateway(self) -> CcxtTradeGateway:
@@ -121,9 +122,30 @@ class CcxtTradeAdapter(TradeAdapter):
             f"no INST.PRODUCT_XREF for {internal_cusip!r} app_id={app_id}"
         )
 
+    def pin_instrument(self, internal_cusip: str) -> None:
+        """Point this session at the product the instrument cache names.
+
+        ``ISSUE_TYPE`` selects the ccxt default type. A Bybit id is shared by
+        the spot pair and the perpetual, and the session must not guess.
+        """
+        if not self.preset.default_type_by_issue:
+            return
+        product = self._inst.get_product_by_cusip(internal_cusip)
+        issue_type = product.get("issue_type") if isinstance(product, dict) else None
+        try:
+            default_type = self.preset.default_type_for(issue_type)
+        except ValueError as exc:
+            raise TradeValidationError(str(exc)) from exc
+        self._default_type = default_type
+        self._gateway.pin_default_type(default_type)
+
+    def _market_type(self) -> str:
+        return self._default_type or self.preset.market_type
+
     def validate_for_dry_run(self, internal_cusip: str, app_id: int) -> str:
         """Validate xref + broker connectivity. Returns vendor symbol."""
         vendor_symbol = self._require_vendor_symbol(internal_cusip, app_id)
+        self.pin_instrument(internal_cusip)
         self._gateway.validate_credentials()
         if not self._gateway.market_exists(vendor_symbol):
             raise SymbolMappingError(
@@ -169,7 +191,7 @@ class CcxtTradeAdapter(TradeAdapter):
         """
         if self._key_profile is None:
             return None
-        return self._key_profile.refusal(self.preset.market_type)
+        return self._key_profile.refusal(self._market_type())
 
     @staticmethod
     def _rejected(
@@ -186,6 +208,10 @@ class CcxtTradeAdapter(TradeAdapter):
             raise TradeValidationError(
                 f"{req.order_type.value} orders not supported by the ccxt adapter — market only"
             )
+        if self.preset.default_type_by_issue and self._default_type is None:
+            raise TradeValidationError(
+                f"{self.preset.exchange_label} order needs the instrument ISSUE_TYPE"
+            )
         side = "buy" if req.side == OrderSide.BUY else "sell"
         refusal = self._key_refusal()
         if refusal is not None:
@@ -199,7 +225,7 @@ class CcxtTradeAdapter(TradeAdapter):
         except BrokerConnectionError as exc:
             if exc.reason is OrderRejectReason.REGION_RESTRICTED and self._key_profile:
                 self._key_profile = self._key_router.record_restriction(
-                    self._session, self._key_profile, self.preset.market_type
+                    self._session, self._key_profile, self._market_type()
                 )
             return self._rejected(req, str(exc), exc.reason)
         order_id = raw.get("id")

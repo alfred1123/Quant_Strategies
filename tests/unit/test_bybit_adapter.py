@@ -39,6 +39,7 @@ def inst_cache():
     cache.get_product_by_cusip.return_value = {
         "product_id": 1,
         "internal_cusip": "btcusdt.crypto",
+        "issue_type": "spot",
     }
     cache.resolve_internal_cusip.return_value = "BTCUSDT"
     return cache
@@ -198,9 +199,13 @@ class TestEgressRoutes:
         assert routes.preferring(None) == (DIRECT, uk, eu)
         assert routes.preferring("gone") == (DIRECT, uk, eu)
 
-    def test_market_type_names_the_product_category(self):
-        assert CCXT_PRESETS["bybit"].market_type == "linear"
-        assert CCXT_PRESETS["binance"].market_type == "default"
+    def test_issue_type_selects_the_default_type(self):
+        bybit = CCXT_PRESETS["bybit"]
+        assert bybit.default_type_for("spot") == "spot"
+        assert bybit.default_type_for("future") == "linear"
+        assert CCXT_PRESETS["binance"].default_type_for("spot") is None
+        with pytest.raises(ValueError, match="ISSUE_TYPE"):
+            bybit.default_type_for(None)
 
 
 class TestBybitKeyIntrospection:
@@ -368,6 +373,7 @@ class TestAdapterKeyRouting:
         profile = KeyProfile(route="direct", info=ApiKeyInfo(read_only=True))
         adapter = self._adapter(inst_cache, self._router(profile))
         adapter.connect()
+        adapter.pin_instrument("btcusdt.crypto")
         result = adapter.place_order(OrderRequest("BTCUSDT", 0.001, OrderSide.BUY))
         assert result.reason is OrderRejectReason.KEY_READ_ONLY
         create.assert_not_called()
@@ -375,12 +381,23 @@ class TestAdapterKeyRouting:
     @patch.object(CcxtTradeGateway, "create_market_order")
     @patch.object(CcxtTradeGateway, "connect")
     def test_known_region_restriction_is_refused_before_submit(self, _connect, create, inst_cache):
+        """A linear refusal blocks a future instrument and leaves a spot one alone."""
         profile = KeyProfile(
             route="uk", info=ApiKeyInfo(kyc_region="GBR"),
             restricted_market_types=frozenset({"linear"}),
         )
+        create.return_value = {"id": None}
         adapter = self._adapter(inst_cache, self._router(profile))
         adapter.connect()
+        adapter.pin_instrument("btcusdt.crypto")
+        adapter.place_order(OrderRequest("BTCUSDT", 0.001, OrderSide.BUY))
+        create.assert_called_once()
+
+        inst_cache.get_product_by_cusip.return_value = {
+            "product_id": 1, "internal_cusip": "btcusdt.crypto", "issue_type": "future",
+        }
+        create.reset_mock()
+        adapter.pin_instrument("btcusdt.crypto")
         result = adapter.place_order(OrderRequest("BTCUSDT", 0.001, OrderSide.BUY))
         assert result.reason is OrderRejectReason.REGION_RESTRICTED
         assert "GBR" in result.message
@@ -396,10 +413,11 @@ class TestAdapterKeyRouting:
         )
         router = self._router(KeyProfile(route="uk"))
         router.record_restriction.return_value = KeyProfile(
-            route="uk", restricted_market_types=frozenset({"linear"})
+            route="uk", restricted_market_types=frozenset({"spot"})
         )
         adapter = self._adapter(inst_cache, router)
         adapter.connect()
+        adapter.pin_instrument("btcusdt.crypto")
 
         result = adapter.place_order(OrderRequest("BTCUSDT", 0.001, OrderSide.BUY))
 
@@ -408,10 +426,10 @@ class TestAdapterKeyRouting:
         session, profile, market_type = router.record_restriction.call_args.args
         assert session.api_key == "k"
         assert profile == KeyProfile(route="uk")
-        assert market_type == "linear"
+        assert market_type == "spot"
         # The in-memory profile follows the cache, so the next order in this
         # session is refused before it is sent.
-        assert adapter.key_profile.restricted_market_types == {"linear"}
+        assert adapter.key_profile.restricted_market_types == {"spot"}
         create.reset_mock()
         again = adapter.place_order(OrderRequest("BTCUSDT", 0.001, OrderSide.BUY))
         assert again.reason is OrderRejectReason.REGION_RESTRICTED
@@ -621,27 +639,43 @@ class TestCcxtTradeGateway:
         assert limits["BTCUSDT"] == MarketLimits("BTCUSDT", min_qty=0.001)
         assert limits["BTC/USDT:USDT"] == MarketLimits("BTC/USDT:USDT", min_qty=0.001)
 
-    def test_a_preset_category_excludes_the_other_markets(self):
-        """Bybit prints BTCUSDT for the spot pair too; a linear session is not it."""
+    def test_a_pinned_default_type_excludes_the_other_markets(self):
+        """Bybit prints BTCUSDT for both; the instrument's default type picks one."""
         exchange = MagicMock()
+        exchange.options = {}
         exchange.markets = {
             "BTC/USDT:USDT": {
                 "id": "BTCUSDT",
                 "symbol": "BTC/USDT:USDT",
                 "linear": True,
+                "spot": False,
                 "limits": {"amount": {"min": 0.001}},
             },
             "BTC/USDT": {
                 "id": "BTCUSDT",
                 "symbol": "BTC/USDT",
                 "linear": False,
+                "spot": True,
                 "limits": {"amount": {"min": 0.000048}},
             },
         }
-        limits = self._connected(exchange).fetch_all_market_limits()
+        gateway = self._connected(exchange)
+        gateway.pin_default_type("spot")
+        limits = gateway.fetch_all_market_limits()
 
-        assert limits["BTCUSDT"].min_qty == 0.001
-        assert "BTC/USDT" not in limits
+        assert limits["BTCUSDT"].min_qty == 0.000048
+        assert "BTC/USDT:USDT" not in limits
+
+    def test_a_spot_holding_is_the_base_balance(self):
+        exchange = MagicMock()
+        exchange.options = {}
+        exchange.market.return_value = {"base": "BTC", "symbol": "BTC/USDT"}
+        exchange.fetch_balance.return_value = {"total": {"BTC": "0.25", "USDT": "10"}}
+        gateway = self._connected(exchange)
+        gateway.pin_default_type("spot")
+
+        assert gateway.fetch_position_qty("BTCUSDT") == 0.25
+        exchange.fetch_positions.assert_not_called()
 
     def test_a_public_session_carries_no_keys(self):
         config = CcxtSessionConfig.public(CCXT_PRESETS["bybit"])
@@ -697,13 +731,15 @@ class TestCreateCcxtAdapter:
 
 class TestPlaceOrder:
     def _adapter(self, inst_cache):
-        return create_ccxt_adapter(
+        adapter = create_ccxt_adapter(
             preset=CCXT_PRESETS["bybit"],
             api_key="k",
             api_secret="s",
             paper=True,
             inst_cache=inst_cache,
         )
+        adapter.pin_instrument("btcusdt.crypto")
+        return adapter
 
     @patch("quant.trade.brokers.ccxt.adapter.confirm_market_order")
     def test_place_order_buy_success(self, mock_confirm, inst_cache):
@@ -872,13 +908,15 @@ class TestPlaceOrder:
 
 class TestApplySignal:
     def _adapter(self, inst_cache):
-        return create_ccxt_adapter(
+        adapter = create_ccxt_adapter(
             preset=CCXT_PRESETS["bybit"],
             api_key="k",
             api_secret="s",
             paper=True,
             inst_cache=inst_cache,
         )
+        adapter.pin_instrument("btcusdt.crypto")
+        return adapter
 
     def test_buy_signal_flat_position_opens_long(self, inst_cache):
         adapter = self._adapter(inst_cache)

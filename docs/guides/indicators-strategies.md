@@ -98,7 +98,7 @@ Official schedule: [Bybit Trading Fees](https://www.bybit.com/en-GB/announcement
 - **Funding** on perps (typically every 8 hours). Daily bars hide most of it; hourly hold-through-funding does not.
 - **Slippage** and partial fills — backtest assumes the close.
 - **Maker / taker split** — one `fee_bps`, and apply is taker.
-- Live Bybit wiring is still `default_type="linear"` (perp) while the fitted cusip is spot. That product mismatch is separate from the fee default; a perp backtest needs both a perp product (#21) and `fee_bps=5.5`. The Analysis cards say the score is a spot close-to-close result with one fee and no funding.
+- A Bybit order uses the instrument's `ISSUE_TYPE` (decision #89). `spot` is the spot pair; `future` is the USDT perpetual (`linear`). The Analysis cards say the score is a spot close-to-close result with one fee and no funding. A perp backtest needs an instrument whose `ISSUE_TYPE` is `future` and `fee_bps=5.5`.
 
 ## Data Source Behaviour
 

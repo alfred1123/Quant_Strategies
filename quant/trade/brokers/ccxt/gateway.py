@@ -68,6 +68,7 @@ class CcxtTradeGateway:
         self._config = config
         self._exchange: ccxt.Exchange | None = None
         self._route: EgressRoute = DIRECT
+        self._default_type: str | None = None
 
     @property
     def exchange(self) -> ccxt.Exchange:
@@ -96,8 +97,9 @@ class CcxtTradeGateway:
             "secret": self._config.api_secret,
             "enableRateLimit": True,
         }
-        if preset.default_type:
-            params["options"] = {"defaultType": preset.default_type}
+        default_type = self._default_type or preset.default_type
+        if default_type:
+            params["options"] = {"defaultType": default_type}
         if route.proxy_url:
             params["httpsProxy"] = route.proxy_url
         exchange = exchange_cls(params)
@@ -169,6 +171,22 @@ class CcxtTradeGateway:
         except ccxt.BaseError as exc:
             raise BrokerConnectionError(f"broker unreachable: {exc}") from exc
 
+    def pin_default_type(self, default_type: str | None) -> None:
+        """Select the product ``market()`` resolves a shared id to.
+
+        Bybit prints ``BTCUSDT`` for the spot pair and the perpetual. ccxt
+        picks the one whose flag matches ``options.defaultType``, read on
+        each call, so a session can follow the instrument it is about to trade.
+        """
+        self._default_type = default_type
+        if self._exchange is None or not default_type:
+            return
+        options = getattr(self._exchange, "options", None)
+        if not isinstance(options, dict):
+            self._exchange.options = {"defaultType": default_type}
+        else:
+            options["defaultType"] = default_type
+
     def market_exists(self, vendor_symbol: str) -> bool:
         if vendor_symbol in self.exchange.markets:
             return True
@@ -199,17 +217,17 @@ class CcxtTradeGateway:
         return self._limits_of(market, symbol=vendor_symbol)
 
     def fetch_all_market_limits(self) -> dict[str, MarketLimits]:
-        """Limits for every symbol this session's category lists.
+        """Limits for every symbol this session's default type lists.
 
         Keyed by both the venue's own id (``BTCUSDT``) and ccxt's unified symbol
         (``BTC/USDT:USDT``), because ``INST.PRODUCT_XREF`` stores one or the
         other depending on the venue and either must resolve.
 
-        A preset that pins ``default_type`` is filtered to it — Bybit prints
-        ``BTCUSDT`` for both the spot pair and the perpetual, and only the
-        perpetual is what a linear session trades.
+        The pinned default type, or the preset's ``default_type``, drops every
+        other market. Bybit prints ``BTCUSDT`` for the spot pair and the
+        perpetual, and only one of those is the instrument being traded.
         """
-        default_type = self._config.preset.default_type
+        default_type = self._default_type or self._config.preset.default_type
         out: dict[str, MarketLimits] = {}
         for market in self.exchange.markets.values():
             if default_type and not market.get(default_type):
@@ -360,11 +378,16 @@ class CcxtTradeGateway:
     def fetch_position_qty(self, vendor_symbol: str) -> float:
         """Signed position size: positive for long, negative for short.
 
+        A spot instrument has no position row. The holding is the base-coin
+        balance. A contract instrument is the signed ``fetch_positions`` size.
+
         ``fetch_positions`` returns ``symbol`` in ccxt's unified format (e.g.
         ``BTC/USDT:USDT``) while ``vendor_symbol`` is the raw exchange symbol
         (e.g. ``BTCUSDT``) from INST.PRODUCT_XREF — compare against both that
         and the raw ``info.symbol`` ccxt preserves from the exchange response.
         """
+        if self._default_type == "spot":
+            return self._base_balance(vendor_symbol)
         try:
             positions = self.exchange.fetch_positions([vendor_symbol])
         except ccxt.BaseError as exc:
@@ -387,3 +410,18 @@ class CcxtTradeGateway:
                 qty = -abs(qty)
             return qty
         return 0.0
+
+    def _base_balance(self, vendor_symbol: str) -> float:
+        """Total balance of the market's base coin — the spot holding."""
+        try:
+            market = self.exchange.market(vendor_symbol)
+            raw = self.exchange.fetch_balance()
+        except ccxt.AuthenticationError as exc:
+            raise self._auth_error(exc, phase="fetch_balance") from exc
+        except ccxt.BaseError as exc:
+            raise BrokerConnectionError(f"fetch_balance failed: {exc}") from exc
+        base = market.get("base")
+        if not base:
+            raise BrokerConnectionError(f"no base currency for {vendor_symbol}")
+        qty = _as_float((raw.get("total") or {}).get(base))
+        return qty or 0.0

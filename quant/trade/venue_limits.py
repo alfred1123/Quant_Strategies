@@ -94,11 +94,24 @@ class VenueLimitsPublisher:
         )
         return len(snapshots)
 
-    def _fetch(self, preset: CcxtExchangePreset) -> dict[str, MarketLimits]:
+    def _fetch(self, preset: CcxtExchangePreset) -> dict[str, dict[str, MarketLimits]]:
+        """Limits per symbol, split by the default type ``ISSUE_TYPE`` selects.
+
+        One id can be two markets. A flat symbol key would keep whichever
+        market ccxt listed last, and the edit-time check would enforce the
+        wrong lot.
+        """
         gateway = CcxtTradeGateway(CcxtSessionConfig.public(preset))
         gateway.connect()
         try:
-            return gateway.fetch_all_market_limits()
+            default_types = list(dict.fromkeys(preset.default_type_by_issue.values())) or [None]
+            merged: dict[str, dict[str, MarketLimits]] = {}
+            for default_type in default_types:
+                gateway.pin_default_type(default_type)
+                label = default_type or "default"
+                for symbol, limits in gateway.fetch_all_market_limits().items():
+                    merged.setdefault(symbol, {})[label] = limits
+            return merged
         finally:
             gateway.disconnect()
 
@@ -116,20 +129,33 @@ class RedisVenueLimits:
 
     def __init__(self, redis_url: str) -> None:
         self._redis = _redis(redis_url)
-        self._by_app: dict[int, dict[str, MarketLimits]] = {}
+        self._by_app: dict[int, dict[str, dict[str, MarketLimits]]] = {}
         self._version: str | None = None
 
-    def get(self, app_id: int, vendor_symbol: str) -> MarketLimits:
-        """The venue's rules for one symbol; empty when nothing is cached."""
+    def get(
+        self, app_id: int, vendor_symbol: str, default_type: str | None = None
+    ) -> MarketLimits:
+        """The venue's rules for one symbol and default type.
+
+        ``default_type`` is what the instrument's ``ISSUE_TYPE`` mapped to.
+        When it is omitted and the symbol has exactly one default type, that
+        rule is the answer. Several and no choice enforce nothing — guessing
+        would apply the other product's lot.
+        """
         self._check_version()
         snapshot = self._by_app.get(app_id)
         if snapshot is None:
             snapshot = self._load(app_id)
             self._by_app[app_id] = snapshot
-        cached = snapshot.get(vendor_symbol)
-        if cached is None:
+        by_default_type = snapshot.get(vendor_symbol)
+        if not by_default_type:
             return MarketLimits(symbol=vendor_symbol)
-        return cached
+        if default_type is not None:
+            rule = by_default_type.get(default_type)
+            return rule if rule is not None else MarketLimits(symbol=vendor_symbol)
+        if len(by_default_type) == 1:
+            return next(iter(by_default_type.values()))
+        return MarketLimits(symbol=vendor_symbol)
 
     def _check_version(self) -> None:
         try:
@@ -141,7 +167,7 @@ class RedisVenueLimits:
             self._version = version
             self._by_app.clear()
 
-    def _load(self, app_id: int) -> dict[str, MarketLimits]:
+    def _load(self, app_id: int) -> dict[str, dict[str, MarketLimits]]:
         try:
             raw = self._redis.get(_key(app_id))
         except redis.RedisError:
@@ -160,20 +186,29 @@ class RedisVenueLimits:
             return {}
 
 
-def _encode(limits: dict[str, MarketLimits]) -> dict[str, dict]:
-    """Symbol → rules, with the symbol left in the key rather than repeated."""
+def _encode(limits: dict[str, dict[str, MarketLimits]]) -> dict[str, dict]:
+    """Symbol → default type → rules. The symbol stays the key; the default type splits it."""
     return {
-        symbol: {"min_qty": rule.min_qty, "min_notional": rule.min_notional}
-        for symbol, rule in limits.items()
+        symbol: {
+            default_type: {"min_qty": rule.min_qty, "min_notional": rule.min_notional}
+            for default_type, rule in by_default_type.items()
+        }
+        for symbol, by_default_type in limits.items()
     }
 
 
-def _decode(payload: dict) -> dict[str, MarketLimits]:
-    return {
-        symbol: MarketLimits(
-            symbol=symbol,
-            min_qty=rule.get("min_qty"),
-            min_notional=rule.get("min_notional"),
-        )
-        for symbol, rule in payload.items()
-    }
+def _decode(payload: dict) -> dict[str, dict[str, MarketLimits]]:
+    decoded: dict[str, dict[str, MarketLimits]] = {}
+    for symbol, by_default_type in payload.items():
+        if not isinstance(by_default_type, dict):
+            continue
+        decoded[symbol] = {
+            default_type: MarketLimits(
+                symbol=symbol,
+                min_qty=rule.get("min_qty"),
+                min_notional=rule.get("min_notional"),
+            )
+            for default_type, rule in by_default_type.items()
+            if isinstance(rule, dict)
+        }
+    return decoded

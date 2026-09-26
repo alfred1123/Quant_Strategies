@@ -142,8 +142,8 @@ The hand-off bot is Bybit spot, BTC/ETH/BNB only, 10 bps per trade, daily bars p
 ## 8. Venue note: Bybit error 10024
 
 The thread also surfaced a Bybit `retCode 10024` ("regulatory restriction"). Bybit returns this
-when the account's jurisdiction is not allowed to trade the product or the request originates
-from a restricted region. It is an account/egress issue, not a strategy one: see
-[UK egress proxy](../architecture/infrastructure.md#uk-egress-proxy). Live Bybit wiring also
-still uses `default_type="linear"` (perp) while research is on spot; see the note at the end of
+when the account may not trade that product. An IP the key does not list is `10010`; the
+[UK egress proxy](../architecture/infrastructure.md#uk-egress-proxy) answers that one. `10024` on a
+linear order is the product. Live Bybit now takes the default type from the instrument's `ISSUE_TYPE`
+(the stored crypto rows are `spot`). See [decision #89](../decisions.md) and the note at the end of
 [Transaction Costs](../guides/indicators-strategies.md#transaction-costs).

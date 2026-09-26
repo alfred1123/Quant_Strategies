@@ -54,7 +54,9 @@ class FakeRedis:
 class TestVenueLimitsPublisher:
     def test_one_snapshot_per_broker_app(self):
         fake = FakeRedis()
-        limits = {"BTCUSDT": MarketLimits("BTCUSDT", min_qty=0.001, min_notional=5.0)}
+        limits = {
+            "BTCUSDT": {"spot": MarketLimits("BTCUSDT", min_qty=0.001, min_notional=5.0)}
+        }
         publisher = _publisher(fake, _refdata(bybit=34, binance=35))
 
         with patch.object(
@@ -65,7 +67,7 @@ class TestVenueLimitsPublisher:
         assert published == 2
         assert mock_fetch.call_count == 2
         assert json.loads(fake.store["venue_limits:34"]) == {
-            "BTCUSDT": {"min_qty": 0.001, "min_notional": 5.0}
+            "BTCUSDT": {"spot": {"min_qty": 0.001, "min_notional": 5.0}}
         }
         # Readers drop their local copy off this stamp.
         assert fake.store[VENUE_LIMITS_VERSION_KEY] == "1"
@@ -77,7 +79,7 @@ class TestVenueLimitsPublisher:
         def fetch(preset):
             if preset.exchange_id == "bybit":
                 raise RuntimeError("venue down")
-            return {"BTCUSDT": MarketLimits("BTCUSDT", min_qty=0.002)}
+            return {"BTCUSDT": {"default": MarketLimits("BTCUSDT", min_qty=0.002)}}
 
         with patch.object(VenueLimitsPublisher, "_fetch", side_effect=fetch):
             published = publisher.publish_all()
@@ -105,7 +107,7 @@ class TestRedisVenueLimits:
         fake = FakeRedis(
             **{
                 "venue_limits:34": json.dumps(
-                    {"BTCUSDT": {"min_qty": 0.001, "min_notional": 5.0}}
+                    {"BTCUSDT": {"spot": {"min_qty": 0.001, "min_notional": 5.0}}}
                 ),
                 VENUE_LIMITS_VERSION_KEY: "7",
             }
@@ -132,17 +134,37 @@ class TestRedisVenueLimits:
     def test_a_version_bump_drops_the_local_copy(self):
         fake = FakeRedis(
             **{
-                "venue_limits:34": json.dumps({"BTCUSDT": {"min_qty": 0.001}}),
+                "venue_limits:34": json.dumps(
+                    {"BTCUSDT": {"spot": {"min_qty": 0.001}}}
+                ),
                 VENUE_LIMITS_VERSION_KEY: "1",
             }
         )
         reader = _reader(fake)
         assert reader.get(34, "BTCUSDT").min_qty == 0.001
 
-        fake.store["venue_limits:34"] = json.dumps({"BTCUSDT": {"min_qty": 0.01}})
+        fake.store["venue_limits:34"] = json.dumps(
+            {"BTCUSDT": {"spot": {"min_qty": 0.01}}}
+        )
         fake.store[VENUE_LIMITS_VERSION_KEY] = "2"
 
         assert reader.get(34, "BTCUSDT").min_qty == 0.01
+
+    def test_the_default_type_picks_its_own_lot(self):
+        fake = FakeRedis(
+            **{
+                "venue_limits:34": json.dumps({
+                    "BTCUSDT": {
+                        "spot": {"min_qty": 0.000048},
+                        "linear": {"min_qty": 0.001},
+                    },
+                }),
+            }
+        )
+        reader = _reader(fake)
+        assert reader.get(34, "BTCUSDT", "spot").min_qty == 0.000048
+        assert reader.get(34, "BTCUSDT", "linear").min_qty == 0.001
+        assert reader.get(34, "BTCUSDT").min_qty is None
 
     def test_an_unreadable_snapshot_enforces_nothing(self):
         fake = FakeRedis(**{"venue_limits:34": "not json"})

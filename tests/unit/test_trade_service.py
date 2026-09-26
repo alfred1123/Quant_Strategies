@@ -46,7 +46,7 @@ class StubVenueLimits:
     def __init__(self) -> None:
         self.limits: MarketLimits | None = None
 
-    def get(self, app_id: int, vendor_symbol: str) -> MarketLimits:
+    def get(self, app_id: int, vendor_symbol: str, default_type: str | None = None) -> MarketLimits:
         return self.limits or MarketLimits(symbol=vendor_symbol)
 
 

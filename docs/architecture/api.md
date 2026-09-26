@@ -106,15 +106,10 @@ cadence rather than keeping their own copy of the rule.
 
 #### A qty the venue would refuse is refused while it can still be fixed
 
-Every exchange has a smallest order. Bybit's linear `BTCUSDT` lot is `0.001`, so
-a deployment carrying `qty = 0.0001` places an order that can only be rejected —
-and a scheduled one does it again on every tick, at an hour when nobody is
-watching. `POST /trade/deployments` and `PATCH /trade/deployments/{id}` therefore
-check the qty against the venue's lot size and answer **400** naming it, a
-broker rule enforced at the API exactly as the cadence rule above is.
+Every exchange has a smallest order, and the lot is the one for the instrument's `ISSUE_TYPE` (decision #89). Bybit's linear `BTCUSDT` lot is `0.001`; the spot pair's lot is much smaller, and a quantity that fails one default type can be legal on the other. A scheduled tick would otherwise send the same rejected order again, at an hour when nobody is watching. `POST /trade/deployments` and `PATCH /trade/deployments/{id}` therefore check the qty against that default type's lot size and answer **400** naming it, a broker rule enforced at the API exactly as the cadence rule above is.
 
 The rules come from ccxt's `load_markets()`, cached in Redis per broker app
-(`venue_limits:<app_id>`) by `VenueLimitsPublisher` at startup and on
+(`venue_limits:<app_id>`, and per default type when one id is two markets) by `VenueLimitsPublisher` at startup and on
 `POST /trade/venue-limits/refresh` — never seeded into REFDATA, which owns values
 a *user* picks from, not facts an exchange can change without telling us
 ([decision #76](../decisions.md)). Three consequences follow from a cache being

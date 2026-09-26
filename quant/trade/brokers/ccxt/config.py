@@ -3,7 +3,7 @@
 Two-layer config (Option C)
 ---------------------------
 * **REFDATA.APP** — broker identity (``app_id``, ``name``, display). Postgres → Redis.
-* **CCXT_PRESETS** — ccxt wiring (exchange class, category, venue behaviour). Code only.
+* **CCXT_PRESETS** — ccxt wiring (exchange class, default type, venue behaviour). Code only.
 
 Dict keys in ``CCXT_PRESETS`` MUST match ``REFDATA.APP.NAME``. Registry joins the layers at
 startup (:mod:`quant.trade.registry`).
@@ -122,20 +122,39 @@ class CcxtExchangePreset:
     exchange_id: str
     exchange_label: str
     default_type: str | None = None
+    #: ``ISSUE_TYPE`` → the ccxt ``defaultType`` for that product.
+    #: Bybit prints one id for the spot pair and the USDT perpetual, and the
+    #: perpetual's default type is ``linear`` while the instrument row says ``future``.
+    default_type_by_issue: dict[str, str] = field(default_factory=dict)
     fetch_order_params: dict | None = field(default=None, compare=False, repr=False)
     venue: CcxtVenue = field(default_factory=CcxtVenue, compare=False, repr=False)
 
     @property
     def market_type(self) -> str:
-        """The product category this preset's sessions trade, for per-key restrictions."""
+        """Default type a session uses when no instrument has been pinned."""
         return self.default_type or "default"
+
+    def default_type_for(self, issue_type: str | None) -> str | None:
+        """ccxt ``defaultType`` for an instrument's ``ISSUE_TYPE``.
+
+        A preset with no map keeps its own ``default_type`` (Binance USD-M is
+        the exchange class itself). A preset that maps issue types refuses an
+        unknown one rather than guessing a product.
+        """
+        if not self.default_type_by_issue:
+            return self.default_type
+        if not issue_type or issue_type not in self.default_type_by_issue:
+            raise ValueError(
+                f"{self.exchange_label} has no default type for ISSUE_TYPE {issue_type!r}"
+            )
+        return self.default_type_by_issue[issue_type]
 
 
 CCXT_PRESETS: dict[str, CcxtExchangePreset] = {
     "bybit": CcxtExchangePreset(
         exchange_id="bybit",
         exchange_label="Bybit",
-        default_type="linear",
+        default_type_by_issue={"spot": "spot", "future": "linear"},
         fetch_order_params={"acknowledged": True},
         venue=BybitVenue(),
     ),

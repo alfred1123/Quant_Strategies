@@ -27,7 +27,7 @@ from quant.trade.dry_run import run_dry_run
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
 from quant.trade.live_apply import LiveApplyOrchestrator
 from quant.trade.models.market import MarketLimits
-from quant.trade.registry import AdapterRegistry
+from quant.trade.registry import AdapterRegistry, preset_for_app
 from quant.trade.schedule_align import compute_initial_scheduled_ts, should_realign_schedule
 from quant.trade.schedule_policy import fitted_interval_id, require_fitted_interval
 
@@ -76,7 +76,18 @@ class TradeService:
         )
         if vendor_symbol is None:
             return MarketLimits(symbol=internal_cusip)
-        return self._data_caches.venue_limits.get(app_id, vendor_symbol)
+        default_type = None
+        preset = preset_for_app(app_id, refdata=self._data_caches.refdata)
+        if preset is not None and preset.default_type_by_issue:
+            product = self._data_caches.instrument_cache.get_product_by_cusip(
+                internal_cusip
+            )
+            issue_type = product.get("issue_type") if isinstance(product, dict) else None
+            try:
+                default_type = preset.default_type_for(issue_type)
+            except ValueError as exc:
+                raise TradeValidationError(str(exc)) from exc
+        return self._data_caches.venue_limits.get(app_id, vendor_symbol, default_type)
 
     def _fitted_interval_id(self, strategy_id: UUID, strategy_vid: int) -> int:
         """The interval this strategy was fitted on — the only one it may schedule.

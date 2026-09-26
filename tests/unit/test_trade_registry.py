@@ -89,7 +89,8 @@ class TestExchangeIdForApp:
         refdata = self._refdata()
 
         assert exchange_id_for_app(34, refdata=refdata) == "bybit"
-        assert preset_for_app(34, refdata=refdata).default_type == "linear"
+        assert preset_for_app(34, refdata=refdata).default_type_for("spot") == "spot"
+        assert preset_for_app(34, refdata=refdata).default_type_for("future") == "linear"
         # Binance trades under a different ccxt class than its REFDATA name.
         assert exchange_id_for_app(35, refdata=refdata) == "binanceusdm"
         assert preset_for_app(35, refdata=refdata).default_type is None
