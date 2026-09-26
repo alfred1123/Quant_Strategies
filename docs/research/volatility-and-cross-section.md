@@ -44,7 +44,7 @@ position_t = signal_t * gate_t
 
 Bollinger z-score is not a substitute. The z-score divides price distance by volatility, so a threshold on it is a price extreme, not a volatility level. Bandwidth `(upper − lower) / middle` would be closer, and it is also missing.
 
-**AlgoDaemon testability:** The binary gate is as-is on daily spot BTC, ETH, or BNB: flat when trailing realized vol is high, else the inner long. That uses closes the bot already has. Continuous scaling is as-is only if the bot accepts a weight in `(0, 1]`; spot cannot lever. Hand-off row 4. The equity paper's Sharpe is not a target.
+**AlgoDaemon testability:** The binary gate is as-is on daily spot BTC, ETH, or BNB: flat when trailing realized vol is high, else the inner long. That uses closes the bot already has. Continuous scaling is as-is only if the bot accepts a weight in `(0, 1]`; spot cannot lever. Hand-off row 5. The equity paper's Sharpe is not a target.
 
 ---
 
@@ -98,7 +98,7 @@ The Journal of Finance abstract (2022) states the spanning result without those 
 
 **Fit here.** Not expressible as a portfolio. There is no universe sort and no second leg. The implication for the coins we do trade is the one in [momentum and liquidity](momentum-reversal-filters.md#4-daily-reversal-in-the-cross-section-momentum-in-the-liquid-names): BTC is the large, liquid leg, which these sorts **short** in the size and volume strategies. Copying the size factor onto a BTC-only book would mean fading BTC, which is the opposite of the baseline. Ranked off the first-five list on purpose.
 
-**AlgoDaemon testability:** Can't be tested as published (hundreds of coins, dollar-neutral shorts, a small-cap leg). Do not fade BTC for being large. The testable adaptation is hand-off row 5: long-only rank of BTC, ETH, and BNB.
+**AlgoDaemon testability:** Can't be tested as published (hundreds of coins, dollar-neutral shorts, a small-cap leg). Do not fade BTC for being large. The testable adaptation is hand-off row 6: long-only rank of BTC, ETH, and BNB.
 
 ---
 
@@ -178,7 +178,7 @@ The same post says the funding factor's sign flipped when the pool went from 44 
 
 **Fit here.** The dollar-neutral basket does not fit. Two pieces do, later: the funding-interval normalization (next page), and the idea of a volatility **gate** rather than a volatility weight (section 1). Fama-MacBeth weights across two factors are not something AND/OR/FILTER can represent; those conjunctions do not estimate betas.
 
-**AlgoDaemon testability:** Can't be tested as published (meme perps, 4-hour bars, a short book). The inverse-vol idea reduces to the flat-when-vol-is-high gate in hand-off row 4. Funding as a spot veto, not as a second leg, is row 7.
+**AlgoDaemon testability:** Can't be tested as published (meme perps, 4-hour bars, a short book). The inverse-vol idea reduces to the flat-when-vol-is-high gate in hand-off row 5. Funding as a spot veto, not as a second leg, is row 8.
 
 ---
 
@@ -222,4 +222,4 @@ A numerical example in the post (long basket +4%, short basket +1%, on 3,000 USD
 
 **Fit here.** Not as a portfolio. The design lesson that does transfer: if we ever add a second factor, give it a job (gate versus signal) instead of averaging two conflicting {−1, 0, +1} series with a hand-picked weight. FILTER already does that. Learning the weight from trailing factor PnL would be a new objective, not a new indicator, and it is a research idea rather than something to build on this evidence.
 
-**AlgoDaemon testability:** Can't be tested. The book is about thirty perpetuals on 4-hour bars, with open interest and a BTC hedge. There is no Sharpe here to chase. Funding as a filter on spot BTC, ETH, or BNB is the only fragment that can be adapted, and only when that series is supplied (hand-off row 7).
+**AlgoDaemon testability:** Can't be tested. The book is about thirty perpetuals on 4-hour bars, with open interest and a BTC hedge. There is no Sharpe here to chase. Funding as a filter on spot BTC, ETH, or BNB is the only fragment that can be adapted, and only when that series is supplied (hand-off row 8).

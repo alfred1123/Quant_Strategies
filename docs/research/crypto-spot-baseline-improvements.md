@@ -132,10 +132,10 @@ The hand-off bot is Bybit spot, BTC/ETH/BNB only, 10 bps per trade, daily bars p
 
 | Idea on this page | AlgoDaemon |
 |-------------------|------------|
-| Baseline Bollinger momentum, long only | **As-is**, daily, each of the three coins. It is the inner signal of hand-off row 1. |
-| 200-day trend filter | **As-is**. Hand-off row 1. |
-| Squeeze / bandwidth breakout | **As-is** from daily OHLC if the bot can compute bandwidth. Hand-off row 6, after the simpler gates. |
-| ATR volatility targeting, continuous size | **As-is** only as a weight in `(0, 1]` from daily ATR or realized vol. Spot cannot lever. Prefer the binary flat gate, hand-off row 4, if the bot has no size input. |
+| Baseline Bollinger momentum, long only | **As-is**, daily, each of the three coins. It is the inner signal of hand-off row 2. |
+| 200-day trend filter | **As-is**. Hand-off row 2. The Donchian ensemble in [Catching crypto trends](catching-crypto-trends.md) is row 1 and needs indicators this page does not have. |
+| Squeeze / bandwidth breakout | **As-is** from daily OHLC if the bot can compute bandwidth. Hand-off row 7, after the simpler gates. |
+| ATR volatility targeting, continuous size | **As-is** only as a weight in `(0, 1]` from daily ATR or realized vol. Spot cannot lever. Prefer the binary flat gate, hand-off row 5, if the bot has no size input. |
 | StochRSI exhaustion, 4h | **Can't** be tested on 4-hour bars. Hourly is allowed and is a poor match for 10 bps. Not in the hand-off. |
 | Pairs / stat-arb | **Can't** be tested with a short leg. Long-the-cheap / flat-the-rich among these three coins would be an adaptation, and the thread did not state the pair, hedge ratio, or window, so it is not in the hand-off. |
 
