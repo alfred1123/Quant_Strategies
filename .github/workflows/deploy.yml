@@ -34,6 +34,7 @@ jobs:
       db: ${{ steps.flags.outputs.db }}
       refdata: ${{ steps.flags.outputs.refdata }}
       config: ${{ steps.flags.outputs.config }}
+      cfn: ${{ steps.flags.outputs.cfn }}
       deploy: ${{ steps.flags.outputs.deploy }}
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +65,12 @@ jobs:
               - 'db/liquidbase/refdata/**'
             config:
               - 'db/liquidbase/config/**'
+            cfn:
+              - 'aws/cfn/**'
+              - 'aws/params/**'
+              - 'aws/lambda/scheduled-task/**'
+              - 'config/scheduler/**'
+              - 'aws/deploy.sh'
 
       - name: Set deploy flags
         id: flags
@@ -78,6 +85,7 @@ jobs:
             echo "db=false" >> "$GITHUB_OUTPUT"
             echo "refdata=false" >> "$GITHUB_OUTPUT"
             echo "config=false" >> "$GITHUB_OUTPUT"
+            echo "cfn=true" >> "$GITHUB_OUTPUT"
             echo "deploy=true" >> "$GITHUB_OUTPUT"
             echo "Manual dispatch — rebuild all images and deploy"
             exit 0
@@ -89,12 +97,14 @@ jobs:
           db="${{ steps.filter.outputs.db }}"
           refdata="${{ steps.filter.outputs.refdata }}"
           config="${{ steps.filter.outputs.config }}"
+          cfn="${{ steps.filter.outputs.cfn }}"
           echo "app=$app" >> "$GITHUB_OUTPUT"
           echo "nginx=$nginx" >> "$GITHUB_OUTPUT"
           echo "compose=$compose" >> "$GITHUB_OUTPUT"
           echo "db=$db" >> "$GITHUB_OUTPUT"
           echo "refdata=$refdata" >> "$GITHUB_OUTPUT"
           echo "config=$config" >> "$GITHUB_OUTPUT"
+          echo "cfn=$cfn" >> "$GITHUB_OUTPUT"
 
           if [[ "$app" == "true" || "$nginx" == "true" || "$compose" == "true" || "$db" == "true" ]]; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
@@ -102,7 +112,7 @@ jobs:
             echo "deploy=false" >> "$GITHUB_OUTPUT"
           fi
 
-          echo "Path filter: app=$app nginx=$nginx compose=$compose db=$db refdata=$refdata config=$config"
+          echo "Path filter: app=$app nginx=$nginx compose=$compose db=$db refdata=$refdata config=$config cfn=$cfn"
 
   test:
     name: test
@@ -236,12 +246,17 @@ jobs:
 
   cfn:
     name: deploy CloudFormation
-    needs: [test]
+    needs: [test, changes]
+    if: >-
+      needs.changes.outputs.cfn == 'true' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
     # Every stack here is safe to auto-deploy on intentional infra commits:
-    #   * Path filter (aws/cfn/**, aws/params/**, config/scheduler/**) means
-    #     app-only pushes skip.
+    #   * The job runs only when aws/cfn, aws/params, the scheduler lambda,
+    #     config/scheduler, or aws/deploy.sh changed. An app or database push
+    #     skips the job. Inside a run, a pure rename and an unrelated
+    #     prod.json key still deploy no stack.
     #   * RDS is guarded at the AWS layer: DeletionPolicy=Retain,
     #     UpdateReplacePolicy=Snapshot, DeletionProtection=true,
     #     BackupRetentionPeriod=7. Data loss is not reachable from CFN.
