@@ -190,26 +190,27 @@ class BtQueueRepo(DbGateway):
             return None
         return rows[-1]
 
-    def sp_get_result(self, queue_id: uuid.UUID | str) -> dict | None:
-        """Wrap ``BT.SP_GET_RESULT`` — latest result row for a queue id."""
+    def sp_get_result(
+        self,
+        queue_id: uuid.UUID | str | None = None,
+        strategy_id: uuid.UUID | str | None = None,
+        strategy_vid: int | None = None,
+    ) -> dict | None:
+        """Wrap ``BT.SP_GET_RESULT``.
+
+        Pass ``queue_id`` for the submission's newest row. Pass
+        ``strategy_id`` and ``strategy_vid`` for that version's current row.
+        The procedure appends only the filters whose inputs are present.
+        """
         return self._call_get_one(
             "CALL bt.sp_get_result("
-            "%s::uuid,"
+            "%s::uuid, %s::uuid, %s::integer,"
             " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
-            (str(queue_id),),
-        )
-
-    def sp_get_result_by_strategy(
-        self,
-        strategy_id: uuid.UUID | str,
-        strategy_vid: int,
-    ) -> dict | None:
-        """Wrap ``BT.SP_GET_RESULT_BY_STRATEGY`` — current result for a version."""
-        return self._call_get_one(
-            "CALL bt.sp_get_result_by_strategy("
-            "%s::uuid, %s::integer,"
-            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
-            (str(strategy_id), int(strategy_vid)),
+            (
+                str(queue_id) if queue_id is not None else None,
+                str(strategy_id) if strategy_id is not None else None,
+                int(strategy_vid) if strategy_vid is not None else None,
+            ),
         )
 
     def fetch_result_payload(
@@ -226,7 +227,7 @@ class BtQueueRepo(DbGateway):
         "no optimization result found" while the payload was sitting in
         BT.RESULT untouched.
         """
-        result = self.sp_get_result_by_strategy(strategy_id, strategy_vid)
+        result = self.sp_get_result(strategy_id=strategy_id, strategy_vid=strategy_vid)
         if not result or not result.get("payload_json"):
             return None
         payload = result["payload_json"]

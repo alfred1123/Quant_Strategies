@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      SP_GET_RESULT takes IN_STRATEGY_ID and IN_STRATEGY_VID as well as
+      IN_QUEUE_ID. Each filter is appended only when that input is present
+      (dynamic SQL, same shape as SP_GET_QUEUE). A strategy lookup reads the
+      current BT.RESULT row and does not walk BT.QUEUE.
+
+      CREATE OR REPLACE cannot change a procedure's argument list, and a
+      second signature would sit beside the old one. Drop the old
+      SP_GET_RESULT and SP_GET_RESULT_BY_STRATEGY first. The strategy read
+      now lives on SP_GET_RESULT.
+    -->
+
+    <changeSet id="1.26.0-001-drop-result-read-signatures" author="alfcheun" context="bt,prod-deploy">
+        <comment>Drop SP_GET_RESULT and SP_GET_RESULT_BY_STRATEGY so the new argument list replaces them</comment>
+        <sql splitStatements="false" stripComments="false"><![CDATA[
+            DROP PROCEDURE IF EXISTS BT.SP_GET_RESULT(
+                IN UUID, OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+            );
+            DROP PROCEDURE IF EXISTS BT.SP_GET_RESULT_BY_STRATEGY(
+                IN UUID, IN INTEGER, OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+            );
+        ]]></sql>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.26.0-002-sp-get-result-strategy-inputs" author="alfcheun" context="bt,prod-deploy">
+        <comment>SP_GET_RESULT — optional strategy id and vid, filters appended per input</comment>
+        <sqlFile path="../procedures/SP_GET_RESULT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+        <rollback>
+            DROP PROCEDURE IF EXISTS BT.SP_GET_RESULT(
+                IN UUID, IN UUID, IN INTEGER, OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+            );
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.26.0-003-grant-sp-get-result" author="alfcheun" context="bt,prod-deploy">
+        <comment>Grant the new SP_GET_RESULT signature to quant_app</comment>
+        <sql splitStatements="false" stripComments="false"><![CDATA[
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
+                    GRANT EXECUTE ON PROCEDURE BT.SP_GET_RESULT(
+                        IN UUID, IN UUID, IN INTEGER,
+                        OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+                    ) TO quant_app;
+                END IF;
+            END $$;
+        ]]></sql>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

@@ -19,8 +19,9 @@ def _repo(strategies, results):
     """``results`` maps ``(strategy_id, vid)`` to a created_at, or None for no result."""
     repo = MagicMock()
     repo.sp_get_strategy_list.return_value = strategies
-    repo.sp_get_result_by_strategy.side_effect = lambda sid, vid: (
-        None if results[(sid, vid)] is None else {"created_at": results[(sid, vid)]}
+    repo.sp_get_result.side_effect = lambda strategy_id, strategy_vid: (
+        None if results[(strategy_id, strategy_vid)] is None
+        else {"created_at": results[(strategy_id, strategy_vid)]}
     )
     repo.sp_get_queued_count.return_value = 0
     return repo

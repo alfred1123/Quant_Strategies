@@ -70,7 +70,7 @@ def stale_versions(
     stale: list[tuple[str, int, str]] = []
     for row in repo.sp_get_strategy_list(user_id=user_id, limit=1000, is_best_ind=None):
         strategy_id, strategy_vid = row["strategy_id"], int(row["strategy_vid"])
-        result = repo.sp_get_result_by_strategy(strategy_id, strategy_vid)
+        result = repo.sp_get_result(strategy_id=strategy_id, strategy_vid=strategy_vid)
         if result is None:
             continue
         if result["created_at"] >= cutover:

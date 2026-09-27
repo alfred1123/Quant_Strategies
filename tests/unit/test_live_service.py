@@ -315,24 +315,24 @@ class TestFetchResultPayload:
     def test_returns_payload_for_the_requested_vid(self):
         bt = BtQueueRepo("postgresql://test")
         sid = uuid4()
-        with patch.object(bt, "sp_get_result_by_strategy") as mock_result:
+        with patch.object(bt, "sp_get_result") as mock_result:
             mock_result.return_value = {
                 "payload_json": {"best": {"window": 20, "signal": 1.0}},
             }
 
             payload = bt.fetch_result_payload(sid, 2)
             assert payload["best"]["window"] == 20
-            mock_result.assert_called_once_with(sid, 2)
+            mock_result.assert_called_once_with(strategy_id=sid, strategy_vid=2)
 
     def test_returns_none_when_missing(self):
         bt = BtQueueRepo("postgresql://test")
-        with patch.object(bt, "sp_get_result_by_strategy", return_value=None):
+        with patch.object(bt, "sp_get_result", return_value=None):
             assert bt.fetch_result_payload(uuid4(), 1) is None
 
     def test_returns_none_when_the_row_carries_no_payload(self):
         bt = BtQueueRepo("postgresql://test")
         with patch.object(
-            bt, "sp_get_result_by_strategy", return_value={"payload_json": None}
+            bt, "sp_get_result", return_value={"payload_json": None}
         ):
             assert bt.fetch_result_payload(uuid4(), 1) is None
 
@@ -340,7 +340,7 @@ class TestFetchResultPayload:
         bt = BtQueueRepo("postgresql://test")
         with patch.object(
             bt,
-            "sp_get_result_by_strategy",
+            "sp_get_result",
             return_value={"payload_json": '{"best": {"window": 40}}'},
         ):
             assert bt.fetch_result_payload(uuid4(), 5)["best"]["window"] == 40
@@ -355,7 +355,7 @@ class TestFetchResultPayload:
         bt = BtQueueRepo("postgresql://test")
         with patch.object(bt, "sp_get_queue", return_value=[]) as mock_queue, patch.object(
             bt,
-            "sp_get_result_by_strategy",
+            "sp_get_result",
             return_value={"payload_json": {"best": {"window": 40, "signal": 1.75}}},
         ):
             payload = bt.fetch_result_payload(uuid4(), 5)
@@ -367,11 +367,11 @@ class TestFetchResultPayload:
         bt = BtQueueRepo("postgresql://test")
         sid = uuid4()
         with patch.object(bt, "_call_get_one", return_value=None) as mock_call:
-            bt.sp_get_result_by_strategy(sid, 5)
+            bt.sp_get_result(strategy_id=sid, strategy_vid=5)
 
         sql, params = mock_call.call_args[0]
-        assert "bt.sp_get_result_by_strategy" in sql
-        # Two INs plus the refcursor and status triplet the OUT list declares.
-        assert sql.count("%s") == 2
+        assert "bt.sp_get_result(" in sql
+        # Three INs plus the refcursor and status triplet the OUT list declares.
+        assert sql.count("%s") == 3
         assert sql.count("NULL::") == 4
-        assert params == (str(sid), 5)
+        assert params == (None, str(sid), 5)

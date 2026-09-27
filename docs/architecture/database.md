@@ -344,8 +344,7 @@ Neither the retention window nor the dump was touched to achieve this. `LOG_PROC
 | `FN_GET_QUEUE_FOR_TERMINAL` | `BT` | **Function** — UI terminal lookup (`RETURNS TABLE`); worker uses `SP_GET_QUEUE_LATEST` |
 | `SP_GET_QUEUE_LATEST` | `BT` | **Queue worker**: active row for one **`QUEUE_ID`** + frozen **`CONFIG_JSON`** (`QUEUE` ⋈ **`STRATEGY`** on **`STRATEGY_VID`**) |
 | `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`** with caller-supplied shredded strategy + buy-and-hold columns + full `PAYLOAD_JSON`; denormalizes `STRATEGY_ID`/`STRATEGY_VID` from `BT.QUEUE`; bumps `RESULT_VID` and flips prior rows' `IS_CURRENT_IND` within the same strategy VID; worker extracts metrics in Python (`quant/queue/result_metrics.py`); **`IN_RESULT_ID`** is caller-supplied UUID; OUT row is status triplet only |
-| `SP_GET_RESULT` | `BT` | Fetch result row for a `QUEUE_ID` (REFCURSOR); includes `RESULT_VID`, `IS_CURRENT_IND` |
-| `SP_GET_RESULT_BY_STRATEGY` | `BT` | Current result for `(STRATEGY_ID, STRATEGY_VID)` where `IS_CURRENT_IND = 'Y'` (REFCURSOR). What the **live trading path** reads — see [Reading a result without the queue](#reading-a-result-without-the-queue) |
+| `SP_GET_RESULT` | `BT` | One result row (REFCURSOR). `IN_QUEUE_ID` reads that submission. `IN_STRATEGY_ID` + `IN_STRATEGY_VID` reads the current row of that version. Filters are appended only when the input is present. See [Reading a result without the queue](#reading-a-result-without-the-queue) |
 | `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`) |
 | `SP_INS_API_CREDENTIAL` | `CORE_ADMIN` | New exchange credential or rotate keys (soft-version); status triplet OUT first |
 | `SP_GET_API_CREDENTIAL` | `CORE_ADMIN` | List/get credentials for `APP_USER_ID` (REFCURSOR) |
@@ -376,17 +375,19 @@ Neither the retention window nor the dump was touched to achieve this. `LOG_PROC
 
 ### Reading a result without the queue
 
-`BT.RESULT` can be reached two ways, and the live trading path must use the
-second one:
+`BT.RESULT` is read by one procedure, `SP_GET_RESULT`. The caller passes the
+key it has:
 
-| Procedure | Keyed on | Used by |
+| Inputs | Row returned | Used by |
 |---|---|---|
-| `SP_GET_RESULT` | `QUEUE_ID` | Job views — "what did *this run* produce?" |
-| `SP_GET_RESULT_BY_STRATEGY` | `(STRATEGY_ID, STRATEGY_VID)` | Live dry-run and apply — "what parameters does this strategy trade on?" |
+| `IN_QUEUE_ID` | Newest row for that submission (`CREATED_AT DESC`) | Job views — "what did *this run* produce?" |
+| `IN_STRATEGY_ID`, `IN_STRATEGY_VID` | Current row (`IS_CURRENT_IND = 'Y'`) | Live dry-run and apply — "what parameters does this strategy trade on?" |
 
-`BtQueueRepo.fetch_result_payload` originally answered the second question with
-the first procedure: it listed `BT.QUEUE` for the strategy, matched a row on
-`STRATEGY_VID`, then fetched that row's result. That made live trading depend on
+A filter is appended only when that input is present. The procedure does not
+write `IN_X IS NULL OR column = IN_X`.
+
+`BtQueueRepo.fetch_result_payload` used to list `BT.QUEUE` for the strategy,
+match a row on `STRATEGY_VID`, then fetch that row's result. That made live trading depend on
 `BT.QUEUE`, which is transient work-tracking data. When the queue was purged in
 production, every `QUEUE_ID` on `BT.RESULT` became an orphan and a live dry-run
 failed with `no optimization result found for strategy — run backtest first`,
@@ -400,8 +401,8 @@ path follow the newest backtest automatically: re-running a strategy version
 bumps `RESULT_VID` and flips the prior row.
 
 !!! note "Purging `BT.QUEUE` is safe"
-    That is the point of this split. Nothing on the live path reads the queue to
-    find parameters, so queue rows can be cleared without stranding a
+    The live path calls `SP_GET_RESULT` with the strategy id and vid, not a
+    queue id. Nothing on the live path reads the queue to find parameters, so queue rows can be cleared without stranding a
     deployment. Anything that still needs "which submission produced this?" has
     `BT.RESULT.QUEUE_ID` to follow, and tolerates it pointing nowhere.
 
