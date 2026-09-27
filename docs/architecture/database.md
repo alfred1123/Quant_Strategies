@@ -172,7 +172,7 @@ PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, 
 | Procedure | Purpose |
 |-----------|---------|
 | `SP_INS_DEPLOYMENT` | Create or version deployment |
-| `SP_GET_DEPLOYMENT` | Read current or historical deployment (owner-scoped, REFCURSOR) |
+| `SP_GET_DEPLOYMENT` | Read current or historical deployment (owner-scoped, REFCURSOR). `STRATEGY_NM` is the pinned version's name |
 | `SP_GET_DEPLOYMENT_CHECK` | Validation read by deployment_id — no owner filter (caller checks) |
 | `SP_GET_MISSED_DUE_DEPLOYMENTS` | Due deployments for one interval (scheduler poller) |
 | `SP_GET_NEXT_DUE_DEPLOYMENTS` | Not-yet-due preview (UI / ops) |
@@ -356,7 +356,7 @@ Neither the retention window nor the dump was touched to achieve this. `LOG_PROC
 | `SP_GET_STRATEGY` | `BT` | Get-one: `IN_STRATEGY_ID` required; optional `IN_STRATEGY_VID`; `IN_IS_BEST_IND='Y'` fetches best VID; else active row. Listing is `SP_GET_STRATEGY_LIST`. |
 | `SP_GET_STRATEGY_LIST` | `BT` | List catalog for Trade picker — `IN_USER_ID` required; optional `IN_IS_BEST_IND` filter (REFCURSOR) |
 | `SP_INS_DEPLOYMENT` | `TRADE` | Create or version deployment (includes schedule fields) |
-| `SP_GET_DEPLOYMENT` | `TRADE` | Read deployment rows (REFCURSOR) |
+| `SP_GET_DEPLOYMENT` | `TRADE` | Read deployment rows (REFCURSOR). Includes `STRATEGY_NM` of the pinned version |
 | `SP_GET_MISSED_DUE_DEPLOYMENTS` | `TRADE` | Apply-now rows for `IN_TM_INTERVAL_ID` (poller); includes `NEXT_SCHEDULED_TS` |
 | `SP_GET_NEXT_DUE_DEPLOYMENTS` | `TRADE` | Not-yet-due preview (UI / ops, optional) |
 | `SP_INS_DEPLOYMENT_SCHEDULE_STATUS` | `TRADE` | Append schedule version (poller advance after apply) |

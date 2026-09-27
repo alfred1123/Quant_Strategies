@@ -26,6 +26,8 @@
       stays in git and prod keeps the old definition.
     -->
 
-    <!-- 1.7.0-schedule-initial-ts applied on prod 2026-09-21 and archived. -->
+    <!-- 1.7.0 and 1.8.0 applied on prod and archived. -->
+
+    <include file="releases/1.9.0-deployment-strategy-name.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

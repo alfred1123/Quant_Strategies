@@ -108,6 +108,15 @@ function setup(rows: PromotionRow[]) {
 describe('PromotionTab comparison panel', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('views the selected version by strategy id and vid', async () => {
+    const onViewStrategy = vi.fn();
+    setup([prow({ strategy_id: 's1', strategy_vid: 4 })]);
+    renderWithProviders(<PromotionTab onViewStrategy={onViewStrategy} />);
+    await userEvent.click(screen.getByText('v4'));
+    await userEvent.click(screen.getByRole('button', { name: 'View' }));
+    expect(onViewStrategy).toHaveBeenCalledWith('s1', 4);
+  });
+
   it('shows baseline copy when compared_vid is null', async () => {
     setup([prow({ compared_vid: null })]);
     renderWithProviders(<PromotionTab />);

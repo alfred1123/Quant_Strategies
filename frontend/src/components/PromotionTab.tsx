@@ -25,6 +25,8 @@ const OUTCOME_COLOR: Record<string, 'success' | 'default' | 'warning' | 'error'>
 };
 
 interface PromotionTabProps {
+  /** Open the stored backtest for this strategy version. */
+  onViewStrategy?: (strategyId: string, strategyVid: number) => void;
   /** Clone a completed backtest's config back into the Backtest tab. */
   onReBacktest?: (queueId: string) => void;
 }
@@ -41,7 +43,7 @@ function compareMetric(
   return direction === 'lower_is_better' ? -higher : higher;
 }
 
-export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
+export default function PromotionTab({ onViewStrategy, onReBacktest }: PromotionTabProps = {}) {
   const promotions = usePromotions();
   const { data: currentUser } = useMe();
   const { data: states = [] } = usePromotionStates();
@@ -173,6 +175,7 @@ export default function PromotionTab({ onReBacktest }: PromotionTabProps = {}) {
               rows={rows}
               metrics={metrics}
               outcomeLabel={outcomeLabel}
+              onViewStrategy={onViewStrategy}
               onReBacktest={onReBacktest}
               canDeploy={
                 selected != null
@@ -360,13 +363,14 @@ function StrategyList({
 }
 
 function ComparisonPanel({
-  row, rows, metrics, outcomeLabel, onReBacktest, onDeploy, canDeploy,
+  row, rows, metrics, outcomeLabel, onViewStrategy, onReBacktest, onDeploy, canDeploy,
   canMutate, mutatePending, onLogicalDelete,
 }: {
   row: PromotionRow | null;
   rows: PromotionRow[];
   metrics: PromotionMetricRow[];
   outcomeLabel: (name: string) => string;
+  onViewStrategy?: (strategyId: string, strategyVid: number) => void;
   onReBacktest?: (queueId: string) => void;
   onDeploy: (row: PromotionRow) => void;
   canDeploy: boolean;
@@ -547,6 +551,12 @@ function ComparisonPanel({
       )}
 
       <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+        {onViewStrategy && (
+          <Button size="small" variant="outlined" color="primary"
+            onClick={() => onViewStrategy(row.strategy_id, row.strategy_vid)}>
+            View
+          </Button>
+        )}
         {onReBacktest && (
           <Button size="small" variant="outlined" color="secondary"
             onClick={() => onReBacktest(row.queue_id)}>

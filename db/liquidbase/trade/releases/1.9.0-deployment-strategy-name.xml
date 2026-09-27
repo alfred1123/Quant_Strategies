@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      SP_GET_DEPLOYMENT returns STRATEGY_NM from the pinned BT.STRATEGY
+      version. The trade list was showing a shortened strategy id, so the
+      name and version of what is trading were not readable.
+    -->
+
+    <changeSet id="1.9.0-001-sp-get-deployment-strategy-nm" author="alfcheun" context="trade,prod-deploy">
+        <comment>SP_GET_DEPLOYMENT — include STRATEGY_NM of the pinned version</comment>
+        <sqlFile path="../procedures/SP_GET_DEPLOYMENT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

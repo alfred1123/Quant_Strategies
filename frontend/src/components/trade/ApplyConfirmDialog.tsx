@@ -92,7 +92,10 @@ function ApplyConfirmContent({ deployment, onClose }: { deployment: DeploymentRo
         {!result && (
           <Stack spacing={1.5}>
             <Row label="Product" value={deployment.internal_cusip} />
-            <Row label="Strategy" value={`${deployment.strategy_id.slice(0, 8)}… v${deployment.strategy_vid}`} />
+            <Row
+              label="Strategy"
+              value={`${deployment.strategy_nm || `${deployment.strategy_id.slice(0, 8)}…`} · v${deployment.strategy_vid}`}
+            />
             <Row label="Mode" value={isLive ? 'Live' : 'Paper'} />
             <Row label="Qty" value={deployment.qty} />
             {isLive && (

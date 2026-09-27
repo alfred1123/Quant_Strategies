@@ -5,13 +5,18 @@ All routes behind ``require_user`` (registered in ``quant.api.main``).
 """
 
 import logging
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from quant.api.auth.dependencies import require_user
 from quant.api.auth.models import CurrentUser
-from quant.api.schemas.strategies import StrategyListRow
-from quant.api.services.strategies import StrategiesService, StrategyListVersions
+from quant.api.schemas.strategies import StrategyListRow, StrategyResult
+from quant.api.services.strategies import (
+    StrategiesService,
+    StrategyListVersions,
+    StrategyNotFound,
+)
 from quant.queue.repo import BtQueueRepo
 
 logger = logging.getLogger(__name__)
@@ -40,3 +45,17 @@ def list_strategies(
         versions=versions,
     )
     return [StrategyListRow(**r) for r in rows]
+
+
+@router.get("/{strategy_id}/result", response_model=StrategyResult)
+def get_strategy_result(
+    strategy_id: UUID,
+    strategy_vid: int = Query(..., ge=1),
+    _user: CurrentUser = Depends(require_user),
+    svc: StrategiesService = Depends(get_strategies_service),
+) -> StrategyResult:
+    """Stored backtest for one strategy version (``SP_GET_RESULT``)."""
+    try:
+        return StrategyResult(**svc.get_result(strategy_id, strategy_vid))
+    except StrategyNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

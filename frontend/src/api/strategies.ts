@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { StrategyListRow, StrategyListVersions } from '../types/strategies';
+import type { StrategyListRow, StrategyListVersions, StrategyResult } from '../types/strategies';
 
 export const STRATEGIES_QUERY_KEY = ['strategies'] as const;
 
@@ -12,6 +12,18 @@ async function listStrategies(
     params: { versions, limit },
   });
   return data;
+}
+
+/** Stored backtest for one version. ``SP_GET_RESULT`` keyed by strategy id and vid. */
+export function fetchStrategyResult(
+  strategyId: string,
+  strategyVid: number,
+): Promise<StrategyResult> {
+  return apiClient
+    .get<StrategyResult>(`/strategies/${strategyId}/result`, {
+      params: { strategy_vid: strategyVid },
+    })
+    .then((r) => r.data);
 }
 
 /** Caller-owned strategy catalog for the Trade picker (Phase 1.6). */

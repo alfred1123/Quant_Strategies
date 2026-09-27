@@ -22,12 +22,12 @@ import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import ScienceIcon from '@mui/icons-material/Science';
 import StopCircleIcon from '@mui/icons-material/StopCircle';
 import { useMemo, useState } from 'react';
-import { useLocation } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useDeployments, useDryRun, useStopDeployment, useUpdateDeployment } from '../../api/trade';
 import { useTradeSession, useTradeSessionFilters } from '../../trade/useTradeSession';
 import { ALL_ACCOUNTS } from '../../types/credentials';
 import type { DeploymentRow, DryRunReport } from '../../types/trade';
-import type { TradeApplyLocationState } from '../../types/strategies';
+import type { TradeApplyLocationState, ViewStrategyLocationState } from '../../types/strategies';
 import AccountSnapshotPanel from '../../components/trade/AccountSnapshotPanel';
 import ApplyConfirmDialog from '../../components/trade/ApplyConfirmDialog';
 import DeploymentDialog, { type DeploymentSelection } from '../../components/trade/DeploymentDialog';
@@ -57,6 +57,7 @@ function accountLabel(
  */
 export default function TradeApplyPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const routeState = (location.state ?? null) as TradeApplyLocationState | null;
 
   const { data: deployments, isLoading, isError, error } = useDeployments();
@@ -232,6 +233,7 @@ export default function TradeApplyPage() {
                   <TableCell>Account</TableCell>
                   <TableCell>Product</TableCell>
                   <TableCell>Strategy</TableCell>
+                  <TableCell>Version</TableCell>
                   <TableCell>Mode</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Schedule</TableCell>
@@ -242,7 +244,7 @@ export default function TradeApplyPage() {
               <TableBody>
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9}>
+                    <TableCell colSpan={10}>
                       <Typography variant="body2" color="text.secondary">
                         No deployments yet. Select a strategy above and click Deploy, or use
                         Promotion → Deploy.
@@ -264,8 +266,9 @@ export default function TradeApplyPage() {
                       <TableCell>{account}</TableCell>
                       <TableCell>{row.internal_cusip}</TableCell>
                       <TableCell>
-                        {row.strategy_id.slice(0, 8)}… v{row.strategy_vid}
+                        {row.strategy_nm || `${row.strategy_id.slice(0, 8)}…`}
                       </TableCell>
+                      <TableCell>v{row.strategy_vid}</TableCell>
                       <TableCell>{row.is_paper_ind === 'Y' ? 'Paper' : 'Live'}</TableCell>
                       <TableCell>
                         <Chip
@@ -282,6 +285,18 @@ export default function TradeApplyPage() {
                         <QtyCell row={row} onError={setActionError} />
                       </TableCell>
                       <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => navigate('/backtest', {
+                            state: {
+                              viewStrategyId: row.strategy_id,
+                              viewStrategyVid: row.strategy_vid,
+                            } satisfies ViewStrategyLocationState,
+                          })}
+                        >
+                          View
+                        </Button>
                         <Tooltip title="Dry run">
                           <IconButton
                             size="small"

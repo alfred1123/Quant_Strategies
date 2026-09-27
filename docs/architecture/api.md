@@ -240,6 +240,7 @@ See [Plan to Profit §1.1](../design/plan-to-profit.md#phase-11-user-secrets) an
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/api/v1/strategies` | Required | List caller-owned `BT.STRATEGY` rows for the Trade strategy picker. Query `versions=best` (default — `IS_BEST_IND` rows only) or `all`; `limit` defaults to 200. Logically deleted rows (`LOGICAL_DELETE_IND='Y'`) are omitted. |
+| `GET` | `/api/v1/strategies/{strategy_id}/result` | Required | Stored backtest for one version. Query `strategy_vid` (required). `SP_GET_STRATEGY` supplies the name and config; `SP_GET_RESULT` supplies the payload, keyed by strategy id and vid. |
 
 Not the same as REFDATA `signal_type` — see [trade-api §2.1](../design/trade-api.md#21-strategy-catalog-phase-16).
 

@@ -77,6 +77,7 @@ class DeploymentRow(BaseModel):
     app_user_id: UUID
     strategy_id: UUID
     strategy_vid: int
+    strategy_nm: str | None = None
     api_credential_id: int
     app_id: int
     internal_cusip: str

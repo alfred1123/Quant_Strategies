@@ -12,6 +12,8 @@
 -- TRANSACT_FROM_TS = when this deployment version became effective (user-facing).
 -- Does not expose CREATED_AT (audit only) or TRANSACT_TO_TS (versioning sentinel).
 -- Filter / ownership validation lives in Python (TradeRepo).
+-- STRATEGY_NM is the name of the pinned version (BT.STRATEGY), so the
+-- trade list can say which strategy and version it is running.
 CREATE OR REPLACE PROCEDURE TRADE.SP_GET_DEPLOYMENT(
     IN  IN_APP_USER_ID      UUID,
     IN  IN_DEPLOYMENT_ID    UUID,
@@ -48,6 +50,7 @@ BEGIN
                    d.APP_USER_ID,
                    d.STRATEGY_ID,
                    d.STRATEGY_VID,
+                   s.STRATEGY_NM,
                    d.API_CREDENTIAL_ID,
                    d.APP_ID,
                    d.INTERNAL_CUSIP,
@@ -68,6 +71,9 @@ BEGIN
                    d.TRANSACT_FROM_TS,
                    d.USER_ID
               FROM TRADE.DEPLOYMENT d
+              LEFT JOIN BT.STRATEGY s
+                ON s.STRATEGY_ID = d.STRATEGY_ID
+               AND s.STRATEGY_VID = d.STRATEGY_VID
               LEFT JOIN REFDATA.TM_INTERVAL ti
                 ON ti.TM_INTERVAL_ID = d.SCHEDULE_TM_INTERVAL_ID
               LEFT JOIN TRADE.DEPLOYMENT_SCHEDULE_STATUS ss
@@ -85,6 +91,7 @@ BEGIN
                    d.APP_USER_ID,
                    d.STRATEGY_ID,
                    d.STRATEGY_VID,
+                   s.STRATEGY_NM,
                    d.API_CREDENTIAL_ID,
                    d.APP_ID,
                    d.INTERNAL_CUSIP,
@@ -105,6 +112,9 @@ BEGIN
                    d.TRANSACT_FROM_TS,
                    d.USER_ID
               FROM TRADE.DEPLOYMENT d
+              LEFT JOIN BT.STRATEGY s
+                ON s.STRATEGY_ID = d.STRATEGY_ID
+               AND s.STRATEGY_VID = d.STRATEGY_VID
               LEFT JOIN REFDATA.TM_INTERVAL ti
                 ON ti.TM_INTERVAL_ID = d.SCHEDULE_TM_INTERVAL_ID
               LEFT JOIN TRADE.DEPLOYMENT_SCHEDULE_STATUS ss
@@ -121,6 +131,7 @@ BEGIN
                    d.APP_USER_ID,
                    d.STRATEGY_ID,
                    d.STRATEGY_VID,
+                   s.STRATEGY_NM,
                    d.API_CREDENTIAL_ID,
                    d.APP_ID,
                    d.INTERNAL_CUSIP,
@@ -141,6 +152,9 @@ BEGIN
                    d.TRANSACT_FROM_TS,
                    d.USER_ID
               FROM TRADE.DEPLOYMENT d
+              LEFT JOIN BT.STRATEGY s
+                ON s.STRATEGY_ID = d.STRATEGY_ID
+               AND s.STRATEGY_VID = d.STRATEGY_VID
               LEFT JOIN REFDATA.TM_INTERVAL ti
                 ON ti.TM_INTERVAL_ID = d.SCHEDULE_TM_INTERVAL_ID
               LEFT JOIN TRADE.DEPLOYMENT_SCHEDULE_STATUS ss

@@ -100,7 +100,7 @@ Routes under `/trade` (auth-required). `AppModeSwitch` in the header toggles Bac
 | `QtyCell` | Position size per deployment row, editable in place; `PATCH /trade/deployments/{id}` with `qty`, refusing anything under `row.min_qty` |
 | `ExecutionLogPanel` | Recent order attempts and fills across the session's deployments |
 | `AccountSnapshotPanel` | Live cash + open positions for the selected account via `useAccountSnapshot()`; read-only |
-| `TradeApplyPage` | Strategy picker + Deploy button + account snapshot + deployments table; `useDeployments()` |
+| `TradeApplyPage` | Strategy picker + Deploy button + account snapshot + deployments table (`STRATEGY_NM`, version, View); `useDeployments()` |
 
 **Account snapshot panel**
 
@@ -299,7 +299,7 @@ Once you know these shapes, every function signature and component prop makes se
 
 ### Layer 5: Pages (`pages/`) — orchestration
 
-- **`BacktestPage.tsx`** — The main page. Owns all state (`useState` for config, results, progress, errors). Wires `ConfigDrawer` → `buildOptimizeRequest()` → enqueue. Re-backtest, Clone, and View hydrate the drawer through `configFromOptimizeRequest` so the stored snake_case `CONFIG_JSON` becomes the camelCase form (venue, cadence, window grid, walk-forward) rather than `DEFAULT_CONFIG`. A stored result whose inline walk-forward threw shows `walk_forward_error` above the analysis panel. A missing block with no message means the split was off, or the search had no valid cell. Reads `currentUser` from `useMe()` hook directly.
+- **`BacktestPage.tsx`** — The main page. Owns all state (`useState` for config, results, progress, errors). Wires `ConfigDrawer` → `buildOptimizeRequest()` → enqueue. Re-backtest, Clone, and View hydrate the drawer through `configFromOptimizeRequest` so the stored snake_case `CONFIG_JSON` becomes the camelCase form (venue, cadence, window grid, walk-forward) rather than `DEFAULT_CONFIG`. A stored result whose inline walk-forward threw shows `walk_forward_error` above the analysis panel. A missing block with no message means the split was off, or the search had no valid cell. Reads `currentUser` from `useMe()` hook directly. Promotion and Trade **View** open the stored result for that strategy id and version through `GET /api/v1/strategies/{strategy_id}/result?strategy_vid=`. Trade passes those two fields in router state; the page loads once and clears the state.
 - **`App.tsx`** — Sets up `BrowserRouter`, the shared MUI dark theme (`theme.ts`), and `ErrorBoundary`. Routes: `/login`, `/backtest`, `/trade/config`, `/trade/apply` (nested under `TradeLayout`). `RequireAuth` / `GuestOnly` wrappers gate auth.
 - **`LoginPage.tsx`** — Login form. On success, navigates to `/` (or the page that triggered the auth redirect via `location.state.from`).
 - **`main.tsx`** — Mounts `<App />` inside `<QueryClientProvider>` and `<StrictMode>`.

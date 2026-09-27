@@ -15,6 +15,21 @@ export interface StrategyListRow {
 
 export type StrategyListVersions = 'best' | 'all';
 
+/** Mirrors ``StrategyResult`` — stored backtest for one version. */
+export interface StrategyResult {
+  strategy_id: string;
+  strategy_vid: number;
+  strategy_nm: string | null;
+  config_json: Record<string, unknown> | null;
+  result: Record<string, unknown> | null;
+}
+
+/** Backtest page opens this version's stored result. */
+export interface ViewStrategyLocationState {
+  viewStrategyId: string;
+  viewStrategyVid: number;
+}
+
 /** Optional react-router state when navigating to Trade Apply. */
 export interface TradeApplyLocationState {
   strategyId?: string;

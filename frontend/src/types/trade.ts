@@ -10,6 +10,7 @@ export interface DeploymentRow {
   app_user_id: string;
   strategy_id: string;
   strategy_vid: number;
+  strategy_nm?: string | null;
   api_credential_id: number;
   app_id: number;
   internal_cusip: string;

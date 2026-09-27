@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import {
   AppBar, Toolbar, Typography, Button, Box, Alert,
   Chip, Divider, CircularProgress, LinearProgress,
@@ -20,6 +21,7 @@ import BrandMark from '../components/BrandMark';
 import { APP_NAME } from '../constants/brand';
 import { runPerformance } from '../api/backtest';
 import { fetchJob, useEnqueueJob, useJobCompletionEffects } from '../api/jobs';
+import { fetchStrategyResult } from '../api/strategies';
 import { useMe } from '../api/auth';
 import { useAssetTypes, useTmIntervals } from '../api/refdata';
 import { useProducts } from '../api/inst';
@@ -31,6 +33,7 @@ import { effectiveSymbol, buildOptimizeRequest, buildPerformanceRequest, configF
 import { buildStrategyNm } from '../utils/strategyIdentity';
 import { overfitColor, overfitLabel, formatMetric, formatDecimal, formatPercent, rowLabel } from '../utils/format';
 import { firstValidationError } from '../utils/validate';
+import type { ViewStrategyLocationState } from '../types/strategies';
 
 const DEFAULT_CONFIG: BacktestConfig = {
   symbol: 'btcusdt.crypto',
@@ -70,6 +73,8 @@ function isAbortError(err: unknown): boolean {
 }
 
 export default function BacktestPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { data: currentUser } = useMe();
   const { data: tmIntervals } = useTmIntervals();
   const { data: products = [] } = useProducts();
@@ -166,32 +171,62 @@ export default function BacktestPage() {
     }
   };
 
+  const showStoredResult = (
+    detail: { config_json: Record<string, unknown> | null; result: Record<string, unknown> | null },
+    missing: string,
+  ) => {
+    if (!detail.result) {
+      setError(missing);
+      return;
+    }
+    const optResult = detail.result as unknown as OptimizeResponse;
+    if (detail.config_json) {
+      setConfig(hydrateConfig(detail.config_json));
+    }
+    setOptimizeResult(optResult);
+    setPerfResult(optResult.performance ?? null);
+    setWfResult(optResult.walk_forward ?? null);
+    if (optResult.top10?.length) {
+      setSelectedIndex(0);
+      setSelectedRow(optResult.top10[0]);
+    } else {
+      setSelectedIndex(null);
+      setSelectedRow(null);
+    }
+    setAnalysisTab(0);
+    setPageTab(0);
+  };
+
+  const handleViewStrategy = async (strategyId: string, strategyVid: number) => {
+    setError(null);
+    try {
+      const detail = await fetchStrategyResult(strategyId, strategyVid);
+      showStoredResult(detail, 'This version has no stored result.');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to load strategy result';
+      console.error('[BacktestPage] handleViewStrategy error:', e);
+      setError(msg);
+    }
+  };
+
+  const appliedViewKey = useRef<string | null>(null);
+  useEffect(() => {
+    const request = (location.state ?? null) as ViewStrategyLocationState | null;
+    if (!request?.viewStrategyId || request.viewStrategyVid == null) return;
+    const key = `${request.viewStrategyId}|${request.viewStrategyVid}`;
+    if (appliedViewKey.current === key) return;
+    appliedViewKey.current = key;
+    void handleViewStrategy(request.viewStrategyId, request.viewStrategyVid);
+    navigate('/backtest', { replace: true, state: null });
+    // Load once per navigation. handleViewStrategy closes over the latest catalogs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, navigate]);
+
   const handleViewJob = async (queueId: string) => {
     setError(null);
     try {
       const detail = await fetchJob(queueId);
-      if (!detail.result) {
-        setError('Job has no stored result payload.');
-        return;
-      }
-      // Result payload is OptimizeResponse.model_dump() — cast through unknown.
-      const optResult = detail.result as unknown as OptimizeResponse;
-      // Restore the frozen config so summary chips + factor count match.
-      if (detail.config_json) {
-        setConfig(hydrateConfig(detail.config_json));
-      }
-      setOptimizeResult(optResult);
-      setPerfResult(optResult.performance ?? null);
-      setWfResult(optResult.walk_forward ?? null);
-      if (optResult.top10?.length) {
-        setSelectedIndex(0);
-        setSelectedRow(optResult.top10[0]);
-      } else {
-        setSelectedIndex(null);
-        setSelectedRow(null);
-      }
-      setAnalysisTab(0);
-      setPageTab(0);
+      showStoredResult(detail, 'Job has no stored result payload.');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to load job result';
       console.error('[BacktestPage] handleViewJob error:', e);
@@ -298,7 +333,9 @@ export default function BacktestPage() {
 
       <Box sx={{ maxWidth: pageTab === 2 ? 'none' : 1200, mx: pageTab === 2 ? 0 : 'auto', p: pageTab === 2 ? 0 : 3 }}>
         {pageTab === 1 && <JobsTable onView={handleViewJob} onCloneEdit={handleCloneEdit} />}
-        {pageTab === 2 && <PromotionTab onReBacktest={handleReBacktest} />}
+        {pageTab === 2 && (
+          <PromotionTab onViewStrategy={handleViewStrategy} onReBacktest={handleReBacktest} />
+        )}
         {pageTab === 0 && (
           <>
         {/* Error */}
