@@ -1,9 +1,9 @@
 # Chin Shum Patreon review
 
 **Doc type:** strategy research  
-**Status:** Offline checks are done. No new signal to enqueue on the current engine. External-data rules below are a backend proposal.
+**Status:** The split-ratio check has been confirmed on the platform. No new signal to enqueue on the current engine. External-data rules below are a backend proposal.
 
-This page paraphrases a review, dated 27 September 2026, of paid posts by 錢琛 (Chin Shum) on his [Patreon](https://www.patreon.com/chinshumquantspeculation). The methods are restated in our words. A performance number is either his, and the sentence says so, or an offline approximation (replica engine), not platform results. The offline scripts that produced the computed figures are kept outside this repository.
+This page paraphrases a review, dated 27 September 2026, of paid posts by 錢琛 (Chin Shum) on his [Patreon](https://www.patreon.com/chinshumquantspeculation). The methods are restated in our words. A performance number is his, a platform result, or an offline approximation (replica engine), not platform results. The sentence says which. The offline scripts that produced the replica figures are kept outside this repository.
 
 The book the review measured against is Bybit spot BTC, ETH, and BNB, daily bars, 10 bps per side, long or flat. Two conditions use `FILTER`. A long-only AND on this engine currently scores as an OR ([bug B1](../design/2026-09-27-algodaemon-bug-report.md#b1-two-factor-and-behaves-like-or-for-long-only-factors)).
 
@@ -17,13 +17,13 @@ The Sharpes and PBO figures in the four findings below are an offline approximat
 
 Four findings:
 
-1. **The exact finalist settings are noise inside profitable families.** Combinatorially symmetric cross-validation on the three finalist families gives a probability of backtest overfitting (PBO) of about 0.40 to 0.79 at the actual fill, above the 20–30% limit he treats as the ceiling. The in-sample winner still makes money out of sample in most splits, at about the family's median Sharpe. Plan on that median: roughly ETH 0.9–1.0, BNB 0.75–0.9, BTC 0.65–0.8. Leave the chosen cells in place. A proposed gate for any new finalist is PBO ≤ 0.30 at both fills.
+1. **The exact finalist settings are noise inside profitable families.** Combinatorially symmetric cross-validation on the three finalist families gives a probability of backtest overfitting (PBO) of about 0.40 to 0.79 at the actual fill, above the 20–30% limit he treats as the ceiling. The in-sample winner still makes money out of sample in most splits, at about the family's median Sharpe. Plan on that median: roughly ETH 0.9–1.0, BNB 0.75–0.9, BTC 0.65–0.8. Leave the chosen cells in place. For a new finalist, read PBO ≤ 0.30 at both fills as a guide, not a hard cutoff. Trimming a 160-day warm-up shifts PBO by up to ±0.11.
 2. **The three-sleeve blend is the Sharpe gain. The weighting scheme is not.** Equal weight, one third each, has an out-of-sample Sharpe of 1.51 in the offline approximation (replica engine), not platform results, against 1.24 for the best single sleeve. His capped inverse-volatility weights land within 0.03 of that. Equal weight with a 0.5 cap per sleeve is the form to implement, and it needs the averaging combiner from [PR #63](https://github.com/alfred1123/Quant_Strategies/pull/63).
 3. **Three ideas that looked runnable were rejected.** US-overnight seasonality on BTC is negative at 10 bps per side. A percentile gate in place of the BTC z-score gate on BNB is weaker than the incumbent. Picking the middle of a plateau does not lower PBO.
 4. **External series are specified, not adopted.** An ETF NAV-premium gate, an ETF-flow score, a treasury-holdings veto, a funding z-score veto, and an on-chain TVL gate are written up for a backend proposal, with publication-time lags and one missing-data rule for the backtest and for live trading.
 
 !!! warning "Offline approximation (replica engine), not platform results"
-    Every Sharpe, PBO, drawdown, correlation, turnover, and return computed for this page is an **offline approximation (replica engine), not platform results**. The replica rebuilds daily net P&L at 10 bps with a fill at the signal close. It matched the recorded platform finalists on in-sample, out-of-sample, late, and full-sample Sharpe: ETH A2 1.398 / 1.241 / 1.002 / 1.324, BNB (BTC z-score window 100 above 0.5) 1.144 / 1.037 / 1.215 / 1.094, and BTC (own z-score window 60 above 2.25) 1.313 / 1.068 / 0.646 / 1.211. Those four-tuples are the recorded platform metrics used as the check. Nothing was enqueued, promoted, or sent to an exchange. His reported numbers are marked as his and are not that replica.
+    Every Sharpe, PBO, drawdown, correlation, turnover, and return computed for this page is an **offline approximation (replica engine), not platform results**, except the figures marked as platform results in [Platform confirmation](#platform-confirmation). The replica rebuilds daily net P&L at 10 bps with a fill at the signal close. It matched the recorded platform finalists on in-sample, out-of-sample, late, and full-sample Sharpe: ETH A2 1.398 / 1.241 / 1.002 / 1.324, BNB (BTC z-score window 100 above 0.5) 1.144 / 1.037 / 1.215 / 1.094, and BTC (own z-score window 60 above 2.25) 1.313 / 1.068 / 0.646 / 1.211. Those four-tuples are the recorded platform metrics used as the check. Nothing was enqueued, promoted, or sent to an exchange. His reported numbers are marked as his and are not that replica.
 
 ## What the Patreon covers
 
@@ -43,7 +43,7 @@ Order is the review's judgement of expected benefit for BTC, ETH, and BNB daily.
 
 | Rank | Method | Fit | One-line use | Expected benefit |
 |------|--------|-----|--------------|------------------|
-| 1 | Overfitting probability via combinatorially symmetric cross-validation (15 Aug 2026) | Method, usable now. Done offline | On every candidate family, compute PBO at 10, 12, and 16 blocks, at a same-close fill and at a one-day delay. Gate at PBO ≤ 0.30 | High, as a reading of the finalists rather than a new trade. The exact settings are noise inside robust families. Plan on the family-median Sharpe |
+| 1 | Overfitting probability via combinatorially symmetric cross-validation (15 Aug 2026) | Method, usable now. Done offline | On every candidate family, compute PBO at 10, 12, and 16 blocks, at a same-close fill and at a one-day delay. Read PBO ≤ 0.30 as a guide, not a hard cutoff. A 160-day warm-up trim moves it by up to ±0.11 | High, as a reading of the finalists rather than a new trade. The exact settings are noise inside robust families. Plan on the family-median Sharpe |
 | 2 | Capped inverse-volatility sizing, with Kelly rejected (5 Sep 2026) | Needs backend. The averaging combiner in [PR #63](https://github.com/alfred1123/Quant_Strategies/pull/63) | Per-sleeve weight proportional to one over in-market volatility, cap 0.4–0.5, leftover cash stays cash. Cut a sleeve whose live drawdown runs too far from the backtest | Moderate. The blend lifts out-of-sample Sharpe from 1.24 to about 1.51. Inverse volatility versus equal weight adds nothing. The cap is risk control |
 | 3 | ETF NAV-premium gate (21 Aug 2026) | Needs external data (daily ETF premium) | Flat BTC when the prior published premium is below a threshold. Carry the last premium across weekends | Unknown until it is run here. His figure: last-observation Sharpe 0.97 against buy-and-hold 0.69, at 2 bps, 26 Jan 2024 to 20 Aug 2026. The effect may be mostly how weekends are filled. Best-documented external series |
 | 4 | Funding z-score as a crowding veto (idea taken from an equity-index perpetual, 12 Sep 2026) | Needs external data (Bybit funding history, which is public) | `FILTER` a finalist with BTC funding z-score below a threshold | Unknown. He has no BTC result for it |
@@ -100,7 +100,7 @@ The same function on his skew-index example returns 14.68% at 10 blocks. That li
 
 Selecting by the in-sample neighbourhood median, which is the rule the researcher actually used, does not lower PBO. At a same-close fill and 10 blocks the neighbourhood PBO is ETH 0.63 / 0.59, BNB 0.55 / 0.65, BTC 0.55 / 0.72, written as the researcher or wide grid and then the local grid. The regression of out-of-sample Sharpe on in-sample Sharpe, for the in-sample winner, has a negative slope in every family, about −0.6 to −1.2. A block that looks strong in sample tends to be followed by a weaker block. That is regime rotation between 2021–22 and 2023–26.
 
-His repeated-ratio check (4:1, 85:15, 9:1, 19:1) is inconsistent across splits, which is what a PBO near one half predicts. The in-sample winner beats the grid median in 4 of 4 splits on both ETH grids and on the BTC researcher grid, in 1 of 4 on the BNB researcher grid, and in 0 of 4 on the BNB and BTC local grids. The neighbourhood pick passes in 0 or 1 of 4 splits, except the BTC local grid, where it passes all 4. The last-year window is the informative one. Over the 4:1 out-of-sample stretch (October 2025 to September 2026, 359 days) the ETH family's grid-median Sharpe is −0.16, and A2 itself is −0.16. BTC at 60 / 2.25 is 0.48. BNB at 100 / 0.5 is 1.81. Those are an offline approximation (replica engine), not platform results. The full split table is under [Repeated train and test splits](#repeated-train-and-test-splits).
+His repeated-ratio check (4:1, 85:15, 9:1, 19:1) is inconsistent across splits, which is what a PBO near one half predicts. The in-sample winner beats the grid median in 4 of 4 splits on both ETH grids and on the BTC researcher grid, in 1 of 4 on the BNB researcher grid, and in 0 of 4 on the BNB and BTC local grids. The neighbourhood pick passes in 0 or 1 of 4 splits, except the BTC local grid, where it passes all 4. The last-year window is the informative one. Over the 4:1 out-of-sample stretch (October 2025 to September 2026, 359 days) the ETH family's grid-median Sharpe is −0.16, and A2 itself is −0.16. BTC at 60 / 2.25 is 0.48. BNB at 100 / 0.5 is 1.81. That reading is an offline approximation (replica engine), not platform results. The platform rerun matched the finalist figures. See [Platform confirmation](#platform-confirmation). The full split table is under [Repeated train and test splits](#repeated-train-and-test-splits).
 
 ### What the numbers mean
 
@@ -112,14 +112,15 @@ His repeated-ratio check (4:1, 85:15, 9:1, 19:1) is inconsistent across splits, 
 
 ### Proposed promotion gate
 
-Add this next to the existing delay-1 check and the sub-period check. It is a process rule. It does not need a platform call.
+Add this next to the existing delay-1 check and the sub-period check. It is a process rule. It does not need a platform call. **PBO ≤ 0.30 is a guide, not a hard cutoff.**
 
 - Compute CSCV PBO on the candidate's local grid, at 10, 12, and 16 blocks, at a same-close fill and at a one-day delay.
-- Accept the cell only if PBO ≤ 0.30 on both fills. Otherwise report the family median as the expected Sharpe, and keep a pre-committed cell rather than the in-sample peak.
+- Read PBO ≤ 0.30 on both fills as a guide. A cell near that line can move across it when the sample changes. The researcher found that trimming a 160-day warm-up shifts PBO by up to ±0.11. That shift is an offline approximation (replica engine), not platform results.
+- When PBO sits well above the guide, report the family median as the expected Sharpe, and keep a pre-committed cell rather than the in-sample peak.
 
 ### Repeated train and test splits
 
-Chin Shum checks several in-sample to out-of-sample ratios. Here each ratio means the in-sample window runs from the common start to the day before the out-of-sample start, and the out-of-sample window runs from that start through 25 Sep 2026. The in-sample winners below were chosen offline on the researcher grids. A platform confirmation is about 24 performance calls (3 families × 4 splits × the winner and the finalist), with no new strategy. It has not been run. The pass/fail is none: this is information. The 19:1 windows are 90–96 days and are too short to weigh. The point of the run, if it is done, is to confirm that the ranking depends on the split, and that the ETH family is flat to negative over the last year.
+Chin Shum checks several in-sample to out-of-sample ratios. Here each ratio means the in-sample window runs from the common start to the day before the out-of-sample start, and the out-of-sample window runs from that start through 25 Sep 2026. The in-sample winners below were chosen offline on the researcher grids. The AlgoDaemon researcher then re-ran the check on the platform: 24 performance calls, three families, four splits, and both the in-sample winner and the finalist, with no new strategy. It matched this table exactly. See [Platform confirmation](#platform-confirmation). The pass/fail is none: this is information. The 19:1 windows are 90–96 days and are too short to weigh. The ranking depends on the split, and the ETH family is flat to negative over the last year.
 
 All figures in this table are an offline approximation (replica engine), not platform results. The in-sample end is the out-of-sample start minus one day. The dates are 80%, 85%, 90%, and 95% of each family's common sample, which is why ETH differs slightly from BNB and BTC. Using the BNB and BTC dates for all three is fine.
 
@@ -140,9 +141,15 @@ All figures in this table are an offline approximation (replica engine), not pla
 
 For reference, our own split (in sample through 30 Jun 2024) picks ETH (60, 1.75, 110, −1.0) with out-of-sample Sharpe 0.93, BNB (55, 1.75) with 0.67, and BTC (60, 1.75) with 0.58. The finalists score 1.24 / 1.04 / 1.07 on that same out-of-sample window. Offline approximation (replica engine), not platform results.
 
+### Platform confirmation
+
+The AlgoDaemon researcher re-ran the split-ratio check on the platform, 24 performance calls, and it matched the offline numbers exactly. The Sharpes in this paragraph are **platform results**. Over 2 Oct 2025 to 25 Sep 2026, the ETH A2 family-median out-of-sample Sharpe was −0.16. ETH buy-and-hold over the same window was −0.44. Finalist out-of-sample Sharpe at the 4:1, 85:15, and 9:1 splits was ETH −0.16 / −0.06 / −0.08, BNB 1.81 / 1.75 / 2.15, and BTC 0.48 / 0.78 / 1.18.
+
+An alternative BNB cell, long when BTC Bollinger z(65) > 2.25, is recorded as an alternative and not a replacement for BNB at window 100 and threshold 0.5. In-sample Sharpe 1.03, out-of-sample Sharpe 1.34, one-day-delay out-of-sample Sharpe 0.94, max drawdown 18%. Those four figures are an offline approximation (replica engine), not platform results.
+
 ### Consensus cells
 
-These are the cells chosen most often as the in-sample winner across the CSCV splits. The BTC row is already in the round-4 platform table. The other two are worth a lookup in the round-3 grids before any new performance call. Offline approximation (replica engine), not platform results. Metrics are in-sample / out-of-sample / late / full / delay-1 out-of-sample / full-sample max drawdown.
+These are the cells chosen most often as the in-sample winner across the CSCV splits. The BTC row is already in the round-4 platform table. The BNB row is recorded as an alternative, not a replacement. The ETH row matches A2, so it needs no change. Offline approximation (replica engine), not platform results. Metrics are in-sample / out-of-sample / late / full / delay-1 out-of-sample / full-sample max drawdown.
 
 | Rule | Offline metrics | Finalist, same metrics |
 |------|-----------------|------------------------|
@@ -152,7 +159,7 @@ These are the cells chosen most often as the in-sample winner across the CSCV sp
 
 A BTC trigger near a window of 60–65 and a threshold of 2.25 is the recurring winner in all three families. Using that same trigger on BNB would raise the BNB sleeve's correlation with the other two. The current BNB–ETH daily correlation is 0.22, and that low overlap is where the blend in the next section earns its Sharpe.
 
-- **BNB consensus.** Smaller full-sample drawdown and a higher out-of-sample Sharpe, with a lower delay-1 Sharpe. Record it as an alternative. Leave the finalist in place. With PBO near one half, a better out-of-sample print is not evidence of a better cell.
+- **BNB consensus.** Smaller full-sample drawdown and a higher out-of-sample Sharpe, with a lower delay-1 Sharpe. It is recorded as an alternative, not a replacement. See [Platform confirmation](#platform-confirmation). With PBO near one half, a better out-of-sample print is not evidence of a better cell.
 - **ETH consensus.** It matches A2. No change.
 - **BTC consensus.** Higher in-sample Sharpe, weaker delay-1 Sharpe. Keep window 60 and threshold 2.25.
 
@@ -287,7 +294,7 @@ Shared rules:
 - In sample is 1 Jul 2021 to 30 Jun 2024 where the history allows it. ETF history starts in January 2024, so that book's in-sample window would be January 2024 to June 2025.
 - A timestamp is the publication time, not the event date. A value for US date *d* may affect only the position set at the close of the first daily bar that ends after publication. For data released in US hours, the default bar is the one that closes at 00:00 UTC on *d*+2.
 - Scheduled gaps (weekends, US holidays) carry the last observation forward. An unscheduled vendor outage sets the position to flat, with the same rule in the backtest and live.
-- Run CSCV at 10, 12, and 16 blocks on each grid before any promotion, and apply the [PBO ≤ 0.30 gate](#proposed-promotion-gate).
+- Run CSCV at 10, 12, and 16 blocks on each grid before any promotion, and read the result against the [PBO guide of 0.30](#proposed-promotion-gate). That line is a guide, not a hard cutoff.
 
 ### E1 ETF NAV premium gate
 
