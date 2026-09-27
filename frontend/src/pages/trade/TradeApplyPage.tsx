@@ -285,8 +285,10 @@ export default function TradeApplyPage() {
                         <QtyCell row={row} onError={setActionError} />
                       </TableCell>
                       <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                        <Stack direction="row" spacing={0.5} sx={{ justifyContent: 'center', alignItems: 'center' }}>
                         <Button
                           size="small"
+                          color="primary"
                           variant="outlined"
                           onClick={() => navigate('/backtest', {
                             state: {
@@ -340,6 +342,7 @@ export default function TradeApplyPage() {
                             <StopCircleIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
+                        </Stack>
                       </TableCell>
                     </TableRow>
                   );

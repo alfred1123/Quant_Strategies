@@ -169,6 +169,7 @@ export default function PromotionTab({ onViewStrategy, onReBacktest }: Promotion
               selectedId={selectedId}
               onSelect={setSelectedId}
               outcomeLabel={outcomeLabel}
+              onViewStrategy={onViewStrategy}
             />
             <ComparisonPanel
               row={selected}
@@ -284,12 +285,13 @@ function Metric({ label, value }: { label: string; value: unknown }) {
 }
 
 function StrategyList({
-  groups, selectedId, onSelect, outcomeLabel,
+  groups, selectedId, onSelect, outcomeLabel, onViewStrategy,
 }: {
   groups: [string, PromotionRow[]][];
   selectedId: string | null;
   onSelect: (id: string) => void;
   outcomeLabel: (name: string) => string;
+  onViewStrategy?: (strategyId: string, strategyVid: number) => void;
 }) {
   return (
     <Stack spacing={1}>
@@ -314,6 +316,7 @@ function StrategyList({
                       <TableCell align="right">Sharpe</TableCell>
                       <TableCell align="right">Calmar</TableCell>
                       <TableCell>When</TableCell>
+                      <TableCell align="right" />
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -348,6 +351,18 @@ function StrategyList({
                           <Typography variant="caption" color="text.secondary">
                             {new Date(d.created_at).toLocaleString()}
                           </Typography>
+                        </TableCell>
+                        <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                          {onViewStrategy && (
+                            <Button
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                              onClick={() => onViewStrategy(d.strategy_id, d.strategy_vid)}
+                            >
+                              View
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

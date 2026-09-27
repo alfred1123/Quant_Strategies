@@ -229,7 +229,7 @@ frontend/src/
 │   ├── HeatmapChart.tsx  # Plotly Sharpe heatmap (window × signal)
 │   ├── EquityCurveChart.tsx  # Plotly equity + drawdown chart
 │   ├── JobsTable.tsx     # Queue tab — MUI DataGrid with VID/Best chip, status filters, actions
-│   ├── PromotionTab.tsx  # Promotion tab — VID comparison, gate results, deploy link
+│   ├── PromotionTab.tsx  # Promotion tab — VID comparison, View on each version, deploy link
 │   ├── UserMenu.tsx      # User avatar + logout
 │   ├── AppModeSwitch.tsx # Backtest | Trade header toggle
 │   ├── BrandMark.tsx     # Gradient app logo — login card + top bars
