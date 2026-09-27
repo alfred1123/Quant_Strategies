@@ -15,6 +15,8 @@ How a row was checked:
 | Git | The named commit is an ancestor of this `main`, and the diff matches the claim. |
 | Dossier | Reported by the research agent. Not re-measured here. |
 
+Round 3 and 4 follow-ups (SMA/EMA levels, sampled grids, window bounds, same-close fills, B24 duplicate versions, hourly annualisation) are checked in [Bug verification, rounds 3–4](2026-09-27-bug-verification-round3-4.md).
+
 Where [Backtest review (2026-09-25)](2026-09-25-backtest-review.md) (PR #58) or [Backtest data hygiene](2026-09-25-backtest-data-hygiene-proposal.md) (PR #59) already analyses an item, this page links there and keeps the repro, the current lines, and the status.
 
 ## Summary
