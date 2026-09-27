@@ -37,7 +37,7 @@ We maintain clear boundaries between:
 
 | Stage | Schema / module | Role |
 |-------|-----------------|------|
-| Backtest | `quant/strategy/`, FastAPI sync routes | Grid search, walk-forward |
+| Backtest | `quant/strategy/`, queue worker | Grid search and walk-forward. The SPA enqueues a job; the worker calls `run_optimize` |
 | Queue | `BT.QUEUE`, `quant/queue/` | Async jobs, rate limits |
 | Worker | `quant/queue/worker.py` | Claim, optimize, write `BT.RESULT` |
 | Promotion | `BT.PROMOTION`, `quant/promotion/` | Auto-promote vs best VID |
@@ -64,12 +64,12 @@ of clarity that even larger firms often lack.
 
 | Area | Our system | Typical quant firm | Gap |
 |------|------------|-------------------|-----|
-| **Alpha research** | Single grid search + walk-forward | Multi-stage pipeline: universe screening, factor modelling, portfolio construction | **Large** |
-| **Data pipeline** | Yahoo / Glassnode, single-asset | Tick data, order book, alt-data, QA, point-in-time correctness | **Medium** |
-| **Risk management** | Max DD + Sharpe gates (`CONFIG.PROMOTION_METRIC`) | Exposure limits, correlation monitoring, VaR/CVaR, margin | **Large** |
-| **Execution** | Market orders, simple fills (planned) | Smart routing, TWAP/VWAP, slippage models, TCA | **Medium** |
+| **Alpha research** | Single grid search + one walk-forward cut | Multi-stage pipeline: universe screening, factor modelling, portfolio construction | **Large** |
+| **Data pipeline** | Interval OHLCV from ccxt (Bybit), Futu, Yahoo, Glassnode, AlphaVantage, and Nasdaq. Per-factor symbols in config. The optimizer still scores one primary series | Tick data, order book, alt-data, QA, point-in-time correctness | **Medium** |
+| **Risk management** | Promotion HARD/SOFT in `CONFIG.PROMOTION_METRIC`: max drawdown, full-sample Sharpe, and — once the refdata rows are applied — hold-out Sharpe and Sharpe versus buy-and-hold. No live pre-trade check | Exposure limits, correlation monitoring, VaR/CVaR, margin | **Large** |
+| **Execution** | Market orders on the live path (ccxt). Backtest fills are fee-adjusted closes | Smart routing, TWAP/VWAP, slippage models, TCA | **Medium** |
 | **Strategy count** | Handful of signal types | Hundreds of signals, portfolio optimisation | **Large** |
-| **Backtesting realism** | Fee-adjusted returns | Bias checks, market impact, PnL attribution | **Medium** |
+| **Backtesting realism** | Fee-adjusted returns and one walk-forward cut. Open: long-only AND scores as OR, stochastic uses the traded coin's high/low/close, and the out-of-sample slice restarts the indicator ([AlgoDaemon bug report](../design/2026-09-27-algodaemon-bug-report.md)) | Bias checks, market impact, PnL attribution | **Medium** |
 | **Team tooling** | Shared strategy pool, VID comparison | Experiment tracking, reproducible research envs | **Small** |
 
 ---
@@ -97,10 +97,13 @@ Many teams hit a wall here because they never built the plumbing.
 
 ## The missing piece: OOP and the trading system
 
-We are implementing OOP (see [Futu Trading](../design/futu-trading.md)), but
-**research lecture patterns have not yet fully shaped how strategies plug into
-backtest, promotion, and live trade**. That integration is the next enablement
-layer.
+The production strategy layer is procedural: REFDATA `METHOD_NAME` / `FUNC_NAME`
+dispatch in `quant/strategy/`. Live apply is the trade worker and the ccxt
+adapter, not a `Strategy` class. The lecture-note interfaces below are the
+target in [OOP Strategy Framework](oop-framework.md). New signals ship on the
+procedural path ([Adding Strategies](../guides/adding-strategies.md)). A rewrite
+of `signals.py`, `optimizer.py`, and `TechnicalAnalysis` is not required for
+the hold-out gate or for Trade.
 
 ### Why OOP matters in a trading system
 
@@ -111,9 +114,9 @@ A proper trading engine benefits from OOP because it enables:
 - **Encapsulation of indicators and signals** — stateful, testable units
 - **Plug-and-play deployment** — promote a VID without rewriting the worker
 
-Today our **infra is strong**; the **strategy layer is still largely procedural**
-(function dispatch from REFDATA `METHOD_NAME` / `FUNC_NAME`). OOP is the
-abstraction that turns infra into a **framework**.
+The infra is strong and the strategy layer is procedural. The interfaces below
+are how a later framework would share one strategy between backtest and live.
+They are not the engine that runs today.
 
 ### Where OOP should integrate
 
@@ -203,14 +206,19 @@ Distilled, actionable backlog mapped to this repo. Status reflects the codebase
 
 **Legend:** ✅ exists · 🟡 partial · ⬜ not started
 
+Rows 2–5 are the procedural backlog. Rows 1 and 6–9 are the target framework
+in [OOP Strategy Framework](oop-framework.md). Their “implement in” paths are
+the later modules, and the running code stays `signals.py`, `optimizer.py`,
+and `TechnicalAnalysis`.
+
 ### Summary matrix
 
 | # | Initiative | Status | Effort | Blocks / depends on |
 |---|------------|--------|--------|---------------------|
-| 1 | Strategy OOP framework | 🟡 | **Large** | Nothing — unlocks 6–9 |
-| 2 | Walk-forward HARD gate | 🟡 | **Small** | OOS metrics in `BT.RESULT` payload |
+| 1 | Strategy OOP framework | 🟡 | **Large** | Target. Items 2–5 ship on the procedural path |
+| 2 | Walk-forward HARD gate | 🟡 | **Small** | Evaluator is done. Remaining work is the refdata `1.26.0` migrate |
 | 3 | Multi-asset | 🟡 | **Medium** | `INST.PRODUCT`, per-factor symbol in config |
-| 4 | Paper trading loop | 🟡 | **Medium** | [Trade Deployment Rollout](../archive/trade-deployment-rollout.md) 1.7 |
+| 4 | Paper trading loop | 🟡 | **Medium** | Worker and market apply exist. Fill simulator and paper-before-live remain |
 | 5 | More strategies | 🟡 | **Small each** | REFDATA seeds + `signals.py` |
 | 6 | Indicator library (OOP) | 🟡 | **Medium** | #1 or incremental wrap of `TechnicalAnalysis` |
 | 7 | Execution models | ⬜ | **Medium → Large** | #1, trade worker |
@@ -221,7 +229,7 @@ Distilled, actionable backlog mapped to this repo. Status reflects the codebase
 
 ### 1. Strategy OOP framework
 
-**Goal:** Turn infra into a composable quant framework (biggest missing piece).
+**Goal (target):** a shared strategy interface. The hold-out gate, new signals, and Trade ship without it.
 
 | Component | Target | Today | Implement in |
 |-----------|--------|-------|----------------|
@@ -252,9 +260,9 @@ Distilled, actionable backlog mapped to this repo. Status reflects the codebase
 | Inline WF on optimize | ✅ | `walk_forward=True` in optimize request (`backtest_service.py`) |
 | WF in queue worker | ✅ | `worker` stores `OptimizeResponse.model_dump()`, which includes `walk_forward.oos_metrics` |
 | Promotion reads OOS | ✅ | `_extract_metric` reads `OOS Sharpe Ratio` and `Sharpe Excess` (decision #83) |
-| REFDATA gate row | queued | `1.26.0` seeds the two HARD rows; context `refdata,prod-deploy` |
+| REFDATA gate row | 🟡 | `db/liquidbase/refdata/releases/1.26.0-promotion-holdout-gates.xml` seeds `oos_sharpe_gate` and `sharpe_excess_gate`, and raises `sharpe_gate` from 0 to 1. Context `refdata,prod-deploy`. The `bt` release `1.26.0` is the `SP_GET_RESULT` signature and does not seed these rows |
 
-The worker already stores the inline walk-forward. `_extract_metric` reads `OOS Sharpe Ratio` and `Sharpe Excess`. The Promotion panel already lists whatever HARD gates the snapshot returns. The rows land when `1.26.0` is deployed, then `POST /api/v1/refdata/refresh`.
+The worker already stores the inline walk-forward, and `_extract_metric` already reads both keys. The Promotion panel lists whatever HARD gates the snapshot returns. The rows take effect when that **refdata** release is migrated, then `POST /api/v1/refdata/refresh`. Until then production keeps the previous Sharpe threshold.
 
 No queue schema change. No OOP required.
 
@@ -296,7 +304,7 @@ Unlocks 5–10 crypto pairs without full OOP refactor if signals stay procedural
 | `EXECUTION_EVENT` writes | ✅ | `live_apply.py` → `SP_INS_EXECUTION_EVENT`; read UI in release 1.8.0 |
 | Promotion rule: paper before live | ⬜ | REFDATA or deployment status check |
 
-**Implementation steps:** follow [Trade Deployment Rollout](../archive/trade-deployment-rollout.md) (picker → dry-run → apply → execution log). Add promotion HARD gate: “must have paper deployment with N days / M fills” later.
+Picker, dry-run, live apply, and the execution log have shipped (execution log in trade `1.8.0`; see [Trade Deployment Rollout](../archive/trade-deployment-rollout.md)). Still open: a fill simulator for crypto paper that does not hit the exchange, and a promotion rule that requires a paper deployment before live apply.
 
 ---
 
@@ -352,7 +360,7 @@ Start with `MarketExecutionModel` in backtest (wrap current fill logic), then sa
 | Rule | Promotion (HARD) | Live pre-trade |
 |------|------------------|----------------|
 | Max drawdown | ✅ HARD gate in `CONFIG.PROMOTION_METRIC` ("Max DD LTE 40%") | ⬜ |
-| Sharpe &gt; 1 | queued — `1.26.0` raises `sharpe_gate` from 0 to 1 on migrate approval | ⬜ |
+| Sharpe &gt; 1 | 🟡 — refdata `1.26.0-promotion-holdout-gates` raises `sharpe_gate` from 0 to 1 on migrate. Not the `bt` `1.26.0` procedure change | ⬜ |
 | Max position size | ⬜ | ⬜ |
 | Max leverage | ⬜ | ⬜ |
 | Correlation / factor exposure | ⬜ | ⬜ |
@@ -377,68 +385,39 @@ Refactor **after** protocols exist (#1); migrate optimizer internals one path at
 
 ---
 
-## Recommended implementation order
+## Recommended next work
 
-Sequenced plan aligned with lecture notes and this codebase. Full detail:
-[OOP Strategy Framework](oop-framework.md).
+The queue, promotion evaluator, and live apply already run on the procedural
+path. The hold-out gate and new signals do not wait on the OOP target.
+[OOP Strategy Framework](oop-framework.md) stays the later shape.
 
-| Phase | Duration | Goal |
-|-------|----------|------|
-| **1 — OOP core** | 1–2 weeks | Strategy / Indicator / Execution / Risk bases; Portfolio + Context; engine refactor |
-| **2 — Multi-asset** | ~1 week | Multi-symbol bars, per-symbol portfolio, execution routing |
-| **3 — Walk-forward gate** | 2–3 days | OOS Sharpe HARD gate in promotion + rejection logging |
-| **4 — Paper trading** | 1–2 weeks | Trade worker, fill simulator, reconciliation, backtest → paper → live rule |
-| **5 — Strategy expansion** | Ongoing | Mean reversion, breakout, trend following, multi-asset variants |
+| Order | Work | Where it stands |
+|-------|------|-----------------|
+| 1 | Apply refdata `1.26.0-promotion-holdout-gates` | Evaluator already reads the keys. Migrate, then `POST /api/v1/refdata/refresh` |
+| 2 | Research realism on the current scorer | [AlgoDaemon bug report](../design/2026-09-27-algodaemon-bug-report.md): AND-as-OR, stochastic high/low/close, walk-forward restart |
+| 3 | More signal types | REFDATA `SIGNAL_TYPE` + `signals.py` ([Adding Strategies](../guides/adding-strategies.md)) |
+| 4 | Multi-asset | Per-factor symbol exists. Optimizer scores one primary series. One `INTERNAL_CUSIP` per deployment |
+| 5 | Paper-before-live, fill simulator | Trade worker, market apply, and the execution log exist (execution log in trade `1.8.0`) |
+| 6 | OOP framework | Target only. Rows 1–5 stay on `signals.py`, `optimizer.py`, and `TechnicalAnalysis` |
 
-### Phase 1 — OOP core
+### Target framework (not scheduled work)
 
-1. Create `Strategy` base class (`quant/strategy/base.py`)
-2. Create `Indicator` base + 5–10 indicators (`quant/strategy/indicators/`)
-3. Create `ExecutionModel` base (`quant/trade/execution/`)
-4. Create `RiskModel` base (`quant/strategy/risk/`)
-5. Implement `Portfolio` and `Context`
-6. Refactor backtest engine to compose these (`quant/strategy/engine.py`)
+If the procedural path is later wrapped, the lecture-note order is:
 
-### Phase 2 — Multi-asset
+1. `Strategy`, `Indicator`, `ExecutionModel`, `RiskModel`, `Portfolio`, `Context`
+2. Engine composes feed → strategy → execution → risk → portfolio
+3. `on_bar` takes `dict[symbol → bar]` and the portfolio tracks a position per symbol
 
-1. Strategy accepts `dict[symbol → bar]` in `on_bar`
-2. Portfolio tracks per-symbol positions
-3. Execution model routes orders by symbol
-
-### Phase 3 — Walk-forward gate
-
-1. Worker persists OOS Sharpe in `BT.RESULT` payload
-2. Extend `quant/promotion/evaluate.py` + REFDATA `PROMOTION_METRIC` row
-3. Log `REJECTED` with gate snapshot (worker already writes promotion outcome)
-
-### Phase 4 — Paper trading
-
-1. Trade worker polling `TRADE.DEPLOYMENT`
-2. Fill simulator for crypto paper
-3. Reconciliation loop vs broker / sim state
-4. Promotion rule: require paper deployment before live apply
-
-### Phase 5 — Strategy expansion (ongoing)
-
-Add via OOP registry or procedural `signals.py` until migration completes:
-mean reversion, breakout, volatility breakout, trend following, multi-asset variants.
-
-### Parallel track (no OOP dependency)
-
-Ship alongside Phase 1 without blocking the framework:
-
-- **Phase 3** walk-forward gate (2–3 days, high impact)
-- **Trade 1.6–1.7** strategy picker + paper apply ([rollout](../archive/trade-deployment-rollout.md))
-- **Procedural strategies** — REFDATA + `signals.py` ([Adding Strategies](../guides/adding-strategies.md))
+That sequence is [OOP Strategy Framework](oop-framework.md). It is not the next release.
 
 ```mermaid
 flowchart LR
-  P1[Phase 1 OOP core] --> P2[Phase 2 Multi-asset]
-  P2 --> P4[Phase 4 Paper trading]
-  P3[Phase 3 WF gate] --> P4
-  P1 --> P5[Phase 5 Strategies]
-  P2 --> P5
-  PT[Parallel: Trade picker] --> P4
+  G[Refdata hold-out rows] --> R[Research realism bugs]
+  R --> S[More signals]
+  S --> M[Multi-asset]
+  M --> P[Paper-before-live]
+  T[OOP target] -.-> S
+  T -.-> M
 ```
 
 ---
@@ -455,29 +434,37 @@ flowchart LR
 | Documentation | ✅ MkDocs wiki + design docs |
 | Queue system | ✅ `BT.QUEUE`, worker, rate limits |
 | Deployment automation | ✅ Trade tab, Promotion → Deploy |
-| Walk-forward math | ✅ Not yet wired as promotion gate |
+| Walk-forward math | ✅ Inline on the queued optimize. Promotion reads OOS Sharpe and Sharpe excess when those REFDATA rows are in the snapshot |
+| Live apply | ✅ Trade worker, ccxt market orders, execution log (trade `1.8.0`) |
 | Broker paper API | ✅ `FutuTrader(paper=True)` |
 
 ### Still needed
 
 | Area | Phase |
 |------|-------|
-| OOP strategy layer | 1 |
-| Multi-asset support | 2 |
-| Walk-forward promotion gate | 3 |
-| Paper trading worker + reconciliation | 4 |
-| More strategies | 5 |
-| Execution models (market → TWAP) | 1 → 4 |
-| Live risk models (beyond promotion) | 1 → 4 |
+| Refdata hold-out rows on the snapshot | 1 |
+| Research realism bugs (AND-as-OR, stochastic, walk-forward restart) | 2 |
+| More strategies on `signals.py` | 3 |
+| Multi-asset portfolio | 4 |
+| Paper-before-live rule and a fill simulator | 5 |
+| OOP strategy layer | Target — [OOP Strategy Framework](oop-framework.md) |
+| Execution beyond a market order | Target |
+| Live risk beyond the promotion gates | Target |
 
-Once Phases 1–4 are done, the system resembles a **small systematic fund**
-lifecycle (research → validate → paper → live) rather than a notebook-style repo.
+Research → validate → paper → live already exists as queue, promotion, and
+deploy. What is thin is the research surface: few signals, one primary series,
+hold-out rows that apply only after the refdata migrate, and no live risk
+check in front of the order.
 
 ---
 
 ## Architecture diagrams
 
 ### System architecture (high level)
+
+The Data, Queue, and Live boxes match the running system. The Backtest box is
+the target composition from the section above. Today's backtest is the optimize
+loop in the worker (`optimizer.py`, `performance.py`, `walk_forward.py`).
 
 ```mermaid
 flowchart TD
@@ -567,22 +554,22 @@ classDiagram
 
 ### Short term
 
-- Add 2–3 more strategies via existing REFDATA + grid search path (#5)
-- Enforce walk-forward as a promotion HARD gate (#2)
-- [Trade Deployment Rollout](../archive/trade-deployment-rollout.md): strategy picker → paper apply (#4)
-- Expand to multi-asset via `INST.PRODUCT` / per-factor symbol (#3)
+- Migrate refdata `1.26.0-promotion-holdout-gates` and refresh the REFDATA snapshot
+- Fix the open scorer bugs in the [AlgoDaemon bug report](../design/2026-09-27-algodaemon-bug-report.md) on the procedural path
+- Add 2–3 more strategies via REFDATA + `signals.py`
 
 ### Medium term
 
-- Complete OOP integration (#1, #6, #7, #8, #9)
-- Paper-trading validation loop with execution log (#4)
+- Multi-asset: distinct factor symbols through the optimizer, one position map, still one deployment per symbol until the schema grows
+- Paper-before-live promotion rule, and a fill simulator that does not hit the exchange
 - Experiment tracking: VID lineage + metrics (MLflow-style, not necessarily MLflow)
 
 ### Long term
 
+- OOP framework, as specified in [OOP Strategy Framework](oop-framework.md)
 - Multi-strategy portfolio construction
 - Advanced execution (TWAP, slippage models)
-- Real-time risk engine alongside promotion rules
+- Real-time risk engine alongside the promotion gates
 
 ---
 
