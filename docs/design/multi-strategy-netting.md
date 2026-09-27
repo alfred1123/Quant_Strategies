@@ -1,9 +1,8 @@
 # Multi-strategy netting — why the execution tables are keyed wrong
 
-**Status: intent side adopted (decision #90), not built. Order side and the
-netting engine: recorded, not built.** It documents a modelling error that
-today's schema does not yet expose, so that the eventual fix is a decision rather
-than a discovery. §5 is the intent step that goes first.
+**Status: intent side built (decision #90, trade release `1.10.0`). Order side and the
+netting engine: recorded, not built.** §5 is the intent that live apply writes
+before the order. The net order that would consume several intents is still open.
 
 ---
 
@@ -130,10 +129,43 @@ nothing to correct.
   #79). An order with no intent would have no owner once netting exists.
 - **One intent per pass.** The retry attempts in a pass share it, because the
   signal is computed once per pass.
+- **No version column.** An intent is never edited. A changed quantity or
+  strategy bumps `DEPLOYMENT_VID`, and the next apply writes a new `INTENT_ID`
+  stamped with that version. `EXECUTION_EVENT` has no version column for the
+  same reason. An `INTENT_VID` is warranted only if `ORDER_ATTEMPT_ID` (§4) is
+  later filled in by updating an existing intent.
 - **No foreign key to `EXECUTION_EVENT` yet.** Today the pair joins on
   `(DEPLOYMENT_ID, TRANSACT_AT)`. Netting adds the nullable `ORDER_ATTEMPT_ID`
   on the intent (§4), which is the direction many-to-one needs. A key on the
   attempt pointing at one intent would have to be removed then.
+
+#### Why buy and sell stay on the execution row
+
+The side is not part of what the strategy asked for. `OrderRetryExecutor` keeps
+the pass's signal and, before every attempt, re-reads the account position and
+calls `intended_side(signal, position_qty)`. The side is the target measured
+against the book at that moment, so it can change inside one pass:
+
+1. The account is flat and the signal is `+1`. The attempt sends a `BUY`.
+2. The confirm comes back unconfirmed. The executor cancels and reads the book again.
+3. The fill had landed, so the position already equals the target. The next attempt is `HOLD`.
+
+Both attempts belong to one intent: the strategy still wanted the same
+`TARGET_QTY`. A side on the intent would have to be overwritten by the second
+attempt, or split into one intent per attempt, and that second table is the
+execution diary again. `INTENT` records the target. `EXECUTION_EVENT` records
+each look at the account: side, quantity, vendor order id, success, and the
+position that attempt saw.
+
+#### Why `EXECUTION_EVENT` keeps `DEPLOYMENT_ID` for now
+
+`EXECUTION_EVENT` is the broker diary. Its `DEPLOYMENT_ID` is accurate while one
+deployment is the only reason an order exists, which is how apply works today.
+The execution log and the intent join both read it. It becomes wrong when one
+net order serves several intents; §4 moves the order to `ORDER_ATTEMPT`, keyed
+by credential, symbol, and tick, with the intent pointing at it. Dropping the
+column before that table exists would leave today's diary without an owner, and
+the §6 questions still decide `ORDER_ATTEMPT`'s key.
 - Dry run writes no intent. Manual and scheduled applies both do.
 - `TRADE.SP_INS_INTENT` writes it. `TRADE.SP_GET_INTENT` reads by deployment
   and time range, scoped by `APP_USER_ID` like `SP_GET_EXECUTION_EVENT`.

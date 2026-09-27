@@ -262,7 +262,7 @@ Implement Fernet in `quant/shared/secrets_crypto.py`; `ApiCredentialRepo` calls 
 
 **Tasks**
 
-- [x] DDL: `TRADE.DEPLOYMENT`, `TRADE.EXECUTION_EVENT`, `TRADE.TRANSACTION` (per [Trade API](trade-api.md)). **No `TRADE.INTENT`** — signal computed in worker; see decision #38.
+- [x] DDL: `TRADE.DEPLOYMENT`, `TRADE.EXECUTION_EVENT`, `TRADE.TRANSACTION` (per [Trade API](trade-api.md)). Phase 1.2 shipped without `TRADE.INTENT` (decision #38). Decision #90 added it in trade release `1.10.0`.
 - [x] `TRADE.DEPLOYMENT` includes **`API_CREDENTIAL_ID INTEGER`** (points at current credential row via GET with `IS_CURRENT_IND='Y'`) — not a separate connection entity.
 - [x] SP: create deployment linked to `BT.STRATEGY` id + `API_CREDENTIAL_ID`.
 - [x] API: `POST` apply / `GET` deployment status (skeleton OK without exchange call).
@@ -511,7 +511,7 @@ Cron and the cursor now agree ([decision #81](../decisions.md)): `price_bar_sync
 | **Depends on** | 1.2, 1.8 |
 | **Blocks** | 2.2, 2.3 |
 
-**Design:** [Deployment performance reconcile](deployment-performance-reconcile.md) (proposed) — per-bar live and backtest returns, ratios derived on read so a paused deployment still reconciles. Strategy and account levels; each strategy's position comes from `TRADE.INTENT` ([Multi-strategy netting §5](multi-strategy-netting.md#5-intent-first), decision #90), which is built first.
+**Design:** [Deployment performance reconcile](deployment-performance-reconcile.md) (proposed) — per-bar live and backtest returns, ratios derived on read so a paused deployment still reconciles. Strategy and account levels; each strategy's position comes from `TRADE.INTENT` ([Multi-strategy netting §5](multi-strategy-netting.md#5-intent-first), decision #90, trade release `1.10.0`). The snapshot tables in that design are still proposed.
 
 **Tasks**
 

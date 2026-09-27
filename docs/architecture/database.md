@@ -12,7 +12,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `CONFIG` | Policy (`APP_ISSUE_FEE`, `APP_APPLY_TIMING`, `API_LIMIT`, `PROMOTION_METRIC`) and `CONFIG.SP_GET_ENUM`, which reads only this schema. Redis prefix `config:<table>` and stamp `config:version`. |
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `MARKET_CALENDAR`, …) and `REFDATA.SP_GET_ENUM`, which reads only this schema. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `MARKET_CALENDAR` is session/timezone by **`LISTING_EXCHANGE`** (`INST.PRODUCT.EXCHANGE`; `''` = default crypto). |
 | `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `PROMOTION`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert/get procedures |
-| `TRADE` | Live trading: `DEPLOYMENT`, `DEPLOYMENT_SCHEDULE_STATUS`, `EXECUTION_EVENT`, `TRANSACTION` + SPs (`INTENT` adopted by decision #90, not built) |
+| `TRADE` | Live trading: `DEPLOYMENT`, `DEPLOYMENT_SCHEDULE_STATUS`, `INTENT`, `EXECUTION_EVENT`, `TRANSACTION` + SPs |
 | `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows) — see [Scheduler & Price Bars](../design/scheduler-price-bars.md) — plus `BAR_SUBSCRIPTION`, standing capture requests with no deployment behind them ([Market data capture](../design/market-data-capture.md)) |
 | `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) — `REFDATA.TICKER_MAPPING` has been dropped |
 
@@ -156,7 +156,7 @@ attempt under the same cusip is a 409 from `UQ_PRODUCT_CUSIP_CURRENT`.
 
 PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, APP_ID)` allowed (multiple accounts on same broker).
 
-**No `TRADE.CONNECTION` table** — runtime broker sessions are ephemeral. Trade audit = `TRADE.EXECUTION_EVENT` + `TRADE.TRANSACTION`. `TRADE.DEPLOYMENT` (Phase 1.2) references `API_CREDENTIAL_ID` only. **No `TRADE.INTENT` yet** — current signal lives in the worker for one tick (decision #38). Decision #90 adopts it; see [Multi-strategy netting §5](../design/multi-strategy-netting.md#5-intent-first).
+**No `TRADE.CONNECTION` table** — runtime broker sessions are ephemeral. Trade audit = `TRADE.INTENT` + `TRADE.EXECUTION_EVENT` + `TRADE.TRANSACTION`. `TRADE.DEPLOYMENT` (Phase 1.2) references `API_CREDENTIAL_ID` only. `TRADE.INTENT` is the target each deployment asked for on one apply (decision #90). It joins its execution rows on `(DEPLOYMENT_ID, TRANSACT_AT)`. See [Multi-strategy netting §5](../design/multi-strategy-netting.md#5-intent-first).
 
 ### TRADE — live execution (Phase 1.2)
 
@@ -164,10 +164,9 @@ PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, 
 |-------|------|
 | `DEPLOYMENT` | Apply target: pinned strategy, credential, product, qty (soft-versioned via `DEPLOYMENT_VID` + `TRANSACT_FROM/TO`) |
 | `DEPLOYMENT_SCHEDULE_STATUS` | Per-tick schedule cursor — `NEXT_SCHEDULED_TS` advance after each apply pass |
+| `INTENT` | Append-only target per deployment per apply. `TARGET_QTY` is signed `SIGNAL_VALUE × QTY`. Written before the order. Joins `EXECUTION_EVENT` on `(DEPLOYMENT_ID, TRANSACT_AT)`; one intent can have several attempts. No version column — a changed deployment writes a new intent with the new `DEPLOYMENT_VID`. Side stays on `EXECUTION_EVENT`, because each retry re-reads the book ([netting §5.1](../design/multi-strategy-netting.md#why-buy-and-sell-stay-on-the-execution-row)) |
 | `EXECUTION_EVENT` | Append-only submit / error diary; `TRANSACT_AT` = tick time, `CREATED_AT` = audit insert, `POSITION_QTY` = signed broker position the attempt decided against |
 | `TRANSACTION` | Append-only broker-confirmed fills |
-
-**Not stored yet:** current signal / target position between ticks. `TRADE.INTENT` is adopted by decision #90 (amends #38) and not built.
 
 | Procedure | Purpose |
 |-----------|---------|
@@ -178,6 +177,8 @@ PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, 
 | `SP_GET_NEXT_DUE_DEPLOYMENTS` | Not-yet-due preview (UI / ops) |
 | `SP_INS_DEPLOYMENT_SCHEDULE_STATUS` | Append schedule cursor after an apply pass |
 | `SP_GET_SCHEDULED_INSTRUMENTS` | Distinct instruments scheduled deployments will trade (bar warmer) |
+| `SP_INS_INTENT` | Append the target for one apply pass |
+| `SP_GET_INTENT` | Read intents (owner-scoped, optional deployment and time range, REFCURSOR) |
 | `SP_INS_EXECUTION_EVENT` | Append execution event, incl. the position it decided against — see [Recording the position an apply saw](#recording-the-position-an-apply-saw) |
 | `SP_GET_EXECUTION_EVENT` | Read execution diary (owner-scoped, REFCURSOR) |
 | `SP_INS_TRANSACTION` | Append fill row |
@@ -362,6 +363,8 @@ Neither the retention window nor the dump was touched to achieve this. `LOG_PROC
 | `SP_INS_DEPLOYMENT_SCHEDULE_STATUS` | `TRADE` | Append schedule version (poller advance after apply) |
 | `SP_GET_DEPLOYMENT_CHECK` | `TRADE` | Validation read by `DEPLOYMENT_ID` — no owner filter; caller checks ownership |
 | `SP_GET_SCHEDULED_INSTRUMENTS` | `TRADE` | Distinct `(TM_INTERVAL_ID, INTERNAL_CUSIP, APP_ID)` for scheduled deployments (bar warmer) |
+| `SP_INS_INTENT` | `TRADE` | Append one target row. `IN_TARGET_QTY` is the signed position. `IN_TRANSACT_AT` is the apply tick |
+| `SP_GET_INTENT` | `TRADE` | Owner-scoped read. Optional `IN_DEPLOYMENT_ID`, `IN_FROM_TS`, `IN_TO_TS`. Newest tick first |
 | `SP_INS_EXECUTION_EVENT` | `TRADE` | Append event; diary only, no scheduler side effects. `IN_POSITION_QTY` since `1.7.0` — see [Recording the position an apply saw](#recording-the-position-an-apply-saw) |
 | `SP_GET_EXECUTION_EVENT` | `TRADE` | Read execution diary (owner-scoped, REFCURSOR) |
 | `SP_INS_TRANSACTION` | `TRADE` | Append fill row |
@@ -456,10 +459,9 @@ the changelog is archived): `TRADE.SP_GET_EXECUTION_EVENT` and
     they are not, and the column then describes the *(credential, symbol)* pair
     rather than the row's `DEPLOYMENT_ID`.
 
-    That pair has no table of its own, which is the deeper issue:
-    `EXECUTION_EVENT` merges "what one strategy wanted" with "what we sent to
-    the exchange", and those separate as soon as orders are netted across
-    strategies. Recorded, deliberately not built — see
+    `TRADE.INTENT` now records what one strategy asked for. `EXECUTION_EVENT`
+    still records what was sent to the exchange. The order side that nets
+    several intents into one order is not built — see
     [Multi-strategy netting](../design/multi-strategy-netting.md).
 
 ## Directory Layout

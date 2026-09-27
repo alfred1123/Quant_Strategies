@@ -252,7 +252,7 @@ Managed bars on either side of a pause are joined into one series. That is corre
 
 | Gap | Where | Fix |
 |---|---|---|
-| No per-strategy position | Only the account holding is recorded | `TRADE.INTENT` ([Multi-strategy netting §5](multi-strategy-netting.md#5-intent-first)) — build first |
+| Snapshot tables not built | `TRADE.INTENT` records each strategy's target (trade `1.10.0`) | `DEPLOYMENT_PERFORMANCE` and `ACCOUNT_PERFORMANCE` in this page are still proposed |
 | Fee currency is dropped | `_extract_fee` in `quant/trade/brokers/ccxt/confirm.py` keeps `fee.cost` and discards `fee.currency`. Bybit spot charges a buy fee in the base coin and a sell fee in the quote, so `FEE_AMT` mixes units. | Record the fee currency on `TRADE.TRANSACTION` and convert base fees at the fill price |
 | Reads have no time filter | `SP_GET_TRANSACTION` and `SP_GET_EXECUTION_EVENT` return the newest `IN_LIMIT` rows | Add a from-timestamp parameter to those two procedures |
 | Spot holdings missing from the snapshot positions | `fetch_open_positions` lists contracts; a spot holding appears only as a balance, with no mark or notional | Add spot holdings as position rows, read from the base balance the way `fetch_position_qty` already does for spot |

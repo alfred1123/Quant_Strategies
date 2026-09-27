@@ -437,7 +437,8 @@ def execute_deployment(deployment, strategy):
         deployment.ticker, final_signal, deployment.qty
     )
 
-    # 6. Persist audit rows (no TRADE.INTENT — signal was in-memory for this tick)
+    # 6. Persist audit rows. Live apply writes TRADE.INTENT before this order
+    #    (decision #90). This sketch is the older in-memory shape.
     log_execution_event(deployment, final_signal, result)  # TRADE.EXECUTION_EVENT
     if result.filled:
         log_transaction(deployment, result)                # TRADE.TRANSACTION
@@ -449,7 +450,7 @@ def execute_deployment(deployment, strategy):
 
 Database: **Quant**. Tables use `SCHEMA.TABLE` naming:
 - `BT.` — backtest artifacts and strategy definitions
-- `TRADE.` — live execution records (`DEPLOYMENT`, `EXECUTION_EVENT`, `TRANSACTION` only — no `INTENT`; decision #38, amended by #90)
+- `TRADE.` — live execution records (`DEPLOYMENT`, `INTENT`, `EXECUTION_EVENT`, `TRANSACTION`; decision #90)
 - `CORE_ADMIN.` — user accounts, API credentials
 - `INST.` — instrument reference (product cross-reference)
 - `REFDATA.` — reference/lookup data
