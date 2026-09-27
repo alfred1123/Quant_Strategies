@@ -75,6 +75,7 @@ or link a design doc — do not turn the research page into a spec.
 | [Funding, basis, and carry](funding-basis-carry.md) | Funding as a filter, 8-hour normalization, perp-spot convergence |
 | [Microstructure, on-chain, and unusual](microstructure-onchain-unusual.md) | 24h roll-out, clock-time flow, attention, on-chain value |
 | [Chin Shum Patreon review](chinshum-review.md) | PBO on the finalist families, sleeve sizing, external-data specs |
+| [Strategies worth new platform features](feature-worthy-strategies.md) | Ranked backend features for low-correlation strategies: perp carry, derived series, time stops, DVOL; offline checks |
 
 Before treating a Sharpe from these pages as a result, read the
 [backtest review (2026-09-25)](../design/2026-09-25-backtest-review.md) and the
