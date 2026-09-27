@@ -1,9 +1,9 @@
 # AlgoDaemon bug verification, rounds 3–4 (2026-09-27)
 
-**Doc type:** platform review. It checks the research agent's round 3 and round 4 findings against the code. This page does not change the engine.
+**Doc type:** platform review. It checks the research agent's round 3 and round 4 findings against the code, and round 5 item B26 in [section 7](#7-b26-volume-limited-to-a-raw-input-column). This page does not change the engine.
 **Status:** open findings, checked against `main` at `69bf240d8` (2026-09-27 08:16 HKT).
 **Follows:** [AlgoDaemon bug report (2026-09-27)](2026-09-27-algodaemon-bug-report.md) (PR #64), which checked B1–B21 against `9c1af3619`. The eight commits after `9c1af3619` are documentation PRs (#60–#66), so the engine lines that report cites have not moved.
-**Sources:** the research dossier (items B22–B25, compiled 2026-09-27 01:50 HKT), the raw job rows in `round3/raw/`, and the round 4 notes (`round4/README.md`). These files are on the researcher's machine and are not in this repository. Live `algodaemon.com` was not called for this page.
+**Sources:** the research dossier (items B22–B25, compiled 2026-09-27 01:50 HKT), the raw job rows in `round3/raw/`, the round 4 notes (`round4/README.md`), and the round 5 note on B26. These files are on the researcher's machine and are not in this repository. Live `algodaemon.com` was not called for this page.
 
 Bar times are UTC. Clock times are HKT.
 
@@ -18,7 +18,7 @@ How each item was checked:
 
 ## Summary
 
-Six items. All six are real, but two are smaller than first reported.
+Seven items. All seven are real. Two of the round 3–4 items are smaller than first reported.
 
 - **SMA and EMA are raw price levels** (item 1). Compared with a threshold of 0 to 0.10, they are always long or never long. "Price above its EMA" cannot be built. Open.
 - **Grids over 10,000 cells are sampled** (item 2). The search switches to Optuna TPE with seed 42 and runs 10,000 trials. The config drawer does show "capped from N combos" before the run. Nothing on the result or the stored job says the grid was sampled, and the sampler repeats cells. Open.
@@ -26,6 +26,7 @@ Six items. All six are real, but two are smaller than first reported.
 - **A signal fills on the same close** (item 4). This is not lookahead. It is a modelling choice, and there is no option to delay the fill. Offline, some Best rules lose most of their out-of-sample Sharpe with a one-day delay. Open, as a proposal.
 - **B24: duplicate jobs make duplicate versions** (item 5). The version is created at **enqueue**, not when the job completes. `SP_INS_STRATEGY` always adds a new `STRATEGY_VID` for the name and never compares `CONFIG_JSON`. Confirmed. Open.
 - **Hourly annualisation** (item 6). **Downgraded.** The web app sets `trading_period` from the bar interval: 365 × 24 = 8,760 for hourly crypto. What is left is that the API accepts any `trading_period` with any interval, and one narrow path in the drawer.
+- **B26: volume is only a raw input column** (item 7). `TechnicalAnalysis` is SMA, EMA, RSI, Bollinger, and stochastic. A factor reads one column, and a rule does not remember the previous position, so OBV, VWAP, dollar volume, Amihud, and "enter when volume confirms, then hold" cannot be built. Lowercase `"volume"` is an opaque HTTP 400 on the paths that look the column up. Open, as a limitation.
 
 ## Status
 
@@ -37,6 +38,7 @@ Six items. All six are real, but two are smaller than first reported.
 | [4](#4-a-signal-is-filled-on-the-same-close) | Round 4 | Same-close fill, with no fill-delay option | Medium | Confirmed as a modelling limit, open. Proposal only | Read + offline |
 | [5](#5-b24-duplicate-jobs-create-separate-versions) | B24 | Duplicate jobs create separate strategy versions | Low | Confirmed, open | Read + raw |
 | [6](#6-hourly-annualisation-default) | — | Hourly runs annualised on a daily `trading_period` | Low | Downgraded. The web app derives it from the interval. The API does not check it | Read + raw |
+| [7](#7-b26-volume-limited-to-a-raw-input-column) | B26 | Volume can only be used as a raw input column | Medium (limitation) | Confirmed, open. No volume indicators, no column arithmetic, no stateful entry | Read. The Sharpe and the replica match: researcher |
 
 Items already covered, or fixed:
 
@@ -46,7 +48,7 @@ Items already covered, or fixed:
 | Stochastic warm-up is about 2 × window, and the extra window slips past the sample-size count (dossier B25) | #64 [B6](2026-09-27-algodaemon-bug-report.md#b6-a-short-sample-volume-filter-is-still-best) | Open. Covered in #64. `%D` is still a rolling mean of `%K` (`quant/strategy/indicators.py` line 62) |
 | B1. FILTER with 3+ factors behaves like OR in its direction factors | #64 [B1](2026-09-27-algodaemon-bug-report.md#b1-two-factor-and-behaves-like-or-for-long-only-factors) | Open. Covered in #64 |
 | B12. My Jobs listed the oldest 50 | #64 [B12](2026-09-27-algodaemon-bug-report.md#b12-my-jobs-listed-the-oldest-50) | Fixed in `9c1af3619`. `SP_GET_QUEUE.sql` line 90 still reads `ORDER BY q.CREATED_AT DESC`. The 50-row cap remains |
-| B7. Single-factor Volume run used price | #64 [B7](2026-09-27-algodaemon-bug-report.md#b7-a-single-factor-volume-run-used-price) | Fixed in `c35ea23d2`. `quant/strategy/performance.py` lines 196–197 still replace `factor` with the requested column |
+| B7. Single-factor Volume run used price | #64 [B7](2026-09-27-algodaemon-bug-report.md#b7-a-single-factor-volume-run-used-price) | Fixed in `c35ea23d2`. `quant/strategy/performance.py` lines 196–197 still replace `factor` with the requested column. The researcher confirmed the fix live in round 5: capital-V `Volume` matched their offline replica to 2e-16. This page did not re-run that |
 
 ## 1. SMA and EMA compare the raw average with the threshold
 
@@ -255,6 +257,50 @@ It runs when the Bar Interval changes (line 326), when a product is picked (line
 
 **Fix direction.** Derive `trading_period` on the server from `tm_interval_id` and the product's asset type, or refuse a request whose `trading_period` is not the daily figure × bars per day. That is not the arbitrary 366 threshold that #41 rejected. In the drawer, recompute `tradingPeriod` whenever `assetType` or `tmIntervalId` changes, not only in the three handlers.
 
+## 7. B26: volume limited to a raw input column
+
+**Status:** confirmed, open. **Severity:** medium (limitation). Nothing in the engine is silently wrong here except the 3-factor FILTER case, which is #64 [B1](2026-09-27-algodaemon-bug-report.md#b1-two-factor-and-behaves-like-or-for-long-only-factors). **Effort:** small for the error text. Medium for a derived series or a column expression. The stateful hold is the [PR #63 proposal](2026-09-26-fractional-sizing-stateful-exits.md#proposal-c-hysteresis-and-a-stop-that-remembers).
+
+**Indicators (read).** `TechnicalAnalysis` (`quant/strategy/indicators.py`) has five methods:
+
+```python
+def get_sma(self, period):                                        # line 23
+def get_ema(self, period):                                        # line 28
+def get_rsi(self, period):                                        # line 33
+def get_bollinger_band(self, period):                             # line 47
+def get_stochastic_oscillator(self, period):                      # line 54
+```
+
+There is no OBV, VWAP, MFI, CMF, relative volume, dollar volume, or Amihud. On a `Volume` column the transforms that return a scale-free series are Bollinger's z-score and RSI. SMA and EMA return the raw level, which is [item 1](#1-sma-and-ema-compare-the-raw-average-with-the-threshold).
+
+**One column (read).** `FactorConfig` carries a single `data_column` (`quant/schemas/backtest.py` line 32). `build_config` copies it onto the `SubStrategy` (`quant/strategy/backtest_service.py` line 314). The series the indicator sees is that one column:
+
+```python
+return sub_df[sub.data_column].reindex(main_index)               # performance.py line 174
+```
+
+`Objective._factor_series_for_sub` is the same read (`quant/strategy/objective.py` line 101). Multi-factor then builds a frame that holds only that series (`performance.py` lines 183–184, `objective.py` lines 151–152). There is no second column and no expression, so dollar volume (V·C), Amihud, OBV, and VWAP cannot be built. Stochastic is the exception already recorded as #64 [B3](2026-09-27-algodaemon-bug-report.md#b3-stochastic-in-a-multi-factor-run-fails-on-high) and [B4](2026-09-27-algodaemon-bug-report.md#b4-cross-coin-stochastic-uses-the-traded-coins-hlc): it reads `High`, `Low`, and `Close` and ignores `factor`.
+
+**Stateless (read).** Every signal is `(data_col, signal)` (`quant/strategy/signals.py` line 236). `momentum_band_signal` (lines 246–251) maps the current indicator value to −1, 0, or 1. Nothing in `SignalDirection` reads the previous position. The only `shift` in the engine is the fill lag in `_compute_pnl_columns` ([item 4](#4-a-signal-is-filled-on-the-same-close)). "Enter when volume confirms, then hold" needs `Pos(t−1)`. That hold is [Proposal C](2026-09-26-fractional-sizing-stateful-exits.md#proposal-c-hysteresis-and-a-stop-that-remembers) on the fractional-sizing page (PR #63). The rule the engine can run is the stateless one: be long only on the bars where volume itself is above the threshold.
+
+**Opaque name (read).** `data_column: str = "price"` has no enum and no check against the loaded columns. The exchange frame's columns are `price`, `factor`, `Open`, `High`, `Low`, `Close`, and `Volume` (`quant/market_data/service.py` lines 751–762). `factor` is a copy of the close. Those names are not put in the error.
+
+The lookup that raises is `sub_df[sub.data_column]`. `str(KeyError("volume"))` is `"'volume'"`. The sync routes turn any exception that is not a `BacktestError` into HTTP 400 with that string (`quant/api/routers/backtest.py` lines 29–32):
+
+```python
+return HTTPException(status_code=400, detail=str(exc))            # line 32
+```
+
+Multi-factor always takes the lookup (`performance.py` line 219, `objective.py` line 151), and so does a factor on another product. A one-factor run on the traded coin does not. It looks the name up only when the name is already a column (`performance.py` lines 196–197, `objective.py` lines 127–129). `"volume"` is not `"Volume"`, so that guard skips the lookup and the pre-filled `factor` (the close) is scored. Lowercase `"volume"` is the 400 on a multi-factor or cross-product run, and a silent price score on a one-factor same-coin run. This page did not call the live API. The researcher's 400 is their sync probe.
+
+**Researcher's measurements (not re-run).** From the round 5 note. This page did not replay them.
+
+- A 3-factor FILTER of BTC Bollinger 65/2.25, ETH Bollinger 100/−1, and ETH Volume z-score 20/0 returned exactly A2's Sharpe, 1.3240, and was long on 62 days when the volume leg was off. That is B1: with three or more factors, FILTER combines the non-gate factors by strongest sign.
+- `data_column: "Volume"` on the traded coin or on another coin, on `/performance` and `/optimize`, single- and multi-factor, matched their offline replica to 2e-16 on 1,559+ grid cells. That is B7 still fixed, confirmed live by the researcher. The code path is the one #64 already cites (`performance.py` lines 196–197).
+- On their offline copy, not a platform run, ETH A2 with a volume entry confirmation went from out-of-sample Sharpe 1.24 to 1.38–1.63 across a plateau. Their stored-bar check (daily and hourly BTC, ETH, and BNB volume: 0 gaps, 0 NaN, 0 zeros) is also theirs.
+
+**Fix direction.** Validate `data_column` against the columns on the loaded frame and put the valid names in the error, including on the one-factor path that currently skips a missing name. Add derived-series indicators (OBV, dollar volume, Amihud, VWAP deviation, volume-weighted mean return), or a `data_column` expression. The stateful "enter only when volume confirms, then hold" belongs with PR #63.
+
 ## Recommended order
 
 1. **Item 2, labelling.** Store and show `search`, `grid_size` and `distinct_trials`, and de-duplicate `top10`. Small. Research conclusions currently read a sampled maximum as a grid maximum.
@@ -262,5 +308,6 @@ It runs when the Bar Interval changes (line 326), when a product is picked (line
 3. **Item 5 and item 3 together.** Validate `config_json` at enqueue, add `CONFIG_HASH`, and add `RangeParam` bounds. All three sit in front of `sp_ins_strategy`. Small.
 4. **Item 4.** Decide whether `fill_delay_bars` belongs on the request and in the promotion checks. Medium.
 5. **Item 6.** Server-side derivation or check of `trading_period`. Small.
+6. **Item 7, the error.** Reject a `data_column` that is not on the loaded frame, and list the valid names, including on the one-factor path that currently skips a missing name. Small. Derived volume series, or a column expression, are the larger piece. "Enter when volume confirms, then hold" is the PR #63 proposal.
 
 The #64 order still stands for B1–B21. B1 (AND and 3+-factor FILTER behaving as OR) is still first.
