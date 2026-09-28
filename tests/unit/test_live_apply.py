@@ -151,6 +151,28 @@ class TestLiveApplyOrchestrator:
         assert report.message == outcome.no_order_message
         assert report.reject_reason is None
 
+    def test_report_without_an_order_uses_the_zero_qty_message(self, orchestrator):
+        """A non-HOLD action with no order result uses the qty-resolved-to-0 message."""
+        orch, _bt = orchestrator
+        outcome = OrderRetryResult(
+            action=IntendedAction.SELL,
+            position_qty=0.0,
+            result=None,
+            attempts=(),
+            max_attempts=5,
+            permanent_failure=False,
+        )
+
+        report = orch._report(
+            _deployment(), outcome, "BTCUSDT", 0.0, bar_source="provider",
+        )
+
+        assert report.action is IntendedAction.SELL
+        assert report.order_success is None
+        assert report.message == outcome.no_order_message
+        assert "qty resolved to 0" in report.message
+        assert report.reject_reason is None
+
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_buy_success(self, mock_signal, orchestrator):
         orch, _bt = orchestrator
