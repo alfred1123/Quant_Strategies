@@ -480,7 +480,7 @@ All backtest requests use a uniform **factor-list** shape. There is no `mode` di
 Each `FactorConfig` carries:
 
 - `symbol` / `vendor_symbol` / `data_source` — **where the indicator reads from** (optional; defaults to the top-level trade asset). Set these when the indicator should be computed from a different product than the one being traded.
-- `data_column` — which column of the source DataFrame becomes the `factor` series (default `"price"`).
+- `data_column` — which column of the source DataFrame becomes the `factor` series (default `"price"`). A name that is not on the loaded frame is rejected on the one-factor path and the multi-factor path; the error lists that frame's columns.
 - `indicator` / `strategy` — what to compute and how to turn it into positions.
 - `window_range` / `signal_range` — the parameter grid for this factor.
 

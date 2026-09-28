@@ -98,6 +98,8 @@ class Objective(ABC):
         sub_df = self._all_data[sub_cusip]
         if sub_cusip != self._config.internal_cusip:
             self._validate_factor_coverage(sub_df, sub_cusip)
+        if sub.data_column not in sub_df.columns:
+            raise ValueError(f"data_column {sub.data_column!r} is not a column; valid names: {', '.join(map(str, sub_df.columns))}")
         return sub_df[sub.data_column].reindex(self._main.index)
 
     def _validate_factor_coverage(self, factor_df, factor_cusip) -> None:
@@ -122,13 +124,8 @@ class SingleFactorObjective(Objective):
     def __init__(self, data, config, windows, *, fee_bps=None) -> None:
         super().__init__(data, config, fee_bps=fee_bps)
         sub = config.get_substrategies()[0]
-        sub_cusip = sub.internal_cusip or config.internal_cusip
-        source = self._all_data[sub_cusip]
-        if sub_cusip != config.internal_cusip or sub.data_column in source.columns:
-            frame = self._main.copy()
-            frame["factor"] = self._factor_series_for_sub(sub)
-        else:
-            frame = self._main
+        frame = self._main.copy()
+        frame["factor"] = self._factor_series_for_sub(sub)
         self._cache = IndicatorCache(frame, config.indicator_name, windows)
         self._signal_func = config.signal_func
 

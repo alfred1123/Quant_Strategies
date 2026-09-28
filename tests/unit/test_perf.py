@@ -500,3 +500,40 @@ class TestMultiFactorPerformance:
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
         assert len(result) == 5
+
+
+def _frame_with_volume(df):
+    """Exchange-shaped frame: ``Volume`` exists, lowercase ``volume`` does not."""
+    frame = df.copy()
+    frame["Volume"] = np.linspace(1000, 2000, len(frame))
+    return frame
+
+
+class TestUnknownDataColumn:
+    def test_one_factor_rejects_a_missing_name(self, sample_ohlc_df):
+        frame = _frame_with_volume(sample_ohlc_df)
+        config = StrategyConfig.single(
+            "test", "get_sma", Strategy.momentum_band_signal, 252,
+            window=5, signal=1.0, data_column="volume",
+        )
+        with pytest.raises(ValueError, match="valid names") as exc:
+            Performance({"test": frame}, config, 5, 1.0).enrich_performance()
+        message = str(exc.value)
+        assert "'volume'" in message
+        for name in ("price", "factor", "Close", "Volume"):
+            assert name in message
+
+    def test_multi_factor_rejects_a_missing_name(self, sample_ohlc_df):
+        frame = _frame_with_volume(sample_ohlc_df)
+        sub_a = SubStrategy("get_sma", "momentum_band_signal", 5, 0.5, "price")
+        sub_b = SubStrategy("get_sma", "momentum_band_signal", 10, 0.5, "volume")
+        config = StrategyConfig(
+            "test", "get_sma", Strategy.momentum_band_signal, 252,
+            conjunction="AND", substrategies=(sub_a, sub_b),
+        )
+        with pytest.raises(ValueError, match="valid names") as exc:
+            Performance({"test": frame}, config).enrich_performance()
+        message = str(exc.value)
+        assert "'volume'" in message
+        for name in ("price", "factor", "Close", "Volume"):
+            assert name in message

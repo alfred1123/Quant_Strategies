@@ -33,6 +33,7 @@ def strategy_json_doc():
         365,
         window=20,
         signal=1.0,
+        data_column="price",
         strategy_id=str(uuid4()),
     )
     return strategy_to_json(cfg)

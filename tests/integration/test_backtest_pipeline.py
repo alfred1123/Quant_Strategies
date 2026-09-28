@@ -571,7 +571,7 @@ class TestStrategyConfigSinglePipeline:
         cfg = StrategyConfig.single(
             "test", "get_bollinger_band",
             Strategy.momentum_band_signal, 252,
-            window=20, signal=1.0
+            window=20, signal=1.0, data_column="price",
         )
         perf = Performance({"test": synthetic_market_data.copy()}, cfg, 20, 1.0)
         perf.enrich_performance()
@@ -587,7 +587,7 @@ class TestStrategyConfigSinglePipeline:
         single = StrategyConfig.single(
             "test", "get_bollinger_band",
             Strategy.momentum_band_signal, 252,
-            window=20, signal=1.0, strategy_id="same"
+            window=20, signal=1.0, strategy_id="same", data_column="price",
         )
         perf_legacy = Performance({"test": synthetic_market_data.copy()}, legacy, 20, 1.0)
         perf_legacy.enrich_performance()
@@ -601,7 +601,7 @@ class TestStrategyConfigSinglePipeline:
     def test_single_config_grid_search(self, synthetic_market_data):
         cfg = StrategyConfig.single(
             "test", "get_sma", Strategy.reversion_band_signal, 252,
-            window=20, signal=0.5
+            window=20, signal=0.5, data_column="price",
         )
         opt = ParametersOptimization({"test": synthetic_market_data.copy()}, cfg)
         results = opt.optimize((10, 20), (0.5, 1.0))
@@ -615,7 +615,7 @@ class TestJsonSerializationPipeline:
         cfg = StrategyConfig.single(
             "btc-usd", "get_bollinger_band",
             Strategy.momentum_band_signal, 365,
-            window=20, signal=1.0, strategy_id="json-test"
+            window=20, signal=1.0, strategy_id="json-test", data_column="price",
         )
         perf = Performance({"btc-usd": synthetic_market_data.copy()}, cfg, 20, 1.0)
         perf.enrich_performance()

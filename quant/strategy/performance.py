@@ -171,6 +171,8 @@ class Performance:
         sub_df = self.all_data[sub_cusip]
         if sub_cusip != self.config.internal_cusip:
             self._validate_factor_coverage(sub_df, sub_cusip)
+        if sub.data_column not in sub_df.columns:
+            raise ValueError(f"data_column {sub.data_column!r} is not a column; valid names: {', '.join(map(str, sub_df.columns))}")
         return sub_df[sub.data_column].reindex(main_index)
 
     def _indicator_and_position(
@@ -190,11 +192,8 @@ class Performance:
     def _compute_single_factor_outputs(self) -> tuple[pd.DataFrame, pd.Series, object]:
         """Shared single-factor indicator → position math (backtest + trade)."""
         sub = self._subs[0]
-        sub_cusip = sub.internal_cusip or self.config.internal_cusip
         data = self.data.copy()
-        source = self.all_data[sub_cusip]
-        if sub_cusip != self.config.internal_cusip or sub.data_column in source.columns:
-            data["factor"] = self._factor_series_for_sub(sub, data.index)
+        data["factor"] = self._factor_series_for_sub(sub, data.index)
         ta = TechnicalAnalysis(data)
         data = ta.data
         indicator_func = getattr(ta, self.config.indicator_name)

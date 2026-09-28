@@ -120,7 +120,7 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 For multi-factor backtests, the pipeline computes each factor independently, then combines:
 
 1. For each `SubStrategy` in `config.substrategies`:
-     - Set `data['factor'] = data[sub.data_column]` (e.g. price or volume)
+     - Set `data['factor'] = data[sub.data_column]` (e.g. price or volume). A name that is not on the loaded frame is rejected, and the error lists that frame's columns. The one-factor path uses the same check.
      - Compute indicator → position array
 2. Call `combine_positions(positions, conjunction)`:
      - **AND** — position taken only when all factors agree; strength-based tiebreak via a percentile rank of bars up to the current one
