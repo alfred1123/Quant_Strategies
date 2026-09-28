@@ -109,8 +109,7 @@ class LiveApplyOrchestrator:
             result = outcome.result
             if result is None:
                 return self._report(deployment, outcome, vendor_symbol, signal,
-                                    bar_source=bar_source,
-                                    message=outcome.no_order_message)
+                                    bar_source=bar_source)
 
             if result.success:
                 self._write_transaction(
@@ -186,7 +185,6 @@ class LiveApplyOrchestrator:
         signal: float,
         *,
         bar_source: str,
-        message: str | None = None,
     ) -> ApplyReport:
         result = outcome.result
         return ApplyReport(
@@ -202,7 +200,7 @@ class LiveApplyOrchestrator:
             filled_qty=result.filled_qty if result else None,
             avg_price=result.avg_price if result else None,
             fee=result.fee if result else None,
-            message=message if message is not None else result.message,
+            message=result.message if result else outcome.no_order_message,
             reject_reason=result.reason if result else None,
         )
 
