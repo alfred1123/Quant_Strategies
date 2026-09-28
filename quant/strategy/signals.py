@@ -136,20 +136,8 @@ def _combine_filter(stacked: np.ndarray, signs: np.ndarray,
     if signs.shape[1] == 2:
         return np.where(gate, stacked[:, 1], 0.0)
 
-    sig_signs = signs[:, 1:]
-    all_pos = (sig_signs == 1).all(axis=1)
-    all_neg = (sig_signs == -1).all(axis=1)
-    direction = np.where(all_pos, 1.0, np.where(all_neg, -1.0, 0.0))
-
-    if strengths is not None:
-        disagree = ((sig_signs == 1).any(axis=1)
-                    & (sig_signs == -1).any(axis=1)
-                    & ~(sig_signs == 0).any(axis=1)
-                    & ~nan_mask)
-        if disagree.any():
-            direction[disagree] = _strongest_sign(
-                sig_signs, _conviction(strengths[1:]), disagree)
-
+    conviction = None if strengths is None else _conviction(strengths[1:])
+    direction = _combine_and(signs[:, 1:], nan_mask, conviction)
     return np.where(gate, direction, 0.0)
 
 

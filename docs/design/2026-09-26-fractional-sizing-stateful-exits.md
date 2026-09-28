@@ -84,11 +84,11 @@ Gross of costs, their Table 1 Combo on BTC is CAGR 30%, vol 17%, Sharpe 1.58, So
 
 **Read.** `Performance._compute_multi_factor_outputs` and `MultiFactorObjective.__call__` both call `combine_positions(..., strengths=indicator_values)`. The strengths are the raw indicator readings. With strengths, a bar where the factors disagree takes the sign of the most convicted non-flat factor (`_combine_and`, `_strongest_sign`). Conviction is a past-only percentile rank (`_conviction`).
 
-**Checked, as the code stood.** `test_and_one_flat_gives_flat` calls `combine_positions` without strengths: a long beside a flat stays flat. `test_and_strength_ignores_flat_factors` used to call it with strengths and expect the flat factor to drop out so the remaining sign won. The backtest and the search always pass strengths, so they took that second result. The test now expects the flat veto.
+**Checked, as the code stood.** `test_and_one_flat_gives_flat` calls `combine_positions` without strengths: a long beside a flat stays flat. `test_and_strength_ignores_flat_factors` used to call it with strengths and expect the flat factor to drop out so the remaining sign won. The backtest and the search always pass strengths, so they took that second result. That test is now `test_and_strength_flat_factor_vetoes` and expects the flat veto.
 
 #### The long-only AND path
 
-**Update.** The reading below is the bug. `combine_positions` now keeps a flat factor as a veto, including when strengths are passed, and `test_and_strength_ignores_flat_factors` asserts that veto. A long-only AND no longer matches OR. Stored AND results from before the fix still match OR until they are flagged.
+**Update.** The reading below is the bug. `combine_positions` now keeps a flat factor as a veto, including when strengths are passed, and `test_and_strength_flat_factor_vetoes` asserts that veto. FILTER with three or more factors uses that same AND. A long-only AND no longer matches OR. Stored AND results from before the fix still match OR until they are flagged.
 
 **Read and inferred from the two tests, as the code stood.** A long-only factor is in {0, +1}. On a bar where one factor is +1 and the other is 0, `_combine_and` did not see unanimous +1, did see a non-zero factor, and with strengths wrote +1. `test_or_any_long` writes +1 for the same inputs under OR. Two long-only factors combined with AND, on the path the engine ran, matched OR.
 

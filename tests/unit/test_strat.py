@@ -542,7 +542,7 @@ class TestCombinePositions:
         assert result[-2] == 1.0
         assert result[-1] == 1.0
 
-    def test_and_strength_ignores_flat_factors(self):
+    def test_and_strength_flat_factor_vetoes(self):
         """A flat factor vetoes AND. It is not dropped so the other sign can win."""
         a = np.zeros(10)
         b = np.zeros(10)

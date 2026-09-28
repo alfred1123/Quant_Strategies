@@ -79,9 +79,9 @@ FILTER with three factors, same series: on 15 bars the gate was on and exactly o
 - `_combine_filter` (lines 136–150) returns the second factor when there are exactly two. With three or more, lines 139–149 apply the same mask to the direction factors.
 - `Performance._compute_multi_factor_outputs` (`quant/strategy/performance.py` lines 226–229) and `MultiFactorObjective.__call__` (`quant/strategy/objective.py` lines 163–165) always pass strengths.
 
-`tests/unit/test_strat.py` `test_and_strength_ignores_flat_factors` asserted this outcome. The public text on `combine_positions` says AND is a position only when all factors agree. The test and that sentence disagreed, and the test now expects the flat veto.
+`tests/unit/test_strat.py` `test_and_strength_ignores_flat_factors` asserted this outcome. The public text on `combine_positions` says AND is a position only when all factors agree. The test and that sentence disagreed. The test is now `test_and_strength_flat_factor_vetoes` and expects the flat veto.
 
-**Fix.** A strength conflict is a row where both +1 and −1 are present and no factor is flat. `{+1, 0}` stays flat, so a flat factor vetoes, including when the other factors have opposite signs. FILTER direction factors use the same rule once there are three or more factors. `{+1, −1}` with no flat factor still takes the stronger reading. Stored AND results from before this fix, and any auto-promotion that used them, still reflect the old combiner. Those results will be flagged, not re-run. Flagging is separate follow-up work.
+**Fix.** A strength conflict is a row where both +1 and −1 are present and no factor is flat. `{+1, 0}` stays flat, so a flat factor vetoes, including when the other factors have opposite signs. That rule lives in `_combine_and`. FILTER with three or more factors calls it for the direction factors. `{+1, −1}` with no flat factor still takes the stronger reading. Stored AND results from before this fix, and any auto-promotion that used them, still reflect the old combiner. Those results will be flagged, not re-run. Flagging is separate follow-up work.
 
 ## B2. Walk-forward OOS restarts the indicator
 
