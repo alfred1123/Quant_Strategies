@@ -400,6 +400,70 @@ class TestEnforceCancels:
         assert uuid.UUID(str(nxt["queue_id"])) in loop._active
 
 
+# ── one terminal row ────────────────────────────────────────────────────
+
+
+class TestOneTerminalRow:
+    """Reap must not add a second terminal row on top of cancel or timeout.
+
+    Both paths already write the row themselves. A later reap sees the child
+    only when it is still in ``_active``; these tests run the real tick order
+    so a double write would show up as a second ``mark_terminal``.
+    """
+
+    def test_crashed_cancel_requested_row_is_cancelled_once(self):
+        """Non-zero exit while the row is CANCEL_REQUESTED.
+
+        Reap drops the dead child and does not write FAILED, because the row
+        is no longer RUNNING. The cancel pass then writes the one CANCELLED row.
+        """
+        row = _row()
+        row["queue_status_id"] = 6  # CANCEL_REQUESTED
+        qid = uuid.UUID(str(row["queue_id"]))
+        repo = MagicMock()
+        repo.get_active.return_value = row
+        repo.list_by_status.side_effect = lambda sid, **kw: [row] if sid == 6 else []
+        repo.claim_next.return_value = None
+        loop = _make_loop(repo=repo)
+        loop._running = True
+        loop._active[qid] = _track(FakeProc(returncode=1), row)
+
+        loop.tick()
+
+        assert qid not in loop._active
+        repo.mark_terminal.assert_called_once_with(row, 5)  # CANCELLED
+
+    def test_timeout_kill_then_reap_writes_failed_once(self):
+        """Timeout writes FAILED and drops the child; the next tick's reap must not write again.
+
+        ``get_active`` keeps reporting RUNNING, so a child left in ``_active``
+        with the kill's non-zero exit would be marked FAILED a second time.
+        """
+        row = _row()
+        row["queue_status_id"] = 2  # RUNNING
+        qid = uuid.UUID(str(row["queue_id"]))
+        repo = MagicMock()
+        repo.get_active.return_value = row
+        repo.list_by_status.return_value = []
+        repo.claim_next.return_value = None
+        loop = _make_loop(repo=repo)
+        loop._running = True
+        loop.JOB_TIMEOUT_S = 1
+        proc = FakeProc(returncode=None)
+        loop._active[qid] = (proc, time.monotonic() - 10, row)
+
+        loop.tick()
+        loop.tick()
+
+        assert proc.killed
+        assert qid not in loop._active
+        repo.mark_terminal.assert_called_once()
+        args = repo.mark_terminal.call_args.args
+        assert args[0] is row
+        assert args[1] == 4  # FAILED
+        assert "timeout" in args[2].lower()
+
+
 # ── _drain ──────────────────────────────────────────────────────────────
 
 
