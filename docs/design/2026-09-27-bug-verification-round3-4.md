@@ -22,7 +22,7 @@ Seven items. All seven are real. Two of the round 3–4 items are smaller than f
 
 - **SMA and EMA are raw price levels** (item 1). Compared with a threshold of 0 to 0.10, they are always long or never long. "Price above its EMA" cannot be built. Open.
 - **Grids over 10,000 cells are sampled** (item 2). The search switches to Optuna TPE with seed 42 and runs 10,000 trials. The config drawer does show "capped from N combos" before the run. Nothing on the result or the stored job says the grid was sampled, and the sampler repeats cells. Open.
-- **Window ranges have no lower bound** (item 3). Window 0 passes validation. For SMA, Bollinger, RSI and stochastic it scores NaN and wastes trials. For EMA, window 0 fails the whole run. A negative window also fails the whole run. Open, low.
+- **Window ranges have no lower bound** (item 3). Window 0 used to pass validation. For SMA, Bollinger, RSI and stochastic it scored NaN and wasted trials. For EMA, window 0 failed the whole run. A negative window also failed the whole run. **Fixed.** `RangeParam` requires `step > 0` and `max >= min`, and `window_range.min` must be at least 2. Signal thresholds are left below 2. Enqueue still accepts `config_json` as a dict.
 - **A signal fills on the same close** (item 4). This is not lookahead. It is a modelling choice, and there is no option to delay the fill. Offline, some Best rules lose most of their out-of-sample Sharpe with a one-day delay. Open, as a proposal.
 - **B24: duplicate jobs make duplicate versions** (item 5). The version is created at **enqueue**, not when the job completes. `SP_INS_STRATEGY` always adds a new `STRATEGY_VID` for the name and never compares `CONFIG_JSON`. Confirmed. Open.
 - **Hourly annualisation** (item 6). **Downgraded.** The web app sets `trading_period` from the bar interval: 365 × 24 = 8,760 for hourly crypto. What is left is that the API accepts any `trading_period` with any interval, and one narrow path in the drawer.
@@ -34,7 +34,7 @@ Seven items. All seven are real. Two of the round 3–4 items are smaller than f
 |---|---|---|---|---|---|
 | [1](#1-sma-and-ema-compare-the-raw-average-with-the-threshold) | B22 | SMA and EMA compare the raw moving average with the threshold | Medium | Confirmed, open. Extends #64 [B16](2026-09-27-algodaemon-bug-report.md#b16-smaema-momentum-on-raw-price-is-buy-and-hold) | Ran + read |
 | [2](#2-big-grids-are-sampled-without-saying-so) | B23 | Grids over 10,000 cells are sampled by TPE; the result does not say so | Medium | Confirmed, open. A pre-run caption exists | Read + raw |
-| [3](#3-window-ranges-have-no-lower-bound) | B23 | `RangeParam` has no bounds; window 0 or below is accepted | Low | Confirmed, open | Ran + read + raw |
+| [3](#3-window-ranges-have-no-lower-bound) | B23 | `RangeParam` has no bounds; window 0 or below is accepted | Low | Fixed. Window floor is 2; signal ranges are unchanged. Enqueue validation is still open | Ran + read + raw |
 | [4](#4-a-signal-is-filled-on-the-same-close) | Round 4 | Same-close fill, with no fill-delay option | Medium | Confirmed as a modelling limit, open. Proposal only | Read + offline |
 | [5](#5-b24-duplicate-jobs-create-separate-versions) | B24 | Duplicate jobs create separate strategy versions | Low | Confirmed, open | Read + raw |
 | [6](#6-hourly-annualisation-default) | — | Hourly runs annualised on a daily `trading_period` | Low | Downgraded. The web app derives it from the interval. The API does not check it | Read + raw |
@@ -156,6 +156,8 @@ The live case is the first row. In job `63dac35d`, 475 of the 10,000 sampled tri
 On the queue path, `EnqueueRequest.config_json` is a plain `dict` (`quant/api/schemas/jobs.py` line 26). `OptimizeRequest` validation happens only in the worker (`quant/queue/worker.py` line 124). The strategy version is created at enqueue (item 5). So a run that fails on a bad range still leaves a new VID behind.
 
 **Fix direction.** Give `RangeParam` `step > 0` and `max >= min`. Add a window-specific minimum of 2 (Bollinger's rolling standard deviation is NaN at window 1). Validate `config_json` as an `OptimizeRequest` at enqueue, before `sp_ins_strategy`, so a bad range gets a 422 and never becomes a version. Put the same minimum on the drawer inputs.
+
+**Fixed in part.** `RangeParam` now requires `step > 0` and `max >= min`, and `FactorConfig.window_range.min` must be at least 2. The floor is not on `RangeParam` itself, because that type is also the signal grid and a signal is often below 2. Enqueue still stores `config_json` before the worker validates it, and the drawer inputs still have no minimum.
 
 ## 4. A signal is filled on the same close
 
@@ -305,7 +307,7 @@ Multi-factor always takes the lookup (`performance.py` line 219, `objective.py` 
 
 1. **Item 2, labelling.** Store and show `search`, `grid_size` and `distinct_trials`, and de-duplicate `top10`. Small. Research conclusions currently read a sampled maximum as a grid maximum.
 2. **Item 1.** Add distance-from-average SMA and EMA. Small, and it unlocks the trend-filter family the research needs.
-3. **Item 5 and item 3 together.** Validate `config_json` at enqueue, add `CONFIG_HASH`, and add `RangeParam` bounds. All three sit in front of `sp_ins_strategy`. Small.
+3. **Item 5 and the rest of item 3.** `RangeParam` bounds are in place. Still open: validate `config_json` at enqueue, and add `CONFIG_HASH`, so a bad range is a 422 and never becomes a version. Small.
 4. **Item 4.** Decide whether `fill_delay_bars` belongs on the request and in the promotion checks. Medium.
 5. **Item 6.** Server-side derivation or check of `trading_period`. Small.
 6. **Item 7, the error.** Reject a `data_column` that is not on the loaded frame, and list the valid names, including on the one-factor path that currently skips a missing name. Small. Derived volume series, or a column expression, are the larger piece. "Enter when volume confirms, then hold" is the PR #63 proposal.

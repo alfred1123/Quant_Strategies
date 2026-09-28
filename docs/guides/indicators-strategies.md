@@ -70,6 +70,8 @@ Step scales with min and max so the grid stays ~20 points. Scaling only max woul
 
 The CLI `--win-min` / `--win-max` / `--win-step` defaults stay daily. The CLI has no bar-interval flag.
 
+A request whose window starts below 2, whose step is not positive, or whose max sits below its min is rejected before the grid is expanded (decision #91). The floor of 2 is the window only. A signal threshold may sit below 2, including at 0 or below.
+
 ## Transaction Costs
 
 `quant/strategy/performance.py` applies **10 bps (0.10%) per unit of turnover** by default (`DEFAULT_FEE_BPS = 10.0`). That is Bybit VIP-0 **spot taker** — the research product is `*.crypto` spot (decision #21) and live apply is a market order (decision #38), so the haircut is taker, not maker.

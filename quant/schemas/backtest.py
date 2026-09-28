@@ -1,11 +1,17 @@
 import numpy as np
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class RangeParam(BaseModel):
     min: float
     max: float
-    step: float
+    step: float = Field(gt=0)
+
+    @model_validator(mode="after")
+    def max_covers_min(self) -> "RangeParam":
+        if self.max < self.min:
+            raise ValueError("max must be >= min")
+        return self
 
     def to_values(self, as_int: bool = False) -> tuple:
         """Expand into a concrete value sequence for the optimizer."""
@@ -36,6 +42,13 @@ class FactorConfig(BaseModel):
     strategy: str
     window_range: RangeParam
     signal_range: RangeParam
+
+    # Lookback only. A signal threshold is often below 2, including negatives.
+    @model_validator(mode="after")
+    def window_at_least_two(self) -> "FactorConfig":
+        if self.window_range.min < 2:
+            raise ValueError("window must be at least 2")
+        return self
 
 
 # ── Requests ────────────────────────────────────────────────────────

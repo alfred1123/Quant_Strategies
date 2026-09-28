@@ -482,7 +482,7 @@ Each `FactorConfig` carries:
 - `symbol` / `vendor_symbol` / `data_source` — **where the indicator reads from** (optional; defaults to the top-level trade asset). Set these when the indicator should be computed from a different product than the one being traded.
 - `data_column` — which column of the source DataFrame becomes the `factor` series (default `"price"`).
 - `indicator` / `strategy` — what to compute and how to turn it into positions.
-- `window_range` / `signal_range` — the parameter grid for this factor.
+- `window_range` / `signal_range` — the parameter grid for this factor. Both are a `RangeParam` (`min`, `max`, `step`) and require `step > 0` and `max >= min`. `window_range.min` must also be at least 2: a window of 1 leaves Bollinger's rolling standard deviation NaN, and a window of 0 or below fails the run inside the objective. A signal is a threshold, so `signal_range` keeps values below 2, including 0 and negatives. A request that breaks these rules is **422** on the sync routes. The queue still checks `config_json` only when the worker builds the `OptimizeRequest` (decision #91).
 
 `conjunction` (`"AND"` / `"OR"` / `"FILTER"`) describes how multiple factors' positions are combined. It is **required only when there are 2+ factors** and must be omitted (or `null`) for a single-factor request — the field is meaningless in that case. The service layer dispatches the optimizer based on `len(factors)`:
 
