@@ -112,7 +112,7 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/api/credentials/repo.py` | `ApiCredentialRepo` | `CALL CORE_ADMIN.SP_*_API_CREDENTIAL` via `DbGateway`. |
 | `quant/shared/secrets_crypto.py` | `CredentialCrypto` | Resolves `EXCHANGE_SECRETS_KEY` (prod fail-fast); Fernet wrapper. |
 | `quant/cli.py` | `main()` | CLI entry point (`python -m quant.cli`) — orchestrates the full pipeline for single-symbol scripted runs. |
-| `quant/queue/worker_loop.py` | `main()` | Long-lived daemon — orphan recovery, `claim_next`, spawn worker subprocesses, BLPOP wake channel. |
+| `quant/queue/worker_loop.py` | `main()` | Long-lived daemon — orphan recovery, `claim_next`, spawn worker subprocesses, mark a crashed child `FAILED` while its row is still `RUNNING`, BLPOP wake channel. |
 | `quant/queue/worker.py` | `WorkerRepo`, `main()` | Per-job backtest worker (`python -m quant.queue.worker <queue_id>`) — reads frozen `CONFIG_JSON`, runs optimize, writes `BT.RESULT`, drives `BT.QUEUE` terminal transitions. |
 
 ## Multi-Factor Flow
