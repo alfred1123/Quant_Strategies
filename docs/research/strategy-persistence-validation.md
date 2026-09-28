@@ -6,6 +6,8 @@
 !!! warning "Every number on this page is an offline approximation, not AlgoDaemon platform results"
     The figures come from the offline replica of the engine's P&L: pnl = yesterday's position × today's close-to-close return − |position change| × 10 bps. On the recorded finalists it reproduces the platform's IS / OOS / LATE / FULL Sharpe exactly (ETH A2 1.398 / 1.241 / 1.002 / 1.324, BNB 1.144 / 1.037 / 1.215 / 1.094, BTC 1.313 / 1.068 / 0.646 / 1.211). All charts carry the same label. The scripts live outside this repository.
 
+Platform check (29 Sep 2026): fresh algodaemon.com runs reproduced the finalists' daily P&L exactly, and confirmed full/OOS Sharpe of 1.32/1.24 (ETH A2), 1.09/1.04 (BNB) and 1.21/1.07 (BTC, from its own warm-up start; 1.27 full from 2021-10-09).
+
 ## The question
 
 Alfred asked: *how can we confirm a strategy's edge will last?* He suggested three ideas:
@@ -22,7 +24,7 @@ The short answer is that no single test proves an edge will last. What we can do
 
 | Item | Value |
 |---|---|
-| Finalists | **ETH A2**: hold ETH when `FILTER(BTC BB z(65) > 2.25, ETH BB z(100) > −1.0)` (in the market about 9% of days). **BNB**: hold BNB when `BTC BB z(100) > 0.5` (about 44%). **BTC**: hold BTC when `BTC BB z(60) > 2.25` (about 9%) |
+| Finalists | **ETH A2**: hold ETH when `FILTER(BTC BB z(65) > 2.25, ETH BB z(100) > −1.0)` (long about 8% of days). **BNB**: hold BNB when `BTC BB z(100) > 0.5` (about 42%). **BTC**: hold BTC when `BTC BB z(60) > 2.25` (about 7%) |
 | Execution | Daily bars, long or flat, fill at the close that produced the signal (delay 0). **Delay 1** fills one close later |
 | Fees | 10 bps per side on position changes |
 | Main data | Bybit spot daily closes, 2021-07-01 to 2026-09-25, as cached from platform responses. The finalists' daily net returns equal the platform-exact return files to within 1e-16 at both delays. IS = to 2024-06-30. OOS = 2024-07-01 to 2026-09-25 (817 days) |
@@ -351,7 +353,7 @@ What this shows:
 
 - In the actual OOS period, only BTC's CUSUM fired (2026-04-18). That matches BTC's weak 2026 rolling Sharpe.
 - Run over the unseen 2018–2021 data, the alarms caught BTC correctly: it stayed above the 95% drawdown band for 677 days and earned 3% over 3.3 years. They also fired on ETH A2 in early 2019, which then went on to +126%. **An alarm means "review and cut size", not "switch off".**
-- For ETH A2 and BTC, which are in the market only about 8–9% of days (BNB is in about 44%), the CUSUM mostly measures how long it has been since the last winning trade. It rises steadily while flat. A per-trade version would be better (see proposals).
+- For ETH A2 and BTC, which are long only about 7–8% of days (BNB about 42%), the CUSUM mostly measures how long it has been since the last winning trade. It rises steadily while flat. A per-trade version would be better (see proposals).
 
 ### Family ensemble (a side result)
 
