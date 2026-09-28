@@ -315,6 +315,21 @@ class TestBuildResult:
         assert result.top10[1]["window_1"] == 100
         assert len(result.grid) == 11
 
+    def test_all_invalid_trials_leave_top10_empty(self):
+        """Every trial failed: no finite Sharpe, so nothing is ranked."""
+        rows = [
+            {"window": 55, "signal": 2.25, "sharpe": np.nan},
+            {"window": 55, "signal": 2.25, "sharpe": np.nan},
+            {"window": 10, "signal": 0.5, "sharpe": np.nan},
+        ]
+
+        result = ParametersOptimization._build_result(pd.DataFrame(rows), study=None)
+
+        assert result.top10 == []
+        assert result.best == {}
+        assert result.n_valid == 0
+        assert len(result.grid) == len(rows)
+
 
 class TestSearchSelection:
     def test_covers_space_is_exhaustive(self):
