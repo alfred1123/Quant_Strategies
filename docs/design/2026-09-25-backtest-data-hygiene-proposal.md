@@ -369,7 +369,7 @@ This proposal does not pause a deployment and does not place an order.
 
 ### Promotion and Best
 
-The hard gates in `REFDATA.PROMOTION_METRIC` are Sharpe greater than 0, and max drawdown at most 0.40 (`max_dd_gate`, `lower_is_better`). The soft order is Sharpe, then Calmar, total return, annualised return, max drawdown. Decision #73 kept the 0.40 threshold: the old additive drawdown overstated, so the gate used to bind near a true 33% on the BTC example, and a real 40% is the limit that was intended. That "about seven points" figure is that one series. It is not a conversion to apply to every row. The new drawdown cannot be computed from the stored scalar.
+The hard gates in `CONFIG.PROMOTION_METRIC` are Sharpe greater than 0, and max drawdown at most 0.40 (`max_dd_gate`, `lower_is_better`). The soft order is Sharpe, then Calmar, total return, annualised return, max drawdown. Decision #73 kept the 0.40 threshold: the old additive drawdown overstated, so the gate used to bind near a true 33% on the BTC example, and a real 40% is the limit that was intended. That "about seven points" figure is that one series. It is not a conversion to apply to every row. The new drawdown cannot be computed from the stored scalar.
 
 What can flip, once a version is recomputed:
 
@@ -726,7 +726,7 @@ The owner wants versions with Sharpe below 1, or that fail the hard gates, off t
 A version is in the catalog when all three hold, on its **current** result:
 
 1. The result is not stale. Stale means `CREATED_AT` before 2026-09-22 10:00:43 UTC, or `MAX_DRAWDOWN > 1`, or `BUY_HOLD_MAX_DRAWDOWN > 1`. After the replay, a new current row leaves the stale set on its own.
-2. The current shredded metrics pass the HARD rows in `REFDATA.PROMOTION_METRIC` (Sharpe greater than 0, drawdown at most 0.40), evaluated now, not from `GATE_RESULTS`. The snapshot can be the old drawdown.
+2. The current shredded metrics pass the HARD rows in `CONFIG.PROMOTION_METRIC` (Sharpe greater than 0, drawdown at most 0.40), evaluated now, not from `GATE_RESULTS`. The snapshot can be the old drawdown.
 3. `SHARPE_RATIO` is at least the catalog floor.
 
 Null Sharpe fails the floor and fails the Sharpe gate. A stale 5.07 fails the stale test, so it cannot sit at the top of Recommended while the census is open.

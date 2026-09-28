@@ -44,30 +44,19 @@ default in `appctl.sh` — see [Dev vs Prod — resolve instance ID](../architec
 
 ## Quick start — prod → local
 
-One-time local DB setup:
+Same order as [Getting Started](../getting-started.md#option-b-prod-aurora-from-the-laptop-prod-tunnel). `dump` needs the prod tunnel. `restore` prints the `bootstrap-roles` command, and that command prints the Liquibase deploy.
 
 ```bash
 sudo apt install -y postgresql-17 postgresql-client-17   # Ubuntu/WSL example
+./scripts/appctl.sh prod tunnel start
 ./scripts/dbctl.sh reset
-```
-
-Dump from Aurora and restore locally:
-
-```bash
-source .env
 ./scripts/dbctl.sh dump
 ./scripts/dbctl.sh restore          # newest file in db/dumps/
-./scripts/dbctl.sh bootstrap-roles  # recreate quant_app role omitted from dump
+./scripts/dbctl.sh bootstrap-roles  # quant_app role omitted from the dump
+DB_TARGET=local ./scripts/liquibase-deploy.sh
 ```
 
-Use local DB in dev:
-
-```bash
-echo 'DB_TARGET=local' >> .env
-./scripts/appctl.sh dev start       # uvicorn + vite + redis + worker
-```
-
-See [Dev vs Prod — local Postgres](../architecture/dev-vs-prod.md#optional-point-dev-at-a-local-postgres).
+Then set `DB_TARGET=local` and start the app: [Getting Started — Option A](../getting-started.md#option-a-local-db-no-tunnel).
 
 ---
 
@@ -75,10 +64,10 @@ See [Dev vs Prod — local Postgres](../architecture/dev-vs-prod.md#optional-poi
 
 | Command | What it does |
 |---------|----------------|
-| `./scripts/dbctl.sh dump` | `pg_dump` Aurora via tunnel → `db/dumps/quantdb_YYYYMMDD_HHMMSS.dump` |
-| `./scripts/dbctl.sh restore [file]` | `pg_restore` into local `quantdb` (default: latest dump) |
-| `./scripts/dbctl.sh reset` | Drop/recreate local `quantdb` + `quant_admin` user |
-| `./scripts/dbctl.sh bootstrap-roles` | Create local `quant_app` role + schema grants |
+| `./scripts/dbctl.sh dump` | `pg_dump` Aurora via tunnel → `db/dumps/quantdb_YYYYMMDD_HHMMSS.dump`. Needs the prod tunnel |
+| `./scripts/dbctl.sh restore [file]` | `pg_restore` into local `quantdb` (default: latest dump). Stops the dev stack first, then prints `bootstrap-roles` |
+| `./scripts/dbctl.sh reset` | Drop/recreate local `quantdb` + `quant_admin`. Stops the dev stack first |
+| `./scripts/dbctl.sh bootstrap-roles` | Create local `quant_app` role + schema grants, then prints `DB_TARGET=local ./scripts/liquibase-deploy.sh` |
 | `./scripts/dbctl.sh status` | Local cluster, schema table counts, latest dump path |
 | `./scripts/dbctl.sh psql` | Open `psql` on local `quantdb` |
 
@@ -157,10 +146,10 @@ Restore a **specific** file:
 
 Restore **destroys and recreates objects** in local `quantdb` (`pg_restore --clean --if-exists`). It does **not** drop the database itself — run `reset` first if you want an empty database.
 
-After restore:
+After restore, in this order:
 
-1. **`bootstrap-roles`** — cluster roles are not included in dumps; local apps using `quant_app` need this step.
-2. Optional: `DB_TARGET=local ./scripts/liquibase-deploy.sh` if you need SP/DDL drift fixed after a old dump.
+1. **`bootstrap-roles`** — cluster roles are not included in dumps; local apps using `quant_app` need this step. The restore command prints it.
+2. **`DB_TARGET=local ./scripts/liquibase-deploy.sh`** — `bootstrap-roles` prints this next. It applies pending procedures and constraints from source.
 
 Verify:
 
@@ -225,7 +214,7 @@ pg_restore -h localhost -p 5432 -U quant_admin -d quantdb \
 
 ## Related
 
-- [Dev vs Prod — local Postgres](../architecture/dev-vs-prod.md#optional-point-dev-at-a-local-postgres)
+- [Getting Started](../getting-started.md) — setup and run modes
 - [Database architecture](../architecture/database.md)
 - [Environment variables — `DB_TARGET`](../env-vars.md)
 - [Login & user provisioning](../design/login.md)

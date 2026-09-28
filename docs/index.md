@@ -1,6 +1,6 @@
 # Quant Strategies
 
-Backtesting and trading framework for crypto and equity markets. Strategies are built around technical indicators (SMA, EMA, RSI, Bollinger Z-score, Stochastic Oscillator) and optimized via N-dimensional grid search over parameter space.
+Backtesting and trading framework for crypto and equity markets. Strategies are built around technical indicators (SMA, EMA, RSI, Bollinger Z-score, Stochastic Oscillator). Parameter search is exhaustive up to 10,000 trials (`OPTUNA_MAX_TRIALS` in `quant/strategy/optimizer.py`) and TPE after that.
 
 **Target:** strategies with Sharpe > 1.5 and strong Calmar ratios.
 

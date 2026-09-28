@@ -1,6 +1,6 @@
 # New User Guide: Run a Backtest
 
-This guide walks you through using the Quant Strategies website at [http://52.221.3.230/](http://52.221.3.230/).
+This guide walks you through using the Quant Strategies website at [https://algodaemon.com](https://algodaemon.com).
 
 ## Current Limitations
 
@@ -11,7 +11,7 @@ This guide walks you through using the Quant Strategies website at [http://52.22
 
 ## 1) Login
 
-1. Open [http://52.221.3.230/](http://52.221.3.230/).
+1. Open [https://algodaemon.com](https://algodaemon.com).
 2. Enter your **Username** and **Password**.
 3. Click **Sign in**.
 
