@@ -611,6 +611,63 @@ class TestCombinePositions:
         result = combine_positions([a, b, c], "AND", strengths=[sa, sb, sc])
         assert result[-1] == 0.0
 
+    def test_three_factor_one_flat_stays_flat_for_and_and_filter(self):
+        """Three factors, one flat: AND stays flat, and so does FILTER with 3+ factors."""
+        long = np.array([1.0])
+        flat = np.array([0.0])
+        strong = np.array([99.0])
+        weak = np.array([1.0])
+        mid = np.array([50.0])
+        and_plain = combine_positions([long, long, flat], "AND")
+        and_strength = combine_positions(
+            [long, long, flat], "AND", strengths=[strong, mid, weak],
+        )
+        filter_plain = combine_positions([long, long, flat], "FILTER")
+        filter_strength = combine_positions(
+            [long, long, flat], "FILTER", strengths=[mid, strong, weak],
+        )
+        np.testing.assert_array_equal(and_plain, [0.0])
+        np.testing.assert_array_equal(and_strength, [0.0])
+        np.testing.assert_array_equal(filter_plain, [0.0])
+        np.testing.assert_array_equal(filter_strength, [0.0])
+
+    def test_all_flat_and_missing_data_do_not_crash(self):
+        """All-flat stays 0. NaN, and None coerced to a number, stay missing."""
+        flat = np.zeros(3)
+        strengths = [np.full(3, 50.0), np.full(3, 80.0)]
+        all_flat = combine_positions([flat, flat], "AND", strengths=strengths)
+        np.testing.assert_array_equal(all_flat, [0.0, 0.0, 0.0])
+
+        with_nan = np.array([0.0, np.nan, 1.0])
+        other = np.array([0.0, 1.0, 1.0])
+        nan_result = combine_positions(
+            [with_nan, other], "AND", strengths=strengths,
+        )
+        assert nan_result[0] == 0.0
+        assert np.isnan(nan_result[1])
+        assert nan_result[2] == 1.0
+
+        # A numeric array turns None into NaN. That row is missing, not a position.
+        missing = np.array([None], dtype=float)
+        none_result = combine_positions(
+            [np.array([1.0]), missing],
+            "AND",
+            strengths=[np.array([99.0]), np.array([1.0])],
+        )
+        assert np.isnan(none_result[0])
+
+        filter_flat = combine_positions(
+            [np.ones(3), flat, flat], "FILTER",
+            strengths=[np.full(3, 50.0), *strengths],
+        )
+        np.testing.assert_array_equal(filter_flat, [0.0, 0.0, 0.0])
+        filter_nan = combine_positions(
+            [np.array([1.0]), np.array([np.nan]), np.array([1.0])],
+            "FILTER",
+            strengths=[np.array([50.0]), np.array([50.0]), np.array([99.0])],
+        )
+        assert np.isnan(filter_nan[0])
+
     def test_three_factors_strength_tiebreak(self):
         """Three factors disagree, the more extreme past reading wins."""
         a = np.zeros(10)

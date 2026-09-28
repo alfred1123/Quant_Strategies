@@ -21,7 +21,7 @@ Where [Backtest review (2026-09-25)](2026-09-25-backtest-review.md) (PR #58) or 
 
 ## Summary
 
-Twenty-one items, B1–B21. Six are high severity. Of those, B1 and B7 are fixed on `main`. B2's split label and B6's refusal of a new short sample are fixed; the walk-forward restart and the stored Best row are not. B3, B4, and B5 are open. B1 rewrote research conclusions: with the strengths the performance and optimize paths always pass, a long-only AND was an OR, and a FILTER of three or more factors had the same hole in its direction factors. The combiner now vetoes a flat factor. Stored AND results from before that fix still match OR until they are flagged.
+Twenty-one items, B1–B21. Six are high severity. Of those, B7 is fixed on `main`. B1 is fixed in this change and is on `main` only after it merges. B2's split label and B6's refusal of a new short sample are fixed; the walk-forward restart and the stored Best row are not. B3, B4, and B5 are open. B1 rewrote research conclusions: with the strengths the performance and optimize paths always pass, a long-only AND was an OR, and a FILTER of three or more factors had the same hole in its direction factors. The combiner now vetoes a flat factor. Stored AND results from before that fix still match OR until they are flagged.
 
 Two status calls differ from the dossier. B14's six `queue_pos: 1` responses match an idle worker claiming each job before the next enqueue; the ranking code on `main` does order two jobs that are still queued. B11's Best flag on a running VID 1 is the insert [Best-VID promotion](best-vid-promotion.md) already specifies; what is open is the label, as with B10.
 
