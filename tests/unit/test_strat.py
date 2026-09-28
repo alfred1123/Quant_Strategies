@@ -563,6 +563,42 @@ class TestCombinePositions:
         result = combine_positions([a, b], "AND", strengths=[sa, sb])
         np.testing.assert_array_equal(result, [0.0, 0.0, 0.0, 1.0])
 
+    def test_and_row_cases_with_and_without_strengths(self):
+        """AND: flat vetoes, unanimous agrees, pure +/- is flat unless strengths pick a side."""
+        a = np.zeros(10)
+        b = np.zeros(10)
+        # 4 {+1, 0}, 5 {-1, 0}, 6 {+1, -1}, 7 all +1, 8 all -1, 9 all 0
+        a[4], b[4] = 1.0, 0.0
+        a[5], b[5] = -1.0, 0.0
+        a[6], b[6] = 1.0, -1.0
+        a[7], b[7] = 1.0, 1.0
+        a[8], b[8] = -1.0, -1.0
+        sa = np.array([10, 20, 30, 40, 50, 50, 30, 50, 50, 50], dtype=float)
+        sb = np.array([10, 20, 30, 40, 50, 50, 99, 50, 50, 50], dtype=float)
+        without = combine_positions([a, b], "AND")
+        with_strength = combine_positions([a, b], "AND", strengths=[sa, sb])
+        np.testing.assert_array_equal(without[4:], [0.0, 0.0, 0.0, 1.0, -1.0, 0.0])
+        np.testing.assert_array_equal(with_strength[4:], [0.0, 0.0, -1.0, 1.0, -1.0, 0.0])
+
+    def test_filter_three_factor_row_cases_with_and_without_strengths(self):
+        """FILTER 3+: direction rows follow AND, with and without strengths."""
+        gate = np.ones(10)
+        sig_a = np.zeros(10)
+        sig_b = np.zeros(10)
+        sig_a[4], sig_b[4] = 1.0, 0.0
+        sig_a[5], sig_b[5] = -1.0, 0.0
+        sig_a[6], sig_b[6] = 1.0, -1.0
+        sig_a[7], sig_b[7] = 1.0, 1.0
+        sig_a[8], sig_b[8] = -1.0, -1.0
+        sa = np.array([10, 20, 30, 40, 50, 50, 30, 50, 50, 50], dtype=float)
+        sb = np.array([10, 20, 30, 40, 50, 50, 99, 50, 50, 50], dtype=float)
+        sg = np.full(10, 50.0)
+        without = combine_positions([gate, sig_a, sig_b], "FILTER")
+        with_strength = combine_positions(
+            [gate, sig_a, sig_b], "FILTER", strengths=[sg, sa, sb])
+        np.testing.assert_array_equal(without[4:], [0.0, 0.0, 0.0, 1.0, -1.0, 0.0])
+        np.testing.assert_array_equal(with_strength[4:], [0.0, 0.0, -1.0, 1.0, -1.0, 0.0])
+
     def test_and_flat_vetoes_when_others_oppose(self):
         """A flat factor vetoes even when the other factors have opposite signs."""
         a = np.zeros(10)
