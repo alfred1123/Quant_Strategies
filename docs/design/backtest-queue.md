@@ -285,6 +285,7 @@ Used by `coordinator/src/queue/repo.ts — queryTerminal()` / `claimNext()` and 
 | Worker — exception | Terminal | `FAILED` (5) |
 | Worker loop — observed cancel | Terminal | `CANCELLED` (6) |
 | Worker loop — boot recovery | Terminal | `FAILED` (5) |
+| Worker loop — child exit ≠ 0, row still `RUNNING` | Terminal | `FAILED` (5) with `ERROR_TEXT="worker crashed exit=N"` |
 | Worker loop — exceeded `JOB_TIMEOUT_S` (600s) | Terminal | `FAILED` (5) with `ERROR_TEXT="job exceeded 600s timeout"` |
 
 !!! warning "`CANCEL_REQUESTED` is observed by the **loop**, not the worker"

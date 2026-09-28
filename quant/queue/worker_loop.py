@@ -11,7 +11,8 @@ Lifecycle:
     1. Boot: mark every active ``RUNNING`` row as ``FAILED`` (orphan recovery).
        Single-replica assumption — see ``recover_stale`` docstring.
     2. Loop:
-         - Reap finished children (non-blocking).
+         - Reap finished children (non-blocking). A non-zero exit marks
+           the row ``FAILED`` while it is still ``RUNNING``.
          - While ``len(active) < max_concurrent``:
              - ``claim_next()`` — if Some(job), spawn worker subprocess.
              - else break.
@@ -190,6 +191,12 @@ class WorkerLoop:
     # ── per-tick steps ───────────────────────────────────────────────────
 
     def _reap_children(self) -> None:
+        """Drop finished children. A non-zero exit marks a still-RUNNING row FAILED.
+
+        Exit 0 means the worker wrote its own terminal row. Re-read before
+        writing: a crash after that write must not replace COMPLETED, FAILED,
+        or CANCELLED.
+        """
         finished = [
             qid for qid, (proc, _start, _row) in self._active.items()
             if proc.poll() is not None
@@ -197,6 +204,19 @@ class WorkerLoop:
         for qid in finished:
             proc, _start, _row = self._active.pop(qid)
             logger.info("worker %s exited with code %s", qid, proc.returncode)
+            if not proc.returncode:
+                continue
+            latest = self._repo.get_active(qid)
+            running_id = self._refdata.resolve_queue_status_id("RUNNING")
+            if latest is None or int(latest["queue_status_id"]) != running_id:
+                continue
+            failed_id = self._refdata.resolve_queue_status_id("FAILED")
+            self._repo.mark_terminal(
+                latest, failed_id, f"worker crashed exit={proc.returncode}",
+            )
+            logger.warning(
+                "worker %s crashed exit=%s -> FAILED", qid, proc.returncode,
+            )
 
     def _enforce_timeouts(self) -> None:
         """Kill workers exceeding JOB_TIMEOUT_S; flip their row to FAILED.

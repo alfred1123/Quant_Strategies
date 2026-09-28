@@ -216,6 +216,64 @@ class TestTick:
         repo.claim_next.assert_not_called()
 
 
+# ── _reap_children ──────────────────────────────────────────────────────
+
+
+class TestReapChildren:
+    """A child that dies on its own used to leave the row RUNNING.
+
+    The slot was freed, but the row stayed RUNNING until the loop process
+    restarted, and that restart failed every RUNNING row — including a sibling
+    that was still healthy. Timeout and cancel already write the terminal row
+    themselves; this is the path where the child exits and the loop does not.
+    """
+
+    def test_nonzero_exit_fails_only_the_job_still_running(self):
+        crashed = _row()
+        crashed["queue_status_id"] = 2  # RUNNING
+        crashed_qid = uuid.UUID(str(crashed["queue_id"]))
+        live_qid = uuid.uuid4()
+        repo = MagicMock()
+        repo.get_active.return_value = crashed
+        loop = _make_loop(repo=repo, max_concurrent=2)
+        loop._active[crashed_qid] = _track(FakeProc(returncode=1), crashed)
+        loop._active[live_qid] = _track(FakeProc(returncode=None))
+
+        loop._reap_children()
+
+        assert crashed_qid not in loop._active
+        assert live_qid in loop._active
+        repo.mark_terminal.assert_called_once_with(crashed, 4, "worker crashed exit=1")
+
+    def test_zero_exit_does_not_write_a_row(self):
+        """Exit 0 means the worker already wrote COMPLETED or FAILED."""
+        qid = uuid.uuid4()
+        repo = MagicMock()
+        loop = _make_loop(repo=repo)
+        loop._active[qid] = _track(FakeProc(returncode=0))
+
+        loop._reap_children()
+
+        assert qid not in loop._active
+        repo.get_active.assert_not_called()
+        repo.mark_terminal.assert_not_called()
+
+    def test_nonzero_exit_keeps_a_row_that_already_left_running(self):
+        """A crash after the worker committed COMPLETED must not overwrite it."""
+        claimed = _row()
+        qid = uuid.UUID(str(claimed["queue_id"]))
+        completed = {**claimed, "queue_status_id": 3}
+        repo = MagicMock()
+        repo.get_active.return_value = completed
+        loop = _make_loop(repo=repo)
+        loop._active[qid] = _track(FakeProc(returncode=1), claimed)
+
+        loop._reap_children()
+
+        assert qid not in loop._active
+        repo.mark_terminal.assert_not_called()
+
+
 # ── _enforce_timeouts ───────────────────────────────────────────────────
 
 
