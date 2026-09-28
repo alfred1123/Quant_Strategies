@@ -25,8 +25,15 @@ Confirm each rule and add a one-line note (for example, which class owns the cha
   Note:
 - [ ] **4. Thorough testing.** The evidence below is filled in.
   Note:
+- [ ] **5. How did this happen?** The section below names where the wrong behaviour starts. If this PR removes or hides bad output, it explains why that output cannot be stopped at the source.
+  Note:
 - [ ] **5. Long-term fix.** The change fixes the root cause in the owning class. The long-term check below is filled in.
   Note:
+
+## How did this happen? (root cause)
+
+- Where the wrong behaviour starts: <!-- The point that produces it, not where it shows up. -->
+- If this PR removes or hides bad output (dropping duplicate rows after the fact, filtering bad values, or catching and ignoring an error), why that output cannot be stopped at its source: <!-- If it cannot, this is a design item under docs/design/, not a quick fix. -->
 
 ## Long-term check
 
