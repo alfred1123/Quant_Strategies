@@ -16,6 +16,7 @@ from quant.trade.models.order import (
     OrderResult,
     OrderSide,
 )
+from quant.trade.order_policy import OrderRetryResult
 
 
 def _deployment(**overrides) -> DeploymentRow:
@@ -129,6 +130,30 @@ class TestLiveApplyOrchestrator:
         adapter.apply_signal.assert_not_called()
         orch._repo.sp_ins_execution_event.assert_called_once()
         orch._notifier.send.assert_not_called()
+
+    def test_report_omitted_message_when_no_order_does_not_crash(self, orchestrator):
+        """``_report`` must not read ``result.message`` when no order was placed.
+
+        ``run`` always passes ``message=`` on this path. A caller that does not
+        would raise ``AttributeError`` before the guard.
+        """
+        orch, _bt = orchestrator
+        outcome = OrderRetryResult(
+            action=IntendedAction.HOLD,
+            position_qty=0.01,
+            result=None,
+            attempts=(),
+            max_attempts=5,
+            permanent_failure=False,
+        )
+
+        report = orch._report(
+            _deployment(), outcome, "BTCUSDT", 0.0, bar_source="provider",
+        )
+
+        assert report.order_success is None
+        assert report.message == outcome.no_order_message
+        assert report.reject_reason is None
 
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_buy_success(self, mock_signal, orchestrator):

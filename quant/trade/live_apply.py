@@ -202,7 +202,9 @@ class LiveApplyOrchestrator:
             filled_qty=result.filled_qty if result else None,
             avg_price=result.avg_price if result else None,
             fee=result.fee if result else None,
-            message=message if message is not None else result.message,
+            message=message if message is not None else (
+                result.message if result else outcome.no_order_message
+            ),
             reject_reason=result.reason if result else None,
         )
 
