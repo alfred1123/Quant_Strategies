@@ -21,7 +21,7 @@ Where [Backtest review (2026-09-25)](2026-09-25-backtest-review.md) (PR #58) or 
 
 ## Summary
 
-Twenty-one items, B1–B21. Six are high severity. Of those, B7 is fixed on `main`. B2's split label and B6's refusal of a new short sample are fixed; the walk-forward restart and the stored Best row are not. B1, B3, B4, and B5 are open. B1 is the one that rewrites research conclusions: with the strengths the performance and optimize paths always pass, a long-only AND is an OR, and a FILTER of three or more factors has the same hole in its direction factors.
+Twenty-one items, B1–B21. Six are high severity. Of those, B1 and B7 are fixed on `main`. B2's split label and B6's refusal of a new short sample are fixed; the walk-forward restart and the stored Best row are not. B3, B4, and B5 are open. B1 rewrote research conclusions: with the strengths the performance and optimize paths always pass, a long-only AND was an OR, and a FILTER of three or more factors had the same hole in its direction factors. The combiner now vetoes a flat factor. Stored AND results from before that fix still match OR until they are flagged.
 
 Two status calls differ from the dossier. B14's six `queue_pos: 1` responses match an idle worker claiming each job before the next enqueue; the ranking code on `main` does order two jobs that are still queued. B11's Best flag on a running VID 1 is the insert [Best-VID promotion](best-vid-promotion.md) already specifies; what is open is the label, as with B10.
 
@@ -29,7 +29,7 @@ Two status calls differ from the dossier. B14's six `queue_pos: 1` responses mat
 
 | B# | Title | Severity | Status | Verified |
 |---|---|---|---|---|
-| [B1](#b1-two-factor-and-behaves-like-or-for-long-only-factors) | Two-factor AND behaves like OR for long-only factors; FILTER with 3+ factors has the same flaw | High | Open | Ran |
+| [B1](#b1-two-factor-and-behaves-like-or-for-long-only-factors) | Two-factor AND behaves like OR for long-only factors; FILTER with 3+ factors has the same flaw | High | Fixed. A flat factor vetoes. Stored AND results still match OR until flagged | Ran |
 | [B2](#b2-walk-forward-oos-restarts-the-indicator) | Walk-forward OOS restarts the indicator; the split date was reported one warmup late | High | Label fixed on main. OOS restart open. Covered by PR #58 items 1 and 7 | Ran (restart). Git (label) |
 | [B3](#b3-stochastic-in-a-multi-factor-run-fails-on-high) | Stochastic in any multi-factor run fails with HTTP 400 `'High'` | High | Open | Ran |
 | [B4](#b4-cross-coin-stochastic-uses-the-traded-coins-hlc) | Cross-coin stochastic uses the traded coin's own High/Low/Close | High | Open. Same root noted in PR #58 item 2 | Ran |
@@ -53,9 +53,9 @@ Two status calls differ from the dossier. B14's six `queue_pos: 1` responses mat
 
 ## B1. Two-factor AND behaves like OR for long-only factors
 
-**Status:** open. **Severity:** high. **Effort:** small.
+**Status:** fixed. **Severity:** high. **Effort:** small.
 
-Not in PR #58 or #59. `f9cb8468e` changed only how `_conviction` ranks bars. The disagree mask is unchanged.
+Not in PR #58 or #59. `f9cb8468e` changed only how `_conviction` ranks bars. The disagree mask was unchanged until this fix.
 
 **Repro (dossier).** `POST /api/v1/backtest/performance` on ETH (`ethusdt.crypto`), daily, 2021-07-01 to 2026-09-23, `fee_bps` 10, Bybit. Factor 1: BTC `get_bollinger_band` / `momentum_long`, window 85, signal 1.0. Factor 2: ETH `get_rsi` / `momentum_long`, window 14, signal 55. Repeated for AND, OR, and FILTER. Files: `round2/raw/performance_conjtest_{AND,OR,FILTER}_ETH_FULL_f10_*.json`.
 
@@ -72,16 +72,16 @@ Not in PR #58 or #59. `f9cb8468e` changed only how `_conviction` ranks bars. The
 
 FILTER with three factors, same series: on 15 bars the gate was on and exactly one of the two direction factors was long, the combined position was long on all 15. Two-factor FILTER does not do this. The drawer still stops at two factors (`frontend/src/components/ConfigDrawer.tsx` line 193), so three factors are reached through the API. `684e289e7` turned Add Factor back on and left that cap in place.
 
-**Cause.** Confirmed in `quant/strategy/signals.py`.
+**Cause.** Confirmed in `quant/strategy/signals.py`, before the fix. Line numbers are from the review snapshot.
 
 - `_combine_and` (lines 154–166) treats any row that is not unanimous and has some signal as a disagreement. `{+1, 0}` qualifies.
 - `_strongest_sign` (lines 122–128) masks flat factors to −inf and returns the sign of the only non-flat factor, so the row becomes +1.
 - `_combine_filter` (lines 136–150) returns the second factor when there are exactly two. With three or more, lines 139–149 apply the same mask to the direction factors.
 - `Performance._compute_multi_factor_outputs` (`quant/strategy/performance.py` lines 226–229) and `MultiFactorObjective.__call__` (`quant/strategy/objective.py` lines 163–165) always pass strengths.
 
-`tests/unit/test_strat.py` `test_and_strength_ignores_flat_factors` (lines 545–555) asserts this outcome. The public text on `combine_positions` (lines 191–194) still says AND is a position only when all factors agree. The test and that sentence disagree. A fix has to change the test.
+`tests/unit/test_strat.py` `test_and_strength_ignores_flat_factors` asserted this outcome. The public text on `combine_positions` says AND is a position only when all factors agree. The test and that sentence disagreed, and the test now expects the flat veto.
 
-**Fix direction.** Treat a row as a conflict only when both +1 and −1 are present. A flat factor stays a veto for AND, and for a FILTER with three or more factors a flat direction factor stays flat. `{+1, −1}` can still go to the stronger reading. Recompute stored AND results that used long-only factors; they are OR results.
+**Fix.** A strength conflict is a row where both +1 and −1 are present and no factor is flat. `{+1, 0}` stays flat, so a flat factor vetoes, including when the other factors have opposite signs. FILTER direction factors use the same rule once there are three or more factors. `{+1, −1}` with no flat factor still takes the stronger reading. Stored AND results from before this fix, and any auto-promotion that used them, still reflect the old combiner. Those results will be flagged, not re-run. Flagging is separate follow-up work.
 
 ## B2. Walk-forward OOS restarts the indicator
 
@@ -372,7 +372,7 @@ Not in PR #58 or #59. Seen once.
 
 ## Recommended fix order
 
-1. **B1.** Every stored long-only AND is an OR, and the unit test currently locks that in. Small change, then recompute the affected results.
+1. **B1.** Fixed in the combiner. Every stored long-only AND from before the fix is an OR. Flag those results; do not re-run them. Flagging is separate follow-up work.
 2. **B3 and B4 together.** Multi-factor stochastic errors; cross-coin stochastic returns the traded coin's oscillator with no error. One indicator-frame change covers both. Small to medium.
 3. **B2, the restart.** The label is already fixed. Hold-out metrics, the overfitting ratio, and the decision #83 gate all drop about one window of the out-of-sample bars. Medium.
 4. **B5.** Write the comparison rule down before changing promotion. Large as a decision, then medium to implement. The hold-out gate does not make two date ranges comparable.

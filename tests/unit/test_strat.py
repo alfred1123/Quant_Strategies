@@ -543,7 +543,7 @@ class TestCombinePositions:
         assert result[-1] == 1.0
 
     def test_and_strength_ignores_flat_factors(self):
-        """Flat (0) factors don't compete in strength tiebreak."""
+        """A flat factor vetoes AND. It is not dropped so the other sign can win."""
         a = np.zeros(10)
         b = np.zeros(10)
         a[-2] = 1.0
@@ -551,8 +551,29 @@ class TestCombinePositions:
         sa = np.full(10, 50.0)
         sb = np.full(10, 50.0)
         result = combine_positions([a, b], "AND", strengths=[sa, sb])
-        assert result[-2] == 1.0
-        assert result[-1] == -1.0
+        assert result[-2] == 0.0
+        assert result[-1] == 0.0
+
+    def test_and_flat_factor_vetoes_with_strengths(self):
+        """AND + strengths: a {+1, 0} row stays flat. A flat factor vetoes."""
+        a = np.array([1.0, -1.0, 0.0, 1.0])
+        b = np.array([0.0, 0.0, -1.0, 1.0])
+        sa = np.array([99.0, 99.0, 1.0, 50.0])
+        sb = np.array([1.0, 1.0, 99.0, 50.0])
+        result = combine_positions([a, b], "AND", strengths=[sa, sb])
+        np.testing.assert_array_equal(result, [0.0, 0.0, 0.0, 1.0])
+
+    def test_and_flat_vetoes_when_others_oppose(self):
+        """A flat factor vetoes even when the other factors have opposite signs."""
+        a = np.zeros(10)
+        b = np.zeros(10)
+        c = np.zeros(10)
+        a[-1], b[-1], c[-1] = 1.0, -1.0, 0.0
+        sa = np.array([10, 20, 30, 40, 50, 60, 70, 80, 50, 99], dtype=float)
+        sb = np.array([10, 20, 30, 40, 50, 60, 70, 80, 50, 50], dtype=float)
+        sc = np.full(10, 50.0)
+        result = combine_positions([a, b, c], "AND", strengths=[sa, sb, sc])
+        assert result[-1] == 0.0
 
     def test_three_factors_strength_tiebreak(self):
         """Three factors disagree, the more extreme past reading wins."""
@@ -620,6 +641,30 @@ class TestCombinePositions:
         # Row 2: gate on, both -1 → -1
         # Row 3: gate off → 0
         np.testing.assert_array_equal(result, [1.0, 0.0, -1.0, 0.0])
+
+    def test_filter_three_factors_flat_direction_vetoes(self):
+        """FILTER 3+ with strengths: a flat direction factor vetoes; +/- still uses strength."""
+        gate = np.ones(10)
+        sig_a = np.zeros(10)
+        sig_b = np.zeros(10)
+        # -4: gate on, direction {+1, 0} → flat veto
+        # -3: gate on, direction {+1, -1}, b more extreme → -1
+        # -2: gate on, both direction factors +1 → +1
+        # -1: gate off, both +1 → flat
+        sig_a[-4], sig_b[-4] = 1.0, 0.0
+        sig_a[-3], sig_b[-3] = 1.0, -1.0
+        sig_a[-2], sig_b[-2] = 1.0, 1.0
+        sig_a[-1], sig_b[-1] = 1.0, 1.0
+        gate[-1] = 0.0
+        sa = np.array([10, 20, 30, 40, 50, 60, 50, 50, 50, 50], dtype=float)
+        sb = np.array([10, 20, 30, 40, 50, 60, 50, 99, 50, 50], dtype=float)
+        sg = np.full(10, 50.0)
+        result = combine_positions(
+            [gate, sig_a, sig_b], "FILTER", strengths=[sg, sa, sb])
+        assert result[-4] == 0.0
+        assert result[-3] == -1.0
+        assert result[-2] == 1.0
+        assert result[-1] == 0.0
 
     def test_filter_nan_propagation(self):
         """FILTER: NaN in gate or signal → NaN in output."""

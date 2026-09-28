@@ -130,7 +130,7 @@ def _strongest_sign(signs: np.ndarray, conviction: np.ndarray,
 
 def _combine_filter(stacked: np.ndarray, signs: np.ndarray,
                     nan_mask: np.ndarray, strengths: list | None) -> np.ndarray:
-    """FILTER: first factor gates on/off; remaining factors give direction."""
+    """FILTER: first factor gates on/off; remaining factors are AND-combined."""
     gate = signs[:, 0] != 0  # True when gate is active
 
     if signs.shape[1] == 2:
@@ -142,8 +142,10 @@ def _combine_filter(stacked: np.ndarray, signs: np.ndarray,
     direction = np.where(all_pos, 1.0, np.where(all_neg, -1.0, 0.0))
 
     if strengths is not None:
-        has_signal = (sig_signs != 0).any(axis=1)
-        disagree = ~all_pos & ~all_neg & has_signal & ~nan_mask
+        disagree = ((sig_signs == 1).any(axis=1)
+                    & (sig_signs == -1).any(axis=1)
+                    & ~(sig_signs == 0).any(axis=1)
+                    & ~nan_mask)
         if disagree.any():
             direction[disagree] = _strongest_sign(
                 sig_signs, _conviction(strengths[1:]), disagree)
@@ -153,14 +155,18 @@ def _combine_filter(stacked: np.ndarray, signs: np.ndarray,
 
 def _combine_and(signs: np.ndarray, nan_mask: np.ndarray,
                  conviction: np.ndarray | None) -> np.ndarray:
-    """AND: position only when all factors agree; conviction breaks conflicts."""
+    """AND: non-zero only when every factor agrees. A flat factor vetoes.
+
+    Conviction resolves a row only when every factor is non-zero and both
+    +1 and -1 are present.
+    """
     all_positive = (signs == 1).all(axis=1)
     all_negative = (signs == -1).all(axis=1)
     combined = np.where(all_positive, 1.0, np.where(all_negative, -1.0, 0.0))
 
     if conviction is not None:
-        has_signal = (signs != 0).any(axis=1)
-        disagree = ~all_positive & ~all_negative & has_signal & ~nan_mask
+        disagree = ((signs == 1).any(axis=1) & (signs == -1).any(axis=1)
+                    & ~(signs == 0).any(axis=1) & ~nan_mask)
         if disagree.any():
             combined[disagree] = _strongest_sign(signs, conviction, disagree)
     return combined
@@ -188,14 +194,17 @@ def combine_positions(positions: list, conjunction: str = "AND",
 
     Args:
         positions: list of numpy arrays, each containing {-1, 0, 1, NaN}.
-        conjunction: "AND"    — position only when ALL agree;
+        conjunction: "AND"    — position only when ALL agree (a flat factor vetoes);
                      "OR"     — position when ANY factor signals;
                      "FILTER" — first factor gates on/off (non-zero = pass),
-                                remaining factors provide direction (AND-combined).
+                                remaining factors provide direction (AND-combined;
+                                with 3+ factors a flat direction factor vetoes).
         strengths: optional list of numpy arrays with raw indicator values.
-            When provided, conflicts are resolved by signal strength
-            (the factor with the most extreme reading wins) instead of
-            going flat (AND) or defaulting to long (OR).
+            When provided, a conflict is resolved by signal strength (the
+            factor with the most extreme reading wins) instead of going flat
+            (AND) or defaulting to long (OR). For AND, and for FILTER
+            direction factors, a conflict is a row where both +1 and -1 are
+            present and no factor is flat. A flat factor is not a conflict.
 
     Returns:
         numpy array of {-1.0, 0.0, 1.0}, NaN where any input is NaN.

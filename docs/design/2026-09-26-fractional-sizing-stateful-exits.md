@@ -84,15 +84,17 @@ Gross of costs, their Table 1 Combo on BTC is CAGR 30%, vol 17%, Sharpe 1.58, So
 
 **Read.** `Performance._compute_multi_factor_outputs` and `MultiFactorObjective.__call__` both call `combine_positions(..., strengths=indicator_values)`. The strengths are the raw indicator readings. With strengths, a bar where the factors disagree takes the sign of the most convicted non-flat factor (`_combine_and`, `_strongest_sign`). Conviction is a past-only percentile rank (`_conviction`).
 
-**Checked.** `test_and_one_flat_gives_flat` calls `combine_positions` without strengths: a long beside a flat stays flat. `test_and_strength_ignores_flat_factors` calls it with strengths: the flat factor drops out and the remaining sign wins, so one long and one flat become long. The backtest and the search always pass strengths, so they take the second test.
+**Checked, as the code stood.** `test_and_one_flat_gives_flat` calls `combine_positions` without strengths: a long beside a flat stays flat. `test_and_strength_ignores_flat_factors` used to call it with strengths and expect the flat factor to drop out so the remaining sign won. The backtest and the search always pass strengths, so they took that second result. The test now expects the flat veto.
 
 #### The long-only AND path
 
-**Read and inferred from the two tests.** A long-only factor is in {0, +1}. On a bar where one factor is +1 and the other is 0, `_combine_and` does not see unanimous +1, does see a non-zero factor, and with strengths writes +1. `test_or_any_long` writes +1 for the same inputs under OR. Two long-only factors combined with AND, on the path the engine actually runs, match OR.
+**Update.** The reading below is the bug. `combine_positions` now keeps a flat factor as a veto, including when strengths are passed, and `test_and_strength_ignores_flat_factors` asserts that veto. A long-only AND no longer matches OR. Stored AND results from before the fix still match OR until they are flagged.
+
+**Read and inferred from the two tests, as the code stood.** A long-only factor is in {0, +1}. On a bar where one factor is +1 and the other is 0, `_combine_and` did not see unanimous +1, did see a non-zero factor, and with strengths wrote +1. `test_or_any_long` writes +1 for the same inputs under OR. Two long-only factors combined with AND, on the path the engine ran, matched OR.
 
 **Checked.** FILTER with two factors returns the second factor when the first is non-zero, and 0 when the first is 0 (`_combine_filter`, `test_filter_gate_active_uses_signal_direction`). Two long-only factors are then +1 only when the gate is +1 and the signal is +1. That is the AND a long-only pair needs.
 
-The [indicators guide](../guides/indicators-strategies.md#conjunction-modes-multi-factor) describes AND as "only when all factors agree," which is the no-strengths path. This proposal does not change AND. An averaged ensemble has to be a new combiner. Building it on top of AND would average the wrong series for long-only factors, because AND has already turned "one of them is long" into "the book is long."
+The [indicators guide](../guides/indicators-strategies.md#conjunction-modes-multi-factor) describes AND as "only when all factors agree." This proposal does not change AND. An averaged ensemble has to be a new combiner. Building it on top of the old AND would have averaged the wrong series for long-only factors, because that AND had already turned "one of them is long" into "the book is long."
 
 ### Walk-forward
 
