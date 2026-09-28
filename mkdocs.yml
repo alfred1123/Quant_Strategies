@@ -142,6 +142,8 @@ nav:
       - Which candidates to merge vs run as separate sleeves: research/merge-vs-distinct-candidates.md
       - Japanese and Korean crypto strategy sources: research/japanese-korean-sources.md
       - Strategies worth new platform features: research/feature-worthy-strategies.md
+      - Strategy persistence validation: research/strategy-persistence-validation.md
+      - Research workflow: research/workflow.md
   - Archive:
       - Overview: archive/README.md
       - Trade Deployment Rollout: archive/trade-deployment-rollout.md
