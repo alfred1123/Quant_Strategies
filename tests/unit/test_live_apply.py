@@ -131,12 +131,8 @@ class TestLiveApplyOrchestrator:
         orch._repo.sp_ins_execution_event.assert_called_once()
         orch._notifier.send.assert_not_called()
 
-    def test_report_omitted_message_when_no_order_does_not_crash(self, orchestrator):
-        """``_report`` must not read ``result.message`` when no order was placed.
-
-        ``run`` always passes ``message=`` on this path. A caller that does not
-        would raise ``AttributeError`` before the guard.
-        """
+    def test_report_without_an_order_uses_the_outcome_message(self, orchestrator):
+        """No order result: the report message is the outcome's, not ``result.message``."""
         orch, _bt = orchestrator
         outcome = OrderRetryResult(
             action=IntendedAction.HOLD,
