@@ -282,6 +282,40 @@ class TestRun:
         assert len(result.grid_df) == 1
 
 
+class TestBuildResult:
+    def test_top10_keeps_one_row_per_parameter_cell(self):
+        """Repeated trials of one cell must not fill the top 10."""
+        best = {"window": 55, "signal": 2.25, "sharpe": 1.40}
+        rows = [dict(best) for _ in range(12)]
+        rows.append({"window": 55, "signal": 2.25, "sharpe": 1.10})
+        for i in range(9):
+            rows.append({"window": 10 + i, "signal": 0.5, "sharpe": 1.0 - i * 0.05})
+        rows.append({"window": 10, "signal": 0.5, "sharpe": 1.0})
+
+        result = ParametersOptimization._build_result(pd.DataFrame(rows), study=None)
+
+        keys = [(r["window"], r["signal"]) for r in result.top10]
+        assert keys[0] == (55, 2.25)
+        assert result.top10[0]["sharpe"] == 1.40
+        assert result.best == result.top10[0]
+        assert len(result.top10) == 10
+        assert len(set(keys)) == 10
+        assert len(result.grid) == len(rows)
+        assert result.n_valid == len(rows)
+
+    def test_top10_dedupes_multi_factor_cells(self):
+        cell = {"window_0": 55, "signal_0": 2.25, "window_1": 65, "signal_1": 1.25, "sharpe": 1.40}
+        rows = [dict(cell) for _ in range(10)]
+        rows.append({**cell, "window_1": 100, "signal_1": 0.25, "sharpe": 0.90})
+
+        result = ParametersOptimization._build_result(pd.DataFrame(rows), study=None)
+
+        assert len(result.top10) == 2
+        assert result.top10[0]["sharpe"] == 1.40
+        assert result.top10[1]["window_1"] == 100
+        assert len(result.grid) == 11
+
+
 class TestSearchSelection:
     def test_covers_space_is_exhaustive(self):
         search, n = ParametersOptimization._select_search(12, 12)

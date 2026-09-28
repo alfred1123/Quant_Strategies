@@ -21,7 +21,7 @@ How each item was checked:
 Seven items. All seven are real. Two of the round 3–4 items are smaller than first reported.
 
 - **SMA and EMA are raw price levels** (item 1). Compared with a threshold of 0 to 0.10, they are always long or never long. "Price above its EMA" cannot be built. Open.
-- **Grids over 10,000 cells are sampled** (item 2). The search switches to Optuna TPE with seed 42 and runs 10,000 trials. The config drawer does show "capped from N combos" before the run. Nothing on the result or the stored job says the grid was sampled, and the sampler repeats cells. Open.
+- **Grids over 10,000 cells are sampled** (item 2). The search switches to Optuna TPE with seed 42 and runs 10,000 trials. The config drawer does show "capped from N combos" before the run. Nothing on the result or the stored job says the grid was sampled, and the sampler repeats cells. The repeated `top10` is fixed. Labelling the sample is still open.
 - **Window ranges have no lower bound** (item 3). Window 0 passes validation. For SMA, Bollinger, RSI and stochastic it scores NaN and wastes trials. For EMA, window 0 fails the whole run. A negative window also fails the whole run. Open, low.
 - **A signal fills on the same close** (item 4). This is not lookahead. It is a modelling choice, and there is no option to delay the fill. Offline, some Best rules lose most of their out-of-sample Sharpe with a one-day delay. Open, as a proposal.
 - **B24: duplicate jobs make duplicate versions** (item 5). The version is created at **enqueue**, not when the job completes. `SP_INS_STRATEGY` always adds a new `STRATEGY_VID` for the name and never compares `CONFIG_JSON`. Confirmed. Open.
@@ -33,7 +33,7 @@ Seven items. All seven are real. Two of the round 3–4 items are smaller than f
 | # | Dossier | Title | Severity | Status | Verified |
 |---|---|---|---|---|---|
 | [1](#1-sma-and-ema-compare-the-raw-average-with-the-threshold) | B22 | SMA and EMA compare the raw moving average with the threshold | Medium | Confirmed, open. Extends #64 [B16](2026-09-27-algodaemon-bug-report.md#b16-smaema-momentum-on-raw-price-is-buy-and-hold) | Ran + read |
-| [2](#2-big-grids-are-sampled-without-saying-so) | B23 | Grids over 10,000 cells are sampled by TPE; the result does not say so | Medium | Confirmed, open. A pre-run caption exists | Read + raw |
+| [2](#2-big-grids-are-sampled-without-saying-so) | B23 | Grids over 10,000 cells are sampled by TPE; the result does not say so | Medium | Confirmed. Repeated `top10` fixed. Labelling still open. A pre-run caption exists | Read + raw |
 | [3](#3-window-ranges-have-no-lower-bound) | B23 | `RangeParam` has no bounds; window 0 or below is accepted | Low | Confirmed, open | Ran + read + raw |
 | [4](#4-a-signal-is-filled-on-the-same-close) | Round 4 | Same-close fill, with no fill-delay option | Medium | Confirmed as a modelling limit, open. Proposal only | Read + offline |
 | [5](#5-b24-duplicate-jobs-create-separate-versions) | B24 | Duplicate jobs create separate strategy versions | Low | Confirmed, open | Read + raw |
@@ -92,7 +92,7 @@ The seeded range suggests a relative distance was intended. `db/liquidbase/refda
 
 ## 2. Big grids are sampled without saying so
 
-**Status:** confirmed, open. **Severity:** medium. The drawer caption stops it from being fully silent, but the result and the stored job say nothing. **Effort:** small for labelling, medium for a hard limit.
+**Status:** confirmed. Repeated `top10` rows are fixed. Labelling is still open. **Severity:** medium. The drawer caption stops it from being fully silent, but the result and the stored job say nothing. **Effort:** small for labelling, medium for a hard limit.
 
 **Repro (raw).** ETH jobs `63dac35d-dd23-4e25-bd62-3e558cec074a` (VID 3) and `666b8aa4-7c5d-4215-90d8-2abae293d7c1` (VID 4), strategy `1f84c585`. Both factors use `window_range` 0–160 step 5 (33 values) and `signal_range` 0–2.5 step 0.25 (11 values). That is 33 × 11 × 33 × 11 = 131,769 cells. The stored result has `total_trials` 10,000 and `valid` 9,346.
 
@@ -117,7 +117,9 @@ def _select_search(total, n_trials):                              # line 320
     return BayesianSearch(), n_trials
 ```
 
-`run_optimize` calls `opt.run(window_list, signal_list)` with no `n_trials` (`quant/strategy/backtest_service.py` line 565), so any grid over 10,000 cells goes to `BayesianSearch` (`TPESampler(seed=OPTUNA_SEED)`, line 251). The only record is the INFO log line from `BayesianSearch.log_start` (lines 234–245). `_build_result` (lines 340–353) sorts all trials by Sharpe and keeps duplicates.
+`run_optimize` calls `opt.run(window_list, signal_list)` with no `n_trials` (`quant/strategy/backtest_service.py` line 565), so any grid over 10,000 cells goes to `BayesianSearch` (`TPESampler(seed=OPTUNA_SEED)`, line 251). The only record is the INFO log line from `BayesianSearch.log_start` (lines 234–245). At `69bf240d8`, `_build_result` (lines 340–353) sorted all trials by Sharpe and kept duplicates.
+
+**top10 de-duplication (fixed).** `_build_result` still sorts by Sharpe, then keeps the first row of each parameter cell (the best Sharpe for that cell) before the top-10 cut. `grid` and `n_valid` still count every trial, including revisits. Labelling (`search`, `grid_size`, `distinct_trials`) is still not stored or shown.
 
 **What the user sees.**
 
@@ -303,7 +305,7 @@ Multi-factor always takes the lookup (`performance.py` line 219, `objective.py` 
 
 ## Recommended order
 
-1. **Item 2, labelling.** Store and show `search`, `grid_size` and `distinct_trials`, and de-duplicate `top10`. Small. Research conclusions currently read a sampled maximum as a grid maximum.
+1. **Item 2, labelling.** Store and show `search`, `grid_size` and `distinct_trials`. Small. `top10` de-duplication is done. Research conclusions currently read a sampled maximum as a grid maximum.
 2. **Item 1.** Add distance-from-average SMA and EMA. Small, and it unlocks the trend-filter family the research needs.
 3. **Item 5 and item 3 together.** Validate `config_json` at enqueue, add `CONFIG_HASH`, and add `RangeParam` bounds. All three sit in front of `sp_ins_strategy`. Small.
 4. **Item 4.** Decide whether `fill_delay_bars` belongs on the request and in the promotion checks. Medium.

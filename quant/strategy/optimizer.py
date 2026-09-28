@@ -35,7 +35,7 @@ class OptimizeResult:
 
     grid_df: pd.DataFrame  # Raw results — NaN preserved, for CSV/heatmap
     best: dict             # Best params by Sharpe (NaN → None)
-    top10: list            # Top 10 by Sharpe descending (NaN → None)
+    top10: list            # Top 10 distinct param cells by Sharpe (NaN → None)
     grid: list             # All rows (NaN → None)
     n_valid: int           # Trials with finite Sharpe
     study: object          # optuna.Study — for visualization
@@ -340,6 +340,9 @@ class ParametersOptimization:
     def _build_result(df: pd.DataFrame, study) -> "OptimizeResult":
         valid = int(df["sharpe"].notna().sum())
         sorted_df = df.dropna(subset=["sharpe"]).sort_values("sharpe", ascending=False)
+        # One row per parameter cell: TPE revisits the same cell.
+        param_cols = [c for c in sorted_df.columns if c != "sharpe"]
+        sorted_df = sorted_df.drop_duplicates(subset=param_cols, keep="first")
         top10 = sorted_df.head(10).replace({np.nan: None}).to_dict(orient="records")
         best = top10[0] if top10 else {}
         grid = df.replace({np.nan: None}).to_dict(orient="records")
