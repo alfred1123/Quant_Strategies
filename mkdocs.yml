@@ -129,6 +129,7 @@ nav:
       - AlgoDaemon bug report (2026-09-27): design/2026-09-27-algodaemon-bug-report.md
       - Bug verification, rounds 3–4 (2026-09-27): design/2026-09-27-bug-verification-round3-4.md
       - Long-term fixes — B1, window bounds, data columns, repeated trials (2026-09-29): design/2026-09-29-long-term-fixes-b1-rangeparam-datacolumn.md
+      - Dependency and OOP review (2026-09-29): design/2026-09-29-dependency-review.md
   - Strategy research:
       - Overview: research/README.md
       - Crypto spot — baseline improvements: research/crypto-spot-baseline-improvements.md
