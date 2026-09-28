@@ -11,7 +11,7 @@ Module import cycles inside `quant/` are still zero, including imports written i
 
 The classes the last review measured are the same size. `PriceBarService` is still **647** lines. `PromotionTab.tsx` grew from 775 lines to **800**. Radon reports no function above cyclomatic complexity **13**, and **11** blocks at rank C.
 
-Five of the seven live-trading failure paths Alfred named have no test at the seam that can send a second order or drop a fill. Broker rejection and the confirm-poll timeout are tested. A timeout on the submit call, an open partial fill, a stale position read, a failed transaction write after a fill, a duplicate submit on retry, and a tick that dies between two due rows are not.
+All seven of the live-trading failure paths Alfred named have no test at the order-sending seam. A broker reject is tested only above the gateway: `tests/` never has `CcxtTradeGateway` see `ccxt.InvalidOrder` or `ccxt.InsufficientFunds`. The other six are a timeout on the submit call, an open partial fill, a stale position read, a failed transaction write after a fill, a duplicate submit on retry, and a tick that dies between two due rows.
 
 The order of work below starts with tests and with deleting the second copy of promotion ranking, then breaks the `api`/`trade` cycle by moving credentials, and leaves gateway and repo splits until those tests exist.
 
