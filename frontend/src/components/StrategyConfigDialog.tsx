@@ -281,7 +281,8 @@ export default function StrategyConfigDialog({
                 variant="outlined"
                 sx={{
                   p: 1.5,
-                  bgcolor: 'grey.50',
+                  bgcolor: '#000',
+                  color: '#fff',
                   maxHeight: 300,
                   overflow: 'auto',
                 }}
@@ -291,6 +292,7 @@ export default function StrategyConfigDialog({
                   variant="caption"
                   sx={{
                     fontFamily: 'monospace',
+                    color: '#fff',
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word',
                     m: 0,
