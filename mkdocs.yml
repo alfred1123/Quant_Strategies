@@ -117,6 +117,7 @@ nav:
       - Login & Authentication: design/login.md
       - User Isolation: design/user-isolation.md
       - Jobs Table Detail UX: design/jobs-table-detail-ux.md
+      - Queue screen aids (2026-09-29): design/2026-09-29-queue-frontend-aids.md
       - Multi-Strategy Netting: design/multi-strategy-netting.md
       - Separate Underlying & Cache: design/separate-underlying.md
       - Alternative Data Sources: design/alt-data-sources.md
