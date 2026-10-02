@@ -18,29 +18,25 @@ Code rules for every code change: the fix lives in the owning class, no shims or
 
 In this order.
 
-### 1. Pull request 76, make a flat factor veto AND
-
-Still a draft. He already said it can merge once it is ready: do not pause live AND or FILTER strategies, at most two filter factors for daily use as a later database setting and not hard-coded in this pull request, no strategy priority or factor weights, and the long-versus-short tie-break stays as it is. Not ready until Check Bugs passes and CI is green on a branch that is not behind `main`. The comparison screen and the engine stamp stay out of this pull request.
-
-### 2. Pull request 86, spend the search budget on distinct parameter cells
+### 1. Pull request 86, spend the search budget on distinct parameter cells
 
 Still a draft. Check Bugs has not passed it. `CONFIG.BACKTEST_SEARCH` uses Liquibase context `config,prod-deploy`, so a merge queues the production migrate, and there is no code fallback if the row is missing. Do not add the cache-page split into this pull request.
 
-### 3. Pull request 87, narrower Glassnode store
+### 2. Pull request 87, narrower Glassnode store
 
 A draft on purpose. He still decides whether a stored point keeps only the latest value, or also the previous value once a real revision shows up. No revision has been observed. The narrower metric table is the recommendation and is not built. Do not purge `API_REQUEST`. Do not turn the offline harness into a live fetch in this pull request.
 
-### 4. After 86 merges
+### 3. After 86 merges
 
 Split [`docs/architecture/refdata-cache.md`](../architecture/refdata-cache.md) so the config cache is its own page. Docs only. The two caches are already separate in code.
 
-### 5. Later, not a bot fix
+### 4. Later, not a bot fix
 
-One golden result per strategy (the comparison screen), fractional position sizing, and stateful exits.
+One golden result per strategy (the comparison screen), fractional position sizing, stateful exits, flagging old stored AND results (and FILTER results with 3+ factors) whose numbers changed when #76 merged, and the later design for at most two filter factors for daily use (not hard-coded; more can be turned on later).
 
 ## Bots, now
 
-- **Quick Fix Bot.** Only a bug Check Bugs has verified, about 20 lines of real code, with tests. Alfred merges it. Do not edit 76, 86, or 87 while those drafts are the chosen fix.
-- **Check Bugs.** Pass or fail 76 and 86. 87 stays a draft until Alfred picks the revision rule.
+- **Quick Fix Bot.** Only a bug Check Bugs has verified, about 20 lines of real code, with tests. Alfred merges it. Do not edit 86 or 87 while those drafts are the chosen fix.
+- **Check Bugs.** Pass or fail 86. 87 stays a draft until Alfred picks the revision rule.
 - **Glassnode.** The offline harness and the sleeve note stay honest. Do not report a Sharpe. Do not build the metric table until the revision rule is chosen. Only point-in-time BTC exchange netflow covers 2021 to mid-2024. SOPR and MVRV z-score point-in-time start 27 Jun 2025. BNB is not on the netflow metric. The BNB stand-in, exchange net position change, has a point-in-time twin that starts 23 Jun 2025 and does not cover 2021 to 2024.
 - **Research, not code.** The first child is point-in-time BTC exchange netflow as factor one and BTC Bollinger 60/2.25 as factor two. The gate is any non-zero day. Nothing is scored until that series is a real column the engine reads.
