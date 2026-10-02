@@ -78,7 +78,7 @@ or link a design doc — do not turn the research page into a spec.
 | [Strategies worth new platform features](feature-worthy-strategies.md) | Ranked backend features for low-correlation strategies: perp carry, derived series, time stops, DVOL; offline checks |
 | [Strategy persistence validation](strategy-persistence-validation.md) | Rolling Sharpe, block bootstrap, PSR/DSR, walk-forward, regime split for the three finalists (offline) |
 | [Research workflow](workflow.md) | Roles, hand-off spec, test conventions and validation gates for the research bots |
-| [Risk control for the three crypto sleeves](risk-control.md) | Draft weights, drawdown tiers, and kill switch for ETH A2, BNB, and BTC; decisions pending Alfred |
+| [Risk control](risk-control.md) | What a run reads and records for the three-sleeve book. The application owns the rule |
 
 Before treating a Sharpe from these pages as a result, read the
 [backtest review (2026-09-25)](../design/2026-09-25-backtest-review.md) and the

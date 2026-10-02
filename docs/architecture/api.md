@@ -63,6 +63,8 @@ All endpoints below are mounted under the `/api/v1` prefix.
 | `POST` | `/api/v1/backtest/jobs/strategies/{strategy_id}/promote` | Manual promote/demote a strategy VID. |
 | `POST` | `/api/v1/backtest/jobs/strategies/{strategy_id}/logical-delete` | Retire or restore a strategy (`LOGICAL_DELETE_IND`). Body: `{ "logical_delete_ind": "Y" or "N", "strategy_vid"?: number }`. Omit `strategy_vid` to flip the whole lineage. |
 
+`run_optimize` reads the risk rule in `quant/strategy/risk_rule.py` before the search and puts it on `OptimizeResponse.risk_rule`. The queue worker stores that payload. While the engine cannot size or combine sleeves, `applied` is false and `metrics_are` is `unit_position`. A missing rule raises, the worker marks the job failed, and `BT.SP_INS_RESULT` is not called. See [Risk control](../research/risk-control.md).
+
 ### Trade (Phase 1.2 — deployments)
 
 | Method | Path | Auth | Description |
