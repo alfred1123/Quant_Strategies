@@ -427,6 +427,105 @@ class TradeRepo(DbGateway):
             ),
         )
 
+    def validate_intent(
+        self,
+        *,
+        app_user_id: UUID,
+        deployment_id: UUID,
+        deployment_vid: int,
+        intent_id: UUID,
+        tm_interval_id: int,
+        bar_timestamp: datetime,
+        bar_source: str,
+        user_id: str,
+    ) -> None:
+        _require_all(
+            app_user_id=app_user_id, deployment_id=deployment_id,
+            deployment_vid=deployment_vid, intent_id=intent_id,
+            tm_interval_id=tm_interval_id, bar_timestamp=bar_timestamp,
+            bar_source=bar_source, user_id=user_id,
+        )
+        dep = self._fetch_deployment_version(deployment_id, deployment_vid)
+        if dep is None:
+            raise TradeValidationError("deployment not found", status_code=404)
+        if str(dep["app_user_id"]) != str(app_user_id):
+            raise TradeValidationError(
+                "deployment does not belong to user", status_code=403
+            )
+
+    def sp_ins_intent(
+        self,
+        *,
+        intent_id: UUID,
+        app_user_id: UUID,
+        deployment_id: UUID,
+        deployment_vid: int,
+        tm_interval_id: int,
+        bar_timestamp: datetime,
+        bar_source: str,
+        signal_value: float | Decimal,
+        target_qty: float | Decimal,
+        transact_at: datetime,
+        user_id: str,
+    ) -> None:
+        """Append the target this deployment asked for on one apply pass.
+
+        A failed write fails the apply. The order has not been sent yet.
+        """
+        self.validate_intent(
+            app_user_id=app_user_id,
+            deployment_id=deployment_id,
+            deployment_vid=deployment_vid,
+            intent_id=intent_id,
+            tm_interval_id=tm_interval_id,
+            bar_timestamp=bar_timestamp,
+            bar_source=bar_source,
+            user_id=user_id,
+        )
+        self._call_write(
+            "CALL trade.sp_ins_intent("
+            "%s::uuid, %s::uuid, %s::integer, %s::integer, %s::timestamptz,"
+            " %s::text, %s::numeric, %s::numeric, %s::timestamptz, %s::text,"
+            " NULL::text, NULL::text, NULL::text)",
+            (
+                str(intent_id),
+                str(deployment_id),
+                int(deployment_vid),
+                int(tm_interval_id),
+                bar_timestamp,
+                bar_source,
+                signal_value,
+                target_qty,
+                transact_at,
+                user_id,
+            ),
+        )
+
+    def sp_get_intent(
+        self,
+        *,
+        app_user_id: UUID,
+        deployment_id: UUID | None = None,
+        from_ts: datetime | None = None,
+        to_ts: datetime | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Target rows for one user, newest tick first."""
+        _require(app_user_id, "app_user_id")
+        clamped = max(1, min(int(limit), 200))
+        return self._call_get(
+            "CALL trade.sp_get_intent("
+            "%s::uuid, %s::uuid, %s::timestamptz, %s::timestamptz, %s::integer,"
+            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (
+                str(app_user_id),
+                str(deployment_id) if deployment_id else None,
+                from_ts,
+                to_ts,
+                clamped,
+            ),
+        )
+
     def sp_ins_deployment_schedule_status(
         self,
         *,
