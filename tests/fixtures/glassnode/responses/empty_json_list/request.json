@@ -1,0 +1,11 @@
+{
+  "metric_path": "market/price_usd_close",
+  "asset": "BTC",
+  "interval": "24h",
+  "since": 1577836800,
+  "until": 1579046400,
+  "captured_at": null,
+  "observed_status": false,
+  "observed_values": false,
+  "values": "not_observed_code_accepts_empty_list"
+}

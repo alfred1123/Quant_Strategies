@@ -1,0 +1,6 @@
+{
+  "client_paginates": false,
+  "observed_body_shape": "json_list",
+  "cursor": null,
+  "note": "Glassnode.get_historical_price issues one GET and reads the body. The 2026-10-03 BTC 24h bodies are JSON lists of {t, v} with no page cursor. No paginated body was captured."
+}

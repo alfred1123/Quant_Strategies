@@ -150,7 +150,7 @@ A one-standard-deviation increase in Twitter posts for "Bitcoin" "yields a 2.50 
 
 **Mechanism.** The authors treat Bitcoin as the store of value and Litecoin as the medium of exchange, following a remark by Charlie Lee, and measure that with unspent and spent outputs, weighted average lifespan, coin-days destroyed, and public transaction data. They then define trading strategies around a price-to-utility (PU) ratio: price relative to an on-chain activity measure, rather than relative to an average of past prices.
 
-**Data.** Chain data (UTXO, STXO, lifespan, coin-days destroyed) at a frequency the abstract does not pin down, plus price. This is the family of series Glassnode sells (SOPR, MVRV, spent output, and so on). The design note already defers the paid tier.
+**Data.** Chain data (UTXO, STXO, lifespan, coin-days destroyed) at a frequency the abstract does not pin down, plus price. This is the family of series Glassnode sells (SOPR, MVRV, spent output, and so on). The Professional plan has been active since 28 Sep 2026 18:00 HKT. The series is still not a factor column; storage is the open draft in [Glassnode market data](../design/glassnode-market-data.md).
 
 **Rough rules.** The abstract does not give an entry threshold. The shape, written as a hypothesis rather than as their code:
 
@@ -166,7 +166,7 @@ A concrete cousin that **is** standard in this literature, but was not given a p
 
 **Reported performance.** The abstract says the back-tests "display trading indicators for both Bitcoin and Litecoin" and support the store-of-value comparison. No return, drawdown, or Sharpe is stated.
 
-**Risks.** On-chain metrics are revised as the chain is re-indexed, and several vendors' "realized price" definitions differ. Entity-adjusted series (removing internal exchange shuffles) are a different signal from raw ones, and the adjustment is a vendor model. Daily publication lag can be a full bar. The Professional Glassnode tier was deferred as too expensive for the current stage. Overfitting a threshold on MVRV is as easy as overfitting a Bollinger width, with less history of independent replications that we were able to read.
+**Risks.** On-chain metrics are revised as the chain is re-indexed, and several vendors' "realized price" definitions differ. Entity-adjusted series (removing internal exchange shuffles) are a different signal from raw ones, and the adjustment is a vendor model. Daily publication lag can be a full bar. A Glassnode rewrite of an old timestamp has not been observed in this repo; the harness compares two saved copies of the same window and the corpus has only one. Overfitting a threshold on MVRV is as easy as overfitting a Bollinger width, with less history of independent replications that we were able to read.
 
 **Fit here.** Not until one series is in the cache as a factor column. The right experiment, if a series is ever licensed, is a FILTER gate on the existing baseline, not a new signal type. That matches rank 5 on the try-first list and should not jump ahead of the trend gate, which needs no vendor.
 

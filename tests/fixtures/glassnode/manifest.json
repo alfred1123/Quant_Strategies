@@ -1,0 +1,197 @@
+{
+  "description": "Offline Glassnode response contract. Synthetic fillers are not the 2026-10-03 series. Do not add a later/ directory.",
+  "window": {
+    "since": 1577836800,
+    "until": 1579046400,
+    "interval": "24h",
+    "asset_observed": "BTC"
+  },
+  "cases": [
+    {
+      "id": "price_usd_close_btc_24h",
+      "type": "response",
+      "path": "responses/price_usd_close_btc_24h",
+      "expect": {
+        "status": 200,
+        "content_type": "application/json",
+        "metric_path": "market/price_usd_close",
+        "asset": "BTC",
+        "interval": "24h",
+        "since": 1577836800,
+        "until": 1579046400,
+        "json_array": true,
+        "point_count": 14,
+        "first_t": 1577836800,
+        "last_t": 1578960000,
+        "step_seconds": 86400,
+        "fill_v": "0",
+        "rate_limit_limit": "600",
+        "values": "first_and_last_observed_middles_synthetic",
+        "first_v": "7199.66110087",
+        "last_v": "8827.76442606"
+      }
+    },
+    {
+      "id": "sopr_btc_24h",
+      "type": "response",
+      "path": "responses/sopr_btc_24h",
+      "expect": {
+        "status": 200,
+        "content_type": "application/json",
+        "metric_path": "indicators/sopr",
+        "asset": "BTC",
+        "interval": "24h",
+        "since": 1577836800,
+        "until": 1579046400,
+        "json_array": true,
+        "point_count": 14,
+        "first_t": 1577836800,
+        "last_t": 1578960000,
+        "step_seconds": 86400,
+        "fill_v": "0",
+        "rate_limit_limit": "600",
+        "values": "first_and_last_observed_middles_synthetic",
+        "first_v": "0.9978004158377769",
+        "last_v": "1.0228497570844635"
+      }
+    },
+    {
+      "id": "mvrv_btc_24h",
+      "type": "response",
+      "path": "responses/mvrv_btc_24h",
+      "expect": {
+        "status": 200,
+        "content_type": "application/json",
+        "metric_path": "market/mvrv",
+        "asset": "BTC",
+        "interval": "24h",
+        "since": 1577836800,
+        "until": 1579046400,
+        "json_array": true,
+        "point_count": 14,
+        "first_t": 1577836800,
+        "last_t": 1578960000,
+        "step_seconds": 86400,
+        "fill_v": "0",
+        "rate_limit_limit": "600",
+        "values": "status_and_shape_observed_values_synthetic"
+      }
+    },
+    {
+      "id": "active_count_btc_24h",
+      "type": "response",
+      "path": "responses/active_count_btc_24h",
+      "expect": {
+        "status": 200,
+        "content_type": "application/json",
+        "metric_path": "addresses/active_count",
+        "asset": "BTC",
+        "interval": "24h",
+        "since": 1577836800,
+        "until": 1579046400,
+        "json_array": true,
+        "point_count": 14,
+        "first_t": 1577836800,
+        "last_t": 1578960000,
+        "step_seconds": 86400,
+        "fill_v": "0",
+        "rate_limit_limit": "600",
+        "values": "status_and_shape_observed_values_synthetic"
+      }
+    },
+    {
+      "id": "transfers_volume_to_exchanges_sum_btc_24h",
+      "type": "response",
+      "path": "responses/transfers_volume_to_exchanges_sum_btc_24h",
+      "expect": {
+        "status": 200,
+        "content_type": "application/json",
+        "metric_path": "transactions/transfers_volume_to_exchanges_sum",
+        "asset": "BTC",
+        "interval": "24h",
+        "since": 1577836800,
+        "until": 1579046400,
+        "json_array": true,
+        "point_count": 14,
+        "first_t": 1577836800,
+        "last_t": 1578960000,
+        "step_seconds": 86400,
+        "fill_v": "0",
+        "rate_limit_limit": "600",
+        "values": "status_and_shape_observed_values_synthetic"
+      }
+    },
+    {
+      "id": "hash_rate_mean_btc_24h",
+      "type": "response",
+      "path": "responses/hash_rate_mean_btc_24h",
+      "expect": {
+        "status": 200,
+        "content_type": "application/json",
+        "metric_path": "mining/hash_rate_mean",
+        "asset": "BTC",
+        "interval": "24h",
+        "since": 1577836800,
+        "until": 1579046400,
+        "json_array": true,
+        "point_count": 14,
+        "first_t": 1577836800,
+        "last_t": 1578960000,
+        "step_seconds": 86400,
+        "fill_v": "0",
+        "rate_limit_limit": "600",
+        "values": "status_and_shape_observed_values_synthetic"
+      }
+    },
+    {
+      "id": "notacoin_price_usd_close",
+      "type": "response",
+      "path": "responses/notacoin_price_usd_close",
+      "expect": {
+        "status": 400,
+        "content_type": "text/plain",
+        "metric_path": "market/price_usd_close",
+        "asset": "NOTACOIN",
+        "interval": "24h",
+        "since": 1577836800,
+        "until": 1579046400,
+        "body_prefix": "parameter a=NOTACOIN is invalid, allowed values=[",
+        "body_complete": false,
+        "values": "plain_text_400_prefix"
+      }
+    },
+    {
+      "id": "empty_json_list",
+      "type": "response",
+      "path": "responses/empty_json_list",
+      "expect": {
+        "status": 200,
+        "content_type": "application/json",
+        "metric_path": "market/price_usd_close",
+        "asset": "BTC",
+        "interval": "24h",
+        "since": 1577836800,
+        "until": 1579046400,
+        "json_array": true,
+        "point_count": 0,
+        "values": "not_observed_code_accepts_empty_list"
+      }
+    },
+    {
+      "id": "pagination",
+      "type": "pagination",
+      "contract": "contracts/pagination.json",
+      "sample": "responses/price_usd_close_btc_24h"
+    },
+    {
+      "id": "rate_limit",
+      "type": "rate_limit",
+      "contract": "contracts/rate_limit.json"
+    },
+    {
+      "id": "interval",
+      "type": "interval",
+      "contract": "contracts/interval.json"
+    }
+  ]
+}
