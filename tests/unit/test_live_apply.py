@@ -129,6 +129,12 @@ class TestLiveApplyOrchestrator:
         assert "HOLD" in report.message
         adapter.apply_signal.assert_not_called()
         orch._repo.sp_ins_execution_event.assert_called_once()
+        intent = orch._repo.sp_ins_intent.call_args.kwargs
+        assert intent["signal_value"] == 1.0
+        assert intent["target_qty"] == Decimal("0.01")
+        assert intent["bar_timestamp"] == datetime(2026, 7, 1, tzinfo=timezone.utc)
+        assert intent["bar_source"] == "provider"
+        assert intent["transact_at"] is not None
         orch._notifier.send.assert_not_called()
 
     def test_report_without_an_order_uses_the_outcome_message(self, orchestrator):
@@ -172,6 +178,20 @@ class TestLiveApplyOrchestrator:
         assert report.message == outcome.no_order_message
         assert "qty resolved to 0" in report.message
         assert report.reject_reason is None
+
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
+    def test_intent_write_failure_places_no_order(self, mock_signal, orchestrator):
+        orch, _bt = orchestrator
+        dep = _deployment()
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = ("k", "s")
+        orch._repo.sp_ins_intent.side_effect = RuntimeError("intent write failed")
+        orch._adapter_registry.create.return_value = _adapter_mock()
+
+        with pytest.raises(RuntimeError, match="intent write failed"):
+            orch.run(dep.app_user_id, dep, "alice")
+
+        orch._adapter_registry.create.assert_not_called()
 
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_buy_success(self, mock_signal, orchestrator):
@@ -405,22 +425,23 @@ class TestSignalDataSource:
     provider only for brokers without a market-data venue."""
 
     @patch("quant.trade.bar_source.exchange_id_for_app", return_value=None)
-    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_venue_less_broker_uses_the_provider_path(
         self, mock_signal, _mock_venue, orchestrator
     ):
         """e.g. Futu equities — the provider series is the only one that exists."""
         orch, _bt = orchestrator
 
-        _signal, source = orch._compute_signal(
+        decision = orch._compute_signal(
             _deployment(schedule_tm_interval_id=None)
         )
 
         assert mock_signal.call_args.kwargs["bar_loader"] is None
-        assert source == "provider"
+        assert decision.bar_source == "provider"
+        assert decision.tm_interval_id == 1
 
     @patch("quant.trade.bar_source.exchange_id_for_app", return_value="bybit")
-    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_manual_deployment_on_a_venue_defaults_to_the_fitted_exchange_bars(
         self, mock_signal, _mock_venue, orchestrator
     ):
@@ -431,9 +452,10 @@ class TestSignalDataSource:
         orch._price_bars.for_app.return_value = service
         dep = _deployment(app_id=34, schedule_tm_interval_id=None)
 
-        _signal, source = orch._compute_signal(dep)
+        decision = orch._compute_signal(dep)
 
-        assert source == "price_bar:bybit"
+        assert decision.bar_source == "price_bar:bybit"
+        assert decision.tm_interval_id == 1
         loader = mock_signal.call_args.kwargs["bar_loader"]
         loader("btcusdt.crypto", 120)
         service.load_window.assert_called_once_with(
@@ -445,19 +467,20 @@ class TestSignalDataSource:
         )
 
     @patch("quant.trade.bar_source.exchange_id_for_app", return_value="bybit")
-    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_scheduled_deployment_names_the_venue_it_priced_from(
         self, mock_signal, _mock_venue, orchestrator
     ):
         orch, _bt = orchestrator
         orch._price_bars = MagicMock()
 
-        _signal, source = orch._compute_signal(_deployment(schedule_tm_interval_id=2))
+        decision = orch._compute_signal(_deployment(schedule_tm_interval_id=2))
 
-        assert source == "price_bar:bybit"
+        assert decision.bar_source == "price_bar:bybit"
+        assert decision.tm_interval_id == 2
 
     @patch("quant.trade.bar_source.exchange_id_for_app", return_value="bybit")
-    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_scheduled_deployment_binds_its_interval_and_broker(
         self, mock_signal, _mock_venue, orchestrator
     ):
@@ -481,7 +504,7 @@ class TestSignalDataSource:
         )
 
     @patch("quant.trade.bar_source.exchange_id_for_app", return_value="bybit")
-    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_venue_without_a_bar_source_refuses(
         self, mock_signal, _mock_venue, orchestrator
     ):
@@ -496,7 +519,7 @@ class TestSignalDataSource:
 
         mock_signal.assert_not_called()
 
-    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "x"))
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_report_carries_the_source_to_the_caller(self, mock_signal, orchestrator):
         """CloudWatch keeps the Lambda's response body — that is the audit trail."""
         orch, _bt = orchestrator

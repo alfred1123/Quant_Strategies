@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import functools
 import logging
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
+from decimal import Decimal
+from typing import NamedTuple
 from uuid import UUID
 
 from quant.api.credentials.repo import ApiCredentialRepo
@@ -29,6 +30,23 @@ from quant.trade.registry import AdapterRegistry
 from quant.trade.schedule_policy import fitted_interval_id
 
 logger = logging.getLogger(__name__)
+
+
+class SignalRead(NamedTuple):
+    """The signal one apply computed, and the bar it was computed on."""
+
+    signal: float
+    bar_source: str
+    bar_timestamp: datetime
+    tm_interval_id: int
+
+
+def _as_utc(data_as_of: str) -> datetime:
+    """``compute_latest_position`` returns the bar index as text."""
+    parsed = datetime.fromisoformat(data_as_of.strip().replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 # Used only when INST.PRODUCT.CCY is not populated for the instrument.
 _FALLBACK_SETTLEMENT_CCY = "USDT"
@@ -83,7 +101,21 @@ class LiveApplyOrchestrator:
                 "API credential not found or cannot decrypt", status_code=404
             )
 
-        signal, bar_source = self._compute_signal(deployment)
+        decision = self._compute_signal(deployment)
+        qty = float(deployment.qty)
+        self._repo.sp_ins_intent(
+            intent_id=uuid.uuid4(),
+            app_user_id=app_user_id,
+            deployment_id=deployment.deployment_id,
+            deployment_vid=deployment.deployment_vid,
+            tm_interval_id=decision.tm_interval_id,
+            bar_timestamp=decision.bar_timestamp,
+            bar_source=decision.bar_source,
+            signal_value=decision.signal,
+            target_qty=Decimal(str(decision.signal)) * Decimal(str(deployment.qty)),
+            transact_at=tick_at,
+            user_id=user_id,
+        )
 
         adapter = self._adapter_registry.create(
             deployment.app_id,
@@ -96,20 +128,19 @@ class LiveApplyOrchestrator:
             vendor_symbol = adapter.validate_for_dry_run(
                 deployment.internal_cusip, deployment.app_id
             )
-            qty = float(deployment.qty)
             outcome = self._retry_executor.execute(
-                adapter, vendor_symbol, signal, qty,
+                adapter, vendor_symbol, decision.signal, qty,
             )
 
             self._audit_attempts(
                 outcome, app_user_id=app_user_id, deployment=deployment,
-                signal=signal, user_id=user_id, qty=qty, tick_at=tick_at,
+                signal=decision.signal, user_id=user_id, qty=qty, tick_at=tick_at,
             )
 
             result = outcome.result
             if result is None:
-                return self._report(deployment, outcome, vendor_symbol, signal,
-                                    bar_source=bar_source)
+                return self._report(deployment, outcome, vendor_symbol, decision.signal,
+                                    bar_source=decision.bar_source)
 
             if result.success:
                 self._write_transaction(
@@ -119,14 +150,15 @@ class LiveApplyOrchestrator:
                 )
             else:
                 self._send_failure_alert(
-                    deployment, outcome, vendor_symbol, signal, qty,
+                    deployment, outcome, vendor_symbol, decision.signal, qty,
                 )
             return self._report(
-                deployment, outcome, vendor_symbol, signal, bar_source=bar_source
+                deployment, outcome, vendor_symbol, decision.signal,
+                bar_source=decision.bar_source,
             )
 
-    def _compute_signal(self, deployment: DeploymentRow) -> tuple[float, str]:
-        """``(signal, bar_source)`` — the position and the series behind it."""
+    def _compute_signal(self, deployment: DeploymentRow) -> SignalRead:
+        """The position, the series behind it, and the bar it was read from."""
         strategy_rows = self._bt.sp_get_strategy(
             deployment.strategy_id, strategy_vid=deployment.strategy_vid
         )
@@ -139,7 +171,9 @@ class LiveApplyOrchestrator:
             deployment.strategy_id, deployment.strategy_vid
         )
         config_json = strategy_rows[0]["config_json"]
-        bar_loader, bar_source = self._resolve_signal_source(deployment, config_json)
+        bar_loader, bar_source, tm_interval_id = self._resolve_signal_source(
+            deployment, config_json
+        )
         try:
             signal, data_as_of = compute_latest_position(
                 config_json,
@@ -155,11 +189,16 @@ class LiveApplyOrchestrator:
             signal, data_as_of, bar_source,
             deployment.deployment_id, deployment.internal_cusip,
         )
-        return signal, bar_source
+        return SignalRead(
+            signal=signal,
+            bar_source=bar_source,
+            bar_timestamp=_as_utc(data_as_of),
+            tm_interval_id=tm_interval_id,
+        )
 
     def _resolve_signal_source(
         self, deployment: DeploymentRow, config_json: dict
-    ) -> tuple[BarLoader | None, str]:
+    ) -> tuple[BarLoader | None, str, int]:
         """Pick the price series for this deployment — see ``resolve_signal_source``.
 
         The rule lives in ``quant/trade/bar_source.py`` so the dry run resolves
