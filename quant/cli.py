@@ -54,7 +54,7 @@ import seaborn as sns
 
 from quant.data.sources import NasdaqDataLink, YahooFinance
 from quant.shared.logging import setup_logging
-from quant.strategy.optimizer import ParametersOptimization
+from quant.strategy.optimizer import ParametersOptimization, SearchPolicy
 from quant.strategy.performance import Performance
 from quant.strategy.signals import SignalDirection, StrategyConfig
 from quant.strategy.walk_forward import WalkForward
@@ -146,6 +146,16 @@ def parse_args(argv=None):
     return p.parse_args(argv)
 
 
+def _load_search_policy() -> SearchPolicy:
+    """Budget, seed, attempt cap, and mode from CONFIG.BACKTEST_SEARCH."""
+    from quant.refdata.reader import RedisRefData
+    from quant.shared.config import get_redis_url
+
+    return SearchPolicy.from_row(
+        RedisRefData(get_redis_url()).get_backtest_search()
+    )
+
+
 def main(args=None):
     if args is None:
         args = parse_args()
@@ -214,14 +224,17 @@ def main(args=None):
                                       args.sig_step))
 
         param_opt = ParametersOptimization(
-            data_dict, config, fee_bps=args.fee,
+            data_dict, config, fee_bps=args.fee, search=_load_search_policy(),
         )
 
         opt_result = param_opt.optimize(window_list, signal_list)
 
         opt_path = os.path.join(args.outdir, f'opt_{tag}.csv')
         opt_result.grid_df.to_csv(opt_path, index=False)
-        logger.info("Grid search: %d combinations evaluated", len(opt_result.grid_df))
+        logger.info(
+            "Search: %s, %d of %d cells",
+            opt_result.search, opt_result.distinct_cells, opt_result.grid_size,
+        )
         logger.info("\n%s", pd.DataFrame(opt_result.top10))
 
         logger.info("Best: window=%d, signal=%.2f, Sharpe=%.4f",
@@ -259,6 +272,7 @@ def main(args=None):
 
         wf = WalkForward(
             wf_data_dict, args.split, config, fee_bps=args.fee,
+            search=_load_search_policy(),
         )
         result = wf.run(window_list, signal_list)
 

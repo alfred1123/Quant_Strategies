@@ -68,6 +68,12 @@ def client():
                 {"name": "sharpe_gate", "display_name": "Sharpe GT 1"},
             ],
         }.get(table, [])
+        ref.get_backtest_search.return_value = {
+            "trial_budget": 10000,
+            "seed": 42,
+            "max_attempts_factor": 3,
+            "over_budget_mode": "TPE_DISTINCT",
+        }
 
         fake_user = CurrentUser(app_user_id=uuid4(), username="test", session_gen=1)
         app.dependency_overrides[require_user] = lambda: fake_user
@@ -139,6 +145,10 @@ class TestOptimizeEndpoint:
             grid=[{"window": 20, "signal": 0.02, "sharpe": 1.8}, {"window": 10, "signal": 0.01, "sharpe": 1.5}],
             n_valid=2,
             study=None,
+            search="exhaustive",
+            grid_size=2,
+            distinct_cells=2,
+            attempts=2,
         )
         mock_opt_cls.return_value = mock_opt
 
@@ -162,6 +172,10 @@ class TestOptimizeEndpoint:
         assert resp.status_code == 200
         body = resp.json()
         assert body["valid"] == 2
+        assert body["search"] == "exhaustive"
+        assert body["grid_size"] == 2
+        assert body["distinct_cells"] == 2
+        assert "total_trials" not in body
         assert body["best"]["sharpe"] == 1.8
 
     @patch("quant.strategy.backtest_service.fetch_df")

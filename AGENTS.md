@@ -110,6 +110,7 @@ All UI dropdown, radio, and selectbox values must come from `REFDATA` tables in 
 | Promotion rules (gates + soft metrics) | `CONFIG.PROMOTION_METRIC` | `DISPLAY_NAME` | `NAME` (also `METRIC_KEY`, `REQUIREMENT_TYPE`, `PRIORITY`, `THRESHOLD`) |
 | Listing session calendar | `REFDATA.MARKET_CALENDAR` | — | `LISTING_EXCHANGE`, `BAR_TIMEZONE`, `MARKET_*` (via `get_market_calendar()`; `''` = default crypto; not a UI dropdown) |
 | Scheduled apply offset (broker × cadence) | `CONFIG.APP_APPLY_TIMING` | — | `EXECUTE_OFFSET` (via `get_execute_offset()` / `get_apply_timing()`) |
+| Search budget (cells, seed, attempt cap, over-budget mode) | `CONFIG.BACKTEST_SEARCH` | — | `TRIAL_BUDGET`, `SEED`, `MAX_ATTEMPTS_FACTOR`, `OVER_BUDGET_MODE` (via `get_backtest_search()`) |
 
 Grid defaults come from `REFDATA.INDICATOR` via `RedisRefData.get_indicator_defaults()` (`quant/refdata/reader.py`).
 

@@ -383,7 +383,11 @@ export default function BacktestPage() {
               <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
                 <Chip label={effectiveSymbol(config)} color="primary" size="small" />
                 <Chip label={`${config.start} → ${config.end}`} size="small" variant="outlined" />
-                <Chip label={`${optimizeResult.valid} / ${optimizeResult.total_trials} valid trials`} size="small" variant="outlined" />
+                <Chip
+                  label={`${optimizeResult.distinct_cells.toLocaleString()} of ${optimizeResult.grid_size.toLocaleString()} cells, ${optimizeResult.search}`}
+                  size="small"
+                  variant="outlined"
+                />
                 <Chip label={`Best Sharpe: ${formatDecimal(optimizeResult.best?.sharpe ?? 0)}`} color="success" size="small" />
                 {config.factors.map((f, i) => (
                   <Chip key={i} label={`F${i + 1}: ${f.indicator} / ${f.strategy}`} size="small" variant="outlined" />

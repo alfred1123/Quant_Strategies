@@ -89,3 +89,7 @@ python -m quant.cli --walk-forward --split 0.7
 ```
 
 **Overfitting ratio:** `1 − (OOS Sharpe / IS Sharpe)`. Values near 0 indicate robust parameters; values near 1 indicate the strategy performs much worse out-of-sample.
+
+## Search budget
+
+Grid search and walk-forward read `CONFIG.BACKTEST_SEARCH` through Redis (`config:backtest_search`). The seeded row is 10,000 distinct cells, seed 42, an attempt cap of 3× the budget, and mode `TPE_DISTINCT`. A grid that fits the budget is exhaustive. A larger grid is a TPE sample of distinct cells, a random sample of distinct cells, or a refusal, depending on `OVER_BUDGET_MODE`. The log line is `Search: <label>, <distinct> of <grid> cells`. Redis has to be up for either flag; the CLI does not keep its own copy of the budget.

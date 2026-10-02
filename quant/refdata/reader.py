@@ -124,6 +124,31 @@ class RedisRefData:
                 return int(r["app_metric_id"])
         return None
 
+    def get_backtest_search(self) -> dict:
+        """The one ``CONFIG.BACKTEST_SEARCH`` policy row.
+
+        Keys: ``trial_budget``, ``seed``, ``max_attempts_factor``,
+        ``over_budget_mode``. The search module decides what a mode means.
+        """
+        rows = self.get_config("backtest_search")
+        if len(rows) != 1:
+            raise RuntimeError(
+                f"CONFIG.BACKTEST_SEARCH has {len(rows)} rows; expected one"
+            )
+        row = rows[0]
+        fields = (
+            "trial_budget",
+            "seed",
+            "max_attempts_factor",
+            "over_budget_mode",
+        )
+        missing = [name for name in fields if row.get(name) is None]
+        if missing:
+            raise RuntimeError(
+                "CONFIG.BACKTEST_SEARCH missing " + ", ".join(missing)
+            )
+        return {name: row[name] for name in fields}
+
     def get_promotion_metrics(self) -> list[dict]:
         """Return PROMOTION_METRIC rows sorted by priority.
 

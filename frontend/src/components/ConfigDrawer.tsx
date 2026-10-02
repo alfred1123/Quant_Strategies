@@ -12,6 +12,7 @@ import {
   useTmIntervals, intervalLabel,
 } from '../api/refdata';
 import { useProducts } from '../api/inst';
+import { useBacktestSearch } from '../api/config';
 import { useStoredCoverages } from '../api/marketData';
 import type { AssetTypeRow } from '../types/refdata';
 import { countSteps } from '../utils/grid';
@@ -234,13 +235,25 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
     onRun(fitted);
   };
 
-  const totalTrials = config.factors.reduce(
+  const { data: searchRows } = useBacktestSearch();
+  const searchRow = searchRows?.[0];
+  const totalCells = config.factors.reduce(
     (acc, f) => acc * countSteps(f.window_range) * countSteps(f.signal_range),
     1,
   );
-  const OPTUNA_MAX_TRIALS = 10_000;
-  const cappedTrials = Math.min(totalTrials, OPTUNA_MAX_TRIALS);
-  const isCapped = totalTrials > OPTUNA_MAX_TRIALS;
+  const budget = searchRow == null ? null : Number(searchRow.trial_budget);
+  const mode = searchRow?.over_budget_mode;
+  const searchLabel = mode === 'TPE_DISTINCT'
+    ? 'TPE sample'
+    : mode === 'RANDOM_DISTINCT'
+      ? 'random sample'
+      : mode;
+  let cellSummary = `${totalCells.toLocaleString()} cells`;
+  if (budget !== null && totalCells > budget && searchLabel) {
+    cellSummary = mode === 'REJECT'
+      ? `${totalCells.toLocaleString()} cells exceed the ${budget.toLocaleString()} budget`
+      : `${budget.toLocaleString()} of ${totalCells.toLocaleString()} cells, ${searchLabel}`;
+  }
 
   return (
     <Drawer
@@ -562,7 +575,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
         {isRunnable && (
           <Typography variant="caption" color="text.secondary">
-            {cappedTrials.toLocaleString()} trials{isCapped ? ` (capped from ${totalTrials.toLocaleString()} combos)` : ''}
+            {cellSummary}
           </Typography>
         )}
         <Box sx={{ flexGrow: 1 }} />

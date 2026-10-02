@@ -110,6 +110,7 @@ Beyond raw `get(table)`, the reader exposes domain helpers used across the app:
 | `resolve_app_metric_id(app_id, metric_nm)` | Metric id for a broker |
 | `resolve_queue_status_id(name)` | Queue status id (raises if missing) |
 | `get_promotion_metrics()` | `PROMOTION_METRIC` rows sorted by priority |
+| `get_backtest_search()` | The one `BACKTEST_SEARCH` row: trial budget, seed, attempt factor, over-budget mode |
 | `get_promotion_states()` / `validate_promotion_state(name)` | Valid promotion-state names |
 
 ---
@@ -118,7 +119,7 @@ Beyond raw `get(table)`, the reader exposes domain helpers used across the app:
 
 The SPA fetches catalogs with `GET /api/v1/refdata/{table}` and policy rows
 with `GET /api/v1/config/{table}` (`usePromotionMetrics` calls
-`promotion_metric`). TanStack Query keys are `['refdata', …]` and
+`promotion_metric`; `useBacktestSearch` calls `backtest_search`). TanStack Query keys are `['refdata', …]` and
 `['config', …]`. There is **no TTL** server-side. `POST /api/v1/refdata/refresh`
 rewrites catalogs. `POST /api/v1/config/refresh` rewrites policy rows.
 

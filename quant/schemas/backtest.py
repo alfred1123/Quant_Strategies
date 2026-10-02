@@ -147,7 +147,9 @@ class WalkForwardResponse(BaseModel):
 
 
 class OptimizeResponse(BaseModel):
-    total_trials: int
+    search: str
+    grid_size: int
+    distinct_cells: int
     valid: int
     best: dict
     top10: list[dict]
