@@ -124,7 +124,7 @@ Promotion criteria are **not hardcoded** in Python. They are stored in `CONFIG.P
 | PRIORITY | INTEGER | Evaluation order (1 = first) |
 | THRESHOLD | NUMERIC | Required value for HARD gates (NULL for SOFT) |
 
-### Evaluation logic (`quant/queue/promote.py`)
+### Evaluation logic (`quant/promotion/evaluate.py`)
 
 1. **Phase 1 — Hard gates**: All HARD metrics must pass their threshold. Any failure → skip promote.
 2. **Phase 2 — Soft comparison**: Compared in priority order against the current best VID. First decisive win/loss decides. All ties → no promote (conservative).
@@ -155,20 +155,13 @@ Priority follows the same convention as `BT.QUEUE`: **lower number = higher prio
 
 ## 3. Python — Auto-Promote in Worker
 
-### 3a. Promotion helper (`quant/queue/promote.py`)
+### 3a. Promotion helper (`quant/promotion/evaluate.py`, `quant/promotion/repo.py`)
 
-Three public functions:
+Public functions in `quant/promotion/evaluate.py` (`PromotionRepo` in `quant/promotion/repo.py` calls `evaluate_promotion`):
 
 ```python
 def passes_hard_gates(payload: dict, promotion_metrics: list[dict]) -> bool:
     """Return True if payload passes every HARD-type gate."""
-
-def should_promote(
-    new_payload: dict,
-    best_payload: dict | None,
-    promotion_metrics: list[dict],
-) -> bool:
-    """Full promotion check: hard gates then soft comparison."""
 
 def evaluate_promotion(
     new_payload: dict,
@@ -177,34 +170,35 @@ def evaluate_promotion(
     *,
     is_current_best: bool = False,
     best_vid: int | None = None,
+    strategy_vid: int | None = None,
 ) -> PromotionDecision:
     """Structured evaluation — returns outcome + gate results + decisive metric."""
 ```
 
-- Receives metric config from REFDATA (no hardcoded sets)
-- `passes_hard_gates` / `should_promote` — original bool helpers (still used by tests)
-- `evaluate_promotion` — wraps both and returns a `PromotionDecision` dataclass:
+- Receives metric config from `CONFIG.PROMOTION_METRIC` (no hardcoded sets)
+- `passes_hard_gates` — bool helper (`tests/unit/test_promote.py`)
+- `evaluate_promotion` — returns a `PromotionDecision` dataclass:
   - `outcome`: `PROMOTED` | `KEPT` | `DEMOTED` | `REJECTED`
   - `gate_results`: list of `GateResult(name, metric_key, passed, value, threshold)`
   - `compared_vid` — the soft-comparison opponent (`NULL` when the candidate *is* the current best / VID 1, or when there is no baseline)
   - Handles NaN / missing gracefully (don't promote if new metric is NaN)
 
-### 3b. Worker completion (`quant/queue/worker.py`)
+### 3b. Worker completion (`PromotionRepo.run` in `quant/promotion/repo.py`)
 
 After writing `BT.RESULT` and before marking COMPLETED:
 
-1. Load `promotion_metrics` from `RefData.get_promotion_metrics()`
-2. Find current best VID for this `strategy_id` via `SP_GET_STRATEGY(is_best_ind='Y')`
+1. Load `promotion_metrics` from `RedisRefData.get_promotion_metrics()`
+2. Find current best VID for this `strategy_id` via `BtQueueRepo.sp_get_strategy(is_best_ind='Y')`
 3. If not the current best, fetch the best VID's `BT.RESULT` payload for comparison
 4. Call `evaluate_promotion(payload, best_payload, promotion_metrics, ...)`
 5. Act on the outcome: `DEMOTED` → `SP_UPD_PROMOTE_STRATEGY(vid=NULL)`, `PROMOTED` → `SP_UPD_PROMOTE_STRATEGY(vid=new_vid)`
 6. **Persist** the decision via `SP_INS_PROMOTION` with gate results and decisive metric detail
 
-### 3c. `BtQueueRepo` wrapper (`quant/queue/repo.py`)
+### 3c. `PromotionRepo` (`quant/promotion/repo.py`)
 
-- `sp_upd_promote_strategy(strategy_id, strategy_vid, user_id)` — `strategy_vid=None` triggers demote-only mode
-- `sp_get_strategy(strategy_id, is_best_ind='Y')` — fetches the current best VID for comparison
-- `sp_ins_promotion(...)` — persists the structured promotion decision to `BT.PROMOTION`
+- `flip_best(strategy_id, strategy_vid, user_id)` — calls `BT.SP_UPD_PROMOTE_STRATEGY`. `strategy_vid=None` is demote-only
+- `ins_promotion(...)` — calls `BT.SP_INS_PROMOTION`
+- `sp_get_strategy(strategy_id, is_best_ind='Y')` stays on `BtQueueRepo` (`quant/queue/repo.py`)
 
 
 ## 4. Manual Promote API

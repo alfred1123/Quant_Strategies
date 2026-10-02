@@ -19,7 +19,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 ## Conventions
 
 !!! danger "No Direct SQL in Application Code"
-    **All** database access from Python/FastAPI goes through **`CALL schema.procedure(...)`** — both reads (`SP_GET_*`) and writes (`SP_INS_*`, `SP_UPD_*`). No raw `SELECT`, `INSERT`, `UPDATE`, or `DELETE` in Python code. Exceptions: **`BT.QUEUE`** mutations use **`BT.SP_INS_QUEUE`** only (**`IN_ACTION`** discriminates enqueue / claim / terminal / cancel). Liquibase seed changesets may use direct SQL. `information_schema` catalog queries (e.g. REFDATA table discovery) are permitted.
+    **All** database access from Python/FastAPI goes through **`CALL schema.procedure(...)`** — both reads (`SP_GET_*`) and writes (`SP_INS_*`, `SP_UPD_*`). No raw `SELECT`, `INSERT`, `UPDATE`, or `DELETE` in Python code. Exceptions: **`BT.QUEUE`** mutations use **`BT.SP_INS_QUEUE`** only. The caller passes `IN_QUEUE_STATUS_ID`; there is no `IN_ACTION`. See [SP_INS_QUEUE](#sp_ins_queue). Liquibase seed changesets may use direct SQL. `information_schema` catalog queries (e.g. REFDATA table discovery) are permitted.
 
     - **REFDATA reads** — application code reads catalogs and policy rows via the Redis-backed `RedisRefData` reader (`quant/refdata/reader.py`). Postgres is hit only by the publisher (`quant/refdata/publisher.py`) at startup and on `POST /api/v1/refdata/refresh` (catalogs) or `POST /api/v1/config/refresh` (policy), which runs `CALL REFDATA.SP_GET_ENUM` for a catalog and `CALL CONFIG.SP_GET_ENUM` for a policy table. Never query those tables directly from application code.
     - If a required procedure does not exist yet, create it first.
@@ -333,13 +333,19 @@ The cost is real and worth knowing before you go looking for their timings: `LOG
 
 Neither the retention window nor the dump was touched to achieve this. `LOG_PROC_DETAIL` is a **30-day rolling window**, purged by `SP_INS_LOG_PROC_SUMMARY` on each run — it is a retention period, not a size cap, so the table holds whatever the platform generates in a month, and a large table is not by itself evidence that the cleanup is broken. That summariser runs **daily**, not weekly: it aggregates and purges in the same call, so a weekly tick let the detail table run to retention plus another six days. `pg_dump` copies the table in full, deliberately — a local mirror without production's timings cannot be used to investigate something that has not been named yet.
 
+### SP_INS_QUEUE
+
+`BT.SP_INS_QUEUE` inserts the next version of one `BT.QUEUE` row (`db/liquidbase/bt/procedures/SP_INS_QUEUE.sql`). Inputs: `IN_QUEUE_ID`, `IN_STRATEGY_ID`, `IN_STRATEGY_VID`, `IN_QUEUE_STATUS_ID`, `IN_PRIORITY`, `IN_ERROR_TEXT`, `IN_USER_ID`. OUT is the status triplet (`OUT_SQLSTATE`, `OUT_SQLMSG`, `OUT_SQLERRMC`). The caller supplies the new status id. There is no `IN_ACTION`.
+
+The worker claims in `WorkerLoopRepo.claim_next` (`quant/queue/worker_loop.py`): `BT.SP_GET_QUEUE` lists active `QUEUED` rows, `in_run_order` picks the head, and this procedure writes that row as `RUNNING`. Those are two statements.
+
 | Procedure | Schema | Type |
 |-----------|--------|------|
 | `CORE_INS_LOG_PROC` | `CORE_ADMIN` | Central logging — measures with `clock_timestamp()`. Called by every SP except the two loop-called ones above |
 | `SP_GET_ENUM` | `REFDATA` | Generic REFCURSOR select for one `REFDATA` table |
 | `SP_GET_ENUM` | `CONFIG` | Generic REFCURSOR select for one `CONFIG` table |
 | `SP_INS_STRATEGY` | `BT` | Resolves `STRATEGY_ID` from `(USER_ID, STRATEGY_NM)`; bumps VID; returns `OUT_STRATEGY_ID` + `OUT_STRATEGY_VID`. Advisory lock per identity. See [strategy-vid-versioning.md](../archive/strategy-vid-versioning.md). |
-| `SP_INS_QUEUE` | `BT` | **Unified queue state machine**: `IN_ACTION` = **`ENQUEUE`**, **`CLAIM_NEXT`**, **`TERMINAL`**, **`CANCEL`** — all **`BT.QUEUE`** transitions |
+| `SP_INS_QUEUE` | `BT` | Next `BT.QUEUE` version. Caller passes `IN_QUEUE_STATUS_ID` (no `IN_ACTION`). See [SP_INS_QUEUE](#sp_ins_queue) |
 | `SP_GET_QUEUE` | `BT` | Flexible queue reader (REFCURSOR). Active rows come back newest `CREATED_AT` first (the My Jobs list). One job's history is `QUEUE_VID` order. **Writes no audit row** — the poll ran ~2,870×/day into `LOG_PROC_DETAIL` |
 | `SP_GET_QUEUE_FOR_TERMINAL` | `BT` | Active rows + strategy metadata (REFCURSOR) |
 | `FN_GET_QUEUE_FOR_TERMINAL` | `BT` | **Function** — UI terminal lookup (`RETURNS TABLE`); worker uses `SP_GET_QUEUE_LATEST` |

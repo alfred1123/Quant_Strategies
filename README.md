@@ -1,6 +1,6 @@
 # Quant Strategies
 
-Backtesting and trading framework for crypto and equity markets. Strategies are built around technical indicators (SMA, EMA, RSI, Bollinger Z-score, Stochastic Oscillator) and optimized via N-dimensional grid search over parameter space.
+Backtesting and trading framework for crypto and equity markets. Strategies are built around technical indicators (SMA, EMA, RSI, Bollinger Z-score, Stochastic Oscillator). Parameter search is exhaustive up to 10,000 trials (`OPTUNA_MAX_TRIALS` in `quant/strategy/optimizer.py`) and TPE after that.
 
 **Target:** strategies with Sharpe > 1.5 and strong Calmar ratios.
 
@@ -11,92 +11,33 @@ Backtesting and trading framework for crypto and equity markets. Strategies are 
 ## Quick Start
 
 ```bash
-# 1. Clone and set up
 git clone https://github.com/alfred1123/Quant_Strategies.git
 cd Quant_Strategies
 ./setup.sh
-cp .env.example .env       # then fill in QUANTDB_PASSWORD, etc.
-
-# 2. Local/dev talks to Postgres on :5432 — no tunnel
-#    (set DB_TARGET=local in .env after the first dump/restore)
-./scripts/appctl.sh dev start
+cp .env.example .env
 ```
 
-Open `http://localhost:5173`. Login, then configure and run backtests from the UI.
+Setup, run modes, and the first local database copy: [Getting Started](docs/getting-started.md). Dump and restore: [Database dump and restore](docs/guides/database-dump-restore.md).
 
-**Prod Aurora from the laptop** is a separate command. It is not part of `dev start`:
+Open `http://localhost:5173` after `./scripts/appctl.sh dev start`.
 
-```bash
-aws sso login --profile alfcheun
-./scripts/appctl.sh prod tunnel start   # localhost:5433 → Aurora :5432
-pg_isready -h 127.0.0.1 -p 5433
-```
-
-**Optional — first-time local copy** (dump needs the prod tunnel; daily `dev start` does not):
-
-```bash
-sudo apt install -y postgresql-17 docker.io docker-compose-v2
-sudo usermod -aG docker "$USER"   # log out/in
-./scripts/dbctl.sh reset && ./scripts/dbctl.sh dump && ./scripts/dbctl.sh restore
-echo 'DB_TARGET=local' >> .env
-./scripts/appctl.sh dev start    # also brings up Redis + queue worker via docker-compose.dev.yml
-```
-
-See [docs/architecture/dev-vs-prod.md](docs/architecture/dev-vs-prod.md#optional-point-dev-at-a-local-postgres) for details. Full dump/restore guide: [docs/guides/database-dump-restore.md](docs/guides/database-dump-restore.md).
-
-**Production:** The app is deployed at `http://52.221.3.230/` via GitHub Actions CI/CD.
+**Production:** [https://algodaemon.com](https://algodaemon.com)
 
 ---
 
 ## Prerequisites
 
-| Requirement | Notes |
-|---|---|
-| Python 3.12+ | Tested on 3.12.3 |
-| Node.js 24+ | Managed via nvm — `setup.sh` installs from `.nvmrc` |
-| PostgreSQL 17 | Shared Aurora via `localhost:5433` (AWS SSM port-forward), or local install on `:5432` (opt-in via `DB_TARGET=local`) |
-| Docker + compose v2 | Only needed for `DB_TARGET=local` (runs Redis + queue worker) or for the prod stack |
+[Getting Started — Prerequisites](docs/getting-started.md#prerequisites).
 
 ---
 
-## Environment Variables
+## Environment variables
 
-Copy `.env.example` to `.env` and fill in any keys you need:
+Names, which are required, and where each default lives: [Environment variables](docs/env-vars.md). On a laptop, leave `QUANTDB_PORT` unset.
 
-```bash
-cp .env.example .env
-```
+### Backtest queue worker
 
-| Variable | Required? | Description |
-|---|---|---|
-| `QUANTDB_HOST` | Yes | PostgreSQL host (default: `localhost`) |
-| `QUANTDB_PORT` | Yes | PostgreSQL port (default: `5433`) |
-| `QUANTDB_USERNAME` | Yes | Database user |
-| `QUANTDB_PASSWORD` | Yes | Database password |
-| `ALPHAVANTAGE_API_KEY` | Optional | Free key from [alphavantage.co](https://www.alphavantage.co/support/#api-key) |
-| `GLASSNODE_API_KEY` | Optional | On-chain crypto metrics |
-| `FUTU_HOST` / `FUTU_PORT` | Optional | Futu OpenD gateway for HK/US equities |
-| `MAX_CONCURRENT_WORKERS` | Optional | Backtest worker subprocesses per `worker_loop` (default `1`) |
-
-**Yahoo Finance requires no API key** — it is the default data source.
-
-### Backtest queue worker (Docker)
-
-The **[backtest queue](docs/design/backtest-queue.md)** runs as a long-lived
-Python daemon (`quant.queue.worker_loop`) that claims `QUEUED` rows from
-`BT.QUEUE` and spawns one `python -m quant.queue.worker <queue_id>`
-subprocess per job. To run it in a container:
-
-```bash
-# .env must include working QUANTDB_* credentials and REDIS_URL
-# (default in compose: redis://redis:6379)
-docker compose up redis worker
-docker compose logs -f worker
-```
-
-FastAPI publishes REFDATA into Redis on boot, so start the API container
-before (or alongside) the worker. The HTTP surface lives on the API
-container at `/api/v1/backtest/jobs/*` — there is no separate coordinator port.
+The [backtest queue](docs/design/backtest-queue.md) is a long-lived `quant.queue.worker_loop` that claims `QUEUED` rows from `BT.QUEUE` and spawns one `python -m quant.queue.worker <queue_id>` subprocess per job. How to start it: [Getting Started — Docker](docs/getting-started.md#docker).
 
 ## Repository Layout
 
