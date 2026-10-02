@@ -26,7 +26,7 @@ E2E tests are excluded by default. Pytest configuration (markers, default option
 
 ## Test Structure
 
-`tests/unit/` holds ~50 fast, mocked test files (strategy, API, trade, scheduler, promotion, market data, …). `tests/integration/` has four SP/pipeline tests. `tests/e2e/` holds opt-in live-provider tests (excluded by default via `-m 'not e2e'`).
+`tests/unit/` holds about 70 fast, mocked test files (strategy, API, trade, scheduler, promotion, market data, …). `tests/integration/` has four SP/pipeline tests. `tests/e2e/` holds opt-in live-provider tests (excluded by default via `-m 'not e2e'`).
 
 Representative unit files: `test_strat.py`, `test_ta.py`, `test_trade*.py`, `test_live_apply.py`, `test_schedule_poller.py`, `test_bybit_adapter.py`, `test_market_data_service.py`.
 

@@ -24,8 +24,9 @@ The variables below cover the core runtime set. See `.env.example` for the full 
 
 | Variable | Required? | Description |
 |---|---|---|
-| `QUANTDB_HOST` | Optional | PostgreSQL host for the `prod` target (default: `localhost`, i.e. the SSM tunnel). |
+| `QUANTDB_HOST` | Optional | Host for the `prod` target. Default `127.0.0.1` (`config/db-targets.json`, `targets.prod.fields.host`) — the SSM tunnel on a laptop. |
 | `QUANTDB_PORT` | Optional | Port for the `prod` target. **Leave unset on a laptop** — `config/db-targets.json` supplies `5433`. Setting it to `5432` makes `prod` point at the local database, which both resolvers refuse. Prod EC2 gets `5432` from SSM together with the real cluster host. |
+| `QUANTDB_NAME` | Optional | Database name for the `prod` target. Default `quantdb` (`config/db-targets.json`, `targets.prod.fields.dbname`). |
 | `QUANTDB_USERNAME` | Yes | Database user. |
 | `QUANTDB_PASSWORD` | Yes | Database password. |
 | `QUANTDB_CONNINFO` | Optional | Full libpq connection string. **Overrides** the four `QUANTDB_*` vars above. Must include `sslmode=require`. Use only when you need non-standard libpq options. |
@@ -49,6 +50,7 @@ code; see [Dev vs Prod](architecture/dev-vs-prod.md#where-local-and-prod-are-def
 | `LOCAL_DB_PASSWORD` | Optional | Local user password (default `LetsGetRich888` — change for non-default installs). |
 | `PROD_DB_PORT` | Optional | Overrides the `prod` port ahead of `QUANTDB_PORT`. For a tunnel on a non-standard local port. |
 | `MAX_CONCURRENT_WORKERS` | Optional | Max concurrent backtest worker subprocesses spawned by one `quant.queue.worker_loop` (default `1`; prod sets `2`). Safe above 1 — one loop claims sequentially, so the non-atomic claim only races between **separate `worker_loop` replicas**, which is what `docs/design/backtest-queue.md` §0 defers. Bound by cores, not RAM: see [Infrastructure Capacity Review §3.2](archive/infra-capacity-review.md#32-three-concurrent-workers-use-two). |
+| `JOB_TIMEOUT_S` | Optional | Seconds before the worker loop kills a backtest job and marks it FAILED. Default `6000` (`WorkerLoop.DEFAULT_JOB_TIMEOUT_S` in `quant/queue/worker_loop.py`). |
 | `DB_POOL_MIN` | Optional | Process Postgres pool floor (default `2`). |
 | `DB_POOL_MAX` | Optional | Process Postgres pool cap (default `10`). |
 | `DB_POOL_MAX_IDLE` | Optional | Seconds an extra connection may sit unused before the pool closes it (default `600`). |
@@ -67,16 +69,18 @@ code; see [Dev vs Prod](architecture/dev-vs-prod.md#where-local-and-prod-are-def
 
 | Variable | Required? | Description |
 |---|---|---|
-| `CORS_ORIGINS` | Optional | Comma-separated allowed origins. **Not set in code** — configure via SSM or `.env` when the browser hits the API from a different origin than the API itself. Leave unset for same-origin only (e.g. nginx bundle, or Vite proxying `/api` to the backend). |
+| `CORS_ORIGINS` | Optional | Comma-separated allowed origins. Default `http://localhost:5173` (`quant/api/main.py`). Set via SSM or `.env` when the browser origin is not that default. |
 | `APP_ENV` | Optional | `dev` (default) or `prod`. Affects logging, cookie `Secure`, JWT enforcement. |
-| `USE_SSM` | Optional | `1` (default in `docker-compose.yml`) loads secrets from AWS SSM Parameter Store first, then falls back to `.env`. Set `0` to force `.env`-only mode. |
+| `USE_SSM` | Optional | `1` (default in `docker-compose.yml`) loads secrets from AWS SSM Parameter Store first, then falls back to `.env`. Set `0` to force `.env`-only mode. `load_config()` in `quant/shared/config.py` loads SSM only when the value is `1`. |
 | `AWS_REGION` | Optional | Region used when `USE_SSM=1`. Default `ap-southeast-1`. |
+| `REDIS_URL` | Optional | Redis for catalog and policy snapshots and the queue wake channel. Default `redis://localhost:6379` (`DEFAULT_REDIS_URL` in `quant/shared/config.py`). `docker-compose.yml` sets `redis://redis:6379`. `docker-compose.dev.yml` sets `redis://127.0.0.1:6379` on the worker. |
 
 ## Authentication (JWT)
 
 | Variable | Required? | Description |
 |---|---|---|
 | `JWT_SECRET` | **Required in prod** | Symmetric HS256 signing key (generate via `openssl rand -base64 32`). In dev (`APP_ENV != prod`) the API auto-generates a random secret each startup. In prod the API refuses to start without it. Rotate by changing the value and restarting. |
+| `TRADE_SERVICE_TOKEN` | Optional | Bearer secret for the scheduler Lambda (`quant/api/auth/dependencies.py`). No default. Unset, blank, or shorter than 16 characters (`_MIN_SERVICE_TOKEN_LEN`) is treated as unset, and a Bearer caller is refused. Prod: SSM `/quant/prod/TRADE_SERVICE_TOKEN`. |
 | `EXCHANGE_SECRETS_KEY` | **Required in prod** (Phase 1.1+) | Fernet key for encrypting `CORE_ADMIN.API_CREDENTIAL` ciphertext (`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`). SSM: `/quant/prod/EXCHANGE_SECRETS_KEY`. Separate from `JWT_SECRET`. |
 | `COOKIE_SECURE` | Optional | `1` to force the `Secure` flag on the auth cookie. Default tracks `APP_ENV == prod`. |
 

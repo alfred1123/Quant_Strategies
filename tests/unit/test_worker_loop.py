@@ -216,6 +216,64 @@ class TestTick:
         repo.claim_next.assert_not_called()
 
 
+# ── _reap_children ──────────────────────────────────────────────────────
+
+
+class TestReapChildren:
+    """A child that dies on its own used to leave the row RUNNING.
+
+    The slot was freed, but the row stayed RUNNING until the loop process
+    restarted, and that restart failed every RUNNING row — including a sibling
+    that was still healthy. Timeout and cancel already write the terminal row
+    themselves; this is the path where the child exits and the loop does not.
+    """
+
+    def test_nonzero_exit_fails_only_the_job_still_running(self):
+        crashed = _row()
+        crashed["queue_status_id"] = 2  # RUNNING
+        crashed_qid = uuid.UUID(str(crashed["queue_id"]))
+        live_qid = uuid.uuid4()
+        repo = MagicMock()
+        repo.get_active.return_value = crashed
+        loop = _make_loop(repo=repo, max_concurrent=2)
+        loop._active[crashed_qid] = _track(FakeProc(returncode=1), crashed)
+        loop._active[live_qid] = _track(FakeProc(returncode=None))
+
+        loop._reap_children()
+
+        assert crashed_qid not in loop._active
+        assert live_qid in loop._active
+        repo.mark_terminal.assert_called_once_with(crashed, 4, "worker crashed exit=1")
+
+    def test_zero_exit_does_not_write_a_row(self):
+        """Exit 0 means the worker already wrote COMPLETED or FAILED."""
+        qid = uuid.uuid4()
+        repo = MagicMock()
+        loop = _make_loop(repo=repo)
+        loop._active[qid] = _track(FakeProc(returncode=0))
+
+        loop._reap_children()
+
+        assert qid not in loop._active
+        repo.get_active.assert_not_called()
+        repo.mark_terminal.assert_not_called()
+
+    def test_nonzero_exit_keeps_a_row_that_already_left_running(self):
+        """A crash after the worker committed COMPLETED must not overwrite it."""
+        claimed = _row()
+        qid = uuid.UUID(str(claimed["queue_id"]))
+        completed = {**claimed, "queue_status_id": 3}
+        repo = MagicMock()
+        repo.get_active.return_value = completed
+        loop = _make_loop(repo=repo)
+        loop._active[qid] = _track(FakeProc(returncode=1), claimed)
+
+        loop._reap_children()
+
+        assert qid not in loop._active
+        repo.mark_terminal.assert_not_called()
+
+
 # ── _enforce_timeouts ───────────────────────────────────────────────────
 
 
@@ -340,6 +398,70 @@ class TestEnforceCancels:
 
         assert qid not in loop._active
         assert uuid.UUID(str(nxt["queue_id"])) in loop._active
+
+
+# ── one terminal row ────────────────────────────────────────────────────
+
+
+class TestOneTerminalRow:
+    """Reap must not add a second terminal row on top of cancel or timeout.
+
+    Both paths already write the row themselves. A later reap sees the child
+    only when it is still in ``_active``; these tests run the real tick order
+    so a double write would show up as a second ``mark_terminal``.
+    """
+
+    def test_crashed_cancel_requested_row_is_cancelled_once(self):
+        """Non-zero exit while the row is CANCEL_REQUESTED.
+
+        Reap drops the dead child and does not write FAILED, because the row
+        is no longer RUNNING. The cancel pass then writes the one CANCELLED row.
+        """
+        row = _row()
+        row["queue_status_id"] = 6  # CANCEL_REQUESTED
+        qid = uuid.UUID(str(row["queue_id"]))
+        repo = MagicMock()
+        repo.get_active.return_value = row
+        repo.list_by_status.side_effect = lambda sid, **kw: [row] if sid == 6 else []
+        repo.claim_next.return_value = None
+        loop = _make_loop(repo=repo)
+        loop._running = True
+        loop._active[qid] = _track(FakeProc(returncode=1), row)
+
+        loop.tick()
+
+        assert qid not in loop._active
+        repo.mark_terminal.assert_called_once_with(row, 5)  # CANCELLED
+
+    def test_timeout_kill_then_reap_writes_failed_once(self):
+        """Timeout writes FAILED and drops the child; the next tick's reap must not write again.
+
+        ``get_active`` keeps reporting RUNNING, so a child left in ``_active``
+        with the kill's non-zero exit would be marked FAILED a second time.
+        """
+        row = _row()
+        row["queue_status_id"] = 2  # RUNNING
+        qid = uuid.UUID(str(row["queue_id"]))
+        repo = MagicMock()
+        repo.get_active.return_value = row
+        repo.list_by_status.return_value = []
+        repo.claim_next.return_value = None
+        loop = _make_loop(repo=repo)
+        loop._running = True
+        loop.JOB_TIMEOUT_S = 1
+        proc = FakeProc(returncode=None)
+        loop._active[qid] = (proc, time.monotonic() - 10, row)
+
+        loop.tick()
+        loop.tick()
+
+        assert proc.killed
+        assert qid not in loop._active
+        repo.mark_terminal.assert_called_once()
+        args = repo.mark_terminal.call_args.args
+        assert args[0] is row
+        assert args[1] == 4  # FAILED
+        assert "timeout" in args[2].lower()
 
 
 # ── _drain ──────────────────────────────────────────────────────────────

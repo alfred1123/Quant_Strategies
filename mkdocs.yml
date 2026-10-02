@@ -102,6 +102,7 @@ nav:
       - HTTPS via Cloudflare: guides/https-cloudflare.md
   - Platform design:
       - Overview: design/README.md
+      - Coding Standards: design/coding-standards.md
       - Backtest Queue: design/backtest-queue.md
       - Trade API: design/trade-api.md
       - Plan to Profit: design/plan-to-profit.md
@@ -116,6 +117,7 @@ nav:
       - Login & Authentication: design/login.md
       - User Isolation: design/user-isolation.md
       - Jobs Table Detail UX: design/jobs-table-detail-ux.md
+      - Queue screen aids (2026-09-29): design/2026-09-29-queue-frontend-aids.md
       - Multi-Strategy Netting: design/multi-strategy-netting.md
       - Separate Underlying & Cache: design/separate-underlying.md
       - Alternative Data Sources: design/alt-data-sources.md
@@ -127,6 +129,8 @@ nav:
       - Code quality review (2026-09-26): design/2026-09-26-code-quality-review.md
       - AlgoDaemon bug report (2026-09-27): design/2026-09-27-algodaemon-bug-report.md
       - Bug verification, rounds 3–4 (2026-09-27): design/2026-09-27-bug-verification-round3-4.md
+      - Long-term fixes — B1, window bounds, data columns, repeated trials (2026-09-29): design/2026-09-29-long-term-fixes-b1-rangeparam-datacolumn.md
+      - Dependency and OOP review (2026-09-29): design/2026-09-29-dependency-review.md
   - Strategy research:
       - Overview: research/README.md
       - Crypto spot — baseline improvements: research/crypto-spot-baseline-improvements.md

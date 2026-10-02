@@ -79,7 +79,7 @@ When proposing a release, state the blast radius — which schemas, how many cha
 **Never** write raw `INSERT`, `UPDATE`, or `DELETE` statements against application tables in Python, API services, or migration seed scripts, **except**:
 
 - **`BT.RESULT`** (queued backtest completion payloads): use **`CALL BT.SP_INS_RESULT(...)`** with a **client-generated** **`RESULT_ID`** (UUID), full payload JSONB, and **caller-supplied shredded metric columns** (extract via `quant/queue/result_metrics.py`) — no raw **`INSERT`** into **`BT.RESULT`** from Python/API and no JSON shredding inside the procedure. Procedure OUT row matches **`BT.SP_INS_QUEUE`**: status triplet only.
-- **`BT.QUEUE`** row transitions — use **`CALL BT.SP_INS_QUEUE(...)` only** with `IN_ACTION` ∈ `ENQUEUE` | `CLAIM_NEXT` | `TERMINAL` | `CANCEL` — no standalone `BT.SP_CLAIM_*` / `SP_CANCEL_*`.
+- **`BT.QUEUE`** row transitions — use **`CALL BT.SP_INS_QUEUE(...)` only**. Inputs are `IN_QUEUE_ID`, `IN_STRATEGY_ID`, `IN_STRATEGY_VID`, `IN_QUEUE_STATUS_ID`, `IN_PRIORITY`, `IN_ERROR_TEXT`, and `IN_USER_ID` (no `IN_ACTION`). The worker claims by reading the `QUEUED` head with `BT.SP_GET_QUEUE` and writing `RUNNING` through that same call (`WorkerLoopRepo.claim_next` in `quant/queue/worker_loop.py`). See [Database](docs/architecture/database.md#sp_ins_queue) — no standalone `BT.SP_CLAIM_*` / `SP_CANCEL_*`.
 
 All other mutations use schema stored procedures (e.g. `BT.SP_INS_STRATEGY`, `BT.SP_INS_API_REQUEST`, `BT.SP_INS_API_REQUEST_PAYLOAD`).
 
@@ -111,7 +111,7 @@ All UI dropdown, radio, and selectbox values must come from `REFDATA` tables in 
 | Listing session calendar | `REFDATA.MARKET_CALENDAR` | — | `LISTING_EXCHANGE`, `BAR_TIMEZONE`, `MARKET_*` (via `get_market_calendar()`; `''` = default crypto; not a UI dropdown) |
 | Scheduled apply offset (broker × cadence) | `CONFIG.APP_APPLY_TIMING` | — | `EXECUTE_OFFSET` (via `get_execute_offset()` / `get_apply_timing()`) |
 
-The `INDICATOR_DEFAULTS` dict in `quant/strategy/signals.py` is a **legacy fallback** — grid defaults should come from `REFDATA.INDICATOR` via `RedisRefData.get_indicator_defaults()`.
+Grid defaults come from `REFDATA.INDICATOR` via `RedisRefData.get_indicator_defaults()` (`quant/refdata/reader.py`).
 
 ### REFDATA Caching
 

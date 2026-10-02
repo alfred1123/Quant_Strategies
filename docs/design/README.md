@@ -24,6 +24,7 @@ today see [Architecture](../architecture/overview.md).
 | Doc | Status |
 |-----|--------|
 | [Jobs table detail UX](jobs-table-detail-ux.md) | Proposed |
+| [Queue screen aids (2026-09-29)](2026-09-29-queue-frontend-aids.md) | Proposed — result in Config, metric tooltips, queue search, two-job compare. Frontend only |
 | [Deployment performance reconcile](deployment-performance-reconcile.md) | Proposed — Phase 2.1–2.3 |
 | [Multi-strategy netting](multi-strategy-netting.md) | `TRADE.INTENT` built (#90, trade `1.10.0`); order side recorded |
 | [Separate underlying & cache](separate-underlying.md) | Partial (cusip/xref only) |
@@ -43,6 +44,8 @@ today see [Architecture](../architecture/overview.md).
 | [Code quality review (2026-09-26)](2026-09-26-code-quality-review.md) | Open findings — scheduler replay, worker reap, and how indicators and signals are modelled |
 | [AlgoDaemon bug report (2026-09-27)](2026-09-27-algodaemon-bug-report.md) | 21 items from the API review. Open high: AND-as-OR, stochastic, walk-forward warmup, cross-range promotion |
 | [Bug verification, rounds 3–4 (2026-09-27)](2026-09-27-bug-verification-round3-4.md) | Seven follow-up items: SMA/EMA raw levels, sampled big grids, window bounds, same-close fills, duplicate versions (B24), volume limited to a raw column (B26). Hourly annualisation downgraded |
+| [Long-term fixes: B1, window bounds, data columns, repeated trials (2026-09-29)](2026-09-29-long-term-fixes-b1-rangeparam-datacolumn.md) | Design items for decision. #76 is the B1 root-cause fix; window floor, data-column check and distinct-trial search proposed |
+| [Dependency and OOP review (2026-09-29)](2026-09-29-dependency-review.md) | Open findings: package cycles, layer leaks, and live-trading failure paths that have no test yet |
 
 ## Shipped or historical → [Archive](../archive/README.md)
 

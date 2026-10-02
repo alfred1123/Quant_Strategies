@@ -69,14 +69,18 @@ pg_isready -h 127.0.0.1 -p 5433
 ```
 
 ```bash
-# First-time local copy: tunnel, then dump, then switch to Option A
+# First local copy. Dump needs the prod tunnel.
+# restore prints the bootstrap-roles command; that command prints the deploy.
 ./scripts/appctl.sh prod tunnel start
 ./scripts/dbctl.sh reset
 ./scripts/dbctl.sh dump
 ./scripts/dbctl.sh restore
 ./scripts/dbctl.sh bootstrap-roles
+DB_TARGET=local ./scripts/liquibase-deploy.sh
 # then set DB_TARGET=local and use Option A — no tunnel after that
 ```
+
+Detail, troubleshooting, and the S3 backup: [Database dump and restore](guides/database-dump-restore.md).
 
 ## Database migrations (Liquibase)
 

@@ -13,12 +13,12 @@ See [System Overview](overview.md) for runtime topologies.
 | Setting | Dev (laptop) | Prod (EC2) | Where it lives |
 |---------|-------------|------------|----------------|
 | `DB_TARGET` | `prod` (tunnel, default) or `local` | `prod` | `.env` — resolved via `config/db-targets.json` |
-| `QUANTDB_HOST` | `localhost` (tunnel) | `quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com` | SSM `/quant/dev/` / SSM `/quant/prod/` |
+| `QUANTDB_HOST` | `127.0.0.1` (tunnel; `config/db-targets.json`) | `quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com` | JSON default; SSM `/quant/prod/` on EC2 |
 | `QUANTDB_PORT` | leave unset — `config/db-targets.json` supplies `5433` | `5432` | SSM (prod); setting it to `5432` in `.env` is refused for `prod` |
 | `QUANTDB_USERNAME` | shared DB user | same | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | `QUANTDB_PASSWORD` | shared DB password | same | SSM `/quant/dev/` / SSM `/quant/prod/` |
 | `APP_ENV` | `dev` (default) | `prod` | `docker-compose.prod.yml` |
-| `USE_SSM` | `1` (default) | `1` | `docker-compose.yml` (default for both) |
+| `USE_SSM` | `0` when `DB_TARGET=local`. Unset otherwise: SSM loads only if the value is `1` | `1` | `scripts/appctl.sh`, `docker-compose.dev.yml`; `${USE_SSM:-1}` in `docker-compose.yml` |
 | `COOKIE_SECURE` | unset (defaults to `APP_ENV == prod`) | `0` (HTTP) / `1` (HTTPS) | `docker-compose.prod.yml` / `docker-compose.cloudflare.yml` |
 | `CORS_ORIGINS` | SSM `/quant/dev/` or `.env` (in-code default `http://localhost:5173`) | SSM `/quant/prod/` (public site URL(s)) | SSM / `.env` |
 | `JWT_SECRET` | shared dev secret from SSM | fixed value from SSM | SSM `/quant/dev/` / SSM `/quant/prod/` |
@@ -34,33 +34,25 @@ See [System Overview](overview.md) for runtime topologies.
 ## How config is loaded
 
 ```
-Developer laptop                          Production EC2
-─────────────────                         ──────────────
-docker compose up                         docker compose -f docker-compose.yml
-      │                                         -f docker-compose.prod.yml up
-      ▼                                               │
- docker-compose.yml                                   ▼
-  APP_ENV=dev                              docker-compose.prod.yml merges:
-  USE_SSM=1 (default)                        APP_ENV=prod
-      │                                      USE_SSM=1
-      ▼                                      COOKIE_SECURE=0
-  SSM /quant/dev/*                                │
-  loads ALL config:                               ▼
-    QUANTDB_HOST (localhost)              SSM /quant/prod/*
-    QUANTDB_PORT (5433)                   loads ALL config:
-    JWT_SECRET, CORS_ORIGINS, etc.          QUANTDB_HOST (RDS endpoint)
-      │                                     QUANTDB_PORT (5432)
-      │  (fallback if SSM unreachable:      JWT_SECRET, CORS_ORIGINS,
-      │   loads .env instead)               EXCHANGE_SECRETS_KEY (required)
-      │                                           │
-      ▼                                           ▼
-  quant/shared/config.py                            quant/shared/config.py
-  _load_from_ssm("dev")                   _load_from_ssm("prod")
-  _build_db_conninfo()                    _build_db_conninfo()
-      │                                           │
-      ▼                                           ▼
-  connects to localhost:5433               connects to RDS:5432
-  (SSM tunnel via prod EC2)               (direct VPC connection)
+Developer laptop                                 Production EC2
+./scripts/appctl.sh dev start                    docker compose -f docker-compose.yml
+(uvicorn + Vite on the host)                          -f docker-compose.prod.yml up
+        │                                                     │
+        ├─ DB_TARGET=local                                    ▼
+        │    USE_SSM=0                                 APP_ENV=prod
+        │    appctl.sh + docker-compose.dev.yml        USE_SSM=1
+        │    .env + config/db-targets.json                   │
+        │    Postgres 127.0.0.1:5432                         ▼
+        │    redis + worker (compose.dev)            SSM /quant/prod/*
+        │                                            QUANTDB_HOST = RDS endpoint
+        └─ DB_TARGET=prod (file default)             QUANTDB_PORT = 5432
+             USE_SSM=1 loads SSM /quant/<APP_ENV>/   JWT_SECRET, CORS_ORIGINS,
+             otherwise .env                          EXCHANGE_SECRETS_KEY (required)
+             tunnel 127.0.0.1:5433 → Aurora :5432           │
+                    │                                       ▼
+                    ▼                                quant/shared/config.py
+             quant/shared/config.py                  load_config() → _load_from_ssm("prod")
+             load_config()
 ```
 
 !!! note "There is no dev EC2"
@@ -115,29 +107,14 @@ pg_isready -h 127.0.0.1 -p 5433
 
 ## Restoring dev environment
 
-Config is loaded from SSM `/quant/dev/` by default. You just need AWS credentials:
-
-```bash
-aws sso login --profile alfcheun
-```
-
-If SSM is unreachable (offline, no AWS creds), the API falls back to `.env`.
-To set up the fallback file:
+`load_config()` in `quant/shared/config.py` reads SSM only when `USE_SSM=1`. Native `./scripts/appctl.sh dev start` loads `.env` unless that flag is set. `DB_TARGET=local` forces `USE_SSM=0`. The Compose stack in `docker-compose.yml` defaults `USE_SSM` to `1`, then loads `/quant/<APP_ENV>/` and falls back to `.env` if Parameter Store is unreachable.
 
 ```bash
 cp .env.example .env
+aws sso login --profile alfcheun   # only when USE_SSM=1
 ```
 
-Then fill in your credentials:
-
-```bash
-# .env — fallback values (only used when SSM is unreachable)
-export QUANTDB_HOST=localhost
-export QUANTDB_PORT=5433
-export QUANTDB_USERNAME=quant_admin
-export QUANTDB_PASSWORD=<your_password>
-JWT_SECRET=<any_value_or_leave_blank_for_auto>
-```
+Names and defaults: [Environment variables](../env-vars.md). How to run: [Getting Started](../getting-started.md).
 
 Local/dev (`DB_TARGET=local`) talks to Postgres on `:5432` and **does not
 need a tunnel**. Reaching **prod Aurora** from the laptop is a different
@@ -166,101 +143,11 @@ aws ssm start-session \
   --profile alfcheun
 ```
 
-Run locally (no Docker needed for dev):
-
-```bash
-uvicorn quant.api.main:app --reload --port 8000
-cd frontend && npm run dev
-```
-
-Or with Docker:
-
-```bash
-docker compose up -d --build
-```
-
 ---
 
-## Optional: point dev at a local Postgres
+## Local database
 
-`./scripts/appctl.sh dev start` with `DB_TARGET=local` uses Postgres on
-`:5432` and does **not** start a tunnel. Reaching the shared Aurora cluster
-from a laptop is [prod tunnel](#prod-tunnel-laptop-to-aurora-on-5433) on
-`:5433`. Leaving `DB_TARGET` unset still selects that prod target — then
-`dev start` will start the prod tunnel if it is down.
-
-### One-time setup
-
-```bash
-# 1. Install Postgres 17 client + server (Ubuntu/WSL example, PGDG repo)
-sudo apt install -y postgresql-17 postgresql-client-17
-
-# 2. Install Docker + compose v2 (used to run Redis + the Python queue
-#    worker that processes backtest jobs). Skip if you already have Docker.
-sudo apt install -y docker.io docker-compose-v2
-sudo usermod -aG docker "$USER"     # log out/in, or use `sg docker -c ...`
-
-# 3. Create the local quant_admin user + quantdb database
-./scripts/dbctl.sh reset
-
-# 4. Dump prod (uses the SSM tunnel) and restore into local
-./scripts/dbctl.sh dump
-./scripts/dbctl.sh restore        # picks the newest dump in db/dumps/
-```
-
-See [Database dump & restore](../guides/database-dump-restore.md) for full steps, troubleshooting, and security notes.
-
-### Daily usage
-
-```bash
-# Append once to .env (per-developer, gitignored)
-echo 'DB_TARGET=local' >> .env
-
-# Start: brings up uvicorn + vite natively AND
-#   docker-compose.dev.yml (redis + worker) automatically.
-# No SSM tunnel needed.
-./scripts/appctl.sh dev start
-
-# Status confirms which target is active + dev stack health
-./scripts/appctl.sh dev status
-#   Mode: dev  (DB_TARGET=local)
-#   backend: running (..., port 8000)
-#   frontend: running (..., port 5173)
-#   DB: reachable on 127.0.0.1:5432  (local)
-#   dev stack:
-#     quant-dev-worker        Up
-#     quant-dev-redis         Up (healthy)
-```
-
-`./scripts/appctl.sh dev kill` (or `stop`) tears down everything — uvicorn,
-vite, **and** the compose stack — so nothing lingers between sessions.
-
-What runs where:
-
-| Component | Where | Port | Source of truth |
-|-----------|-------|------|-----------------|
-| FastAPI (uvicorn --reload) | host (native) | 8000 | `quant/api/`, `quant/` |
-| Vite dev server | host (native) | 5173 | `frontend/` |
-| PostgreSQL 17 | host (native, systemd) | 5432 | `pg_dump` of Aurora |
-| Redis 7 | docker | 6379 | `docker-compose.dev.yml` |
-| Worker (`quant.queue.worker_loop`) | docker (host network) | — | `docker-compose.dev.yml` |
-
-The worker container uses `network_mode: host` so it can reach the
-host-side Postgres at `127.0.0.1:5432` and the host-side Redis at
-`127.0.0.1:6379` without any extra docker network plumbing (Linux/WSL2
-only). FastAPI hydrates Redis with all REFDATA tables on boot — verify
-with `docker exec quant-dev-redis redis-cli keys 'refdata:*'`. The worker
-then claims `QUEUED` rows from `BT.QUEUE` and spawns one
-`python -m quant.queue.worker <queue_id>` subprocess per job.
-
-To switch back to the shared prod DB, comment out / remove `DB_TARGET=local`
-from `.env` (or run `DB_TARGET=prod ./scripts/appctl.sh dev start` for a
-one-off override).
-
-How it works: `appctl.sh` passes `DB_TARGET=local` (plus `USE_SSM=0`, so the API
-does not fetch prod credentials it will not use) to uvicorn and to the worker
-container. Nothing hands over a host or a port — both ends resolve the target
-themselves from `config/db-targets.json`, described next.
+`DB_TARGET=local` uses host Postgres on `:5432` and does not open a tunnel. `scripts/appctl.sh` exports `USE_SSM=0` for that target, and `docker-compose.dev.yml` sets the same on the worker. Both ends resolve host and port from `config/db-targets.json` (next section). Setup, the first copy, and daily commands: [Getting Started](../getting-started.md). Dump and restore: [Database dump and restore](../guides/database-dump-restore.md).
 
 ---
 
@@ -381,7 +268,7 @@ aws ssm send-command --instance-ids "$INSTANCE_ID" \
 | `docker-compose.yml` | Base services — `USE_SSM=1` default, SSM-first for all envs |
 | `docker-compose.prod.yml` | Prod behavioral flags only — `APP_ENV=prod`, `USE_SSM=1`, `COOKIE_SECURE=0` |
 | `docker-compose.tls.yml` | TLS layer — `COOKIE_SECURE=1`, `DOMAIN`, certbot |
-| `quant/shared/config.py` | Config loader — tries SSM first, falls back to `.env` if unreachable |
+| `quant/shared/config.py` | `load_config()` reads SSM only when `USE_SSM=1`; otherwise `.env` |
 | `quant/api/auth/router.py` | Cookie `Secure` flag — reads `COOKIE_SECURE` or falls back to `APP_ENV` |
 | `quant/api/main.py` | Swagger toggle, CORS — reads `APP_ENV`, `CORS_ORIGINS` |
 | `aws/scripts/init-ssm-params.sh` | Bootstraps SSM parameters (run once) |
@@ -392,7 +279,7 @@ aws ssm send-command --instance-ids "$INSTANCE_ID" \
 ## Docker Compose layering
 
 ```bash
-# Dev (HTTP, local build)
+# Compose base (HTTP). Laptop dev is `./scripts/appctl.sh dev start`, not this file.
 docker compose up -d --build
 
 # Prod — CI deploys via ECR pull (no --build on EC2). Manual equivalent:
