@@ -223,7 +223,7 @@ Loaded at runtime via `RedisRefData.get_promotion_metrics()`. See [Best-VID Prom
 
 ### CONFIG — backtest search
 
-`CONFIG.BACKTEST_SEARCH` is one mutable policy row: `TRIAL_BUDGET`, `SEED`, `MAX_ATTEMPTS_FACTOR`, and `OVER_BUDGET_MODE` (`TPE_DISTINCT`, `RANDOM_DISTINCT`, or `REJECT`). Release `1.2.0` seeds 10000 / 42 / 3 / `TPE_DISTINCT`. Its context is `config` only, so a `prod-deploy` migrate skips it until that context is added. `RedisRefData.get_backtest_search()` is the read path. `CONFIG.SP_GET_ENUM` already returns every column of a policy table, so the procedure body is unchanged (decision #91).
+`CONFIG.BACKTEST_SEARCH` is one mutable policy row: `TRIAL_BUDGET`, `SEED`, `MAX_ATTEMPTS_FACTOR`, and `OVER_BUDGET_MODE` (`TPE_DISTINCT`, `RANDOM_DISTINCT`, or `REJECT`). Release `1.2.0` seeds 10000 / 42 / 3 / `TPE_DISTINCT`. Context is `config,prod-deploy`, so a push to `main` queues both changesets for the production migrate. `RedisRefData.get_backtest_search()` is the read path. `CONFIG.SP_GET_ENUM` already returns every column of a policy table, so the procedure body is unchanged (decision #91).
 
 ## Deployment
 

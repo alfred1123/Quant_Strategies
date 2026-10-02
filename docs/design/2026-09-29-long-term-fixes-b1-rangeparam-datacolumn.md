@@ -266,7 +266,7 @@ D2 plus D4, with the numbers in the DB.
 
 ### Shipped (decision #91)
 
-D2 plus D4 are in `quant/strategy/optimizer.py`. The seeded mode is `TPE_DISTINCT`. `RANDOM_DISTINCT` and `REJECT` are the other values of `OVER_BUDGET_MODE`, so switching is a row change. `OPTUNA_MAX_TRIALS`, `OPTUNA_SEED`, the `n_trials` argument, and `total_trials` are gone. The drawer reads `GET /api/v1/config/backtest_search`. The results chip reads `{distinct_cells} of {grid_size} cells, {search}`.
+D2 plus D4 are in `quant/strategy/optimizer.py`. Release `config/1.2.0` (the table and its seed row) has context `config,prod-deploy`. The seeded mode is `TPE_DISTINCT`. `RANDOM_DISTINCT` and `REJECT` are the other values of `OVER_BUDGET_MODE`, so switching is a row change. `OPTUNA_MAX_TRIALS`, `OPTUNA_SEED`, the `n_trials` argument, and `total_trials` are gone. The drawer reads `GET /api/v1/config/backtest_search`. The results chip reads `{distinct_cells} of {grid_size} cells, {search}`.
 
 Checked against current `main` before the change: seed 42, 500 bars, windows `(5, 10, 15, 20, 25)`, signals `(0.5, 1.0, 1.5, 2.0, 2.5)`, `n_trials=20` wrote **20 rows, 15 distinct cells, 20 objective calls**, and **7 distinct cells in `top10`**. The "14" in the Ran note above was a different series. The test asserts 20 distinct cells and 20 objective calls.
 
