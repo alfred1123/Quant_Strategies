@@ -120,4 +120,10 @@ These come from the [persistence validation study](strategy-persistence-validati
 
 ## Risk control (Risk Guardian)
 
-Risk Guardian owns sleeve sizing and caps, drawdown limits based on bootstrap resampling rather than the single historical path, the blend-level kill switch, and return concentration. It builds on the validation gates above rather than re-running them, and it tests sizing offline until the platform supports fractional positions (PR #63 proposals). Its priorities are in `/workspace/priorities/risk-guardian.md`. This section will be expanded by Risk Guardian.
+**Role.** Risk Guardian owns sleeve sizing, drawdown limits, the blend-level kill switch, and return concentration. It builds on the validation gates above. Its inputs are the researcher's platform daily P&L and Scout's [persistence validation study](strategy-persistence-validation.md).
+
+**Calibration.** Weights and thresholds are calibrated on in-sample Bybit data only (through 2024-06-30). The 2018–21 Binance splice is a stress test.
+
+**Reconciliation.** Final figures are reconciled with algodaemon.com. A same-close blend figure counts once the researcher has rebuilt it from platform daily P&L. Delay-1 results, the 2018–21 splice, bootstrap quantiles, and alarm simulations stay labelled offline.
+
+**Decisions.** Alfred chooses the weights, the drawdown tiers, and the kill-switch rule. The draft for ETH A2, BNB 100/0.5, and BTC 60/2.25 is [Risk control for the three crypto sleeves](risk-control.md). The platform cannot size or combine sleeves yet ([fractional sizing and stateful exits](../design/2026-09-26-fractional-sizing-stateful-exits.md), [PR #63](https://github.com/alfred1123/Quant_Strategies/pull/63)), so none of that draft can run on AlgoDaemon.
