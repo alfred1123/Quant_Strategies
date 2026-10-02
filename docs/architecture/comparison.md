@@ -69,7 +69,7 @@ of clarity that even larger firms often lack.
 | **Risk management** | Promotion HARD/SOFT in `CONFIG.PROMOTION_METRIC`: max drawdown, full-sample Sharpe, and — once the refdata rows are applied — hold-out Sharpe and Sharpe versus buy-and-hold. No live pre-trade check | Exposure limits, correlation monitoring, VaR/CVaR, margin | **Large** |
 | **Execution** | Market orders on the live path (ccxt). Backtest fills are fee-adjusted closes | Smart routing, TWAP/VWAP, slippage models, TCA | **Medium** |
 | **Strategy count** | Handful of signal types | Hundreds of signals, portfolio optimisation | **Large** |
-| **Backtesting realism** | Fee-adjusted returns and one walk-forward cut. Open: long-only AND scores as OR, stochastic uses the traded coin's high/low/close, and the out-of-sample slice restarts the indicator ([AlgoDaemon bug report](../design/2026-09-27-algodaemon-bug-report.md)) | Bias checks, market impact, PnL attribution | **Medium** |
+| **Backtesting realism** | Fee-adjusted returns and one walk-forward cut. Open: stochastic uses the traded coin's high/low/close, and the out-of-sample slice restarts the indicator. Long-only AND used to score as OR; the combiner now vetoes a flat factor, and stored AND results from before that fix still match OR until flagged ([AlgoDaemon bug report](../design/2026-09-27-algodaemon-bug-report.md)) | Bias checks, market impact, PnL attribution | **Medium** |
 | **Team tooling** | Shared strategy pool, VID comparison | Experiment tracking, reproducible research envs | **Small** |
 
 ---
@@ -394,7 +394,7 @@ path. The hold-out gate and new signals do not wait on the OOP target.
 | Order | Work | Where it stands |
 |-------|------|-----------------|
 | 1 | Apply refdata `1.26.0-promotion-holdout-gates` | Evaluator already reads the keys. Migrate, then `POST /api/v1/refdata/refresh` |
-| 2 | Research realism on the current scorer | [AlgoDaemon bug report](../design/2026-09-27-algodaemon-bug-report.md): AND-as-OR, stochastic high/low/close, walk-forward restart |
+| 2 | Research realism on the current scorer | [AlgoDaemon bug report](../design/2026-09-27-algodaemon-bug-report.md): stochastic high/low/close, walk-forward restart. AND-as-OR is fixed in the combiner; stored results still need flagging |
 | 3 | More signal types | REFDATA `SIGNAL_TYPE` + `signals.py` ([Adding Strategies](../guides/adding-strategies.md)) |
 | 4 | Multi-asset | Per-factor symbol exists. Optimizer scores one primary series. One `INTERNAL_CUSIP` per deployment |
 | 5 | Paper-before-live, fill simulator | Trade worker, market apply, and the execution log exist (execution log in trade `1.8.0`) |
@@ -443,7 +443,7 @@ flowchart LR
 | Area | Phase |
 |------|-------|
 | Refdata hold-out rows on the snapshot | 1 |
-| Research realism bugs (AND-as-OR, stochastic, walk-forward restart) | 2 |
+| Research realism bugs (stochastic, walk-forward restart; stored AND results still to flag) | 2 |
 | More strategies on `signals.py` | 3 |
 | Multi-asset portfolio | 4 |
 | Paper-before-live rule and a fill simulator | 5 |

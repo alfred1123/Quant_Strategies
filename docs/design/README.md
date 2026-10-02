@@ -43,7 +43,7 @@ today see [Architecture](../architecture/overview.md).
 |-----|--------|
 | [Backtest review (2026-09-25)](2026-09-25-backtest-review.md) | Open findings — measurement, promotion, and live fill |
 | [Code quality review (2026-09-26)](2026-09-26-code-quality-review.md) | Open findings — scheduler replay, worker reap, and how indicators and signals are modelled |
-| [AlgoDaemon bug report (2026-09-27)](2026-09-27-algodaemon-bug-report.md) | 21 items from the API review. Open high: AND-as-OR, stochastic, walk-forward warmup, cross-range promotion |
+| [AlgoDaemon bug report (2026-09-27)](2026-09-27-algodaemon-bug-report.md) | 21 items from the API review. AND-as-OR is fixed in the combiner; stored results still need flagging. Open high: stochastic, walk-forward warmup, cross-range promotion |
 | [Bug verification, rounds 3–4 (2026-09-27)](2026-09-27-bug-verification-round3-4.md) | Seven follow-up items: SMA/EMA raw levels, sampled big grids, window bounds, same-close fills, duplicate versions (B24), volume limited to a raw column (B26). Hourly annualisation downgraded |
 | [Long-term fixes: B1, window bounds, data columns, repeated trials (2026-09-29)](2026-09-29-long-term-fixes-b1-rangeparam-datacolumn.md) | Design items for decision. #76 is the B1 root-cause fix; window floor, data-column check and distinct-trial search proposed |
 | [Dependency and OOP review (2026-09-29)](2026-09-29-dependency-review.md) | Open findings: package cycles, layer leaks, and live-trading failure paths that have no test yet |

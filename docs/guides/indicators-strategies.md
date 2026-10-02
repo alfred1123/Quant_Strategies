@@ -41,9 +41,9 @@ When combining multiple factors:
 
 | Mode | Behaviour |
 |------|-----------|
-| **AND** | Position taken only when all factors agree on direction. Ties broken by percentile-rank strength, using bars up to the current one. |
+| **AND** | Position taken only when every factor agrees on direction. A flat factor vetoes. A conflict — both long and short, and no flat factor — is broken by percentile-rank strength, using bars up to the current one. |
 | **OR** | Position taken when any factor signals. Strongest signal wins (percentile-rank tiebreak on bars up to the current one). |
-| **FILTER** | Factor 1 is the **Gate** (must be non-zero to allow a trade); factor 2 is the **Signal** (supplies direction). The UI labels the cards Gate / Signal. Adding a factor while FILTER is selected inserts it as the gate so the original recipe stays the signal. |
+| **FILTER** | Factor 1 is the **Gate** (must be non-zero to allow a trade); factor 2 is the **Signal** (supplies direction). The UI labels the cards Gate / Signal. Adding a factor while FILTER is selected inserts it as the gate so the original recipe stays the signal. With three or more factors the direction factors are AND-combined, so a flat direction factor vetoes. |
 
 ## Trading Period
 
