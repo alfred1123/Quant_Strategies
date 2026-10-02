@@ -22,13 +22,17 @@ They are not the 2026-10-03 bodies. Point ``--compare`` at the copies kept
 outside the repo when a later fetch of the same window should be checked.
 No revision has been observed. This script does not invent one.
 
-Sleeve factor note, chosen before any run. The three series are not the same
-backtest. Only point-in-time BTC exchange netflow covers 2021 to mid-2024.
+Sleeve factor note. The research room named the child before any result. The
+three series are not the same backtest. Only point-in-time BTC exchange
+netflow covers 2021 to mid-2024. The child below is what the application will
+store and read. It is not a number for a person to apply by hand.
 
-- Point-in-time BTC exchange netflow is factor one. BTC 60/2.25 stays factor two.
-- On a two-factor FILTER the first factor is the gate and the second is the direction. Netflow has to be first if it is meant to turn the sleeve on and off. Put second, the sleeve's direction is thrown away.
-- The gate is any non-zero day, not outflow versus a zero line. A negative netflow day still lets a long sleeve through. An outflow-only cut is a different series and is not in this harness.
-- SOPR and MVRV z-score stay on the July 2025 window in that same note.
+- The raw point-in-time BTC exchange netflow series (transactions/transfers_volume_exchanges_net_pit) has no exact zeros in the saved copy from 11 Dec 2019 through 1 Oct 2026 (2487 days, 0 nulls, smallest absolute value about 2.56). The 2021-07-01 to 2024-06-30 window is 1096 days and also has no exact zero. A non-zero gate on the raw series never turns the sleeve off, so it is not the child.
+- The named series, chosen before a result: 1 when that point-in-time value is below zero, and 0 otherwise. No other cut. The 0 must be stored. Dropping zero days is not allowed.
+- That 0/1 column is factor one. BTC 60/2.25 stays factor two. On a two-factor FILTER the first factor is the gate and the second is the direction. The 0/1 column has to be first if it is meant to turn the sleeve on and off. Put second, the sleeve's direction is thrown away. The gate indicator is an SMA with window 1, so a stored 0 stays off and a 1 stays on. A wider window or a Bollinger is not this series.
+- In the saved copy the 0/1 column is 0 on 702 days and 1 on 1785 days. That is a count of the named rule, not a backtest result.
+- The signal threshold on the SMA (window 1) of the 0/1 outflow column has to sit strictly between 0 and 1. Any value in that open range leaves a stored 0 off and a stored 1 on, so the threshold is not a search and do not pick or recommend a specific number inside the range. The sleeve's 2.25 is not the gate's threshold. A threshold of 2.25 would leave the gate off every day, because a 1 is never above 2.25.
+- SOPR and MVRV z-score stay a from-July-2025 check only.
 
 Store proposal, not a decision. A stored point keeps the latest value for now, and this is a proposal until Alfred confirms. Keeping a second stored value is not the point-in-time series. Point-in-time is a different Glassnode series.
 """
@@ -61,18 +65,37 @@ DEFAULT_FIXTURE_ROOT = ROOT / "tests" / "fixtures" / "glassnode"
 
 # Chosen before any run. The suite fails if the contract file drifts from this.
 SLEEVE_FACTOR_RULE = (
-    "Point-in-time BTC exchange netflow is factor one. BTC 60/2.25 stays factor two.",
     (
+        "The raw point-in-time BTC exchange netflow series "
+        "(transactions/transfers_volume_exchanges_net_pit) has no exact zeros in the saved copy "
+        "from 11 Dec 2019 through 1 Oct 2026 (2487 days, 0 nulls, smallest absolute value about 2.56). "
+        "The 2021-07-01 to 2024-06-30 window is 1096 days and also has no exact zero. "
+        "A non-zero gate on the raw series never turns the sleeve off, so it is not the child."
+    ),
+    (
+        "The named series, chosen before a result: 1 when that point-in-time value is below zero, "
+        "and 0 otherwise. No other cut. The 0 must be stored. Dropping zero days is not allowed."
+    ),
+    (
+        "That 0/1 column is factor one. BTC 60/2.25 stays factor two. "
         "On a two-factor FILTER the first factor is the gate and the second is the direction. "
-        "Netflow has to be first if it is meant to turn the sleeve on and off. "
-        "Put second, the sleeve's direction is thrown away."
+        "The 0/1 column has to be first if it is meant to turn the sleeve on and off. "
+        "Put second, the sleeve's direction is thrown away. "
+        "The gate indicator is an SMA with window 1, so a stored 0 stays off and a 1 stays on. "
+        "A wider window or a Bollinger is not this series."
     ),
     (
-        "The gate is any non-zero day, not outflow versus a zero line. "
-        "A negative netflow day still lets a long sleeve through. "
-        "An outflow-only cut is a different series and is not in this harness."
+        "In the saved copy the 0/1 column is 0 on 702 days and 1 on 1785 days. "
+        "That is a count of the named rule, not a backtest result."
     ),
-    "SOPR and MVRV z-score stay on the July 2025 window in that same note.",
+    (
+        "The signal threshold on the SMA (window 1) of the 0/1 outflow column has to sit "
+        "strictly between 0 and 1. Any value in that open range leaves a stored 0 off and a stored 1 on, "
+        "so the threshold is not a search and do not pick or recommend a specific number inside the range. "
+        "The sleeve's 2.25 is not the gate's threshold. A threshold of 2.25 would leave the gate off "
+        "every day, because a 1 is never above 2.25."
+    ),
+    "SOPR and MVRV z-score stay a from-July-2025 check only.",
 )
 
 # Proposal until Alfred confirms. Separate from the sleeve factor rule above.
@@ -419,7 +442,44 @@ def _check_sleeve_factors(root: Path, case: dict) -> str:
         "distribution/exchange_net_position_change_pit",
         "BNB PIT path",
     )
-    return "BTC netflow PIT covers 2021 to mid-2024; SOPR, MVRV z-score, and BNB do not"
+    _check_named_child(doc.get("child"))
+    return "BTC netflow PIT covers 2021 to mid-2024; the child is the stored 0/1 column"
+
+
+def _check_named_child(child: object) -> None:
+    """Lock the named 0/1 child. Counts are only the ones already checked."""
+    if not isinstance(child, dict):
+        raise TypeError("the named child is missing")
+    _eq(child.get("named_before_result"), True, "child named before a result")
+    _eq(child.get("raw_metric_path"), "transactions/transfers_volume_exchanges_net_pit", "child raw path")
+    saved = child.get("saved_copy")
+    if not isinstance(saved, dict):
+        raise TypeError("saved copy counts are missing")
+    _eq(saved.get("from"), "2019-12-11", "saved copy start")
+    _eq(saved.get("through"), "2026-10-01", "saved copy end")
+    _eq(saved.get("days"), 2487, "saved copy days")
+    _eq(saved.get("nulls"), 0, "saved copy nulls")
+    _eq(saved.get("exact_zeros"), False, "saved copy exact zeros")
+    _eq(saved.get("smallest_absolute_value"), "about 2.56", "smallest absolute value")
+    window = child.get("window")
+    if not isinstance(window, dict):
+        raise TypeError("child window counts are missing")
+    _eq(window.get("from"), "2021-07-01", "child window start")
+    _eq(window.get("to"), "2024-06-30", "child window end")
+    _eq(window.get("days"), 1096, "child window days")
+    _eq(window.get("exact_zeros"), False, "child window exact zeros")
+    _eq(child.get("below_zero"), 1, "below zero")
+    _eq(child.get("otherwise"), 0, "otherwise")
+    _eq(child.get("store_zero"), True, "store zero")
+    _eq(child.get("drop_zero_days"), False, "drop zero days")
+    _eq(child.get("days_at_0"), 702, "days at 0")
+    _eq(child.get("days_at_1"), 1785, "days at 1")
+    _eq(child.get("factor_one"), "0/1 column", "factor one")
+    _eq(child.get("factor_two"), "BTC 60/2.25", "factor two")
+    _eq(child.get("gate_indicator"), "SMA", "gate indicator")
+    _eq(child.get("gate_window"), 1, "gate window")
+    _eq(child.get("signal_threshold_open_range"), "(0, 1)", "signal threshold range")
+    _eq(child.get("signal_threshold_is_a_search"), False, "signal threshold search")
 
 
 def _check_interval(root: Path, case: dict) -> str:

@@ -78,9 +78,20 @@ class TestSuite:
         assert harness.STORE_VALUE_PROPOSAL == expected
         for sentence in expected:
             assert sentence in note
-        assert harness.SLEEVE_FACTOR_RULE[0] == (
-            "Point-in-time BTC exchange netflow is factor one. BTC 60/2.25 stays factor two."
+        definition = (
+            "The named series, chosen before a result: 1 when that point-in-time value is below zero, "
+            "and 0 otherwise. No other cut. The 0 must be stored. Dropping zero days is not allowed."
         )
+        threshold = (
+            "The signal threshold on the SMA (window 1) of the 0/1 outflow column has to sit "
+            "strictly between 0 and 1. Any value in that open range leaves a stored 0 off and a stored 1 on, "
+            "so the threshold is not a search and do not pick or recommend a specific number inside the range. "
+            "The sleeve's 2.25 is not the gate's threshold. A threshold of 2.25 would leave the gate off "
+            "every day, because a 1 is never above 2.25."
+        )
+        assert definition in harness.SLEEVE_FACTOR_RULE
+        assert threshold in harness.SLEEVE_FACTOR_RULE
+        assert "0.5" not in threshold
 
     def test_equal_coverage_fails_closed(self, tmp_path):
         src = FIXTURE_ROOT / "contracts" / "sleeve_factors.json"

@@ -85,14 +85,24 @@ The sleeve those facts were checked against is the 2021 to mid-2024 window. On t
 
 A full-window Sharpe on the restated `indicators/sopr` or `market/mvrv_z_score` series would be look-ahead. The January 2020 `indicators/sopr` fixture is a 14-day shape sample of that restated path, with synthetic middles. It is not that Sharpe. `market/mvrv` in the same sample is not `market/mvrv_z_score`.
 
-`combine_positions` already implements a two-factor FILTER as gate then direction: the first factor passes on any non-zero value, and the second factor supplies the position (`quant/strategy/signals.py`, decision #6). A negative gate still passes. That is why the note below refuses an outflow-only cut: a negative netflow day would still let the long sleeve through, and an outflow-only gate would be a different series.
+The research room named the child before any result. The application will store that column and read it as factor one. The sentences below are that behavior. They are not a number for a person to apply by hand.
+
+The raw point-in-time BTC exchange netflow series (`transactions/transfers_volume_exchanges_net_pit`) has no exact zeros in the saved copy from 11 Dec 2019 through 1 Oct 2026 (2487 days, 0 nulls, smallest absolute value about 2.56). The 2021-07-01 to 2024-06-30 window is 1096 days and also has no exact zero. A non-zero gate on the raw series never turns the sleeve off, so it is not the child.
+
+The named series, chosen before a result, is 1 when that point-in-time value is below zero, and 0 otherwise. No other cut. The application stores the 0. Dropping zero days is not allowed. In the saved copy that column is 0 on 702 days and 1 on 1785 days. That is a count of the named rule, not a backtest result.
+
+That 0/1 column is factor one. BTC 60/2.25 stays factor two. `combine_positions` already implements a two-factor FILTER as gate then direction (`quant/strategy/signals.py`, decision #6). The 0/1 column has to be first. Put second, the sleeve's direction is thrown away. The gate indicator is `get_sma` with window 1, so a stored 0 stays off and a stored 1 stays on. A wider window or a Bollinger is not this series. `momentum_band_signal` is long only when the indicator is above its signal threshold. The signal threshold on the SMA (window 1) of the 0/1 outflow column has to sit strictly between 0 and 1. Any value in that open range leaves a stored 0 off and a stored 1 on, so the threshold is not a search and do not pick or recommend a specific number inside the range. The sleeve's 2.25 is not the gate's threshold. A threshold of 2.25 would leave the gate off every day, because a 1 is never above 2.25.
+
+SOPR and MVRV z-score stay a from-July-2025 check only.
 
 The rule, in the harness note:
 
-- Point-in-time BTC exchange netflow is factor one. BTC 60/2.25 stays factor two.
-- On a two-factor FILTER the first factor is the gate and the second is the direction. Netflow has to be first if it is meant to turn the sleeve on and off. Put second, the sleeve's direction is thrown away.
-- The gate is any non-zero day, not outflow versus a zero line. A negative netflow day still lets a long sleeve through. An outflow-only cut is a different series and is not in this harness.
-- SOPR and MVRV z-score stay on the July 2025 window in that same note.
+- The raw point-in-time BTC exchange netflow series (transactions/transfers_volume_exchanges_net_pit) has no exact zeros in the saved copy from 11 Dec 2019 through 1 Oct 2026 (2487 days, 0 nulls, smallest absolute value about 2.56). The 2021-07-01 to 2024-06-30 window is 1096 days and also has no exact zero. A non-zero gate on the raw series never turns the sleeve off, so it is not the child.
+- The named series, chosen before a result: 1 when that point-in-time value is below zero, and 0 otherwise. No other cut. The 0 must be stored. Dropping zero days is not allowed.
+- That 0/1 column is factor one. BTC 60/2.25 stays factor two. On a two-factor FILTER the first factor is the gate and the second is the direction. The 0/1 column has to be first if it is meant to turn the sleeve on and off. Put second, the sleeve's direction is thrown away. The gate indicator is an SMA with window 1, so a stored 0 stays off and a 1 stays on. A wider window or a Bollinger is not this series.
+- In the saved copy the 0/1 column is 0 on 702 days and 1 on 1785 days. That is a count of the named rule, not a backtest result.
+- The signal threshold on the SMA (window 1) of the 0/1 outflow column has to sit strictly between 0 and 1. Any value in that open range leaves a stored 0 off and a stored 1 on, so the threshold is not a search and do not pick or recommend a specific number inside the range. The sleeve's 2.25 is not the gate's threshold. A threshold of 2.25 would leave the gate off every day, because a 1 is never above 2.25.
+- SOPR and MVRV z-score stay a from-July-2025 check only.
 
 None of these paths is a method on `Glassnode`, and none is an `APP_METRIC` row. Wiring them waits on the store, which is still the proposal above.
 
@@ -259,7 +269,7 @@ python scripts/glassnode_local_harness.py --compare earlier_dir later_dir
 | `pagination` | The client issues one GET. The sample body is one list and has no cursor. No paginated body was captured |
 | `rate_limit` | Short window `600` on the successful fixtures. Remaining and reset are described. Monthly cap 160,000 is an operator figure, not a header. No 429 body |
 | `interval` | Every series case is `24h`. No sub-daily body is in the corpus |
-| `sleeve_factors` | The three series above. Only BTC point-in-time netflow covers 2021 to mid-2024. The rule text is fixed. A missing contract file fails the suite |
+| `sleeve_factors` | The three series above. Only BTC point-in-time netflow covers 2021 to mid-2024. The child is the stored 0/1 column, not a non-zero gate on the raw series. The rule text is fixed. A missing contract file fails the suite |
 | `revision` | No second copy. Fails if `later/` appears under the fixture root |
 
 The parser is `quant/data/glassnode_response.py`. `Glassnode.get_historical_price` does not call it, so this change does not alter a backtest or a live order.
@@ -268,7 +278,7 @@ The parser is `quant/data/glassnode_response.py`. `Glassnode.get_historical_pric
 
 A stored point keeps the latest value for now, and this is a proposal until Alfred confirms. Keeping a second stored value is not the point-in-time series. Point-in-time is a different Glassnode series.
 
-The sleeve factor note is already chosen, and this proposal does not change it: point-in-time BTC exchange netflow is factor one, BTC 60/2.25 stays factor two, the gate is any non-zero day, and SOPR and MVRV z-score stay on the July 2025 window. That note is not a store.
+The sleeve factor note is already chosen, and this proposal does not change it: the 0/1 column is factor one, BTC 60/2.25 stays factor two, the gate indicator is an SMA with window 1, and SOPR and MVRV z-score stay a from-July-2025 check only. That note is not a store.
 
 The external copies are the log of a rewrite. A second stored value would be a different storage shape. It is not what the `*_pit` paths are. Those paths are separate Glassnode series, already named in the sleeve note.
 
