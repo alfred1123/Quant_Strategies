@@ -10,7 +10,7 @@
       before the order. TARGET_QTY is the signed target (decision #90).
     -->
 
-    <changeSet id="1.10.0-001-trade-intent" author="alfcheun" context="trade">
+    <changeSet id="1.10.0-001-trade-intent" author="alfcheun" context="trade,prod-deploy">
         <comment>TRADE.INTENT — target position per deployment per apply</comment>
         <sqlFile path="../tables/INTENT.sql" relativeToChangelogFile="true"
                  splitStatements="true" stripComments="true"/>
@@ -19,7 +19,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="1.10.0-002-sp-ins-intent" author="alfcheun" context="trade">
+    <changeSet id="1.10.0-002-sp-ins-intent" author="alfcheun" context="trade,prod-deploy">
         <comment>SP_INS_INTENT — append one target row</comment>
         <sqlFile path="../procedures/SP_INS_INTENT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="false"/>
@@ -28,7 +28,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="1.10.0-003-grant-sp-ins-intent" author="alfcheun" context="trade">
+    <changeSet id="1.10.0-003-grant-sp-ins-intent" author="alfcheun" context="trade,prod-deploy">
         <comment>Grant SP_INS_INTENT to quant_app when the role exists</comment>
         <sql splitStatements="false" stripComments="false"><![CDATA[
             DO $$
@@ -44,7 +44,7 @@
         <rollback/>
     </changeSet>
 
-    <changeSet id="1.10.0-004-sp-get-intent" author="alfcheun" context="trade">
+    <changeSet id="1.10.0-004-sp-get-intent" author="alfcheun" context="trade,prod-deploy">
         <comment>SP_GET_INTENT — owner-scoped read by deployment and time range</comment>
         <sqlFile path="../procedures/SP_GET_INTENT.sql" relativeToChangelogFile="true"
                  splitStatements="false" stripComments="false"/>
@@ -53,7 +53,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="1.10.0-005-grant-sp-get-intent" author="alfcheun" context="trade">
+    <changeSet id="1.10.0-005-grant-sp-get-intent" author="alfcheun" context="trade,prod-deploy">
         <comment>Grant SP_GET_INTENT to quant_app when the role exists</comment>
         <sql splitStatements="false" stripComments="false"><![CDATA[
             DO $$
