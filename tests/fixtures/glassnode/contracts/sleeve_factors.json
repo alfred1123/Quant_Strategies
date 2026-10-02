@@ -1,0 +1,64 @@
+{
+  "checked_on": "2026-10-03",
+  "sleeve_window": "2021 to mid-2024",
+  "note": "Coverage facts from a check already run outside this repo. No body for these paths is stored here. The three series do not share a backtest window.",
+  "series": [
+    {
+      "id": "exchange_netflow_pit",
+      "metric_path": "transactions/transfers_volume_exchanges_net_pit",
+      "what": "point-in-time exchange netflow volume",
+      "covers_2021_to_mid_2024": true,
+      "assets": {
+        "BTC": {
+          "starts": "2019-12-11",
+          "covers_2021_to_mid_2024": true
+        },
+        "ETH": {
+          "starts": "2022-02-15",
+          "covers_2021_to_mid_2024": false,
+          "why": "starts 15 Feb 2022, so it does not cover the whole 2021 to mid-2024 window"
+        },
+        "BNB": {
+          "valid_asset": false,
+          "why": "BNB is not a valid asset on this metric"
+        }
+      }
+    },
+    {
+      "id": "sopr_and_mvrv_z_score",
+      "metrics": ["indicators/sopr_pit", "market/mvrv_z_score_pit"],
+      "starts": "2025-06-27",
+      "check": "from July 2025 only",
+      "covers_2021_to_mid_2024": false,
+      "restated": {
+        "metrics": ["indicators/sopr", "market/mvrv_z_score"],
+        "full_window_sharpe": "look-ahead",
+        "why": "A full-window Sharpe on the restated series would be look-ahead. These two are a from-July-2025 check only."
+      }
+    },
+    {
+      "id": "bnb_exchange_balance_change",
+      "why": "netflow volume rejects BNB, so exchange balance change is the stand-in",
+      "covers_2021_to_mid_2024": false,
+      "restated": {
+        "metric_path": "distribution/exchange_net_position_change",
+        "what": "exchange balance change",
+        "starts": "2020-08-29",
+        "backtestable_2021_to_mid_2024": false,
+        "why": "The restated series is not a backtest for the 2021 to mid-2024 window."
+      },
+      "pit": {
+        "metric_path": "distribution/exchange_net_position_change_pit",
+        "starts": "2025-06-23",
+        "covers_2021_to_mid_2024": false,
+        "why": "The point-in-time twin starts 23 Jun 2025 and does not cover 2021-2024."
+      }
+    }
+  ],
+  "rule": [
+    "Point-in-time BTC exchange netflow is factor one. BTC 60/2.25 stays factor two.",
+    "On a two-factor FILTER the first factor is the gate and the second is the direction. Netflow has to be first if it is meant to turn the sleeve on and off. Put second, the sleeve's direction is thrown away.",
+    "The gate is any non-zero day, not outflow versus a zero line. A negative netflow day still lets a long sleeve through. An outflow-only cut is a different series and is not in this harness.",
+    "SOPR and MVRV z-score stay on the July 2025 window in that same note."
+  ]
+}

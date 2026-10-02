@@ -55,7 +55,32 @@ class TestSuite:
         assert "pagination" in ids
         assert "rate_limit" in ids
         assert "interval" in ids
+        assert "sleeve_factors" in ids
         assert "revision" in ids
+
+    def test_sleeve_note_matches_the_chosen_rule(self):
+        note = inspect.getsource(harness)
+        for sentence in harness.SLEEVE_FACTOR_RULE:
+            assert sentence in note
+        contract = json.loads(
+            (FIXTURE_ROOT / "contracts" / "sleeve_factors.json").read_text(encoding="utf-8")
+        )
+        assert tuple(contract["rule"]) == harness.SLEEVE_FACTOR_RULE
+        covers = [item["covers_2021_to_mid_2024"] for item in contract["series"]]
+        assert covers == [True, False, False]
+
+    def test_equal_coverage_fails_closed(self, tmp_path):
+        src = FIXTURE_ROOT / "contracts" / "sleeve_factors.json"
+        dest_dir = tmp_path / "contracts"
+        dest_dir.mkdir()
+        doc = json.loads(src.read_text(encoding="utf-8"))
+        for item in doc["series"]:
+            item["covers_2021_to_mid_2024"] = True
+        (dest_dir / "sleeve_factors.json").write_text(json.dumps(doc), encoding="utf-8")
+        with pytest.raises(AssertionError, match="equally backtestable"):
+            harness._check_sleeve_factors(
+                tmp_path, {"contract": "contracts/sleeve_factors.json"}
+            )
 
     def test_missing_manifest_fails_closed(self, tmp_path):
         report = harness.run_suite(tmp_path)

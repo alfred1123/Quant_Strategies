@@ -192,6 +192,11 @@
       "id": "interval",
       "type": "interval",
       "contract": "contracts/interval.json"
+    },
+    {
+      "id": "sleeve_factors",
+      "type": "sleeve_factors",
+      "contract": "contracts/sleeve_factors.json"
     }
   ]
 }

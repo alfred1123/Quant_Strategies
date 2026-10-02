@@ -71,6 +71,31 @@ A provider interval shorter than one day is refused before that call. The class 
 
 The factor model is another symbol, or another column on that symbol's frame. It is not a second metric of the same symbol. `_build_data_dict` keys frames by cusip. Two metrics of `btcusdt.crypto` do not fit.
 
+## Sleeve factors
+
+A check already run on 3 Oct 2026, outside this repo, dated three series the research sleeves might use. They do not share a window. This change did not call Glassnode again. No response body for these paths is in the repo. The [harness note](#harness) records the rule that was chosen before any run.
+
+The sleeve those facts were checked against is the 2021 to mid-2024 window. On the research page that window is the blend from 8 Oct 2021 through 30 Jun 2024, and BTC at its own Bollinger z-score window 60 above 2.25 is the BTC sleeve ([Chin Shum review](../research/chinshum-review.md)).
+
+| Series | What was checked | 2021 to mid-2024 |
+|---|---|---|
+| `transactions/transfers_volume_exchanges_net_pit` | Point-in-time exchange netflow volume. BTC starts 11 Dec 2019. ETH starts 15 Feb 2022. BNB is not a valid asset. | BTC covers the window. ETH does not cover the whole window. BNB cannot be requested. |
+| `indicators/sopr_pit`, `market/mvrv_z_score_pit` | Both start 27 Jun 2025. | A from-July-2025 check only. |
+| `distribution/exchange_net_position_change` | Exchange balance change, the BNB stand-in, because netflow volume rejects BNB. The restated series starts 29 Aug 2020. The point-in-time twin `distribution/exchange_net_position_change_pit` starts 23 Jun 2025. | The point-in-time twin does not cover 2021–2024. The restated series is not a backtest for that window. |
+
+A full-window Sharpe on the restated `indicators/sopr` or `market/mvrv_z_score` series would be look-ahead. The January 2020 `indicators/sopr` fixture is a 14-day shape sample of that restated path, with synthetic middles. It is not that Sharpe. `market/mvrv` in the same sample is not `market/mvrv_z_score`.
+
+`combine_positions` already implements a two-factor FILTER as gate then direction: the first factor passes on any non-zero value, and the second factor supplies the position (`quant/strategy/signals.py`, decision #6). A negative gate still passes. That is why the note below refuses an outflow-only cut: a negative netflow day would still let the long sleeve through, and an outflow-only gate would be a different series.
+
+The rule, in the harness note:
+
+- Point-in-time BTC exchange netflow is factor one. BTC 60/2.25 stays factor two.
+- On a two-factor FILTER the first factor is the gate and the second is the direction. Netflow has to be first if it is meant to turn the sleeve on and off. Put second, the sleeve's direction is thrown away.
+- The gate is any non-zero day, not outflow versus a zero line. A negative netflow day still lets a long sleeve through. An outflow-only cut is a different series and is not in this harness.
+- SOPR and MVRV z-score stay on the July 2025 window in that same note.
+
+None of these paths is a method on `Glassnode`, and none is an `APP_METRIC` row. Wiring them is still the open store decision above.
+
 ### One request for the window, then local bars
 
 Price already works this way when the cache hits. One refresh is one HTTP call for the whole window (the client does not paginate, and the captured bodies are one JSON list). `refresh_payload` stores that frame. The next run with refresh off slices it. The indicator walks the column in memory. There is no HTTP call per bar on this path.
@@ -234,11 +259,14 @@ python scripts/glassnode_local_harness.py --compare earlier_dir later_dir
 | `pagination` | The client issues one GET. The sample body is one list and has no cursor. No paginated body was captured |
 | `rate_limit` | Short window `600` on the successful fixtures. Remaining and reset are described. Monthly cap 160,000 is an operator figure, not a header. No 429 body |
 | `interval` | Every series case is `24h`. No sub-daily body is in the corpus |
+| `sleeve_factors` | The three series above. Only BTC point-in-time netflow covers 2021 to mid-2024. The rule text is fixed. A missing contract file fails the suite |
 | `revision` | No second copy. Fails if `later/` appears under the fixture root |
 
 The parser is `quant/data/glassnode_response.py`. `Glassnode.get_historical_price` does not call it, so this change does not alter a backtest or a live order.
 
 ## What Alfred decides
+
+The sleeve factor note is already chosen: point-in-time BTC exchange netflow is factor one, BTC 60/2.25 stays factor two, and SOPR and MVRV z-score stay on the July 2025 window. That note is not a store.
 
 Latest `v` only, or keep the previous `v` as well once `--compare` on the external copies shows a real change.
 

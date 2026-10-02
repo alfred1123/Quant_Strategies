@@ -21,6 +21,14 @@ series, and every value of the other four metrics, are synthetic fillers.
 They are not the 2026-10-03 bodies. Point ``--compare`` at the copies kept
 outside the repo when a later fetch of the same window should be checked.
 No revision has been observed. This script does not invent one.
+
+Sleeve factor note, chosen before any run. The three series are not the same
+backtest. Only point-in-time BTC exchange netflow covers 2021 to mid-2024.
+
+- Point-in-time BTC exchange netflow is factor one. BTC 60/2.25 stays factor two.
+- On a two-factor FILTER the first factor is the gate and the second is the direction. Netflow has to be first if it is meant to turn the sleeve on and off. Put second, the sleeve's direction is thrown away.
+- The gate is any non-zero day, not outflow versus a zero line. A negative netflow day still lets a long sleeve through. An outflow-only cut is a different series and is not in this harness.
+- SOPR and MVRV z-score stay on the July 2025 window in that same note.
 """
 
 from __future__ import annotations
@@ -48,6 +56,22 @@ from quant.data.glassnode_response import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_FIXTURE_ROOT = ROOT / "tests" / "fixtures" / "glassnode"
+
+# Chosen before any run. The suite fails if the contract file drifts from this.
+SLEEVE_FACTOR_RULE = (
+    "Point-in-time BTC exchange netflow is factor one. BTC 60/2.25 stays factor two.",
+    (
+        "On a two-factor FILTER the first factor is the gate and the second is the direction. "
+        "Netflow has to be first if it is meant to turn the sleeve on and off. "
+        "Put second, the sleeve's direction is thrown away."
+    ),
+    (
+        "The gate is any non-zero day, not outflow versus a zero line. "
+        "A negative netflow day still lets a long sleeve through. "
+        "An outflow-only cut is a different series and is not in this harness."
+    ),
+    "SOPR and MVRV z-score stay on the July 2025 window in that same note.",
+)
 StepStatus = Literal["PASS", "FAIL"]
 
 
@@ -221,6 +245,8 @@ def _run_case(root: Path, case: dict) -> str:
         return _check_rate_limit(root, case)
     if kind == "interval":
         return _check_interval(root, case)
+    if kind == "sleeve_factors":
+        return _check_sleeve_factors(root, case)
     raise ValueError(f"unknown case type {kind!r}")
 
 
@@ -323,6 +349,66 @@ def _check_rate_limit(root: Path, case: dict) -> str:
     if checked < 1:
         raise AssertionError("no successful response carries x-rate-limit-limit")
     return f"limit 600 on {checked} responses; remaining and reset are described, not stored as absolutes"
+
+
+def _check_sleeve_factors(root: Path, case: dict) -> str:
+    """Lock the 3 Oct coverage facts. The three series are not one backtest."""
+    doc = _load_json(_require_path(root, case["contract"]))
+    rule = tuple(doc.get("rule") or ())
+    if rule != SLEEVE_FACTOR_RULE:
+        raise AssertionError("sleeve factor note does not match the chosen rule")
+
+    series = doc.get("series")
+    if not isinstance(series, list) or len(series) != 3:
+        raise AssertionError("expected three series, each with its own window")
+    covers = [item.get("covers_2021_to_mid_2024") for item in series]
+    if len(set(covers)) < 2:
+        raise AssertionError("the three series must not be equally backtestable")
+    if covers != [True, False, False]:
+        raise AssertionError(
+            "only point-in-time BTC exchange netflow covers 2021 to mid-2024"
+        )
+
+    netflow, pit_indicators, bnb = series
+    _eq(netflow["metric_path"], "transactions/transfers_volume_exchanges_net_pit", "netflow path")
+    btc = netflow["assets"]["BTC"]
+    eth = netflow["assets"]["ETH"]
+    bnb_asset = netflow["assets"]["BNB"]
+    _eq(btc["starts"], "2019-12-11", "BTC netflow start")
+    _eq(btc["covers_2021_to_mid_2024"], True, "BTC netflow window")
+    _eq(eth["starts"], "2022-02-15", "ETH netflow start")
+    _eq(eth["covers_2021_to_mid_2024"], False, "ETH netflow window")
+    _eq(bnb_asset["valid_asset"], False, "BNB on netflow")
+
+    _eq(pit_indicators["starts"], "2025-06-27", "SOPR and MVRV z-score PIT start")
+    _eq(pit_indicators["check"], "from July 2025 only", "SOPR and MVRV z-score check")
+    _eq(
+        pit_indicators["metrics"],
+        ["indicators/sopr_pit", "market/mvrv_z_score_pit"],
+        "PIT indicator paths",
+    )
+    _eq(pit_indicators["restated"]["full_window_sharpe"], "look-ahead", "restated Sharpe")
+    _eq(
+        pit_indicators["restated"]["metrics"],
+        ["indicators/sopr", "market/mvrv_z_score"],
+        "restated indicator paths",
+    )
+
+    _eq(bnb["restated"]["starts"], "2020-08-29", "BNB restated start")
+    _eq(bnb["restated"]["backtestable_2021_to_mid_2024"], False, "BNB restated window")
+    _eq(bnb["pit"]["starts"], "2025-06-23", "BNB PIT start")
+    _eq(bnb["pit"]["covers_2021_to_mid_2024"], False, "BNB PIT window")
+    _eq(
+        bnb["restated"]["metric_path"],
+        "distribution/exchange_net_position_change",
+        "BNB restated path",
+    )
+    _eq(
+        bnb["pit"]["metric_path"],
+        "distribution/exchange_net_position_change_pit",
+        "BNB PIT path",
+    )
+    return "BTC netflow PIT covers 2021 to mid-2024; SOPR, MVRV z-score, and BNB do not"
 
 
 def _check_interval(root: Path, case: dict) -> str:
