@@ -29,7 +29,7 @@ today see [Architecture](../architecture/overview.md).
 | [Multi-strategy netting](multi-strategy-netting.md) | `TRADE.INTENT` built (#90, trade `1.10.0`); order side recorded |
 | [Separate underlying & cache](separate-underlying.md) | Partial (cusip/xref only) |
 | [Alternative data sources](alt-data-sources.md) | Partial (Glassnode, Nasdaq) |
-| [Glassnode market data](glassnode-market-data.md) | Draft — narrower `{t, v}` store recommended; revision rule still open |
+| [Glassnode market data](glassnode-market-data.md) | Draft — narrower `{t, v}` store recommended; latest value is the proposal until confirmed |
 | [User isolation](user-isolation.md) | v1 partial — shared strategy pool |
 | [Login & authentication](login.md) | Phase 1 done; phases 2–3 proposed |
 | [Futu trading (OOP)](futu-trading.md) | Design only |

@@ -29,6 +29,8 @@ backtest. Only point-in-time BTC exchange netflow covers 2021 to mid-2024.
 - On a two-factor FILTER the first factor is the gate and the second is the direction. Netflow has to be first if it is meant to turn the sleeve on and off. Put second, the sleeve's direction is thrown away.
 - The gate is any non-zero day, not outflow versus a zero line. A negative netflow day still lets a long sleeve through. An outflow-only cut is a different series and is not in this harness.
 - SOPR and MVRV z-score stay on the July 2025 window in that same note.
+
+Store proposal, not a decision. A stored point keeps the latest value for now, and this is a proposal until Alfred confirms. Keeping a second stored value is not the point-in-time series. Point-in-time is a different Glassnode series.
 """
 
 from __future__ import annotations
@@ -71,6 +73,15 @@ SLEEVE_FACTOR_RULE = (
         "An outflow-only cut is a different series and is not in this harness."
     ),
     "SOPR and MVRV z-score stay on the July 2025 window in that same note.",
+)
+
+# Proposal until Alfred confirms. Separate from the sleeve factor rule above.
+STORE_VALUE_PROPOSAL = (
+    "A stored point keeps the latest value for now, and this is a proposal until Alfred confirms.",
+    (
+        "Keeping a second stored value is not the point-in-time series. "
+        "Point-in-time is a different Glassnode series."
+    ),
 )
 StepStatus = Literal["PASS", "FAIL"]
 

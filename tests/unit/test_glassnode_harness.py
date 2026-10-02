@@ -69,6 +69,19 @@ class TestSuite:
         covers = [item["covers_2021_to_mid_2024"] for item in contract["series"]]
         assert covers == [True, False, False]
 
+    def test_store_proposal_is_latest_only_until_confirmed(self):
+        note = inspect.getsource(harness)
+        expected = (
+            "A stored point keeps the latest value for now, and this is a proposal until Alfred confirms.",
+            "Keeping a second stored value is not the point-in-time series. Point-in-time is a different Glassnode series.",
+        )
+        assert harness.STORE_VALUE_PROPOSAL == expected
+        for sentence in expected:
+            assert sentence in note
+        assert harness.SLEEVE_FACTOR_RULE[0] == (
+            "Point-in-time BTC exchange netflow is factor one. BTC 60/2.25 stays factor two."
+        )
+
     def test_equal_coverage_fails_closed(self, tmp_path):
         src = FIXTURE_ROOT / "contracts" / "sleeve_factors.json"
         dest_dir = tmp_path / "contracts"

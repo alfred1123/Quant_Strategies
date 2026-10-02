@@ -4,7 +4,7 @@
 **Date:** 2026-10-03
 **Scope:** how a Glassnode series should be fetched and stored. Parent: [Alternative data sources](alt-data-sources.md).
 
-Alfred still has to choose one thing before a store is built: whether a point keeps only the latest value, or also keeps the previous value once a revision of history is actually observed. No revision has been observed.
+A stored point keeps the latest value for now, and this is a proposal until Alfred confirms. Keeping a second stored value is not the point-in-time series. Point-in-time is a different Glassnode series. No revision has been observed.
 
 ## Recommendation
 
@@ -14,7 +14,7 @@ Leave the `BT.API_REQUEST` and `BT.API_REQUEST_PAYLOAD` rows that already exist 
 
 `MARKET_DATA.PRICE_BAR` is the wrong table for this. A price bar there is an immutable fact (see [Scheduler, price bars](scheduler-price-bars.md)). A Glassnode point is a vendor series that may be rewritten later. The first write would own the primary key, and a later correction would hit the same unique-violation path the bar service treats as a lost race.
 
-The narrower store is not in this change. The [harness](#harness) is, so a later copy of the same window can show a rewrite before anyone picks a revision rule.
+The narrower store is not in this change. The [harness](#harness) is, so a later copy of the same window can show a rewrite. The store proposal above is latest-only until Alfred confirms.
 
 ## What was checked
 
@@ -94,7 +94,7 @@ The rule, in the harness note:
 - The gate is any non-zero day, not outflow versus a zero line. A negative netflow day still lets a long sleeve through. An outflow-only cut is a different series and is not in this harness.
 - SOPR and MVRV z-score stay on the July 2025 window in that same note.
 
-None of these paths is a method on `Glassnode`, and none is an `APP_METRIC` row. Wiring them is still the open store decision above.
+None of these paths is a method on `Glassnode`, and none is an `APP_METRIC` row. Wiring them waits on the store, which is still the proposal above.
 
 ### One request for the window, then local bars
 
@@ -181,9 +181,9 @@ One row per `(metric, asset, interval, timestamp)` with `v`, written and read th
 | Database growth | A point is a timestamp and a number. A refresh of an unchanged day does not store a second copy of the whole history. Growth follows new days and genuine value changes, not refreshes. |
 | 160,000 / month | Still one HTTP call per series per refresh. The series is then reused from the table, which is the same "one request, then local bars" path price already has on a cache hit. The cap still needs a counter that counts calls, which `SP_GET_API_LIMIT_CHK` does not. |
 | Single IP | The fetch stays on one host. The store does not add calls. A loop that ignores the table would. Shipping the store without a call counter leaves that loop possible. |
-| Reproducibility | A backtest that reads the table sees the values last written. That is stable until a refresh writes a different `v` for an old `t`. Whether that write replaces the point or keeps the previous `v` is the open choice below. Exchange bars stay on `PRICE_BAR` under their own `SOURCE_APP_ID`, so a Glassnode close and a Bybit close do not share a key. |
+| Reproducibility | A backtest that reads the table sees the values last written. A stored point keeps the latest value for now, and this is a proposal until Alfred confirms. A refresh that writes a different `v` for an old `t` replaces that point. Keeping a second stored value is not the point-in-time series. Point-in-time is a different Glassnode series. The copies outside the repo stay the log of a rewrite. Exchange bars stay on `PRICE_BAR` under their own `SOURCE_APP_ID`, so a Glassnode close and a Bybit close do not share a key. |
 
-The table is new DDL. It is staged only after the revision rule is chosen, with `context` set to the schema and not `prod-deploy`, in its own changeset. This page does not add that changeset.
+The table is new DDL. It is staged only after Alfred confirms this proposal, with `context` set to the schema and not `prod-deploy`, in its own changeset. This page does not add that changeset.
 
 ## A purge is an option, not this change
 
@@ -264,13 +264,13 @@ python scripts/glassnode_local_harness.py --compare earlier_dir later_dir
 
 The parser is `quant/data/glassnode_response.py`. `Glassnode.get_historical_price` does not call it, so this change does not alter a backtest or a live order.
 
-## What Alfred decides
+## Store proposal
 
-The sleeve factor note is already chosen: point-in-time BTC exchange netflow is factor one, BTC 60/2.25 stays factor two, and SOPR and MVRV z-score stay on the July 2025 window. That note is not a store.
+A stored point keeps the latest value for now, and this is a proposal until Alfred confirms. Keeping a second stored value is not the point-in-time series. Point-in-time is a different Glassnode series.
 
-Latest `v` only, or keep the previous `v` as well once `--compare` on the external copies shows a real change.
+The sleeve factor note is already chosen, and this proposal does not change it: point-in-time BTC exchange netflow is factor one, BTC 60/2.25 stays factor two, the gate is any non-zero day, and SOPR and MVRV z-score stay on the July 2025 window. That note is not a store.
 
-Latest-only is enough while no revision has been seen. The external copies are the log. A previous-value column, or a second version of the point, waits until a diff names a timestamp. Building that history for a rumor spends schema on an event the harness has not recorded.
+The external copies are the log of a rewrite. A second stored value would be a different storage shape. It is not what the `*_pit` paths are. Those paths are separate Glassnode series, already named in the sleeve note.
 
 Related, and also not decided here: the call counter that would enforce 160,000/month and the short window. `SP_GET_API_LIMIT_CHK` is not that counter. Updating the free-tier seed without changing the count would still not see a refresh.
 
