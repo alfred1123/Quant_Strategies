@@ -38,7 +38,7 @@ The sanity check that changes the reading: out-of-sample Sharpe for the whole re
 - Sharpe is mean divided by the sample standard deviation, times √365. Warm-up bars, where an indicator is missing, are dropped.
 - In sample is 2021-07-01 → 2024-06-30. Out of sample is 2024-07-01 → 2026-09-25 (817 days, about 2.2 years).
 - BTC's own indicators use history from March 2020. For ETH and BNB, the BTC factor is cut to the traded coin's calendar, as the engine does.
-- `FILTER` is the platform combiner in which the gate is factor 1 and the position is factor 2's signal while the gate is on. Sweeps for this page are FILTER, not AND. A long-only AND on this engine currently scores as an OR ([bug B1](../design/2026-09-27-algodaemon-bug-report.md#b1-two-factor-and-behaves-like-or-for-long-only-factors)).
+- `FILTER` is the platform combiner in which the gate is factor 1 and the position is factor 2's signal while the gate is on. Sweeps for this page are FILTER, not AND. A long-only AND used to score as an OR ([bug B1](../design/2026-09-27-algodaemon-bug-report.md#b1-two-factor-and-behaves-like-or-for-long-only-factors)); the combiner now vetoes a flat factor. Stored AND results from before that fix still match OR until they are flagged.
 - Indicator formulas follow the platform: SMA-based RSI, and a Bollinger z-score.
 - Sortino, where it is quoted, uses a 0% target: mean divided by the root-mean-square of the negative returns, times √365. Turnover is the sum of absolute position changes per year.
 
