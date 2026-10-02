@@ -69,7 +69,7 @@ def run_dry_run(
         )
 
     result_payload = bt.fetch_result_payload(req.strategy_id, req.strategy_vid)
-    bar_loader, bar_source = resolve_signal_source(
+    bar_loader, bar_source, _tm_interval_id = resolve_signal_source(
         app_id=req.app_id,
         schedule_tm_interval_id=None,
         fitted_interval_id=fitted_interval_id(strategy_row["config_json"]),

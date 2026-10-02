@@ -85,6 +85,9 @@ def resolve_signal_source(
 ):
     """Pick the price series a deployment's signal is computed from, and name it.
 
+    Returns ``(loader, bar_source, tm_interval_id)``. The interval is the
+    schedule when one is set, otherwise the interval the strategy was fitted on.
+
     The rule is by venue, not by schedule: a signal reads the bars of the
     exchange it executes on whenever that exchange serves market data. The
     schedule only sets the bar interval — without one (manual apply) the signal
@@ -107,7 +110,7 @@ def resolve_signal_source(
     interval_id = schedule_tm_interval_id
     if interval_id is None:
         if venue is None:
-            return None, "provider"
+            return None, "provider", fitted_interval_id
         interval_id = fitted_interval_id
     if price_bars is None:
         raise TradeValidationError(
@@ -121,7 +124,7 @@ def resolve_signal_source(
         source_app_id=app_id,
         include_forming=True,
     )
-    return loader, f"price_bar:{venue}"
+    return loader, f"price_bar:{venue}", interval_id
 
 
 class DeploymentInstrumentSource:

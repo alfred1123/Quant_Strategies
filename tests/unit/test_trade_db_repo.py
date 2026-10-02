@@ -302,6 +302,31 @@ class TestCallMatchesProcedureDdl:
         sql = mock_write.call_args.args[0]
         assert _call_arg_count(sql) == _ddl_param_count("SP_INS_EXECUTION_EVENT.sql")
 
+    @patch.object(TradeRepo, "validate_intent")
+    @patch.object(TradeRepo, "_call_write")
+    def test_ins_intent(self, mock_write, _validate, repo):
+        repo.sp_ins_intent(
+            intent_id=uuid4(),
+            app_user_id=uuid4(),
+            deployment_id=uuid4(),
+            deployment_vid=1,
+            tm_interval_id=1,
+            bar_timestamp=datetime(2026, 7, 1, tzinfo=UTC),
+            bar_source="price_bar:bybit",
+            signal_value=1,
+            target_qty=Decimal("0.01"),
+            transact_at=datetime(2026, 9, 27, tzinfo=UTC),
+            user_id="alice",
+        )
+        sql = mock_write.call_args.args[0]
+        assert _call_arg_count(sql) == _ddl_param_count("SP_INS_INTENT.sql")
+
+    @patch.object(TradeRepo, "_call_get", return_value=[])
+    def test_get_intent(self, mock_get, repo):
+        repo.sp_get_intent(app_user_id=uuid4(), deployment_id=uuid4())
+        sql = mock_get.call_args.args[0]
+        assert _call_arg_count(sql) == _ddl_param_count("SP_GET_INTENT.sql")
+
     @patch.object(TradeRepo, "validate_execution_event")
     @patch.object(TradeRepo, "_call_write")
     def test_execution_event_transact_at_is_never_null(
