@@ -1,10 +1,10 @@
 # Glassnode market data
 
-**Status:** Draft. The narrower metric store is the option this page argues for. Alfred has rejected latest-only storage. The history-plus-archive store is a later pull request, and nothing in the fetch or the database changes with this page.
+**Status:** Draft. The narrower metric store is the option this page argues for. Alfred has rejected latest-only storage. The later store keeps history and purges closed copies. That purge is a later pull request, and nothing in the fetch or the database changes with this page.
 **Date:** 2026-10-03
 **Scope:** how a Glassnode series should be fetched and stored. Parent: [Alternative data sources](alt-data-sources.md).
 
-Alfred has rejected latest-only storage. The later Glassnode store keeps history, and old copies are archived out of the live table so they do not accumulate there. That history-plus-archive store is a later pull request and is not built here. Keeping that history is not the point-in-time series. Point-in-time is a different Glassnode series. No revision has been observed. The harness module still contains the earlier sentence that a stored point keeps the latest value until Alfred confirms. That sentence is not the recommendation.
+Alfred has rejected latest-only storage. The later Glassnode store keeps history. Alfred's archive path is a purge of closed copies, not a delete of the live rows and not a vague archive. That store is a later pull request and is not built here. Keeping that history is not the point-in-time series. Point-in-time is a different Glassnode series. No revision has been observed. A later report will record a data delay or a changed stored point, and this pull request does not build that report.
 
 ## Recommendation
 
@@ -14,7 +14,7 @@ Leave the `BT.API_REQUEST` and `BT.API_REQUEST_PAYLOAD` rows that already exist 
 
 `MARKET_DATA.PRICE_BAR` is the wrong table for this. A price bar there is an immutable fact (see [Scheduler, price bars](scheduler-price-bars.md)). A Glassnode point is a vendor series that may be rewritten later. The first write would own the primary key, and a later correction would hit the same unique-violation path the bar service treats as a lost race.
 
-The narrower store is not in this change. The [harness](#harness) is, so a later copy of the same window can show a rewrite. The history-plus-archive store is a later pull request and is not built here.
+The narrower store is not in this change. The [harness](#harness) is, so a later copy of the same window can show a rewrite. The later store keeps history and purges closed copies. That purge is not a delete of the live rows and not a vague archive. It is a later pull request and is not built here.
 
 ## What was checked
 
@@ -104,7 +104,7 @@ The rule, in the harness note:
 - The signal threshold on the SMA (window 1) of the 0/1 outflow column has to sit strictly between 0 and 1. Any value in that open range leaves a stored 0 off and a stored 1 on, so the threshold is not a search and do not pick or recommend a specific number inside the range. The sleeve's 2.25 is not the gate's threshold. A threshold of 2.25 would leave the gate off every day, because a 1 is never above 2.25.
 - SOPR and MVRV z-score stay a from-July-2025 check only.
 
-None of these paths is a method on `Glassnode`, and none is an `APP_METRIC` row. Wiring them waits on the later history-plus-archive store. It is not built here.
+None of these paths is a method on `Glassnode`, and none is an `APP_METRIC` row. Wiring them waits on the later store. It is not built here.
 
 ### One request for the window, then local bars
 
@@ -188,16 +188,16 @@ One row per `(metric, asset, interval, timestamp)` with `v`, written and read th
 
 | Cost | What happens |
 |---|---|
-| Database growth | A point is a timestamp and a number. A refresh of an unchanged day does not store a second copy of the whole history. When a value changes, the later store keeps that history. Old copies are archived out of the live table so they do not accumulate there. That archive is not built here. |
+| Database growth | A point is a timestamp and a number. A refresh of an unchanged day does not store a second copy of the whole history. When a value changes, the later store keeps that history. Alfred's archive path is a purge of closed copies, not a delete of the live rows and not a vague archive. That purge is not built here. |
 | 160,000 / month | Still one HTTP call per series per refresh. The series is then reused from the table, which is the same "one request, then local bars" path price already has on a cache hit. The cap still needs a counter that counts calls, which `SP_GET_API_LIMIT_CHK` does not. |
 | Single IP | The fetch stays on one host. The store does not add calls. A loop that ignores the table would. Shipping the store without a call counter leaves that loop possible. |
-| Reproducibility | A backtest that reads the live table sees the current points. The later store keeps history, and old copies are archived out of the live table so they do not accumulate there. That history-plus-archive store is a later pull request and is not built here. Keeping that history is not the point-in-time series. Point-in-time is a different Glassnode series. The copies outside the repo stay the log of a rewrite. Exchange bars stay on `PRICE_BAR` under their own `SOURCE_APP_ID`, so a Glassnode close and a Bybit close do not share a key. |
+| Reproducibility | A backtest that reads the live table sees the current points. The later store keeps history. Alfred's archive path is a purge of closed copies, not a delete of the live rows and not a vague archive. That store is a later pull request and is not built here. Keeping that history is not the point-in-time series. Point-in-time is a different Glassnode series. The copies outside the repo stay the log of a rewrite. Exchange bars stay on `PRICE_BAR` under their own `SOURCE_APP_ID`, so a Glassnode close and a Bybit close do not share a key. |
 
-The history-plus-archive store is a later pull request. This page does not add a table, a changeset, or an archive.
+The later store is a later pull request. This page does not add a table, a changeset, or purge SQL.
 
 ## A purge is an option, not this change
 
-[Separate underlying](separate-underlying.md#future-work-scheduled-purge-of-closed-versions) describes a future purge of closed `API_REQUEST` versions. The payload file comments that the purge path is dropping a partition. Neither is implemented, and this change does not implement them. There is no `DELETE`, no `DROP`, and no `SP_PURGE_*` in this change.
+[Separate underlying](separate-underlying.md#future-work-scheduled-purge-of-closed-versions) describes a future purge of closed `API_REQUEST` versions. The payload file comments that the purge path is dropping a partition. Neither is implemented, and this change does not implement them. There is no `DELETE`, no `DROP`, and no `SP_PURGE_*` in this change. The later Glassnode store's path is the same kind of step: a purge of closed copies, not a delete of the live rows and not a vague archive. This page does not add that purge.
 
 Blast radius, if someone does it later:
 
@@ -276,7 +276,7 @@ The parser is `quant/data/glassnode_response.py`. `Glassnode.get_historical_pric
 
 ## Later store
 
-Alfred has rejected latest-only storage. The later Glassnode store keeps history, and old copies are archived out of the live table so they do not accumulate there. That history-plus-archive store is a later pull request and is not built here.
+Alfred has rejected latest-only storage. The later Glassnode store keeps history. Alfred's archive path is a purge of closed copies, not a delete of the live rows and not a vague archive. That store is a later pull request and is not built here.
 
 Keeping that history is not the point-in-time series. Point-in-time is a different Glassnode series. The sleeve factor note is already chosen and is not this store: the 0/1 column is factor one, BTC 60/2.25 stays factor two, the gate indicator is an SMA with window 1, and SOPR and MVRV z-score stay a from-July-2025 check only.
 
@@ -287,6 +287,6 @@ Related, and also not decided here: the call counter that would enforce 160,000/
 ## What this change does not do
 
 - No new HTTP calls, no new `API_REQUEST` writes, no migration, no purge SQL.
-- No metric table, no changeset, and no archive. The history-plus-archive store is a later pull request.
+- No metric table, no changeset, and no purge SQL. The later store is a later pull request.
 - No edit to `Glassnode.get_historical_price`.
 - No API key. Tracked files have a placeholder in `.env.example` (`your_key_here`). No live key was found in tracked files.

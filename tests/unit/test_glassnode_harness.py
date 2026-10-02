@@ -69,15 +69,10 @@ class TestSuite:
         covers = [item["covers_2021_to_mid_2024"] for item in contract["series"]]
         assert covers == [True, False, False]
 
-    def test_store_proposal_is_latest_only_until_confirmed(self):
+    def test_harness_does_not_keep_the_latest_only_sentence(self):
         note = inspect.getsource(harness)
-        expected = (
-            "A stored point keeps the latest value for now, and this is a proposal until Alfred confirms.",
-            "Keeping a second stored value is not the point-in-time series. Point-in-time is a different Glassnode series.",
-        )
-        assert harness.STORE_VALUE_PROPOSAL == expected
-        for sentence in expected:
-            assert sentence in note
+        assert "latest value for now" not in note
+        assert not hasattr(harness, "STORE_VALUE_PROPOSAL")
         definition = (
             "The named series, chosen before a result: 1 when that point-in-time value is below zero, "
             "and 0 otherwise. No other cut. The 0 must be stored. Dropping zero days is not allowed."

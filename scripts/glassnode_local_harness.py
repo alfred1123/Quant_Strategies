@@ -33,8 +33,6 @@ store and read. It is not a number for a person to apply by hand.
 - In the saved copy the 0/1 column is 0 on 702 days and 1 on 1785 days. That is a count of the named rule, not a backtest result.
 - The signal threshold on the SMA (window 1) of the 0/1 outflow column has to sit strictly between 0 and 1. Any value in that open range leaves a stored 0 off and a stored 1 on, so the threshold is not a search and do not pick or recommend a specific number inside the range. The sleeve's 2.25 is not the gate's threshold. A threshold of 2.25 would leave the gate off every day, because a 1 is never above 2.25.
 - SOPR and MVRV z-score stay a from-July-2025 check only.
-
-Store proposal, not a decision. A stored point keeps the latest value for now, and this is a proposal until Alfred confirms. Keeping a second stored value is not the point-in-time series. Point-in-time is a different Glassnode series.
 """
 
 from __future__ import annotations
@@ -96,15 +94,6 @@ SLEEVE_FACTOR_RULE = (
         "every day, because a 1 is never above 2.25."
     ),
     "SOPR and MVRV z-score stay a from-July-2025 check only.",
-)
-
-# Proposal until Alfred confirms. Separate from the sleeve factor rule above.
-STORE_VALUE_PROPOSAL = (
-    "A stored point keeps the latest value for now, and this is a proposal until Alfred confirms.",
-    (
-        "Keeping a second stored value is not the point-in-time series. "
-        "Point-in-time is a different Glassnode series."
-    ),
 )
 StepStatus = Literal["PASS", "FAIL"]
 
