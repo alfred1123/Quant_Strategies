@@ -8,7 +8,8 @@
     <!--
       CONFIG schema (config.databasechangelog).
 
-      Policy tables: fees, apply timing, API limits, promotion gates.
+      Policy tables: fees, apply timing, API limits, promotion gates,
+      backtest search budget.
       Catalogs stay in REFDATA.
 
       PRODUCTION SAFETY
@@ -24,5 +25,6 @@
 
     <include file="releases/1.0.0-move-policy-tables.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.1.0-sp-get-enum.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.2.0-backtest-search.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

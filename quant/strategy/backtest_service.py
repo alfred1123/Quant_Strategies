@@ -21,7 +21,11 @@ from quant.schemas.backtest import (
     WalkForwardRequest,
     WalkForwardResponse,
 )
-from quant.strategy.optimizer import ParametersOptimization
+from quant.strategy.optimizer import (
+    OverBudgetGrid,
+    ParametersOptimization,
+    SearchPolicy,
+)
 from quant.strategy.performance import Performance
 from quant.strategy.signals import StrategyConfig, SubStrategy, resolve_signal_func
 from quant.strategy.walk_forward import WalkForward
@@ -488,11 +492,25 @@ def _build_perf_response(data_dict, config, best, fee_bps) -> PerformanceRespons
     )
 
 
+def _search_policy(cache) -> SearchPolicy:
+    return SearchPolicy.from_row(cache.get_backtest_search())
+
+
+def _run_search(opt: ParametersOptimization, window_list, signal_list):
+    try:
+        return opt.run(window_list, signal_list)
+    except OverBudgetGrid as exc:
+        raise BacktestError(str(exc), status_code=422) from exc
+
+
 def _build_wf_response(data_dict, config, window_list, signal_list,
-                        split_ratio, fee_bps) -> WalkForwardResponse:
+                        split_ratio, fee_bps, search: SearchPolicy) -> WalkForwardResponse:
     """Run WalkForward and return a WalkForwardResponse."""
-    wf = WalkForward(data_dict, split_ratio, config, fee_bps=fee_bps)
-    result = wf.run(window_list, signal_list)
+    wf = WalkForward(data_dict, split_ratio, config, fee_bps=fee_bps, search=search)
+    try:
+        result = wf.run(window_list, signal_list)
+    except OverBudgetGrid as exc:
+        raise BacktestError(str(exc), status_code=422) from exc
 
     chart_df = (result.full_equity_df.dropna(subset=["cumu"])
                 if result.full_equity_df is not None else pd.DataFrame())
@@ -561,8 +579,9 @@ def run_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache=None, ba
     require_scoreable_sample(data_dict, req, cache)
     config = build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
-    opt = ParametersOptimization(data_dict, config, fee_bps=req.fee_bps)
-    result = opt.run(window_list, signal_list)
+    policy = _search_policy(cache)
+    opt = ParametersOptimization(data_dict, config, fee_bps=req.fee_bps, search=policy)
+    result = _run_search(opt, window_list, signal_list)
 
     # ── Inline performance for best params ──
     perf_resp = None
@@ -581,14 +600,16 @@ def run_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache=None, ba
         try:
             wf_resp = _build_wf_response(
                 data_dict, config, window_list, signal_list,
-                req.split_ratio, req.fee_bps,
+                req.split_ratio, req.fee_bps, policy,
             )
         except Exception as exc:
             logger.warning("Inline walk-forward failed", exc_info=True)
             wf_error = str(exc).strip() or type(exc).__name__
 
     return OptimizeResponse(
-        total_trials=len(result.grid_df),
+        search=result.search,
+        grid_size=result.grid_size,
+        distinct_cells=result.distinct_cells,
         valid=result.n_valid,
         best=result.best,
         top10=result.top10,
@@ -631,5 +652,5 @@ def run_walk_forward(req: WalkForwardRequest, cache, inst_cache=None, bt_cache=N
 
     return _build_wf_response(
         data_dict, config, window_list, signal_list,
-        req.split_ratio, req.fee_bps,
+        req.split_ratio, req.fee_bps, _search_policy(cache),
     )

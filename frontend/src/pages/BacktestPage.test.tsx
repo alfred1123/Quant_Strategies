@@ -33,7 +33,9 @@ function jobResult(walkForwardError: string | null) {
   return {
     config_json: null,
     result: {
-      total_trials: 4,
+      search: 'exhaustive',
+      grid_size: 4,
+      distinct_cells: 4,
       valid: 2,
       best: { sharpe: 1.2 },
       top10: [],
@@ -65,6 +67,7 @@ describe('BacktestPage walk-forward failure', () => {
     await user.click(screen.getByRole('tab', { name: 'Queue' }));
     await user.click(screen.getByRole('button', { name: 'View job' }));
     expect(await screen.findByText(/Best Sharpe/)).toBeInTheDocument();
+    expect(screen.getByText('4 of 4 cells, exhaustive')).toBeInTheDocument();
     expect(screen.queryByText(/Walk-forward did not finish/)).not.toBeInTheDocument();
   });
 });

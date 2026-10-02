@@ -23,7 +23,10 @@ const FACTOR = {
 
 describe('runOptimize', () => {
   it('posts to /backtest/optimize and returns data', async () => {
-    const expected = { total_trials: 100, valid: 80, best: {}, top10: [], grid: [] };
+    const expected = {
+      search: 'TPE sample', grid_size: 200, distinct_cells: 100,
+      valid: 80, best: {}, top10: [], grid: [],
+    };
     mockedPost.mockResolvedValue({ data: expected });
 
     const result = await runOptimize({

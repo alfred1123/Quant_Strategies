@@ -23,7 +23,7 @@ How the research bots work together on Alfred's crypto strategies: who does what
 **Hand-off spec to the researcher**
 - Rules in engine terms: indicator, data column (capital-V `Volume`), momentum or reversion, signal sign.
 - FILTER for two conditions, never AND (B1). Three or more factors go offline only.
-- Parameter ranges with steps and the combination count (under 10,000, B23).
+- Parameter ranges with steps and the combination count. The seeded search budget is 10,000 distinct cells (`CONFIG.BACKTEST_SEARCH`). A larger grid is a labeled sample of distinct cells (decision #91, B23).
 - Which finalist it should beat or diversify, the source link and any out-of-sample evidence.
 - The offline gate result: one-day delay, neighbourhood median, correlation to the sleeves.
 - Anything the engine can't express, flagged.
@@ -62,7 +62,7 @@ These come from the [persistence validation study](strategy-persistence-validati
 6. Buy-and-hold benchmark over the same windows.
 
 **Grid and platform limits**
-- Grids stay under 10,000 combinations, because larger ones are silently TPE-sampled (B23). Window minimum 1 or more.
+- Grids larger than `CONFIG.BACKTEST_SEARCH.TRIAL_BUDGET` (seeded at 10,000) are a labeled sample of distinct cells (decision #91). Window minimum 1 or more.
 - Wide ranges with sensible steps. Sync optimise calls of 150 trials or fewer, one at a time.
 - At most 2 queued jobs, since there are 2 workers. Queue only real finalists, and never promote by hand.
 - The offline replica is used only after it reproduces the platform exactly.
@@ -105,7 +105,7 @@ These come from the [persistence validation study](strategy-persistence-validati
 - When a fix is merged, Check Bugs confirms it on `main` and flips the status to fixed with the commit. It then tells the researcher which tests to re-run and tells Scout if an engine limit that blocked an idea has been lifted.
 - Current limits Scout's hand-off specs should respect:
   - SMA/EMA are raw levels (B22).
-  - Grids over 10,000 cells are sampled (B23).
+  - Grids over the search budget are a labeled sample of distinct cells (decision #91, B23).
   - FILTER with 3+ factors acts like OR (B1).
   - Fills happen on the same close, with no delay option.
   - A factor reads one column (B26).

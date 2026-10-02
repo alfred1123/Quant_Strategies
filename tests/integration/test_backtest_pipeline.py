@@ -16,6 +16,7 @@ from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, strate
 from quant.strategy.performance import Performance
 from quant.strategy.optimizer import ParametersOptimization
 from quant.strategy.walk_forward import WalkForward, WalkForwardResult
+from tests.policy import WIDE
 
 
 @pytest.fixture
@@ -83,7 +84,7 @@ class TestParameterOptimizationPipeline:
 
     def test_grid_search_produces_results(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", Strategy.momentum_band_signal, 252)
-        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config, search=WIDE)
         windows = (10, 20, 30)
         signals = (0.5, 1.0, 1.5)
         results = opt.optimize(windows, signals)
@@ -94,7 +95,7 @@ class TestParameterOptimizationPipeline:
 
     def test_grid_search_can_pivot_to_heatmap(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", Strategy.momentum_band_signal, 252)
-        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config, search=WIDE)
         results = opt.optimize((10, 20), (0.5, 1.0))
         pivot = results.grid_df.pivot(index="window", columns="signal", values="sharpe")
         assert pivot.shape == (2, 2)
@@ -214,7 +215,7 @@ class TestBoundedSignalPipeline:
 
     def test_bounded_param_opt(self, synthetic_market_data):
         config = StrategyConfig("test", "get_rsi", Strategy.momentum_bounded_signal, 252)
-        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config, search=WIDE)
         results = opt.optimize((10, 14), (60.0, 70.0))
         assert len(results.grid_df) == 4
         assert results.grid_df["sharpe"].notna().all()
@@ -250,13 +251,11 @@ class TestTransactionCostPipeline:
     def test_fee_propagates_to_param_opt(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", Strategy.momentum_band_signal, 252)
         opt_zero = ParametersOptimization(
-            {"test": synthetic_market_data.copy()}, config, fee_bps=0,
-        )
+            {"test": synthetic_market_data.copy()}, config, fee_bps=0, search=WIDE)
         results_zero = opt_zero.optimize((20,), (1.0,))
 
         opt_high = ParametersOptimization(
-            {"test": synthetic_market_data.copy()}, config, fee_bps=50,
-        )
+            {"test": synthetic_market_data.copy()}, config, fee_bps=50, search=WIDE)
         results_high = opt_high.optimize((20,), (1.0,))
 
         # Higher fees should produce lower or equal Sharpe
@@ -384,7 +383,10 @@ class TestCLIMainIntegration:
         })
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("quant.cli.YahooFinance") as mock_yf_cls:
+            with (
+                patch("quant.cli.YahooFinance") as mock_yf_cls,
+                patch("quant.cli._load_search_policy", return_value=WIDE),
+            ):
                 mock_yf = MagicMock()
                 mock_yf.get_historical_price.return_value = mock_price
                 mock_yf_cls.return_value = mock_yf
@@ -424,7 +426,7 @@ class TestWalkForwardPipeline:
 
     def test_walk_forward_full_pipeline(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", Strategy.momentum_band_signal, 252)
-        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config)
+        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config, search=WIDE)
         result = wf.run((10, 20, 30), (0.5, 1.0, 1.5))
 
         assert isinstance(result, WalkForwardResult)
@@ -435,7 +437,7 @@ class TestWalkForwardPipeline:
 
     def test_walk_forward_summary_table(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", Strategy.momentum_band_signal, 252)
-        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config)
+        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config, search=WIDE)
         result = wf.run((20,), (1.0,))
         summary = result.summary()
 
@@ -449,7 +451,7 @@ class TestWalkForwardPipeline:
         config = StrategyConfig("test", "get_bollinger_band", Strategy.momentum_band_signal, 252)
         results = {}
         for ratio in (0.3, 0.5, 0.7):
-            wf = WalkForward({"test": synthetic_market_data.copy()}, ratio, config)
+            wf = WalkForward({"test": synthetic_market_data.copy()}, ratio, config, search=WIDE)
             results[ratio] = wf.run((20,), (1.0,))
 
         # All should complete without error
@@ -459,13 +461,11 @@ class TestWalkForwardPipeline:
     def test_walk_forward_with_fees(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", Strategy.momentum_band_signal, 252)
         wf_no_fee = WalkForward(
-            {"test": synthetic_market_data.copy()}, 0.5, config, fee_bps=0,
-        )
+            {"test": synthetic_market_data.copy()}, 0.5, config, fee_bps=0, search=WIDE)
         result_no_fee = wf_no_fee.run((20,), (1.0,))
 
         wf_fee = WalkForward(
-            {"test": synthetic_market_data.copy()}, 0.5, config, fee_bps=50,
-        )
+            {"test": synthetic_market_data.copy()}, 0.5, config, fee_bps=50, search=WIDE)
         result_fee = wf_fee.run((20,), (1.0,))
 
         # Higher fees should reduce in-sample total return
@@ -474,7 +474,7 @@ class TestWalkForwardPipeline:
     def test_walk_forward_crypto_period(self, synthetic_market_data):
         """Walk-forward should work with crypto trading period (365)."""
         config = StrategyConfig("test", "get_bollinger_band", Strategy.momentum_band_signal, 365)
-        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config)
+        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config, search=WIDE)
         result = wf.run((20,), (1.0,))
         assert isinstance(result, WalkForwardResult)
         assert np.isfinite(result.is_metrics["Annualized Return"])
@@ -487,7 +487,10 @@ class TestWalkForwardPipeline:
         })
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("quant.cli.YahooFinance") as mock_yf_cls:
+            with (
+                patch("quant.cli.YahooFinance") as mock_yf_cls,
+                patch("quant.cli._load_search_policy", return_value=WIDE),
+            ):
                 mock_yf = MagicMock()
                 mock_yf.get_historical_price.return_value = mock_price
                 mock_yf_cls.return_value = mock_yf
@@ -533,7 +536,7 @@ class TestStrategyConfigPipeline:
     def test_config_grid_search(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band",
                                 Strategy.momentum_band_signal, 252)
-        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config, search=WIDE)
         results = opt.optimize((10, 20), (0.5, 1.0))
         assert len(results.grid_df) == 4
         assert results.grid_df["sharpe"].notna().all()
@@ -541,7 +544,7 @@ class TestStrategyConfigPipeline:
     def test_config_walk_forward(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band",
                                 Strategy.momentum_band_signal, 252)
-        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config)
+        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config, search=WIDE)
         result = wf.run((10, 20), (0.5, 1.0))
         assert isinstance(result, WalkForwardResult)
         assert result.best_window in (10, 20)
@@ -555,11 +558,11 @@ class TestStrategyConfigPipeline:
         perf.enrich_performance()
         assert isinstance(perf.get_strategy_performance(), pd.Series)
 
-        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config, search=WIDE)
         results = list(opt.optimize((20,), (0.5,)).grid_df.itertuples(index=False))
         assert len(results) == 1
 
-        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config)
+        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config, search=WIDE)
         wf_result = wf.run((20,), (0.5,))
         assert isinstance(wf_result, WalkForwardResult)
 
@@ -603,7 +606,7 @@ class TestStrategyConfigSinglePipeline:
             "test", "get_sma", Strategy.reversion_band_signal, 252,
             window=20, signal=0.5
         )
-        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, cfg)
+        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, cfg, search=WIDE)
         results = opt.optimize((10, 20), (0.5, 1.0))
         assert len(results.grid_df) == 4
 
@@ -753,7 +756,7 @@ class TestMultiFactorGridSearch:
             "test", "get_sma", Strategy.momentum_band_signal, 252,
             conjunction="AND", substrategies=(sub_a, sub_b),
         )
-        opt = ParametersOptimization({"test": multi_factor_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": multi_factor_market_data.copy()}, config, search=WIDE)
         results = opt.optimize_multi(
             [(10, 20), (10, 20)],
             [(0.5, 1.0), (0.5,)],
@@ -771,7 +774,7 @@ class TestMultiFactorGridSearch:
             "test", "get_sma", Strategy.momentum_band_signal, 252,
             conjunction="OR", substrategies=(sub_a, sub_b),
         )
-        opt = ParametersOptimization({"test": multi_factor_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": multi_factor_market_data.copy()}, config, search=WIDE)
         results = opt.optimize_multi(
             [(10, 20), (10, 20)],
             [(0.5,), (0.5,)],
@@ -787,11 +790,9 @@ class TestMultiFactorGridSearch:
             conjunction="AND", substrategies=(sub_a, sub_b),
         )
         opt_zero = ParametersOptimization(
-            {"test": multi_factor_market_data.copy()}, config, fee_bps=0,
-        )
+            {"test": multi_factor_market_data.copy()}, config, fee_bps=0, search=WIDE)
         opt_high = ParametersOptimization(
-            {"test": multi_factor_market_data.copy()}, config, fee_bps=50.0,
-        )
+            {"test": multi_factor_market_data.copy()}, config, fee_bps=50.0, search=WIDE)
         r_zero = opt_zero.optimize_multi(
             [(10,), (20,)], [(0.5,), (0.5,)],
         )
@@ -872,7 +873,7 @@ class TestCrossProductPipeline:
             "btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
             substrategies=(sub,),
         )
-        opt = ParametersOptimization(cross_product_data, config)
+        opt = ParametersOptimization(cross_product_data, config, search=WIDE)
         results = opt.optimize((10, 20), (0.5, 1.0))
         assert len(results.grid_df) == 4
         assert results.grid_df["sharpe"].notna().all()
@@ -885,7 +886,7 @@ class TestCrossProductPipeline:
             "btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
             substrategies=(sub,),
         )
-        wf = WalkForward(cross_product_data, 0.5, config)
+        wf = WalkForward(cross_product_data, 0.5, config, search=WIDE)
         result = wf.run((10, 20), (0.5, 1.0))
         assert isinstance(result, WalkForwardResult)
         assert result.best_window in (10, 20)

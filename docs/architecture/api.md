@@ -50,7 +50,7 @@ All endpoints below are mounted under the `/api/v1` prefix.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/v1/backtest/optimize` | Run parameter grid search over a list of factors. Returns top-10 results, grid, and best params. When walk-forward was requested and threw, the search result is still returned and `walk_forward_error` holds the message; `walk_forward` stays null. The page does not call this. A run is a queued job, and the worker calls `run_optimize`. |
+| `POST` | `/api/v1/backtest/optimize` | Run parameter grid search over a list of factors. Returns top-10 results, grid, and best params, plus `search`, `grid_size`, and `distinct_cells`. `valid` is how many of those cells have a finite Sharpe. `OVER_BUDGET_MODE = REJECT` on a grid larger than the budget is HTTP 422 after the series is loaded. When walk-forward was requested and threw, the search result is still returned and `walk_forward_error` holds the message; `walk_forward` stays null. The page does not call this. A run is a queued job, and the worker calls `run_optimize`. |
 | `POST` | `/api/v1/backtest/performance` | Run a single backtest at fixed params. Returns equity curve, metrics, and daily P&L. |
 | `POST` | `/api/v1/backtest/walk-forward` | Walk-forward overfitting test. Returns IS/OOS metrics, overfitting ratio, and full equity curve. |
 | `POST` | `/api/v1/backtest/jobs` | Enqueue a backtest job (202 Accepted). |

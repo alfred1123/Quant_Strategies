@@ -1,3 +1,11 @@
+export interface BacktestSearchRow {
+  backtest_search_id: number;
+  trial_budget: number;
+  seed: number;
+  max_attempts_factor: number;
+  over_budget_mode: string;
+}
+
 export interface PromotionMetricRow {
   promotion_metric_id: number;
   name: string;

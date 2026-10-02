@@ -273,3 +273,51 @@ class TestSchemaCaches:
             ("refdata", "indicator"),
             ("config", "promotion_metric"),
         ]
+
+
+def _search_reader(rows):
+    instance = RedisRefData.__new__(RedisRefData)
+
+    def get_config(table):
+        if table == "backtest_search":
+            return rows
+        raise AssertionError(f"unexpected CONFIG table {table!r}")
+
+    instance.get_config = get_config
+    return instance
+
+
+class TestGetBacktestSearch:
+    def test_reads_the_single_policy_row(self):
+        reader = _search_reader([{
+            "backtest_search_id": 1,
+            "trial_budget": 10000,
+            "seed": 42,
+            "max_attempts_factor": 3,
+            "over_budget_mode": "TPE_DISTINCT",
+            "user_id": "system",
+        }])
+        assert reader.get_backtest_search() == {
+            "trial_budget": 10000,
+            "seed": 42,
+            "max_attempts_factor": 3,
+            "over_budget_mode": "TPE_DISTINCT",
+        }
+
+    def test_two_rows_raise(self):
+        reader = _search_reader([
+            {"trial_budget": 1, "seed": 1, "max_attempts_factor": 1, "over_budget_mode": "TPE_DISTINCT"},
+            {"trial_budget": 2, "seed": 1, "max_attempts_factor": 1, "over_budget_mode": "REJECT"},
+        ])
+        with pytest.raises(RuntimeError, match="CONFIG.BACKTEST_SEARCH has 2 rows"):
+            reader.get_backtest_search()
+
+    def test_missing_field_raises(self):
+        reader = _search_reader([{
+            "trial_budget": 10000,
+            "seed": 42,
+            "max_attempts_factor": None,
+            "over_budget_mode": "TPE_DISTINCT",
+        }])
+        with pytest.raises(RuntimeError, match="missing max_attempts_factor"):
+            reader.get_backtest_search()
