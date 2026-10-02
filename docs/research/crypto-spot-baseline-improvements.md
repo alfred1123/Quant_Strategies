@@ -58,9 +58,7 @@ the result. The gate lowers both the full-sample Sharpe and the hold-out Sharpe.
 
 ### 2.3 Volatility targeting (14-day ATR)
 
-Scale position size inversely to recent volatility, e.g. `size = target_vol / ATR_14`, capped
-at 1× for spot. Smaller positions in turbulent regimes lower the PnL standard deviation, which
-is the denominator of Sharpe.
+Scale position size inversely to recent volatility, for example target volatility divided by a 14-day ATR. A target and a cap are a rule the application reads, and a run records which rule it applied. This page does not set them. Smaller positions in turbulent regimes lower the PnL standard deviation, which is the denominator of Sharpe.
 
 ## 3. Other strategies from the thread
 

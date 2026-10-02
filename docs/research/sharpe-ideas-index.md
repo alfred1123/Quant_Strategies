@@ -55,17 +55,17 @@ These candidates are for a backtesting bot on AlgoDaemon. Limits, as given for t
 
 "As-is" means spot OHLCV of those three coins is enough. "Needs adapting" means the bot still trades that spot book, but some other series is only a signal. Sweep grids below are **proposed for the bot**. They are not optima published by the sources. Fix one coin at a time unless the rule is the three-coin rank. Report Sharpe with √365 and with the 10 bp cost on, not a pre-cost figure.
 
-### 1. Donchian ensemble, 25% vol target, cap 1× (as-is if the bot can size)
+### 1. Donchian ensemble (as-is if the bot can size)
 
 Top candidate. Published net-of-10 bp results exist for exactly BTC, ETH, and BNB, on daily closes, long or flat. Run each coin separately. This is not the 200-day Bollinger gate already run here, which lowered BTC hold-out Sharpe from 1.185 to 0.964. Full write-up, including gaps and the paper's inconsistent MAR and Sortino cells: [Catching crypto trends](catching-crypto-trends.md).
 
 | | |
 |--|--|
-| Rules | For each lookback *n*, long when today's close equals the max close over the last *n* days including today; flat when the close is at or below a mid-line stop that never falls (`stop(t+1) = max(stop(t), mid(t))`). Initial stop on entry is the mid-line. `w_n = min(0.25 / σ_90, 1) × position_n`. Combo weight is the equal average of the nine `w_n`. The weight known at the close earns the **next** day's return. A breakout or a stop trades immediately. A volatility-only change trades only if the relative gap versus the drifted weight exceeds 20%. No shorts. If both entry and exit are true on one bar, exit an existing long first (**[SUGGESTION]**; the paper does not say). |
-| Indicators | Donchian up/down/mid on **closes** (not highs/lows). 90-day annualized volatility of simple close-to-close returns, sample standard deviation, √365 (**[SUGGESTION]**; the paper says 90-day annualized volatility and does not specify the convention). Fractional weight capped at 1. |
-| Sweep | Paper's lookbacks, do not refit them first: {5, 10, 20, 30, 60, 90, 150, 250, 360}. Target vol 25% and cap 1.0 (the paper's cap is 2.0; the 1× cap is ours). Fee 10 bps on `|Δw|`. **[SUGGESTION]**, not from the paper: also run (a) binary long/flat with no vol target, weight 0 or 1, if the bot cannot size; (b) target vol 40% and 60% to see when the 1× cap binds; (c) the same signals with a one-bar delay; (d) drop lookbacks shorter than 20, which trade the most. Hold out 2022–2026 if the sample allows. The paper's own results are full-sample through 19 March 2025. |
+| Rules | For each lookback *n*, long when today's close equals the max close over the last *n* days including today; flat when the close is at or below a mid-line stop that never falls (`stop(t+1) = max(stop(t), mid(t))`). Initial stop on entry is the mid-line. Each lookback is scaled by a volatility target and a cap, then the nine weights are averaged. The weight known at the close earns the **next** day's return. A breakout or a stop trades immediately. A volatility-only change trades only if it passes the band the paper states. No shorts. If both entry and exit are true on one bar, exit an existing long first (**[SUGGESTION]**; the paper does not say). A volatility target, a cap, and that band are a rule the application reads, and a run records which rule it applied. This hand-off does not set them. |
+| Indicators | Donchian up/down/mid on **closes** (not highs/lows). 90-day annualized volatility of simple close-to-close returns, sample standard deviation, √365 (**[SUGGESTION]**; the paper says 90-day annualized volatility and does not specify the convention). Fractional weight. The cap is a rule the application reads. |
+| Sweep | Paper's lookbacks, do not refit them first: {5, 10, 20, 30, 60, 90, 150, 250, 360}. Fee 10 bps on `|Δw|`. **[SUGGESTION]**, not from the paper: also run (a) binary long/flat with no volatility weight, if the bot cannot size; (b) the same signals with a one-bar delay; (c) drop lookbacks shorter than 20, which trade the most. Hold out 2022–2026 if the sample allows. The paper's own results are full-sample through 19 March 2025. Do not sweep a target vol or a cap on this page. Those are a rule the application reads. |
 | Bars | Daily. Do not move it to hourly. A separate Xueqiu Turtle, same 10 bp one-way fee, is positive on daily Bitcoin and loses money on 4-hour and 1-hour bars ([that post](catching-crypto-trends.md#xueqiu-daily-turtle-holds-up-faster-bars-do-not)). |
-| Source | [Zarattini, Pagani, and Barbon, SSRN 5209907](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5209907). PDF: <https://concretumgroup.com/wp-content/uploads/2026/02/Catching-Crypto-Trends.pdf>. Table 3, net of 10 bps and the 20% threshold: BTC from Jan-2015 CAGR 30%, vol 17%, Sharpe 1.56, max drawdown 19%; ETH from Aug-2015 27%, 16%, 1.51, 15%; BNB from Jul-2017 17%, 15%, 1.06, 17%. Those Sharpes are the authors'. A 1× cap is **not** in the paper. On a later Binance sample our own check found the 25% target rarely wants more than 1× on these three coins ([the calculation](catching-crypto-trends.md#a-1-cap-our-calculation-not-the-papers)). |
+| Source | [Zarattini, Pagani, and Barbon, SSRN 5209907](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5209907). PDF: <https://concretumgroup.com/wp-content/uploads/2026/02/Catching-Crypto-Trends.pdf>. Table 3, net of 10 bps and the paper's rebalance band: BTC from Jan-2015 CAGR 30%, vol 17%, Sharpe 1.56, max drawdown 19%; ETH from Aug-2015 27%, 16%, 1.51, 15%; BNB from Jul-2017 17%, 15%, 1.06, 17%. Those Sharpes are the authors'. A later Binance calculation of the paper's printed weight is in [Catching crypto trends](catching-crypto-trends.md#volatility-weight-recorded-calculation). It does not choose a cap. |
 
 ### 2. Trend-gated Bollinger momentum (as-is)
 
@@ -105,7 +105,7 @@ Same position rule as the trend-gated Bollinger (candidate 2), with the SMA gate
 
 ### 5. Realized-volatility flat gate (as-is)
 
-Price-only version of volatility timing. Do not scale size above 1. Continuous sizing is optional and only if the bot already accepts a weight in `(0, 1]`; otherwise use this binary gate.
+Price-only version of volatility timing. Continuous sizing is optional and only if the bot already accepts a fractional weight. A cap is a rule the application reads, and a run records which rule it applied. This hand-off does not set one. Otherwise use this binary gate.
 
 | | |
 |--|--|
@@ -171,7 +171,7 @@ Not handed to the bot: perp-versus-spot convergence, cash-and-carry, any short b
 |------|----------------|
 | [Baseline improvements](crypto-spot-baseline-improvements.md) | BTC daily Bollinger momentum, squeeze, 200-day filter, ATR sizing, StochRSI, pairs |
 | [Momentum, reversal, and filters](momentum-reversal-filters.md) | Time-series momentum, daily reversal versus liquid momentum, trend and cross-asset gates |
-| [Catching crypto trends](catching-crypto-trends.md) | Donchian ensemble; BTC/ETH/BNB net of 10 bps; 1× cap is our calculation |
+| [Catching crypto trends](catching-crypto-trends.md) | Donchian ensemble; BTC/ETH/BNB net of 10 bps. The paper's volatility target is not a setting this page applies |
 | [Volatility and the cross-section](volatility-and-cross-section.md) | Vol targeting, size / momentum / volume factors, factor momentum, risk-balanced baskets |
 | [Funding, basis, and carry](funding-basis-carry.md) | Funding as a factor, 8-hour normalization, perp-spot bounds, cash-and-carry |
 | [Microstructure, on-chain, and unusual](microstructure-onchain-unusual.md) | Screen-number roll-out, clock-time order flow, attention, on-chain value, adaptive factor weights |
