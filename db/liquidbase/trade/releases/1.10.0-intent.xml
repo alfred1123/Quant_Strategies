@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      TRADE.INTENT — one append-only row per deployment per apply, written
+      before the order. TARGET_QTY is the signed target (decision #90).
+    -->
+
+    <changeSet id="1.10.0-001-trade-intent" author="alfcheun" context="trade,prod-deploy">
+        <comment>TRADE.INTENT — target position per deployment per apply</comment>
+        <sqlFile path="../tables/INTENT.sql" relativeToChangelogFile="true"
+                 splitStatements="true" stripComments="true"/>
+        <rollback>
+            <sql>DROP TABLE IF EXISTS TRADE.INTENT;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.10.0-002-sp-ins-intent" author="alfcheun" context="trade,prod-deploy">
+        <comment>SP_INS_INTENT — append one target row</comment>
+        <sqlFile path="../procedures/SP_INS_INTENT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+        <rollback>
+            <sql>DROP PROCEDURE IF EXISTS TRADE.SP_INS_INTENT(UUID, UUID, INTEGER, INTEGER, TIMESTAMPTZ, TEXT, NUMERIC, NUMERIC, TIMESTAMPTZ, TEXT, OUT TEXT, OUT TEXT, OUT TEXT);</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.10.0-003-grant-sp-ins-intent" author="alfcheun" context="trade,prod-deploy">
+        <comment>Grant SP_INS_INTENT to quant_app when the role exists</comment>
+        <sql splitStatements="false" stripComments="false"><![CDATA[
+            DO $$
+            BEGIN
+              IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
+                GRANT EXECUTE ON PROCEDURE TRADE.SP_INS_INTENT(
+                    UUID, UUID, INTEGER, INTEGER, TIMESTAMPTZ, TEXT, NUMERIC, NUMERIC,
+                    TIMESTAMPTZ, TEXT, OUT TEXT, OUT TEXT, OUT TEXT
+                ) TO quant_app;
+              END IF;
+            END $$;
+        ]]></sql>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.10.0-004-sp-get-intent" author="alfcheun" context="trade,prod-deploy">
+        <comment>SP_GET_INTENT — owner-scoped read by deployment and time range</comment>
+        <sqlFile path="../procedures/SP_GET_INTENT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+        <rollback>
+            <sql>DROP PROCEDURE IF EXISTS TRADE.SP_GET_INTENT(UUID, UUID, TIMESTAMPTZ, TIMESTAMPTZ, INTEGER, OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT);</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.10.0-005-grant-sp-get-intent" author="alfcheun" context="trade,prod-deploy">
+        <comment>Grant SP_GET_INTENT to quant_app when the role exists</comment>
+        <sql splitStatements="false" stripComments="false"><![CDATA[
+            DO $$
+            BEGIN
+              IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
+                GRANT EXECUTE ON PROCEDURE TRADE.SP_GET_INTENT(
+                    UUID, UUID, TIMESTAMPTZ, TIMESTAMPTZ, INTEGER,
+                    OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+                ) TO quant_app;
+              END IF;
+            END $$;
+        ]]></sql>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>
