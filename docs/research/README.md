@@ -70,7 +70,7 @@ or link a design doc — do not turn the research page into a spec.
 | [Crypto spot — baseline improvements](crypto-spot-baseline-improvements.md) | BB momentum long, squeeze, trend filter, external Sharpe claims |
 | [Sharpe ideas — where to start](sharpe-ideas-index.md) | Ranked shortlist, [AlgoDaemon hand-off](sharpe-ideas-index.md#algodaemon-hand-off), source log |
 | [Momentum, reversal, and filters](momentum-reversal-filters.md) | Time-series momentum, liquid vs illiquid reversal, cross-product gate |
-| [Catching crypto trends](catching-crypto-trends.md) | Donchian ensemble, 10 bp net results on BTC/ETH/BNB, 1× cap |
+| [Catching crypto trends](catching-crypto-trends.md) | Donchian ensemble, 10 bp net results on BTC/ETH/BNB. The paper's volatility target is not a setting this page applies |
 | [Volatility and the cross-section](volatility-and-cross-section.md) | Vol targeting, size/momentum factors, risk-balanced baskets |
 | [Funding, basis, and carry](funding-basis-carry.md) | Funding as a filter, 8-hour normalization, perp-spot convergence |
 | [Microstructure, on-chain, and unusual](microstructure-onchain-unusual.md) | 24h roll-out, clock-time flow, attention, on-chain value |
@@ -93,7 +93,7 @@ is in the [code quality review (2026-09-26)](../design/2026-09-26-code-quality-r
 
 The bot is Bybit spot only, BTC/ETH/BNB only, 10 bps per trade, daily bars preferred, backtests only. No perps, so funding and basis cannot be *traded*. Full rules, indicators, and sweep grids are in [AlgoDaemon hand-off](sharpe-ideas-index.md#algodaemon-hand-off). Most promising first:
 
-1. Donchian ensemble with a ratcheting mid-line stop and a 25% vol target, long or flat, daily, cap 1×. BTC, ETH, BNB. Net-of-10 bp figures are the paper's, not ours.
+1. Donchian ensemble with a ratcheting mid-line stop, long or flat, daily. BTC, ETH, BNB. A volatility target and a cap are a rule the application reads, and a run records which rule it applied. This list does not set them. Net-of-10 bp figures are the paper's, not ours.
 2. Trend-gated Bollinger momentum, long or flat, daily, each coin.
 3. Time-series momentum: long when the N-day return is positive.
 4. Cross-asset SMA gate among the three coins.

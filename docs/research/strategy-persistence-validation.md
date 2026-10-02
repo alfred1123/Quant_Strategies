@@ -330,11 +330,7 @@ Caution: the finalists were chosen using 2021–2026 data, so post-2023 is not i
 
 ### 7. Live monitoring (optional rule, tested historically)
 
-Three alarms were calibrated on IS returns (2021-07 to 2024-06) with a stationary bootstrap, then applied to (i) the OOS period and (ii) the unseen 2018–2021 period as if it were live:
-
-- **Drawdown alarm:** current drawdown above the 95th (or 99th) percentile of bootstrapped max-drawdown-to-date for the same elapsed days.
-- **Return alarm:** cumulative return below the 5th percentile of bootstrapped paths.
-- **CUSUM:** one-sided Page CUSUM for a drop in mean daily return from the IS mean to zero. The threshold is set for a 5% false-alarm chance per year under the IS edge.
+An offline study tested alarms on in-sample returns (2021-07 to 2024-06) and recorded when they fired on the out-of-sample window and on 2018–2021. The study used a drawdown band, a return band, and a one-sided CUSUM. Those levels are a record of that test. A sleeve weight, a drawdown cut, and an alarm level are a rule the application reads, and a run records which rule it applied. This page does not set them.
 
 ![Monitoring alarms](img/persistence-monitoring.png)
 
@@ -352,7 +348,7 @@ Three alarms were calibrated on IS returns (2021-07 to 2024-06) with a stationar
 What this shows:
 
 - In the actual OOS period, only BTC's CUSUM fired (2026-04-18). That matches BTC's weak 2026 rolling Sharpe.
-- Run over the unseen 2018–2021 data, the alarms caught BTC correctly: it stayed above the 95% drawdown band for 677 days and earned 3% over 3.3 years. They also fired on ETH A2 in early 2019, which then went on to +126%. **An alarm means "review and cut size", not "switch off".**
+- Run over the unseen 2018–2021 data, the study's drawdown band stayed crossed on BTC for 677 days, and that window earned 3% over 3.3 years. The same test also fired on ETH A2 in early 2019, which then went on to +126%. What a later alarm does is a rule the application reads. This page does not set a cut.
 - For ETH A2 and BTC, which are long only about 7–8% of days (BNB about 42%), the CUSUM mostly measures how long it has been since the last winning trade. It rises steadily while flat. A per-trade version would be better (see proposals).
 
 ### Family ensemble (a side result)
@@ -373,7 +369,7 @@ The ensemble beats the finalist on data the finalist never saw. It loses on the 
 
 | Idea | Verdict | Why |
 |---|---|---|
-| **Moving average of rolling Sharpe** | **Useful as a dashboard. Not useful as a test.** | A 180-day Sharpe has a standard error of about ±1.2–1.4, and a 365-day Sharpe about ±0.8–1.0. The observed swings sit at the 58th–79th percentile of what a constant edge produces. Trailing Sharpe and its MAs did not predict the next 180 days (correlations −0.45 to +0.12). The MA adds lag. Replace it with a bootstrap band around rolling Sharpe and drawdown, set in advance, as in §7 |
+| **Moving average of rolling Sharpe** | **Useful as a dashboard. Not useful as a test.** | A 180-day Sharpe has a standard error of about ±1.2–1.4, and a 365-day Sharpe about ±0.8–1.0. The observed swings sit at the 58th–79th percentile of what a constant edge produces. Trailing Sharpe and its MAs did not predict the next 180 days (correlations −0.45 to +0.12). The MA adds lag. A live band is a rule the application reads, and a run records which rule it applied. §7 records a historical test. It does not set the band |
 | **Bootstrap** | **Yes. Use the stationary block bootstrap, not iid.** | It gives honest intervals for Sharpe, Sortino, drawdown, and CAGR. The iid version is too narrow where returns cluster (BTC OOS lower bound −0.23 iid vs −0.93 block). It does not remove selection bias, so pair it with DSR and walk-forward |
 | **Bigger test share (60/40, 50/50)** | **Not on its own. Prefer walk-forward.** | One split's result mostly reflects where the cut falls (finalist OOS −0.16 to 1.79 depending on the cut). A bigger test share narrows the interval only with the square root of test length. Walk-forward uses every day after the first train window as honest OOS, which gives the tightest intervals (for example BNB anchored 1.33, CI 0.66 to 1.94). Quarterly refits beat monthly. Even so, pick-best walk-forward only matches the grid median, so the stable choice is to fix a family and trade its median or ensemble |
 
@@ -392,7 +388,7 @@ The ensemble beats the finalist on data the finalist never saw. It loses on the 
 | Best walk-forward (extended, delay 0) vs grid median / fixed | 2y/3m 1.17 vs 0.97 / 1.38 | anchored/3m 1.33 vs 1.22 / 1.34 | anchored/3m 0.88 vs 1.13 / 0.83 |
 | Delay 1, OOS | 1.24 → 1.26 | 1.04 → 0.99 | 1.07 → 0.97 |
 | Live alarm in OOS | none | none | CUSUM 2026-04-18 |
-| Overall | Most credible edge. Holds on unseen data, not boom-dependent. 365-day Sharpe now about 0 (within noise) | Credible, but the Sharpe advantage over B&H is small. Its value is lower drawdown. Weakest DSR | Weakest persistence evidence. Fails on unseen 2018–21 data. Edge concentrated post-2023. Treat as hindsight-fitted and size it down |
+| Overall | Most credible edge. Holds on unseen data, not boom-dependent. 365-day Sharpe now about 0 (within noise) | Credible, but the Sharpe advantage over B&H is small. Its value is lower drawdown. Weakest DSR | Weakest persistence evidence. Fails on unseen 2018–21 data. Edge concentrated post-2023. Treat as hindsight-fitted. A sleeve weight is a rule the application reads, and a run records which rule it applied |
 
 ## Recommended validation protocol
 
@@ -405,7 +401,7 @@ For every new candidate family, and yearly for live strategies:
 5. **PSR and DSR** at the logged N. Target PSR(0) ≥ 0.95 on OOS and DSR ≥ 0.9 on FULL. Report MinTRL so everyone knows how long live evidence will take.
 6. **Regime table** (R1–R5 above) with buy-and-hold alongside. The bust must show a small drawdown, the boom a positive return, and post-2023 a Sharpe CI above zero. Keep 2020–2022 in training, and read it as a stress test as well.
 7. **Unseen-history check.** Wherever older data exists (pre-2021 Binance), run the fixed candidate on it untouched.
-8. **Incubate** (paper or small size) with the alarms from §7 fixed in advance: drawdown above the 95% bootstrap band triggers a size cut, 99% triggers a review, and a CUSUM alarm triggers a review. Promote to full size only after the incubation Sharpe's PSR(0) reaches 0.95 or the MinTRL is met, whichever comes first.
+8. **Incubate.** A live size and any alarm are a rule the application reads, and the run records which rule it applied. §7 is a historical record of one offline test. This protocol does not set a weight, a drawdown cut, or an alarm level.
 9. **Do not re-tune on a bad quarter.** The rank IC of about 0 means re-tuning is noise-chasing. Re-tune only on a schedule set in advance (anchored, quarterly) or when a new family is validated.
 
 ## Future directions and proposed engine features
@@ -421,7 +417,7 @@ These are proposals for discussion, not code.
 - **CSCV PBO** as a built-in optimize output.
 - **Live monitor:** a drawdown-vs-bootstrap band and a per-trade CUSUM, calibrated at deployment and stored with the strategy version.
 - **Longer history ingestion** (Binance spot back to 2017) for research runs, flagged as a different venue.
-- Research follow-ups: per-trade (not per-day) statistics for sparse strategies; a regime-aware sizing test (for example, a smaller BTC sleeve); a repeat of this study each quarter as OOS grows.
+- Research follow-ups: per-trade (not per-day) statistics for sparse strategies, and a repeat of this study each quarter as OOS grows. A sleeve weight is a rule the application reads, and a run records which rule it applied. This page does not set one.
 
 ## Charts on this page
 

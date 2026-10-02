@@ -43,7 +43,7 @@ These come from the [persistence validation study](strategy-persistence-validati
 7. **Overfitting across the family.** PBO/CSCV of about 0.30 or less as a guide. Above that, expect the family-median Sharpe, not the best cell's.
 8. **Concentration and benchmark.** Time in market, skew, Sortino, the effect of removing the top 1-3 days, and buy-and-hold over the same windows.
 
-**Live monitoring.** A rolling Sharpe is a dashboard, not a test (a 1-year window has a standard error of about ±0.8-1.0). Alarms (CUSUM, or drawdown past a bootstrap quantile) mean "review and cut size", not "switch off". Blend-level sizing, drawdown limits and the kill switch belong to Risk Guardian.
+**Live monitoring.** A rolling Sharpe is a dashboard, not a test (a 1-year window has a standard error of about ±0.8-1.0). A sleeve weight, a drawdown cut, and an alarm level are a rule the application reads, and a run records which rule it applied. This workflow does not set them.
 
 ## Platform backtesting (AlgoDaemon Quant Researcher)
 

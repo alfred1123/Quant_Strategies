@@ -1,7 +1,7 @@
 # Catching crypto trends (Donchian ensemble)
 
 **Doc type:** strategy research  
-**Status:** hypothesis — not backtested here. The figures below are the authors' or, where marked, a separate calculation. Nothing here is scheduled for live.
+**Status:** hypothesis — not backtested here. The figures below are the authors' or, where marked, a separate calculation. Nothing here is scheduled for live. A volatility target, a cap, and a rebalance band are a rule the application reads, and a run records which rule it applied. This page does not set them.
 
 This is the closest published daily, long-only trend rule to the coins and the fee the AlgoDaemon bot actually uses. It is a Donchian breakout with a ratcheting mid-line stop and a volatility target, averaged across nine lookbacks. It is not expressible with the indicators in this repository today. It is the first row of the [AlgoDaemon hand-off](sharpe-ideas-index.md#algodaemon-hand-off).
 
@@ -18,7 +18,7 @@ Labels used below: **[PAPER]** is in the PDF. **[UNSTATED]** is not. **[SUGGESTI
 
 ## Mechanism
 
-A close that prints a new *n*-day closing high goes long that lookback. A close at or below a mid-channel stop that only ratchets up goes flat. Each lookback is then scaled to a 25% annualized volatility target, capped, and the nine weights are averaged. The bet is the usual trend bet: cut the long bear, keep the upside, and stop the position's volatility from dominating the Sharpe denominator. Because the target is 25% and these coins are usually much more volatile than that, the paper's book is often only partly invested. That is a feature of the sizing, not of the breakout.
+A close that prints a new *n*-day closing high goes long that lookback. A close at or below a mid-channel stop that only ratchets up goes flat. Each lookback is then scaled by a volatility target and a cap, and the nine weights are averaged. The bet is the usual trend bet: cut the long bear, keep the upside, and stop the position's volatility from dominating the Sharpe denominator. The target and the cap are the paper's. This page does not set them.
 
 ## Data
 
@@ -47,14 +47,14 @@ The stop used on day *t*+1 is the higher of day *t*'s stop and the mid-line at t
 Volatility σ_t is "the 90-day annualized volatility of the returns of the underlying asset computed on day *t*" (§4.2). §4.3 calls the same object "3-month annualized volatility". It is the asset's volatility, shared by every lookback, not the strategy's volatility.
 
 ```text
-w_n(t)     = min(0.25 / σ_t, 2.00) × Pos_n(t)    # 25% vol target, 200% cap
+w_n(t)     = min(target_vol / σ_t, cap) × Pos_n(t)    # the paper prints both; this page does not set them
 w_Combo(t) = (1/9) × Σ w_n(t)
 ret_Combo(t) = w_Combo(t-1) × ret_asset(t)       # weight at t earns the next day's return
 ```
 
-The paper does not allow the allocation to exceed 200%. Weights are averaged, not voted. The weight is known at the end of day *t* and earns day *t*+1, which is execution at the signal close.
+The paper does not allow the allocation to exceed the cap it prints. Weights are averaged, not voted. The weight is known at the end of day *t* and earns day *t*+1, which is execution at the signal close.
 
-**[PAPER]** §5.1. Rebalance only when the gap between current and target allocation is more than 20%, and that threshold applies **only** to volatility-driven changes. A new breakout or a trailing-stop exit is traded immediately. After §5.1, reported results are net of 10 bps plus that threshold. The authors say Bitcoin exchange costs are "generally below 5 bps". At 50 bps the threshold recovers about 100 bps/year of CAGR (Fig. 3). Sensitivity is shown at 0, 10, 25, and 50 bps.
+**[PAPER]** §5.1. Rebalance only when the gap between current and target allocation passes the band the paper states, and that band applies **only** to volatility-driven changes. A new breakout or a trailing-stop exit is traded immediately. After §5.1, reported results are net of 10 bps plus that band. The authors say Bitcoin exchange costs are "generally below 5 bps". At 50 bps the band recovers about 100 bps/year of CAGR (Fig. 3). Sensitivity is shown at 0, 10, 25, and 50 bps. A rebalance band is a rule the application reads, and a run records which rule it applied. This page does not set it.
 
 **[PAPER]** Table 2, gross, Bitcoin trade counts from 2015 to March 2025, as a check that a short lookback really does trade: 5d 292, 10d 156, 20d 78, 30d 49, 60d 28, 90d 20, 150d 15, 250d 9, 360d 5.
 
@@ -66,7 +66,7 @@ Do not fill these in and then call the result a reproduction.
 |-----|------|
 | Return type, std, and annualization of σ | Simple or log returns, sample or population standard deviation, and √365 or √252 are all **[UNSTATED]**. **[SUGGESTION]** Simple close-to-close returns, sample std of the last 90 daily returns, √365. |
 | Same-bar entry and exit | If the close is both a new high and at or below the stop, precedence is **[UNSTATED]**. The paper lists entry first. **[SUGGESTION]** Exit an existing position first. If that leaves the lookback flat, allow a new entry on the same bar only when `Close == Up_n` and `Close > Mid_n`. Test the other order. |
-| The 20% band | Absolute percentage points of NAV, or relative to the target weight? Per lookback, or on the combo? Is "current" the weight after price drift? All **[UNSTATED]**. **[SUGGESTION]** On the combo, relative gap `|w_current − w_target| / w_target > 0.20`, with `w_current` drifted. Also test an absolute 0.20 gap. |
+| The rebalance band | Absolute percentage points of NAV, or relative to the target weight? Per lookback, or on the combo? Is "current" the weight after price drift? All **[UNSTATED]**. This page does not set the band. |
 | What 10 bps multiplies | Per side on traded notional, per round trip, or on `|Δw|` is **[UNSTATED]**. **[SUGGESTION]** Charge 10 bps × `|Δw|` × NAV, which is the natural reading of a 10 bp cost on a sized book. |
 | Signal day vs vol drift | On a breakout or stop, it is **[UNSTATED]** whether the trade goes to the full new combo target (absorbing any vol drift) or only the lookback's own change. **[SUGGESTION]** Test both. The hand-off recipe trades to the full target. |
 | Slippage, risk-free rate, close time | Slippage is not mentioned. The risk-free rate inside Sharpe and Sortino is **[UNSTATED]**. So is the daily close time. |
@@ -92,7 +92,7 @@ Buy-and-hold Bitcoin drawdown is described as ">80%" (**[PAPER]** §5). No figur
 | 360d | 29% | 20% | 1.28 | 1.27 | 34% | 0.83 | 12% | 0.18 |
 | Combo | 30% | 17% | 1.58 | 2.03 | 19% | 0.88 | 14% | 0.17 |
 
-### Net of 10 bps and the 20% threshold
+### Net of 10 bps and the paper's rebalance band
 
 **[PAPER]** Table 3. These three rows are the ones that match the bot's universe. The same table also reports, for coins the bot cannot trade, SOL 27% CAGR / Sharpe 1.68 / max drawdown 12%, XRP 18% / 1.00 / 14%, and DOGE 24% / 1.20 / 15%. The full table has 40 coins.
 
@@ -112,11 +112,11 @@ Flagged and left as printed. Do not "correct" a table to match CAGR/MDD.
 - **Sortino.** Bitcoin combo Sortino falls from 2.03 gross to 1.23 net, while Sharpe barely moves (1.58 to 1.56). The paper does not explain that.
 - **5-day CAGR.** §5.1 says the 5-day model's CAGR falls "from 34% to 18%" at 50 bps. Table 1 lists the 5-day gross CAGR as 36%.
 
-## A 1× cap (our calculation, not the paper's)
+## Volatility weight (recorded calculation)
 
-**[PAPER]** The only cap in the paper is 200%. A 1× cap is not tested and not discussed.
+**[PAPER]** The paper prints one cap. A second, tighter cap is not tested and not discussed.
 
-**[MY CALC]** On Binance spot daily closes (BTC and ETH from 2017-08-17, BNB from 2017-11-06, all through 2026-09-26), `0.25 / σ_90` was computed from simple returns and a sample standard deviation. Binance's public API was used because a Bybit fetch returned 403. This is not the authors' sample and not a reproduction of their backtest.
+**[MY CALC]** On Binance spot daily closes (BTC and ETH from 2017-08-17, BNB from 2017-11-06, all through 2026-09-26), the paper's printed volatility weight was computed from simple returns and a sample standard deviation. Binance's public API was used because a Bybit fetch returned 403. This is not the authors' sample and not a reproduction of their backtest. A cap is a rule the application reads, and a run records which rule it applied. This calculation does not set one.
 
 | Coin | Annualization | Days with raw weight > 1 | Median raw weight | Max raw weight |
 |------|----------------|---------------------------|-------------------|----------------|
@@ -127,7 +127,7 @@ Flagged and left as printed. Do not "correct" a table to match CAGR/MDD.
 | BNB | √365 | 0.0% | 0.35 | 0.96 |
 | BNB | √252 | 0.9% | 0.42 | 1.15 |
 
-On that window, a 1× cap barely binds for these three coins at a 25% target and √365. A spot book capped at 1× should be close to the paper's sized book **on these coins and this later sample**. The 200% cap could still have mattered in quieter years the calculation does not cover (Bitcoin 2015–2016 was not in the file). The median raw weights sit near 0.3–0.5, so at a 25% target the strategy is usually under-invested. Raising the target is what makes the 1× cap bind. That last sentence is **[SUGGESTION]**, not a paper result.
+On that window the paper's printed weight stayed at or under 1 for these three coins at √365. That is a record of the calculation, not a cap to apply. The authors' own cap could still have mattered in quieter years the calculation does not cover (Bitcoin 2015–2016 was not in the file). The median raw weights sit near 0.3–0.5, so under the paper's printed target the strategy is usually under-invested.
 
 ## Xueqiu: daily Turtle holds up, faster bars do not
 
@@ -161,4 +161,4 @@ The post's summary is that the same rules run from about 33% annualized down to 
 
 Not expressible. There is no Donchian, no stop that ratchets, and no weight in `(0, 1]`. A 200-day Bollinger gate is a coarser trend filter and remains the thing this codebase can run without new indicators. Adding Donchian, a trailing stop, and a size multiplier would be platform design, not a parameter change.
 
-**AlgoDaemon testability:** As-is as a **long/flat daily** book on Bybit spot BTC, ETH, and BNB, with the paper's 200% cap replaced by **1×**. This is not a rerun of the 200-day Bollinger FILTER already tried on the stored BTC book in this repository, which lowered hold-out Sharpe from 1.185 to 0.964 ([try-these-first](sharpe-ideas-index.md#try-these-first)). That gate is a z-score sign, not this ensemble. That needs three things the binary z-score signal does not have: a Donchian channel on closes, a trailing stop, and a volatility weight. If the bot can only hold 0 or 1, run that binary Donchian (no 0.25/σ scaling) as a fallback and do not compare its Sharpe to Table 3, which is the sized combo. Hourly is an out-of-sample stress test only; the paper is daily, and the Xueqiu Turtle above loses money at 4-hour and 1-hour after fees. The hand-off row states the sweeps, including which of them are **[SUGGESTION]** rather than the paper's grid.
+**AlgoDaemon testability:** As-is as a **long/flat daily** book on Bybit spot BTC, ETH, and BNB. A volatility target and a cap are a rule the application reads, and a run records which rule it applied. This page does not set them. This is not a rerun of the 200-day Bollinger FILTER already tried on the stored BTC book in this repository, which lowered hold-out Sharpe from 1.185 to 0.964 ([try-these-first](sharpe-ideas-index.md#try-these-first)). That gate is a z-score sign, not this ensemble. That needs three things the binary z-score signal does not have: a Donchian channel on closes, a trailing stop, and a volatility weight. If the bot can only hold 0 or 1, run that binary Donchian and do not compare its Sharpe to Table 3, which is the sized combo. Hourly is an out-of-sample stress test only; the paper is daily, and the Xueqiu Turtle above loses money at 4-hour and 1-hour after fees. The hand-off row states the sweeps, including which of them are **[SUGGESTION]** rather than the paper's grid.

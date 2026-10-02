@@ -210,13 +210,13 @@ Only ETH on the 30-day share beat buy and hold in the test window. The rest deca
 
 ## S5. Implied volatility (DVOL): sizing and VRP gates
 
-**Rule in plain words.** Three ways to use Deribit's 30-day implied-vol index:
+**Rule in plain words.** Three ways the offline check used Deribit's 30-day implied-vol index. A volatility target, a cap, and a flat-gate level are a rule the application reads, and a run records which rule it applied. This page does not set them.
 
-1. **Size** the position as target ÷ DVOL, capped at 1.
-2. **Gate**: stay flat when DVOL is in the top 10–20% of its past year.
+1. **Size** the position from a volatility target over DVOL.
+2. **Gate**: stay flat when DVOL is in the high tail of its past year.
 3. **Variance risk premium (VRP) gate**: stay long only while DVOL is above trailing realized vol.
 
-**Parameters.** Target vol 40% or 60%. Percentile gate 0.8 or 0.9 over 365 days. VRP = DVOL − 30-day realized vol, used either as sign > 0 or as its 90-day z-score > 0.
+**What the offline check ran.** The variants are the table below. They are a record of that check, not settings to apply.
 
 **Sources.**
 
