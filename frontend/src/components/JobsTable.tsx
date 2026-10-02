@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import {
-  Alert, Box, Button, Chip, CircularProgress, Stack, Typography,
+  Alert, Box, Button, Chip, CircularProgress, InputAdornment, Stack, TextField, Typography,
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import { fetchJob, useCancelJob, useJobs, useReenqueueJob, usePromoteStrategy } from '../api/jobs';
@@ -40,6 +41,7 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
   const reenqueue = useReenqueueJob();
   const promote = usePromoteStrategy();
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'ALL'>('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
   const [cloneLoading, setCloneLoading] = useState<string | null>(null);
   const [configLoading, setConfigLoading] = useState<string | null>(null);
   const [configDialogData, setConfigDialogData] = useState<{
@@ -63,16 +65,26 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
   };
 
   const rows = useMemo(() => {
-    const all = jobs.data ?? [];
-    if (statusFilter === 'ALL') return all;
+    let filtered = jobs.data ?? [];
+
+    // Filter by search term (case-insensitive)
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (r) => r.strategy_nm?.toLowerCase().includes(term),
+      );
+    }
+
+    // Filter by status
+    if (statusFilter === 'ALL') return filtered;
     // CANCELLED chip groups CANCEL_REQUESTED + CANCELLED \u2014 they're the same to a user.
     if (statusFilter === 'CANCELLED') {
-      return all.filter(
+      return filtered.filter(
         (r) => r.queue_status === 'CANCELLED' || r.queue_status === 'CANCEL_REQUESTED',
       );
     }
-    return all.filter((r) => r.queue_status === statusFilter);
-  }, [jobs.data, statusFilter]);
+    return filtered.filter((r) => r.queue_status === statusFilter);
+  }, [jobs.data, statusFilter, searchTerm]);
 
   const columns: GridColDef<JobRow>[] = useMemo(
     () => [
@@ -301,7 +313,21 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
         </Alert>
       )}
 
-      <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
+      <Stack direction="row" spacing={2} sx={{ mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+        <TextField
+          size="small"
+          placeholder="Search strategy..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          sx={{ width: 220 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" color="action" />
+              </InputAdornment>
+            ),
+          }}
+        />
         {FILTER_STATES.map((s) => (
           <Chip
             key={s}
