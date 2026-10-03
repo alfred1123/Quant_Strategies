@@ -30,5 +30,6 @@
 
     <include file="releases/1.9.0-deployment-strategy-name.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.10.0-intent.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.11.0-deployment-performance.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

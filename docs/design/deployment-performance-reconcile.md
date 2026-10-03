@@ -1,6 +1,6 @@
 # Deployment performance reconcile
 
-**Status:** Proposed. Covers [Plan to profit](plan-to-profit.md) Phase 2.1 (data model), 2.2 (job), and 2.3 (UI). Resolves open decision #3 in that page once adopted. Depends on `TRADE.INTENT` ([Multi-strategy netting §5](multi-strategy-netting.md#5-intent-first), decision #90).
+**Status:** Strategy rows are staged. Trade release `1.11.0` adds `TRADE.DEPLOYMENT_PERFORMANCE`, `SP_INS_DEPLOYMENT_PERFORMANCE`, and `SP_GET_DEPLOYMENT_PERFORMANCE`, and adds `FEE_CCY_CD` on `TRADE.TRANSACTION`. The changeset context is `trade` alone, so production does not apply it until `prod-deploy` is added. The account table, the daily job, and the UI in this page are still proposed. Open decision #3 stays open until the snapshot tables are adopted. The live terms are `quant/trade/pnl_reconcile.py`. `BACKTEST_RETURN` is the `pnl` from `Performance` (`quant/strategy/performance.py`) passed in on the write. Depends on `TRADE.INTENT` ([Multi-strategy netting §5](multi-strategy-netting.md#5-intent-first), decision #90).
 
 **Question it answers:** is each live strategy earning what its backtest said it would, does the account hold what the strategies asked for, and when either is behind, is the cause the strategy or the execution?
 
@@ -68,6 +68,8 @@ The strategy's position for bar `k+1` is `TARGET_QTY` from its intent at `s_k`. 
 | Fee | `− Σ fee_in_quote / UNIT_NOTIONAL_AMT` | Broker-charged fee from `TRADE.TRANSACTION.FEE_AMT` |
 
 `LIVE_RETURN` is the sum.
+
+`FEE_AMT` stays the raw broker cost. `FEE_CCY_CD` is the coin that cost was charged in. Conversion happens when the bar is priced. A fee already in the product quote (`TRANS_CCY_CD`) is used as charged. A fee in the base coin is `cost × fill price`. A missing currency, or any other coin, leaves `LIVE_FEE_RETURN` and `LIVE_RETURN` null when the cost is non-zero. A zero or absent fee is 0. Rows written before `FEE_CCY_CD` existed keep a null fee currency and follow that same rule. The product master records the quote only; the caller supplies the base coin.
 
 **Which fills are the strategy's.** While each deployment applies on its own, a `TRANSACTION` row carries the `DEPLOYMENT_ID` that placed it, and the fills are that deployment's. Once netting places one order for several strategies, the order's fill gap and fee are shared by each strategy's `|Δ TARGET_QTY|` at that slot. The fee netting saves lands at the account level.
 
@@ -197,10 +199,11 @@ One current row per `(API_CREDENTIAL_ID, INTERNAL_CUSIP, IS_PAPER_IND, TM_INTERV
 
 ### 5.3 Procedures
 
-- `TRADE.SP_INS_DEPLOYMENT_PERFORMANCE` and `TRADE.SP_INS_ACCOUNT_PERFORMANCE` each take a batch of bars and apply the insert, version, or no-op rule per key.
-- `TRADE.SP_GET_DEPLOYMENT_PERFORMANCE` and `TRADE.SP_GET_ACCOUNT_PERFORMANCE` return current rows in a time range, scoped by `APP_USER_ID` like `SP_GET_TRANSACTION`. The chart reads only these.
+- `TRADE.SP_INS_DEPLOYMENT_PERFORMANCE` writes one bar. A current row for `(DEPLOYMENT_ID, TM_INTERVAL_ID, BAR_TIMESTAMP)` whose values are unchanged (`IS NOT DISTINCT FROM`) is a no-op. A change reuses that row's id, inserts the next VID, and flips the previous current row to `N`. A new bar uses the caller's UUID and VID 1. The job calls it once per bar.
+- `TRADE.SP_GET_DEPLOYMENT_PERFORMANCE` returns current rows in a bar-time range, scoped by `APP_USER_ID` through the current `DEPLOYMENT` row. Newest bar first. `CREATED_AT` is returned as `RECONCILED_AT`.
+- `TRADE.SP_INS_ACCOUNT_PERFORMANCE` and `TRADE.SP_GET_ACCOUNT_PERFORMANCE` are still proposed.
 
-Each logs with `V_LOG_START TIMESTAMPTZ := clock_timestamp();`. The release is a new `trade` changeset with context `trade` alone; adding `prod-deploy` is a separate decision.
+Each logs with `V_LOG_START TIMESTAMPTZ := clock_timestamp();`. Release `1.11.0` uses context `trade` alone. Adding `prod-deploy` is a separate decision. The app image that calls the new `SP_INS_TRANSACTION` signature has to wait for that release: a fill write is best-effort, so a signature the database does not have yet drops the fill row and the apply still completes.
 
 ### 5.4 Snapshot table vs materialized view (open decision #3)
 
@@ -210,7 +213,7 @@ Each logs with `V_LOG_START TIMESTAMPTZ := clock_timestamp();`. The release is a
 
 ## 6. The job (Phase 2.2)
 
-Runs once a day on the trade host's cron (decision #35), after the daily `23:55 UTC` slot has settled.
+Release `1.11.0` stores a bar the caller has already priced. The daily job described here is still proposed. It runs once a day on the trade host's cron (decision #35), after the daily `23:55 UTC` slot has settled.
 
 1. For each deployment with rows to write (enabled, or disabled with a non-zero last target), read the last current `BAR_TIMESTAMP`. Start one bar before it so a late fill on that bar is picked up.
 2. Read intents, attempts, fills, and `DEPLOYMENT` versions from that time forward, and `PRICE_BAR` closes plus warmup for the range.
@@ -252,8 +255,8 @@ Managed bars on either side of a pause are joined into one series. That is corre
 
 | Gap | Where | Fix |
 |---|---|---|
-| Snapshot tables not built | `TRADE.INTENT` records each strategy's target (trade `1.10.0`) | `DEPLOYMENT_PERFORMANCE` and `ACCOUNT_PERFORMANCE` in this page are still proposed |
-| Fee currency is dropped | `_extract_fee` in `quant/trade/brokers/ccxt/confirm.py` keeps `fee.cost` and discards `fee.currency`. Bybit spot charges a buy fee in the base coin and a sell fee in the quote, so `FEE_AMT` mixes units. | Record the fee currency on `TRADE.TRANSACTION` and convert base fees at the fill price |
+| Account snapshot not built | Strategy bars are staged in trade `1.11.0` | `ACCOUNT_PERFORMANCE`, the daily job (§6), and the UI (§7) are still proposed |
+| Historical fills have no fee currency | `FEE_CCY_CD` is stored from this release forward. Rows already in `TRADE.TRANSACTION` have a null fee currency, and a non-zero cost with a null currency leaves that bar's fee term and `LIVE_RETURN` null | Backfill only where the venue coin is still known; do not treat a null as quote |
 | Reads have no time filter | `SP_GET_TRANSACTION` and `SP_GET_EXECUTION_EVENT` return the newest `IN_LIMIT` rows | Add a from-timestamp parameter to those two procedures |
 | Spot holdings missing from the snapshot positions | `fetch_open_positions` lists contracts; a spot holding appears only as a balance, with no mark or notional | Add spot holdings as position rows, read from the base balance the way `fetch_position_qty` already does for spot |
 | Fill ↔ attempt link | `TRANSACTION` joins to `EXECUTION_EVENT` only by `VENDOR_ORDER_ID` | Sufficient for ccxt; confirm Futu fills carry the same id |

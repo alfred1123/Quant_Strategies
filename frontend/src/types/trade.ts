@@ -127,6 +127,7 @@ export interface ApplyReport {
   filled_qty: number | null;
   avg_price: number | null;
   fee: number | null;
+  fee_ccy: string | null;
   message: string;
 }
 
@@ -200,6 +201,7 @@ export interface TransactionRow {
   price: string | null;
   notional_amt: string | null;
   fee_amt: string | null;
+  fee_ccy_cd: string | null;
   vendor_order_id: string | null;
   trans_ccy_cd: string;
   filled_at: string;

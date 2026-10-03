@@ -21,6 +21,7 @@ class ApplyReport(BaseModel):
     filled_qty: float | None = None
     avg_price: float | None = None
     fee: float | None = None
+    fee_ccy: str | None = None
     message: str
     # Why the broker refused, when the refusal was classified rather than only
     # described. The scheduler pauses instead of retrying a reason that no
