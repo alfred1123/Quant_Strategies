@@ -1,0 +1,5374 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/design/2026-09-29-dependency-review/">
+      
+      
+        <link rel="prev" href="../2026-09-29-long-term-fixes-b1-rangeparam-datacolumn/">
+      
+      
+        <link rel="next" href="../../research/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Dependency and OOP review (2026-09-29) - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dependency-and-oop-review-2026-09-29" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Dependency and OOP review (2026-09-29)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Platform design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../research/" class="md-tabs__link">
+          
+  
+  
+  Strategy research
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../archive/" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/prod-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../coding-standards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding Standards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plan-to-profit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment-performance-reconcile/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Performance Reconcile
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best-vid-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ccxt-bar-timezones/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Bar Timezones & Apply Timing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-data-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../db-connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-29-queue-frontend-aids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue screen aids (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../glassnode-market-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glassnode market data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-25-backtest-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest review (2026-09-25)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-25-backtest-data-hygiene-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest data hygiene (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-26-fractional-sizing-stateful-exits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fractional sizing and stateful exits (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-26-code-quality-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code quality review (2026-09-26)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-27-algodaemon-bug-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AlgoDaemon bug report (2026-09-27)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-27-bug-verification-round3-4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bug verification, rounds 3–4 (2026-09-27)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-29-long-term-fixes-b1-rangeparam-datacolumn/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Long-term fixes — B1, window bounds, data columns, repeated trials (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency and OOP review (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency and OOP review (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-module-dependency-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Module dependency graph
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Module dependency graph">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-graph-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the graph is
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#module-cycles-including-lazy-imports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module cycles, including lazy imports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#package-cycles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Package cycles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-trade-imports-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: trade imports api
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-trade-and-queue-import-each-other" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: trade and queue import each other
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-promotion-imports-queue-and-queue-imports-promotion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: promotion imports queue, and queue imports promotion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-schemas-and-refdata-import-trade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: schemas and refdata import trade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-market_data-imports-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: market_data imports strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-layer-leaks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Layer leaks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Layer leaks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#routes-and-repos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Routes and repos
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-login-stamps-the-repo-from-the-route" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: login stamps the repo from the route
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log-proc-summary-stays-on-the-repo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log-proc summary stays on the repo
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-promotionrepo-both-decides-and-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: PromotionRepo both decides and writes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#broker-types-in-strategy-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Broker types in strategy code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frontend-copies-of-backend-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frontend copies of backend rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-oversized-classes-and-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Oversized classes and functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Oversized classes and functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finding-tradeserviceupdate_deployment-decides-and-writes-in-one-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: TradeService.update_deployment decides and writes in one method
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-fetch_df-still-chooses-the-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: fetch_df still chooses the source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-ccxttradegateway-is-three-clients" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: CcxtTradeGateway is three clients
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-traderepo-is-one-schema-and-it-also-checks-statuses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: TradeRepo is one schema, and it also checks statuses
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frontend-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frontend files
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-duplicated-facts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Duplicated facts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Duplicated facts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finding-two-sharpe-formulas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: two Sharpe formulas
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-hard-coded-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Hard-coded values
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Hard-coded values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finding-queue-status-ids-are-literals-in-sql" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: queue status ids are literals in SQL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-job-priority-and-the-per-user-cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: job priority and the per-user cap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-backfill-size-and-the-warm-lookback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: backfill size and the warm lookback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-schedule-statuses-are-a-python-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: schedule statuses are a Python set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-confirm-delays-and-the-two-retry-budgets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: confirm delays and the two retry budgets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-live-trading-failure-path-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Live-trading failure-path tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Live-trading failure-path tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#broker-rejects-an-order-tested-above-the-gateway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Broker rejects an order: tested above the gateway
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-gateway-maps-a-venue-reject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: gateway maps a venue reject
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#broker-times-out-the-poll-is-tested-the-submit-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Broker times out: the poll is tested, the submit is not
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-a-submit-timeout-does-not-become-a-second-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: a submit timeout does not become a second order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partial-fill-a-terminal-partial-is-tested-an-open-partial-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partial fill: a terminal partial is tested, an open partial is not
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-an-open-partial-is-remembered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: an open partial is remembered
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#position-read-lags-or-is-stale-no-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position read lags or is stale: no test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-a-stale-position-does-not-send-a-second-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: a stale position does not send a second order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-database-write-after-a-successful-order-the-audit-is-tested-the-fill-row-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The database write after a successful order: the audit is tested, the fill row is not
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-a-failed-fill-row-does-not-hide-the-fill-and-does-not-send-another-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: a failed fill row does not hide the fill, and does not send another order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#duplicate-submission-on-retry-no-idempotency-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duplicate submission on retry: no idempotency test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-one-client-order-id-for-a-retry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: one client order id for a retry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scheduler-tick-crash-mid-cycle-a-whole-interval-is-tested-a-row-in-the-middle-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduler tick crash mid-cycle: a whole interval is tested, a row in the middle is not
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-one-bad-row-does-not-drop-the-rest-of-the-interval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: one bad row does not drop the rest of the interval
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#refactor-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refactor order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decisions-for-alfred" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions for Alfred
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy research
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Strategy research
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/crypto-spot-baseline-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crypto spot — baseline improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/sharpe-ideas-index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharpe ideas — where to start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/momentum-reversal-filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum, reversal, and filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/catching-crypto-trends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catching crypto trends
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/volatility-and-cross-section/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Volatility and the cross-section
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/funding-basis-carry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Funding, basis, and carry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/microstructure-onchain-unusual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Microstructure, on-chain, and unusual
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/polyu-quant-course-methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods from the PolyU quantitative trading course
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/dutch-algotrading-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dutch Algotrading Patreon review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/chinshum-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chin Shum Patreon review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/merge-vs-distinct-candidates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which candidates to merge vs run as separate sleeves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/japanese-korean-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Japanese and Korean crypto strategy sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/feature-worthy-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategies worth new platform features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/strategy-persistence-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy persistence validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/risk-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Risk control for the three sleeves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/live-order-execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/return-compounding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Return Compounding (bug)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/infra-capacity-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure Capacity Review (2026-09)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer (abandoned)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-module-dependency-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Module dependency graph
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Module dependency graph">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-graph-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the graph is
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#module-cycles-including-lazy-imports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module cycles, including lazy imports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#package-cycles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Package cycles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-trade-imports-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: trade imports api
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-trade-and-queue-import-each-other" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: trade and queue import each other
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-promotion-imports-queue-and-queue-imports-promotion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: promotion imports queue, and queue imports promotion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-schemas-and-refdata-import-trade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: schemas and refdata import trade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-market_data-imports-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: market_data imports strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-layer-leaks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Layer leaks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Layer leaks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#routes-and-repos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Routes and repos
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-login-stamps-the-repo-from-the-route" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: login stamps the repo from the route
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log-proc-summary-stays-on-the-repo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log-proc summary stays on the repo
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-promotionrepo-both-decides-and-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: PromotionRepo both decides and writes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#broker-types-in-strategy-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Broker types in strategy code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frontend-copies-of-backend-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frontend copies of backend rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-oversized-classes-and-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Oversized classes and functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Oversized classes and functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finding-tradeserviceupdate_deployment-decides-and-writes-in-one-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: TradeService.update_deployment decides and writes in one method
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-fetch_df-still-chooses-the-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: fetch_df still chooses the source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-ccxttradegateway-is-three-clients" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: CcxtTradeGateway is three clients
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-traderepo-is-one-schema-and-it-also-checks-statuses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: TradeRepo is one schema, and it also checks statuses
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frontend-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frontend files
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-duplicated-facts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Duplicated facts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Duplicated facts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finding-two-sharpe-formulas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: two Sharpe formulas
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-hard-coded-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Hard-coded values
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Hard-coded values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finding-queue-status-ids-are-literals-in-sql" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: queue status ids are literals in SQL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-job-priority-and-the-per-user-cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: job priority and the per-user cap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-backfill-size-and-the-warm-lookback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: backfill size and the warm lookback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-schedule-statuses-are-a-python-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: schedule statuses are a Python set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finding-confirm-delays-and-the-two-retry-budgets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding: confirm delays and the two retry budgets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-live-trading-failure-path-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Live-trading failure-path tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Live-trading failure-path tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#broker-rejects-an-order-tested-above-the-gateway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Broker rejects an order: tested above the gateway
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-gateway-maps-a-venue-reject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: gateway maps a venue reject
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#broker-times-out-the-poll-is-tested-the-submit-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Broker times out: the poll is tested, the submit is not
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-a-submit-timeout-does-not-become-a-second-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: a submit timeout does not become a second order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partial-fill-a-terminal-partial-is-tested-an-open-partial-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partial fill: a terminal partial is tested, an open partial is not
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-an-open-partial-is-remembered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: an open partial is remembered
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#position-read-lags-or-is-stale-no-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position read lags or is stale: no test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-a-stale-position-does-not-send-a-second-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: a stale position does not send a second order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-database-write-after-a-successful-order-the-audit-is-tested-the-fill-row-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The database write after a successful order: the audit is tested, the fill row is not
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-a-failed-fill-row-does-not-hide-the-fill-and-does-not-send-another-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: a failed fill row does not hide the fill, and does not send another order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#duplicate-submission-on-retry-no-idempotency-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duplicate submission on retry: no idempotency test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-one-client-order-id-for-a-retry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: one client order id for a retry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scheduler-tick-crash-mid-cycle-a-whole-interval-is-tested-a-row-in-the-middle-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduler tick crash mid-cycle: a whole interval is tested, a row in the middle is not
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-item-one-bad-row-does-not-drop-the-rest-of-the-interval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design item: one bad row does not drop the rest of the interval
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#refactor-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refactor order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decisions-for-alfred" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions for Alfred
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="dependency-and-oop-review-2026-09-29">Dependency and OOP review (2026-09-29)<a class="headerlink" href="#dependency-and-oop-review-2026-09-29" title="Permanent link">&para;</a></h1>
+<p><strong>Doc type:</strong> design review. No application code in this change.
+<strong>Checked against:</strong> <code>main</code> at <code>413f17763cb1b5d0acf845532e1f1fdda7618bf0</code> (2026-09-29). Line numbers below are from that commit.
+<strong>Standards:</strong> <a href="../coding-standards/">Coding standards</a>, in particular <a href="../coding-standards/#1-oop-ownership">OOP ownership</a>, <a href="../coding-standards/#3-no-hard-coded-values">no hard-coded values</a>, and <a href="../coding-standards/#live-trading">live trading</a>.
+<strong>Earlier reviews, not repeated here:</strong> <a href="../2026-09-26-code-quality-review/">Code quality review (2026-09-26)</a> (its <a href="../2026-09-26-code-quality-review/#object-oriented-design">OOP section</a> and <a href="../2026-09-26-code-quality-review/#boundaries">boundaries</a>), <a href="../2026-09-25-backtest-review/">Backtest review (2026-09-25)</a>, and <a href="../2026-09-29-long-term-fixes-b1-rangeparam-datacolumn/">Long-term fixes (2026-09-29)</a>.</p>
+<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
+<p>Module import cycles inside <code>quant/</code> are still zero, including imports written inside functions. The packages are not acyclic. An AST walk found <strong>32</strong> simple cycles among eight packages. Five of them are two-package loops. Every one of those loops is closed by an edge that points the wrong way against the layering in the coding standards, or by <code>quant/queue/worker.py</code> importing the trade bar factory while <code>quant/trade</code> imports <code>BtQueueRepo</code>.</p>
+<p>The classes the last review measured are the same size. <code>PriceBarService</code> is still <strong>647</strong> lines. <code>PromotionTab.tsx</code> grew from 775 lines to <strong>800</strong>. Radon reports no function above cyclomatic complexity <strong>13</strong>, and <strong>11</strong> blocks at rank C.</p>
+<p>All seven of the live-trading failure paths Alfred named have no test at the order-sending seam. A broker reject is tested only above the gateway: <code>tests/</code> never has <code>CcxtTradeGateway</code> see <code>ccxt.InvalidOrder</code> or <code>ccxt.InsufficientFunds</code>. The other six are a timeout on the submit call, an open partial fill, a stale position read, a failed transaction write after a fill, a duplicate submit on retry, and a tick that dies between two due rows.</p>
+<p>The order of work below starts with tests and with deleting the second copy of promotion ranking, then breaks the <code>api</code>/<code>trade</code> cycle by moving credentials, and leaves gateway and repo splits until those tests exist.</p>
+<h2 id="method">Method<a class="headerlink" href="#method" title="Permanent link">&para;</a></h2>
+<p>Commands run on this commit, from the repo root:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>rev-parse<span class="w"> </span>HEAD
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># 413f17763cb1b5d0acf845532e1f1fdda7618bf0</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>python3<span class="w"> </span>--version
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># Python 3.12.3</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>python3<span class="w"> </span>-m<span class="w"> </span>radon<span class="w"> </span>--version
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1"># 6.0.1</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>python3<span class="w"> </span>-m<span class="w"> </span>radon<span class="w"> </span>raw<span class="w"> </span>quant<span class="w"> </span>-s<span class="w"> </span>-j
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>python3<span class="w"> </span>-m<span class="w"> </span>radon<span class="w"> </span>cc<span class="w"> </span>quant<span class="w"> </span>-s<span class="w"> </span>-j
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>wc<span class="w"> </span>-l<span class="w"> </span>frontend/src/components/PromotionTab.tsx<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">      </span>frontend/src/components/ConfigDrawer.tsx<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">      </span>frontend/src/pages/BacktestPage.tsx<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">      </span>quant/market_data/service.py
+</code></pre></div>
+<p><code>radon</code> 6.0.1 was installed in the sandbox for this measurement (<code>python3 -m pip install radon</code>). It is not a project dependency.</p>
+<p>The import graph is a walk of <code>quant/**/*.py</code> with the standard-library <code>ast</code> module. <strong>128</strong> modules parsed, <strong>0</strong> syntax errors. An import inside a function is counted as lazy. An import under <code>if TYPE_CHECKING</code> is not a runtime edge. One of those would have looked like a broker importing a repo: <code>quant/trade/brokers/ccxt/adapter.py</code> line 30 imports <code>InstrumentCache</code> only for type checking. It is excluded below.</p>
+<p>A runtime import is upward when the target package sits above the source in this order, top to bottom: <code>api</code>, <code>queue</code>, <code>promotion</code> and <code>trade</code> together, <code>strategy</code>, <code>market_data</code>, <code>refdata</code> and <code>data</code> together, <code>schemas</code>, <code>shared</code>. That order matches the coding standards (routes, then services, then repos, then brokers, with <code>shared</code> at the bottom) and puts HTTP schemas and <code>shared</code> where every layer may import them. <code>quant/cli.py</code> is an entry-point module, not a package. It imports <code>data</code>, <code>shared</code>, and <code>strategy</code> at module level (one, one, and four statements).</p>
+<p>Class and function lengths are <code>end_lineno - lineno + 1</code> on the same AST. That counts every line in the span, including blanks and comments. Radon <code>raw</code> reports source lines (<code>sloc</code>) separately. Cyclomatic complexity is radon's. Radon does not parse TypeScript, so the frontend figures are file lengths from <code>wc -l</code> only.</p>
+<p>Package cycles are every simple cycle in the runtime package graph. Each cycle is recorded once, starting at its alphabetically first package. There are <strong>32</strong>. The longest has six packages. <code>data</code> and <code>shared</code> are in no cycle.</p>
+<h2 id="1-module-dependency-graph">1. Module dependency graph<a class="headerlink" href="#1-module-dependency-graph" title="Permanent link">&para;</a></h2>
+<h3 id="what-the-graph-is">What the graph is<a class="headerlink" href="#what-the-graph-is" title="Permanent link">&para;</a></h3>
+<p><strong>137</strong> module-level import statements cross a package boundary, and <strong>10</strong> more do so from inside a function. <strong>35</strong> distinct package pairs have at least one runtime edge.</p>
+<pre class="mermaid"><code>flowchart LR
+  api --&gt; market_data
+  api --&gt; promotion
+  api --&gt; queue
+  api --&gt; refdata
+  api --&gt; schemas
+  api --&gt; shared
+  api --&gt; strategy
+  api --&gt; trade
+  data --&gt; shared
+  market_data --&gt; shared
+  market_data -.-&gt; strategy
+  promotion --&gt; refdata
+  promotion --&gt; shared
+  promotion -.-&gt; queue
+  queue --&gt; promotion
+  queue --&gt; refdata
+  queue --&gt; schemas
+  queue --&gt; shared
+  queue --&gt; strategy
+  queue --&gt; trade
+  refdata --&gt; data
+  refdata --&gt; shared
+  refdata -.-&gt; trade
+  schemas -.-&gt; trade
+  strategy --&gt; data
+  strategy --&gt; refdata
+  strategy --&gt; schemas
+  strategy --&gt; shared
+  trade -.-&gt; api
+  trade --&gt; market_data
+  trade -.-&gt; queue
+  trade --&gt; refdata
+  trade --&gt; schemas
+  trade --&gt; shared
+  trade --&gt; strategy</code></pre>
+<p>Solid arrows point downward or sideways. Dotted arrows point upward against the order in <a href="#method">Method</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Edge</th>
+<th style="text-align: right;">Module-level statements</th>
+<th style="text-align: right;">Lazy</th>
+<th>Direction</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>api</code> → <code>market_data</code>, <code>promotion</code>, <code>queue</code>, <code>refdata</code>, <code>schemas</code>, <code>shared</code>, <code>strategy</code>, <code>trade</code></td>
+<td style="text-align: right;">5, 4, 8, 11, 8, 13, 1, 8</td>
+<td style="text-align: right;">0, 1, 0, 0, 1, 0, 7</td>
+<td>downward</td>
+</tr>
+<tr>
+<td><code>trade</code> → <code>api</code></td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">0</td>
+<td>upward</td>
+</tr>
+<tr>
+<td><code>trade</code> → <code>queue</code></td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">0</td>
+<td>upward</td>
+</tr>
+<tr>
+<td><code>promotion</code> → <code>queue</code></td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td>upward</td>
+</tr>
+<tr>
+<td><code>refdata</code> → <code>trade</code></td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">0</td>
+<td>upward</td>
+</tr>
+<tr>
+<td><code>schemas</code> → <code>trade</code></td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">0</td>
+<td>upward</td>
+</tr>
+<tr>
+<td><code>market_data</code> → <code>strategy</code></td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td>upward</td>
+</tr>
+<tr>
+<td><code>queue</code> → <code>trade</code></td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td>downward, and it closes a cycle</td>
+</tr>
+<tr>
+<td><code>strategy</code> → <code>data</code>, <code>refdata</code>, <code>schemas</code>, <code>shared</code></td>
+<td style="text-align: right;">3, 1, 2, 1</td>
+<td style="text-align: right;">0</td>
+<td>downward</td>
+</tr>
+<tr>
+<td><code>data</code> → <code>shared</code>, <code>market_data</code> → <code>shared</code>, <code>refdata</code> → <code>data</code> and <code>shared</code></td>
+<td style="text-align: right;">2, 5, 2, 2</td>
+<td style="text-align: right;">0, 0, 0, 1</td>
+<td>downward</td>
+</tr>
+</tbody>
+</table>
+<h3 id="module-cycles-including-lazy-imports">Module cycles, including lazy imports<a class="headerlink" href="#module-cycles-including-lazy-imports" title="Permanent link">&para;</a></h3>
+<p><strong>0</strong> module cycles on module-level imports. <strong>0</strong> again when the 12 function-level internal imports are added. That re-measures the result in the <a href="../2026-09-26-code-quality-review/#boundaries">code quality review</a>. The lazy imports are not hiding a cycle.</p>
+<p>The 12 function-level imports are:</p>
+<ul>
+<li><code>quant/api/main.py</code> lines 54, 72, 73, 86, 101, and 105 to 109, all inside <code>lifespan</code>. They build the credential helper, the adapter registry, the venue-limit publisher, the bar factory, and the schedule sweeper after the app object exists.</li>
+<li><code>quant/refdata/publisher.py</code> line 115 imports <code>quant.shared.config</code> inside a method.</li>
+<li><code>quant/trade/registry.py</code> line 45 imports <code>create_ccxt_adapter</code> inside the registry builder, so importing the registry module does not import ccxt.</li>
+</ul>
+<h3 id="package-cycles">Package cycles<a class="headerlink" href="#package-cycles" title="Permanent link">&para;</a></h3>
+<p>The eight packages <code>api</code>, <code>market_data</code>, <code>promotion</code>, <code>queue</code>, <code>refdata</code>, <code>schemas</code>, <code>strategy</code>, and <code>trade</code> form one strongly connected component. It contains <strong>32</strong> simple cycles: <strong>5</strong> of length 2, <strong>7</strong> of length 3, <strong>11</strong> of length 4, <strong>7</strong> of length 5, and <strong>2</strong> of length 6.</p>
+<p>The five loops between two packages are:</p>
+<ol>
+<li><code>api</code> → <code>trade</code> → <code>api</code></li>
+<li><code>promotion</code> → <code>queue</code> → <code>promotion</code></li>
+<li><code>queue</code> → <code>trade</code> → <code>queue</code></li>
+<li><code>refdata</code> → <code>trade</code> → <code>refdata</code></li>
+<li><code>schemas</code> → <code>trade</code> → <code>schemas</code></li>
+</ol>
+<p>The longer cycles are those same edges joined by ordinary downward imports (<code>strategy</code> → <code>refdata</code>, <code>trade</code> → <code>strategy</code>, <code>trade</code> → <code>market_data</code>, <code>queue</code> → <code>strategy</code>). Fixing the six upward edges below removes all 32 cycles. No new package has to be invented to do that.</p>
+<h3 id="finding-trade-imports-api">Finding: <code>trade</code> imports <code>api</code><a class="headerlink" href="#finding-trade-imports-api" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> blocks fixes. A credential change is also a trade change, and the other way around, because the packages import each other.</li>
+<li><strong>Where:</strong> <code>quant/trade/account.py</code> lines 14 to 15, <code>quant/trade/dry_run.py</code> lines 8 to 9, <code>quant/trade/live_apply.py</code> lines 11 to 12, and <code>quant/trade/service.py</code> lines 8 to 9. Each imports <code>ApiCredentialRepo</code> and <code>CredentialService</code>.</li>
+<li><strong>How did this happen?</strong> The credential HTTP routes were built under <code>quant/api/credentials/</code>, and the trade orchestrators then imported that package to decrypt a key. The <a href="../2026-09-26-code-quality-review/#boundaries">boundaries section</a> already records the eight imports. This measurement adds the cycle they close with <code>api</code> → <code>trade</code>.</li>
+<li><strong>Owning class:</strong> <code>CredentialService</code> in <code>quant/api/credentials/service.py</code>, and <code>ApiCredentialRepo</code> beside it.</li>
+<li><strong>Fix:</strong> Move both classes into a package <code>trade</code> is allowed to import (a <code>quant/credentials/</code> package, or under <code>quant/trade/</code> if the only callers are trade and the credential router). Update the four trade modules, the credential router, and <code>quant/api/main.py</code> in the same pull request. Delete the old modules. Leave no re-export.</li>
+</ul>
+<h3 id="finding-trade-and-queue-import-each-other">Finding: <code>trade</code> and <code>queue</code> import each other<a class="headerlink" href="#finding-trade-and-queue-import-each-other" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> causes ripple. A bar-factory change and a queue-repo change edit both packages.</li>
+<li><strong>Where:</strong> <code>BtQueueRepo</code> is imported by <code>quant/trade/db_repo.py</code> line 11, <code>quant/trade/dry_run.py</code> line 10, <code>quant/trade/live_apply.py</code> line 13, and <code>quant/trade/service.py</code> line 10. The other way, <code>quant/queue/worker.py</code> line 44 imports <code>PriceBarServiceFactory</code> from <code>quant/trade/bar_source.py</code>.</li>
+<li><strong>How did this happen?</strong> The coding standards require <code>TradeRepo</code> to take a <code>BtQueueRepo</code> so <code>sp_get_strategy</code> has one owner. That edge is the composition the standards ask for. The cycle appeared when the worker also needed a bar service and imported it from <code>quant/trade</code>, the package that holds the deployment binding.</li>
+<li><strong>Owning class:</strong> <code>BtQueueRepo</code> keeps <code>sp_get_strategy</code>. <code>PriceBarServiceFactory</code> (<code>quant/trade/bar_source.py</code> line 24) owns the per-broker <code>PriceBarService</code>.</li>
+<li><strong>Fix:</strong> Keep the <code>BtQueueRepo</code> injection. Move the worker's import off <code>quant.trade</code> by having the process entry point pass a constructed <code>PriceBarServiceFactory</code> into <code>BacktestWorker</code>, the same way <code>lifespan</code> already constructs one. <code>quant/queue/worker.py</code> then takes the factory as an argument and does not import <code>quant.trade</code>. Update <code>quant/queue/worker.py</code> and its tests in the same pull request. Do not leave a wrapper import.</li>
+</ul>
+<h3 id="finding-promotion-imports-queue-and-queue-imports-promotion">Finding: <code>promotion</code> imports <code>queue</code>, and <code>queue</code> imports <code>promotion</code><a class="headerlink" href="#finding-promotion-imports-queue-and-queue-imports-promotion" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> tidy-up. The <a href="../2026-09-26-code-quality-review/#boundaries">boundaries section</a> already calls this the intended composition: <code>PromotionRepo</code> takes a <code>BtQueueRepo</code>, and the worker takes a <code>PromotionRepo</code>. It is not a module cycle.</li>
+<li><strong>Where:</strong> <code>quant/promotion/repo.py</code> line 15, and <code>quant/queue/worker.py</code> line 40.</li>
+<li><strong>How did this happen?</strong> One stored-procedure wrapper, injected, which is what the standards require. The package cycle is the shape of that injection plus the worker calling <code>PromotionRepo.run</code>.</li>
+<li><strong>Owning class:</strong> <code>BtQueueRepo</code> for the strategy read. <code>PromotionRepo</code> for the promotion writes.</li>
+<li><strong>Fix:</strong> Leave the injection. The change that belongs here is in <a href="#finding-promotionrepo-both-decides-and-writes">section 2</a>: <code>PromotionRepo.run</code> should stop owning the decision, which is what makes the worker depend on the policy module through the repo.</li>
+</ul>
+<h3 id="finding-schemas-and-refdata-import-trade">Finding: <code>schemas</code> and <code>refdata</code> import <code>trade</code><a class="headerlink" href="#finding-schemas-and-refdata-import-trade" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> causes ripple. Already listed in the <a href="../2026-09-26-code-quality-review/#boundaries">boundaries section</a>. Re-measured: the same three schema imports and the same two bundle imports, at the same lines.</li>
+<li><strong>Where:</strong> <code>quant/schemas/apply.py</code> line 7 (<code>IntendedAction</code>, <code>OrderRejectReason</code>). <code>quant/schemas/dry_run.py</code> lines 8 to 9 (<code>KeyProfile</code>, <code>IntendedAction</code>). <code>quant/refdata/bundle.py</code> lines 12 to 13 (<code>RedisKeyProfiles</code>, <code>RedisVenueLimits</code>).</li>
+<li><strong>How did this happen?</strong> The domain enums were defined next to the broker, and the HTTP models then imported them. The cache bundle was written as the one object API and worker both construct, so it learned about broker caches.</li>
+<li><strong>Owning class:</strong> the enums belong with the domain (<code>quant/trade/models/</code>). <code>DataCaches</code> is the composition root and should not live in the reader package.</li>
+<li><strong>Fix:</strong> Move <code>IntendedAction</code>, <code>OrderRejectReason</code>, and <code>KeyProfile</code> to a module both <code>schemas</code> and <code>trade</code> may import, update every importer in the same pull request, and delete the old names. Move <code>DataCaches</code> out of <code>quant/refdata/bundle.py</code> to the composition site (<code>quant/api/main.py</code> and the worker already construct it). <code>RedisRefData</code> stays the reader and does not import <code>quant.trade</code>.</li>
+</ul>
+<h3 id="finding-market_data-imports-strategy">Finding: <code>market_data</code> imports <code>strategy</code><a class="headerlink" href="#finding-market_data-imports-strategy" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> causes ripple. One function call is why a bar warmer depends on the backtest engine. The <a href="../2026-09-26-code-quality-review/#boundaries">boundaries section</a> names the import. The cycle it joins (<code>market_data</code> → <code>strategy</code> → <code>refdata</code> → <code>trade</code> → <code>market_data</code>) is the new measurement.</li>
+<li><strong>Where:</strong> <code>quant/market_data/warm.py</code> line 37 imports <code>live_lookback_bars</code>, and line 46 sets <code>DEFAULT_WARM_LOOKBACK = live_lookback_bars(110)</code>.</li>
+<li><strong>How did this happen?</strong> The warmer was moved out of <code>quant/trade</code> so it would not know about deployments. The lookback length stayed a call into <code>Performance</code>.</li>
+<li><strong>Owning class:</strong> <code>BarWarmer</code>. The length formula stays on <code>Performance.live_lookback_bars</code> (<code>quant/strategy/performance.py</code> line 30).</li>
+<li><strong>Fix:</strong> <code>BarWarmer</code> takes the lookback as a constructor argument. The market-data route, which already builds the warmer (<code>quant/api/market_data/router.py</code> line 53), passes the number. Delete the import in <code>warm.py</code>. Update that caller and the tests in the same pull request. The literal <code>110</code> is a separate hard-coded value, covered in <a href="#5-hard-coded-values">section 5</a>.</li>
+</ul>
+<p><code>strategy</code> does not import <code>trade</code> or <code>api</code>. A signal still cannot see a broker. That boundary from the earlier review still holds.</p>
+<h2 id="2-layer-leaks">2. Layer leaks<a class="headerlink" href="#2-layer-leaks" title="Permanent link">&para;</a></h2>
+<p>Inside the packages, modules were classed as route, service, repo (<code>DbGateway</code> subclasses), broker (<code>quant/trade/brokers/</code>, <code>quant/trade/adapters/</code>, and <code>CcxtBarFetcher</code>), domain, or <code>shared</code> and schemas at the bottom. A lower layer importing an upper one is a leak. Services importing a schema is ordinary: the schema sits at the bottom.</p>
+<p>Runtime leaks under that rule, after dropping <code>TYPE_CHECKING</code> imports:</p>
+<table>
+<thead>
+<tr>
+<th>From</th>
+<th>To</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>repo</td>
+<td>policy module</td>
+<td><code>quant/promotion/repo.py</code> line 14 imports <code>evaluate_promotion</code> and the outcome constants</td>
+</tr>
+<tr>
+<td>refdata bundle</td>
+<td>repos and trade caches</td>
+<td><code>quant/refdata/bundle.py</code> lines 9 to 13, the same composition as the package finding above</td>
+</tr>
+</tbody>
+</table>
+<p>No service module builds a <code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, or <code>DELETE</code>. The only application SQL outside <code>DbGateway</code> is the catalog query in <code>RefDataPublisher</code> (<code>quant/refdata/publisher.py</code> line 53, <code>information_schema.tables</code>), which the standards allow, and <code>DbGateway</code> itself. <code>BtQueueRepo.sp_get_queued_count</code> (<code>quant/queue/repo.py</code> line 146) calls <code>cur.execute</code> on a <code>CALL</code>, because the count column sits in front of the status triplet and <code>_call_write</code> cannot return it. That call stays inside the repo.</p>
+<p><code>BacktestWorker</code>, <code>WorkerLoop</code>, and <code>RefDataPublisher</code> call <code>open_pool</code>. They are process entry points. Request services receive a repo.</p>
+<h3 id="routes-and-repos">Routes and repos<a class="headerlink" href="#routes-and-repos" title="Permanent link">&para;</a></h3>
+<p>Most routes construct a repo and hand it to a service. That is the composition root, and it is allowed. <code>quant/api/routers/jobs.py</code> line 48, <code>quant/api/routers/strategies.py</code> line 29, <code>quant/api/routers/promotion.py</code> line 28, and <code>quant/api/routers/deployments.py</code> line 43 do this and do not call stored procedures themselves.</p>
+<p>Two routes call a repo method from the handler:</p>
+<ul>
+<li><code>quant/api/auth/router.py</code> line 101 calls <code>repo.update_last_login</code> after <code>AuthService</code> has already verified the password and issued the token.</li>
+<li><code>quant/api/admin/router.py</code> line 60 calls <code>repo.summarize()</code> on <code>LogProcRepo</code>.</li>
+</ul>
+<h3 id="finding-login-stamps-the-repo-from-the-route">Finding: login stamps the repo from the route<a class="headerlink" href="#finding-login-stamps-the-repo-from-the-route" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> causes ripple. The next login rule has two homes, <code>AuthService</code> and the route.</li>
+<li><strong>Where:</strong> <code>quant/api/auth/router.py</code> lines 99 to 103. The handler catches every exception so a failed stamp does not fail login.</li>
+<li><strong>How did this happen?</strong> The stamp was added as a fire-and-forget beside the cookie, instead of as a method on <code>AuthService</code>, which already owns <code>verify_credentials</code>, <code>create_token</code>, and <code>cache_user</code>.</li>
+<li><strong>Owning class:</strong> <code>AuthService</code>.</li>
+<li><strong>Fix:</strong> <code>AuthService</code> gains the stamp and the "failure does not fail login" rule, including the <code>logger.exception</code> the standards require for that pattern. The route calls that method. Delete the <code>repo</code> use from the handler. Update the route tests in the same pull request.</li>
+</ul>
+<h3 id="log-proc-summary-stays-on-the-repo">Log-proc summary stays on the repo<a class="headerlink" href="#log-proc-summary-stays-on-the-repo" title="Permanent link">&para;</a></h3>
+<p><code>LogProcRepo.summarize</code> is one stored-procedure call. No service owns a policy around it. Adding a service would be a wrapper whose only job is to forward the call, which the standards reject. The route may keep constructing <code>LogProcRepo</code> and calling <code>summarize</code>.</p>
+<h3 id="finding-promotionrepo-both-decides-and-writes">Finding: <code>PromotionRepo</code> both decides and writes<a class="headerlink" href="#finding-promotionrepo-both-decides-and-writes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> blocks fixes. A promotion-rule change edits the repo, because the repo is what the worker calls.</li>
+<li><strong>Where:</strong> <code>PromotionRepo.run</code> at <code>quant/promotion/repo.py</code> line 118 calls <code>evaluate_promotion</code> (line 140) and then <code>_apply</code> (line 148). The only caller is <code>quant/queue/worker.py</code> line 165. <code>PromotionService</code> (<code>quant/api/services/promotion.py</code>) is read-only and does not own this flow.</li>
+<li><strong>How did this happen?</strong> The repo was the class the worker already had, so the "evaluate, then flip, then insert" sequence was added there. The pure decision already lived in <code>evaluate_promotion</code>.</li>
+<li><strong>Owning class:</strong> <code>evaluate_promotion</code> owns the decision. <code>PromotionRepo.flip_best</code> and <code>ins_promotion</code> own the writes.</li>
+<li><strong>Fix:</strong> Delete <code>PromotionRepo.run</code>. A function next to <code>evaluate_promotion</code> (same module, not a new package) loads the best row through the injected <code>BtQueueRepo</code>, calls <code>evaluate_promotion</code>, then calls the two write methods. <code>BacktestWorker</code> calls that function. Update <code>quant/queue/worker.py</code> and the promotion tests in the same pull request. Do not keep <code>run</code> as a deprecated alias.</li>
+</ul>
+<h3 id="broker-types-in-strategy-code">Broker types in strategy code<a class="headerlink" href="#broker-types-in-strategy-code" title="Permanent link">&para;</a></h3>
+<p>A search of <code>quant/strategy</code> for venue names (<code>bybit</code>, <code>ccxt</code>, <code>futu</code>, <code>USDT</code>) hits comments only: the fee note on <code>Performance</code> line 101, and an example cusip in <code>signals.py</code> line 46. <code>strategy</code> does not import <code>trade</code>. The live path is still <code>quant/strategy/live_service.py</code> called by the trade stack, which the <a href="../2026-09-26-code-quality-review/#object-oriented-design">OOP section</a> already describes. No new leak.</p>
+<h3 id="frontend-copies-of-backend-rules">Frontend copies of backend rules<a class="headerlink" href="#frontend-copies-of-backend-rules" title="Permanent link">&para;</a></h3>
+<p><code>PromotionTab</code> still re-ranks. Re-measured: the file is <strong>800</strong> lines (<code>wc -l</code>). On the 2026-09-26 commit it was 775. <code>compareMetric</code> is now lines 35 to 44, called at lines 423, 499, and 547. The server copy is still <code>quant/promotion/evaluate.py</code> <code>_compare</code>, lines 71 to 75. The <a href="../2026-09-26-code-quality-review/#7-promotiontab-re-implements-ranking-and-it-is-the-largest-ui-file">UI finding</a> stands. One extra copy is in the same file: lines 76 to 87 pick a "recommended" row by the highest <code>sharpe_ratio</code> among <code>is_best_ind = 'Y'</code> rows, which is a ranking the promotion response already decided.</p>
+<ul>
+<li><strong>Severity:</strong> causes ripple.</li>
+<li><strong>How did this happen?</strong> The tab was built to explain a comparison before the API returned gate rows, and the explanation stayed after the API grew <code>OOS Sharpe Ratio</code> and <code>Sharpe Excess</code>.</li>
+<li><strong>Owning class:</strong> <code>evaluate_promotion</code> on the server. The tab owns presentation.</li>
+<li><strong>Fix:</strong> Delete <code>compareMetric</code> and the Sharpe reducer. Render <code>gate_results</code> and the outcome the API returns. Split the deploy action, which already has <code>DeploymentDialog</code>, from the list. Update <code>PromotionTab.tsx</code> and <code>PromotionTab.test.tsx</code> in the same pull request. Leave no second comparison function.</li>
+</ul>
+<p>Annualisation is a second frontend rule. <code>ConfigDrawer</code> lines 145 to 149 multiply <code>REFDATA.ASSET_TYPE.TRADING_PERIOD</code> by <code>barsPerDay</code> from <code>frontend/src/utils/interval.ts</code> (lines 37 to 39). The Python parser for the same interval text is <code>parse_period</code> in <code>quant/shared/intervals.py</code> line 28. The engine then trusts whatever <code>trading_period</code> the request carries (<code>Performance</code> line 108). The CLI still has its own year lengths, which <a href="../2026-09-25-backtest-review/#10-the-cli-year-length-is-a-separate-constant">finding 10 of the backtest review</a> already records (<code>quant/cli.py</code> lines 78 to 80, <code>crypto</code> 365 and <code>equity</code> 252).</p>
+<ul>
+<li><strong>Severity:</strong> causes ripple. An hourly Sharpe is scaled in the drawer and unscaled on any other caller.</li>
+<li><strong>How did this happen?</strong> The drawer had to speak HTTP, so it reimplemented the interval arithmetic the API does not return.</li>
+<li><strong>Owning class:</strong> <code>RedisRefData</code>, which already reads <code>ASSET_TYPE</code> and <code>TM_INTERVAL</code>. The strategy builder proposed in the <a href="../2026-09-29-long-term-fixes-b1-rangeparam-datacolumn/#shared-owner-the-strategy-builder">long-term fixes</a> is the place that applies the scale once.</li>
+<li><strong>Fix:</strong> The builder sets <code>trading_period</code> from ref data and the interval. The drawer sends the interval id and stops multiplying. Delete <code>annualization</code> in <code>ConfigDrawer</code> and the CLI's <code>ASSET_TRADING_PERIODS</code> in the same pull request, and update the CLI to call the builder or retire it, which is the decision already asked in the long-term fixes. Callers of <code>trading_period</code> on the request that used to supply the scaled number are updated in that same pull request.</li>
+</ul>
+<p><code>validateBacktestConfig</code> (<code>frontend/src/utils/validate.ts</code> line 11) checks that required fields are filled. It does not know indicator floors or data columns. It is not a second copy of those rules. Those stay with the strategy builder.</p>
+<h2 id="3-oversized-classes-and-functions">3. Oversized classes and functions<a class="headerlink" href="#3-oversized-classes-and-functions" title="Permanent link">&para;</a></h2>
+<p><code>radon raw</code> on <code>quant/</code>: <strong>128</strong> modules, <strong>17,185</strong> lines, <strong>11,186</strong> source lines.</p>
+<p><code>radon cc</code> on <code>quant/</code>: <strong>980</strong> blocks (192 classes, 548 methods, 240 functions). Ranks: <strong>A 905</strong>, <strong>B 64</strong>, <strong>C 11</strong>. Mean complexity <strong>2.53</strong>. Maximum <strong>13</strong>. No block is rank D or above.</p>
+<p>The review trigger in the coding standards is about 300 lines for a class and about 50 for a function. AST spans:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Lines</th>
+<th style="text-align: right;">Methods</th>
+<th>Class</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">647</td>
+<td style="text-align: right;">19</td>
+<td><code>PriceBarService</code></td>
+<td><code>quant/market_data/service.py</code> lines 148 to 794</td>
+</tr>
+<tr>
+<td style="text-align: right;">586</td>
+<td style="text-align: right;">23</td>
+<td><code>TradeRepo</code></td>
+<td><code>quant/trade/db_repo.py</code> lines 33 to 618</td>
+</tr>
+<tr>
+<td style="text-align: right;">364</td>
+<td style="text-align: right;">25</td>
+<td><code>CcxtTradeGateway</code></td>
+<td><code>quant/trade/brokers/ccxt/gateway.py</code> lines 64 to 427</td>
+</tr>
+<tr>
+<td style="text-align: right;">363</td>
+<td style="text-align: right;">17</td>
+<td><code>TradeService</code></td>
+<td><code>quant/trade/service.py</code> lines 37 to 399</td>
+</tr>
+<tr>
+<td style="text-align: right;">292</td>
+<td style="text-align: right;">27</td>
+<td><code>Performance</code></td>
+<td><code>quant/strategy/performance.py</code> lines 99 to 390</td>
+</tr>
+<tr>
+<td style="text-align: right;">286</td>
+<td style="text-align: right;">9</td>
+<td><code>LiveApplyOrchestrator</code></td>
+<td><code>quant/trade/live_apply.py</code> lines 37 to 322</td>
+</tr>
+<tr>
+<td style="text-align: right;">263</td>
+<td style="text-align: right;">26</td>
+<td><code>RedisRefData</code></td>
+<td><code>quant/refdata/reader.py</code> lines 39 to 301</td>
+</tr>
+<tr>
+<td style="text-align: right;">258</td>
+<td style="text-align: right;">13</td>
+<td><code>BtQueueRepo</code></td>
+<td><code>quant/queue/repo.py</code> lines 32 to 289</td>
+</tr>
+<tr>
+<td style="text-align: right;">243</td>
+<td style="text-align: right;">11</td>
+<td><code>WorkerLoop</code></td>
+<td><code>quant/queue/worker_loop.py</code> lines 123 to 365</td>
+</tr>
+<tr>
+<td style="text-align: right;">242</td>
+<td style="text-align: right;">12</td>
+<td><code>InstrumentCache</code></td>
+<td><code>quant/data/instruments.py</code> lines 25 to 266</td>
+</tr>
+<tr>
+<td style="text-align: right;">235</td>
+<td style="text-align: right;">11</td>
+<td><code>FutuTrader</code></td>
+<td><code>quant/trade/futu_trader.py</code> lines 37 to 271</td>
+</tr>
+<tr>
+<td style="text-align: right;">231</td>
+<td style="text-align: right;">11</td>
+<td><code>JobsService</code></td>
+<td><code>quant/api/services/jobs.py</code> lines 56 to 286</td>
+</tr>
+<tr>
+<td style="text-align: right;">231</td>
+<td style="text-align: right;">8</td>
+<td><code>CcxtBarFetcher</code></td>
+<td><code>quant/market_data/fetcher.py</code> lines 89 to 319</td>
+</tr>
+<tr>
+<td style="text-align: right;">229</td>
+<td style="text-align: right;">9</td>
+<td><code>BacktestCache</code></td>
+<td><code>quant/data/backtest_cache.py</code> lines 19 to 247</td>
+</tr>
+<tr>
+<td style="text-align: right;">228</td>
+<td style="text-align: right;">11</td>
+<td><code>BarSubscriptionService</code></td>
+<td><code>quant/market_data/subscriptions.py</code> lines 132 to 359</td>
+</tr>
+<tr>
+<td style="text-align: right;">222</td>
+<td style="text-align: right;">23</td>
+<td><code>CcxtTradeAdapter</code></td>
+<td><code>quant/trade/brokers/ccxt/adapter.py</code> lines 60 to 281</td>
+</tr>
+</tbody>
+</table>
+<p><strong>192</strong> classes in total. <strong>16</strong> are 200 lines or longer. <strong>4</strong> are over 300.</p>
+<p><code>PriceBarService</code> is unchanged from the <a href="../2026-09-26-code-quality-review/#7-promotiontab-re-implements-ranking-and-it-is-the-largest-ui-file">code quality review</a>: the file is still <strong>794</strong> lines, and the class still starts at line 148. That review's conclusion stands. The class is wide because freshness, backfill, and the signal window share one fail-closed rule. Splitting it does not unblock the dependency cycles above. It waits until the tests around it are the reason for a change.</p>
+<p><strong>28</strong> functions and methods span 51 lines or more. Seven span 80 or more:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Lines</th>
+<th style="text-align: right;">Complexity</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">126</td>
+<td style="text-align: right;">(module <code>main</code>, not in the C list)</td>
+<td><code>quant/cli.py</code> <code>main</code>, lines 149 to 274</td>
+</tr>
+<tr>
+<td style="text-align: right;">107</td>
+<td style="text-align: right;">12</td>
+<td><code>quant/strategy/backtest_service.py</code> <code>fetch_df</code>, lines 170 to 276</td>
+</tr>
+<tr>
+<td style="text-align: right;">98</td>
+<td style="text-align: right;"></td>
+<td><code>quant/strategy/backtest_service.py</code> <code>_fetch_exchange_df</code>, lines 70 to 167</td>
+</tr>
+<tr>
+<td style="text-align: right;">87</td>
+<td style="text-align: right;">10</td>
+<td><code>PriceBarService.backfill</code>, lines 288 to 374</td>
+</tr>
+<tr>
+<td style="text-align: right;">85</td>
+<td style="text-align: right;"></td>
+<td><code>quant/api/main.py</code> <code>lifespan</code>, lines 41 to 125</td>
+</tr>
+<tr>
+<td style="text-align: right;">85</td>
+<td style="text-align: right;"></td>
+<td><code>InstrumentCache.create_instrument</code>, lines 182 to 266</td>
+</tr>
+<tr>
+<td style="text-align: right;">82</td>
+<td style="text-align: right;"></td>
+<td><code>quant/trade/dry_run.py</code> <code>run_dry_run</code>, lines 24 to 105</td>
+</tr>
+</tbody>
+</table>
+<p>The eleven rank-C blocks are all between 11 and 13:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Complexity</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">13</td>
+<td><code>TradeService.update_deployment</code>, line 218</td>
+</tr>
+<tr>
+<td style="text-align: right;">13</td>
+<td><code>FutuTrader.apply_signal</code>, line 231</td>
+</tr>
+<tr>
+<td style="text-align: right;">13</td>
+<td><code>quant/trade/brokers/ccxt/confirm.py</code> <code>_parse_terminal</code>, line 36</td>
+</tr>
+<tr>
+<td style="text-align: right;">12</td>
+<td><code>OptimizeResult.extract_plots</code>, line 64</td>
+</tr>
+<tr>
+<td style="text-align: right;">12</td>
+<td><code>fetch_df</code>, line 170</td>
+</tr>
+<tr>
+<td style="text-align: right;">12</td>
+<td><code>KeyRouter.connect</code>, line 62</td>
+</tr>
+<tr>
+<td style="text-align: right;">11</td>
+<td><code>Performance.__init__</code>, line 106</td>
+</tr>
+<tr>
+<td style="text-align: right;">11</td>
+<td><code>quant/promotion/evaluate.py</code> <code>_extract_metric</code>, line 49</td>
+</tr>
+<tr>
+<td style="text-align: right;">11</td>
+<td><code>OrderRetryPolicy.is_retryable</code>, line 109</td>
+</tr>
+<tr>
+<td style="text-align: right;">11</td>
+<td><code>CcxtTradeAdapter.place_order</code>, line 206</td>
+</tr>
+<tr>
+<td style="text-align: right;">11</td>
+<td><code>CcxtTradeGateway.fetch_open_positions</code>, line 336</td>
+</tr>
+</tbody>
+</table>
+<h3 id="finding-tradeserviceupdate_deployment-decides-and-writes-in-one-method">Finding: <code>TradeService.update_deployment</code> decides and writes in one method<a class="headerlink" href="#finding-tradeserviceupdate_deployment-decides-and-writes-in-one-method" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> causes ripple.</li>
+<li><strong>Where:</strong> <code>quant/trade/service.py</code> lines 218 to 290. Complexity 13, 73 lines.</li>
+<li><strong>How did this happen?</strong> Each new deployment field (schedule, paper flag, enablement) added another branch to the one method the route already called.</li>
+<li><strong>Owning class:</strong> <code>TradeService</code>.</li>
+<li><strong>Fix:</strong> Keep one public <code>update_deployment</code>. Split the schedule decision and the status decision into methods on <code>TradeService</code> that return the row to write, and let <code>update_deployment</code> perform the single <code>TradeRepo</code> write. The route keeps calling <code>update_deployment</code>. Tests in <code>tests/unit/test_trade_service.py</code> are updated in the same pull request. No second service.</li>
+</ul>
+<h3 id="finding-fetch_df-still-chooses-the-source">Finding: <code>fetch_df</code> still chooses the source<a class="headerlink" href="#finding-fetch_df-still-chooses-the-source" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> tidy-up. The exchange path is already <code>_fetch_exchange_df</code> (98 lines). <code>fetch_df</code> is the remaining branch.</li>
+<li><strong>Where:</strong> <code>quant/strategy/backtest_service.py</code> lines 170 to 276. Complexity 12.</li>
+<li><strong>How did this happen?</strong> Provider and exchange loads grew inside the function the optimizer already called.</li>
+<li><strong>Owning class:</strong> the data load in <code>quant/strategy/backtest_service.py</code>. The strategy builder from the long-term fixes owns validation, not the fetch.</li>
+<li><strong>Fix:</strong> <code>run_optimize</code>, <code>run_performance</code>, and <code>run_walk_forward</code> call either the exchange loader or the provider loader. Delete the branch inside <code>fetch_df</code>. Update those three callers and their tests in the same pull request.</li>
+</ul>
+<h3 id="finding-ccxttradegateway-is-three-clients">Finding: <code>CcxtTradeGateway</code> is three clients<a class="headerlink" href="#finding-ccxttradegateway-is-three-clients" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> tidy-up until the failure tests in <a href="#6-live-trading-failure-path-tests">section 6</a> exist, then causes ripple, because every order bug is edited in a 364-line class.</li>
+<li><strong>Where:</strong> <code>quant/trade/brokers/ccxt/gateway.py</code> lines 64 to 427. 25 methods: session setup, <code>create_market_order</code> (line 249), positions (line 378), balances (line 306), and market limits.</li>
+<li><strong>How did this happen?</strong> ccxt's exchange object was wrapped once, and each new call (<code>fetch_positions</code>, <code>fetch_balance</code>, <code>load_markets</code>) was added to that wrapper.</li>
+<li><strong>Owning class:</strong> <code>CcxtTradeGateway</code> today. After the split, order submission stays on a class the adapter uses for <code>create_order</code>, <code>cancel_order</code>, and <code>fetch_order</code>. Account reads and market metadata are separate classes.</li>
+<li><strong>Fix:</strong> Do this only after the gateway tests in section 6. Then replace <code>CcxtTradeGateway</code> with those classes, update <code>CcxtTradeAdapter</code> and <code>KeyRouter</code> in the same pull request, and delete <code>CcxtTradeGateway</code>. No facade left behind. Live-trading risk is high because the order payload path moves, so this is last in the <a href="#refactor-order">refactor order</a>.</li>
+</ul>
+<h3 id="finding-traderepo-is-one-schema-and-it-also-checks-statuses">Finding: <code>TradeRepo</code> is one schema, and it also checks statuses<a class="headerlink" href="#finding-traderepo-is-one-schema-and-it-also-checks-statuses" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> tidy-up for the line count. The status check is a real policy leak, severity causes ripple.</li>
+<li><strong>Where:</strong> <code>quant/trade/db_repo.py</code> lines 33 to 618, 23 methods, <strong>532</strong> source lines. <code>SCHEDULE_STATUSES</code> is line 18. The check that uses it is line 257.</li>
+<li><strong>How did this happen?</strong> Every <code>TRADE</code> procedure wrapper went on the one repo the service already held. The comment on line 17 says the status column has no database constraint, so the allowed set was written next to the wrapper.</li>
+<li><strong>Owning class:</strong> <code>TradeRepo</code> owns the procedure calls. It should not own the set of legal statuses. See <a href="#finding-schedule-statuses-are-a-python-set">section 5</a>.</li>
+<li><strong>Fix:</strong> Do not split the repo into several classes to shorten it. The wrappers are one schema. Move the status set out as in section 5, and leave the <code>CALL</code>s here. A split of the class waits until a second caller needs a subset and is copying methods.</li>
+</ul>
+<h3 id="frontend-files">Frontend files<a class="headerlink" href="#frontend-files" title="Permanent link">&para;</a></h3>
+<p><code>wc -l</code> on <code>frontend/src</code> (107 TypeScript files, <strong>15,233</strong> lines). Files at 400 lines or more:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Lines</th>
+<th>File</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">800</td>
+<td><code>frontend/src/components/PromotionTab.tsx</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">752</td>
+<td><code>frontend/src/components/ConfigDrawer.test.tsx</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">581</td>
+<td><code>frontend/src/components/ConfigDrawer.tsx</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">518</td>
+<td><code>frontend/src/pages/BacktestPage.tsx</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">500</td>
+<td><code>frontend/src/pages/MarketDataPage.tsx</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">463</td>
+<td><code>frontend/src/components/trade/DeploymentDialog.tsx</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">380</td>
+<td><code>frontend/src/pages/trade/TradeApplyPage.tsx</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>ConfigDrawer.tsx</code> is still <strong>581</strong> lines, the same length the <a href="../2026-09-26-code-quality-review/#object-oriented-design">OOP section</a> recorded. <code>BacktestPage.tsx</code> is <strong>518</strong> lines. That review described it as about 480. It is still a container: it enqueues, switches tabs, and refetches. It does not compute a signal. The split that matters is <code>PromotionTab</code>, in section 2. <code>ConfigDrawer</code> gets smaller when <code>annualization</code> and the <code>?? 5</code> window defaults leave, which is the builder work already specified in the long-term fixes. No new component hierarchy.</p>
+<h2 id="4-duplicated-facts">4. Duplicated facts<a class="headerlink" href="#4-duplicated-facts" title="Permanent link">&para;</a></h2>
+<p>Each row is one fact with more than one home. Facts already specified in the long-term fixes are listed so this page points at the owner, and the design is not rewritten.</p>
+<table>
+<thead>
+<tr>
+<th>Fact</th>
+<th>Copies measured on this commit</th>
+<th>Single owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Queue status id for a name</td>
+<td>Python callers use <code>RedisRefData.resolve_queue_status_id</code>. Two SQL routines hard-code <code>QUEUE_STATUS_ID IN (1,2,3)</code>. See <a href="#finding-queue-status-ids-are-literals-in-sql">section 5</a>.</td>
+<td><code>RedisRefData.resolve_queue_status_id</code> for Python. The procedure joins <code>REFDATA.QUEUE_STATUS</code> on <code>NAME</code>.</td>
+</tr>
+<tr>
+<td>Factor series and the 80% date coverage</td>
+<td><code>Performance._factor_series_for_sub</code> line 168 and <code>_validate_factor_coverage</code> line 251 (<code>coverage &lt; 0.80</code> at line 262). <code>Objective</code> copies both at lines 95 and 103 (<code>coverage &lt; 0.80</code> at line 109).</td>
+<td>The <code>FactorInput</code> resolver in <a href="../2026-09-29-long-term-fixes-b1-rangeparam-datacolumn/#c-b26-data_column-is-not-validated">long-term fixes, item C</a>. Not redesigned here.</td>
+</tr>
+<tr>
+<td>Data column <code>"v"</code> / <code>"price"</code> / <code>"factor"</code></td>
+<td>Still the defaults named in that same item: <code>SubStrategy</code> line 34, <code>StrategyConfig.single</code> line 57, <code>strategy_to_json</code> line 355, <code>config_from_json</code> line 399, <code>get_substrategies</code> line 92, <code>FactorConfig</code> line 32.</td>
+<td>The strategy builder, same item.</td>
+</tr>
+<tr>
+<td>Window and signal bounds</td>
+<td><code>RangeParam</code> (<code>quant/schemas/backtest.py</code> line 5) still has no floor.</td>
+<td>The strategy builder, <a href="../2026-09-29-long-term-fixes-b1-rangeparam-datacolumn/#b-window-and-signal-range-bounds">item B</a>.</td>
+</tr>
+<tr>
+<td>Sharpe ratio</td>
+<td><code>Performance.get_sharpe_ratio</code> lines 312 to 323. <code>Objective._sharpe</code> lines 74 to 93, whose docstring calls itself the numpy form of the same ratio (decision #63). <code>tests/unit/test_objective.py</code> asserts they match.</td>
+<td><code>Performance.get_sharpe_ratio</code>. <code>Objective._sharpe</code> calls it, or both call one function that <code>Performance</code> owns. Delete the second formula. Update <code>Objective</code> and the parity test in the same pull request.</td>
+</tr>
+<tr>
+<td>Annualisation scale</td>
+<td>Drawer (<code>ConfigDrawer</code> lines 145 to 149), CLI (<code>quant/cli.py</code> lines 78 to 80), engine (<code>Performance</code> line 108, which uses the number it is given).</td>
+<td>The strategy builder, as in <a href="#frontend-copies-of-backend-rules">section 2</a>.</td>
+</tr>
+<tr>
+<td>Settlement currency</td>
+<td><code>_FALLBACK_SETTLEMENT_CCY = "USDT"</code> at <code>quant/trade/live_apply.py</code> line 34, used at line 290. This is the known-debt row in the coding standards. No second literal was found in <code>quant/</code>.</td>
+<td><code>LiveApplyOrchestrator._settlement_ccy</code>, reading <code>INST.PRODUCT.CCY</code>. Delete the fallback in the pull request that touches this method. Callers that depended on a missing <code>CCY</code> becoming <code>USDT</code> are updated in that same pull request: a missing currency raises.</td>
+</tr>
+<tr>
+<td>Promotion comparison</td>
+<td><code>_compare</code> and <code>compareMetric</code>, plus the Sharpe reducer at <code>PromotionTab</code> lines 76 to 87.</td>
+<td><code>evaluate_promotion</code>. See <a href="#frontend-copies-of-backend-rules">section 2</a>.</td>
+</tr>
+<tr>
+<td>Bar-window coverage versus factor-date coverage</td>
+<td><code>_MIN_WINDOW_COVERAGE = 0.8</code> at <code>quant/market_data/service.py</code> line 43 is the share of a lookback that must exist before a signal runs. The <code>0.80</code> in <code>Performance</code> and <code>Objective</code> is the share of the main product's dates a second instrument must cover. Same number, different facts.</td>
+<td><code>PriceBarService</code> owns the window fraction. The factor resolver owns the date fraction. They stay different owners. The literals still belong in config, in <a href="#5-hard-coded-values">section 5</a>.</td>
+</tr>
+<tr>
+<td>Retry budget</td>
+<td><code>ScheduleTickRunner</code> uses <code>DEFAULT_MAX_ATTEMPTS = 3</code> and <code>DEFAULT_RETRY_BACKOFF_S = 5.0</code> (<code>quant/trade/scheduler/tick.py</code> lines 41 and 45). <code>OrderRetryPolicy</code> defaults to <code>max_attempts=5</code> and <code>backoff_s=2.0</code> (<code>quant/trade/order_policy.py</code> line 92). A tick therefore retries the whole apply three times, and each apply retries the order five times.</td>
+<td>One policy object. <code>ScheduleTickRunner</code> and <code>OrderRetryExecutor</code> both take it. Delete the two defaults. Where the numbers live is a <a href="#decisions-for-alfred">decision</a>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="finding-two-sharpe-formulas">Finding: two Sharpe formulas<a class="headerlink" href="#finding-two-sharpe-formulas" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> causes ripple. A change to the ratio that updates only <code>Performance</code> leaves the search on the old formula until the parity test fails.</li>
+<li><strong>How did this happen?</strong> Decision #63 put a numpy path on the objective so the search would not build a <code>Performance</code> per cell. The formula was copied, and a parity test was added to keep the copy honest.</li>
+<li><strong>Owning class:</strong> <code>Performance</code>.</li>
+<li><strong>Fix:</strong> One function, owned by <code>Performance</code>, computes the ratio from a pnl series and a <code>trading_period</code>. <code>Objective._sharpe</code> calls it. Delete the second arithmetic. Update <code>quant/strategy/objective.py</code> and <code>tests/unit/test_objective.py</code> in the same pull request. No compatibility wrapper that accepts the old private helper.</li>
+</ul>
+<h2 id="5-hard-coded-values">5. Hard-coded values<a class="headerlink" href="#5-hard-coded-values" title="Permanent link">&para;</a></h2>
+<p>The known-debt table in the <a href="../coding-standards/#3-no-hard-coded-values">coding standards</a> is still accurate and is not copied here: <code>OPTUNA_MAX_TRIALS</code>, <code>OPTUNA_SEED</code>, <code>sorted_df.head(10)</code>, <code>_FALLBACK_SETTLEMENT_CCY</code>, and the worker-loop timeouts. <code>DEFAULT_RETRY_BACKOFF_S</code> and the two <code>DEFAULT_SETTLE_S</code> constants (<code>quant/market_data/warm.py</code> line 52 and <code>quant/trade/scheduler/sweep.py</code> line 42, both <code>10.0</code>) are the examples that table already names.</p>
+<p>These are further values on this commit. Decision #65 and decision #84 already set the default fee at 10 bps and added <code>CONFIG.APP_ISSUE_FEE</code> for the Bybit future schedule. <code>Performance.DEFAULT_FEE_BPS</code> (line 101) and <code>fee_bps: float = 10.0</code> on <code>OptimizeRequest</code> and <code>PerformanceRequest</code> (<code>quant/schemas/backtest.py</code> lines 60 and 95) are that decision, not a new finding. The open piece is the one decision #84 already states: the drawer does not read <code>CONFIG.APP_ISSUE_FEE</code> yet. <code>MIN_METRIC_OBS = 60</code> (<code>Performance</code> line 104) is decision #63 and stays on <code>Performance</code>.</p>
+<h3 id="finding-queue-status-ids-are-literals-in-sql">Finding: queue status ids are literals in SQL<a class="headerlink" href="#finding-queue-status-ids-are-literals-in-sql" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> blocks fixes. Insert order in <code>REFDATA.QUEUE_STATUS</code> is the only thing that makes <code>1</code>, <code>2</code>, and <code>3</code> mean <code>QUEUED</code>, <code>RUNNING</code>, and <code>CANCEL_REQUESTED</code>. Python never uses those integers. It calls <code>resolve_queue_status_id(name)</code>.</li>
+<li><strong>Where:</strong> <code>db/liquidbase/bt/procedures/SP_GET_QUEUE_FOR_TERMINAL.sql</code> lines 51 and 73, and <code>db/liquidbase/bt/functions/FN_GET_QUEUE_FOR_TERMINAL.sql</code> line 62. The seed (<code>db/liquidbase/refdata/data/QUEUE_STATUS.sql</code> lines 11 to 16) inserts <code>QUEUED</code>, <code>RUNNING</code>, <code>CANCEL_REQUESTED</code> first and does not set the identity values.</li>
+<li><strong>How did this happen?</strong> The procedure was written when those three rows were the first identity values, and the filter was never switched to <code>NAME</code>. The table comment mentions <code>IS_TERMINAL_IND</code>, and the table has no such column (<code>db/liquidbase/refdata/tables/QUEUE_STATUS.sql</code>).</li>
+<li><strong>Owning class:</strong> the procedure and the function. Python's owner is <code>RedisRefData.resolve_queue_status_id</code>.</li>
+<li><strong>Fix:</strong> Both routines join <code>REFDATA.QUEUE_STATUS</code> and filter on <code>NAME IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')</code>, or on a real terminal flag if Alfred adds that column. Delete the integer list. This is a new Liquibase changeset with context <code>bt</code> only. The previous changesets that point at these files are archived, so editing the body does nothing until that changeset exists. Blast radius: schema <code>BT</code>, one changeset, two routine bodies replaced (<code>SP_GET_QUEUE_FOR_TERMINAL</code> and <code>FN_GET_QUEUE_FOR_TERMINAL</code>). Do not add <code>prod-deploy</code> until Alfred asks. Callers of the routines are unchanged because the signature stays. Any test or client that assumed ids <code>1, 2, 3</code> is updated in the same pull request.</li>
+</ul>
+<h3 id="finding-job-priority-and-the-per-user-cap">Finding: job priority and the per-user cap<a class="headerlink" href="#finding-job-priority-and-the-per-user-cap" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> causes ripple.</li>
+<li><strong>Where:</strong> <code>PRIORITY_MAP = {"normal": 100, "high": 0}</code> at <code>quant/api/schemas/jobs.py</code> line 14. <code>MAX_QUEUED_PER_USER = 30</code> at line 17. <code>JobsService</code> enforces the cap.</li>
+<li><strong>How did this happen?</strong> The queue UI needed a label and a limit before a <code>CONFIG</code> row existed, and the numbers were written on the request schema.</li>
+<li><strong>Owning class:</strong> <code>JobsService</code> for the cap. Priority labels belong in <code>REFDATA</code>, next to <code>QUEUE_STATUS</code>, read through <code>RedisRefData</code>.</li>
+<li><strong>Fix:</strong> A <code>REFDATA</code> row for the two labels and their integer priorities, and a <code>CONFIG</code> row for the cap. <code>JobsService</code> reads both. Delete <code>PRIORITY_MAP</code> and <code>MAX_QUEUED_PER_USER</code>. Update the jobs router, the frontend label map, and the tests in the same pull request.</li>
+</ul>
+<h3 id="finding-backfill-size-and-the-warm-lookback">Finding: backfill size and the warm lookback<a class="headerlink" href="#finding-backfill-size-and-the-warm-lookback" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> causes ripple for the lookback (it is also the upward import). Tidy-up for the backfill cap, which is a time budget written up in the comment at <code>quant/market_data/service.py</code> lines 45 to 59.</li>
+<li><strong>Where:</strong> <code>MAX_BACKFILL_BARS = 10_000</code> at line 60. <code>live_lookback_bars(110)</code> at <code>quant/market_data/warm.py</code> line 46.</li>
+<li><strong>How did this happen?</strong> Both were sized against a proxy timeout and a typical indicator window, and left as module constants.</li>
+<li><strong>Owning class:</strong> <code>PriceBarService</code> for the backfill cap. <code>BarWarmer</code> for the lookback count, with the formula staying on <code>Performance</code>.</li>
+<li><strong>Fix:</strong> The backfill cap is process tuning (it tracks the proxy timeout), so it becomes an environment variable documented in <code>docs/env-vars.md</code>, read by <code>PriceBarService</code>. Delete the constant. The lookback count is a business window: a <code>CONFIG</code> row, passed into <code>BarWarmer</code> as in <a href="#finding-market_data-imports-strategy">section 1</a>. Update callers in the same pull request as each change. Do not batch them with the gateway split.</li>
+</ul>
+<h3 id="finding-schedule-statuses-are-a-python-set">Finding: schedule statuses are a Python set<a class="headerlink" href="#finding-schedule-statuses-are-a-python-set" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> causes ripple.</li>
+<li><strong>Where:</strong> <code>SCHEDULE_STATUSES</code> at <code>quant/trade/db_repo.py</code> line 18: <code>PENDING</code>, <code>SUCCESS</code>, <code>FAILED</code>. The comment says the column has no check constraint.</li>
+<li><strong>How did this happen?</strong> The procedure accepts any string, so the repo grew a set to reject typos.</li>
+<li><strong>Owning class:</strong> <code>TradeRepo</code> today. The names belong in <code>REFDATA</code>, read by <code>RedisRefData</code>, and checked by <code>TradeService</code> before the write.</li>
+<li><strong>Fix:</strong> A <code>REFDATA</code> table for schedule status, a <code>RedisRefData</code> resolver, and <code>TradeService</code> rejects an unknown name. Delete <code>SCHEDULE_STATUSES</code>. Update <code>TradeRepo</code>, <code>TradeService</code>, and <code>tests/unit/test_trade_db_repo.py</code> in the same pull request. A database check constraint can follow in the same changeset. Context <code>bt</code> until Alfred adds <code>prod-deploy</code>.</li>
+</ul>
+<h3 id="finding-confirm-delays-and-the-two-retry-budgets">Finding: confirm delays and the two retry budgets<a class="headerlink" href="#finding-confirm-delays-and-the-two-retry-budgets" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> causes ripple for the two budgets, because a timeout is retried on both clocks. Tidy-up for the poll delays.</li>
+<li><strong>Where:</strong> <code>_CONFIRM_DELAYS_S = (0.3, 0.6, 1.2, 2.4, 3.5)</code> at <code>quant/trade/brokers/ccxt/confirm.py</code> line 12. The retry defaults are in <a href="#4-duplicated-facts">section 4</a>.</li>
+<li><strong>How did this happen?</strong> The poll was tuned once against the venue and never given a home. The tick and the order executor were written separately, each with a budget that looked small on its own.</li>
+<li><strong>Owning class:</strong> <code>confirm_market_order</code> owns the poll. <code>OrderRetryPolicy</code> should own every retry count. <code>ScheduleTickRunner</code> should take that policy.</li>
+<li><strong>Fix:</strong> One <code>OrderRetryPolicy</code> constructed from a <code>CONFIG</code> row (attempts and backoff) or, if Alfred classes both as process tuning, from environment variables documented in <code>docs/env-vars.md</code>. <code>ScheduleTickRunner</code> and <code>OrderRetryExecutor</code> receive it. Delete <code>DEFAULT_MAX_ATTEMPTS</code>, <code>DEFAULT_RETRY_BACKOFF_S</code>, and the defaults on <code>OrderRetryPolicy.__init__</code>. The confirm delays are process tuning and move to the same kind of home in the pull request that touches <code>confirm.py</code>. Update <code>quant/trade/scheduler/tick.py</code>, <code>quant/trade/order_policy.py</code>, and their tests in the same pull request.</li>
+</ul>
+<p><code>split_ratio: float = 0.5</code> (<code>quant/schemas/backtest.py</code> line 87) is a research default of the same shape as the Optuna seed. It belongs on the <code>CONFIG.BACKTEST_SEARCH</code> row already proposed in the long-term fixes, not a new table. The drawer defaults <code>win_min ?? 5</code>, <code>win_max ?? 100</code>, <code>win_step ?? 5</code> at <code>ConfigDrawer.tsx</code> lines 157 to 160 are the literals item B of those fixes already tells the drawer to drop.</p>
+<p>Other module constants (<code>DEFAULT_POLL_INTERVAL_S</code>, <code>DEFAULT_MAX_DRAIN_PASSES</code>, <code>KEY_PROFILE_TTL_S</code>, the two-second Redis socket timeouts) are process tuning with no environment variable. They are the same shape as the worker timings in the known-debt table. The pull request that next touches each module moves that constant to an environment variable and documents it. They are not a batch of their own.</p>
+<h2 id="6-live-trading-failure-path-tests">6. Live-trading failure-path tests<a class="headerlink" href="#6-live-trading-failure-path-tests" title="Permanent link">&para;</a></h2>
+<p>Checked by reading <code>quant/trade/</code> (live apply, brokers, adapters, scheduler) and searching <code>tests/</code> for each path. Paths that already have a test are recorded so they are not rebuilt. Design items are only for the gaps. Each later pull request is tests plus the production change that makes the new assertion true, with a run on <code>main</code> quoted first, as the coding standards require.</p>
+<p>Prefer a small fake exchange or a fake repo over <code>MagicMock</code>. <code>tests/unit/test_bybit_adapter.py</code> (989 lines) patches ccxt and the gateway heavily. The new tests should follow <code>StubRefData</code> and <code>FakeProc</code>: a real object with the methods the production code calls.</p>
+<h3 id="broker-rejects-an-order-tested-above-the-gateway">Broker rejects an order: tested above the gateway<a class="headerlink" href="#broker-rejects-an-order-tested-above-the-gateway" title="Permanent link">&para;</a></h3>
+<p>These tests exist:</p>
+<ul>
+<li><code>tests/unit/test_ccxt_confirm.py</code> line 52, <code>test_rejected_is_failure</code>, for a fetched order with <code>status=rejected</code>.</li>
+<li><code>tests/unit/test_bybit_adapter.py</code> line 792, <code>test_place_order_broker_error_returns_failed_result</code>, which stubs <code>create_market_order</code> to raise <code>BrokerConnectionError</code>.</li>
+<li>Size and region rejects before submit, in the same file (lines 819 and 409).</li>
+<li><code>tests/unit/test_live_apply.py</code> line 273, <code>test_reject_reason_reaches_the_report</code>.</li>
+<li><code>tests/unit/test_schedule_tick.py</code> line 248, <code>test_rejected_order_counts_as_a_failure</code>.</li>
+</ul>
+<p>No test constructs <code>CcxtTradeGateway</code> and has <code>exchange.create_order</code> raise <code>ccxt.InvalidOrder</code> or <code>ccxt.InsufficientFunds</code>. The mapping is <code>quant/trade/brokers/ccxt/gateway.py</code> lines 253 to 256. A search of <code>tests/</code> found no call that reaches <code>create_order</code> on the exchange object.</p>
+<h3 id="design-item-gateway-maps-a-venue-reject">Design item: gateway maps a venue reject<a class="headerlink" href="#design-item-gateway-maps-a-venue-reject" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> blocks fixes. The next edit to <code>create_market_order</code> can drop the exception type and nothing in <code>tests/</code> fails.</li>
+<li><strong>How did this happen?</strong> The adapter tests inject <code>BrokerConnectionError</code>, so the gateway's <code>except</code> clauses were never the subject of a test.</li>
+<li><strong>Owning class:</strong> <code>CcxtTradeGateway</code>.</li>
+<li><strong>What the test asserts:</strong> A fake exchange whose <code>create_order</code> raises <code>ccxt.InvalidOrder</code> produces <code>BrokerConnectionError</code> with <code>invalid order</code> in the message, and <code>ccxt.InsufficientFunds</code> produces <code>insufficient funds</code>. The adapter's <code>place_order</code> then returns <code>success=False</code> and does not call <code>confirm_market_order</code>. No second <code>create_order</code>.</li>
+<li><strong>Fakes:</strong> A hand-written exchange object with <code>create_order</code>, <code>market</code>, and <code>markets</code>. Not <code>MagicMock</code>.</li>
+<li><strong>Size:</strong> One test class beside the existing adapter tests. <code>tests/unit/test_ccxt_confirm.py</code> is 145 lines and covers the poll loop. This class is a fraction of that file.</li>
+<li><strong>Live-trading risk:</strong> none while the test passes on current <code>main</code>. If it fails, the fix is inside <code>CcxtTradeGateway.create_market_order</code> only, and the adapter tests are updated in that same pull request.</li>
+</ul>
+<h3 id="broker-times-out-the-poll-is-tested-the-submit-is-not">Broker times out: the poll is tested, the submit is not<a class="headerlink" href="#broker-times-out-the-poll-is-tested-the-submit-is-not" title="Permanent link">&para;</a></h3>
+<p><code>tests/unit/test_ccxt_confirm.py</code> line 113, <code>test_timeout_returns_unconfirmed</code>, covers a fetch that stays <code>open</code> until <code>_CONFIRM_DELAYS_S</code> is spent. <code>tests/unit/test_order_policy.py</code> lines 59 and 71 treat the word <code>timeout</code> in a message as retryable. <code>tests/unit/test_live_apply.py</code> line 300 retries an unconfirmed result.</p>
+<p>No test has <code>exchange.create_order</code> raise <code>ccxt.RequestTimeout</code> or <code>ccxt.NetworkError</code>. <code>create_market_order</code> wraps every other <code>ccxt.BaseError</code> as <code>create_order failed: ...</code> (gateway line 259) and the adapter returns a failed <code>OrderResult</code> with <code>vendor_order_id=None</code> (<code>adapter.py</code> lines 225 to 230). Whether that message is retried depends on <code>OrderRetryPolicy.is_retryable</code> seeing the word <code>timeout</code>. Nothing asserts the outcome.</p>
+<h3 id="design-item-a-submit-timeout-does-not-become-a-second-order">Design item: a submit timeout does not become a second order<a class="headerlink" href="#design-item-a-submit-timeout-does-not-become-a-second-order" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> blocks fixes. This is the path that does not know whether the venue accepted the order.</li>
+<li><strong>How did this happen?</strong> The confirm poll was tested because it returns a domain <code>OrderResult</code>. The exception on <code>create_order</code> was left to the generic <code>BaseError</code> handler.</li>
+<li><strong>Owning class:</strong> <code>CcxtTradeGateway</code> for the mapping. <code>OrderRetryExecutor</code> for what happens next.</li>
+<li><strong>What the test asserts:</strong> A fake exchange whose <code>create_order</code> raises <code>ccxt.RequestTimeout</code> produces one failed result carrying the vendor's message, and <code>OrderRetryExecutor</code> does not call <code>apply_signal</code> a second time unless the result is classified retryable on purpose. If the classification says retryable, the second attempt sends the same client order id as the first (that id is the <a href="#design-item-one-client-order-id-for-a-retry">duplicate-submission item</a> below, and this test lands in that same pull request so the two assertions share one fake).</li>
+<li><strong>Fakes:</strong> The same hand-written exchange. It records every <code>create_order</code> argument.</li>
+<li><strong>Size:</strong> A second test on that fake, in the same module as the reject test.</li>
+<li><strong>Live-trading risk:</strong> the retry rule is live behavior. The pull request quotes the current <code>main</code> result before changing it.</li>
+</ul>
+<h3 id="partial-fill-a-terminal-partial-is-tested-an-open-partial-is-not">Partial fill: a terminal partial is tested, an open partial is not<a class="headerlink" href="#partial-fill-a-terminal-partial-is-tested-an-open-partial-is-not" title="Permanent link">&para;</a></h3>
+<p><code>tests/unit/test_ccxt_confirm.py</code> line 38, <code>test_partial_fill_on_cancel_is_success</code>, and line 72, <code>test_expired_with_fill_is_success</code>, assert that a canceled or expired order with <code>filled &gt; 0</code> is a success and keeps <code>filled_qty</code>.</p>
+<p>An order that is still <code>open</code> with <code>filled &gt; 0</code> makes <code>_parse_terminal</code> return <code>None</code> (<code>confirm.py</code> lines 45 to 66). When the poll budget ends, <code>confirm_market_order</code> returns an unconfirmed <code>OrderResult</code> that does not set <code>filled_qty</code> (lines 110 to 121). <code>OrderRetryExecutor</code> then cancels and calls <code>apply_signal</code> again for the full quantity (<code>order_policy.py</code> lines 160 to 164). No test uses an open order whose <code>filled</code> is already non-zero.</p>
+<h3 id="design-item-an-open-partial-is-remembered">Design item: an open partial is remembered<a class="headerlink" href="#design-item-an-open-partial-is-remembered" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> blocks fixes. A retry that ignores the filled part buys the remainder twice if the cancel does not roll the fill back.</li>
+<li><strong>How did this happen?</strong> <code>_parse_terminal</code> only returns once the status is terminal, and the timeout result was written for the <code>filled == 0</code> case the unit test uses.</li>
+<li><strong>Owning class:</strong> <code>confirm_market_order</code>.</li>
+<li><strong>What the test asserts:</strong> A fake gateway whose <code>fetch_order</code> returns <code>status=open</code> and <code>filled</code> equal to half the request, for every poll, produces an unconfirmed result whose <code>filled_qty</code> is that half. <code>OrderRetryExecutor</code> does not submit a second order for the original full quantity. The later client-order-id pull request is what makes the second assertion true. Until that id exists, this test fails on <code>main</code>, which is the evidence the standards ask for.</li>
+<li><strong>Fakes:</strong> A fake gateway with <code>fetch_order</code> returning that dict. The executor test uses a fake adapter whose <code>apply_signal</code> records quantity, not <code>MagicMock</code>.</li>
+<li><strong>Size:</strong> Two tests, one on <code>confirm_market_order</code> and one on <code>OrderRetryExecutor</code>.</li>
+<li><strong>Live-trading risk:</strong> high once the executor stops sending the second full order. Ship it with the client-order-id pull request, not as a silent change to retry policy.</li>
+</ul>
+<h3 id="position-read-lags-or-is-stale-no-test">Position read lags or is stale: no test<a class="headerlink" href="#position-read-lags-or-is-stale-no-test" title="Permanent link">&para;</a></h3>
+<p>The <a href="../2026-09-26-code-quality-review/#1-a-stuck-schedule-re-applies-every-tick-a-second-fill-needs-a-lagging-position-read">stuck-schedule finding</a> already explains the mechanism. <code>OrderRetryExecutor.execute</code> re-reads <code>get_position_qty</code> every attempt (<code>order_policy.py</code> line 146). <code>intended_side</code> returns <code>HOLD</code> when the book already matches the signal. A lagging read returns the old quantity, so the next attempt sends another order. <code>tests/unit/test_order_policy.py</code> sets <code>get_position_qty</code> to a constant <code>0.0</code>. <code>tests/unit/test_bybit_adapter.py</code> covers a fresh position (lines 506, 527, 546) and does not cover a read that is still flat after a fill.</p>
+<p><code>tests/unit/test_schedule_tick.py</code> line 348, <code>test_applied_but_not_advanced_is_reported_as_stuck</code>, covers the schedule write throwing. It does not cover the position endpoint.</p>
+<h3 id="design-item-a-stale-position-does-not-send-a-second-order">Design item: a stale position does not send a second order<a class="headerlink" href="#design-item-a-stale-position-does-not-send-a-second-order" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> blocks fixes. This is the live path the earlier review left open.</li>
+<li><strong>How did this happen?</strong> The position tests assert the happy shapes ccxt returns. They never sequence "fill, then a read that still shows flat".</li>
+<li><strong>Owning class:</strong> <code>OrderRetryExecutor</code>, with <code>CcxtTradeAdapter</code> sending a client order id derived the way that earlier review describes: from the deployment and the scheduled time.</li>
+<li><strong>What the test asserts:</strong> First attempt fills. Second attempt's <code>get_position_qty</code> still returns <code>0</code>. The fake exchange records one <code>create_order</code>, and a repeated submit with the same client order id comes back as the original fill, <code>success=True</code>, not a second position.</li>
+<li><strong>Fakes:</strong> A fake exchange that stores orders by client id. A fake adapter is not enough on its own, because the bug is the second submit reaching the venue.</li>
+<li><strong>Size:</strong> One test class. The production change is the client order id on <code>CcxtTradeAdapter.place_order</code> and <code>CcxtTradeGateway.create_market_order</code>. Update every caller of <code>create_market_order</code> in that same pull request (the adapter is the caller).</li>
+<li><strong>Live-trading risk:</strong> high. The order payload gains an id. Say so in that pull request. No production deploy from the branch.</li>
+</ul>
+<h3 id="the-database-write-after-a-successful-order-the-audit-is-tested-the-fill-row-is-not">The database write after a successful order: the audit is tested, the fill row is not<a class="headerlink" href="#the-database-write-after-a-successful-order-the-audit-is-tested-the-fill-row-is-not" title="Permanent link">&para;</a></h3>
+<p><code>LiveApplyOrchestrator._write_transaction</code> (<code>quant/trade/live_apply.py</code> lines 243 to 278) catches every exception, logs it, and lets the apply report success. <code>tests/unit/test_live_apply.py</code> line 377, <code>test_audit_failure_does_not_crash</code>, sets <code>sp_ins_execution_event</code> to raise. A search of <code>tests/</code> found no test that sets <code>sp_ins_transaction</code> to raise. The success tests assert it was called once (line 205).</p>
+<p>The schedule-cursor failure is a different write. It is tested (<code>test_applied_but_not_advanced_is_reported_as_stuck</code>) and discussed in the stuck-schedule finding. It is not this gap.</p>
+<h3 id="design-item-a-failed-fill-row-does-not-hide-the-fill-and-does-not-send-another-order">Design item: a failed fill row does not hide the fill, and does not send another order<a class="headerlink" href="#design-item-a-failed-fill-row-does-not-hide-the-fill-and-does-not-send-another-order" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> blocks fixes. The handler is the "best-effort, never fails the cycle" pattern the standards allow only with a docstring and <code>logger.exception</code>. The docstring is there (line 253). No test locks it.</li>
+<li><strong>How did this happen?</strong> The audit write was tested because it loops over attempts. The transaction write was left on the happy-path assertion.</li>
+<li><strong>Owning class:</strong> <code>LiveApplyOrchestrator</code>.</li>
+<li><strong>What the test asserts:</strong> The fake repo's <code>sp_ins_transaction</code> raises <code>RuntimeError</code>. <code>run</code> still returns <code>order_success=True</code> and the vendor order id. <code>apply_signal</code> was called once. The exception is logged (the test captures the log record). The report does not claim the transaction row exists.</li>
+<li><strong>Fakes:</strong> A small repo object with the methods <code>run</code> calls, <code>sp_ins_transaction</code> raising. The adapter is a small class with a fixed fill, not <code>MagicMock</code>.</li>
+<li><strong>Size:</strong> One test in <code>tests/unit/test_live_apply.py</code> (that file is 539 lines).</li>
+<li><strong>Live-trading risk:</strong> none if the test passes on current <code>main</code>. The pull request quotes that run.</li>
+</ul>
+<h3 id="duplicate-submission-on-retry-no-idempotency-test">Duplicate submission on retry: no idempotency test<a class="headerlink" href="#duplicate-submission-on-retry-no-idempotency-test" title="Permanent link">&para;</a></h3>
+<p><code>tests/unit/test_order_policy.py</code> line 144, <code>test_unconfirmed_cancels_and_retries_to_exhaustion</code>, asserts <code>cancel_order</code> and <code>apply_signal</code> each run three times. The adapter has no client order id. The only mention in <code>quant/trade</code> is the comment in <code>ScheduleTickRunner._advance</code> (<code>quant/trade/scheduler/tick.py</code> lines 298 to 300): neither an in-flight lease nor an idempotent client order id exists. That comment, and the correction that a current position usually prevents the second fill, is the stuck-schedule finding. The missing test is still missing.</p>
+<h3 id="design-item-one-client-order-id-for-a-retry">Design item: one client order id for a retry<a class="headerlink" href="#design-item-one-client-order-id-for-a-retry" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> blocks fixes.</li>
+<li><strong>How did this happen?</strong> Cancel-and-retry was implemented as a new <code>apply_signal</code>, which builds a new <code>OrderRequest</code> with no id tying it to the attempt that timed out.</li>
+<li><strong>Owning class:</strong> <code>CcxtTradeAdapter</code> and <code>CcxtTradeGateway</code>. <code>OrderRetryExecutor</code> passes the id through.</li>
+<li><strong>What the test asserts:</strong> Two attempts for the same deployment and scheduled time call <code>create_order</code> with one client id. The fake exchange, asked to create that id again, returns the first order and does not increase the position. A successful first fill followed by a retry is one position, not two.</li>
+<li><strong>Fakes:</strong> The same fake exchange as the stale-position item. These two design items are one pull request. Shipping them separately would leave a retry rule with no id, or an id with no retry test.</li>
+<li><strong>Size:</strong> The id parameter on <code>create_market_order</code>, the adapter, the executor, and the tests. <code>quant/trade/order_policy.py</code> is 188 lines. The change is a slice of that plus the gateway method.</li>
+<li><strong>Live-trading risk:</strong> high. One pull request, called out as a live path.</li>
+</ul>
+<h3 id="scheduler-tick-crash-mid-cycle-a-whole-interval-is-tested-a-row-in-the-middle-is-not">Scheduler tick crash mid-cycle: a whole interval is tested, a row in the middle is not<a class="headerlink" href="#scheduler-tick-crash-mid-cycle-a-whole-interval-is-tested-a-row-in-the-middle-is-not" title="Permanent link">&para;</a></h3>
+<p><code>ScheduleSweeper.sweep</code> catches an exception from <code>run_interval</code> and continues (<code>quant/trade/scheduler/sweep.py</code> lines 70 to 76). <code>tests/unit/test_schedule_sweep.py</code> line 44, <code>test_a_failing_interval_does_not_stop_the_others</code>, covers that.</p>
+<p>Inside one interval, <code>ScheduleTickRunner._run_one</code> catches exceptions from the apply callable (<code>tick.py</code> lines 191 to 198). <code>tests/unit/test_schedule_tick.py</code> line 218, <code>test_a_failing_row_does_not_stop_the_others</code>, covers a row whose apply raises.</p>
+<p><code>run_interval</code> builds the result list with a comprehension (<code>tick.py</code> line 177). Anything <code>_run_one</code> does not catch, including a row that lacks <code>deployment_id</code> (line 189, before the <code>try</code>), escapes <code>run_interval</code>. Rows later in that interval never run. The sweeper then logs and drops the interval report, including rows already applied. No test feeds two due rows where the second raises outside the apply <code>try</code>.</p>
+<p><code>SchedulePoller.run</code> (<code>quant/trade/scheduler/poller.py</code> lines 66 to 77) lets any exception other than <code>CancelledError</code> stop the loop. The sweep absorbs per-interval failures, so this fires when <code>interval_ids()</code> itself raises. No poller test covers that. It is the start of a pass, not the middle. It is recorded here so it is not mistaken for the mid-cycle gap.</p>
+<h3 id="design-item-one-bad-row-does-not-drop-the-rest-of-the-interval">Design item: one bad row does not drop the rest of the interval<a class="headerlink" href="#design-item-one-bad-row-does-not-drop-the-rest-of-the-interval" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> causes ripple. A crash after the first order has already been sent skips every later deployment on that interval, and the sweeper's report no longer lists the one that traded.</li>
+<li><strong>How did this happen?</strong> The comprehension treats <code>_run_one</code> as infallible once the apply <code>try</code> was added. The key read sits outside that <code>try</code>.</li>
+<li><strong>Owning class:</strong> <code>ScheduleTickRunner</code>.</li>
+<li><strong>What the test asserts:</strong> Two due rows. The first apply succeeds and the schedule advance is called. The second row has no <code>deployment_id</code>. <code>run_interval</code> returns a report that contains the first row as <code>APPLIED</code> and the second as a failed outcome, and does not raise. A fake repo records that the second row was not advanced and was not applied.</li>
+<li><strong>Fakes:</strong> A repo object with <code>sp_get_missed_due_deployments</code>, <code>sp_ins_deployment_schedule_status</code>, and <code>write_deployment</code>. The apply callable is a function, which the tick already accepts.</li>
+<li><strong>Size:</strong> One test in <code>tests/unit/test_schedule_tick.py</code> (355 lines) and the <code>try</code> moved so it wraps the whole row.</li>
+<li><strong>Live-trading risk:</strong> medium. Today that exception aborts the rest of the interval. After the fix, later rows still trade. The pull request says so.</li>
+</ul>
+<h2 id="refactor-order">Refactor order<a class="headerlink" href="#refactor-order" title="Permanent link">&para;</a></h2>
+<p>Each step is one pull request. Callers of any changed interface are updated in that same pull request. No shims, aliases, or fallbacks. Safest and most unblocking first.</p>
+<ol>
+<li><strong>Gateway reject and submit-timeout tests.</strong> Scope: <code>CcxtTradeGateway</code> and a fake exchange, tests first. Rules 4 and 5. Unblocks every later edit to <code>create_market_order</code>. Live-trading risk: none if the tests pass on <code>main</code>. If a mapping is wrong, the fix stays inside the gateway.</li>
+<li><strong>Transaction-write failure test.</strong> Scope: <code>LiveApplyOrchestrator._write_transaction</code> and one test. Rule 4. Unblocks edits to the fill-row path. Live-trading risk: none while production code is unchanged.</li>
+<li><strong>Delete the second promotion ranking.</strong> Scope: <code>PromotionTab.tsx</code> and its test. Drop <code>compareMetric</code> and the Sharpe reducer. Render the API outcome. Rules 1 and 2. Unblocks promotion-rule changes so they stop requiring a UI edit. Live-trading risk: none.</li>
+<li><strong><code>BarWarmer</code> takes its lookback.</strong> Scope: <code>quant/market_data/warm.py</code> and <code>quant/api/market_data/router.py</code>. Removes the <code>market_data</code> → <code>strategy</code> edge and the cycles that use it. Rules 1 and 3 (the literal <code>110</code> moves in this pull request only if the <a href="#decisions-for-alfred">decision</a> on its home is made; otherwise the route passes <code>live_lookback_bars(110)</code> and the import leaves <code>market_data</code>). Live-trading risk: low. The warm pass is best-effort. Apply still fails closed in <code>PriceBarService.ensure_fresh</code>.</li>
+<li><strong>Move credentials out of <code>quant.api</code>.</strong> Scope: <code>CredentialService</code>, <code>ApiCredentialRepo</code>, the four trade importers, the credential router, <code>quant/api/main.py</code>. Removes <code>trade</code> → <code>api</code> and every cycle that uses it. Rules 1 and 2. Unblocks credential fixes from touching the trade package's imports. Live-trading risk: medium, because live apply imports these classes. Behavior of decrypt and fetch stays the same. The pull request lists the live path.</li>
+<li><strong>Promotion decision leaves the repo.</strong> Scope: delete <code>PromotionRepo.run</code>, call the evaluate-then-write function from <code>BacktestWorker</code>. Rules 1 and 2. Unblocks promotion policy from being edited inside a <code>DbGateway</code>. Live-trading risk: none. This is the backtest worker.</li>
+<li><strong>Tick contains one bad row.</strong> Scope: <code>ScheduleTickRunner.run_interval</code> and one test. Rules 1 and 4. Unblocks a partial interval from disappearing out of the sweep report. Live-trading risk: medium. Later rows in the interval keep trading.</li>
+<li><strong>Client order id, open partial, and stale position.</strong> One pull request. Scope: <code>CcxtTradeAdapter</code>, <code>CcxtTradeGateway.create_market_order</code>, <code>OrderRetryExecutor</code>, and the fakes in section 6. Rules 1, 2, and 4. Unblocks retries that cannot double-fill. Live-trading risk: high. The order payload changes.</li>
+<li><strong>Queue status ids in the two SQL routines.</strong> Scope: one Liquibase changeset, context <code>bt</code>, replacing <code>SP_GET_QUEUE_FOR_TERMINAL</code> and <code>FN_GET_QUEUE_FOR_TERMINAL</code>. Rule 3. Unblocks a re-seed of <code>REFDATA.QUEUE_STATUS</code> from changing who shows up in the jobs list. Live-trading risk: none. Do not add <code>prod-deploy</code> in that pull request.</li>
+<li><strong>Gateway and <code>TradeRepo</code> splits.</strong> Only after steps 1, 2, and 8. <code>CcxtTradeGateway</code> becomes order submission, account reads, and market metadata, and the old class is deleted. <code>TradeRepo</code> stays one repo. The status set moves in the schedule-status pull request, not here. Live-trading risk: high for the gateway split, low for leaving <code>TradeRepo</code> whole.</li>
+</ol>
+<p>Hard-coded limits other than the ones a step above already moves (job cap, priority labels, backfill cap, confirm delays) are each taken in the pull request that next edits that module. They are not a single cleanup pull request.</p>
+<h2 id="decisions-for-alfred">Decisions for Alfred<a class="headerlink" href="#decisions-for-alfred" title="Permanent link">&para;</a></h2>
+<p>These are choices. Everything else above has an owner and a fix that follows the standards.</p>
+<ol>
+<li><strong>Warm lookback <code>110</code>.</strong> Pass <code>live_lookback_bars(110)</code> from the market-data route so <code>market_data</code> stops importing <code>strategy</code> now, or put the count on a <code>CONFIG</code> row in that same pull request?</li>
+<li><strong>A tick row that raises outside <code>apply</code>.</strong> Should later deployments on that interval still trade (step 7), or should the interval keep aborting as it does today?</li>
+<li><strong>Retry budget.</strong> One policy for the tick and the order executor. Is the number the tick's 3 attempts and 5 seconds, the executor's 5 attempts and 2 seconds, or a new pair? Does it live in <code>CONFIG</code>, or in environment variables as process tuning?</li>
+<li><strong>Client order id.</strong> The <a href="../2026-09-26-code-quality-review/#1-a-stuck-schedule-re-applies-every-tick-a-second-fill-needs-a-lagging-position-read">stuck-schedule finding</a> already recommends an id derived from the deployment and the scheduled time, and treating "already filled" as success. Confirm that this is what the tests in step 8 must assert.</li>
+<li><strong><code>prod-deploy</code> for the queue-status changeset (step 9).</strong> The changeset is staged with context <code>bt</code> only. Adding <code>prod-deploy</code> queues it for the production migrate job. Say so if that should happen. Until then it waits for a manual database deploy.</li>
+</ol>
+<p>Already asked, and not re-opened here: the <code>StrategyBuilder</code> and the CLI's retirement (<a href="../2026-09-29-long-term-fixes-b1-rangeparam-datacolumn/#shared-owner-the-strategy-builder">long-term fixes</a>), and the fee home (decisions #65 and #84).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>

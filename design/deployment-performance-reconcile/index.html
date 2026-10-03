@@ -1,0 +1,4467 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/design/deployment-performance-reconcile/">
+      
+      
+        <link rel="prev" href="../plan-to-profit/">
+      
+      
+        <link rel="next" href="../best-vid-promotion/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Deployment Performance Reconcile - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deployment-performance-reconcile" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Deployment Performance Reconcile
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Platform design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../research/" class="md-tabs__link">
+          
+  
+  
+  Strategy research
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../archive/" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/prod-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../coding-standards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding Standards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plan-to-profit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Performance Reconcile
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Performance Reconcile
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-why-a-stored-daily-sharpe-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Why a stored daily Sharpe fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-which-bars-belong-to-a-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Which bars belong to a strategy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-strategy-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Strategy level
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Strategy level">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-live-return" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Live return
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-backtest-return-on-the-live-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Backtest return on the live bars
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-two-comparisons-two-causes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Two comparisons, two causes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-known-differences-that-are-not-edge-decay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Known differences that are not edge decay
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-account-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Account level
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Account level">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-what-it-holds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 What it holds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-mixed-intervals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Mixed intervals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-the-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 The identity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-ratios-on-the-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Ratios on the account
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-tradedeployment_performance-strategy-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 TRADE.DEPLOYMENT_PERFORMANCE — strategy level
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-tradeaccount_performance-account-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 TRADE.ACCOUNT_PERFORMANCE — account level
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Procedures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-snapshot-table-vs-materialized-view-open-decision-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Snapshot table vs materialized view (open decision #3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-the-job-phase-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. The job (Phase 2.2)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-ui-phase-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. UI (Phase 2.3)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. UI (Phase 2.3)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-open-position-and-notional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Open position and notional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Performance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-gaps-to-close-before-building" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Gaps to close before building
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best-vid-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ccxt-bar-timezones/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Bar Timezones & Apply Timing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-data-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../db-connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-29-queue-frontend-aids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue screen aids (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../glassnode-market-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glassnode market data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-25-backtest-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest review (2026-09-25)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-25-backtest-data-hygiene-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest data hygiene (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-26-fractional-sizing-stateful-exits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fractional sizing and stateful exits (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-26-code-quality-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code quality review (2026-09-26)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-27-algodaemon-bug-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AlgoDaemon bug report (2026-09-27)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-27-bug-verification-round3-4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bug verification, rounds 3–4 (2026-09-27)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-29-long-term-fixes-b1-rangeparam-datacolumn/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Long-term fixes — B1, window bounds, data columns, repeated trials (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-29-dependency-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency and OOP review (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy research
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Strategy research
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/crypto-spot-baseline-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crypto spot — baseline improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/sharpe-ideas-index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharpe ideas — where to start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/momentum-reversal-filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum, reversal, and filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/catching-crypto-trends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catching crypto trends
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/volatility-and-cross-section/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Volatility and the cross-section
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/funding-basis-carry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Funding, basis, and carry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/microstructure-onchain-unusual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Microstructure, on-chain, and unusual
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/polyu-quant-course-methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods from the PolyU quantitative trading course
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/dutch-algotrading-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dutch Algotrading Patreon review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/chinshum-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chin Shum Patreon review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/merge-vs-distinct-candidates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which candidates to merge vs run as separate sleeves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/japanese-korean-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Japanese and Korean crypto strategy sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/feature-worthy-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategies worth new platform features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/strategy-persistence-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy persistence validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/risk-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Risk control for the three sleeves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/live-order-execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/return-compounding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Return Compounding (bug)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/infra-capacity-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure Capacity Review (2026-09)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer (abandoned)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-why-a-stored-daily-sharpe-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Why a stored daily Sharpe fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-which-bars-belong-to-a-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Which bars belong to a strategy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-strategy-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Strategy level
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Strategy level">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-live-return" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Live return
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-backtest-return-on-the-live-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Backtest return on the live bars
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-two-comparisons-two-causes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Two comparisons, two causes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-known-differences-that-are-not-edge-decay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Known differences that are not edge decay
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-account-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Account level
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Account level">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-what-it-holds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 What it holds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-mixed-intervals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Mixed intervals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-the-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 The identity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-ratios-on-the-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Ratios on the account
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-tradedeployment_performance-strategy-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 TRADE.DEPLOYMENT_PERFORMANCE — strategy level
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-tradeaccount_performance-account-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 TRADE.ACCOUNT_PERFORMANCE — account level
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-procedures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Procedures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-snapshot-table-vs-materialized-view-open-decision-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Snapshot table vs materialized view (open decision #3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-the-job-phase-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. The job (Phase 2.2)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-ui-phase-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. UI (Phase 2.3)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. UI (Phase 2.3)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-open-position-and-notional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Open position and notional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Performance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-gaps-to-close-before-building" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Gaps to close before building
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="deployment-performance-reconcile">Deployment performance reconcile<a class="headerlink" href="#deployment-performance-reconcile" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Proposed. Covers <a href="../plan-to-profit/">Plan to profit</a> Phase 2.1 (data model), 2.2 (job), and 2.3 (UI). Resolves open decision #3 in that page once adopted. Depends on <code>TRADE.INTENT</code> (<a href="../multi-strategy-netting/#5-intent-first">Multi-strategy netting §5</a>, decision #90).</p>
+<p><strong>Question it answers:</strong> is each live strategy earning what its backtest said it would, does the account hold what the strategies asked for, and when either is behind, is the cause the strategy or the execution?</p>
+<hr />
+<h2 id="1-why-a-stored-daily-sharpe-fails">1. Why a stored daily Sharpe fails<a class="headerlink" href="#1-why-a-stored-daily-sharpe-fails" title="Permanent link">&para;</a></h2>
+<p>The first sketch in Phase 2.1 stored one row per deployment per day holding <em>live Sharpe</em> and <em>cumulative return</em>. That row breaks in two ways.</p>
+<p><strong>A deployment stops partway through its life.</strong></p>
+<ul>
+<li><strong>Auto-pause</strong> (decisions #70 and #79). Three failed attempts in one pass version the deployment <code>PAUSED</code> with <code>IS_ENABLED_IND='N'</code>. The broker position stays open.</li>
+<li><strong>Kill switch.</strong> The same write with the same result: disabled, position held.</li>
+<li><strong>Re-enable.</strong> Ops turns it back on days later, so the live history now has a hole in it.</li>
+</ul>
+<p>A Sharpe number computed at each snapshot is taken over whatever window existed that day. Once the window has a hole, the value mixes days the strategy managed with days nobody managed. It also cannot be compared with a backtest, because the backtest never had the hole.</p>
+<p><strong>Two strategies trade one asset on one account.</strong> The broker keeps one position per symbol per account: the base-coin balance on spot, the net contract size on a perp. <code>EXECUTION_EVENT.POSITION_QTY</code> records that account number (<a href="../multi-strategy-netting/#3-where-position_qty-really-belongs">Multi-strategy netting §3</a>). The broker cannot say how much of it belongs to each strategy, so a per-strategy return built from it is a guess.</p>
+<p><strong>Answer:</strong> store per-bar returns, derive every ratio on read, and take each strategy's position from its own <code>TRADE.INTENT</code> target. Reconcile at two levels:</p>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Grain</th>
+<th>Position</th>
+<th>Answers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Strategy</strong></td>
+<td>deployment × bar</td>
+<td><code>INTENT.TARGET_QTY</code> — what the strategy asked for</td>
+<td>Is the strategy earning its backtest?</td>
+</tr>
+<tr>
+<td><strong>Account</strong></td>
+<td>credential × instrument × bar</td>
+<td>Broker holding</td>
+<td>Does the account hold and earn what the strategies asked for?</td>
+</tr>
+</tbody>
+</table>
+<p>The two levels meet in one identity (§4.3). Its remainder is the alarm.</p>
+<hr />
+<h2 id="2-which-bars-belong-to-a-strategy">2. Which bars belong to a strategy<a class="headerlink" href="#2-which-bars-belong-to-a-strategy" title="Permanent link">&para;</a></h2>
+<p>A deployment applies at slots <code>s_k</code>, each one <code>EXECUTE_OFFSET</code> before bar <code>k</code> closes (decision #81). The position from <code>s_k</code> to <code>s_{k+1}</code> is whatever the apply at <code>s_k</code> chose.</p>
+<p><strong>Rule:</strong> bar <code>k+1</code> is <strong>managed</strong> for a deployment when it has an <code>INTENT</code> at <code>s_k</code> and that pass recorded a successful attempt in <code>TRADE.EXECUTION_EVENT</code>. A <code>HOLD</code> counts: <code>OrderRetryExecutor</code> writes an attempt row for it. The intent and its attempts join on <code>(DEPLOYMENT_ID, TRANSACT_AT)</code>.</p>
+<p>Every stop case falls out of that one rule:</p>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Bars before</th>
+<th>Bar after the event</th>
+<th>Later bars</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Auto-pause at slot <code>s_k</code> (third failure)</td>
+<td>managed</td>
+<td>unmanaged, because <code>s_k</code> failed</td>
+<td>unmanaged until a slot succeeds again</td>
+</tr>
+<tr>
+<td>Kill switch between <code>s_k</code> and <code>s_{k+1}</code></td>
+<td>managed</td>
+<td>still managed; <code>s_k</code> chose that position</td>
+<td>unmanaged</td>
+</tr>
+<tr>
+<td>Re-enable, next slot succeeds</td>
+<td>—</td>
+<td>managed again</td>
+<td>managed</td>
+</tr>
+<tr>
+<td>Scheduler missed <code>s_k</code> (host down)</td>
+<td>managed</td>
+<td>unmanaged; no intent at <code>s_k</code></td>
+<td>resumes on the next successful slot</td>
+</tr>
+<tr>
+<td><code>QTY</code> or strategy changed (new <code>DEPLOYMENT_VID</code>)</td>
+<td>managed</td>
+<td>managed under the new VID</td>
+<td>managed</td>
+</tr>
+</tbody>
+</table>
+<p>An unmanaged bar still gets a strategy row with <code>IS_MANAGED_IND = 'N'</code>, and strategy metrics leave it out. A paused deployment still carries its last target, and the account still holds it, because a pause does not flatten. That exposure is real money and belongs in the account level.</p>
+<p>Strategy rows start at the first successful slot. They stop once the deployment is disabled <strong>and</strong> its last target is zero.</p>
+<hr />
+<h2 id="3-strategy-level">3. Strategy level<a class="headerlink" href="#3-strategy-level" title="Permanent link">&para;</a></h2>
+<h3 id="31-live-return">3.1 Live return<a class="headerlink" href="#31-live-return" title="Permanent link">&para;</a></h3>
+<p>The strategy's position for bar <code>k+1</code> is <code>TARGET_QTY</code> from its intent at <code>s_k</code>. It is marked on the same <code>MARKET_DATA.PRICE_BAR</code> closes the signal reads (decision #45), from the deployment's own <code>SOURCE_APP_ID</code>. <code>c_k</code> is the close of bar <code>k</code>.</p>
+<ul>
+<li><code>UNIT_NOTIONAL_AMT</code> = <code>QTY × c_k</code> under the <code>DEPLOYMENT_VID</code> in force at <code>s_k</code>. It is the notional of one full unit. Dividing by it puts live on the backtest's −1 / 0 / +1 scale, and a <code>QTY</code> change midway leaves the series comparable.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Formula</th>
+<th>What it isolates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Position</td>
+<td><code>TARGET_QTY × (c_{k+1} − c_k) / UNIT_NOTIONAL_AMT</code></td>
+<td>The move the strategy's position caught</td>
+</tr>
+<tr>
+<td>Fill gap</td>
+<td><code>Σ fill_qty_signed × (c_k − fill_px) / UNIT_NOTIONAL_AMT</code></td>
+<td>Filling at <code>s_k</code> on the forming candle against the close the backtest assumes</td>
+</tr>
+<tr>
+<td>Fee</td>
+<td><code>− Σ fee_in_quote / UNIT_NOTIONAL_AMT</code></td>
+<td>Broker-charged fee from <code>TRADE.TRANSACTION.FEE_AMT</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>LIVE_RETURN</code> is the sum.</p>
+<p><strong>Which fills are the strategy's.</strong> While each deployment applies on its own, a <code>TRANSACTION</code> row carries the <code>DEPLOYMENT_ID</code> that placed it, and the fills are that deployment's. Once netting places one order for several strategies, the order's fill gap and fee are shared by each strategy's <code>|Δ TARGET_QTY|</code> at that slot. The fee netting saves lands at the account level.</p>
+<p>A strategy whose order never filled still holds its target on this level. That is deliberate: this level measures the strategy. The account level shows the missing fill.</p>
+<h3 id="32-backtest-return-on-the-live-bars">3.2 Backtest return on the live bars<a class="headerlink" href="#32-backtest-return-on-the-live-bars" title="Permanent link">&para;</a></h3>
+<p>The benchmark is the strategy's own backtest <strong>replayed over the live window</strong>. The stored <code>BT.RESULT</code> covers the research sample; its dates are not the live dates.</p>
+<ul>
+<li>Config: <code>BT.STRATEGY.CONFIG_JSON</code> for the <code>STRATEGY_ID</code> / <code>STRATEGY_VID</code> on the deployment version, including its stored <code>fee_bps</code>.</li>
+<li>Bars: the same <code>PRICE_BAR</code> series the live marks use, closed bars only.</li>
+<li>Engine: <code>Performance</code> in <code>quant/strategy/performance.py</code>, unchanged. Its PnL line is <code>position_{t-1} × return_t − |Δposition| × fee</code> (see <a href="../../guides/indicators-strategies/#transaction-costs">Transaction costs</a>).</li>
+</ul>
+<p>The replay needs the indicator warmup ahead of the first live bar, the same lookback live apply already loads (<code>live_lookback_days</code>).</p>
+<p><code>BACKTEST_RETURN</code> is the replay's <code>pnl</code> on bar <code>k+1</code>.</p>
+<h3 id="33-two-comparisons-two-causes">3.3 Two comparisons, two causes<a class="headerlink" href="#33-two-comparisons-two-causes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Compare</th>
+<th>Gap means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LIVE_RETURN</code> vs <code>BACKTEST_RETURN</code>, managed bars</td>
+<td><strong>Execution drift.</strong> Fill gap, fee model, signal flips on the forming candle.</td>
+</tr>
+<tr>
+<td>Replay Sharpe vs research Sharpe (<code>BT.RESULT</code>)</td>
+<td><strong>Edge decay or regime.</strong> The strategy itself earns less on new data.</td>
+</tr>
+</tbody>
+</table>
+<p>A deployment can execute perfectly and still lose because the edge is gone. It can also keep its edge and still lose it to fees. Keeping the two apart is the point.</p>
+<h3 id="34-known-differences-that-are-not-edge-decay">3.4 Known differences that are not edge decay<a class="headerlink" href="#34-known-differences-that-are-not-edge-decay" title="Permanent link">&para;</a></h3>
+<p>These are listed so the UI labels them instead of blaming the strategy. The engine side is in the "Not modelled" list under <a href="../../guides/indicators-strategies/#transaction-costs">Transaction costs</a>.</p>
+<ul>
+<li><strong>Fill timing.</strong> Live fills <code>EXECUTE_OFFSET</code> before the close on the forming candle (decision #81). The fill gap column measures it directly.</li>
+<li><strong>Signal on the forming candle.</strong> Near a band edge the live signal can differ from the closed-bar signal. It shows up as <code>TARGET_POSITION ≠ BACKTEST_POSITION</code>.</li>
+<li><strong>Reversal in two steps.</strong> <code>intended_side</code> maps signal −1 on a long to <code>SELL</code> (flatten), and the short opens on the next slot. The backtest reverses in one bar and pays 2× fee there.</li>
+<li><strong>Fees.</strong> The broker fee against the single <code>fee_bps</code>: taker, VIP tier, fee coin.</li>
+<li><strong>Slippage, partial fills, funding.</strong> Slippage lands in the fill gap. A partial fill leaves the account short of the target and shows at the account level. Funding needs its own column once a perp deployment exists.</li>
+</ul>
+<hr />
+<h2 id="4-account-level">4. Account level<a class="headerlink" href="#4-account-level" title="Permanent link">&para;</a></h2>
+<h3 id="41-what-it-holds">4.1 What it holds<a class="headerlink" href="#41-what-it-holds" title="Permanent link">&para;</a></h3>
+<p>One row per <code>(API_CREDENTIAL_ID, INTERNAL_CUSIP, IS_PAPER_IND)</code> per bar. The credential and paper flag come off the <code>DEPLOYMENT_VID</code> of each deployment on that asset.</p>
+<ul>
+<li><code>HELD_QTY</code> — the broker holding after the fills at <code>s_k</code>: <code>POSITION_QTY</code> on the last attempt at <code>s_k</code>, plus signed <code>TRANSACTION.QUANTITY</code> of the fills that followed.</li>
+<li><code>TARGET_QTY</code> — <code>Σ TARGET_QTY</code> over the deployments' latest intents on this asset, paused ones included.</li>
+<li><code>PNL_AMT</code> — the real result in quote currency: <code>HELD_QTY × (c_{k+1} − c_k)</code> plus the fill gap, minus every fee on the asset.</li>
+</ul>
+<p><code>HELD_QTY − TARGET_QTY</code> is the <strong>position gap</strong>. It is zero when the account holds exactly what the strategies asked for.</p>
+<h3 id="42-mixed-intervals">4.2 Mixed intervals<a class="headerlink" href="#42-mixed-intervals" title="Permanent link">&para;</a></h3>
+<p>The account row uses the finest interval among the deployments on the asset. An hourly and a daily strategy on BTC give hourly account rows. For crypto the daily close is also an hourly close, so 24 hourly moves sum to the daily move exactly. The identity below is checked at the daily grain.</p>
+<h3 id="43-the-identity">4.3 The identity<a class="headerlink" href="#43-the-identity" title="Permanent link">&para;</a></h3>
+<p>For each account × asset × day:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>PNL_AMT  =  Σ strategy PnL (LIVE_RETURN × UNIT_NOTIONAL_AMT, managed and unmanaged)
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>          + fee saved by netting
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>          + REMAINDER_PNL_AMT
+</code></pre></div>
+<p><code>REMAINDER_PNL_AMT</code> is stored. It is non-zero when the account holds something no strategy asked for:</p>
+<table>
+<thead>
+<tr>
+<th>Cause</th>
+<th>Position gap looks like</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Two deployments fight without netting: B sees A's long and answers <code>HOLD</code></td>
+<td><code>HELD_QTY</code> short of <code>TARGET_QTY</code> by B's <code>QTY</code></td>
+</tr>
+<tr>
+<td>Partial fill</td>
+<td>Short of target by the unfilled part</td>
+</tr>
+<tr>
+<td>Manual trade on the account</td>
+<td>Any size, no intent behind it</td>
+</tr>
+<tr>
+<td>Dust below <code>_FLAT_EPS</code></td>
+<td>Tiny, ignorable</td>
+</tr>
+</tbody>
+</table>
+<p>A remainder past a threshold is the Phase 2.4 alert. The threshold is a <code>CONFIG</code> row; it is not in code.</p>
+<h3 id="44-ratios-on-the-account">4.4 Ratios on the account<a class="headerlink" href="#44-ratios-on-the-account" title="Permanent link">&para;</a></h3>
+<p>Account return for a day is <code>PNL_AMT / Σ UNIT_NOTIONAL_AMT</code> over the deployments managed that day. Account Sharpe on the asset comes from that daily series with <code>trading_period</code> for daily bars. A Sharpe across the whole account, all assets, needs account equity by day; balances have no history yet, so that stays out of this design.</p>
+<hr />
+<h2 id="5-tables">5. Tables<a class="headerlink" href="#5-tables" title="Permanent link">&para;</a></h2>
+<p>Both are soft-versioned like the rest of <code>TRADE</code>. A recompute that changes any value inserts the next VID and flips <code>IS_CURRENT_IND</code>. One that changes nothing is a no-op. A late <code>TRANSACTION</code> row (fill writes are best-effort) corrects its bar on the next run. Audit is <code>USER_ID</code> and <code>CREATED_AT</code>; no <code>UPDATED_AT</code>.</p>
+<h3 id="51-tradedeployment_performance-strategy-level">5.1 <code>TRADE.DEPLOYMENT_PERFORMANCE</code> — strategy level<a class="headerlink" href="#51-tradedeployment_performance-strategy-level" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DEPLOYMENT_PERFORMANCE_ID</code></td>
+<td><code>UUID</code></td>
+<td>Row identity</td>
+</tr>
+<tr>
+<td><code>DEPLOYMENT_PERFORMANCE_VID</code></td>
+<td><code>INTEGER</code></td>
+<td>Version</td>
+</tr>
+<tr>
+<td><code>DEPLOYMENT_ID</code></td>
+<td><code>UUID</code></td>
+<td>Logical deployment</td>
+</tr>
+<tr>
+<td><code>DEPLOYMENT_VID</code></td>
+<td><code>INTEGER</code></td>
+<td>Version in force at <code>s_k</code></td>
+</tr>
+<tr>
+<td><code>INTENT_ID</code></td>
+<td><code>UUID</code></td>
+<td>The intent at <code>s_k</code>; null on a bar with no intent</td>
+</tr>
+<tr>
+<td><code>TM_INTERVAL_ID</code></td>
+<td><code>INTEGER</code></td>
+<td>Bar interval, as on <code>PRICE_BAR</code></td>
+</tr>
+<tr>
+<td><code>BAR_TIMESTAMP</code></td>
+<td><code>TIMESTAMPTZ</code></td>
+<td>The bar, as on <code>PRICE_BAR</code></td>
+</tr>
+<tr>
+<td><code>IS_MANAGED_IND</code></td>
+<td><code>CHAR(1)</code></td>
+<td><code>Y</code> when the pass at <code>s_k</code> succeeded (§2)</td>
+</tr>
+<tr>
+<td><code>TARGET_POSITION</code></td>
+<td><code>NUMERIC</code></td>
+<td><code>TARGET_QTY / QTY</code></td>
+</tr>
+<tr>
+<td><code>BACKTEST_POSITION</code></td>
+<td><code>NUMERIC</code></td>
+<td>Replay position −1 / 0 / +1</td>
+</tr>
+<tr>
+<td><code>UNIT_NOTIONAL_AMT</code></td>
+<td><code>NUMERIC</code></td>
+<td><code>QTY × c_k</code> — turns returns back into quote amounts</td>
+</tr>
+<tr>
+<td><code>LIVE_RETURN</code></td>
+<td><code>NUMERIC</code></td>
+<td>Sum of the three components</td>
+</tr>
+<tr>
+<td><code>LIVE_FILL_GAP_RETURN</code></td>
+<td><code>NUMERIC</code></td>
+<td>Fill gap component</td>
+</tr>
+<tr>
+<td><code>LIVE_FEE_RETURN</code></td>
+<td><code>NUMERIC</code></td>
+<td>Fee component</td>
+</tr>
+<tr>
+<td><code>BACKTEST_RETURN</code></td>
+<td><code>NUMERIC</code></td>
+<td>Replay <code>pnl</code></td>
+</tr>
+</tbody>
+</table>
+<p>One current row per <code>(DEPLOYMENT_ID, TM_INTERVAL_ID, BAR_TIMESTAMP)</code>. For a daily deployment that key is the trade date Phase 2.2 names.</p>
+<h3 id="52-tradeaccount_performance-account-level">5.2 <code>TRADE.ACCOUNT_PERFORMANCE</code> — account level<a class="headerlink" href="#52-tradeaccount_performance-account-level" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ACCOUNT_PERFORMANCE_ID</code></td>
+<td><code>UUID</code></td>
+<td>Row identity</td>
+</tr>
+<tr>
+<td><code>ACCOUNT_PERFORMANCE_VID</code></td>
+<td><code>INTEGER</code></td>
+<td>Version</td>
+</tr>
+<tr>
+<td><code>API_CREDENTIAL_ID</code></td>
+<td><code>INTEGER</code></td>
+<td>Account</td>
+</tr>
+<tr>
+<td><code>INTERNAL_CUSIP</code></td>
+<td><code>TEXT</code></td>
+<td>Instrument</td>
+</tr>
+<tr>
+<td><code>IS_PAPER_IND</code></td>
+<td><code>CHAR(1)</code></td>
+<td>Paper or live</td>
+</tr>
+<tr>
+<td><code>TM_INTERVAL_ID</code></td>
+<td><code>INTEGER</code></td>
+<td>Finest interval on the asset (§4.2)</td>
+</tr>
+<tr>
+<td><code>BAR_TIMESTAMP</code></td>
+<td><code>TIMESTAMPTZ</code></td>
+<td>The bar</td>
+</tr>
+<tr>
+<td><code>HELD_QTY</code></td>
+<td><code>NUMERIC</code></td>
+<td>Broker holding (§4.1)</td>
+</tr>
+<tr>
+<td><code>TARGET_QTY</code></td>
+<td><code>NUMERIC</code></td>
+<td>Sum of strategy targets</td>
+</tr>
+<tr>
+<td><code>CLOSE_PX</code></td>
+<td><code>NUMERIC</code></td>
+<td><code>c_{k+1}</code>, so notional is <code>HELD_QTY × CLOSE_PX</code> without a join</td>
+</tr>
+<tr>
+<td><code>PNL_AMT</code></td>
+<td><code>NUMERIC</code></td>
+<td>Real result in quote</td>
+</tr>
+<tr>
+<td><code>FEE_AMT</code></td>
+<td><code>NUMERIC</code></td>
+<td>Fees charged in quote</td>
+</tr>
+<tr>
+<td><code>REMAINDER_PNL_AMT</code></td>
+<td><code>NUMERIC</code></td>
+<td>§4.3 remainder</td>
+</tr>
+</tbody>
+</table>
+<p>One current row per <code>(API_CREDENTIAL_ID, INTERNAL_CUSIP, IS_PAPER_IND, TM_INTERVAL_ID, BAR_TIMESTAMP)</code>.</p>
+<h3 id="53-procedures">5.3 Procedures<a class="headerlink" href="#53-procedures" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>TRADE.SP_INS_DEPLOYMENT_PERFORMANCE</code> and <code>TRADE.SP_INS_ACCOUNT_PERFORMANCE</code> each take a batch of bars and apply the insert, version, or no-op rule per key.</li>
+<li><code>TRADE.SP_GET_DEPLOYMENT_PERFORMANCE</code> and <code>TRADE.SP_GET_ACCOUNT_PERFORMANCE</code> return current rows in a time range, scoped by <code>APP_USER_ID</code> like <code>SP_GET_TRANSACTION</code>. The chart reads only these.</li>
+</ul>
+<p>Each logs with <code>V_LOG_START TIMESTAMPTZ := clock_timestamp();</code>. The release is a new <code>trade</code> changeset with context <code>trade</code> alone; adding <code>prod-deploy</code> is a separate decision.</p>
+<h3 id="54-snapshot-table-vs-materialized-view-open-decision-3">5.4 Snapshot table vs materialized view (open decision #3)<a class="headerlink" href="#54-snapshot-table-vs-materialized-view-open-decision-3" title="Permanent link">&para;</a></h3>
+<p><strong>Snapshot tables.</strong> A materialized view would rescan <code>INTENT</code>, <code>EXECUTION_EVENT</code>, <code>TRANSACTION</code>, and <code>PRICE_BAR</code> on every refresh, and it cannot hold the backtest replay, which is Python. The tables are written incrementally, version their corrections, and the chart reads them with no joins.</p>
+<hr />
+<h2 id="6-the-job-phase-22">6. The job (Phase 2.2)<a class="headerlink" href="#6-the-job-phase-22" title="Permanent link">&para;</a></h2>
+<p>Runs once a day on the trade host's cron (decision #35), after the daily <code>23:55 UTC</code> slot has settled.</p>
+<ol>
+<li>For each deployment with rows to write (enabled, or disabled with a non-zero last target), read the last current <code>BAR_TIMESTAMP</code>. Start one bar before it so a late fill on that bar is picked up.</li>
+<li>Read intents, attempts, fills, and <code>DEPLOYMENT</code> versions from that time forward, and <code>PRICE_BAR</code> closes plus warmup for the range.</li>
+<li>Classify each bar per §2, compute §3.1, replay §3.2, and write strategy rows.</li>
+<li>Group the deployments by account × asset, compute §4 from the same reads plus the strategy rows just written, and write account rows.</li>
+</ol>
+<p>Each run reads only the bars since the last row, which meets the Phase 2.1 task of avoiding a full scan. The job writes no orders and needs no broker credentials.</p>
+<hr />
+<h2 id="7-ui-phase-23">7. UI (Phase 2.3)<a class="headerlink" href="#7-ui-phase-23" title="Permanent link">&para;</a></h2>
+<h3 id="71-open-position-and-notional">7.1 Open position and notional<a class="headerlink" href="#71-open-position-and-notional" title="Permanent link">&para;</a></h3>
+<p>The Trade page shows what is open now, at both levels:</p>
+<table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Quantity</th>
+<th>Notional</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Each deployment</td>
+<td>Latest <code>INTENT.TARGET_QTY</code></td>
+<td><code>TARGET_QTY × mark</code></td>
+<td><code>SP_GET_INTENT</code></td>
+</tr>
+<tr>
+<td>Account × asset</td>
+<td>Broker holding</td>
+<td><code>HELD × mark</code></td>
+<td><code>GET /api/v1/trade/accounts/{id}/snapshot</code></td>
+</tr>
+<tr>
+<td>Position gap</td>
+<td>Holding − Σ targets</td>
+<td>Gap × mark</td>
+<td>Derived; highlighted when non-zero</td>
+</tr>
+</tbody>
+</table>
+<p>The mark is the snapshot's <code>mark_price</code>, or the latest <code>PRICE_BAR</code> close when the venue returns none. Unrealized PnL per deployment is its <code>DEPLOYMENT_PERFORMANCE</code> return since the target last changed, times <code>UNIT_NOTIONAL_AMT</code>.</p>
+<h3 id="72-performance">7.2 Performance<a class="headerlink" href="#72-performance" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Cumulative return</strong>, live and backtest, per deployment over managed bars. Unmanaged stretches are shaded.</li>
+<li><strong>Sharpe</strong>, live and replay, over managed bars only, annualised with the interval's <code>trading_period</code> the same way <code>Performance</code> does it. Below <code>MIN_METRIC_OBS</code> (60) managed bars it reads "insufficient data", the same floor the backtest uses. Seven days of rows (the Phase 2.3 exit criterion) show the return chart; Sharpe arrives at bar 60.</li>
+<li><strong>Account × asset</strong>: daily PnL, account Sharpe (§4.4), and the remainder with its cause when one is identifiable.</li>
+<li><strong>Drift breakdown</strong>: summed fill gap, fee, and position difference, so a user sees <em>where</em> live fell behind.</li>
+<li><strong>Last reconcile</strong> timestamp from the newest <code>CREATED_AT</code>, with the stale warning past 36 hours.</li>
+<li>Paper deployments (<code>IS_PAPER_IND</code>) are labelled and kept out of any live total.</li>
+</ul>
+<p>Managed bars on either side of a pause are joined into one series. That is correct for the strategy's per-bar distribution; the shading keeps the gap visible.</p>
+<hr />
+<h2 id="8-gaps-to-close-before-building">8. Gaps to close before building<a class="headerlink" href="#8-gaps-to-close-before-building" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>Where</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Snapshot tables not built</td>
+<td><code>TRADE.INTENT</code> records each strategy's target (trade <code>1.10.0</code>)</td>
+<td><code>DEPLOYMENT_PERFORMANCE</code> and <code>ACCOUNT_PERFORMANCE</code> in this page are still proposed</td>
+</tr>
+<tr>
+<td>Fee currency is dropped</td>
+<td><code>_extract_fee</code> in <code>quant/trade/brokers/ccxt/confirm.py</code> keeps <code>fee.cost</code> and discards <code>fee.currency</code>. Bybit spot charges a buy fee in the base coin and a sell fee in the quote, so <code>FEE_AMT</code> mixes units.</td>
+<td>Record the fee currency on <code>TRADE.TRANSACTION</code> and convert base fees at the fill price</td>
+</tr>
+<tr>
+<td>Reads have no time filter</td>
+<td><code>SP_GET_TRANSACTION</code> and <code>SP_GET_EXECUTION_EVENT</code> return the newest <code>IN_LIMIT</code> rows</td>
+<td>Add a from-timestamp parameter to those two procedures</td>
+</tr>
+<tr>
+<td>Spot holdings missing from the snapshot positions</td>
+<td><code>fetch_open_positions</code> lists contracts; a spot holding appears only as a balance, with no mark or notional</td>
+<td>Add spot holdings as position rows, read from the base balance the way <code>fetch_position_qty</code> already does for spot</td>
+</tr>
+<tr>
+<td>Fill ↔ attempt link</td>
+<td><code>TRANSACTION</code> joins to <code>EXECUTION_EVENT</code> only by <code>VENDOR_ORDER_ID</code></td>
+<td>Sufficient for ccxt; confirm Futu fills carry the same id</td>
+</tr>
+<tr>
+<td>Funding</td>
+<td>No perp deployment yet</td>
+<td>Add a funding column when the first <code>ISSUE_TYPE = future</code> deployment goes live</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../plan-to-profit/">Plan to profit</a> — Phase 2 tasks and exit criteria</li>
+<li><a href="../multi-strategy-netting/">Multi-strategy netting</a> — <code>TRADE.INTENT</code>, and the order side that comes later</li>
+<li><a href="../scheduler-trade-open-questions/#5-stuck-deployment-bad-config-permanent-broker-error">Scheduler &amp; trade open questions</a> — auto-pause and why it does not flatten</li>
+<li><a href="../../decisions/">Decisions</a> — #35, #45, #70, #79, #81, #90</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>

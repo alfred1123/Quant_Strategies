@@ -1,0 +1,3743 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/research/japanese-korean-sources/">
+      
+      
+        <link rel="prev" href="../merge-vs-distinct-candidates/">
+      
+      
+        <link rel="next" href="../feature-worthy-strategies/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Japanese and Korean crypto strategy sources - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#japanese-and-korean-crypto-strategy-sources" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Japanese and Korean crypto strategy sources
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../design/" class="md-tabs__link">
+          
+  
+  
+  Platform design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Strategy research
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../archive/" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/prod-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/coding-standards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding Standards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/plan-to-profit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/deployment-performance-reconcile/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Performance Reconcile
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/best-vid-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/ccxt-bar-timezones/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Bar Timezones & Apply Timing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/market-data-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/db-connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-29-queue-frontend-aids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue screen aids (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/glassnode-market-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glassnode market data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-25-backtest-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest review (2026-09-25)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-25-backtest-data-hygiene-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest data hygiene (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-26-fractional-sizing-stateful-exits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fractional sizing and stateful exits (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-26-code-quality-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code quality review (2026-09-26)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-27-algodaemon-bug-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AlgoDaemon bug report (2026-09-27)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-27-bug-verification-round3-4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bug verification, rounds 3–4 (2026-09-27)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-29-long-term-fixes-b1-rangeparam-datacolumn/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Long-term fixes — B1, window bounds, data columns, repeated trials (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-29-dependency-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency and OOP review (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy research
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Strategy research
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crypto-spot-baseline-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crypto spot — baseline improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sharpe-ideas-index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharpe ideas — where to start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../momentum-reversal-filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum, reversal, and filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../catching-crypto-trends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catching crypto trends
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../volatility-and-cross-section/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Volatility and the cross-section
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../funding-basis-carry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Funding, basis, and carry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../microstructure-onchain-unusual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Microstructure, on-chain, and unusual
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../polyu-quant-course-methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods from the PolyU quantitative trading course
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dutch-algotrading-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dutch Algotrading Patreon review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../chinshum-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chin Shum Patreon review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../merge-vs-distinct-candidates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which candidates to merge vs run as separate sleeves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Japanese and Korean crypto strategy sources
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Japanese and Korean crypto strategy sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#ranked-ideas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked ideas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hand-offs-sent-to-the-researcher" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hand-offs sent to the researcher
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hand-offs sent to the researcher">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#btc-regime-gate-for-eth-and-bnb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BTC-regime gate for ETH and BNB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hourly-re-run-of-daily-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hourly re-run of daily rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#korean-volatility-breakout-replications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Korean volatility-breakout replications
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#paid-communities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Paid communities
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../feature-worthy-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategies worth new platform features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy-persistence-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy persistence validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../risk-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Risk control for the three sleeves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/live-order-execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/return-compounding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Return Compounding (bug)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/infra-capacity-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure Capacity Review (2026-09)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer (abandoned)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#ranked-ideas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked ideas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hand-offs-sent-to-the-researcher" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hand-offs sent to the researcher
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hand-offs sent to the researcher">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#btc-regime-gate-for-eth-and-bnb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BTC-regime gate for ETH and BNB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hourly-re-run-of-daily-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hourly re-run of daily rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#korean-volatility-breakout-replications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Korean volatility-breakout replications
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#paid-communities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Paid communities
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="japanese-and-korean-crypto-strategy-sources">Japanese and Korean crypto strategy sources<a class="headerlink" href="#japanese-and-korean-crypto-strategy-sources" title="Permanent link">&para;</a></h1>
+<p><strong>Doc type:</strong> strategy research<br />
+<strong>Status:</strong> Two hand-off specs have been sent to the AlgoDaemon Quant Researcher; platform results pending.</p>
+<p>Public Japanese and Korean pages describe a few rules that English trend write-ups tend to skip: a Bitcoin moving-average regime used as a switch for altcoins, a kimchi-premium overheat level, funding and Nasdaq state for crash entries, and a habit of not trusting the 00:00 UTC daily close. This note ranks those ideas for AlgoDaemon. The target book is Bybit spot BTC, ETH, and BNB, 10 bps, daily bars preferred and hourly allowed, a position in {−1, 0, +1}, stateless signals, and the indicators the engine already has (SMA, EMA, RSI, Bollinger z-score, stochastic). A second factor may be a <code>FILTER</code> gate. The compilation used public pages only. Nothing was signed up for, joined, or bought, and no backtest was run for this page.</p>
+<p>Plain moving-average crosses and Donchian trend-following show up often in these sources. They are not re-ranked here. That family is already queued on <a href="../catching-crypto-trends/">Catching crypto trends</a>, <a href="../polyu-quant-course-methods/">Methods from the PolyU quantitative trading course</a>, and the <a href="../dutch-algotrading-review/">Dutch Algotrading Patreon review</a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Figures below are the authors' claims</p>
+<p>Every performance number on this page is the author's own claim, or a figure printed on the public page named with it, for the period and market that page states. They have not been reproduced here. Do not read them as AlgoDaemon results or as expected live performance.</p>
+</div>
+<p>Tags mean the following. <strong>Testable now</strong> can run on AlgoDaemon as it stands, and the rule is specific enough to enqueue. <strong>Needs backend</strong> names a missing capability (fractional size, a calendar feature, an intraday stop, a stateful exit). <strong>Needs external data</strong> names a series this book does not store. The order is a judgement of the Sharpe benefit expected for BTC, ETH, and BNB daily. It is not a measured ranking.</p>
+<h2 id="ranked-ideas">Ranked ideas<a class="headerlink" href="#ranked-ideas" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Rank</th>
+<th>Idea</th>
+<th>Source</th>
+<th>Tag</th>
+<th>Rule, in one line</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Volatility-targeted "super uptrend"</td>
+<td><a href="https://tenmillionquant.tistory.com/34">TenMillionQuant</a>, from Kang Hwan-guk (KR)</td>
+<td>Needs backend</td>
+<td>Long only while close is above SMA(3), SMA(5), SMA(10), and SMA(20). Size is at most 1, and at most 2% divided by a 5-day average of (previous high − previous low) / open.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>BTC-regime gate for alts</td>
+<td><a href="https://www.busan.com/view/busan/view.php?code=2025060213362646803">Busan Ilbo interview</a> with Kang Hwan-guk (KR)</td>
+<td>Testable now, if the gate can read BTC closes while the trade is ETH or BNB. Otherwise needs a small backend change.</td>
+<td><code>FILTER</code> the alt's own trend with BTC close above its 120-day average.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Kimchi-premium regime</td>
+<td>Kang's overheat list, plus <a href="https://capitalnoted.com/is-the-korean-kimchi-premium-still-front-running-bitcoin-price/">Capital Noted</a> (EN, on Korean data)</td>
+<td>Needs external data</td>
+<td>Flat when the Upbit premium is at least 10%. Optionally allow a new long only after the premium has recently crossed up through zero.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Nasdaq "risk-on" plus a funding state, for BTC crash-buys</td>
+<td><a href="https://qiita.com/tikeda123/items/c38b1dbc85d02f99c32c">tikeda123 on Qiita</a> (JP)</td>
+<td>Needs external data</td>
+<td>Buy a crash only when the Nasdaq 5-day return is positive. Skip the buy when funding is in its top fifth and that Nasdaq return is negative.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Funding-rate contrarian</td>
+<td><a href="https://note.com/ryo_bitbank/n/ndd379b02ace0">りょうP on note</a> (JP)</td>
+<td>Needs external data, and a stateful exit</td>
+<td>Long when funding is negative. Flat once funding reaches +0.01%.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Noise-ratio chop filter, in a close-only form</td>
+<td><a href="https://tenmillionquant.tistory.com/44">TenMillionQuant</a>, from the same Kang book (KR)</td>
+<td>Testable now</td>
+<td><code>FILTER</code> a trend rule with RSI(N) at or above 50 × (1 + e), so the book only trades when directional efficiency is high.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Anchor-free daily rules</td>
+<td><a href="http://coinpick.com/daily_quant/14308">퀀트픽</a> (KR) and a <a href="https://qiita.com/pip_pip_pip_p/items/839b90222ae7cc969422">Qiita shifted-bar note</a> (JP)</td>
+<td>Testable now, on hourly bars</td>
+<td>Re-run a daily rule on 1-hour closes with every window multiplied by 24, so the result does not depend on the 00:00 UTC close.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Weekday and month seasonality</td>
+<td><a href="https://www.moneypartners.co.jp/mplab/column/column_bitcoin-weekday-anomaly.html">Money Partners</a> (JP) and a <a href="https://firelife.tistory.com/50">Kang seasonality summary</a> (KR)</td>
+<td>Needs backend</td>
+<td>Flat on Thursdays, or a long bias only from November through April.</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Larry Williams volatility breakout, Korean variants</td>
+<td><a href="https://wikidocs.net/book/1665">WikiDocs Bitcoin autotrade</a> and many Upbit bots (KR)</td>
+<td>Needs backend</td>
+<td>Buy when price reaches today's open plus k times the previous high-low range. Sell at the next open. Often only if the open is above a short average.</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Opening-range breakout ("Doten-kun")</td>
+<td><a href="https://note.com/uki_profit/n/nad33f21ede74">UKI</a>, rule checked by <a href="https://nehori.com/nikki/2022/02/13/post-38010/">nehori</a> (JP)</td>
+<td>Needs backend</td>
+<td>On 2-hour bars, go long the next bar when high − open is at least 1.6 times the average range of the last five bars. Reverse on the opposite signal.</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Heikin-Ashi as momentum that drops the last day, plus a one-day reversal</td>
+<td><a href="https://note.com/btcml/n/n6198a3714fe5">richmanbtc</a> (JP)</td>
+<td>Testable now as an approximation. Overlaps the queued dip family.</td>
+<td>Long when a short momentum measure that excludes today is positive and today was down.</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Minute-of-hour reversal</td>
+<td><a href="https://note.com/hht/n/nc0caf98477db">Hoheto</a> (JP)</td>
+<td>Not applicable</td>
+<td>At one minute past the hour, fade the prior five-minute move and exit after about half an hour. Needs minute data.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>How to read the top of the list.</strong></p>
+<p>Rank 1 is evidence for sizing, not a new signal. The stateless piece is short-horizon trend-following: long when close is above the highest of SMA(3), SMA(5), SMA(10), and SMA(20), otherwise flat. With only two conditions that is approximately <code>FILTER(close &gt; SMA(3), close &gt; SMA(20))</code>. The reported drawdown is low because a fixed 2% daily-range target often leaves BTC only partly invested. Fractional weights and a volatility scale are <a href="../../design/2026-09-26-fractional-sizing-stateful-exits/#proposal-a-fractional-weights">Proposal A</a> and <a href="../../design/2026-09-26-fractional-sizing-stateful-exits/#proposal-b-an-average-then-a-volatility-weight">Proposal B</a> of the <a href="https://github.com/alfred1123/Quant_Strategies/pull/63">backend proposal merged in PR #63</a>. TenMillionQuant, replicating Kang's book on Bithumb BTC from January 2014 to March 2022 at a 0.2% cost, claims a cumulative 169× against about 70× for buy and hold, with a maximum drawdown of −16.7%. That test is one coin and in sample. The same author's replications of the breakout variants were large losses; those are in <a href="#korean-volatility-breakout-replications">Korean volatility-breakout replications</a>. A related Excel book from SugangLive (noise-scaled breakout, a moving-average score, and volatility sizing, on BTC, ETH, XRP, DOGE, and LTC, January 2017 to January 2022, cost 0.2%) claims a portfolio return of 31093% and a maximum drawdown of −0.0819292. SugangLive's version of the range target is 5%, not 2%.</p>
+<p>Rank 2 is the idea worth a platform run. Kang's public statement of the rule is that a cross above the 120-day average is an uptrend, a cross below it is a downtrend, and alts should be sold together with Bitcoin when Bitcoin falls under that average. A dual-momentum variant in a book summary holds the top three of the top twenty alts by one-week return, one third each, and only on Tuesdays when BTC is above the 120-day average; otherwise cash. That sleeve is cross-sectional, so this engine cannot run it. The public pages give no numeric results, only that the return is good. The book's tables are paywalled, and 120 days was likely chosen in sample. The spec that was sent is <a href="#btc-regime-gate-for-eth-and-bnb">below</a>.</p>
+<p>Rank 3 needs a Korean premium series. Capital Noted, on 2025 data only, claims that zero-crossings from a discount to a premium were followed by an average return of +1.7% after seven days and +6.2% after thirty days, with win rates of 67% and 70%. The same note says the correlation between the premium's level and forward returns is slightly negative, about −0.06, and that Coinbase-premium flips lead to roughly flat returns. That is one year and a small number of crossings. The 10% "overheat" level shows up in manias (2017–18, 2021, and October 2025, when a 52-week Upbit Data Lab range ran from 8.08% to −3.29%). A 90-day mean on KIMP Radar for 17 June 2026 to 14 September 2026 was −0.018%, so the premium is usually near zero and the extreme gate almost never fires. A Korean academic paper finds the premium mean-reverts with the exchange rate (Upbit versus Binance, 26 September 2017 to 6 April 2023). That is an arbitrage result, not a direction. Usable inputs, once someone loads them, are Upbit's public daily candles for KRW-BTC (from October 2017) and KRW-USDT, or FRED dollar-won (<code>DEXKOUS</code>) with a forward-fill, against a USDT close. Upbit Data Lab's own premium series starts only on 19 June 2024. CryptoQuant's longer Korea Premium Index is a paid API. The rule to test after the data exists is an exit overlay <code>gate = premium &lt; 10%</code>, swept at 5%, 8%, 10%, and 15%, on the existing trend rules, and optionally an entry that requires a cross up through zero within the last 5, 10, or 20 days.</p>
+<p>Rank 4 is an event study, gross of costs, on 4-hour bars from May 2017 to June 2026. The author calls a crash a 4-hour return below its rolling 180-bar mean minus two standard deviations, enters at the next 4-hour open, and exits after 24 or 48 hours with a 24-hour cooldown. Author's claims: all crashes, held 48 hours, average +0.603%, profit factor 1.368, n = 201; the risk-on subset, +1.431%, profit factor 2.375, t-statistic 3.024, n = 88; funding in its top fifth and Nasdaq down over five days, held 24 hours, −0.242%, profit factor 0.837, n = 26. The author also says the interaction term is not statistically significant. The headline cell is small (n = 15 in the write-up's tightest cut), and 2022 contributes n = 4. A daily translation, if a second factor could read an external close, would be <code>FILTER</code> of a queued dip rule with Nasdaq close above its close five days earlier. Nasdaq daily (<code>NASDAQCOM</code> on FRED) and Bybit funding history are both free. Neither is wired in.</p>
+<p>Rank 5, on Binance USD-M hourly bars, long only, full size, 0.06% per side: enter when funding is negative (lagged one bar) and exit when funding reaches +0.01%. The author's claim for ETH/USDT from December 2020 to December 2025 is 75 trades and a total return of 399.09%. Other coins in the same note: SOL 123.29%, AVAX −31.45%, DOGE −32.66%. There is no buy-and-hold number and no Sharpe. The author describes the book as close to holding. The entry and exit thresholds differ, so a faithful port is stateful. A stateless stand-in, long while an 8-hour average of funding is below a threshold, still needs the funding series.</p>
+<p>Rank 6 is a filter on trend rules, not a new return. The book's noise ratio is 1 minus the absolute open-to-close move divided by the high-low range, averaged over 20 days, and the book uses that average as the breakout coefficient. The stated logic is that low noise means the bar is trending and high noise means it is prone to reverse. The original needs intraday open, high, and low. A close-only translation, derived for this note and not claimed by the author: Kaufman's efficiency ratio over N bars equals the absolute value of 2 × RSI/100 − 1 when RSI is a simple average of up and down moves, so RSI(N) at or above 50 × (1 + e) means up-direction efficiency of at least e. Wilder's RSI is the same idea with an exponential weight. The two public replications of the original disagree: TenMillionQuant's noise-scaled breakout plus a moving-average score, on BTC, LTC, ETC, and XRP, Bithumb from June 2017 to March 2022 at 0.2% cost, printed a return of −48.69878948390697 and a maximum drawdown of −69.87742425708808; SugangLive's Excel version of a similar rule is the 31093% portfolio above. This row was not sent as its own sweep. Drop it if the queue already gates trend entries on RSI.</p>
+<p>Rank 7 is the second spec that was sent. See <a href="#hourly-re-run-of-daily-rules">Hourly re-run of daily rules</a>. The Korean post moved a volatility-breakout anchor to 10:00 Korea time. On a short sample from 1 January 2019 to 10 November 2020, with a 0.5% round trip, the author claims an annual compound return of 80.55% and a maximum drawdown of −16.87% on BTC, and an annual compound return of 140% with a maximum drawdown under 15% on ETH. Those figures are anchor-optimised, the sample is short, and the author sells a program. The Qiita note built 24 hour-shifted daily bars and reports that the same Heikin-Ashi rule stops working on a bar shifted by 12 hours. The author's suggestion is that technical rules work on the standard daily close because that is the close everyone watches. That cuts both ways: the 00:00 UTC edge may be real microstructure, and a daily Sharpe may be partly luck of the anchor. Clock-time effects already on this wiki are in <a href="../microstructure-onchain-unusual/#2-clock-time-bursts-and-order-book-features">Microstructure, on-chain, and unusual</a>.</p>
+<p>Rank 8, from a broker column on Dukascopy BTC/USD daily open-to-close returns, 1 January 2021 to 31 December 2025: Monday 0.19%, Tuesday 0.04%, Wednesday 0.44%, Thursday −0.18%, Friday 0.02%, Saturday 0.07%, Sunday 0.18%. The column calls Wednesday a consistent rise and Thursday a consistent fall. Five years, no significance test, and a marketing page. Kang's seasonality chapter, via a public summary, says Bitcoin is mostly strong from November through April and weak from May through October. A month effect has about ten independent observations per calendar month. A day-of-week or month feature does not exist on the engine. If it is added, "flat on Thursday (UTC)" is a cheap overlay on a queued trend rule and a high multiple-testing risk.</p>
+<p>Rank 10 is one month of leveraged profit on bitFlyer BTC-FX in March–April 2018: the author's claim is 20 million yen to 100 million yen in about a month. A later port of the same shape to Japanese stocks, 2000–2022, printed a profit factor of 1.09 and an average annual return of 6.47%. That is a different market, so it is not evidence for BTC. The rule needs high, low, and a stop-and-reverse. A close-only cousin, a short-window Bollinger z-score above about 1.5, is just short-term momentum.</p>
+<p>Rank 11 has charts and no costs. A follow-up says the rule worked reasonably well through the first half of 2021 and fails when the daily bar is shifted by 12 hours. A long-only approximation is <code>FILTER(RSI(2) below 30, 40, or 50, with EMA(3) above EMA(10))</code>. That overlaps the dip rules already queued from the PolyU notes, so it was not sent as a separate hand-off.</p>
+<p>Rank 12 is minute data and a hold of about 28–30 minutes, strongest at 09:00 Japan time, which is 00:00 UTC. The sample is one-minute BitMEX index data from July 2019 to June 2020, charts only, gross of costs. The author says implementing the published strategy on its own will not make money, because of costs and hourly turnover. The only takeaway for this book is that the 00:00 UTC daily close is a real microstructure event. Korean volatility-breakout bots sell just before 09:00 Korea time and buy after it, and Upbit's daily candle resets at 00:00 UTC, which is a plausible source of that print.</p>
+<h2 id="hand-offs-sent-to-the-researcher">Hand-offs sent to the researcher<a class="headerlink" href="#hand-offs-sent-to-the-researcher" title="Permanent link">&para;</a></h2>
+<p>Two specs were sent. Both avoid a plain trend cross and the RSI or Bollinger dip family already in the queue. The other ideas above need a series or a backend this engine does not have. Rank 6 is testable and was not part of the send: it is a quality filter on rules the queue already has.</p>
+<h3 id="btc-regime-gate-for-eth-and-bnb">BTC-regime gate for ETH and BNB<a class="headerlink" href="#btc-regime-gate-for-eth-and-bnb" title="Permanent link">&para;</a></h3>
+<p>From Kang Hwan-guk's 120-day Bitcoin average, rank 2.</p>
+<p><strong>Hypothesis.</strong> Alt drawdowns are driven by the Bitcoin regime. Gating ETH and BNB on Bitcoin's trend should cut whipsaw that belongs to the alt, and should cut deep alt drawdowns, more cleanly than the alt's own trend does.</p>
+<p><strong>Prerequisite.</strong> The gate has to read BTCUSDT closes while the traded symbol is ETHUSDT or BNBUSDT. If a second factor can only see the traded symbol, this needs one backend change, a cross-symbol close, and it should not be forced into a same-symbol stand-in.</p>
+<p><strong>Variants.</strong> Daily bars, long only, positions in {0, +1}, 10 bps per side.</p>
+<ul>
+<li>V0, the published rule with no extra filter: ETH or BNB is long when BTC close is above SMA(BTC close, L_btc), and flat otherwise.</li>
+<li>V1, the gate on the alt's own trend: <code>FILTER(primary = own close &gt; SMA(own close, L_own), gate = BTC close &gt; SMA(BTC close, L_btc))</code>.</li>
+<li>V2, the same gate on a dip rule already in the queue: <code>FILTER(primary = the queued ETH or BNB dip, gate = BTC close &gt; SMA(BTC close, L_btc))</code>.</li>
+</ul>
+<p><strong>Sweep.</strong> L_btc in {60, 90, 120, 150, 200}. 120 is the author's value. Repeat the same lengths with an EMA. L_own in {20, 50, 100, 120, 200}.</p>
+<p><strong>Benchmarks.</strong> ETH and BNB buy and hold. The own-asset rule close &gt; SMA(close, 120). V1 with the gate removed.</p>
+<p><strong>What would count as a success.</strong> V1 Sharpe at least 0.1 above the own-trend Sharpe, with a lower maximum drawdown, on both ETH and BNB. The result has to hold across L_btc from 90 to 150, not at a single length. Split the sample into 2018–2021 and 2022–2026.</p>
+<p><strong>Watch.</strong> BNB's Bybit spot history is shorter than BTC and ETH; check the listing date before reading a long window. BTC and ETH are highly correlated, so the gain may be small on ETH and larger on BNB.</p>
+<p>A separate, already-run question — whether the z-score form of a BTC gate is the same strategy as several other trend candidates — is on <a href="../merge-vs-distinct-candidates/">Which candidate strategies to merge vs run as separate sleeves</a>. That page's merged rule is a Bollinger threshold, not this SMA(120) gate. Do not treat the two as the same sweep.</p>
+<h3 id="hourly-re-run-of-daily-rules">Hourly re-run of daily rules<a class="headerlink" href="#hourly-re-run-of-daily-rules" title="Permanent link">&para;</a></h3>
+<p>From the Korean practice of spreading a daily signal across bar anchors, and from the Japanese check that a shifted daily bar can erase a rule. Rank 7.</p>
+<p><strong>Hypothesis.</strong> A daily rule's Sharpe on 00:00 UTC bars includes luck of the anchor. Running the same rule on 1-hour closes, with every window multiplied by 24, does not depend on that anchor. It shows whether the edge is the rule or the clock.</p>
+<p><strong>Test.</strong> Hourly bars, 10 bps. For each daily rule R(L) already queued, for example close above SMA(L), or a fast EMA above a slow EMA, run the same rule with every window times 24. An SMA of 50 daily closes becomes an SMA of 1,200 hourly closes. EMA(12) and EMA(26) become EMA(288) and EMA(624).</p>
+<p>Turnover on an hourly signal can be high. Without a stateful hold, keep it in check with a slower gate: <code>FILTER(close &gt; SMA(24 × L), close &gt; SMA(24 × L_slow))</code>, with L_slow in {1.5 L, 2 L}. Report turnover and the fees paid, not only Sharpe.</p>
+<p>Compare Sharpe, maximum drawdown, turnover, and fee drag with the daily rule R(L).</p>
+<p><strong>Sweep.</strong> L is whatever daily length is already queued for that rule. The slow-gate multiplier is 1.0 (no extra gate), 1.5, or 2.0.</p>
+<p><strong>How to read it.</strong> Hourly Sharpe close to the daily Sharpe means the edge survives the anchor, and the hourly form can be used to diversify anchors. Hourly Sharpe clearly worse, before fees, means part of the daily edge is the 00:00 UTC print. Keep the daily bars, and treat the daily Sharpe as optimistic.</p>
+<p>Shifting the daily anchor itself (06:00, 12:00, and 18:00 UTC, against 00:00) would be a cleaner four-way comparison. That is a small backend item. It is not required for the hourly check.</p>
+<h2 id="korean-volatility-breakout-replications">Korean volatility-breakout replications<a class="headerlink" href="#korean-volatility-breakout-replications" title="Permanent link">&para;</a></h2>
+<p>The volatility breakout is the workhorse of Korean retail crypto bots, and the public replications are the reason it stays low on the list. The shape is Larry Williams: today's target is the open plus a coefficient times the previous day's high-low range; buy if price trades through the target during the day; sell at the next day's open. On Upbit that open is 09:00 Korea time, which is 00:00 UTC. Common filters are an open above a 5-day average (the WikiDocs book), price above a 15-day average (a widely copied Upbit bot), a coefficient set to the 20-day average noise ratio, and a moving-average score used as a size. The engine cannot express an intraday stop at <code>open + k × range</code>, and it cannot see that range from close-only SMA, EMA, RSI, Bollinger, or stochastic. On hourly bars the same rule would also need the session's open and the previous day's range as features.</p>
+<p>Author's claims, none of them reproduced here:</p>
+<table>
+<thead>
+<tr>
+<th>Replication</th>
+<th>Sample and cost, as stated</th>
+<th>What the author printed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://wellsw.tistory.com/132">wellsw</a>, best coefficient per coin on Upbit</td>
+<td>About the last 200 days into December 2021. Fees plus slippage 0.3%.</td>
+<td>KRW-BTC at k = 0.30: period return 1.30×, maximum drawdown 14.06%, buy-and-hold 1.31×. ETH: period return 1.26× against 1.51× for holding. No better than holding BTC, and worse than holding ETH.</td>
+</tr>
+<tr>
+<td><a href="https://tenmillionquant.tistory.com/41">TenMillionQuant</a>, the book's uptrend-plus-breakout-plus-vol-sizing recipe</td>
+<td>BTC, LTC, ETC, and XRP on Bithumb, June 2017 to March 2022, cost 0.2%.</td>
+<td>Return −79.82112310880937, maximum drawdown −79.90856361952895.</td>
+</tr>
+<tr>
+<td>mintchoco-jelly, Upbit BTC, K = 0.5</td>
+<td>1,000 days. <strong>No fees.</strong></td>
+<td>Cumulative return 5.767873637615697, maximum drawdown 26.98.</td>
+</tr>
+</tbody>
+</table>
+<p>Two independent replications show either no edge or a large loss. The no-fee result does not survive a strategy that can trade every day: two sides at this platform's 10 bps is 20 bps on a trade day, and many of the published tests ignore that. Coefficients are also chosen per coin, on the same sample that is reported. The rule is tied to the 09:00 Korea open and to Upbit's retail flow, which is not Bybit's daily close. Low priority even after an intraday stop exists.</p>
+<p>The noise-scaled variant of the same breakout is the contradictory pair in rank 6: one replication lost about half the capital, and another Excel sheet printed a five-digit percentage. That disagreement is another reason not to promote the family on a headline.</p>
+<h2 id="paid-communities">Paid communities<a class="headerlink" href="#paid-communities" title="Permanent link">&para;</a></h2>
+<p>Of the paid Japanese and Korean products surveyed for this note, only Kang Hwan-guk's books are worth considering. The useful pair is <em>Bitcoin: Ride the Explosive Rise</em> (2024) and <em>The Magic Formula for Cryptocurrency Investment</em> (2018). They are where the 120-day gate, the volatility-breakout variants, the seasonality chapter, and the volatility sizing are written out with the author's own backtests. A Kyobo listing for the 2024 book was ₩25,200 in print and ₩20,160 for the ebook, about US$15. Buy the ebook if the gated tables are the point. The independent breakout replications above failed, and the published results are in sample, so the purchase is for the rules, not for a track record.</p>
+<p>The rest of the list is not worth paying for. Quantus is another backtester. Paid notes derived from richmanbtc, and paid Donchian bot code, are intraday or old trend code outside this use case. A pump-alert Discord, generic mentoring courses, and a volatility-breakout program sold off anchor-optimised claims are a reject. bitbank's botter Discord is free, and it is a place to hear what is working, not a product to buy.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,4056 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/design/2026-09-27-bug-verification-round3-4/">
+      
+      
+        <link rel="prev" href="../2026-09-27-algodaemon-bug-report/">
+      
+      
+        <link rel="next" href="../2026-09-29-long-term-fixes-b1-rangeparam-datacolumn/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Bug verification, rounds 3–4 (2026-09-27) - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#algodaemon-bug-verification-rounds-34-2026-09-27" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Bug verification, rounds 3–4 (2026-09-27)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Platform design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../research/" class="md-tabs__link">
+          
+  
+  
+  Strategy research
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../archive/" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/prod-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../coding-standards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding Standards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plan-to-profit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment-performance-reconcile/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Performance Reconcile
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best-vid-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ccxt-bar-timezones/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Bar Timezones & Apply Timing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-data-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../db-connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-29-queue-frontend-aids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue screen aids (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../glassnode-market-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glassnode market data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-25-backtest-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest review (2026-09-25)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-25-backtest-data-hygiene-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest data hygiene (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-26-fractional-sizing-stateful-exits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fractional sizing and stateful exits (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-26-code-quality-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code quality review (2026-09-26)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-27-algodaemon-bug-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AlgoDaemon bug report (2026-09-27)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bug verification, rounds 3–4 (2026-09-27)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bug verification, rounds 3–4 (2026-09-27)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-sma-and-ema-compare-the-raw-average-with-the-threshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. SMA and EMA compare the raw average with the threshold
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-big-grids-are-sampled-without-saying-so" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Big grids are sampled without saying so
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-window-ranges-have-no-lower-bound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Window ranges have no lower bound
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-a-signal-is-filled-on-the-same-close" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. A signal is filled on the same close
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-b24-duplicate-jobs-create-separate-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. B24: duplicate jobs create separate versions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-hourly-annualisation-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Hourly annualisation default
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-b26-volume-limited-to-a-raw-input-column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. B26: volume limited to a raw input column
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended order
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-29-long-term-fixes-b1-rangeparam-datacolumn/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Long-term fixes — B1, window bounds, data columns, repeated trials (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-09-29-dependency-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency and OOP review (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy research
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Strategy research
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/crypto-spot-baseline-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crypto spot — baseline improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/sharpe-ideas-index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharpe ideas — where to start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/momentum-reversal-filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum, reversal, and filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/catching-crypto-trends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catching crypto trends
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/volatility-and-cross-section/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Volatility and the cross-section
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/funding-basis-carry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Funding, basis, and carry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/microstructure-onchain-unusual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Microstructure, on-chain, and unusual
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/polyu-quant-course-methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods from the PolyU quantitative trading course
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/dutch-algotrading-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dutch Algotrading Patreon review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/chinshum-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chin Shum Patreon review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/merge-vs-distinct-candidates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which candidates to merge vs run as separate sleeves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/japanese-korean-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Japanese and Korean crypto strategy sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/feature-worthy-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategies worth new platform features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/strategy-persistence-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy persistence validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research/risk-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Risk control for the three sleeves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/live-order-execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/return-compounding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Return Compounding (bug)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/infra-capacity-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure Capacity Review (2026-09)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer (abandoned)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-sma-and-ema-compare-the-raw-average-with-the-threshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. SMA and EMA compare the raw average with the threshold
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-big-grids-are-sampled-without-saying-so" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Big grids are sampled without saying so
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-window-ranges-have-no-lower-bound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Window ranges have no lower bound
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-a-signal-is-filled-on-the-same-close" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. A signal is filled on the same close
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-b24-duplicate-jobs-create-separate-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. B24: duplicate jobs create separate versions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-hourly-annualisation-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Hourly annualisation default
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-b26-volume-limited-to-a-raw-input-column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. B26: volume limited to a raw input column
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended order
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="algodaemon-bug-verification-rounds-34-2026-09-27">AlgoDaemon bug verification, rounds 3–4 (2026-09-27)<a class="headerlink" href="#algodaemon-bug-verification-rounds-34-2026-09-27" title="Permanent link">&para;</a></h1>
+<p><strong>Doc type:</strong> platform review. It checks the research agent's round 3 and round 4 findings against the code, and round 5 item B26 in <a href="#7-b26-volume-limited-to-a-raw-input-column">section 7</a>. This page does not change the engine.
+<strong>Status:</strong> open findings, checked against <code>main</code> at <code>69bf240d8</code> (2026-09-27 08:16 HKT).
+<strong>Follows:</strong> <a href="../2026-09-27-algodaemon-bug-report/">AlgoDaemon bug report (2026-09-27)</a> (PR #64), which checked B1–B21 against <code>9c1af3619</code>. The eight commits after <code>9c1af3619</code> are documentation PRs (#60–#66), so the engine lines that report cites have not moved.
+<strong>Sources:</strong> the research dossier (items B22–B25, compiled 2026-09-27 01:50 HKT), the raw job rows in <code>round3/raw/</code>, the round 4 notes (<code>round4/README.md</code>), and the round 5 note on B26. These files are on the researcher's machine and are not in this repository. Live <code>algodaemon.com</code> was not called for this page.</p>
+<p>Bar times are UTC. Clock times are HKT.</p>
+<p>How each item was checked:</p>
+<table>
+<thead>
+<tr>
+<th>Mark</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ran</td>
+<td>Reproduced on synthetic data with the engine code from this <code>main</code>. Production job ids and their stored numbers are still the dossier's.</td>
+</tr>
+<tr>
+<td>Read</td>
+<td>The cause is in the current source. Line numbers are <code>main</code> at <code>69bf240d8</code>.</td>
+</tr>
+<tr>
+<td>Raw</td>
+<td>Read from the stored job or strategy rows the researcher saved from the API.</td>
+</tr>
+<tr>
+<td>Offline</td>
+<td>Measured by the researcher's offline copy of the engine (<code>round4/replica.py</code>). That copy matches the platform to 2e-16 on the round 3 grids, but it is not a platform run.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
+<p>Seven items. All seven are real. Two of the round 3–4 items are smaller than first reported.</p>
+<ul>
+<li><strong>SMA and EMA are raw price levels</strong> (item 1). Compared with a threshold of 0 to 0.10, they are always long or never long. "Price above its EMA" cannot be built. Open.</li>
+<li><strong>Grids over 10,000 cells are sampled</strong> (item 2). The search switches to Optuna TPE with seed 42 and runs 10,000 trials. The config drawer does show "capped from N combos" before the run. Nothing on the result or the stored job says the grid was sampled, and the sampler repeats cells. Open.</li>
+<li><strong>Window ranges have no lower bound</strong> (item 3). Window 0 passes validation. For SMA, Bollinger, RSI and stochastic it scores NaN and wastes trials. For EMA, window 0 fails the whole run. A negative window also fails the whole run. Open, low.</li>
+<li><strong>A signal fills on the same close</strong> (item 4). This is not lookahead. It is a modelling choice, and there is no option to delay the fill. Offline, some Best rules lose most of their out-of-sample Sharpe with a one-day delay. Open, as a proposal.</li>
+<li><strong>B24: duplicate jobs make duplicate versions</strong> (item 5). The version is created at <strong>enqueue</strong>, not when the job completes. <code>SP_INS_STRATEGY</code> always adds a new <code>STRATEGY_VID</code> for the name and never compares <code>CONFIG_JSON</code>. Confirmed. Open.</li>
+<li><strong>Hourly annualisation</strong> (item 6). <strong>Downgraded.</strong> The web app sets <code>trading_period</code> from the bar interval: 365 × 24 = 8,760 for hourly crypto. What is left is that the API accepts any <code>trading_period</code> with any interval, and one narrow path in the drawer.</li>
+<li><strong>B26: volume is only a raw input column</strong> (item 7). <code>TechnicalAnalysis</code> is SMA, EMA, RSI, Bollinger, and stochastic. A factor reads one column, and a rule does not remember the previous position, so OBV, VWAP, dollar volume, Amihud, and "enter when volume confirms, then hold" cannot be built. Lowercase <code>"volume"</code> is an opaque HTTP 400 on the paths that look the column up. Open, as a limitation.</li>
+</ul>
+<h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Dossier</th>
+<th>Title</th>
+<th>Severity</th>
+<th>Status</th>
+<th>Verified</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#1-sma-and-ema-compare-the-raw-average-with-the-threshold">1</a></td>
+<td>B22</td>
+<td>SMA and EMA compare the raw moving average with the threshold</td>
+<td>Medium</td>
+<td>Confirmed, open. Extends #64 <a href="../2026-09-27-algodaemon-bug-report/#b16-smaema-momentum-on-raw-price-is-buy-and-hold">B16</a></td>
+<td>Ran + read</td>
+</tr>
+<tr>
+<td><a href="#2-big-grids-are-sampled-without-saying-so">2</a></td>
+<td>B23</td>
+<td>Grids over 10,000 cells are sampled by TPE; the result does not say so</td>
+<td>Medium</td>
+<td>Confirmed, open. A pre-run caption exists</td>
+<td>Read + raw</td>
+</tr>
+<tr>
+<td><a href="#3-window-ranges-have-no-lower-bound">3</a></td>
+<td>B23</td>
+<td><code>RangeParam</code> has no bounds; window 0 or below is accepted</td>
+<td>Low</td>
+<td>Confirmed, open</td>
+<td>Ran + read + raw</td>
+</tr>
+<tr>
+<td><a href="#4-a-signal-is-filled-on-the-same-close">4</a></td>
+<td>Round 4</td>
+<td>Same-close fill, with no fill-delay option</td>
+<td>Medium</td>
+<td>Confirmed as a modelling limit, open. Proposal only</td>
+<td>Read + offline</td>
+</tr>
+<tr>
+<td><a href="#5-b24-duplicate-jobs-create-separate-versions">5</a></td>
+<td>B24</td>
+<td>Duplicate jobs create separate strategy versions</td>
+<td>Low</td>
+<td>Confirmed, open</td>
+<td>Read + raw</td>
+</tr>
+<tr>
+<td><a href="#6-hourly-annualisation-default">6</a></td>
+<td>—</td>
+<td>Hourly runs annualised on a daily <code>trading_period</code></td>
+<td>Low</td>
+<td>Downgraded. The web app derives it from the interval. The API does not check it</td>
+<td>Read + raw</td>
+</tr>
+<tr>
+<td><a href="#7-b26-volume-limited-to-a-raw-input-column">7</a></td>
+<td>B26</td>
+<td>Volume can only be used as a raw input column</td>
+<td>Medium (limitation)</td>
+<td>Confirmed, open. No volume indicators, no column arithmetic, no stateful entry</td>
+<td>Read. The Sharpe and the replica match: researcher</td>
+</tr>
+</tbody>
+</table>
+<p>Items already covered, or fixed:</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Where</th>
+<th>Status on <code>69bf240d8</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B5. Promotion compares Sharpe across different date ranges</td>
+<td>#64 <a href="../2026-09-27-algodaemon-bug-report/#b5-promotion-compares-sharpe-across-different-date-ranges">B5</a></td>
+<td>Open. Covered in #64</td>
+</tr>
+<tr>
+<td>Stochastic warm-up is about 2 × window, and the extra window slips past the sample-size count (dossier B25)</td>
+<td>#64 <a href="../2026-09-27-algodaemon-bug-report/#b6-a-short-sample-volume-filter-is-still-best">B6</a></td>
+<td>Open. Covered in #64. <code>%D</code> is still a rolling mean of <code>%K</code> (<code>quant/strategy/indicators.py</code> line 62)</td>
+</tr>
+<tr>
+<td>B1. FILTER with 3+ factors behaves like OR in its direction factors</td>
+<td>#64 <a href="../2026-09-27-algodaemon-bug-report/#b1-two-factor-and-behaves-like-or-for-long-only-factors">B1</a></td>
+<td>Open. Covered in #64</td>
+</tr>
+<tr>
+<td>B12. My Jobs listed the oldest 50</td>
+<td>#64 <a href="../2026-09-27-algodaemon-bug-report/#b12-my-jobs-listed-the-oldest-50">B12</a></td>
+<td>Fixed in <code>9c1af3619</code>. <code>SP_GET_QUEUE.sql</code> line 90 still reads <code>ORDER BY q.CREATED_AT DESC</code>. The 50-row cap remains</td>
+</tr>
+<tr>
+<td>B7. Single-factor Volume run used price</td>
+<td>#64 <a href="../2026-09-27-algodaemon-bug-report/#b7-a-single-factor-volume-run-used-price">B7</a></td>
+<td>Fixed in <code>c35ea23d2</code>. <code>quant/strategy/performance.py</code> lines 196–197 still replace <code>factor</code> with the requested column. The researcher confirmed the fix live in round 5: capital-V <code>Volume</code> matched their offline replica to 2e-16. This page did not re-run that</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-sma-and-ema-compare-the-raw-average-with-the-threshold">1. SMA and EMA compare the raw average with the threshold<a class="headerlink" href="#1-sma-and-ema-compare-the-raw-average-with-the-threshold" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> confirmed, open. <strong>Severity:</strong> medium. <strong>Effort:</strong> small for new indicator variants. Stored SMA/EMA results do not need a replay; they are buy-and-hold or empty.</p>
+<p>This extends #64 <a href="../2026-09-27-algodaemon-bug-report/#b16-smaema-momentum-on-raw-price-is-buy-and-hold">B16</a> and PR #58 <a href="../2026-09-25-backtest-review/#6-arithmetic-sharpe-can-rank-a-ruined-short-and-smaema-band-signals-are-buy-and-hold">item 6</a>. Both record the symptom. Neither proposes an indicator that can express a trend rule.</p>
+<p><strong>Repro (dossier).</strong> <code>POST /backtest/performance</code>, BTC daily, 2021-07-01 to 2026-09-25, 10 bps. <code>get_sma</code> and <code>get_ema</code>, window 50:</p>
+<ul>
+<li><code>momentum_long</code> at signals 0.00, 0.05 and 0.10: 100% time in market, turnover 0, Sharpe 0.4814. Buy-and-hold is also 0.4814.</li>
+<li><code>reversion_long</code> at 0.05: 0% time in market, Sharpe NaN.</li>
+<li>Signal 60,000: in the market on 48–49% of days. That is "the average is above 60,000 USDT", not a trend rule.</li>
+<li>As a FILTER gate (window 200, signal 0.05) in front of BTC Bollinger 55/1.75, the gate is always open.</li>
+</ul>
+<p><strong>Confirmed by running.</strong> A synthetic random walk between about 22,000 and 177,000, window 50, through <code>Performance</code>:</p>
+<ul>
+<li><code>momentum_band_signal_long_only</code> at 0.00, 0.05 and 0.10 is long on every scored bar. Sharpe equals buy-and-hold (1.0281) for both SMA and EMA.</li>
+<li><code>reversion_band_signal_long_only</code> is never in the market. Sharpe is NaN.</li>
+<li>On the same series, price was above its EMA(50) on 60% of bars. That is the rule a user expects, and no setting produces it.</li>
+</ul>
+<p><strong>Cause.</strong> <code>quant/strategy/indicators.py</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_sma</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">period</span><span class="p">):</span>                                        <span class="c1"># line 23</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">sma</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'factor'</span><span class="p">]</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="n">period</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_ema</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">period</span><span class="p">):</span>                                        <span class="c1"># line 28</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">ema</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'factor'</span><span class="p">]</span><span class="o">.</span><span class="n">ewm</span><span class="p">(</span><span class="n">span</span><span class="o">=</span><span class="n">period</span><span class="p">,</span> <span class="n">adjust</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+</code></pre></div>
+<p>Both return the average itself, in price units. The band signals compare that value with the threshold (<code>quant/strategy/signals.py</code> lines 246–251):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">position</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">data_col</span> <span class="o">&gt;</span> <span class="n">signal</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">data_col</span> <span class="o">&lt;</span> <span class="o">-</span><span class="n">signal</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+</code></pre></div>
+<p>On a positive price, the average is always above any small threshold. Only Bollinger is normalised: it returns <code>(factor - sma) / rstd</code> (lines 47–52). So Bollinger at signal 0 is exactly "price above SMA(w)". There is no EMA equivalent.</p>
+<p>The seeded range suggests a relative distance was intended. <code>db/liquidbase/refdata/data/INDICATOR.sql</code> lines 5–6 give SMA and EMA a signal range of 0.00–0.10, step 0.01. That only makes sense for something like <code>price / MA − 1</code>.</p>
+<p><strong>Fix direction (no code here).</strong> Add distance-from-average variants, for example <code>price / SMA(w) − 1</code> and <code>price / EMA(w) − 1</code>, or <code>(price − MA) / MA</code>. They are unbounded like Bollinger, so they work with the existing band signals, and the seeded 0–0.10 range becomes a real "at least x% above the average" threshold. Then take the raw-level SMA and EMA out of the default picker, or label them "level". Nothing that is stored needs a replay.</p>
+<h2 id="2-big-grids-are-sampled-without-saying-so">2. Big grids are sampled without saying so<a class="headerlink" href="#2-big-grids-are-sampled-without-saying-so" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> confirmed, open. <strong>Severity:</strong> medium. The drawer caption stops it from being fully silent, but the result and the stored job say nothing. <strong>Effort:</strong> small for labelling, medium for a hard limit.</p>
+<p><strong>Repro (raw).</strong> ETH jobs <code>63dac35d-dd23-4e25-bd62-3e558cec074a</code> (VID 3) and <code>666b8aa4-7c5d-4215-90d8-2abae293d7c1</code> (VID 4), strategy <code>1f84c585</code>. Both factors use <code>window_range</code> 0–160 step 5 (33 values) and <code>signal_range</code> 0–2.5 step 0.25 (11 values). That is 33 × 11 × 33 × 11 = 131,769 cells. The stored result has <code>total_trials</code> 10,000 and <code>valid</code> 9,346.</p>
+<p>Checked in the stored <code>grid</code> of <code>63dac35d</code>:</p>
+<ul>
+<li>The 10,000 trials cover only <strong>9,655 distinct cells</strong>. TPE picks from a categorical space and repeats cells.</li>
+<li><code>top10</code> is <strong>ten copies of the same cell</strong> (55/2.25 + 65/1.25, Sharpe 1.4027). There is no de-duplication before the top 10 is cut.</li>
+<li>654 trials have a null Sharpe. 475 of those contain a window of 0 (item 3).</li>
+<li>The Best pick is the highest full-period Sharpe among the sampled cells. The job's own walk-forward picked 25/2.25 + 100/0.25, with out-of-sample Sharpe 0.355. The walk-forward's in-sample search is the same size, so it is sampled too.</li>
+</ul>
+<p><strong>Cause.</strong> <code>quant/strategy/optimizer.py</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">OPTUNA_MAX_TRIALS</span> <span class="o">=</span> <span class="mi">10_000</span>                                        <span class="c1"># line 28</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">OPTUNA_SEED</span> <span class="o">=</span> <span class="mi">42</span>                                                  <span class="c1"># line 29</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">_select_search</span><span class="p">(</span><span class="n">total</span><span class="p">,</span> <span class="n">n_trials</span><span class="p">):</span>                              <span class="c1"># line 320</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="k">if</span> <span class="n">n_trials</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="n">n_trials</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">total</span><span class="p">,</span> <span class="n">OPTUNA_MAX_TRIALS</span><span class="p">)</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="k">if</span> <span class="n">n_trials</span> <span class="o">&gt;=</span> <span class="n">total</span><span class="p">:</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="k">return</span> <span class="n">ExhaustiveSearch</span><span class="p">(),</span> <span class="n">total</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="k">return</span> <span class="n">BayesianSearch</span><span class="p">(),</span> <span class="n">n_trials</span>
+</code></pre></div>
+<p><code>run_optimize</code> calls <code>opt.run(window_list, signal_list)</code> with no <code>n_trials</code> (<code>quant/strategy/backtest_service.py</code> line 565), so any grid over 10,000 cells goes to <code>BayesianSearch</code> (<code>TPESampler(seed=OPTUNA_SEED)</code>, line 251). The only record is the INFO log line from <code>BayesianSearch.log_start</code> (lines 234–245). <code>_build_result</code> (lines 340–353) sorts all trials by Sharpe and keeps duplicates.</p>
+<p><strong>What the user sees.</strong></p>
+<ul>
+<li>API: <code>OptimizeResponse</code> (<code>quant/schemas/backtest.py</code> lines 149–163) has <code>total_trials</code> and <code>valid</code>, and no field for the grid size or the search method. <code>total_trials</code> is <code>len(result.grid_df)</code> (<code>backtest_service.py</code> line 591), so it reads 10,000, the trials run, not the cells in the grid. The stored job result is the same payload.</li>
+<li>Config drawer: before the run it shows <code>10,000 trials (capped from 131,769 combos)</code> (<code>frontend/src/components/ConfigDrawer.tsx</code> lines 237–243 and 565). "Capped" does not say the 10,000 are chosen by TPE, or that cells repeat. The drawer keeps its own copy of the 10,000 constant (line 241).</li>
+<li>Results: the chip reads <code>9346 / 10000 valid trials</code> (<code>frontend/src/pages/BacktestPage.tsx</code> line 349). Nothing there, or on a stored job opened later, says the grid was sampled.</li>
+</ul>
+<p><strong>Fix direction.</strong> Return and store <code>search</code> (<code>exhaustive</code> or <code>tpe</code>), <code>grid_size</code>, and <code>distinct_trials</code> with the result, and show them on the results chip and the job row. De-duplicate <code>top10</code> by parameters. Then decide the limit: refuse grids above 10,000 cells, or keep TPE and label the Best as "best of a sample". The drawer caption should say "sampled" instead of "capped".</p>
+<h2 id="3-window-ranges-have-no-lower-bound">3. Window ranges have no lower bound<a class="headerlink" href="#3-window-ranges-have-no-lower-bound" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> confirmed, open. <strong>Severity:</strong> low. <strong>Effort:</strong> small.</p>
+<p><strong>Cause.</strong> <code>quant/schemas/backtest.py</code> lines 5–14:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">RangeParam</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="nb">min</span><span class="p">:</span> <span class="nb">float</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="nb">max</span><span class="p">:</span> <span class="nb">float</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">step</span><span class="p">:</span> <span class="nb">float</span>
+</code></pre></div>
+<p>There are no bounds on <code>min</code>, <code>max</code> or <code>step</code>. The frontend <code>RangeFields</code> inputs have no minimum either. <code>require_scoreable_sample</code> (<code>backtest_service.py</code> lines 539–556) reads only <code>window_range.max</code>. Window values come from <code>to_values(as_int=True)</code>, which is <code>range(int(min), int(max) + 1, int(step))</code>.</p>
+<p><strong>What happens downstream (ran, pandas 3.0.6 with this <code>main</code>'s engine code).</strong></p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Window 0: SMA, Bollinger, RSI, stochastic</td>
+<td><code>rolling(window=0)</code> is allowed and returns all NaN. The position is NaN, the Sharpe is NaN, and the trial is counted as invalid. The run completes. A 0–20 step 5 grid with 3 signals gave 15 trials and 12 valid. The 3 window-0 trials had a null Sharpe</td>
+</tr>
+<tr>
+<td>Window 0: EMA</td>
+<td><code>ewm(span=0)</code> raises <code>ValueError: span must satisfy: span &gt;= 1</code>. <code>IndicatorCache</code> builds every window in the <code>Objective</code> constructor, before the per-trial <code>try</code> in <code>SearchStrategy.evaluate</code> (<code>optimizer.py</code> lines 184–191). So the <strong>whole run fails</strong>: HTTP 400 on the sync route, FAILED in the queue</td>
+</tr>
+<tr>
+<td>Negative window, any rolling indicator</td>
+<td><code>rolling(window=-5)</code> raises <code>ValueError: window must be an integer 0 or greater</code>. The whole run fails in the same way</td>
+</tr>
+<tr>
+<td><code>step</code> 0</td>
+<td><code>range()</code> raises <code>ValueError</code> for windows. <code>np.arange</code> raises <code>ZeroDivisionError</code> for signals. The run fails</td>
+</tr>
+</tbody>
+</table>
+<p>The live case is the first row. In job <code>63dac35d</code>, 475 of the 10,000 sampled trials had a window of 0, and every one of them had a null Sharpe. Because the grid was sampled, those wasted trials were also cells that were never searched.</p>
+<p>On the queue path, <code>EnqueueRequest.config_json</code> is a plain <code>dict</code> (<code>quant/api/schemas/jobs.py</code> line 26). <code>OptimizeRequest</code> validation happens only in the worker (<code>quant/queue/worker.py</code> line 124). The strategy version is created at enqueue (item 5). So a run that fails on a bad range still leaves a new VID behind.</p>
+<p><strong>Fix direction.</strong> Give <code>RangeParam</code> <code>step &gt; 0</code> and <code>max &gt;= min</code>. Add a window-specific minimum of 2 (Bollinger's rolling standard deviation is NaN at window 1). Validate <code>config_json</code> as an <code>OptimizeRequest</code> at enqueue, before <code>sp_ins_strategy</code>, so a bad range gets a 422 and never becomes a version. Put the same minimum on the drawer inputs.</p>
+<h2 id="4-a-signal-is-filled-on-the-same-close">4. A signal is filled on the same close<a class="headerlink" href="#4-a-signal-is-filled-on-the-same-close" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> confirmed as a modelling limit. Open as a proposal. <strong>Severity:</strong> medium, for how far live results can fall short of the backtest. <strong>Effort:</strong> small for an option, medium once the drawer, stored config and promotion carry it.</p>
+<p>This is not lookahead. PR #58 already notes the timing in its <a href="../2026-09-25-backtest-review/#overview">overview</a> and <a href="../2026-09-25-backtest-review/#4-live-orders-are-not-the-fill-the-backtest-measures">item 4</a>. What is new here is the round 4 measurement and the missing option.</p>
+<p><strong>Cause.</strong> <code>quant/strategy/performance.py</code>, <code>_compute_pnl_columns</code> (lines 271–285):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">prior</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'FinalPosition'</span><span class="p">]</span><span class="o">.</span><span class="n">shift</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="o">...</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'pnl'</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'FinalPosition_x1'</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'chg'</span><span class="p">]</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>                    <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'trade'</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">transaction_cost</span><span class="p">)</span>
+</code></pre></div>
+<p><code>chg</code> is <code>price.pct_change()</code> (line 237 or 244). The position decided on the close of bar <em>t</em> uses only data up to <em>t</em>, and earns the move from <em>t</em> to <em>t+1</em>. In effect it is filled at the close that produced the signal. The optimizer's <code>Objective._sharpe</code> (<code>quant/strategy/objective.py</code> lines 74–93) does the same thing with <code>pos_x1[1:] = pos[:-1]</code>. There is no delay parameter anywhere in <code>quant/strategy/</code> or on <code>OptimizeRequest</code>. The only <code>shift</code> in the engine is the one above.</p>
+<p><strong>Offline measurements (researcher, <code>round4/README.md</code>, <code>fill_timing.py</code>, <code>e_hourly.py</code>).</strong> These come from the offline engine copy, not from a platform run. "Delay 1" means a fill one bar later, <code>FinalPosition.shift(2)</code> in the formula above.</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>OOS Sharpe, delay 0 → delay 1</th>
+<th>FULL Sharpe, delay 0 → delay 1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ETH A1 (Best v5: gate 55/2.25, ETH 110/−0.75)</td>
+<td>1.60 → 0.69</td>
+<td>1.43 → 1.20</td>
+</tr>
+<tr>
+<td>ETH A2 (gate 65/2.25, ETH 100/−1.0)</td>
+<td>1.24 → 1.26</td>
+<td>1.32 → 1.57</td>
+</tr>
+<tr>
+<td>BNB Best 75/2.5</td>
+<td>1.20 → 0.45</td>
+<td>1.25 → 1.10</td>
+</tr>
+<tr>
+<td>BTC Best 55/1.75</td>
+<td>0.82 → 0.00</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>A1 and the BNB and BTC Best rules lose most of their out-of-sample Sharpe with a one-day delay. A2 holds up.</li>
+<li>Across the round 3 grids, a one-day delay raises in-sample Sharpe and lowers out-of-sample Sharpe. The recent edge is concentrated on the first day after each signal. A1 earns 41% of its OOS gross P&amp;L on its 10 entry days.</li>
+<li>Hourly ETH A1 (windows × 24, <code>trading_period</code> 8,760): Sharpe 1.10 after 10 bps fees and 1.33 with no fees. OOS is 1.36 after fees and 1.60 with no fees. 6.6% time in market. On hourly bars, fees cost about 0.24 Sharpe.</li>
+</ul>
+<p>With about 10 out-of-sample entries per gated rule, a few days decide these numbers.</p>
+<p><strong>Proposal (no code).</strong> Add <code>fill_delay_bars</code> (default 0, today's behaviour) to <code>OptimizeRequest</code>, <code>PerformanceRequest</code> and the stored <code>CONFIG_JSON</code>. Apply it as <code>FinalPosition.shift(1 + fill_delay_bars)</code> in both <code>_compute_pnl_columns</code> and <code>Objective._sharpe</code>, and charge turnover on the delayed position. Show it on the results chip. Before any rule is promoted for live trading, a delay-1 re-score beside the delay-0 score would show which winners are delay-fragile. Whether promotion should require it is a separate decision.</p>
+<h2 id="5-b24-duplicate-jobs-create-separate-versions">5. B24: duplicate jobs create separate versions<a class="headerlink" href="#5-b24-duplicate-jobs-create-separate-versions" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> confirmed, open. <strong>Severity:</strong> low. <strong>Effort:</strong> small for a server-side check.</p>
+<p><strong>Repro (raw).</strong> <code>round3/raw/job_63dac35d-….json</code>, <code>job_666b8aa4-….json</code> and <code>strategies_all_after_r3.json</code>:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>63dac35d-dd23-4e25-bd62-3e558cec074a</code></th>
+<th><code>666b8aa4-7c5d-4215-90d8-2abae293d7c1</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Strategy</td>
+<td><code>1f84c585</code>, VID 3</td>
+<td><code>1f84c585</code>, VID 4</td>
+</tr>
+<tr>
+<td>Version created</td>
+<td>2026-09-26 22:15:02 HKT</td>
+<td>2026-09-26 22:15:33 HKT</td>
+</tr>
+<tr>
+<td>Job completed</td>
+<td>22:33:38 HKT</td>
+<td>22:33:57 HKT</td>
+</tr>
+<tr>
+<td><code>config_json</code></td>
+<td>identical (same SHA-256 of the key-sorted JSON)</td>
+<td>identical</td>
+</tr>
+<tr>
+<td>Sharpe</td>
+<td>1.40274733793208</td>
+<td>1.40274733793208</td>
+</tr>
+<tr>
+<td>Stored <code>grid</code></td>
+<td>identical</td>
+<td>identical</td>
+</tr>
+</tbody>
+</table>
+<p>VID 3 became Best, then lost Best to VID 5 (<code>53d62e76</code>, Sharpe 1.4304). VID 4 was never Best. The two versions were created 31 seconds apart. The web app disables Run while an enqueue is pending (<code>BacktestPage.tsx</code> line 296, <code>isRunning={enqueue.isPending}</code>), so this was not a fast double-click in the UI. It was two separate submissions. Who sent them is not established.</p>
+<p><strong>Where the version is created.</strong> At <strong>enqueue</strong>, not when the job completes.</p>
+<ul>
+<li><code>JobsService.enqueue</code> (<code>quant/api/services/jobs.py</code> lines 112–137) calls <code>self._repo.sp_ins_strategy(strategy_nm=..., config_json=..., user_id=...)</code> (lines 119–123), then <code>sp_ins_queue</code>. It does not look for an existing version, a config hash, or a job that is already queued.</li>
+<li><code>BtQueueRepo.sp_ins_strategy</code> (<code>quant/queue/repo.py</code> lines 107–128): "When <code>(user_id, strategy_nm)</code> already exists the SP reuses that <code>STRATEGY_ID</code> and bumps <code>STRATEGY_VID</code>."</li>
+<li>The procedure, <code>db/liquidbase/bt/procedures/SP_INS_STRATEGY_VID_BY_NM.sql</code>, looks up the id by name only (lines 60–66), then:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">SELECT</span><span class="w"> </span><span class="k">COALESCE</span><span class="p">(</span><span class="k">MAX</span><span class="p">(</span><span class="n">STRATEGY_VID</span><span class="p">),</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">V_VID</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="n">BT</span><span class="p">.</span><span class="n">STRATEGY</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">STRATEGY_ID</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">V_STRATEGY_ID</span><span class="p">;</span><span class="w">           </span><span class="c1">-- lines 73–76</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">BT</span><span class="p">.</span><span class="n">STRATEGY</span><span class="w"> </span><span class="p">(...,</span><span class="w"> </span><span class="n">CONFIG_JSON</span><span class="p">,</span><span class="w"> </span><span class="p">...)</span><span class="w"> </span><span class="k">VALUES</span><span class="w"> </span><span class="p">(...,</span><span class="w"> </span><span class="n">IN_CONFIG_JSON</span><span class="p">,</span><span class="w"> </span><span class="p">...);</span><span class="w">  </span><span class="c1">-- lines 85–109</span>
+</code></pre></div>
+<p><code>CONFIG_JSON</code> is written and never compared. The advisory lock on user plus name (lines 55–57) orders concurrent inserts. It does not merge them.</p>
+<ul>
+<li><code>BT.STRATEGY</code> (<code>db/liquidbase/bt/tables/STRATEGY.sql</code>) has no hash column. Its only unique key is <code>(USER_ID, STRATEGY_NM, STRATEGY_VID)</code>.</li>
+<li>On completion, the worker (<code>quant/queue/worker.py</code> lines 158–176) inserts the result, runs promotion, and writes COMPLETED. It does not create or merge versions.</li>
+<li><code>EnqueueRequest</code> (<code>quant/api/schemas/jobs.py</code> lines 22–27) has <code>strategy_nm</code>, <code>config_json</code> and <code>priority</code>. There is no idempotency key.</li>
+</ul>
+<p><strong>Relation to PR #59.</strong> <a href="../2026-09-25-backtest-data-hygiene-proposal/#strategy-identity">Strategy identity</a> proposes a server-built <code>RECIPE_KEY</code> so the server, not the client's name string, decides which rows are one lineage. That fixes <strong>lineage</strong> identity, and decision #82 records it as not adopted. It does not stop this bug: under <code>RECIPE_KEY</code>, every enqueue is still the next VID. <a href="../2026-09-25-backtest-data-hygiene-proposal/#proposed-key">Proposed key</a> puts the date range, fee, grid and walk-forward settings on the version on purpose, so a version-level check has to compare the whole normalised <code>CONFIG_JSON</code>.</p>
+<p><strong>Fix direction.</strong> Store a <code>CONFIG_HASH</code> on <code>BT.STRATEGY</code>. It is a hash of the normalised <code>CONFIG_JSON</code>: sorted keys, and numbers as numbers (the stored configs mix <code>"0.25"</code> strings with floats). In <code>SP_INS_STRATEGY</code>, if the latest version for that id has the same hash, return it instead of inserting. Then either refuse a second queued job on that version, or return the existing <code>queue_id</code>. A deliberate re-run can pass an explicit flag. The existing duplicate (VID 4) can be retired with <code>LOGICAL_DELETE_IND</code>. It is not Best.</p>
+<h2 id="6-hourly-annualisation-default">6. Hourly annualisation default<a class="headerlink" href="#6-hourly-annualisation-default" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> downgraded. The web app does not leave hourly runs on 365. <strong>Severity:</strong> low. <strong>Effort:</strong> small.</p>
+<p><strong>What the code does.</strong></p>
+<ul>
+<li>Backend: <code>OptimizeRequest.trading_period: int</code> and <code>PerformanceRequest.trading_period: int</code> are required, with no default and no bounds (<code>quant/schemas/backtest.py</code> lines 59 and 94). <code>build_config</code> passes the number straight through (<code>backtest_service.py</code> line 327, <code>trading_period=req.trading_period</code>). Nothing compares it with <code>tm_interval_id</code>. PR #41 (<code>c932fa432</code>, 2026-09-03 23:28 HKT) dropped a server-side <code>_require_annualization</code> guard on purpose, and moved the job to the drawer.</li>
+<li>Frontend default: <code>DEFAULT_CONFIG.tradingPeriod: 365</code> with <code>tmIntervalId: null</code> (<code>frontend/src/pages/BacktestPage.tsx</code> lines 44–45). The drawer then seeds DAILY (<code>ConfigDrawer.tsx</code> lines 116–120), so 365 matches.</li>
+<li>Frontend derivation: <code>annualization</code> (<code>ConfigDrawer.tsx</code> lines 145–149) multiplies the asset type's daily <code>trading_period</code> by bars per day for the chosen interval:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">perDay</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">row</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="nx">barsPerDay</span><span class="p">(</span><span class="nx">row</span><span class="p">.</span><span class="nx">period_length</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">return</span><span class="w"> </span><span class="nx">perDay</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="nb">Math</span><span class="p">.</span><span class="nx">round</span><span class="p">(</span><span class="nx">dailyTradingPeriod</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">perDay</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nx">dailyTradingPeriod</span><span class="p">;</span>
+</code></pre></div>
+<p>It runs when the Bar Interval changes (line 326), when a product is picked (line 305), and when an asset type is picked (line 373). <code>barsPerDay</code> (<code>frontend/src/utils/interval.ts</code> lines 37–40) is 86,400 ÷ the bar length in seconds. Hourly crypto gets 365 × 24 = 8,760.
+- Clone and Re-backtest restore the stored <code>trading_period</code> (<code>frontend/src/utils/requestBuilders.ts</code> line 89).</p>
+<p><strong>Stored evidence (raw).</strong> Every job and strategy row the researcher saved that has <code>tm_interval_id</code> 2 (1H) carries <code>trading_period</code> 8,760: 30 distinct hourly jobs, for example <code>cc10cae1</code>. All 32 daily jobs carry 365.</p>
+<p><strong>What is left.</strong></p>
+<ol>
+<li>The API accepts <code>trading_period</code> 365 with an hourly <code>tm_interval_id</code> and scores it. Hourly Sharpe is then about √24 ≈ 4.9 times too low, and annualised return is far too low as well. A script, or an old client, can store such a row, and promotion would compare it bare.</li>
+<li>One narrow path in the drawer (read from code, not reproduced in a browser). The Bar Interval handler updates <code>tradingPeriod</code> only when <code>selectedAssetType</code> is set (lines 325–327). On first load the asset type is filled in by an effect that deliberately leaves <code>tradingPeriod</code> alone (lines 127–135). A user who switches to 1H before that effect runs keeps 365. Clearing the asset type also resets 365 regardless of interval (line 370), but validation then blocks the run until an asset type is picked again, and picking one recomputes the value.</li>
+</ol>
+<p><strong>Fix direction.</strong> Derive <code>trading_period</code> on the server from <code>tm_interval_id</code> and the product's asset type, or refuse a request whose <code>trading_period</code> is not the daily figure × bars per day. That is not the arbitrary 366 threshold that #41 rejected. In the drawer, recompute <code>tradingPeriod</code> whenever <code>assetType</code> or <code>tmIntervalId</code> changes, not only in the three handlers.</p>
+<h2 id="7-b26-volume-limited-to-a-raw-input-column">7. B26: volume limited to a raw input column<a class="headerlink" href="#7-b26-volume-limited-to-a-raw-input-column" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> confirmed, open. <strong>Severity:</strong> medium (limitation). Nothing in the engine is silently wrong here except the 3-factor FILTER case, which is #64 <a href="../2026-09-27-algodaemon-bug-report/#b1-two-factor-and-behaves-like-or-for-long-only-factors">B1</a>. <strong>Effort:</strong> small for the error text. Medium for a derived series or a column expression. The stateful hold is the <a href="../2026-09-26-fractional-sizing-stateful-exits/#proposal-c-hysteresis-and-a-stop-that-remembers">PR #63 proposal</a>.</p>
+<p><strong>Indicators (read).</strong> <code>TechnicalAnalysis</code> (<code>quant/strategy/indicators.py</code>) has five methods:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_sma</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">period</span><span class="p">):</span>                                        <span class="c1"># line 23</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_ema</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">period</span><span class="p">):</span>                                        <span class="c1"># line 28</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_rsi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">period</span><span class="p">):</span>                                        <span class="c1"># line 33</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_bollinger_band</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">period</span><span class="p">):</span>                             <span class="c1"># line 47</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_stochastic_oscillator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">period</span><span class="p">):</span>                      <span class="c1"># line 54</span>
+</code></pre></div>
+<p>There is no OBV, VWAP, MFI, CMF, relative volume, dollar volume, or Amihud. On a <code>Volume</code> column the transforms that return a scale-free series are Bollinger's z-score and RSI. SMA and EMA return the raw level, which is <a href="#1-sma-and-ema-compare-the-raw-average-with-the-threshold">item 1</a>.</p>
+<p><strong>One column (read).</strong> <code>FactorConfig</code> carries a single <code>data_column</code> (<code>quant/schemas/backtest.py</code> line 32). <code>build_config</code> copies it onto the <code>SubStrategy</code> (<code>quant/strategy/backtest_service.py</code> line 314). The series the indicator sees is that one column:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">return</span> <span class="n">sub_df</span><span class="p">[</span><span class="n">sub</span><span class="o">.</span><span class="n">data_column</span><span class="p">]</span><span class="o">.</span><span class="n">reindex</span><span class="p">(</span><span class="n">main_index</span><span class="p">)</span>               <span class="c1"># performance.py line 174</span>
+</code></pre></div>
+<p><code>Objective._factor_series_for_sub</code> is the same read (<code>quant/strategy/objective.py</code> line 101). Multi-factor then builds a frame that holds only that series (<code>performance.py</code> lines 183–184, <code>objective.py</code> lines 151–152). There is no second column and no expression, so dollar volume (V·C), Amihud, OBV, and VWAP cannot be built. Stochastic is the exception already recorded as #64 <a href="../2026-09-27-algodaemon-bug-report/#b3-stochastic-in-a-multi-factor-run-fails-on-high">B3</a> and <a href="../2026-09-27-algodaemon-bug-report/#b4-cross-coin-stochastic-uses-the-traded-coins-hlc">B4</a>: it reads <code>High</code>, <code>Low</code>, and <code>Close</code> and ignores <code>factor</code>.</p>
+<p><strong>Stateless (read).</strong> Every signal is <code>(data_col, signal)</code> (<code>quant/strategy/signals.py</code> line 236). <code>momentum_band_signal</code> (lines 246–251) maps the current indicator value to −1, 0, or 1. Nothing in <code>SignalDirection</code> reads the previous position. The only <code>shift</code> in the engine is the fill lag in <code>_compute_pnl_columns</code> (<a href="#4-a-signal-is-filled-on-the-same-close">item 4</a>). "Enter when volume confirms, then hold" needs <code>Pos(t−1)</code>. That hold is <a href="../2026-09-26-fractional-sizing-stateful-exits/#proposal-c-hysteresis-and-a-stop-that-remembers">Proposal C</a> on the fractional-sizing page (PR #63). The rule the engine can run is the stateless one: be long only on the bars where volume itself is above the threshold.</p>
+<p><strong>Opaque name (read).</strong> <code>data_column: str = "price"</code> has no enum and no check against the loaded columns. The exchange frame's columns are <code>price</code>, <code>factor</code>, <code>Open</code>, <code>High</code>, <code>Low</code>, <code>Close</code>, and <code>Volume</code> (<code>quant/market_data/service.py</code> lines 751–762). <code>factor</code> is a copy of the close. Those names are not put in the error.</p>
+<p>The lookup that raises is <code>sub_df[sub.data_column]</code>. <code>str(KeyError("volume"))</code> is <code>"'volume'"</code>. The sync routes turn any exception that is not a <code>BacktestError</code> into HTTP 400 with that string (<code>quant/api/routers/backtest.py</code> lines 29–32):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">return</span> <span class="n">HTTPException</span><span class="p">(</span><span class="n">status_code</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">detail</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>            <span class="c1"># line 32</span>
+</code></pre></div>
+<p>Multi-factor always takes the lookup (<code>performance.py</code> line 219, <code>objective.py</code> line 151), and so does a factor on another product. A one-factor run on the traded coin does not. It looks the name up only when the name is already a column (<code>performance.py</code> lines 196–197, <code>objective.py</code> lines 127–129). <code>"volume"</code> is not <code>"Volume"</code>, so that guard skips the lookup and the pre-filled <code>factor</code> (the close) is scored. Lowercase <code>"volume"</code> is the 400 on a multi-factor or cross-product run, and a silent price score on a one-factor same-coin run. This page did not call the live API. The researcher's 400 is their sync probe.</p>
+<p><strong>Researcher's measurements (not re-run).</strong> From the round 5 note. This page did not replay them.</p>
+<ul>
+<li>A 3-factor FILTER of BTC Bollinger 65/2.25, ETH Bollinger 100/−1, and ETH Volume z-score 20/0 returned exactly A2's Sharpe, 1.3240, and was long on 62 days when the volume leg was off. That is B1: with three or more factors, FILTER combines the non-gate factors by strongest sign.</li>
+<li><code>data_column: "Volume"</code> on the traded coin or on another coin, on <code>/performance</code> and <code>/optimize</code>, single- and multi-factor, matched their offline replica to 2e-16 on 1,559+ grid cells. That is B7 still fixed, confirmed live by the researcher. The code path is the one #64 already cites (<code>performance.py</code> lines 196–197).</li>
+<li>On their offline copy, not a platform run, ETH A2 with a volume entry confirmation went from out-of-sample Sharpe 1.24 to 1.38–1.63 across a plateau. Their stored-bar check (daily and hourly BTC, ETH, and BNB volume: 0 gaps, 0 NaN, 0 zeros) is also theirs.</li>
+</ul>
+<p><strong>Fix direction.</strong> Validate <code>data_column</code> against the columns on the loaded frame and put the valid names in the error, including on the one-factor path that currently skips a missing name. Add derived-series indicators (OBV, dollar volume, Amihud, VWAP deviation, volume-weighted mean return), or a <code>data_column</code> expression. The stateful "enter only when volume confirms, then hold" belongs with PR #63.</p>
+<h2 id="recommended-order">Recommended order<a class="headerlink" href="#recommended-order" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Item 2, labelling.</strong> Store and show <code>search</code>, <code>grid_size</code> and <code>distinct_trials</code>, and de-duplicate <code>top10</code>. Small. Research conclusions currently read a sampled maximum as a grid maximum.</li>
+<li><strong>Item 1.</strong> Add distance-from-average SMA and EMA. Small, and it unlocks the trend-filter family the research needs.</li>
+<li><strong>Item 5 and item 3 together.</strong> Validate <code>config_json</code> at enqueue, add <code>CONFIG_HASH</code>, and add <code>RangeParam</code> bounds. All three sit in front of <code>sp_ins_strategy</code>. Small.</li>
+<li><strong>Item 4.</strong> Decide whether <code>fill_delay_bars</code> belongs on the request and in the promotion checks. Medium.</li>
+<li><strong>Item 6.</strong> Server-side derivation or check of <code>trading_period</code>. Small.</li>
+<li><strong>Item 7, the error.</strong> Reject a <code>data_column</code> that is not on the loaded frame, and list the valid names, including on the one-factor path that currently skips a missing name. Small. Derived volume series, or a column expression, are the larger piece. "Enter when volume confirms, then hold" is the PR #63 proposal.</li>
+</ol>
+<p>The #64 order still stands for B1–B21. B1 (AND and 3+-factor FILTER behaving as OR) is still first.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>
