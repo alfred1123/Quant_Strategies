@@ -1,0 +1,7 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json",
+    "x-rate-limit-limit": "600"
+  }
+}

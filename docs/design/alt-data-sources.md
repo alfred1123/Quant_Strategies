@@ -1,6 +1,6 @@
 # Design Doc: Alternative Data Sources
 
-**Status:** Partially implemented (Glassnode + NasdaqDataLink classes exist in `quant/data/sources.py`; FMP/MarineTraffic/Aviationstack are still proposals).
+**Status:** Partially implemented (Glassnode + NasdaqDataLink classes exist in `quant/data/sources.py`; FMP/MarineTraffic/Aviationstack are still proposals). The Glassnode cost deferral below is stale as of 28 Sep 2026 — see [Glassnode market data](glassnode-market-data.md).
 **Date:** 2026-04-15
 **Scope:** `quant/data/sources.py`, `quant/api/`, REFDATA
 
@@ -52,16 +52,20 @@ and crypto strategies. Each provider will be integrated as a new class in
 | **Historical depth** | 10+ years (BTC data since 2009 genesis block) |
 | **Resolution** | Daily (`24h`) |
 | **API limits** | Tier-dependent; free tier covers ~20 core metrics |
-| **Cost** | Free (very limited) / $29/mo (Advanced) / **$799/mo (Professional — required for most useful metrics)** |
+| **Cost** | List price was Free / $29/mo (Advanced) / $799/mo (Professional). Professional has been the plan in use since 28 Sep 2026 18:00 HKT |
 | **Key endpoints** | `/v1/metrics/indicators/sopr`, `/v1/metrics/market/mvrv`, `/v1/metrics/addresses/active_count`, `/v1/metrics/transactions/transfers_volume_to_exchanges_sum`, `/v1/metrics/mining/hash_rate_mean` |
-| **Criteria met** | C1 ✓ C2 ✓ C3 ✓ C4 ✓ C6 ✗ (Professional tier is $799/mo) |
+| **Criteria met** | C1 ✓ C2 ✓ C3 ✓ C4 ✓. C6 was the old objection (list price $799/mo). The plan is already active; storage is the open question |
 
-**Why deferred:** While the `Glassnode` class already exists in `data.py`, the
-free tier is extremely limited — most actionable on-chain metrics (SOPR, MVRV,
-exchange flows) require the Professional tier at **$799/mo**, which fails C6
-(affordable for solo/small-team). The Advanced tier ($29/mo) unlocks some
-metrics but with restricted resolution and history. Revisit when the platform
-generates revenue or when Glassnode offers more affordable research-grade access.
+**Why this used to be deferred:** The free tier is extremely limited, and the
+on-chain paths below were written when Professional was **$799/mo**, which
+failed C6. That cost reason is stale. The Professional plan has been active
+since 28 Sep 2026 18:00 HKT. On 3 Oct 2026 the close-price path and the five
+on-chain paths in the sketch answered for BTC at `24h`. The class still only
+requests `market/price_usd_close`, and `REFDATA.APP_METRIC` still seeds only
+that row. Where the series should be stored, and how a revision of history
+would be kept, is the open draft in
+[Glassnode market data](glassnode-market-data.md). The sketch below is not
+implemented.
 
 **Integration sketch** (extend existing class):
 
@@ -333,7 +337,7 @@ this data.
 | **P2** | Nasdaq Data Link | $0–50/mo | 50+ yr | Low — Python SDK | ★★★★☆ |
 | **P3** | MarineTraffic | £10–100/mo | 15+ yr | Medium — event aggregation | ★★★☆☆ |
 | **P4** | Aviationstack | $50/mo | <10 yr | Medium — pagination + aggregation | ★★☆☆☆ |
-| **—** | Glassnode (on-chain) | $29–799/mo | 10+ yr | Minimal — extend existing class | Deferred (cost) |
+| **—** | Glassnode (on-chain) | Professional, active since 28 Sep 2026 | 10+ yr | Client still price-only; store undecided | [Open draft](glassnode-market-data.md) |
 | **—** | Satellite/Foot Traffic | $400–5K/mo | Varies | High — CV/enterprise | Deferred |
 
 **Recommended order:** FMP → Nasdaq Data Link → MarineTraffic → Aviationstack.
@@ -343,7 +347,9 @@ macro data) and requires minimal integration effort (clean REST JSON). Nasdaq
 Data Link follows with unmatched historical depth and a free tier. MarineTraffic
 unlocks the unique harbor-tracking use case but needs event-to-daily aggregation.
 Aviationstack is lowest priority due to shallow history. Glassnode on-chain
-metrics are deferred until the Professional tier ($799/mo) becomes justifiable.
+metrics are no longer waiting on the Professional price. The plan is active,
+the endpoints answered, and the series is still not a factor column. The open
+question is the store, in [Glassnode market data](glassnode-market-data.md).
 
 ---
 
@@ -417,4 +423,4 @@ The frontend's `useApps()` hook will pick them up automatically after `POST /api
 3. **Add FMP unit tests** with mocked API responses.
 4. **Build macro overlay strategy** — e.g. BTC + Treasury yield regime filter.
 5. **Repeat for Nasdaq Data Link** (P2) once FMP is validated.
-6. **Glassnode on-chain** — revisit when Professional tier cost is justifiable.
+6. **Glassnode on-chain** — Professional is active. Storage is the open draft in [Glassnode market data](glassnode-market-data.md). The class still fetches close price only.

@@ -383,6 +383,8 @@ Not in scope for this PR — flagged here so the next data-layer change can targ
 
 ### Future work — scheduled purge of closed versions
 
+Do not implement the purge from this section. Dropping the yearly `CREATED_AT` partition removes the current payload as well as closed ones, and deleting the JSONB row by row rewrites those documents into WAL. The blast radius is spelled out in [Glassnode market data](glassnode-market-data.md#a-purge-is-an-option-not-this-change). This page does not contain the SQL.
+
 Soft-versioning means `BT.API_REQUEST` and `BT.API_REQUEST_PAYLOAD` accumulate closed rows (`TRANSACT_TO_TS < '9999-12-31'`) every time a user ticks *Refresh dataset*. The current schema has **no scheduled purge** — closed rows live until the partition is manually dropped. Two pieces of work are needed before automating this:
 
 1. **Repartitioning by `TRANSACT_TO_TS`** (or a dedicated archive flag column) instead of `CREATED_AT`. The current `pg_partman` yearly partitions on `CREATED_AT` cleanly drop *all* versions written in a given year — both still-current and closed — which is wrong: we want to keep current rows regardless of age. Splitting current vs. closed into separate partition trees (or moving closed rows to an archive table on close) is required first.

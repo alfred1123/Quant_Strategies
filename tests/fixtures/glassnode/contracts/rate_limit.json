@@ -1,0 +1,20 @@
+{
+  "observed_at": "2026-10-03T02:13:00+08:00",
+  "short_window": {
+    "header_limit": "x-rate-limit-limit",
+    "limit": "600",
+    "header_remaining": "x-rate-limit-remaining",
+    "remaining": "decremented by 1 per call; the absolute remaining value was not retained",
+    "header_reset": "x-rate-limit-reset",
+    "reset": "about 20 seconds"
+  },
+    "monthly_cap": {
+        "calls": 160000,
+        "period": "month",
+        "shared": true,
+        "in_response_headers": false,
+        "source": "operator note 2026-10-03"
+    },
+  "exhausted_body_saved": false,
+  "note": "The short window was observed on the successful calls. A 429 body was not captured. The monthly cap is separate from x-rate-limit-limit."
+}
