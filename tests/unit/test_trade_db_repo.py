@@ -449,3 +449,95 @@ class TestCallMatchesProcedureDdl:
         repo.sp_get_transaction(app_user_id=uuid4(), deployment_id=uuid4(), limit=10)
         sql = mock_get.call_args.args[0]
         assert _call_arg_count(sql) == _ddl_param_count("SP_GET_TRANSACTION.sql")
+
+    @patch.object(TradeRepo, "validate_transaction")
+    @patch.object(TradeRepo, "_call_write")
+    def test_ins_transaction_records_fee_currency(self, mock_write, _validate, repo):
+        repo.sp_ins_transaction(
+            transaction_id=uuid4(),
+            app_user_id=uuid4(),
+            deployment_id=uuid4(),
+            app_id=10,
+            internal_cusip="btcusdt.crypto",
+            buy_sell_cd="BUY",
+            trans_ccy_cd="USDT",
+            user_id="alice",
+            fee_amt=Decimal("0.001"),
+            fee_ccy_cd="BTC",
+        )
+        sql = mock_write.call_args.args[0]
+        params = mock_write.call_args.args[1]
+        assert _call_arg_count(sql) == _ddl_param_count("SP_INS_TRANSACTION.sql")
+        assert params[params.index(Decimal("0.001")) + 1] == "BTC"
+
+    @patch.object(TradeRepo, "validate_deployment_performance")
+    @patch.object(TradeRepo, "_call_write")
+    def test_ins_deployment_performance(self, mock_write, _validate, repo):
+        repo.sp_ins_deployment_performance(
+            deployment_performance_id=uuid4(),
+            app_user_id=uuid4(),
+            deployment_id=uuid4(),
+            deployment_vid=1,
+            tm_interval_id=1,
+            bar_timestamp=datetime(2026, 7, 2, tzinfo=UTC),
+            is_managed_ind="Y",
+            user_id="alice",
+            live_return=Decimal("0.0895"),
+            backtest_return=Decimal("0.09"),
+        )
+        sql = mock_write.call_args.args[0]
+        params = mock_write.call_args.args[1]
+        assert _call_arg_count(sql) == _ddl_param_count(
+            "SP_INS_DEPLOYMENT_PERFORMANCE.sql"
+        )
+        assert Decimal("0.0895") in params
+        assert Decimal("0.09") in params
+
+    @patch.object(TradeRepo, "_call_get", return_value=[])
+    def test_get_deployment_performance(self, mock_get, repo):
+        repo.sp_get_deployment_performance(
+            app_user_id=uuid4(),
+            deployment_id=uuid4(),
+            from_ts=datetime(2026, 7, 1, tzinfo=UTC),
+            limit=800,
+        )
+        sql = mock_get.call_args.args[0]
+        assert _call_arg_count(sql) == _ddl_param_count(
+            "SP_GET_DEPLOYMENT_PERFORMANCE.sql"
+        )
+        assert mock_get.call_args.args[1][4] == 800
+
+    @patch.object(TradeRepo, "_call_get", return_value=[])
+    def test_get_deployment_performance_clamps_limit(self, mock_get, repo):
+        repo.sp_get_deployment_performance(app_user_id=uuid4(), limit=99_999)
+        assert mock_get.call_args.args[1][4] == 10_000
+
+
+class TestDeploymentPerformanceValidation:
+    def _kwargs(self, **overrides):
+        base = {
+            "app_user_id": uuid4(),
+            "deployment_performance_id": uuid4(),
+            "deployment_id": uuid4(),
+            "deployment_vid": 1,
+            "tm_interval_id": 1,
+            "bar_timestamp": datetime(2026, 7, 2, tzinfo=UTC),
+            "is_managed_ind": "Y",
+            "user_id": "alice",
+        }
+        base.update(overrides)
+        return base
+
+    def test_managed_flag_must_be_y_or_n(self, repo):
+        with pytest.raises(TradeValidationError, match="is_managed_ind"):
+            repo.validate_deployment_performance(**self._kwargs(is_managed_ind="X"))
+
+    @patch.object(
+        TradeRepo,
+        "_fetch_current_deployment",
+        return_value={"app_user_id": "other"},
+    )
+    def test_owner_mismatch(self, _fetch, repo):
+        with pytest.raises(TradeValidationError, match="does not belong") as exc:
+            repo.validate_deployment_performance(**self._kwargs())
+        assert exc.value.status_code == 403

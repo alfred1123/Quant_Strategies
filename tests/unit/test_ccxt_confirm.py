@@ -13,27 +13,37 @@ from quant.trade.models.order import OrderRequest, OrderSide
 
 class TestExtractFee:
     def test_dict_fee(self):
-        assert _extract_fee({"fee": {"cost": 0.25, "currency": "USDT"}}) == 0.25
+        assert _extract_fee({"fee": {"cost": 0.25, "currency": "USDT"}}) == (0.25, "USDT")
+
+    def test_base_coin_fee_keeps_its_currency(self):
+        assert _extract_fee({"fee": {"cost": 0.001, "currency": " BTC "}}) == (0.001, "BTC")
 
     def test_none_cost(self):
-        assert _extract_fee({"fee": {"cost": None}}) is None
+        assert _extract_fee({"fee": {"cost": None}}) == (None, None)
 
     def test_no_fee_key(self):
-        assert _extract_fee({}) is None
+        assert _extract_fee({}) == (None, None)
 
     def test_non_dict_fee(self):
-        assert _extract_fee({"fee": 0.1}) is None
+        assert _extract_fee({"fee": 0.1}) == (None, None)
 
 
 class TestParseTerminal:
     def test_closed_order_is_terminal_success(self):
-        order = {"id": "o1", "status": "closed", "filled": 0.01, "average": 64000.0, "fee": {"cost": 0.25}}
+        order = {
+            "id": "o1",
+            "status": "closed",
+            "filled": 0.01,
+            "average": 64000.0,
+            "fee": {"cost": 0.25, "currency": "USDT"},
+        }
         result = _parse_terminal(order, vendor_order_id="o1")
         assert result is not None
         assert result.success is True
         assert result.filled_qty == 0.01
         assert result.avg_price == 64000.0
         assert result.fee == 0.25
+        assert result.fee_ccy == "USDT"
 
     def test_partial_fill_on_cancel_is_success(self):
         order = {"id": "o2", "status": "canceled", "filled": 0.005, "average": 63000.0}
@@ -82,7 +92,7 @@ class TestConfirmMarketOrder:
         gw = MagicMock()
         gw.fetch_order.return_value = {
             "id": "abc", "status": "closed", "filled": 0.01,
-            "average": 64000.0, "fee": {"cost": 0.256},
+            "average": 64000.0, "fee": {"cost": 0.256, "currency": "BTC"},
         }
         req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
         result = confirm_market_order(gw, req=req, vendor_order_id="abc")
@@ -91,6 +101,7 @@ class TestConfirmMarketOrder:
         assert result.filled_qty == 0.01
         assert result.avg_price == 64000.0
         assert result.fee == 0.256
+        assert result.fee_ccy == "BTC"
         assert result.side == OrderSide.BUY
         assert result.requested_qty == 0.01
         mock_sleep.assert_called_once()

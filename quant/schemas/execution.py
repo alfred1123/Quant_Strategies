@@ -43,6 +43,7 @@ class TransactionRow(BaseModel):
     price: Decimal | None = None
     notional_amt: Decimal | None = None
     fee_amt: Decimal | None = None
+    fee_ccy_cd: str | None = None
     vendor_order_id: str | None = None
     trans_ccy_cd: str
     filled_at: datetime
