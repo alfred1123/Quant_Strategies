@@ -1,0 +1,12 @@
+{
+  "metric_path": "market/price_usd_close",
+  "asset": "NOTACOIN",
+  "interval": "24h",
+  "since": 1577836800,
+  "until": 1579046400,
+  "captured_at": "2026-10-03T02:13:00+08:00",
+  "observed_status": true,
+  "observed_values": false,
+  "body_retained": "prefix",
+  "values": "plain_text_400_prefix"
+}

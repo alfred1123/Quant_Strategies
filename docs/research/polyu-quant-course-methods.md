@@ -7,7 +7,7 @@ This page paraphrases a review of the Hong Kong Polytechnic University (PolyU) q
 
 Figures printed in the notes come from equities, futures, or classroom simulations. None of them are crypto results, and none of them are AlgoDaemon results. Where a number appears below, the sentence says which course-notes example it came from. No figure was filled in.
 
-Two-condition rules use `FILTER(primary, gate)`: the primary signal is taken only while the gate is true, and the position is flat otherwise. A long-only AND on this engine currently scores as an OR ([bug B1](../design/2026-09-27-algodaemon-bug-report.md#b1-two-factor-and-behaves-like-or-for-long-only-factors)). Crypto trades every calendar day, so annualise with √365. The notes use about 250 or 261 trading days.
+Two-condition rules use `FILTER(primary, gate)`: the primary signal is taken only while the gate is true, and the position is flat otherwise. A long-only AND used to score as an OR ([bug B1](../design/2026-09-27-algodaemon-bug-report.md#b1-two-factor-and-behaves-like-or-for-long-only-factors)); the combiner now vetoes a flat factor. Stored AND results from before that fix still match OR until they are flagged. Crypto trades every calendar day, so annualise with √365. The notes use about 250 or 261 trading days.
 
 ## What the course covers
 

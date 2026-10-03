@@ -542,8 +542,8 @@ class TestCombinePositions:
         assert result[-2] == 1.0
         assert result[-1] == 1.0
 
-    def test_and_strength_ignores_flat_factors(self):
-        """Flat (0) factors don't compete in strength tiebreak."""
+    def test_and_strength_flat_factor_vetoes(self):
+        """A flat factor vetoes AND. It is not dropped so the other sign can win."""
         a = np.zeros(10)
         b = np.zeros(10)
         a[-2] = 1.0
@@ -551,8 +551,122 @@ class TestCombinePositions:
         sa = np.full(10, 50.0)
         sb = np.full(10, 50.0)
         result = combine_positions([a, b], "AND", strengths=[sa, sb])
-        assert result[-2] == 1.0
-        assert result[-1] == -1.0
+        assert result[-2] == 0.0
+        assert result[-1] == 0.0
+
+    def test_and_flat_factor_vetoes_with_strengths(self):
+        """AND + strengths: a {+1, 0} row stays flat. A flat factor vetoes."""
+        a = np.array([1.0, -1.0, 0.0, 1.0])
+        b = np.array([0.0, 0.0, -1.0, 1.0])
+        sa = np.array([99.0, 99.0, 1.0, 50.0])
+        sb = np.array([1.0, 1.0, 99.0, 50.0])
+        result = combine_positions([a, b], "AND", strengths=[sa, sb])
+        np.testing.assert_array_equal(result, [0.0, 0.0, 0.0, 1.0])
+
+    def test_and_row_cases_with_and_without_strengths(self):
+        """AND: flat vetoes, unanimous agrees, pure +/- is flat unless strengths pick a side."""
+        a = np.zeros(10)
+        b = np.zeros(10)
+        # 4 {+1, 0}, 5 {-1, 0}, 6 {+1, -1}, 7 all +1, 8 all -1, 9 all 0
+        a[4], b[4] = 1.0, 0.0
+        a[5], b[5] = -1.0, 0.0
+        a[6], b[6] = 1.0, -1.0
+        a[7], b[7] = 1.0, 1.0
+        a[8], b[8] = -1.0, -1.0
+        sa = np.array([10, 20, 30, 40, 50, 50, 30, 50, 50, 50], dtype=float)
+        sb = np.array([10, 20, 30, 40, 50, 50, 99, 50, 50, 50], dtype=float)
+        without = combine_positions([a, b], "AND")
+        with_strength = combine_positions([a, b], "AND", strengths=[sa, sb])
+        np.testing.assert_array_equal(without[4:], [0.0, 0.0, 0.0, 1.0, -1.0, 0.0])
+        np.testing.assert_array_equal(with_strength[4:], [0.0, 0.0, -1.0, 1.0, -1.0, 0.0])
+
+    def test_filter_three_factor_row_cases_with_and_without_strengths(self):
+        """FILTER 3+: direction rows follow AND, with and without strengths."""
+        gate = np.ones(10)
+        sig_a = np.zeros(10)
+        sig_b = np.zeros(10)
+        sig_a[4], sig_b[4] = 1.0, 0.0
+        sig_a[5], sig_b[5] = -1.0, 0.0
+        sig_a[6], sig_b[6] = 1.0, -1.0
+        sig_a[7], sig_b[7] = 1.0, 1.0
+        sig_a[8], sig_b[8] = -1.0, -1.0
+        sa = np.array([10, 20, 30, 40, 50, 50, 30, 50, 50, 50], dtype=float)
+        sb = np.array([10, 20, 30, 40, 50, 50, 99, 50, 50, 50], dtype=float)
+        sg = np.full(10, 50.0)
+        without = combine_positions([gate, sig_a, sig_b], "FILTER")
+        with_strength = combine_positions(
+            [gate, sig_a, sig_b], "FILTER", strengths=[sg, sa, sb])
+        np.testing.assert_array_equal(without[4:], [0.0, 0.0, 0.0, 1.0, -1.0, 0.0])
+        np.testing.assert_array_equal(with_strength[4:], [0.0, 0.0, -1.0, 1.0, -1.0, 0.0])
+
+    def test_and_flat_vetoes_when_others_oppose(self):
+        """A flat factor vetoes even when the other factors have opposite signs."""
+        a = np.zeros(10)
+        b = np.zeros(10)
+        c = np.zeros(10)
+        a[-1], b[-1], c[-1] = 1.0, -1.0, 0.0
+        sa = np.array([10, 20, 30, 40, 50, 60, 70, 80, 50, 99], dtype=float)
+        sb = np.array([10, 20, 30, 40, 50, 60, 70, 80, 50, 50], dtype=float)
+        sc = np.full(10, 50.0)
+        result = combine_positions([a, b, c], "AND", strengths=[sa, sb, sc])
+        assert result[-1] == 0.0
+
+    def test_three_factor_one_flat_stays_flat_for_and_and_filter(self):
+        """Three factors, one flat: AND stays flat, and so does FILTER with 3+ factors."""
+        long = np.array([1.0])
+        flat = np.array([0.0])
+        strong = np.array([99.0])
+        weak = np.array([1.0])
+        mid = np.array([50.0])
+        and_plain = combine_positions([long, long, flat], "AND")
+        and_strength = combine_positions(
+            [long, long, flat], "AND", strengths=[strong, mid, weak],
+        )
+        filter_plain = combine_positions([long, long, flat], "FILTER")
+        filter_strength = combine_positions(
+            [long, long, flat], "FILTER", strengths=[mid, strong, weak],
+        )
+        np.testing.assert_array_equal(and_plain, [0.0])
+        np.testing.assert_array_equal(and_strength, [0.0])
+        np.testing.assert_array_equal(filter_plain, [0.0])
+        np.testing.assert_array_equal(filter_strength, [0.0])
+
+    def test_all_flat_and_missing_data_do_not_crash(self):
+        """All-flat stays 0. NaN, and None coerced to a number, stay missing."""
+        flat = np.zeros(3)
+        strengths = [np.full(3, 50.0), np.full(3, 80.0)]
+        all_flat = combine_positions([flat, flat], "AND", strengths=strengths)
+        np.testing.assert_array_equal(all_flat, [0.0, 0.0, 0.0])
+
+        with_nan = np.array([0.0, np.nan, 1.0])
+        other = np.array([0.0, 1.0, 1.0])
+        nan_result = combine_positions(
+            [with_nan, other], "AND", strengths=strengths,
+        )
+        assert nan_result[0] == 0.0
+        assert np.isnan(nan_result[1])
+        assert nan_result[2] == 1.0
+
+        # A numeric array turns None into NaN. That row is missing, not a position.
+        missing = np.array([None], dtype=float)
+        none_result = combine_positions(
+            [np.array([1.0]), missing],
+            "AND",
+            strengths=[np.array([99.0]), np.array([1.0])],
+        )
+        assert np.isnan(none_result[0])
+
+        filter_flat = combine_positions(
+            [np.ones(3), flat, flat], "FILTER",
+            strengths=[np.full(3, 50.0), *strengths],
+        )
+        np.testing.assert_array_equal(filter_flat, [0.0, 0.0, 0.0])
+        filter_nan = combine_positions(
+            [np.array([1.0]), np.array([np.nan]), np.array([1.0])],
+            "FILTER",
+            strengths=[np.array([50.0]), np.array([50.0]), np.array([99.0])],
+        )
+        assert np.isnan(filter_nan[0])
 
     def test_three_factors_strength_tiebreak(self):
         """Three factors disagree, the more extreme past reading wins."""
@@ -620,6 +734,30 @@ class TestCombinePositions:
         # Row 2: gate on, both -1 → -1
         # Row 3: gate off → 0
         np.testing.assert_array_equal(result, [1.0, 0.0, -1.0, 0.0])
+
+    def test_filter_three_factors_flat_direction_vetoes(self):
+        """FILTER 3+ with strengths: a flat direction factor vetoes; +/- still uses strength."""
+        gate = np.ones(10)
+        sig_a = np.zeros(10)
+        sig_b = np.zeros(10)
+        # -4: gate on, direction {+1, 0} → flat veto
+        # -3: gate on, direction {+1, -1}, b more extreme → -1
+        # -2: gate on, both direction factors +1 → +1
+        # -1: gate off, both +1 → flat
+        sig_a[-4], sig_b[-4] = 1.0, 0.0
+        sig_a[-3], sig_b[-3] = 1.0, -1.0
+        sig_a[-2], sig_b[-2] = 1.0, 1.0
+        sig_a[-1], sig_b[-1] = 1.0, 1.0
+        gate[-1] = 0.0
+        sa = np.array([10, 20, 30, 40, 50, 60, 50, 50, 50, 50], dtype=float)
+        sb = np.array([10, 20, 30, 40, 50, 60, 50, 99, 50, 50], dtype=float)
+        sg = np.full(10, 50.0)
+        result = combine_positions(
+            [gate, sig_a, sig_b], "FILTER", strengths=[sg, sa, sb])
+        assert result[-4] == 0.0
+        assert result[-3] == -1.0
+        assert result[-2] == 1.0
+        assert result[-1] == 0.0
 
     def test_filter_nan_propagation(self):
         """FILTER: NaN in gate or signal → NaN in output."""

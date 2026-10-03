@@ -132,6 +132,40 @@ class TestComputeLatestPositionParity:
         assert sig == expected_sig
         assert as_of == expected_as_of
 
+    def test_live_and_stays_flat_when_one_factor_is_flat(self):
+        """Live evaluation stays flat when one long-only AND factor is flat.
+
+        ``live_service.compute_latest_position`` calls
+        ``Performance.compute_latest_position`` and does not combine on its own.
+        """
+        rng = np.random.default_rng(0)
+        n = 80
+        close = 100 + np.cumsum(rng.normal(0, 0.4, n))
+        idx = pd.date_range("2020-01-01", periods=n, freq="D")
+        frame = pd.DataFrame({
+            "price": close, "factor": close, "v": close,
+            "Close": close, "High": close + 1, "Low": close - 1,
+        }, index=idx)
+        sub_a = SubStrategy(
+            "get_bollinger_band", "momentum_band_signal_long_only", 20, 1.0, "v",
+        )
+        sub_b = SubStrategy(
+            "get_rsi", "momentum_bounded_signal_long_only", 14, 70.0, "v",
+        )
+        config = StrategyConfig(
+            "eth-usd", "get_bollinger_band",
+            SignalDirection.momentum_band_signal_long_only, 365,
+            conjunction="AND", substrategies=(sub_a, sub_b),
+        )
+        data = {config.internal_cusip: frame}
+        enrich = Performance(data, config)
+        enrich._trade_enrich_positions()
+        assert enrich.data["position1"].iloc[-1] == 1.0
+        assert enrich.data["position2"].iloc[-1] == 0.0
+        sig, as_of = Performance(data, config).compute_latest_position()
+        assert sig == 0.0
+        assert as_of == str(idx[-1])
+
 
 class TestCompound:
     """Returns must compound, not sum — see docs/archive/return-compounding.md."""
