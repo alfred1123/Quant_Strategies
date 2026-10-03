@@ -1,0 +1,13 @@
+---
+description: Tell Alfred's work from bot work before writing code
+alwaysApply: true
+---
+
+# Who fixes what
+
+Before writing code, read `docs/design/who-fixes-what.md`.
+
+- If the task is on Alfred's list, do not implement it.
+- If it is an open product decision, stop and say so.
+- If it is on the bot list and is a verified bug under about 20 lines of real code, it can be a small fix.
+- Ignore pull request 5. It is not this team's.
