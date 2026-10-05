@@ -10,4 +10,4 @@ Before writing code, read `docs/design/who-fixes-what.md`.
 - If the task is on Alfred's list, do not implement it.
 - If it is an open product decision, stop and say so.
 - If it is on the bot list and is a verified bug under about 20 lines of real code, it can be a small fix.
-- Ignore pull request 5. It is not this team's.
+- Do not push to or change the draft state of a pull request a person opened rather than a bot (for example #92). Alfred reviews and merges it.

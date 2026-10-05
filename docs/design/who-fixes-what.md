@@ -1,6 +1,6 @@
 # Who fixes what
 
-**Updated:** 3 Oct 2026, HKT. Bot Coordinator keeps this page current.
+**Updated:** 5 Oct 2026, HKT. Bot Coordinator keeps this page current.
 
 ## How to tell them apart
 
@@ -30,7 +30,9 @@ Split [`docs/architecture/refdata-cache.md`](../architecture/refdata-cache.md) s
 
 One golden result per strategy (the comparison screen), fractional position sizing, stateful exits, flagging old stored AND results (and FILTER results with 3+ factors) whose numbers changed when #76 merged, the later design for at most two filter factors for daily use (not hard-coded; more can be turned on later), and the later Glassnode narrower metric store (keeps history; purge of closed copies; no live fetch in a harness-only change).
 
-Draft pull request 89 (record the risk rule a backtest run reads) touches application code. Alfred merges it. Bots do not own it. Draft docs pull requests 88 (this page) and 90 (docs-no-risk-numbers) stay bot/docs drafts. None of those three is on the ordered list above.
+Draft pull request 89 (record the risk rule a backtest run reads) touches application code. Alfred merges it. Bots do not own it. Draft pull request 91 (stage strategy-bar PnL reconcile and the fee coin) changes application code, the trade database, and the frontend. The code is `quant/trade/pnl_reconcile.py`, `quant/trade/db_repo.py`, `quant/trade/brokers/ccxt/confirm.py`, `quant/trade/live_apply.py`, and schemas. The database change is Liquibase trade release 1.11.0. It adds a `TRADE.DEPLOYMENT_PERFORMANCE` table and `SP_INS` and `SP_GET` procedures. It adds `FEE_CCY_CD` on `TRADE.TRANSACTION` and changes the `SP_INS_TRANSACTION` signature. Alfred merges it. Bots do not own it. Draft docs pull requests 88 (this page) and 90 (docs-no-risk-numbers) stay bot/docs drafts. None of those four is on the ordered list above.
+
+Pull request 92 (strategy filtering by name) was opened by loki99-art on 5 Oct 2026. It is ready for review, with no review yet. loki99-art is a person, not one of the bots. It adds a client-side strategy-name search box to the Queue table in `frontend/src/components/JobsTable.tsx`. It edits [`docs/design/2026-09-29-queue-frontend-aids.md`](2026-09-29-queue-frontend-aids.md) to drop the proposed result block and plain-language labels, leaving search and two-job compare. Frontend code means Alfred reviews and merges it. Dropping those two proposed items is a product decision for Alfred. The two-job compare that page lists next overlaps with Alfred's later comparison screen (one golden result per strategy), so it is not bot work. Bots do not push to a person's pull request or change its draft state. Check Bugs may review it. It is not on the ordered list above.
 
 ## Bots, now
 
