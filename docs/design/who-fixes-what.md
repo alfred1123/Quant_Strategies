@@ -1,6 +1,6 @@
 # Who fixes what
 
-**Updated:** 5 Oct 2026, HKT. Bot Coordinator keeps this page current.
+**Updated:** 8 Oct 2026, HKT. Bot Coordinator keeps this page current.
 
 ## How to tell them apart
 
@@ -28,7 +28,7 @@ Split [`docs/architecture/refdata-cache.md`](../architecture/refdata-cache.md) s
 
 ### 3. Later, not a bot fix
 
-One golden result per strategy (the comparison screen), fractional position sizing, stateful exits, flagging old stored AND results (and FILTER results with 3+ factors) whose numbers changed when #76 merged, the later design for at most two filter factors for daily use (not hard-coded; more can be turned on later), and the later Glassnode narrower metric store (keeps history; purge of closed copies; no live fetch in a harness-only change). The two-job compare that [`docs/design/2026-09-29-queue-frontend-aids.md`](2026-09-29-queue-frontend-aids.md) lists next overlaps with that comparison screen (one golden result per strategy). It is not bot work.
+One golden result per strategy (the comparison screen), fractional position sizing, stateful exits, flagging old stored AND results (and FILTER results with 3+ factors) whose numbers changed when #76 merged, the later design for at most two filter factors for daily use (not hard-coded; more can be turned on later), and the later Glassnode narrower metric store (keeps history; purge of closed copies; no live fetch in a harness-only change). #98 (compare two jobs dialog) merged on 8 Oct 2026, so the two-job compare that [`docs/design/2026-09-29-queue-frontend-aids.md`](2026-09-29-queue-frontend-aids.md) listed next is now in the Queue tab. It overlaps the still-open comparison screen (one golden result per strategy). Whether #98 is the first step toward that screen, and any further work on it, is Alfred's decision and not bot work.
 
 Draft pull request 89 (record the risk rule a backtest run reads) touches application code. Alfred merges it. Bots do not own it. Draft pull request 91 (stage strategy-bar PnL reconcile and the fee coin) changes application code, the trade database, and the frontend. The code is `quant/trade/pnl_reconcile.py`, `quant/trade/db_repo.py`, `quant/trade/brokers/ccxt/confirm.py`, `quant/trade/live_apply.py`, and schemas. The database change is Liquibase trade release 1.11.0. It adds a `TRADE.DEPLOYMENT_PERFORMANCE` table and `SP_INS` and `SP_GET` procedures. It adds `FEE_CCY_CD` on `TRADE.TRANSACTION` and changes the `SP_INS_TRANSACTION` signature. Alfred merges it. Bots do not own it. Draft docs pull request 90 (docs-no-risk-numbers) stays a bot/docs draft. None of those three is on the ordered list above.
 
