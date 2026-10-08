@@ -10,12 +10,15 @@ function detail(
     strategy_nm: 'sma',
     config_json: config,
     result: { performance: { strategy_metrics: metrics } },
-  } as JobDetail;
+  } as unknown as JobDetail;
 }
 
 describe('formatDiff', () => {
-  it('paints a larger max-drawdown diff red and a smaller one green', () => {
+  it('paints a larger max-drawdown diff red', () => {
     expect(formatDiff(0.4, 0.2, true, true)).toEqual({ text: '+20.00 pp', color: 'error.main' });
+  });
+
+  it('paints a smaller max-drawdown diff green', () => {
     expect(formatDiff(0.2, 0.4, true, true)).toEqual({ text: '-20.00 pp', color: 'success.main' });
   });
 

@@ -45,6 +45,7 @@ function rangeLabel(value: unknown): string | undefined {
   return `min ${min} max ${max} step ${step}`;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- the unit test imports this helper
 export function extractJobSummary(detail: JobDetail): JobSummary {
   const config = detail.config_json ?? {};
   const result = detail.result ?? {};
@@ -92,6 +93,7 @@ function formatNumber(value: number | null, decimals = 2): string {
   return value.toFixed(decimals);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- the unit test imports this helper
 export function formatDiff(a: number | null, b: number | null, isPercent = false, lowerIsBetter = false): { text: string; color: string } {
   if (a === null || b === null) return { text: '—', color: 'text.secondary' };
   const diff = a - b;
