@@ -30,7 +30,7 @@ interface JobSummary {
   strategyNm: string | null;
   symbol: string | null;
   dateRange: string | null;
-  factors: Array<{ name: string; window?: number; signal?: number }>;
+  factors: Array<{ name: string; window?: string; signal?: string }>;
   sharpe: number | null;
   calmar: number | null;
   totalReturn: number | null;
@@ -38,7 +38,14 @@ interface JobSummary {
   configJson: Record<string, unknown> | null;
 }
 
-function extractJobSummary(detail: JobDetail): JobSummary {
+function rangeLabel(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { min, max, step } = value as Record<string, unknown>;
+  if (typeof min !== 'number' || typeof max !== 'number' || typeof step !== 'number') return undefined;
+  return `min ${min} max ${max} step ${step}`;
+}
+
+export function extractJobSummary(detail: JobDetail): JobSummary {
   const config = detail.config_json ?? {};
   const result = detail.result ?? {};
   const perf = (result.performance as Record<string, unknown>) ?? {};
@@ -47,15 +54,15 @@ function extractJobSummary(detail: JobDetail): JobSummary {
   const factors = Array.isArray(config.factors)
     ? config.factors.map((f: Record<string, unknown>) => ({
         name: String(f.indicator ?? f.name ?? 'Unknown'),
-        window: typeof f.window === 'number' ? f.window : undefined,
-        signal: typeof f.signal === 'number' ? f.signal : undefined,
+        window: rangeLabel(f.window_range),
+        signal: rangeLabel(f.signal_range),
       }))
     : [];
 
-  const startDate = config.start ?? config.start_date ?? config.startDate;
-  const endDate = config.end ?? config.end_date ?? config.endDate;
+  const startDate = config.start;
+  const endDate = config.end;
   const dateRange =
-    startDate && endDate ? `${formatDateTime(String(startDate))} → ${formatDateTime(String(endDate))}` : null;
+    startDate && endDate ? `${String(startDate)} → ${String(endDate)}` : null;
 
   const sharpeVal = metrics['Sharpe Ratio'];
   const calmarVal = metrics['Calmar Ratio'];
@@ -80,28 +87,12 @@ function formatPercent(value: number | null): string {
   return `${(value * 100).toFixed(2)}%`;
 }
 
-function formatDateTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return dateStr;
-  
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  
-  let hours = date.getHours();
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const ampm = hours >= 12 ? 'pm' : 'am';
-  hours = hours % 12 || 12;
-  
-  return `${year}-${month}-${day} (${hours}:${minutes} ${ampm})`;
-}
-
 function formatNumber(value: number | null, decimals = 2): string {
   if (value === null) return '—';
   return value.toFixed(decimals);
 }
 
-function formatDiff(a: number | null, b: number | null, isPercent = false): { text: string; color: string } {
+export function formatDiff(a: number | null, b: number | null, isPercent = false, lowerIsBetter = false): { text: string; color: string } {
   if (a === null || b === null) return { text: '—', color: 'text.secondary' };
   const diff = a - b;
   if (diff === 0) return { text: '0', color: 'text.secondary' };
@@ -109,7 +100,7 @@ function formatDiff(a: number | null, b: number | null, isPercent = false): { te
   const text = isPercent
     ? `${sign}${(diff * 100).toFixed(2)} pp`
     : `${sign}${diff.toFixed(2)}`;
-  const color = diff > 0 ? 'success.main' : 'error.main';
+  const color = (lowerIsBetter ? diff < 0 : diff > 0) ? 'success.main' : 'error.main';
   return { text, color };
 }
 
@@ -117,7 +108,7 @@ function DifferenceColumn({ a, b }: { a: JobSummary; b: JobSummary }) {
   const sharpeDiff = formatDiff(a.sharpe, b.sharpe);
   const calmarDiff = formatDiff(a.calmar, b.calmar);
   const returnDiff = formatDiff(a.totalReturn, b.totalReturn, true);
-  const ddDiff = formatDiff(a.maxDrawdown, b.maxDrawdown, true);
+  const ddDiff = formatDiff(a.maxDrawdown, b.maxDrawdown, true, true);
 
   return (
     <Box sx={{ minWidth: 100, textAlign: 'center' }}>
