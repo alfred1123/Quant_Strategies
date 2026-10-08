@@ -121,7 +121,7 @@ function DifferenceColumn({ a, b }: { a: JobSummary; b: JobSummary }) {
 
   return (
     <Box sx={{ minWidth: 100, textAlign: 'center' }}>
-      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600 }} gutterBottom>
         A compare to B
       </Typography>
       <Typography variant="body2" color="text.secondary" gutterBottom>
@@ -158,25 +158,25 @@ function DifferenceColumn({ a, b }: { a: JobSummary; b: JobSummary }) {
       </Typography>
 
       <Grid container spacing={1}>
-        <Grid item xs={6}>
+        <Grid size={6}>
           <Typography variant="caption" color="text.secondary">
             Sharpe
           </Typography>
           <Typography variant="body2" sx={{ color: sharpeDiff.color }}>{sharpeDiff.text}</Typography>
         </Grid>
-        <Grid item xs={6}>
+        <Grid size={6}>
           <Typography variant="caption" color="text.secondary">
             Calmar
           </Typography>
           <Typography variant="body2" sx={{ color: calmarDiff.color }}>{calmarDiff.text}</Typography>
         </Grid>
-        <Grid item xs={6}>
+        <Grid size={6}>
           <Typography variant="caption" color="text.secondary">
             Return
           </Typography>
           <Typography variant="body2" sx={{ color: returnDiff.color }}>{returnDiff.text}</Typography>
         </Grid>
-        <Grid item xs={6}>
+        <Grid size={6}>
           <Typography variant="caption" color="text.secondary">
             Drawdown
           </Typography>
@@ -192,7 +192,7 @@ function JobColumn({ summary, label }: { summary: JobSummary; label: string }) {
 
   return (
     <Box sx={{ flex: 1, minWidth: 0 }}>
-      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600 }} gutterBottom>
         {label}
       </Typography>
       <Typography variant="body2" color="text.secondary" noWrap title={summary.strategyNm ?? undefined}>
@@ -241,25 +241,25 @@ function JobColumn({ summary, label }: { summary: JobSummary; label: string }) {
       </Typography>
 
       <Grid container spacing={1}>
-        <Grid item xs={6}>
+        <Grid size={6}>
           <Typography variant="caption" color="text.secondary">
             Sharpe
           </Typography>
           <Typography variant="body2">{formatNumber(summary.sharpe)}</Typography>
         </Grid>
-        <Grid item xs={6}>
+        <Grid size={6}>
           <Typography variant="caption" color="text.secondary">
             Calmar
           </Typography>
           <Typography variant="body2">{formatNumber(summary.calmar)}</Typography>
         </Grid>
-        <Grid item xs={6}>
+        <Grid size={6}>
           <Typography variant="caption" color="text.secondary">
             Total Return
           </Typography>
           <Typography variant="body2">{formatPercent(summary.totalReturn)}</Typography>
         </Grid>
-        <Grid item xs={6}>
+        <Grid size={6}>
           <Typography variant="caption" color="text.secondary">
             Max Drawdown
           </Typography>
@@ -307,21 +307,13 @@ function JobColumn({ summary, label }: { summary: JobSummary; label: string }) {
   );
 }
 
-export default function CompareJobsDialog({ open, onClose, queueIds }: CompareJobsDialogProps) {
-  const [loading, setLoading] = useState(false);
+function CompareJobsBody({ queueIds }: { queueIds: [string, string] }) {
   const [error, setError] = useState<string | null>(null);
   const [summaries, setSummaries] = useState<[JobSummary, JobSummary] | null>(null);
+  const loading = summaries === null && error === null;
 
   useEffect(() => {
-    if (!open || !queueIds) {
-      setSummaries(null);
-      setError(null);
-      return;
-    }
-
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     Promise.all([fetchJob(queueIds[0]), fetchJob(queueIds[1])])
       .then(([job1, job2]) => {
@@ -331,16 +323,41 @@ export default function CompareJobsDialog({ open, onClose, queueIds }: CompareJo
       .catch((err) => {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Failed to load jobs');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [open, queueIds]);
+  }, [queueIds]);
 
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Typography color="error" sx={{ py: 2 }}>
+        {error}
+      </Typography>
+    );
+  }
+
+  if (!summaries) return null;
+
+  return (
+    <Stack direction="row" spacing={3} divider={<Divider orientation="vertical" flexItem />}>
+      <JobColumn summary={summaries[0]} label="Job A" />
+      <DifferenceColumn a={summaries[0]} b={summaries[1]} />
+      <JobColumn summary={summaries[1]} label="Job B" />
+    </Stack>
+  );
+}
+
+export default function CompareJobsDialog({ open, onClose, queueIds }: CompareJobsDialogProps) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
@@ -350,22 +367,8 @@ export default function CompareJobsDialog({ open, onClose, queueIds }: CompareJo
         </IconButton>
       </DialogTitle>
       <DialogContent dividers>
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
-          </Box>
-        )}
-        {error && (
-          <Typography color="error" sx={{ py: 2 }}>
-            {error}
-          </Typography>
-        )}
-        {summaries && !loading && (
-          <Stack direction="row" spacing={3} divider={<Divider orientation="vertical" flexItem />}>
-            <JobColumn summary={summaries[0]} label="Job A" />
-            <DifferenceColumn a={summaries[0]} b={summaries[1]} />
-            <JobColumn summary={summaries[1]} label="Job B" />
-          </Stack>
+        {open && queueIds && (
+          <CompareJobsBody key={`${queueIds[0]}:${queueIds[1]}`} queueIds={queueIds} />
         )}
       </DialogContent>
     </Dialog>
