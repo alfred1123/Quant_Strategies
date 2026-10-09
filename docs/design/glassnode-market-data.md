@@ -95,14 +95,7 @@ That 0/1 column is factor one. BTC 60/2.25 stays factor two. `combine_positions`
 
 SOPR and MVRV z-score stay a from-July-2025 check only.
 
-The rule, in the harness note:
-
-- The raw point-in-time BTC exchange netflow series (transactions/transfers_volume_exchanges_net_pit) has no exact zeros in the saved copy from 11 Dec 2019 through 1 Oct 2026 (2487 days, 0 nulls, smallest absolute value about 2.56). The 2021-07-01 to 2024-06-30 window is 1096 days and also has no exact zero. A non-zero gate on the raw series never turns the sleeve off, so it is not the child.
-- The named series, chosen before a result: 1 when that point-in-time value is below zero, and 0 otherwise. No other cut. The 0 must be stored. Dropping zero days is not allowed.
-- That 0/1 column is factor one. BTC 60/2.25 stays factor two. On a two-factor FILTER the first factor is the gate and the second is the direction. The 0/1 column has to be first if it is meant to turn the sleeve on and off. Put second, the sleeve's direction is thrown away. The gate indicator is an SMA with window 1, so a stored 0 stays off and a 1 stays on. A wider window or a Bollinger is not this series.
-- In the saved copy the 0/1 column is 0 on 702 days and 1 on 1785 days. That is a count of the named rule, not a backtest result.
-- The signal threshold on the SMA (window 1) of the 0/1 outflow column has to sit strictly between 0 and 1. Any value in that open range leaves a stored 0 off and a stored 1 on, so the threshold is not a search and do not pick or recommend a specific number inside the range. The sleeve's 2.25 is not the gate's threshold. A threshold of 2.25 would leave the gate off every day, because a 1 is never above 2.25.
-- SOPR and MVRV z-score stay a from-July-2025 check only.
+The harness locks this rule without restating it; the wording under [Sleeve factors](#sleeve-factors) is the source.
 
 None of these paths is a method on `Glassnode`, and none is an `APP_METRIC` row. Wiring them waits on the later store. It is not built here.
 

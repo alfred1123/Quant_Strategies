@@ -1,6 +1,6 @@
 # Design: Separate Indicator Underlying from Trading Underlying
 
-**Status:** Partially implemented. Decision [#21 INTERNAL_CUSIP](../decisions.md) defines the canonical product identifier; `INST.PRODUCT` and `INST.PRODUCT_XREF` are live (decisions #20, #22). Per-sub-strategy override of the indicator underlying (the bulk of this design) has not yet been wired through `StrategyConfig` / `SubStrategy`.
+**Status:** Partially implemented. Decision [#21 INTERNAL_CUSIP](../decisions.md) defines the canonical product identifier; `INST.PRODUCT` and `INST.PRODUCT_XREF` are live (decisions #20, #22). Per-factor `FactorConfig.symbol` / `vendor_symbol` and multi-cusip `_build_data_dict` are **shipped on main** (`quant/schemas/backtest.py`, `quant/strategy/backtest_service.py`). `SubStrategy.internal_cusip` carries the indicator underlying. Still backlog: the `PRODUCT_ID` migration on `BT.STRATEGY` / `BT.RESULT` (neither table has that column).
 **Date:** 2026-04-18
 **Author:** alfcheun
 
@@ -139,29 +139,35 @@ For the common single-ticker case, the dict has one entry — no overhead.
 
 ### Phase 2 — API Backend
 
-#### 2a. `quant/api/schemas/backtest.py` — add `symbol` per factor
+**Shipped on main.** Per-factor `symbol` / `vendor_symbol` and the multi-cusip fetch below are in the tree. The `PRODUCT_ID` migration in Phase 3 is still backlog.
+
+#### 2a. `quant/schemas/backtest.py` — `symbol` and `vendor_symbol` per factor
+
+`FactorConfig` lives in `quant/schemas/backtest.py`:
 
 ```python
 class FactorConfig(BaseModel):
+    symbol: str | None = None          # internal_cusip; unset = trade asset
+    vendor_symbol: str | None = None   # direct vendor symbol override
+    data_column: str = "price"
     indicator: str
     strategy: str
-    data_column: str = "price"
     window_range: RangeParam
     signal_range: RangeParam
-    symbol: str | None = None   # NEW: None = use request-level symbol
 ```
 
-Request models keep `symbol: str` for now. `product_id` comes in DB phase.
+Request models keep `symbol: str` for the trade asset. `product_id` stays in the database phase.
 
-#### 2b. `quant/api/services/backtest.py` — fetch unique symbols
+#### 2b. `quant/strategy/backtest_service.py` — fetch unique symbols
+
+`_build_data_dict` fetches the trade symbol, then each factor cusip that is not already in the dict. The helper is `fetch_df`:
 
 ```python
-symbols = {req.symbol}
-for f in (req.factors or []):
-    if f.symbol is not None:
-        symbols.add(f.symbol)
-
-data = {sym: _fetch_df(sym, ...) for sym in symbols}
+data_dict = {req.symbol: fetch_df(req.symbol, ...)}
+for f in req.factors:
+    cusip = (f.vendor_symbol or f.symbol) if (f.symbol or f.vendor_symbol) else None
+    if cusip and cusip not in data_dict:
+        data_dict[cusip] = fetch_df(cusip, ...)
 ```
 
 ### Phase 3 — Database (all access via stored procedures)
@@ -211,8 +217,8 @@ Same pattern for `BT.RESULT`.
 
 #### 3c. Update procedures
 
-- `BT.SP_INS_STRATEGY` — `IN_TICKER` → `IN_PRODUCT_ID`
-- Completed backtest rows: **`INSERT INTO BT.RESULT`** (worker) + **`CALL BT.SP_INS_QUEUE`** (**`TERMINAL`**) — **no** **`BT.SP_INS_RESULT`** procedure (**see `BT.RESULT` / queue design in Liquibase `db/liquidbase/bt/`**).
+- `BT.SP_INS_STRATEGY` — `IN_TICKER` → `IN_PRODUCT_ID` (backlog; `BT.STRATEGY` has no `PRODUCT_ID` column)
+- Completed backtest rows are written with `CALL BT.SP_INS_RESULT` (worker-supplied `RESULT_ID`). Close the queue row by writing a terminal `QUEUE_STATUS_ID` through `BT.SP_INS_QUEUE` (status id only). `WorkerLoopRepo.claim_next` is two Python statements: `BT.SP_GET_QUEUE`, then `BT.SP_INS_QUEUE` with the running status id (`quant/queue/worker_loop.py`). See [SP_INS_QUEUE](../architecture/database.md#sp_ins_queue).
 - New: `BT.SP_GET_STRATEGY`, `BT.SP_GET_RESULT` — backend reads via procedure
 
 #### 3c.1. Where procedures are applied in the flow
@@ -231,7 +237,7 @@ Use this sequence during implementation so each layer switches cleanly.
 
 3. **Backtest write path (existing BT inserts):**
     - Update `BT.SP_INS_STRATEGY` to accept product identity (`IN_PRODUCT_ID`) instead of ticker.
-    - Persist results with **`INSERT INTO BT.RESULT`** where appropriate; close queue jobs with **`BT.SP_INS_QUEUE`** (**`TERMINAL`**).
+    - Persist results with `CALL BT.SP_INS_RESULT`. Close the queue job by writing a terminal `QUEUE_STATUS_ID` through `BT.SP_INS_QUEUE` (status id only). See [SP_INS_QUEUE](../architecture/database.md#sp_ins_queue).
 
 4. **Backtest read path (result display):**
     - Use `BT.SP_GET_STRATEGY` and `BT.SP_GET_RESULT` for result/history views.
@@ -247,7 +253,7 @@ Procedure ownership by UI surface:
 |---|---|---|
 | Product selector | List products | `INST.SP_GET_PRODUCT` |
 | Data source / broker symbol resolution | Resolve current vendor symbol | `INST.SP_GET_PRODUCT_XREF` |
-| Backtest run save | Insert strategy + result rows | `BT.SP_INS_STRATEGY`, **`INSERT BT.RESULT`**, `BT.SP_INS_QUEUE` |
+| Backtest run save | Insert strategy + result rows | `BT.SP_INS_STRATEGY`, `BT.SP_INS_RESULT`, `BT.SP_INS_QUEUE` |
 | Backtest history screen | Read saved runs | `BT.SP_GET_STRATEGY`, `BT.SP_GET_RESULT` |
 | Admin product maintenance | Create/update mappings | `INST.SP_INS_PRODUCT`, `INST.SP_INS_PRODUCT_XREF` |
 
@@ -306,16 +312,17 @@ BT.API_REQUEST_PAYLOAD  (data — JSONB, partitioned yearly via pg_partman)
 
 **Relationship:** `API_REQUEST` 1 → N `API_REQUEST_PAYLOAD` on `(API_REQ_ID, API_REQ_VID)`.
 
-**Unique partial index** on `API_REQUEST`:
+**Proposed / not in source DDL.** The partial unique index below is not in `db/liquidbase/bt/tables/API_REQUEST.sql`. [Glassnode market data](glassnode-market-data.md#api_request-as-it-is) already records that `UX_API_REQUEST_CURRENT_SUBSCRIPTION` is not in the DDL, so a current-row lookup is not constrained to one row.
 
 ```sql
+-- Proposed / not in source DDL:
 CREATE UNIQUE INDEX UX_API_REQUEST_CURRENT_SUBSCRIPTION
 ON BT.API_REQUEST (APP_ID, APP_METRIC_ID, TM_INTERVAL_ID, INTERNAL_CUSIP)
 NULLS NOT DISTINCT
 WHERE TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31';
 ```
 
-This guarantees exactly **one current row** per subscription key.
+Applied, this would keep exactly **one current row** per subscription key.
 
 ### Soft-versioning model
 
@@ -371,7 +378,7 @@ read_payload(...)                  refresh_payload(..., fetcher)
 
 ### Date sync across products + factors
 
-A backtest with N products/factors aligns DataFrames via `reindex` on the main product's index. If a factor is missing dates the main product has, the result silently corrupts. `_build_data_dict` in `quant/api/services/backtest.py` therefore enforces an **intersection check** after fetching: the common `[max(starts), min(ends)]` across all tickers must cover the requested `[start, end]`, else 400 with the limiting ticker named.
+A backtest with N products/factors aligns DataFrames via `reindex` on the main product's index. If a factor is missing dates the main product has, the result silently corrupts. `_build_data_dict` in `quant/strategy/backtest_service.py` (**shipped on main**) therefore enforces an **intersection check** after fetching: the common `[max(starts), min(ends)]` across all tickers must cover the requested `[start, end]`, else 400 with the limiting ticker named.
 
 ### Future work — minimise provider traffic without payload duplication
 
@@ -394,7 +401,7 @@ This is a meaningful chunk of work — partition migrations on a populated table
 
 ### FastAPI integration
 
-The FastAPI backend creates `BacktestCache` at startup (`quant/api/main.py` lifespan). `_fetch_df` in `quant/api/services/backtest.py` is the sole caller — it dispatches to `refresh_payload(...)` when the user ticks *Refresh dataset* and to `read_payload(...)` otherwise. Falls back to a direct provider call only when the DB is unavailable (e.g. unit tests).
+The FastAPI lifespan (`quant/api/main.py`) builds `DataCaches`, which constructs `BacktestCache`. `fetch_df` in `quant/strategy/backtest_service.py` dispatches to `refresh_payload(...)` when the user ticks *Refresh dataset* and to `read_payload(...)` otherwise. It falls back to a direct provider call only when the cache is not wired (for example unit tests).
 
 ### Partition maintenance
 
@@ -422,7 +429,7 @@ Backend:
 | Phase | Scope |
 |-------|-------|
 | **1** | **Python backend** — SubStrategy.ticker, Performance/ParamOpt accept `dict[str, DataFrame]`, main.py builds data dict |
-| **2** | **API** — FactorConfig.symbol, service fetches unique symbols |
+| **2** | **API** — `FactorConfig.symbol` / `vendor_symbol`, multi-cusip `_build_data_dict` (**shipped on main**) |
 | **3** | **Database** — INST seed + procedures, BT ALTER (TICKER → PRODUCT_ID), SP_GET_* procedures |
 | **4** | **Frontend** — Product dropdown, per-factor symbol override |
 | **5** | Tests — unit + integration across all layers |
