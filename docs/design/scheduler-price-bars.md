@@ -384,7 +384,7 @@ Every "Refresh dataset" click creates a new `API_REQ_VID` in `BT.API_REQUEST` an
 2. Fetch the requested `[RANGE_START_TS, RANGE_END_TS]` from the provider (the smallest range the caller needs for that refresh).
 3. Call `BT.SP_INS_API_REQUEST` with the existing `API_REQ_ID` — the SP closes the prior VID and inserts a new current row + payload with the merged range.
 
-There is **no** `BT.SP_CONSOLIDATE_API_REQUEST`. Purging closed rows / partition retention is separate future work ([Separate Underlying & Cache](separate-underlying.md) § scheduled purge of closed versions).
+There is **no** `BT.SP_CONSOLIDATE_API_REQUEST`. Old payload partitions are dropped by `BT.SP_DETACH_API_REQUEST_PAYLOAD` ([Separate Underlying & Cache](separate-underlying.md#scheduled-detach-of-old-payload-partitions)).
 
 ---
 

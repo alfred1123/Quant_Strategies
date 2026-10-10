@@ -7,7 +7,11 @@ from unittest.mock import patch
 import pytest
 
 from quant.api.admin.models import StaleConnectionSweep
-from quant.api.admin.repo import ConnectionMaintenanceRepo, DEFAULT_STALE_IDLE_SECONDS
+from quant.api.admin.repo import (
+    ApiRequestPayloadRepo,
+    ConnectionMaintenanceRepo,
+    DEFAULT_STALE_IDLE_SECONDS,
+)
 
 PROC_DIR = (
     Path(__file__).resolve().parents[2]
@@ -69,3 +73,42 @@ class TestTerminateStaleConnections:
 
     def test_default_idle_seconds_is_one_hour(self):
         assert DEFAULT_STALE_IDLE_SECONDS == 3600
+
+
+BT_PROC_DIR = (
+    Path(__file__).resolve().parents[2]
+    / "db"
+    / "liquidbase"
+    / "bt"
+    / "procedures"
+)
+
+
+@pytest.fixture
+def payload_repo():
+    instance = ApiRequestPayloadRepo.__new__(ApiRequestPayloadRepo)
+    instance.user_id = "system"
+    return instance
+
+
+class TestDetachApiRequestPayload:
+    @patch.object(ApiRequestPayloadRepo, "_call_write", return_value=(1,))
+    def test_call_matches_procedure_ddl(self, mock_write, payload_repo):
+        payload_repo.detach(retention_days=14)
+        sql = mock_write.call_args.args[0]
+        txt = (BT_PROC_DIR / "SP_DETACH_API_REQUEST_PAYLOAD.sql").read_text()
+        sig = re.search(
+            r"CREATE OR REPLACE PROCEDURE\s+[\w.]+\s*\((.*?)\)\s*LANGUAGE",
+            txt,
+            re.S | re.I,
+        )
+        assert sig
+        ddl_count = len(
+            [ln for ln in sig.group(1).splitlines() if re.match(r"\s*(IN|OUT)\s+\w+", ln)]
+        )
+        assert _call_arg_count(sql) == ddl_count
+        assert mock_write.call_args.args[1] == (14,)
+
+    @patch.object(ApiRequestPayloadRepo, "_call_write", return_value=())
+    def test_returns_zero_on_empty_tail(self, mock_write, payload_repo):
+        assert payload_repo.detach(retention_days=14) == 0

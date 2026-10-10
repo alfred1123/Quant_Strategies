@@ -10,8 +10,8 @@ import logging
 from fastapi import APIRouter, Depends, Request
 
 from quant.api.admin.connection_maintenance import ConnectionMaintenanceService
-from quant.api.admin.repo import ConnectionMaintenanceRepo, LogProcRepo
-from quant.api.admin.schemas import TerminateStaleConnectionsRequest
+from quant.api.admin.repo import ApiRequestPayloadRepo, ConnectionMaintenanceRepo, LogProcRepo
+from quant.api.admin.schemas import DetachApiRequestPayloadRequest, TerminateStaleConnectionsRequest
 from quant.api.auth.dependencies import require_user_or_service
 
 logger = logging.getLogger(__name__)
@@ -21,6 +21,10 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 def _get_log_proc_repo(request: Request) -> LogProcRepo:
     return LogProcRepo(request.app.state.db_conninfo, user_id="system")
+
+
+def _get_api_request_payload_repo(request: Request) -> ApiRequestPayloadRepo:
+    return ApiRequestPayloadRepo(request.app.state.db_conninfo, user_id="system")
 
 
 def _get_connection_maintenance_service(request: Request) -> ConnectionMaintenanceService:
@@ -49,6 +53,23 @@ def terminate_stale_connections(
         "terminated": sweep.terminated,
         "idle_seconds": body.idle_seconds,
     }
+
+
+@router.post("/db/detach-api-request-payload")
+def detach_api_request_payload(
+    body: DetachApiRequestPayloadRequest = DetachApiRequestPayloadRequest(),
+    caller: str = Depends(require_user_or_service),
+    repo: ApiRequestPayloadRepo = Depends(_get_api_request_payload_repo),
+) -> dict:
+    """Detach payload partitions whose range ended before *retention_days*."""
+    dropped = repo.detach(retention_days=body.retention_days)
+    logger.info(
+        "db/detach-api-request-payload: dropped=%d retention_days=%d caller=%s",
+        dropped,
+        body.retention_days,
+        caller,
+    )
+    return {"dropped": dropped, "retention_days": body.retention_days}
 
 
 @router.post("/log-proc-summary/summarize")

@@ -32,5 +32,6 @@
     <include file="releases/1.25.0-sp-get-queue-newest-first.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.26.0-sp-get-result-strategy-inputs.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.27.0-api-call.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.28.0-detach-api-request-payload.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

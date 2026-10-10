@@ -38,6 +38,23 @@ class ConnectionMaintenanceRepo(DbGateway):
         return StaleConnectionSweep(stale=int(tail[0]), terminated=int(tail[1]))
 
 
+class ApiRequestPayloadRepo(DbGateway):
+    """Drop old ``BT.API_REQUEST_PAYLOAD`` partitions."""
+
+    def detach(self, *, retention_days: int) -> int:
+        """Call ``BT.SP_DETACH_API_REQUEST_PAYLOAD``.
+
+        Returns how many partitions were dropped. The procedure does not
+        write ``API_REQUEST``.
+        """
+        tail = self._call_write(
+            "CALL BT.SP_DETACH_API_REQUEST_PAYLOAD("
+            "%s::integer, NULL::text, NULL::text, NULL::text, NULL::integer)",
+            (retention_days,),
+        )
+        return int(tail[0]) if tail else 0
+
+
 class LogProcRepo(DbGateway):
     """SP wrappers for CORE_ADMIN.LOG_PROC_SUMMARY."""
 

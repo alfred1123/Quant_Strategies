@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.28.0-001-sp-detach-api-request-payload" author="alfcheun" context="bt,prod-deploy">
+        <comment>Detach old API_REQUEST_PAYLOAD partitions. Does not write API_REQUEST.</comment>
+        <sqlFile path="../procedures/SP_DETACH_API_REQUEST_PAYLOAD.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback>
+            <sql>
+                DROP PROCEDURE IF EXISTS BT.SP_DETACH_API_REQUEST_PAYLOAD(
+                    IN INTEGER,
+                    OUT TEXT, OUT TEXT, OUT TEXT, OUT INTEGER
+                );
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.28.0-002-grant-sp-detach-api-request-payload" author="alfcheun" context="bt,prod-deploy">
+        <comment>quant_app may detach a payload partition once the role exists.</comment>
+        <sql splitStatements="false" stripComments="false"><![CDATA[
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
+                    GRANT EXECUTE ON PROCEDURE BT.SP_DETACH_API_REQUEST_PAYLOAD(
+                        IN INTEGER,
+                        OUT TEXT, OUT TEXT, OUT TEXT, OUT INTEGER
+                    ) TO quant_app;
+                END IF;
+            END $$;
+        ]]></sql>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

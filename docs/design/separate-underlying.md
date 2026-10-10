@@ -388,16 +388,11 @@ Eventually we'll want **delta-row storage** for those metrics — instead of one
 
 Not in scope for this PR — flagged here so the next data-layer change can target it.
 
-### Future work — scheduled purge of closed versions
+### Scheduled detach of old payload partitions
 
-Do not implement the purge from this section. Dropping the yearly `CREATED_AT` partition removes the current payload as well as closed ones, and deleting the JSONB row by row rewrites those documents into WAL. The blast radius is spelled out in [Glassnode market data](glassnode-market-data.md#a-purge-is-an-option-not-this-change). This page does not contain the SQL.
+`BT.SP_DETACH_API_REQUEST_PAYLOAD` detaches a child partition and drops it when the partition's upper bound is older than the retention the caller passes. The bound decides. The procedure does not read or write `API_REQUEST`. Release `bt/1.28.0`, context `bt,prod-deploy`. The daily job `detach_api_request_payload` passes 14 days at 03:15 UTC.
 
-Soft-versioning means `BT.API_REQUEST` and `BT.API_REQUEST_PAYLOAD` accumulate closed rows (`TRANSACT_TO_TS < '9999-12-31'`) every time a user ticks *Refresh dataset*. The current schema has **no scheduled purge** — closed rows live until the partition is manually dropped. Two pieces of work are needed before automating this:
-
-1. **Repartitioning by `TRANSACT_TO_TS`** (or a dedicated archive flag column) instead of `CREATED_AT`. The current `pg_partman` yearly partitions on `CREATED_AT` cleanly drop *all* versions written in a given year — both still-current and closed — which is wrong: we want to keep current rows regardless of age. Splitting current vs. closed into separate partition trees (or moving closed rows to an archive table on close) is required first.
-2. **Retention policy + scheduler.** Decide how long closed versions are kept (e.g. 90 days for audit replay), then drive purges via `pg_cron` or an external scheduled job calling a new `BT.SP_PURGE_CLOSED_API_REQUESTS(retention_days)` procedure that does whole-partition `DROP` rather than per-row `DELETE`.
-
-This is a meaningful chunk of work — partition migrations on a populated table need a careful online plan (`pg_partman` partition-add + data-copy + cutover). Tracking separately; the *Refresh dataset* checkbox above intentionally minimises closed-row creation in the meantime so the eventual migration has less to chew through.
+Prod partitions are yearly on `CREATED_AT`. The 2026 child runs through `2027-01-01`, so that partition stays until 14 days after that date. Closed header rows stay in `API_REQUEST`.
 
 ### FastAPI integration
 
@@ -405,7 +400,7 @@ The FastAPI lifespan (`quant/api/main.py`) builds `DataCaches`, which constructs
 
 ### Partition maintenance
 
-`API_REQUEST_PAYLOAD` is partitioned by `CREATED_AT` (yearly, via `pg_partman`). Purge path = `DROP TABLE <partition>`. No TTL policy yet — partitions grow until manually dropped. See the "Scheduled purge of closed versions" future-work section above for why automated dropping is non-trivial under the current partition key.
+`API_REQUEST_PAYLOAD` is partitioned by `CREATED_AT` (yearly, via `pg_partman`). `BT.SP_DETACH_API_REQUEST_PAYLOAD` drops a child whose range has ended. See [Scheduled detach of old payload partitions](#scheduled-detach-of-old-payload-partitions).
 
 ## Data Flow (after)
 

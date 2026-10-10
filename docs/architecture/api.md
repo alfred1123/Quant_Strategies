@@ -361,6 +361,7 @@ These routers are mounted with `require_user_or_service` so the EventBridge Lamb
 |--------|------|------|-------------|
 | `POST` | `/api/v1/admin/log-proc-summary/summarize` | Service or session | Aggregate `LOG_PROC_DETAIL` into daily per-procedure summaries. |
 | `POST` | `/api/v1/admin/db/terminate-stale-connections` | Service or session | Terminate `quant_app` Postgres sessions idle longer than `idle_seconds` (default 3600). Posts to `SLACK_WEBHOOK_URL` when any stale session is found. EventBridge job `term_stale_connections`. |
+| `POST` | `/api/v1/admin/db/detach-api-request-payload` | Service or session | Detach `API_REQUEST_PAYLOAD` partitions whose range ended more than `retention_days` ago (default 14). Does not write `API_REQUEST`. EventBridge job `detach_api_request_payload`. |
 | `POST` | `/api/v1/market-data/price-bars/sync` | Service or session | Pre-fetch bars for every series a scheduled deployment or a subscription wants (bar warmer). |
 | `POST` | `/api/v1/scheduler/tick` | Service or session | Apply every deployment currently due across all intervals (hourly platform sweep). |
 

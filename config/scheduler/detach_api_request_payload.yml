@@ -1,0 +1,16 @@
+# detach_api_request_payload — drop payload partitions older than 14 days.
+#
+# The partition bound decides. 03:15 UTC is away from the bar boundary
+# and from the other hourly jobs. This is not the Glassnode fetch.
+
+task: detach_api_request_payload
+path: /api/v1/admin/db/detach-api-request-payload
+description: Detach API_REQUEST_PAYLOAD partitions older than 14 days
+enabled: true
+
+payload:
+  retention_days: 14
+
+schedule:
+  expression: "cron(15 3 * * ? *)"
+  timezone: UTC

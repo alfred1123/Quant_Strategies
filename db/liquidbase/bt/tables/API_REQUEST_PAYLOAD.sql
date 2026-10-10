@@ -2,7 +2,8 @@
 -- merges with previous VID, writes the complete dataset as a new VID).
 -- Read path: join on API_REQUEST WHERE IS_CURRENT_IND = 'Y' to find active subscriptions,
 --            then SELECT MAX(API_REQ_VID) payload for the latest version.
--- Purge path: DROP partition containing old rows.
+-- Purge path: BT.SP_DETACH_API_REQUEST_PAYLOAD detaches a child partition
+-- whose range ended before the retention window, then drops it.
 CREATE TABLE BT.API_REQUEST_PAYLOAD (
     API_REQ_ID     UUID NOT NULL,
     API_REQ_VID    INTEGER NOT NULL,

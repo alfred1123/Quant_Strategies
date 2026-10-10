@@ -353,6 +353,7 @@ The worker claims in `WorkerLoopRepo.claim_next` (`quant/queue/worker_loop.py`):
 | `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`** with caller-supplied shredded strategy + buy-and-hold columns + full `PAYLOAD_JSON`; denormalizes `STRATEGY_ID`/`STRATEGY_VID` from `BT.QUEUE`; bumps `RESULT_VID` and flips prior rows' `IS_CURRENT_IND` within the same strategy VID; worker extracts metrics in Python (`quant/queue/result_metrics.py`); **`IN_RESULT_ID`** is caller-supplied UUID; OUT row is status triplet only |
 | `SP_GET_RESULT` | `BT` | One result row (REFCURSOR). `IN_QUEUE_ID` reads that submission. `IN_STRATEGY_ID` + `IN_STRATEGY_VID` reads the current row of that version. Filters are appended only when the input is present. See [Reading a result without the queue](#reading-a-result-without-the-queue) |
 | `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`) |
+| `SP_DETACH_API_REQUEST_PAYLOAD` | `BT` | Detach and drop a payload partition whose range ended before `IN_RETENTION_DAYS`. Does not read or write `API_REQUEST` |
 | `SP_INS_API_CREDENTIAL` | `CORE_ADMIN` | New exchange credential or rotate keys (soft-version); status triplet OUT first |
 | `SP_GET_API_CREDENTIAL` | `CORE_ADMIN` | List/get credentials for `APP_USER_ID` (REFCURSOR) |
 | `SP_GET_CREDENTIAL_CHECK` | `CORE_ADMIN` | Validation read by `API_CREDENTIAL_ID` — no owner filter; caller checks ownership + active status |

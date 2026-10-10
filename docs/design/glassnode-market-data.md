@@ -183,20 +183,9 @@ One row per `(metric, asset, interval, timestamp)` with `v`, written and read th
 
 The later store is a later pull request. This page does not add a table, a changeset, or purge SQL.
 
-## A purge is an option, not this change
+## Scheduled detach
 
-[Separate underlying](separate-underlying.md#future-work-scheduled-purge-of-closed-versions) describes a future purge of closed `API_REQUEST` versions. The payload file comments that the purge path is dropping a partition. Neither is implemented, and this change does not implement them. There is no `DELETE`, no `DROP`, and no `SP_PURGE_*` in this change. The later Glassnode store's path is the same kind of step: a purge of closed copies, not a delete of the live rows and not a vague archive. This page does not add that purge.
-
-Blast radius, if someone does it later:
-
-- `API_REQUEST_PAYLOAD` is partitioned by `CREATED_AT`, yearly, via `pg_partman`. A current payload and the closed payloads written in the same year share a partition.
-- Dropping that partition removes the document `SP_GET_API_REQUEST` inner-joins. The next backtest misses. The following refresh refetches every series from one IP and writes a new full document, against the shared monthly cap.
-- The header rows are not in that partition. After the payload is gone they point at nothing.
-- Deleting the JSONB row by row rewrites those documents into WAL. That is a rewrite proportional to the stored history, on the database the app is reading. The 2026-08-16 migration is the reminder that a wide `BT` rewrite dies in the middle. A purge of this table is that shape.
-- Closed versions are the only copy of a previous series. Removing them removes the ability to see what an earlier backtest would have read. The app does not read them today, which is a reason to stop creating them, not a reason to delete them first.
-- A safe drop needs a partition scheme that does not put the current row in the dropped set, and a count of rows and bytes from the live catalog. Neither exists here.
-
-Do that work as its own change, after those two facts are known. Do not attach it to a Glassnode feature.
+[Separate underlying](separate-underlying.md#scheduled-detach-of-old-payload-partitions) is the drop. `BT.SP_DETACH_API_REQUEST_PAYLOAD` drops a payload partition whose range has ended. It does not read or write `API_REQUEST`. Prod's 2026 partition runs through `2027-01-01` and holds the current payload with the closed copies, so that partition stays until 14 days after that date. Release `bt/1.28.0`. Context is `bt,prod-deploy`. The narrower metric store is still a later pull request.
 
 ## Revisions
 
