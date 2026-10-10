@@ -1,0 +1,8 @@
+{
+  "captured_interval": "24h",
+  "client_default": "24h",
+  "client_forwards_resolution_param": true,
+  "provider_backtest_refuses_shorter_than_one_day": true,
+  "sub_daily_body_saved": false,
+  "note": "The class accepts any resolution string and the unit test forwards 1h. The backtest service refuses a provider interval shorter than one day. No sub-daily body was captured on 2026-10-03."
+}

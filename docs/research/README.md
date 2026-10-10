@@ -85,7 +85,8 @@ Before treating a Sharpe from these pages as a result, read the
 [AlgoDaemon bug report (2026-09-27)](../design/2026-09-27-algodaemon-bug-report.md).
 The review records how this engine annualizes, promotes, and costs a backtest.
 The bug report records measurements on top of that, including a long-only AND
-that currently scores as an OR. Engineering quality
+that used to score as an OR. That combiner is fixed; stored AND results from
+before the fix still match OR until they are flagged. Engineering quality
 of the same tree — the worker, the scheduler, typing, and the session cookie —
 is in the [code quality review (2026-09-26)](../design/2026-09-26-code-quality-review.md).
 

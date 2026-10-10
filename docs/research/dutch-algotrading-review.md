@@ -84,7 +84,7 @@ A few other posts were only skimmed from the public text. A vigor-trend post rep
 
 ## Hand-off specs
 
-**AlgoDaemon testability:** Specs A, B, and C are as-is. Long only, positions 0 or +1. Two conditions use `FILTER`. A long-only AND currently scores as an OR ([bug B1](../design/2026-09-27-algodaemon-bug-report.md#b1-two-factor-and-behaves-like-or-for-long-only-factors)).
+**AlgoDaemon testability:** Specs A, B, and C are as-is. Long only, positions 0 or +1. Two conditions use `FILTER`. A long-only AND used to score as an OR ([bug B1](../design/2026-09-27-algodaemon-bug-report.md#b1-two-factor-and-behaves-like-or-for-long-only-factors)); the combiner now vetoes a flat factor. Stored AND results from before that fix still match OR until they are flagged.
 
 | Setting | Value |
 |---------|--------|

@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react';
 import {
-  Alert, Box, Button, Chip, CircularProgress, Stack, Typography,
+  Alert, Box, Button, Checkbox, Chip, CircularProgress, InputAdornment, Stack, TextField, Tooltip, Typography,
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import { fetchJob, useCancelJob, useJobs, useReenqueueJob, usePromoteStrategy } from '../api/jobs';
 import type { JobDetail, JobRow, JobStatus } from '../types/jobs';
 import StrategyConfigDialog from './StrategyConfigDialog';
+import CompareJobsDialog from './CompareJobsDialog';
 
 const STATUS_COLOR: Record<
   JobStatus,
@@ -40,6 +43,7 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
   const reenqueue = useReenqueueJob();
   const promote = usePromoteStrategy();
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'ALL'>('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
   const [cloneLoading, setCloneLoading] = useState<string | null>(null);
   const [configLoading, setConfigLoading] = useState<string | null>(null);
   const [configDialogData, setConfigDialogData] = useState<{
@@ -47,6 +51,25 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
     config: Record<string, unknown> | null;
     strategyNm: string | null;
   }>({ open: false, config: null, strategyNm: null });
+  const [compareSelection, setCompareSelection] = useState<Set<string>>(new Set());
+  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
+
+  const toggleCompareSelection = (queueId: string) => {
+    setCompareSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(queueId)) {
+        next.delete(queueId);
+      } else if (next.size < 2) {
+        next.add(queueId);
+      }
+      return next;
+    });
+  };
+
+  const compareQueueIds = useMemo<[string, string] | null>(() => {
+    if (compareSelection.size !== 2) return null;
+    return Array.from(compareSelection) as [string, string];
+  }, [compareSelection]);
 
   const handleViewConfig = async (row: JobRow) => {
     setConfigLoading(row.queue_id);
@@ -63,16 +86,26 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
   };
 
   const rows = useMemo(() => {
-    const all = jobs.data ?? [];
-    if (statusFilter === 'ALL') return all;
+    let filtered = jobs.data ?? [];
+
+    // Filter by search term (case-insensitive)
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (r) => r.strategy_nm?.toLowerCase().includes(term),
+      );
+    }
+
+    // Filter by status
+    if (statusFilter === 'ALL') return filtered;
     // CANCELLED chip groups CANCEL_REQUESTED + CANCELLED \u2014 they're the same to a user.
     if (statusFilter === 'CANCELLED') {
-      return all.filter(
+      return filtered.filter(
         (r) => r.queue_status === 'CANCELLED' || r.queue_status === 'CANCEL_REQUESTED',
       );
     }
-    return all.filter((r) => r.queue_status === statusFilter);
-  }, [jobs.data, statusFilter]);
+    return filtered.filter((r) => r.queue_status === statusFilter);
+  }, [jobs.data, statusFilter, searchTerm]);
 
   const columns: GridColDef<JobRow>[] = useMemo(
     () => [
@@ -213,8 +246,21 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
               && promote.variables?.strategyId === p.row.strategy_id;
             const isCloning = cloneLoading === p.row.queue_id;
             const isLoadingConfig = configLoading === p.row.queue_id;
+            const isSelectedForCompare = compareSelection.has(p.row.queue_id);
+            const canSelectForCompare = isSelectedForCompare || compareSelection.size < 2;
             return (
-              <Stack direction="row" spacing={0.5}>
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                <Tooltip title={isSelectedForCompare ? 'Deselect' : compareSelection.size >= 2 ? 'Max 2 selected' : 'Select to compare'}>
+                  <span>
+                    <Checkbox
+                      size="small"
+                      checked={isSelectedForCompare}
+                      disabled={!canSelectForCompare}
+                      onChange={() => toggleCompareSelection(p.row.queue_id)}
+                      sx={{ p: 0.5 }}
+                    />
+                  </span>
+                </Tooltip>
                 {onView && (
                   <Button size="small" color="primary" variant="outlined"
                     onClick={() => onView(p.row.queue_id)}>
@@ -264,7 +310,7 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
         },
       },
     ],
-    [cancel, reenqueue, promote, onView, onCloneEdit, cloneLoading, configLoading, handleViewConfig],
+    [cancel, reenqueue, promote, onView, onCloneEdit, cloneLoading, configLoading, handleViewConfig, compareSelection, toggleCompareSelection],
   );
 
   return (
@@ -301,7 +347,23 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
         </Alert>
       )}
 
-      <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
+      <Stack direction="row" spacing={2} sx={{ mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+        <TextField
+          size="small"
+          placeholder="Search strategy..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          sx={{ width: 220 }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" color="action" />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
         {FILTER_STATES.map((s) => (
           <Chip
             key={s}
@@ -312,6 +374,25 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
             onClick={() => setStatusFilter(s)}
           />
         ))}
+        {compareSelection.size > 0 && (
+          <>
+            <Box sx={{ flexGrow: 1 }} />
+            <Chip
+              label={`${compareSelection.size} selected`}
+              size="small"
+              onDelete={() => setCompareSelection(new Set())}
+            />
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<CompareArrowsIcon />}
+              disabled={compareSelection.size !== 2}
+              onClick={() => setCompareDialogOpen(true)}
+            >
+              Compare
+            </Button>
+          </>
+        )}
       </Stack>
 
       <Box sx={{ height: 560 }}>
@@ -335,6 +416,12 @@ export default function JobsTable({ onView, onCloneEdit }: JobsTableProps = {}) 
         onClose={() => setConfigDialogData({ open: false, config: null, strategyNm: null })}
         config={configDialogData.config}
         strategyNm={configDialogData.strategyNm}
+      />
+
+      <CompareJobsDialog
+        open={compareDialogOpen}
+        onClose={() => setCompareDialogOpen(false)}
+        queueIds={compareQueueIds}
       />
     </Box>
   );

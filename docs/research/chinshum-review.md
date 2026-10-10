@@ -5,7 +5,7 @@
 
 This page paraphrases a review, dated 27 September 2026, of paid posts by 錢琛 (Chin Shum) on his [Patreon](https://www.patreon.com/chinshumquantspeculation). The methods are restated in our words. A performance number is his, a platform result, or an offline approximation (replica engine), not platform results. The sentence says which. The offline scripts that produced the replica figures are kept outside this repository.
 
-The book the review measured against is Bybit spot BTC, ETH, and BNB, daily bars, 10 bps per side, long or flat. Two conditions use `FILTER`. A long-only AND on this engine currently scores as an OR ([bug B1](../design/2026-09-27-algodaemon-bug-report.md#b1-two-factor-and-behaves-like-or-for-long-only-factors)).
+The book the review measured against is Bybit spot BTC, ETH, and BNB, daily bars, 10 bps per side, long or flat. Two conditions use `FILTER`. A long-only AND used to score as an OR ([bug B1](../design/2026-09-27-algodaemon-bug-report.md#b1-two-factor-and-behaves-like-or-for-long-only-factors)); the combiner now vetoes a flat factor. Stored AND results from before that fix still match OR until they are flagged.
 
 ## Summary
 

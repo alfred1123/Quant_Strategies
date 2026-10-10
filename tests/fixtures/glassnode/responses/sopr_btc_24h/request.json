@@ -1,0 +1,11 @@
+{
+  "metric_path": "indicators/sopr",
+  "asset": "BTC",
+  "interval": "24h",
+  "since": 1577836800,
+  "until": 1579046400,
+  "captured_at": "2026-10-03T02:13:00+08:00",
+  "observed_status": true,
+  "observed_values": "anchors",
+  "values": "first_and_last_observed_middles_synthetic"
+}

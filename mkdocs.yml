@@ -103,6 +103,7 @@ nav:
   - Platform design:
       - Overview: design/README.md
       - Coding Standards: design/coding-standards.md
+      - Who Fixes What: design/who-fixes-what.md
       - Backtest Queue: design/backtest-queue.md
       - Trade API: design/trade-api.md
       - Plan to Profit: design/plan-to-profit.md
@@ -121,6 +122,7 @@ nav:
       - Multi-Strategy Netting: design/multi-strategy-netting.md
       - Separate Underlying & Cache: design/separate-underlying.md
       - Alternative Data Sources: design/alt-data-sources.md
+      - Glassnode market data: design/glassnode-market-data.md
       - Futu Trading (OOP): design/futu-trading.md
       - Frontend Code Audit: design/frontend-audit.md
       - Backtest review (2026-09-25): design/2026-09-25-backtest-review.md

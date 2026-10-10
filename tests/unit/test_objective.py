@@ -96,6 +96,38 @@ class TestObjectiveEquivalence:
                     got = obj((window,), (signal,))
                     _assert_sharpe_equal(got, expected)
 
+    def test_long_only_and_sharpe_matches_performance(self):
+        """Backtest and optimiser share one combiner, so one AND config has one Sharpe."""
+        np.random.seed(42)
+        n = 300
+        idx = pd.date_range("2020-01-01", periods=n, freq="D")
+        eth = 50 + np.cumsum(np.random.randn(n) * 0.3)
+        frame = pd.DataFrame({
+            "price": eth, "factor": eth, "v": eth,
+            "Close": eth,
+            "High": eth + np.abs(np.random.randn(n) * 0.3),
+            "Low": eth - np.abs(np.random.randn(n) * 0.3),
+        }, index=idx)
+        sub_a = SubStrategy(
+            "get_bollinger_band", "momentum_band_signal_long_only", 20, 1.0, "v",
+        )
+        sub_b = SubStrategy(
+            "get_rsi", "momentum_bounded_signal_long_only", 14, 55.0, "v",
+        )
+        config = StrategyConfig(
+            "eth-usd", "get_bollinger_band",
+            SignalDirection.momentum_band_signal_long_only, 365,
+            conjunction="AND", substrategies=(sub_a, sub_b),
+        )
+        data = {"eth-usd": frame}
+        windows, signals = (20, 14), (1.0, 55.0)
+        expected = _perf_sharpe(data, config, windows, signals, fee_bps=10)
+        got = MultiFactorObjective(
+            data, config, [(20,), (14,)], fee_bps=10,
+        )(windows, signals)
+        assert np.isfinite(expected)
+        _assert_sharpe_equal(got, expected)
+
     def test_multi_factor_conjunctions(self, multi_factor_df):
         data = {"test": multi_factor_df}
         ranges = [(5, 10), (8, 12)]
