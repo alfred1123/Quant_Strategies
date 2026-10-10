@@ -146,7 +146,9 @@ export interface MultiFactorRow {
 }
 
 export interface OptimizeResponse {
-  total_trials: number;
+  search: string;
+  grid_size: number;
+  distinct_cells: number;
   valid: number;
   best: Top10Row;
   top10: Top10Row[];

@@ -20,6 +20,7 @@ from quant.strategy.signals import Strategy, StrategyConfig
 from quant.strategy.performance import Performance
 from quant.strategy.optimizer import ParametersOptimization
 from quant.strategy.walk_forward import WalkForward
+from tests.policy import WIDE
 
 pytestmark = pytest.mark.e2e
 
@@ -169,7 +170,7 @@ class TestParamOptE2E:
             signal_func=Strategy.momentum_band_signal,
             trading_period=252,
         )
-        opt = ParametersOptimization(spy_data, config)
+        opt = ParametersOptimization(spy_data, config, search=WIDE)
         results = list(opt.optimize((10, 20), (0.5, 1.0)))
 
         assert len(results) == 4  # 2 windows × 2 signals
@@ -199,7 +200,7 @@ class TestWalkForwardE2E:
             signal_func=Strategy.momentum_band_signal,
             trading_period=252,
         )
-        wf = WalkForward(spy_data, 0.5, config)
+        wf = WalkForward(spy_data, 0.5, config, search=WIDE)
         result = wf.run((10, 20), (0.5, 1.0))
 
         assert result.best_window in (10, 20)
@@ -214,7 +215,7 @@ class TestWalkForwardE2E:
             signal_func=Strategy.reversion_band_signal,
             trading_period=252,
         )
-        wf = WalkForward(spy_data, 0.5, config)
+        wf = WalkForward(spy_data, 0.5, config, search=WIDE)
         result = wf.run((15, 25), (0.5, 1.5))
         summary = result.summary()
 

@@ -9,7 +9,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | Schema | Purpose |
 |--------|---------|
 | `CORE_ADMIN` | App users (`APP_USER`), proc audit log (`LOG_PROC_DETAIL`), exchange API credentials (`API_CREDENTIAL`) |
-| `CONFIG` | Policy (`APP_ISSUE_FEE`, `APP_APPLY_TIMING`, `API_LIMIT`, `PROMOTION_METRIC`) and `CONFIG.SP_GET_ENUM`, which reads only this schema. Redis prefix `config:<table>` and stamp `config:version`. |
+| `CONFIG` | Policy (`APP_ISSUE_FEE`, `APP_APPLY_TIMING`, `API_LIMIT`, `PROMOTION_METRIC`, `BACKTEST_SEARCH`) and `CONFIG.SP_GET_ENUM`, which reads only this schema. Redis prefix `config:<table>` and stamp `config:version`. |
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `MARKET_CALENDAR`, …) and `REFDATA.SP_GET_ENUM`, which reads only this schema. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `MARKET_CALENDAR` is session/timezone by **`LISTING_EXCHANGE`** (`INST.PRODUCT.EXCHANGE`; `''` = default crypto). |
 | `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `PROMOTION`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert/get procedures |
 | `TRADE` | Live trading: `DEPLOYMENT`, `DEPLOYMENT_SCHEDULE_STATUS`, `INTENT`, `EXECUTION_EVENT`, `TRANSACTION` + SPs |
@@ -220,6 +220,10 @@ Persisted strategies (`BT.STRATEGY`) are created when backtest jobs complete —
 - **SOFT** — comparison metrics evaluated in priority order against the current best VID.
 
 Loaded at runtime via `RedisRefData.get_promotion_metrics()`. See [Best-VID Promotion §2](../design/best-vid-promotion.md#2-promotion-metric-configuration-refdata-driven).
+
+### CONFIG — backtest search
+
+`CONFIG.BACKTEST_SEARCH` is one mutable policy row: `TRIAL_BUDGET`, `SEED`, `MAX_ATTEMPTS_FACTOR`, and `OVER_BUDGET_MODE` (`TPE_DISTINCT`, `RANDOM_DISTINCT`, or `REJECT`). Release `1.2.0` seeds 10000 / 42 / 3 / `TPE_DISTINCT`. Context is `config,prod-deploy`, so a push to `main` queues both changesets for the production migrate. `RedisRefData.get_backtest_search()` is the read path. `CONFIG.SP_GET_ENUM` already returns every column of a policy table, so the procedure body is unchanged (decision #91).
 
 ## Deployment
 

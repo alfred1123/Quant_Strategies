@@ -10,7 +10,7 @@ Usage:
     # Single-factor
     config = StrategyConfig("BTC-USD", "get_bollinger_band",
                             SignalDirection.momentum_band_signal, 365)
-    wf = WalkForward(data, 0.5, config)
+    wf = WalkForward(data, 0.5, config, search=policy)
     result = wf.run(window_tuple, signal_tuple)
 
     # Multi-factor — run() auto-detects from config
@@ -19,7 +19,7 @@ Usage:
     config = StrategyConfig("BTC-USD", "get_sma",
                             SignalDirection.momentum_band_signal, 365,
                             conjunction="AND", substrategies=(sub1, sub2))
-    wf = WalkForward(data, 0.5, config)
+    wf = WalkForward(data, 0.5, config, search=policy)
     result = wf.run(window_ranges, signal_ranges)
 """
 
@@ -28,7 +28,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from quant.strategy.optimizer import ParametersOptimization
+from quant.strategy.optimizer import ParametersOptimization, SearchPolicy
 from quant.strategy.performance import Performance
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ class WalkForwardResult:
 class WalkForward:
     """Walk-forward overfitting test for the backtest pipeline."""
 
-    def __init__(self, data, split_ratio, config, *, fee_bps=None):
+    def __init__(self, data, split_ratio, config, *, fee_bps=None, search: SearchPolicy):
         """
         Args:
             data: dict[str, DataFrame] keyed by internal_cusip.
@@ -77,6 +77,7 @@ class WalkForward:
         self.split_ratio = split_ratio
         self.config = config
         self.fee_bps = fee_bps
+        self.search = search
 
         self.split_idx = int(len(self.data) * split_ratio)
         if self.split_idx < 2 or self.split_idx >= len(self.data) - 1:
@@ -114,7 +115,7 @@ class WalkForward:
 
         # ── In-sample: optimize on training split ───────────────────
         opt_result = ParametersOptimization(
-            is_data_dict, self.config, fee_bps=self.fee_bps,
+            is_data_dict, self.config, fee_bps=self.fee_bps, search=self.search,
         ).run(window_values, signal_values)
 
         best_window, best_signal = opt_result.best_params()

@@ -13,7 +13,8 @@ from quant.strategy.objective import (
     Objective,
     SingleFactorObjective,
 )
-from quant.strategy.optimizer import ParametersOptimization
+from quant.strategy.optimizer import ParametersOptimization, SearchPolicy
+from tests.policy import WIDE
 from quant.strategy.performance import Performance
 from quant.strategy.signals import SignalDirection, StrategyConfig, SubStrategy
 
@@ -285,7 +286,7 @@ class TestOptimizeGridMatchesPerformance:
         config = StrategyConfig("test", indicator, signal_func, trading_period)
         windows = (5, 10, 20)
         signals = _signals_for(signal_func)
-        result = ParametersOptimization(data, config, fee_bps=5.0).optimize(
+        result = ParametersOptimization(data, config, fee_bps=5.0, search=WIDE).optimize(
             windows, signals,
         )
         assert len(result.grid_df) == len(windows) * len(signals)
@@ -304,9 +305,9 @@ class TestOptimizeGridMatchesPerformance:
         )
         windows = (5, 8, 10, 12, 15)
         signals = (0.5, 1.0, 1.5)
-        result = ParametersOptimization(data, config).optimize(
-            windows, signals, n_trials=4,
-        )
+        result = ParametersOptimization(
+            data, config, search=SearchPolicy(4, 42, 3, "TPE_DISTINCT"),
+        ).optimize(windows, signals)
         assert len(result.grid_df) == 4
         for row in result.grid_df.itertuples(index=False):
             expected = _perf_sharpe(
@@ -326,7 +327,7 @@ class TestOptimizeGridMatchesPerformance:
         )
         window_ranges = [(5, 10), (8, 14)]
         signal_ranges = [(0.5, 1.5), (70.0, 80.0)]
-        result = ParametersOptimization(data, config).optimize_multi(
+        result = ParametersOptimization(data, config, search=WIDE).optimize_multi(
             window_ranges, signal_ranges,
         )
         assert len(result.grid_df) == 16
@@ -342,7 +343,7 @@ class TestOptimizeGridMatchesPerformance:
         single = StrategyConfig(
             "test", "get_ema", SignalDirection.reversion_band_signal, 252,
         )
-        single_res = ParametersOptimization(data, single).run((5, 15), (0.5, 1.5))
+        single_res = ParametersOptimization(data, single, search=WIDE).run((5, 15), (0.5, 1.5))
         for row in single_res.grid_df.itertuples(index=False):
             _assert_sharpe_equal(
                 row.sharpe,
@@ -356,7 +357,7 @@ class TestOptimizeGridMatchesPerformance:
             SignalDirection.momentum_band_signal, 365,
             conjunction="AND", substrategies=(sub_a, sub_b),
         )
-        multi_res = ParametersOptimization(data, multi).run([(5,), (10,)], [(1.0,), (0.5,)])
+        multi_res = ParametersOptimization(data, multi, search=WIDE).run([(5,), (10,)], [(1.0,), (0.5,)])
         row = multi_res.grid_df.iloc[0]
         _assert_sharpe_equal(
             row["sharpe"],
@@ -377,7 +378,7 @@ class TestWalkForwardOptimizeMatchesPerformance:
             SignalDirection.momentum_band_signal, 365,
         )
         windows, signals = (5, 10, 20), (0.5, 1.5)
-        wf = WalkForward(data, 0.5, config, fee_bps=5.0)
+        wf = WalkForward(data, 0.5, config, fee_bps=5.0, search=WIDE)
         result = wf.run(windows, signals)
 
         is_data = {t: frame.iloc[:wf.split_idx].copy() for t, frame in data.items()}
@@ -406,7 +407,7 @@ class TestWalkForwardOptimizeMatchesPerformance:
             "test", "get_sma", SignalDirection.momentum_band_signal, 365,
             conjunction=conjunction, substrategies=(sub_a, sub_b),
         )
-        wf = WalkForward(data, 0.5, config)
+        wf = WalkForward(data, 0.5, config, search=WIDE)
         result = wf.run([(5, 12), (8, 14)], [(0.5, 1.5), (70.0, 80.0)])
         is_data = {t: frame.iloc[:wf.split_idx].copy() for t, frame in data.items()}
         _assert_sharpe_equal(
@@ -435,4 +436,4 @@ class TestCoverageFailFast:
         )
         data = {"main": main, "factor": factor}
         with pytest.raises(ValueError, match="covers only"):
-            ParametersOptimization(data, config).optimize((5,), (0.5,))
+            ParametersOptimization(data, config, search=WIDE).optimize((5,), (0.5,))

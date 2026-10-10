@@ -45,7 +45,6 @@ The default home for a value is the database. Values live in reference or config
 
 | Where | Value | Why it is debt |
 |---|---|---|
-| `quant/strategy/optimizer.py` | `OPTUNA_MAX_TRIALS = 10_000`, `OPTUNA_SEED = 42` | Search budget and seed are research settings, fixed in code. |
 | `quant/strategy/optimizer.py`, `_build_result` | `sorted_df.head(10)` (the `top10` result size) | Result size is a literal, and the field name `top10` bakes it into the API schema. |
 | `quant/trade/live_apply.py` | `_FALLBACK_SETTLEMENT_CCY = "USDT"` | A live-trading currency guessed in code when `INST.PRODUCT.CCY` is empty. Also a fallback path, which rule 2 forbids. |
 | `quant/queue/worker_loop.py`, `WorkerLoop` | `DEFAULT_JOB_TIMEOUT_S = 6000`, `BLPOP_TIMEOUT_S = 30`, `DRAIN_TIMEOUT_S = 30`, `CANCEL_GRACE_S = 10`, `WAKE_SOCKET_MARGIN_S = 5` | The job timeout is a business limit with an env override defaulting to a code constant. The other timings are process tuning with no config at all. |

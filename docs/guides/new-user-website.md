@@ -61,7 +61,7 @@ You can optionally add a second factor by clicking **+ Add Factor** and choosing
 
 ## 7) Run the Backtest
 
-1. Review the trial count shown at the bottom of the panel.
+1. Review the cell count at the bottom of the panel. A grid inside the search budget shows that count. A larger grid names how many distinct cells the budget will score, and whether that sample is TPE or random.
 2. Click **Run Optimization**.
 3. Wait for the progress bar to finish — do not close or refresh the page.
 

@@ -264,6 +264,18 @@ D2 plus D4, with the numbers in the DB.
 
 **Decision needed from Alfred:** (1) Over-budget grids: TPE over distinct cells, a seeded random sample of distinct cells, or refuse the grid? (2) Move budget, seed and attempt cap to a `CONFIG.BACKTEST_SEARCH` row? (3) Close #71 rather than merge it?
 
+### Shipped (decision #91)
+
+D2 plus D4 are in `quant/strategy/optimizer.py`. Release `config/1.2.0` (the table and its seed row) has context `config,prod-deploy`. The seeded mode is `TPE_DISTINCT`. `RANDOM_DISTINCT` and `REJECT` are the other values of `OVER_BUDGET_MODE`, so switching is a row change. `OPTUNA_MAX_TRIALS`, `OPTUNA_SEED`, the `n_trials` argument, and `total_trials` are gone. The drawer reads `GET /api/v1/config/backtest_search`. The results chip reads `{distinct_cells} of {grid_size} cells, {search}`.
+
+Checked against current `main` before the change: seed 42, 500 bars, windows `(5, 10, 15, 20, 25)`, signals `(0.5, 1.0, 1.5, 2.0, 2.5)`, `n_trials=20` wrote **20 rows, 15 distinct cells, 20 objective calls**, and **7 distinct cells in `top10`**. The "14" in the Ran note above was a different series. The test asserts 20 distinct cells and 20 objective calls.
+
+Not built, because the code has no owner for them and this change does not add one:
+
+- `StrategyBuilder`. `REJECT` is raised by the search after the series is loaded, and `backtest_service` maps it to HTTP 422. Enqueue still creates a strategy version.
+- Signal values generated from integer indices. That belongs with item B's `SignalRange`.
+- Items A, B, and C.
+
 ## Shared owner: the strategy builder
 
 Items A (conjunction), B (window floor), C (data column) and D (grid size) all ask one question: is this request a valid strategy, according to ref data? Today the answer is spread across `build_config`, `_build_param_ranges`, `resolve_signal_func`, a hard-coded tuple in `combine_positions`, and nothing at all at enqueue or in the CLI.

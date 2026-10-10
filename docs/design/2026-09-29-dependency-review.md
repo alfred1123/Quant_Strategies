@@ -372,7 +372,7 @@ Each row is one fact with more than one home. Facts already specified in the lon
 
 ## 5. Hard-coded values
 
-The known-debt table in the [coding standards](coding-standards.md#3-no-hard-coded-values) is still accurate and is not copied here: `OPTUNA_MAX_TRIALS`, `OPTUNA_SEED`, `sorted_df.head(10)`, `_FALLBACK_SETTLEMENT_CCY`, and the worker-loop timeouts. `DEFAULT_RETRY_BACKOFF_S` and the two `DEFAULT_SETTLE_S` constants (`quant/market_data/warm.py` line 52 and `quant/trade/scheduler/sweep.py` line 42, both `10.0`) are the examples that table already names.
+The known-debt table in the [coding standards](coding-standards.md#3-no-hard-coded-values) is still the list, and is not copied here: `sorted_df.head(10)`, `_FALLBACK_SETTLEMENT_CCY`, and the worker-loop timeouts. The search budget and seed left that table for `CONFIG.BACKTEST_SEARCH` (decision #91). `DEFAULT_RETRY_BACKOFF_S` and the two `DEFAULT_SETTLE_S` constants (`quant/market_data/warm.py` line 52 and `quant/trade/scheduler/sweep.py` line 42, both `10.0`) are the examples that table already names.
 
 These are further values on this commit. Decision #65 and decision #84 already set the default fee at 10 bps and added `CONFIG.APP_ISSUE_FEE` for the Bybit future schedule. `Performance.DEFAULT_FEE_BPS` (line 101) and `fee_bps: float = 10.0` on `OptimizeRequest` and `PerformanceRequest` (`quant/schemas/backtest.py` lines 60 and 95) are that decision, not a new finding. The open piece is the one decision #84 already states: the drawer does not read `CONFIG.APP_ISSUE_FEE` yet. `MIN_METRIC_OBS = 60` (`Performance` line 104) is decision #63 and stays on `Performance`.
 

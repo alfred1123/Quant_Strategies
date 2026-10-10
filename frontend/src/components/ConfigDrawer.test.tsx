@@ -46,6 +46,18 @@ const products: ProductRow[] = [
   { product_id: 12, product_vid: 1, internal_cusip: 'ethusdt.crypto', display_nm: 'Ethereum / USDT', asset_type_id: 1, exchange: null, ccy: 'USDT', description: null },
 ];
 
+vi.mock('../api/config', () => ({
+  useBacktestSearch: () => ({
+    data: [{
+      backtest_search_id: 1,
+      trial_budget: 10000,
+      seed: 42,
+      max_attempts_factor: 3,
+      over_budget_mode: 'TPE_DISTINCT',
+    }],
+  }),
+}));
+
 vi.mock('../api/refdata', () => ({
   useIndicators: () => ({ data: indicators }),
   useSignalTypes: () => ({ data: signalTypes }),

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.2.0-001-create-backtest-search" author="alfcheun" context="config,prod-deploy">
+        <comment>CONFIG.BACKTEST_SEARCH — trial budget, seed, attempt cap, over-budget mode</comment>
+        <sqlFile path="../tables/BACKTEST_SEARCH.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback>
+            <sql>DROP TABLE IF EXISTS CONFIG.BACKTEST_SEARCH;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.2.0-002-seed-backtest-search" author="alfcheun" context="config,prod-deploy">
+        <comment>One row: budget 10000, seed 42, attempt factor 3, mode TPE_DISTINCT</comment>
+        <sqlFile path="../data/BACKTEST_SEARCH.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback>
+            <sql>DELETE FROM CONFIG.BACKTEST_SEARCH;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
