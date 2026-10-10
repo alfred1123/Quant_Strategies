@@ -31,5 +31,6 @@
 
     <include file="releases/1.26.0-promotion-holdout-gates.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.27.0-app-issue-fee.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.28.0-glassnode-app-metric.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

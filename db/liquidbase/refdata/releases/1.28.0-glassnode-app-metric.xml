@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.28.0-001-glassnode-app-metric" author="alfcheun" context="refdata,prod-deploy">
+        <comment>Glassnode on-chain and sleeve series on REFDATA.APP_METRIC. Close price is already seeded. The client still ignores METRIC_PATH.</comment>
+        <sqlFile path="../data/APP_METRIC_GLASSNODE.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback>
+            <sql>
+                DELETE FROM REFDATA.APP_METRIC
+                 WHERE APP_ID = 2
+                   AND METRIC_NM IN (
+                       'sopr',
+                       'mvrv',
+                       'active_count',
+                       'transfers_volume_to_exchanges_sum',
+                       'hash_rate_mean',
+                       'transfers_volume_exchanges_net_pit',
+                       'sopr_pit',
+                       'mvrv_z_score_pit',
+                       'exchange_net_position_change',
+                       'exchange_net_position_change_pit'
+                   );
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

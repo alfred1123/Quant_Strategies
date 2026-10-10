@@ -61,9 +61,11 @@ on-chain paths below were written when Professional was **$799/mo**, which
 failed C6. That cost reason is stale. The Professional plan has been active
 since 28 Sep 2026 18:00 HKT. On 3 Oct 2026 the close-price path and the five
 on-chain paths in the sketch answered for BTC at `24h`. The class still only
-requests `market/price_usd_close`, and `REFDATA.APP_METRIC` still seeds only
-that row. Where the series should be stored, and how a revision of history
-would be kept, is the open draft in
+requests `market/price_usd_close`. `REFDATA.APP_METRIC` seeds the on-chain
+and sleeve series in `refdata/1.28.0` (context `refdata,prod-deploy`). The
+class ignores `METRIC_PATH`, so those rows do not change a fetch. Where the
+series should be stored, and how a revision of history would be kept, is the
+open draft in
 [Glassnode market data](glassnode-market-data.md). The sketch below is not
 implemented.
 

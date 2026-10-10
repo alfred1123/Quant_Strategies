@@ -1,6 +1,6 @@
 # Glassnode market data
 
-**Status:** Draft. The narrower metric store is the option this page argues for. Alfred has rejected latest-only storage. The later store keeps history and purges closed copies. That purge is a later pull request, and nothing in the fetch or the database changes with this page.
+**Status:** Draft. The narrower metric store is the option this page argues for. Alfred has rejected latest-only storage. The later store keeps history and purges closed copies. That purge is a later pull request. Release `refdata/1.28.0` seeds the catalog rows. The fetch is unchanged.
 **Date:** 2026-10-03
 **Scope:** how a Glassnode series should be fetched and stored. Parent: [Alternative data sources](alt-data-sources.md).
 
@@ -59,11 +59,11 @@ A provider interval shorter than one day is refused before that call. The class 
 | Metric path | In `Glassnode` | In `REFDATA.APP_METRIC` | In the alt-data page | Seen 2026-10-03 |
 |---|---|---|---|---|
 | `market/price_usd_close` | yes, the only URL | yes, `metric_nm = price` | price client already existed | 200, 14 points, anchors retained |
-| `indicators/sopr` | no | no | sketch only | 200, `{t, v}`, anchors retained |
-| `market/mvrv` | no | no | sketch only | 200, `{t, v}`, values not retained |
-| `addresses/active_count` | no | no | sketch only | 200, `{t, v}`, values not retained |
-| `transactions/transfers_volume_to_exchanges_sum` | no | no | sketch only | 200, `{t, v}`, values not retained |
-| `mining/hash_rate_mean` | no | no | sketch only | 200, `{t, v}`, values not retained |
+| `indicators/sopr` | no | yes, `metric_nm = sopr`, release `1.28.0` | sketch only | 200, `{t, v}`, anchors retained |
+| `market/mvrv` | no | yes, `metric_nm = mvrv`, release `1.28.0` | sketch only | 200, `{t, v}`, values not retained |
+| `addresses/active_count` | no | yes, `metric_nm = active_count`, release `1.28.0` | sketch only | 200, `{t, v}`, values not retained |
+| `transactions/transfers_volume_to_exchanges_sum` | no | yes, `metric_nm = transfers_volume_to_exchanges_sum`, release `1.28.0` | sketch only | 200, `{t, v}`, values not retained |
+| `mining/hash_rate_mean` | no | yes, `metric_nm = hash_rate_mean`, release `1.28.0` | sketch only | 200, `{t, v}`, values not retained |
 
 `get_onchain_metric` exists only as a sketch in [Alternative data sources](alt-data-sources.md). It is not a method on the class. Adding a row to `APP_METRIC` would not change the URL: the class ignores `METRIC_PATH`.
 
@@ -97,7 +97,7 @@ SOPR and MVRV z-score stay a from-July-2025 check only.
 
 The harness locks this rule without restating it; the wording under [Sleeve factors](#sleeve-factors) is the source.
 
-None of these paths is a method on `Glassnode`, and none is an `APP_METRIC` row. Wiring them waits on the later store. It is not built here.
+None of these paths is a method on `Glassnode`. Release `refdata/1.28.0` seeds them on `REFDATA.APP_METRIC`. The class ignores `METRIC_PATH`, so the rows do not change a fetch. Wiring them waits on the later store. It is not built here.
 
 ### One request for the window, then local bars
 
@@ -112,7 +112,7 @@ An on-chain series would be the same shape, once it is wired:
 
 That is one request per metric per refresh, then local math. It is not a request per bar. The missing piece is the metric dimension on the fetch, and a place to put `{t, v}` that is not a full-history JSON blob. Neither is built here.
 
-The [alt-data page](alt-data-sources.md) deferred the five on-chain paths because Professional was $799/mo. That reason is stale. The plan has been active since 28 Sep 2026 18:00 HKT, and those five paths plus close price answered on 3 Oct 2026. The class still only requests close price, and `APP_METRIC` still only seeds that one row. Cost is no longer what blocks a strategy from reading SOPR. The fetch and the store are.
+The [alt-data page](alt-data-sources.md) deferred the five on-chain paths because Professional was $799/mo. That reason is stale. The plan has been active since 28 Sep 2026 18:00 HKT, and those five paths plus close price answered on 3 Oct 2026. The class still only requests close price. `REFDATA.APP_METRIC` seeds the series in release `refdata/1.28.0` (context `refdata,prod-deploy`). Cost is no longer what blocks a strategy from reading SOPR. The fetch and the store are.
 
 ## API_REQUEST, as it is
 
