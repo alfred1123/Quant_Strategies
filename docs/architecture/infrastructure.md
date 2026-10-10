@@ -389,6 +389,7 @@ the `path`, the cron expression and whether it is enabled:
 | `price_bar_sync` | `cron(0 * * * ? *)` | `/api/v1/market-data/price-bars/sync` | Warm `MARKET_DATA.PRICE_BAR` for scheduled deployments |
 | `term_stale_connections` | `cron(45 * * * ? *)` | `/api/v1/admin/db/terminate-stale-connections` | Terminate `quant_app` idle Postgres sessions older than one hour |
 | `detach_api_request_payload` | `cron(15 3 * * ? *)` | `/api/v1/admin/db/detach-api-request-payload` | Drop payload partitions whose range ended more than 14 days ago |
+| `fill_scheduled_providers` | `cron(15 6 * * ? *)` | `/api/v1/admin/providers/fill` | Replace the stored window for providers the checkbox does not call |
 
 No path takes substitution fields, and none points at
 `/trade/deployments/{id}/apply`. That route requires a human — it trades on the

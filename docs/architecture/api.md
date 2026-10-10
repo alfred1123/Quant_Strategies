@@ -362,6 +362,7 @@ These routers are mounted with `require_user_or_service` so the EventBridge Lamb
 | `POST` | `/api/v1/admin/log-proc-summary/summarize` | Service or session | Aggregate `LOG_PROC_DETAIL` into daily per-procedure summaries. |
 | `POST` | `/api/v1/admin/db/terminate-stale-connections` | Service or session | Terminate `quant_app` Postgres sessions idle longer than `idle_seconds` (default 3600). Posts to `SLACK_WEBHOOK_URL` when any stale session is found. EventBridge job `term_stale_connections`. |
 | `POST` | `/api/v1/admin/db/detach-api-request-payload` | Service or session | Detach `API_REQUEST_PAYLOAD` partitions whose range ended more than `retention_days` ago (default 14). Does not write `API_REQUEST`. EventBridge job `detach_api_request_payload`. |
+| `POST` | `/api/v1/admin/providers/fill` | Service or session | Insert a fresh window for every non-exchange app whose Refresh dataset flag is `N`. EventBridge job `fill_scheduled_providers`. |
 | `POST` | `/api/v1/market-data/price-bars/sync` | Service or session | Pre-fetch bars for every series a scheduled deployment or a subscription wants (bar warmer). |
 | `POST` | `/api/v1/scheduler/tick` | Service or session | Apply every deployment currently due across all intervals (hourly platform sweep). |
 
@@ -374,6 +375,7 @@ exchange rate limit on behalf of a user who did not ask.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET`  | `/api/v1/market-data/subscriptions` | Every bar subscription with its coverage (first bar, last bar, gap count) and the venue's own `vendor_symbol`. |
+| `GET`  | `/api/v1/market-data/provider-series` | Current provider windows (`APP_ID`, metric, product, range) without the JSON body. A header whose payload is gone comes back as unavailable. |
 | `POST` | `/api/v1/market-data/subscriptions` | Create a subscription, or version one — enable, disable, retarget. |
 | `GET`  | `/api/v1/market-data/price-bars/coverage` | `MIN`/`MAX` stored bar plus gap count for one series — what is **held**. |
 | `GET`  | `/api/v1/market-data/price-bars/venue-depth` | Oldest bar the venue serves, how many bars that is, and the fill ceiling — what **exists**. |

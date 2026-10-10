@@ -16,6 +16,8 @@ import {
   TableHead,
   TableRow,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Toolbar,
   Tooltip,
   Typography,
@@ -26,8 +28,8 @@ import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import SearchIcon from '@mui/icons-material/Search';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useMe } from '../api/auth';
-import { useSubscribe, useSubscriptions } from '../api/marketData';
-import { intervalLabel, useApps, useTmIntervals } from '../api/refdata';
+import { useProviderSeries, useSubscribe, useSubscriptions } from '../api/marketData';
+import { intervalLabel, useAppMetrics, useApps, useTmIntervals } from '../api/refdata';
 import AppModeSwitch from '../components/AppModeSwitch';
 import BrandMark from '../components/BrandMark';
 import UserMenu from '../components/UserMenu';
@@ -35,7 +37,7 @@ import BackfillDialog from '../components/market-data/BackfillDialog';
 import CreateInstrumentDialog from '../components/market-data/CreateInstrumentDialog';
 import SubscriptionDialog from '../components/market-data/SubscriptionDialog';
 import { APP_NAME } from '../constants/brand';
-import type { BarSubscriptionRow, Coverage } from '../types/marketData';
+import type { BarSubscriptionRow, Coverage, ProviderSeriesRow } from '../types/marketData';
 
 function formatDay(value: string | null): string {
   return value ? value.slice(0, 10) : '—';
@@ -266,7 +268,8 @@ function matches(row: BarSubscriptionRow, needle: string): boolean {
 }
 
 /**
- * Market data — capture price bars for products nobody is trading yet.
+ * Data — what is stored, by kind. Exchange bars are captured here.
+ * Provider series are filled on their schedule.
  *
  * The platform could only collect bars for instruments a strategy was already
  * deployed against, which made the first thing you want to do impossible:
@@ -279,11 +282,79 @@ function matches(row: BarSubscriptionRow, needle: string): boolean {
  * the operational one and must not be diluted by rows that are deliberately
  * dormant — and a status column asks the reader to filter by eye every time.
  */
+function ProviderAvailability({
+  rows,
+  loading,
+  failed,
+  appNameById,
+  metricNameById,
+}: {
+  rows: ProviderSeriesRow[];
+  loading: boolean;
+  failed: boolean;
+  appNameById: Map<number, string>;
+  metricNameById: Map<number, string>;
+}) {
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+        <CircularProgress size={28} />
+      </Box>
+    );
+  }
+  if (failed) {
+    return <Alert severity="error">Failed to load provider series</Alert>;
+  }
+  return (
+    <TableContainer component={Paper} variant="outlined">
+      <Table size="small" aria-label="Provider series">
+        <TableHead>
+          <TableRow>
+            <TableCell>Product</TableCell>
+            <TableCell>Source</TableCell>
+            <TableCell>Series</TableCell>
+            <TableCell>Stored</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rows.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={4}>
+                <Typography variant="body2" color="text.secondary">
+                  No provider series is stored yet. The daily fill writes one for each
+                  product that has a vendor symbol.
+                </Typography>
+              </TableCell>
+            </TableRow>
+          )}
+          {rows.map(row => (
+            <TableRow key={`${row.app_id}-${row.app_metric_id}-${row.internal_cusip}`}>
+              <TableCell>{row.internal_cusip ?? '—'}</TableCell>
+              <TableCell>{appNameById.get(row.app_id) ?? row.app_id}</TableCell>
+              <TableCell>{metricNameById.get(row.app_metric_id) ?? row.app_metric_id}</TableCell>
+              <TableCell>
+                {row.has_payload_ind === 'N' ? (
+                  <Chip size="small" color="warning" label="unavailable" />
+                ) : (
+                  `${row.range_start_ts?.slice(0, 10) ?? '—'} → ${row.range_end_ts?.slice(0, 10) ?? '—'}`
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
 export default function MarketDataPage() {
   const { data: currentUser } = useMe();
   const { data: subscriptions, isLoading, isError, error } = useSubscriptions();
   const { data: intervals = [] } = useTmIntervals();
+  const [kind, setKind] = useState<'bars' | 'provider'>('bars');
   const { data: apps = [] } = useApps();
+  const { data: metrics = [] } = useAppMetrics(kind === 'provider');
+  const providerQuery = useProviderSeries(kind === 'provider');
   const toggle = useSubscribe();
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -301,6 +372,10 @@ export default function MarketDataPage() {
   const appNameById = useMemo(
     () => new Map(apps.map(a => [a.app_id, a.display_name])),
     [apps],
+  );
+  const metricNameById = useMemo(
+    () => new Map(metrics.map(m => [m.app_metric_id, m.display_name])),
+    [metrics],
   );
 
   const { capturing, paused, hidden } = useMemo(() => {
@@ -370,11 +445,11 @@ export default function MarketDataPage() {
           >
             <Box>
               <Typography variant="h5" component="h1">
-                Market data
+                Data
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Capture exchange bars for a product before deciding to trade it — so a
-                strategy can be fitted on the series it will actually trade.
+                What is stored. Exchange bars are captured here. Provider series are
+                filled on their schedule.
               </Typography>
             </Box>
             {/*
@@ -392,18 +467,41 @@ export default function MarketDataPage() {
             </Stack>
           </Stack>
 
-          {isLoading && (
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={kind}
+            onChange={(_event, next: 'bars' | 'provider' | null) => {
+              if (next) setKind(next);
+            }}
+            aria-label="Data kind"
+          >
+            <ToggleButton value="bars">Exchange bars</ToggleButton>
+            <ToggleButton value="provider">Provider series</ToggleButton>
+          </ToggleButtonGroup>
+
+          {kind === 'provider' && (
+            <ProviderAvailability
+              rows={providerQuery.data ?? []}
+              loading={providerQuery.isLoading}
+              failed={providerQuery.isError}
+              appNameById={appNameById}
+              metricNameById={metricNameById}
+            />
+          )}
+
+          {kind === 'bars' && isLoading && (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
               <CircularProgress size={28} />
             </Box>
           )}
-          {isError && (
+          {kind === 'bars' && isError && (
             <Alert severity="error">
               {error instanceof Error ? error.message : 'Failed to load subscriptions'}
             </Alert>
           )}
 
-          {!isLoading && !isError && (
+          {kind === 'bars' && !isLoading && !isError && (
             <>
               <TextField
                 size="small"

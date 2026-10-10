@@ -15,6 +15,17 @@ export interface Coverage {
   error: string | null;
 }
 
+/** One stored provider window. The JSON body is not on this row. */
+export interface ProviderSeriesRow {
+  app_id: number;
+  app_metric_id: number;
+  tm_interval_id: number | null;
+  internal_cusip: string | null;
+  range_start_ts: string | null;
+  range_end_ts: string | null;
+  has_payload_ind: 'Y' | 'N';
+}
+
 export interface BarSubscriptionRow {
   bar_subscription_id: string;
   bar_subscription_vid: number;

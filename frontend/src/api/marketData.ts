@@ -5,6 +5,7 @@ import type {
   BackfillReport,
   BackfillRequest,
   BarSubscriptionRow,
+  ProviderSeriesRow,
   Coverage,
   SubscribeRequest,
   VenueDepth,
@@ -18,6 +19,18 @@ export interface SeriesKey {
 }
 
 export const SUBSCRIPTIONS_QUERY_KEY = ['market-data', 'subscriptions'] as const;
+export const PROVIDER_SERIES_QUERY_KEY = ['market-data', 'provider-series'] as const;
+
+export function useProviderSeries(enabled: boolean) {
+  return useQuery({
+    queryKey: PROVIDER_SERIES_QUERY_KEY,
+    queryFn: async () => {
+      const { data } = await apiClient.get<ProviderSeriesRow[]>('/market-data/provider-series');
+      return data;
+    },
+    enabled,
+  });
+}
 
 async function listSubscriptions(): Promise<BarSubscriptionRow[]> {
   const { data } = await apiClient.get<BarSubscriptionRow[]>('/market-data/subscriptions');

@@ -172,7 +172,7 @@ class TestItRefusesRatherThanSubstitute:
     ):
         bar_services.for_app.return_value.stored_bounds.return_value = None
 
-        with pytest.raises(BacktestError, match="Market data page"):
+        with pytest.raises(BacktestError, match="Data page"):
             fetch_df(
                 "btcusdt.crypto", "2020-04-01", "2020-04-05", "bybit",
                 refdata, inst_cache, bar_services=bar_services, tm_interval_id=DAILY,

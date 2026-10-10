@@ -1,0 +1,18 @@
+# fill_scheduled_providers — replace the stored window for providers the
+# Refresh dataset checkbox does not call.
+#
+# The daily Glassnode point is stamped 00:00 UTC. That stamp is not when
+# the point is published, so this job does not run then. 06:15 UTC is
+# after the night and clear of the 03:15 partition drop.
+
+task: fill_scheduled_providers
+path: /api/v1/admin/providers/fill
+description: Insert a fresh window for every non-exchange app whose Refresh dataset flag is N
+enabled: true
+
+payload:
+  since: "2010-01-01"
+
+schedule:
+  expression: "cron(15 6 * * ? *)"
+  timezone: UTC

@@ -103,6 +103,18 @@ class BackfillPlan(BaseModel):
     target: datetime
 
 
+class ProviderSeriesRow(BaseModel):
+    """One current provider window. The JSON body is not included."""
+
+    app_id: int
+    app_metric_id: int
+    tm_interval_id: int | None = None
+    internal_cusip: str | None = None
+    range_start_ts: datetime | None = None
+    range_end_ts: datetime | None = None
+    has_payload_ind: Literal["Y", "N"]
+
+
 class BackfillRequest(BaseModel):
     """Fill one series over an explicit range. ``end`` defaults to the last close."""
 

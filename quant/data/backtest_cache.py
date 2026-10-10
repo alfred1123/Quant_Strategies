@@ -70,6 +70,13 @@ class BacktestCache(DbGateway):
 
     # ── proc wrappers ──────────────────────────────────────────────────
 
+    def list_availability(self) -> list[dict]:
+        """Current provider windows, without the JSON body."""
+        return self._call_get(
+            "CALL BT.SP_GET_API_REQUEST_AVAILABILITY(NULL, NULL, NULL, NULL)",
+            (),
+        )
+
     def _get_api_request(self, app_id, app_metric_id, tm_interval_id, internal_cusip) -> list[dict]:
         return self._call_get(
             "CALL BT.SP_GET_API_REQUEST(%s, %s, %s, %s, NULL, NULL, NULL, NULL)",

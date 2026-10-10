@@ -83,7 +83,7 @@ def _fetch_exchange_df(
 
     Reads only. A backtest asking for five years must not become a five-year
     exchange crawl on someone's behalf — capture is a standing decision made on
-    the Market data page, per the explicit-backfill rule — so a range the store
+    the Data page, per the explicit-backfill rule — so a range the store
     cannot cover is an error naming what *is* covered, never a short series
     quietly returned. A backtest run over a narrower window than requested is
     exactly the silent substitution this branch exists to end.
@@ -126,7 +126,7 @@ def _fetch_exchange_df(
     if bounds is None:
         raise BacktestError(
             f"no {app['name']} bars captured for {internal_cusip} at interval "
-            f"{tm_interval_id} — subscribe to the series on the Market data page "
+            f"{tm_interval_id} — subscribe to the series on the Data page "
             f"and backfill it, then re-run"
         )
 
@@ -144,7 +144,7 @@ def _fetch_exchange_df(
             f"{_stamp(first_bar, period)} to {_stamp(last_bar, period)}, which "
             f"does not span the requested {_stamp(range_start, period)} to "
             f"{_stamp(range_end, period)} — backfill the missing history on the "
-            f"Market data page, or narrow the range. A venue cannot serve "
+            f"Data page, or narrow the range. A venue cannot serve "
             f"history from before the pair listed there"
         )
 

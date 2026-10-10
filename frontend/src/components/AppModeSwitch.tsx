@@ -9,12 +9,12 @@ interface AppModeSwitchProps {
 
 // Ordered the way the work runs: capture the bars, fit on them, then trade.
 const SEGMENTS: { mode: AppMode; to: string; label: string }[] = [
-  { mode: 'market-data', to: '/market-data', label: 'Market data' },
+  { mode: 'market-data', to: '/market-data', label: 'Data' },
   { mode: 'backtest', to: '/backtest', label: 'Backtest' },
   { mode: 'trade', to: '/trade', label: 'Trade' },
 ];
 
-/** Segmented app-mode control — Market data, Backtest and Trade. */
+/** Segmented app-mode control — Data, Backtest and Trade. */
 export default function AppModeSwitch({ mode }: AppModeSwitchProps) {
   return (
     <Box

@@ -11,8 +11,15 @@ from fastapi import APIRouter, Depends, Request
 
 from quant.api.admin.connection_maintenance import ConnectionMaintenanceService
 from quant.api.admin.repo import ApiRequestPayloadRepo, ConnectionMaintenanceRepo, LogProcRepo
-from quant.api.admin.schemas import DetachApiRequestPayloadRequest, TerminateStaleConnectionsRequest
+from quant.api.admin.schemas import (
+    DetachApiRequestPayloadRequest,
+    FillScheduledProvidersRequest,
+    TerminateStaleConnectionsRequest,
+)
 from quant.api.auth.dependencies import require_user_or_service
+from quant.api.deps import get_data_caches
+from quant.data.provider_fill import fill_scheduled_providers
+from quant.refdata.bundle import DataCaches
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +77,34 @@ def detach_api_request_payload(
         caller,
     )
     return {"dropped": dropped, "retention_days": body.retention_days}
+
+
+@router.post("/providers/fill")
+def fill_providers(
+    body: FillScheduledProvidersRequest,
+    caller: str = Depends(require_user_or_service),
+    caches: DataCaches = Depends(get_data_caches),
+) -> dict:
+    """Insert a fresh window for every provider the checkbox does not call."""
+    report = fill_scheduled_providers(
+        caches.refdata,
+        caches.instrument_cache,
+        caches.backtest_cache,
+        since=body.since,
+    )
+    logger.info(
+        "providers/fill: filled=%d failed=%d since=%s caller=%s",
+        report.filled,
+        report.failed,
+        body.since.isoformat(),
+        caller,
+    )
+    return {
+        "filled": report.filled,
+        "failed": report.failed,
+        "since": body.since.isoformat(),
+        "errors": report.errors,
+    }
 
 
 @router.post("/log-proc-summary/summarize")

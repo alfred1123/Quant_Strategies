@@ -2,7 +2,7 @@
 
 **Status: built.** All of §11 is committed — `MARKET_DATA.BAR_SUBSCRIPTION` and
 its three procedures, the subscription repo and `InstrumentSource` union, the API
-routes, the Market data page, and the backtest seam (§7) that makes the captured
+routes, the Data tab, and the backtest seam (§7) that makes the captured
 bars usable for the decision that motivated capturing them. Recorded as
 [decision #50](../decisions.md) and [#51](../decisions.md).
 
@@ -442,11 +442,22 @@ Scoping the list to the venue left one dead end, which is now closed. A venue
 with no xrefs lists nothing, and the empty state said *"add an `INST.PRODUCT_XREF`
 row for it"* — an instruction to open a SQL client against production, from
 inside the page whose whole point was that capture no longer required one. The
-Market data page now has an **Add an instrument** action beside *Capture a
+Data tab now has an **Add an instrument** action beside *Capture a
 series*, and the empty state points at it. It writes the `INST.PRODUCT` row and
 its first `INST.PRODUCT_XREF` row in one submit, because a product without an
 xref is invisible to this very dropdown — see decision #62 and
 [Creating an instrument](../architecture/database.md#creating-an-instrument).
+
+## Two kinds on the Data tab
+
+The app-mode control is labeled **Data**. Exchange bars are the capture table
+on this page: first bar, last bar, gaps, and an unavailable chip when the venue
+cannot be asked. Provider series are the other kind. `GET /api/v1/market-data/provider-series`
+lists current `BT.API_REQUEST` windows — source, metric, product, and the stored
+range — and does not return the JSON body. A header whose payload partition was
+dropped still appears, marked unavailable. The list is not filtered by user.
+Release `bt/1.29.0` has context `bt,prod-deploy`.
+Recorded as [decision #98](../decisions.md).
 
 ## 7. The backtest seam (built)
 
@@ -477,7 +488,7 @@ Four things follow, and each is a decision rather than a detail:
 - **It refuses rather than substitutes.** A range the store cannot cover is an
   error naming the range it *can* — never a shorter series quietly returned
   under the requested label. Nor does a backtest trigger a fetch: capture is a
-  standing decision made on the Market data page (§5), not a side effect of
+  standing decision made on the Data tab (§5), not a side effect of
   pressing Run, so a five-year request never becomes a five-year exchange crawl
   on someone's behalf.
 - **The interval comes from the request, not from this module.** `read_bars`
@@ -594,7 +605,7 @@ sanctioned continuity repair.
 | 1. **DDL** — `MARKET_DATA.BAR_SUBSCRIPTION` + three procedures | **Done and released** — `1.3.0-bar-subscription.xml`, `context="market_data,prod-deploy"` |
 | 2. **Python** — subscription repo; `InstrumentSource` protocol; warmer union (§4) | **Done** — `quant/market_data/subscriptions.py`, `quant/market_data/warm.py` |
 | 3. **API** — subscription CRUD, backfill and coverage routes, `require_user` | **Done** — `quant/api/market_data/router.py` |
-| 4. **UI** — a Market data page: product / interval / venue pickers from REFDATA and `INST.PRODUCT`, coverage per row, and an explicit backfill action | **Done** — `frontend/src/pages/MarketDataPage.tsx`. This is the part that was looked for and not found |
+| 4. **UI** — the Data tab: product / interval / venue pickers from REFDATA and `INST.PRODUCT`, coverage per row, and an explicit backfill action | **Done** — `frontend/src/pages/MarketDataPage.tsx`. Provider series are a second kind on the same tab ([§Two kinds](#two-kinds-on-the-data-tab)) |
 | 5. **Backtest seam** — exchange `data_source` → `read_bars` | **Done** — `fetch_df` branches on `IS_EXCHANGE_IND`; §9's factor question closed. An optional interval on the request is still open, and daily is resolved from REFDATA meanwhile |
 | 6. **Tests** — repo, warmer union, backfill reporting, and a backtest run pinned to a `SOURCE_APP_ID` | **Done** — `tests/unit/test_backtest_exchange_source.py` covers the pinned run and the four refusals |
 

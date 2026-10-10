@@ -34,6 +34,13 @@ export interface PromotionStateRow {
   description: string | null;
 }
 
+export interface AppMetricRow {
+  app_metric_id: number;
+  app_id: number;
+  metric_nm: string;
+  display_name: string;
+}
+
 export interface DataColumnRow {
   column_name: string;
   display_name: string;

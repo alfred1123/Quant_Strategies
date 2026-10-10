@@ -29,12 +29,15 @@ from quant.market_data.subscriptions import (
 )
 from quant.market_data.warm import BarWarmer
 from quant.queue.repo import BtQueueRepo
+from quant.api.deps import get_data_caches
+from quant.refdata.bundle import DataCaches
 from quant.schemas.market_data import (
     BackfillPlan,
     BackfillReport,
     BackfillRequest,
     BarSubscriptionRow,
     Coverage,
+    ProviderSeriesRow,
     SubscribeRequest,
     VenueDepth,
 )
@@ -110,6 +113,15 @@ def sync_price_bars(
             for r in report.results
         ],
     }
+
+
+@router.get("/provider-series", response_model=list[ProviderSeriesRow])
+def list_provider_series(
+    _user: CurrentUser = Depends(require_user),
+    caches: DataCaches = Depends(get_data_caches),
+) -> list[ProviderSeriesRow]:
+    """Current provider windows. The stored JSON is not returned."""
+    return [ProviderSeriesRow(**row) for row in caches.backtest_cache.list_availability()]
 
 
 @router.get("/subscriptions", response_model=list[BarSubscriptionRow])

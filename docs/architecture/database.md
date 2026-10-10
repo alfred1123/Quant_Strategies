@@ -380,7 +380,8 @@ The worker claims in `WorkerLoopRepo.claim_next` (`quant/queue/worker_loop.py`):
 | `SP_GET_PRICE_BAR` | `MARKET_DATA` | Range read by `(INTERNAL_CUSIP, TM_INTERVAL_ID, SOURCE_APP_ID, start, end)` |
 | `SP_GET_PRICE_BAR_COVERAGE` | `MARKET_DATA` | `MIN`/`MAX` timestamps via index `LIMIT 1` probes |
 | `SP_INS_BAR_SUBSCRIPTION` | `MARKET_DATA` | Version a capture request — create, enable, disable, retarget |
-| `SP_GET_BAR_SUBSCRIPTION` | `MARKET_DATA` | Current subscriptions, for the Market data page (not user-scoped — bars are shared) |
+| `SP_GET_BAR_SUBSCRIPTION` | `MARKET_DATA` | Current subscriptions, for the Data tab (not user-scoped — bars are shared) |
+| `SP_GET_API_REQUEST_AVAILABILITY` | `BT` | Current provider windows without the JSON body. A missing payload is `HAS_PAYLOAD_IND = N`. No user filter. Release `bt/1.29.0`, context `bt,prod-deploy` |
 | `SP_GET_ACTIVE_BAR_SUBSCRIPTIONS` | `MARKET_DATA` | Enabled series for the bar warmer, shaped like `TRADE.SP_GET_SCHEDULED_INSTRUMENTS` |
 
 ### Reading a result without the queue

@@ -467,7 +467,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
           Only {captured.first} to {captured.last} is captured
           {seriesKeys.length > 1 ? ' across the series in this run' : ` for ${config.symbol} on ${tradedApp?.display_name}`}.
           {' '}Run Optimization will use that range rather than submit a job the
-          worker will refuse. Backfill more history on the Market data page to
+          worker will refuse. Backfill more history on the Data page to
           keep a wider window.
         </Alert>
       )}

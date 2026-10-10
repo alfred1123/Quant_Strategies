@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from pydantic import BaseModel, Field
 
 
@@ -13,6 +15,14 @@ class DetachApiRequestPayloadRequest(BaseModel):
         ge=1,
         le=3660,
         description="Drop payload partitions whose range ended more than this many days ago.",
+    )
+
+
+class FillScheduledProvidersRequest(BaseModel):
+    """POST /api/v1/admin/providers/fill body."""
+
+    since: date = Field(
+        description="First day of the window. The insert replaces that day through today.",
     )
 
 
