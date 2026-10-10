@@ -511,7 +511,7 @@ Cron and the cursor now agree ([decision #81](../decisions.md)): `price_bar_sync
 | **Depends on** | 1.2, 1.8 |
 | **Blocks** | 2.2, 2.3 |
 
-**Design:** [Deployment performance reconcile](deployment-performance-reconcile.md) (proposed) — per-bar live and backtest returns, ratios derived on read so a paused deployment still reconciles. Strategy and account levels; each strategy's position comes from `TRADE.INTENT` ([Multi-strategy netting §5](multi-strategy-netting.md#5-intent-first), decision #90, trade release `1.10.0`). The snapshot tables in that design are still proposed.
+**Design:** [Deployment performance reconcile](deployment-performance-reconcile.md) — per-bar live and backtest returns, ratios derived on read so a paused deployment still reconciles. Strategy and account levels; each strategy's position comes from `TRADE.INTENT` ([Multi-strategy netting §5](multi-strategy-netting.md#5-intent-first), decision #90, trade release `1.10.0`). The strategy table is staged in trade `1.11.0` (context `trade` only). The account table, the daily job, and the UI are still proposed.
 
 **Tasks**
 

@@ -23,14 +23,24 @@ class _FillStatus:
     filled_qty: float | None = None
     avg_price: float | None = None
     fee: float | None = None
+    fee_ccy: str | None = None
 
 
-def _extract_fee(order: dict) -> float | None:
+def _fee_ccy(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _extract_fee(order: dict) -> tuple[float | None, str | None]:
+    """Raw ``fee.cost`` and ``fee.currency``. The cost is not converted."""
     fee = order.get("fee")
     if isinstance(fee, dict):
         cost = fee.get("cost")
-        return float(cost) if cost is not None else None
-    return None
+        amount = float(cost) if cost is not None else None
+        return amount, _fee_ccy(fee.get("currency"))
+    return None, None
 
 
 def _parse_terminal(order: dict, *, vendor_order_id: str | None) -> _FillStatus | None:
@@ -39,7 +49,7 @@ def _parse_terminal(order: dict, *, vendor_order_id: str | None) -> _FillStatus 
     filled = float(order.get("filled") or 0)
     avg = order.get("average")
     avg_price = float(avg) if avg is not None else None
-    fee = _extract_fee(order)
+    fee, fee_ccy = _extract_fee(order)
     oid = str(order.get("id")) if order.get("id") is not None else vendor_order_id
 
     if status == "closed" or (
@@ -53,6 +63,7 @@ def _parse_terminal(order: dict, *, vendor_order_id: str | None) -> _FillStatus 
             filled_qty=filled,
             avg_price=avg_price,
             fee=fee,
+            fee_ccy=fee_ccy,
         )
     if status == "rejected" or (
         filled == 0 and status in ("canceled", "cancelled", "expired")
@@ -105,6 +116,7 @@ def confirm_market_order(
                 filled_qty=fill.filled_qty,
                 avg_price=fill.avg_price,
                 fee=fill.fee,
+                fee_ccy=fill.fee_ccy,
             )
 
     return OrderResult(

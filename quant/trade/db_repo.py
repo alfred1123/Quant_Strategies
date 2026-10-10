@@ -232,6 +232,41 @@ class TradeRepo(DbGateway):
                 "app_id does not match deployment", status_code=400
             )
 
+    def validate_deployment_performance(
+        self,
+        *,
+        app_user_id: UUID,
+        deployment_performance_id: UUID,
+        deployment_id: UUID,
+        deployment_vid: int,
+        tm_interval_id: int,
+        bar_timestamp: datetime,
+        is_managed_ind: str,
+        user_id: str,
+    ) -> None:
+        _require_all(
+            app_user_id=app_user_id,
+            deployment_performance_id=deployment_performance_id,
+            deployment_id=deployment_id,
+            deployment_vid=deployment_vid,
+            tm_interval_id=tm_interval_id,
+            bar_timestamp=bar_timestamp,
+            is_managed_ind=is_managed_ind,
+            user_id=user_id,
+        )
+        if is_managed_ind not in ("Y", "N"):
+            raise TradeValidationError("is_managed_ind must be Y or N")
+
+        dep = self._fetch_current_deployment(deployment_id)
+        if dep is None:
+            raise TradeValidationError(
+                "deployment not found or not current", status_code=404
+            )
+        if str(dep["app_user_id"]) != str(app_user_id):
+            raise TradeValidationError(
+                "deployment does not belong to user", status_code=403
+            )
+
     def validate_schedule_status(
         self,
         *,
@@ -582,6 +617,7 @@ class TradeRepo(DbGateway):
         price: float | Decimal | None = None,
         notional_amt: float | Decimal | None = None,
         fee_amt: float | Decimal | None = None,
+        fee_ccy_cd: str | None = None,
         vendor_order_id: str | None = None,
     ) -> None:
         self.validate_transaction(
@@ -597,7 +633,8 @@ class TradeRepo(DbGateway):
             "CALL trade.sp_ins_transaction("
             "%s::uuid, %s::uuid, %s::integer, %s::integer, %s::integer,"
             " %s::text, %s::text, %s::text, %s::text,"
-            " %s::numeric, %s::numeric, %s::numeric, %s::numeric, %s::text, %s::text,"
+            " %s::numeric, %s::numeric, %s::numeric, %s::numeric,"
+            " %s::text, %s::text, %s::text,"
             " NULL::text, NULL::text, NULL::text)",
             (
                 str(transaction_id),
@@ -613,7 +650,68 @@ class TradeRepo(DbGateway):
                 price,
                 notional_amt,
                 fee_amt,
+                fee_ccy_cd,
                 vendor_order_id,
+                user_id,
+            ),
+        )
+
+    def sp_ins_deployment_performance(
+        self,
+        *,
+        deployment_performance_id: UUID,
+        app_user_id: UUID,
+        deployment_id: UUID,
+        deployment_vid: int,
+        tm_interval_id: int,
+        bar_timestamp: datetime,
+        is_managed_ind: str,
+        user_id: str,
+        intent_id: UUID | None = None,
+        target_position: Decimal | float | None = None,
+        backtest_position: Decimal | float | None = None,
+        unit_notional_amt: Decimal | float | None = None,
+        live_return: Decimal | float | None = None,
+        live_fill_gap_return: Decimal | float | None = None,
+        live_fee_return: Decimal | float | None = None,
+        backtest_return: Decimal | float | None = None,
+    ) -> None:
+        """Insert, version, or no-op one strategy performance bar.
+
+        ``backtest_return`` is the ``Performance`` replay ``pnl`` for this
+        bar. The live terms come from ``quant.trade.pnl_reconcile``.
+        """
+        self.validate_deployment_performance(
+            app_user_id=app_user_id,
+            deployment_performance_id=deployment_performance_id,
+            deployment_id=deployment_id,
+            deployment_vid=deployment_vid,
+            tm_interval_id=tm_interval_id,
+            bar_timestamp=bar_timestamp,
+            is_managed_ind=is_managed_ind,
+            user_id=user_id,
+        )
+        self._call_write(
+            "CALL trade.sp_ins_deployment_performance("
+            "%s::uuid, %s::uuid, %s::integer, %s::uuid, %s::integer,"
+            " %s::timestamptz, %s::char(1), %s::numeric, %s::numeric, %s::numeric,"
+            " %s::numeric, %s::numeric, %s::numeric, %s::numeric, %s::text,"
+            " NULL::text, NULL::text, NULL::text)",
+            (
+                str(deployment_performance_id),
+                str(deployment_id),
+                int(deployment_vid),
+                str(intent_id) if intent_id else None,
+                int(tm_interval_id),
+                bar_timestamp,
+                is_managed_ind,
+                target_position,
+                backtest_position,
+                unit_notional_amt,
+                live_return,
+                live_fill_gap_return,
+                live_fee_return,
+                backtest_return,
                 user_id,
             ),
         )
@@ -712,6 +810,35 @@ class TradeRepo(DbGateway):
             (
                 str(app_user_id),
                 str(deployment_id) if deployment_id else None,
+                clamped,
+            ),
+        )
+
+    def sp_get_deployment_performance(
+        self,
+        *,
+        app_user_id: UUID,
+        deployment_id: UUID | None = None,
+        from_ts: datetime | None = None,
+        to_ts: datetime | None = None,
+        limit: int = 500,
+    ) -> list[dict]:
+        """Current strategy bars for one user, newest bar first.
+
+        The cap is wider than the execution diary: a chart reads the life of
+        the deployment, and a year of hourly bars is several thousand rows.
+        """
+        _require(app_user_id, "app_user_id")
+        clamped = max(1, min(int(limit), 10_000))
+        return self._call_get(
+            "CALL trade.sp_get_deployment_performance("
+            "%s::uuid, %s::uuid, %s::timestamptz, %s::timestamptz, %s::integer,"
+            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (
+                str(app_user_id),
+                str(deployment_id) if deployment_id else None,
+                from_ts,
+                to_ts,
                 clamped,
             ),
         )

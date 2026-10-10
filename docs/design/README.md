@@ -25,7 +25,7 @@ today see [Architecture](../architecture/overview.md).
 |-----|--------|
 | [Jobs table detail UX](jobs-table-detail-ux.md) | Proposed |
 | [Queue screen aids (2026-09-29)](2026-09-29-queue-frontend-aids.md) | Proposed — result in Config, metric tooltips, queue search, two-job compare. Frontend only |
-| [Deployment performance reconcile](deployment-performance-reconcile.md) | Proposed — Phase 2.1–2.3 |
+| [Deployment performance reconcile](deployment-performance-reconcile.md) | Strategy bars staged (trade `1.11.0`, context `trade`); account, job, and UI still proposed |
 | [Multi-strategy netting](multi-strategy-netting.md) | `TRADE.INTENT` built (#90, trade `1.10.0`); order side recorded |
 | [Separate underlying & cache](separate-underlying.md) | Partial (cusip/xref only) |
 | [Alternative data sources](alt-data-sources.md) | Partial (Glassnode, Nasdaq) |

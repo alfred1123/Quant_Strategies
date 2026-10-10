@@ -52,6 +52,7 @@ BEGIN
                    t.PRICE,
                    t.NOTIONAL_AMT,
                    t.FEE_AMT,
+                   t.FEE_CCY_CD,
                    t.VENDOR_ORDER_ID,
                    t.TRANS_CCY_CD,
                    t.CREATED_AT AS FILLED_AT
@@ -78,6 +79,7 @@ BEGIN
                    t.PRICE,
                    t.NOTIONAL_AMT,
                    t.FEE_AMT,
+                   t.FEE_CCY_CD,
                    t.VENDOR_ORDER_ID,
                    t.TRANS_CCY_CD,
                    t.CREATED_AT AS FILLED_AT

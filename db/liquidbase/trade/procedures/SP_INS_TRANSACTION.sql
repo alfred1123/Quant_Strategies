@@ -1,6 +1,8 @@
 -- Append one broker-confirmed fill row.
 --
 -- IN_TRANSACTION_ID supplied by caller (UUID).
+-- IN_FEE_AMT is the raw broker cost. IN_FEE_CCY_CD is the coin that cost
+-- was charged in. TRANS_CCY_CD stays the product quote.
 -- Validation lives in Python (TradeRepo).
 CREATE OR REPLACE PROCEDURE TRADE.SP_INS_TRANSACTION(
     IN  IN_TRANSACTION_ID    UUID,
@@ -16,6 +18,7 @@ CREATE OR REPLACE PROCEDURE TRADE.SP_INS_TRANSACTION(
     IN  IN_PRICE             NUMERIC,
     IN  IN_NOTIONAL_AMT      NUMERIC,
     IN  IN_FEE_AMT           NUMERIC,
+    IN  IN_FEE_CCY_CD        TEXT,
     IN  IN_VENDOR_ORDER_ID   TEXT,
     IN  IN_USER_ID           TEXT,
     OUT OUT_SQLSTATE         TEXT,
@@ -54,6 +57,7 @@ BEGIN
         PRICE,
         NOTIONAL_AMT,
         FEE_AMT,
+        FEE_CCY_CD,
         VENDOR_ORDER_ID,
         USER_ID,
         CREATED_AT
@@ -71,6 +75,7 @@ BEGIN
         IN_PRICE,
         IN_NOTIONAL_AMT,
         IN_FEE_AMT,
+        IN_FEE_CCY_CD,
         IN_VENDOR_ORDER_ID,
         IN_USER_ID,
         NOW() AT TIME ZONE 'UTC'
@@ -105,7 +110,7 @@ BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
     GRANT EXECUTE ON PROCEDURE TRADE.SP_INS_TRANSACTION(
         UUID, UUID, INTEGER, INTEGER, INTEGER, TEXT, TEXT, TEXT, TEXT,
-        NUMERIC, NUMERIC, NUMERIC, NUMERIC, TEXT, TEXT,
+        NUMERIC, NUMERIC, NUMERIC, NUMERIC, TEXT, TEXT, TEXT,
         OUT TEXT, OUT TEXT, OUT TEXT
     ) TO quant_app;
   END IF;

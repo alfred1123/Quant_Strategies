@@ -86,3 +86,5 @@ class OrderResult:
     filled_qty: float | None = None
     avg_price: float | None = None
     fee: float | None = None
+    #: Coin the broker charged ``fee`` in. ``None`` when the venue omitted it.
+    fee_ccy: str | None = None
