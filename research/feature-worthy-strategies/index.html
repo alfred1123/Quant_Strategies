@@ -1,0 +1,4433 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Backtesting and trading framework for crypto and equity markets">
+      
+      
+      
+        <link rel="canonical" href="https://alfred1123.github.io/Quant_Strategies/research/feature-worthy-strategies/">
+      
+      
+        <link rel="prev" href="../japanese-korean-sources/">
+      
+      
+        <link rel="next" href="../strategy-persistence-validation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Strategies worth new platform features - Quant Strategies Wiki</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#strategies-worth-new-platform-features" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Quant Strategies Wiki" class="md-header__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant Strategies Wiki
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Strategies worth new platform features
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/cli-backtest/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../design/" class="md-tabs__link">
+          
+  
+  
+  Platform design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Strategy research
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../archive/" class="md-tabs__link">
+          
+  
+  
+  Archive
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../decisions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decisions
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Quant Strategies Wiki" class="md-nav__button md-logo" aria-label="Quant Strategies Wiki" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant Strategies Wiki
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alfred1123/Quant_Strategies" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alfred1123/Quant_Strategies
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    React Frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/credentials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Encryption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/refdata-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REFDATA Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/dev-vs-prod/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev vs Prod Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison to Pro Quant Firms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/oop-framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Strategy Framework
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cli-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/new-user-website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New User Guide (Website)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/indicators-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper Trading (Futu)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/live-trading-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Trading Promotion (Slack & Mainnet)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/adding-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/database-dump-restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Dump & Restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/prod-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/https-cloudflare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTPS via Cloudflare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/coding-standards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding Standards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/who-fixes-what/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Who Fixes What
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/backtest-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/trade-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/plan-to-profit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan to Profit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/deployment-performance-reconcile/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Performance Reconcile
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/best-vid-promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best-VID Promotion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/scheduler-price-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler, Price Bars & Consolidation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/scheduler-trade-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scheduler & Trade Open Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/ccxt-bar-timezones/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Bar Timezones & Apply Timing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/ccxt-trade-and-xref-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ccxt Trade & XREF Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/market-data-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market Data Capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/db-connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/login/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Login & Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/user-isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/jobs-table-detail-ux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs Table Detail UX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-29-queue-frontend-aids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue screen aids (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/multi-strategy-netting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Strategy Netting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/separate-underlying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Separate Underlying & Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/alt-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternative Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/glassnode-market-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glassnode market data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/futu-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futu Trading (OOP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/frontend-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend Code Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-25-backtest-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest review (2026-09-25)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-25-backtest-data-hygiene-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest data hygiene (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-26-fractional-sizing-stateful-exits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fractional sizing and stateful exits (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-26-code-quality-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code quality review (2026-09-26)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-27-algodaemon-bug-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AlgoDaemon bug report (2026-09-27)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-27-bug-verification-round3-4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bug verification, rounds 3–4 (2026-09-27)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-29-long-term-fixes-b1-rangeparam-datacolumn/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Long-term fixes — B1, window bounds, data columns, repeated trials (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/2026-09-29-dependency-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency and OOP review (2026-09-29)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy research
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Strategy research
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crypto-spot-baseline-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crypto spot — baseline improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sharpe-ideas-index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharpe ideas — where to start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../momentum-reversal-filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum, reversal, and filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../catching-crypto-trends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catching crypto trends
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../volatility-and-cross-section/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Volatility and the cross-section
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../funding-basis-carry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Funding, basis, and carry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../microstructure-onchain-unusual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Microstructure, on-chain, and unusual
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../polyu-quant-course-methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods from the PolyU quantitative trading course
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dutch-algotrading-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dutch Algotrading Patreon review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../chinshum-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chin Shum Patreon review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../merge-vs-distinct-candidates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which candidates to merge vs run as separate sleeves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../japanese-korean-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Japanese and Korean crypto strategy sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategies worth new platform features
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategies worth new platform features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ranked-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-offline-check-was-set-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the offline check was set up
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s1-spot-perp-carry-and-carry-when-the-trend-is-flat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S1. Spot-perp carry, and carry when the trend is flat
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s2-basis-and-funding-level-as-a-regime-signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S2. Basis and funding level as a regime signal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s3-coinbase-premium-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S3. Coinbase premium gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s4-taker-flow-imbalance-on-daily-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S4. Taker-flow imbalance on daily bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s5-implied-volatility-dvol-sizing-and-vrp-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S5. Implied volatility (DVOL): sizing and VRP gates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s6-ethbtc-and-bnbbtc-ratio-trades" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S6. ETH/BTC and BNB/BTC ratio trades
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s7-capitulation-volume-reversal-with-a-time-stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S7. Capitulation-volume reversal with a time stop
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s8-open-interest-flush-and-leverage-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S8. Open-interest flush and leverage events
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s9-time-of-day-and-weekday-seasonality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S9. Time-of-day and weekday seasonality
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#considered-and-not-ranked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Considered and not ranked
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testable-on-algodaemon-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testable on AlgoDaemon today
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sources-that-were-blocked-or-not-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources that were blocked or not read
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy-persistence-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy persistence validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../risk-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Risk control for the three sleeves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Archive
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/trade-deployment-rollout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trade Deployment Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/live-order-execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Order Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-speed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Speed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/return-compounding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Return Compounding (bug)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/infra-capacity-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure Capacity Review (2026-09)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-queue-json-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Queue JSON Viewer (abandoned)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/ts-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/deploy-build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/backtest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest API (concepts)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/strategy-vid-versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy VID Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.1-signoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0 Signoffs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.2-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.2 Capacity Snapshot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/phase-0/phase-0.3-topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 0.3 Deploy Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ranked-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-offline-check-was-set-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the offline check was set up
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s1-spot-perp-carry-and-carry-when-the-trend-is-flat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S1. Spot-perp carry, and carry when the trend is flat
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s2-basis-and-funding-level-as-a-regime-signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S2. Basis and funding level as a regime signal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s3-coinbase-premium-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S3. Coinbase premium gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s4-taker-flow-imbalance-on-daily-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S4. Taker-flow imbalance on daily bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s5-implied-volatility-dvol-sizing-and-vrp-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S5. Implied volatility (DVOL): sizing and VRP gates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s6-ethbtc-and-bnbbtc-ratio-trades" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S6. ETH/BTC and BNB/BTC ratio trades
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s7-capitulation-volume-reversal-with-a-time-stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S7. Capitulation-volume reversal with a time stop
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s8-open-interest-flush-and-leverage-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S8. Open-interest flush and leverage events
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#s9-time-of-day-and-weekday-seasonality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S9. Time-of-day and weekday seasonality
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#considered-and-not-ranked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Considered and not ranked
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testable-on-algodaemon-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testable on AlgoDaemon today
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sources-that-were-blocked-or-not-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources that were blocked or not read
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="strategies-worth-new-platform-features">Strategies worth new platform features<a class="headerlink" href="#strategies-worth-new-platform-features" title="Permanent link">&para;</a></h1>
+<p><strong>Doc type:</strong> strategy research<br />
+<strong>Status:</strong> hypothesis — offline approximations only, not platform results. Nothing on this page has been run on AlgoDaemon.</p>
+<p>The three finalists are really one strategy: a BTC Bollinger-band trend regime traded on three coins (ETH A2, BNB, and BTC; see <a href="../merge-vs-distinct-candidates/">merge vs distinct</a>). The overfitting check in the <a href="../chinshum-review/#overfitting-check-on-the-three-finalist-families">Chin Shum review</a> put the probability of backtest overfitting at 0.4–0.8, and ETH A2 lost money out of sample over the last year. Another variant of the same BTC trend adds little. What the book is missing is a return stream that does <strong>not</strong> move with the BTC trend.</p>
+<p>This page ranks the <strong>new backend features</strong> that would unlock such streams, and gives the evidence for each strategy behind them. It does not repeat proposals that already exist. Those are linked instead:</p>
+<ul>
+<li>Fractional weights, an averaging combiner, hysteresis with a ratcheting stop, and a close-only Donchian: the <a href="../../design/2026-09-26-fractional-sizing-stateful-exits/">fractional sizing and stateful exits proposal</a> (PR #63).</li>
+<li>ETF NAV premium, ETF flows, treasury-company holdings, a funding-rate crowding veto, on-chain TVL, and stablecoin supply: the <a href="../chinshum-review/#external-data-specs-for-a-backend-proposal">external-data specs</a> E1–E6.</li>
+<li>Funding z-score filters and perp-spot convergence: <a href="../funding-basis-carry/">Funding, basis, and carry</a>.</li>
+<li>Vol targeting and cross-sectional factors: <a href="../volatility-and-cross-section/">Volatility and the cross-section</a>.</li>
+<li>Kimchi premium, weekday seasonality, and Korean breakout rules: <a href="../japanese-korean-sources/">Japanese and Korean sources</a>.</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Two kinds of numbers on this page</p>
+<p><strong>Author-reported</strong> figures are quoted from the named source, with that source's sample and cost assumption. We have not reproduced them.</p>
+<p><strong>Offline approximation</strong> figures come from a short Python check run for this page. It uses Binance public data as a stand-in for Bybit, daily UTC closes, 10 bp per side per leg, and a <strong>next-day fill</strong>: the position decided at close <em>t</em> is filled at close <em>t+1</em>. That is one bar slower than the platform's <a href="../../design/2026-09-27-bug-verification-round3-4/#4-a-signal-is-filled-on-the-same-close">same-close fill</a>. Train is up to 2023-12-31 and test is 2024-01-01 to 2026-08-31. Sharpe uses √365. <strong>These are not platform results.</strong> Each is labelled "offline approximation" where it appears.</p>
+</div>
+<hr />
+<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>The only low-correlation stream with real size is carry.</strong> Holding spot against a short perpetual earned about 7–8% a year on BTC and ETH notional from mid-2021 to August 2026, with a daily correlation to the finalist blend of about 0.0–0.1 (offline approximation). Carry has compressed, though: BTC funding summed to 1.7% over January–August 2026. BNB funding was negative in four of the last five years, so carry does not work on BNB.</li>
+<li><strong>"Carry when the trend is flat" is the most useful combination we found.</strong> It puts idle trend capital into the carry trade and raised the BTC sleeve's test Sharpe from 1.29 to 1.53 and ETH A2's from 1.68 to 1.88 (offline approximation, next-day fill, parameters not re-fitted). This needs a perpetual leg with a funding cashflow. The engine has neither today.</li>
+<li><strong>A generic derived or external series column comes second.</strong> One feature lets a rule read a ratio, a spread, or a premium. That covers the Coinbase premium, spot-perp basis, ETH/BTC, and the kimchi premium, and it is also the base E1–E6 need. The Coinbase premium was the most promising gate we tested, but its evidence is mixed.</li>
+<li><strong>Most "alternative" signals failed at 10 bp or out of sample.</strong> That includes the 21:00–23:00 UTC hour, weekday effects, daily taker-flow imbalance, the ETH/BTC ratio (trend or mean reversion), DVOL gates, and MVRV. Their features rank low.</li>
+<li><strong>Nothing new is worth a backtest on AlgoDaemon today.</strong> The one idea the engine can express, a one-day capitulation bounce, was flat to negative offline. The details are under <a href="#testable-on-algodaemon-today">Testable on AlgoDaemon today</a>.</li>
+</ul>
+<h2 id="ranked-features">Ranked features<a class="headerlink" href="#ranked-features" title="Permanent link">&para;</a></h2>
+<p>"Diversification value" is our estimate of how much the unlocked strategy would add to the BTC-trend book, based on the offline correlation and the strength of the evidence. "Effort" is S, M, or L for the backend alone.</p>
+<table>
+<thead>
+<tr>
+<th>Rank</th>
+<th>Feature</th>
+<th>Strategies it unlocks</th>
+<th>Diversification value</th>
+<th>Data cost and availability</th>
+<th>Effort</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>F1. Perpetual leg with funding cashflow</strong> (a two-leg delta-neutral position: long spot plus short perp, marked with funding income and both legs' fees)</td>
+<td><a href="#s1-spot-perp-carry-and-carry-when-the-trend-is-flat">S1 carry sleeve</a>, carry-when-flat inside each trend sleeve; later the He et al. convergence trade in <a href="../funding-basis-carry/#3-random-maturity-arbitrage-around-the-no-arbitrage-bound">funding-basis-carry</a></td>
+<td><strong>High.</strong> Correlation to the blend was about 0.0–0.1 offline. Returns are small now (about 2–3% a year in 2026).</td>
+<td>Free: Bybit and Binance publish funding history and perp klines.</td>
+<td>L</td>
+<td><strong>P1</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>F2. Derived and external daily series</strong> (a column that is an expression of two loaded series, such as a ratio, a difference, or a spread, plus a loader for an outside daily close such as Coinbase BTC-USD)</td>
+<td><a href="#s3-coinbase-premium-gate">S3 Coinbase premium</a>, <a href="#s2-basis-and-funding-level-as-a-regime-signal">S2 basis as a regime signal</a>, <a href="#s6-ethbtc-and-bnbbtc-ratio-trades">S6 ETH/BTC ratio</a>; also the kimchi premium and E1</td>
+<td><strong>Medium.</strong> The Coinbase premium gate correlated about 0.4 with the blend offline.</td>
+<td>Free: Coinbase Exchange public candles, perp klines. Kimchi needs Upbit plus FX.</td>
+<td>M</td>
+<td><strong>P1</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>F3. Hold-for-N-bars exit</strong> (after an entry event, stay long for N bars regardless of the signal; this extends the state in <a href="../../design/2026-09-26-fractional-sizing-stateful-exits/#proposal-c-hysteresis-and-a-stop-that-remembers">Proposal C</a>)</td>
+<td><a href="#s7-capitulation-volume-reversal-with-a-time-stop">S7 capitulation reversal</a>, <a href="#s8-open-interest-flush-and-leverage-events">S8 OI-flush rebound</a>, and event studies generally</td>
+<td><strong>Medium in correlation, low in evidence.</strong> Offline correlation was about 0.0–0.2, but there are only 7–10 events per coin in the test window.</td>
+<td>None (uses existing data)</td>
+<td>S (once Proposal C exists)</td>
+<td><strong>P2</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>F4. Extra kline fields and scale-free volume indicators</strong> (taker-buy volume, quote volume, and trade count as data columns, plus ratio or share indicators; this is part of <a href="../../design/2026-09-27-bug-verification-round3-4/#7-b26-volume-limited-to-a-raw-input-column">B26</a>)</td>
+<td><a href="#s4-taker-flow-imbalance-on-daily-bars">S4 taker-flow imbalance</a>, the volume leg of S7</td>
+<td><strong>Low.</strong> Offline flow mostly restated price; correlation was about 0.3–0.5.</td>
+<td>Binance klines carry taker-buy volume. Bybit's kline endpoint returns only volume and turnover, so Bybit would need aggregation from its public trade archive.</td>
+<td>M</td>
+<td><strong>P3</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>F5. Implied-vol series (Deribit DVOL) and vol-target sizing</strong> (sizing needs <a href="../../design/2026-09-26-fractional-sizing-stateful-exits/#proposal-a-fractional-weights">Proposal A</a>)</td>
+<td><a href="#s5-implied-volatility-dvol-sizing-and-vrp-gates">S5 DVOL sizing and VRP gates</a></td>
+<td><strong>Low as a signal.</strong> It is a risk tool: it cut the train-period drawdown offline but did not raise Sharpe.</td>
+<td>Free: Deribit public API, BTC and ETH from March 2021. There is no BNB DVOL.</td>
+<td>S (data) plus Proposal A</td>
+<td><strong>P3</strong></td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>F6. Open-interest series in coin units</strong></td>
+<td><a href="#s8-open-interest-flush-and-leverage-events">S8</a></td>
+<td><strong>Low.</strong> Published evidence is null to weak.</td>
+<td>Free on Bybit and Binance. Neither the history depth nor the Bybit endpoint was checked from here.</td>
+<td>M</td>
+<td>P4</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>F7. Calendar and time-of-day factor</strong> (hour, weekday, month-turn)</td>
+<td><a href="#s9-time-of-day-and-weekday-seasonality">S9 seasonality</a></td>
+<td><strong>None at 10 bp.</strong> The 21:00–23:00 UTC hour was deeply negative after fees offline.</td>
+<td>None</td>
+<td>S</td>
+<td>P4: build only if fees fall below about 4 bp</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>F8. Spread or long-short position across two coins</strong></td>
+<td>S6 as a market-neutral ratio trade</td>
+<td><strong>Low.</strong> Offline the ratio trades earned close to nothing in the test window.</td>
+<td>Free (cross pairs ETHBTC and BNBBTC exist on Binance)</td>
+<td>L</td>
+<td>P5</td>
+</tr>
+</tbody>
+</table>
+<p>Not ranked: HMM regime switching, a portfolio drawdown brake, and short options. See <a href="#considered-and-not-ranked">Considered and not ranked</a>.</p>
+<hr />
+<h2 id="how-the-offline-check-was-set-up">How the offline check was set up<a class="headerlink" href="#how-the-offline-check-was-set-up" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Data.</strong> Binance public data dumps: spot daily klines for BTCUSDT, ETHUSDT, BNBUSDT, ETHBTC, and BNBBTC; hourly BTCUSDT; USDⓈ-M perpetual daily klines and funding history for the three coins. Also the Deribit DVOL index (BTC), Coinbase Exchange daily candles (BTC-USD and USDT-USD), and Coin Metrics community MVRV. Data ends 2026-08-31. The Bybit and Binance REST APIs were geo-blocked from our network, so Binance's archive stands in for Bybit.</li>
+<li><strong>Engine.</strong> Daily P&amp;L = held position × close-to-close return − |change in position| × 10 bp, with the next-day fill described above. Carry P&amp;L = spot return − perp return + funding settled that UTC day, with 10 bp on each leg on entry and exit.</li>
+<li><strong>Finalist replica.</strong> The same engine gives the three finalist rules (BTC z60 &gt; 2.25; ETH A2 = BTC z65 &gt; 2.25 and ETH z100 &gt; −1.0; BNB = BTC z100 &gt; 0.5) and an equal-weight blend. Test Sharpe was 1.29 for BTC, 1.68 for ETH A2, 1.24 for BNB, and 1.85 for the blend. Over the last 12 months (2025-09-01 to 2026-08-31) it was 0.27, 0.20, 0.75, and 0.66. These parameters were chosen on data that includes the test window, so the test figures are <strong>not</strong> out of sample and overstate the edge. Use them only as the baseline for correlation and for "adds to the sleeve" comparisons. Our last-12-month ETH A2 figure (+0.20) differs from the platform's −0.16 because the venue, the window, and the fill all differ.</li>
+<li><strong>Correlations</strong> are daily, against that blend, over the full sample and over the test window.</li>
+</ul>
+<hr />
+<h2 id="s1-spot-perp-carry-and-carry-when-the-trend-is-flat">S1. Spot-perp carry, and carry when the trend is flat<a class="headerlink" href="#s1-spot-perp-carry-and-carry-when-the-trend-is-flat" title="Permanent link">&para;</a></h2>
+<p><strong>Rule in plain words.</strong> Buy one unit of spot and sell one unit of the perpetual. The position has almost no price exposure, and it collects funding while funding is positive. Two versions:</p>
+<ol>
+<li><strong>Carry sleeve.</strong> Hold the pair all the time, or only while trailing funding is above a threshold.</li>
+<li><strong>Carry when flat.</strong> Inside each trend sleeve, put the capital into the pair whenever the trend rule is flat. Unwind both legs on the day the trend turns long.</li>
+</ol>
+<p><strong>Parameters.</strong> Funding gate: trailing 7-day funding, annualized, above 0%, 5%, or 10%. Coins: BTC and ETH only (see below).</p>
+<p><strong>Sources.</strong></p>
+<ul>
+<li>Schmeling, Schrimpf, and Todorov, <em>Crypto Carry</em>, <a href="https://www.bis.org/publ/work1087.htm">BIS Working Paper 1087</a> (English; later in <em>Management Science</em>). Abstract and summary only; the PDF did not load from our network.</li>
+<li>CoinDesk, <a href="https://www.coindesk.com/markets/2026/08/03/the-bitcoin-futures-yield-collapse-once-over-20-now-less-than-treasury-notes">3 August 2026</a>, citing Glassnode (English).</li>
+<li>takurot, <a href="https://qiita.com/takurot/items/1e1b64e702ac07704228">Qiita, 29 July 2026</a>, a NautilusTrader test of funding-rate arbitrage (Japanese).</li>
+<li>FMZ, <a href="https://www.fmz.com/digest-topic/8469">资金费率策略近况和推荐操作</a> ("Where funding-rate strategies stand", December 2021) and <a href="https://www.fmz.com/digest-topic/10578">币本位做空资费套利策略的量化实现</a> ("A coin-margined short-perp funding strategy", January 2025) (Chinese).</li>
+</ul>
+<p><strong>Author-reported evidence.</strong></p>
+<ul>
+<li>Schmeling et al.: carry averaged more than 10% a year and at times reached 40–60%. They tie it to trend-chasing small investors and to limits on arbitrage capital. High carry precedes crashes. The launch of spot ETFs lowered carry by several percentage points. (Sample and costs as in the paper; we read only the abstract.)</li>
+<li>CoinDesk / Glassnode: the 3-month BTC basis was about 3% a year against about 3.8% on the 2-year US Treasury, and had stayed below Treasuries for 157 days since February 2026. The only earlier stretch like it, August 2022 to January 2023, ended at the cycle low.</li>
+<li>takurot (Japanese): over 66 days (May–July 2026) average funding was about 3.1% annualized, and all 32 parameter sets lost money at a 0.02% maker fee. His break-even was average funding above about 7.5% annualized. His best setting entered above 10%, held at least 168 hours, and exited below 0%. This is a short in-sample test.</li>
+<li>FMZ (Chinese, paraphrased): in the 2021 bull market the site's public funding strategy briefly ran above 100% annualized. By December 2021 entry premiums had fallen from about 0.5% to about 0.1%, fees and slippage were eating frequent trades, and the long-hold yield had become "very low". The 2025 post shows cumulative BTC coin-margined funding of about 50% over five years (2020 to early 2025), and notes that BNB's cumulative funding was negative.</li>
+</ul>
+<p><strong>Offline approximation</strong> (BTC, per unit of spot notional, next-day fill, 10 bp per leg):</p>
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Train Sharpe</th>
+<th>Train CAGR</th>
+<th>Test Sharpe</th>
+<th>Test CAGR</th>
+<th>Last 12m CAGR</th>
+<th>Max DD, train / test</th>
+<th>Corr. to blend, full / test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BTC, carry always on</td>
+<td>8.9*</td>
+<td>15.9%</td>
+<td>11.9*</td>
+<td>7.3%</td>
+<td>3.4%</td>
+<td>−2.3% / −0.4%</td>
+<td>0.10 / 0.02</td>
+</tr>
+<tr>
+<td>BTC, carry while 7-day funding &gt; 5% a year</td>
+<td>5.5*</td>
+<td>10.9%</td>
+<td>2.3*</td>
+<td>2.5%</td>
+<td>—</td>
+<td>−4.8% / −3.2%</td>
+<td>0.10 / 0.02</td>
+</tr>
+<tr>
+<td>ETH, carry always on†</td>
+<td>7.0*</td>
+<td>7.0%</td>
+<td>11.3*</td>
+<td>7.4%</td>
+<td>2.4%</td>
+<td>−1.8% / −0.6%</td>
+<td>—</td>
+</tr>
+<tr>
+<td>BNB, carry always on†</td>
+<td>−4.7</td>
+<td>−8.9%</td>
+<td>−1.1</td>
+<td>−1.5%</td>
+<td>1.9%</td>
+<td>−21.4% / −5.9%</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>* These Sharpe ratios are an artefact of daily marking. The pair's daily P&amp;L had an annualized volatility of only 1.4%, and its worst day was −107 bp. The ratios ignore intraday basis moves, margin calls, exchange risk, and the extra capital the short perp needs. Read the CAGR, not the Sharpe.<br />
+† The ETH and BNB rows start on 2021-07-01. The BTC rows start with the first perp data in September 2019, so their train window includes the 2020–2021 high-funding years. From 2021-07-01, BTC always-on earned 7.9% a year in train.</p>
+<p>Funding summed by calendar year (offline, Binance): BTC 17.2% (2020), 30.6%, 4.2%, 7.9%, 12.0%, 5.1%, and 1.7% for January–August 2026. ETH 27.5%, 37.5%, 0.8%, 8.3%, 13.0%, 4.9%, and 1.0%. BNB 2.3%, 21.7%, −12.6%, −8.3%, −3.3%, −2.1%, and 1.8%.</p>
+<p><strong>Carry when flat</strong> (offline approximation, same capital, 20 bp to unwind both legs when the trend enters):</p>
+<table>
+<thead>
+<tr>
+<th>Sleeve</th>
+<th>Train Sharpe, trend → trend + carry</th>
+<th>Test Sharpe</th>
+<th>Test CAGR</th>
+<th>Last 12m Sharpe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BTC (z60 &gt; 2.25)</td>
+<td>1.41 → 1.68</td>
+<td>1.29 → 1.53</td>
+<td>18.0% → 22.0%</td>
+<td>0.27 → 0.33</td>
+</tr>
+<tr>
+<td>ETH A2</td>
+<td>1.41 → 1.62</td>
+<td>1.68 → 1.88</td>
+<td>34.7% → 39.6%</td>
+<td>0.20 → 0.23</td>
+</tr>
+<tr>
+<td>BNB (BTC z100 &gt; 0.5)</td>
+<td>0.96 → 0.69</td>
+<td>1.24 → 1.11</td>
+<td>46.9% → 40.1%</td>
+<td>0.75 → 0.70</td>
+</tr>
+</tbody>
+</table>
+<p>Adding always-on BTC carry as a fourth equal-weight sleeve to the three-sleeve blend moved test Sharpe from 1.85 to 1.98 and test max drawdown from −12.3% to −8.8%, but cut test CAGR from 34.8% to 27.7% (offline approximation). Gating carry on funding above 5% did <strong>worse</strong> than leaving it on: the extra switching costs more than the gate saves.</p>
+<p><strong>Plausibility at 10 bp.</strong> Good for a slow, always-on or when-flat sleeve: a round trip costs 40 bp across two legs, which about two months of 2024-level funding covers. Poor for anything that switches often. At 2026 funding (about 2–3% a year) the edge is thin, and a spot sleeve that sits in cash earns nothing either, so carry when flat is still an improvement.</p>
+<p><strong>Correlation to the BTC-trend sleeves.</strong> About 0.0–0.1 daily. Schmeling et al. warn that carry and crash risk are linked, so the tail correlation may be higher than the daily one.</p>
+<p><strong>New platform capability needed.</strong></p>
+<ol>
+<li>A <strong>perpetual instrument</strong> (Bybit USDT perps for BTC and ETH) with daily klines and 8-hour funding history.</li>
+<li>A <strong>two-leg position</strong>: long spot plus short perp, charged fees on both legs.</li>
+<li><strong>Funding as a cashflow</strong> in <code>performance</code>'s P&amp;L, credited per settlement.</li>
+<li>For carry when flat, a way for a sleeve to say "when this rule is flat, hold the carry pair". That is either a mode on the sleeve or a job for the <a href="../../design/2026-09-26-fractional-sizing-stateful-exits/#proposal-b-an-average-then-a-volatility-weight">multi-sleeve combiner</a>.</li>
+<li>A capital or margin assumption for the short leg, so returns are not quoted per unit of notional only.</li>
+</ol>
+<p>None of this exists: <a href="../funding-basis-carry/#4-cash-and-carry-as-a-holding-strategy">funding-basis-carry §4</a> already records cash-and-carry as not expressible, and no backend proposal covers it.</p>
+<p><strong>AlgoDaemon testability:</strong> Can't be tested. There is no perpetual, no second leg, and no funding cashflow.</p>
+<hr />
+<h2 id="s2-basis-and-funding-level-as-a-regime-signal">S2. Basis and funding level as a regime signal<a class="headerlink" href="#s2-basis-and-funding-level-as-a-regime-signal" title="Permanent link">&para;</a></h2>
+<p><strong>Rule in plain words.</strong> Use the size of the basis or funding as information about the spot market, not as a trade in itself. Two directions have been argued:</p>
+<ul>
+<li><strong>Crowding veto</strong> (already specified as <a href="../chinshum-review/#e4-funding-rate-crowding-veto">E4</a>): do not open a new long while funding is extremely high.</li>
+<li><strong>Capitulation or regime floor</strong> (new here): when the annualized basis falls below the risk-free rate for a long stretch, the leveraged longs have left, and that has marked cycle lows (CoinDesk / Glassnode above). K33 found that CME days with rising open interest and a rising basis were followed by a better next day than days with rising open interest and a falling basis.</li>
+</ul>
+<p><strong>Parameters.</strong> Basis measure: perp premium over spot, or the annualized 7-day funding sum. Thresholds: basis minus the 2-year Treasury yield below 0 for at least N days (N = 30, 60, 90). K33's version is the sign of the daily change in CME basis and in open interest.</p>
+<p><strong>Sources.</strong> CoinDesk, <a href="https://www.coindesk.com/markets/2026/08/03/the-bitcoin-futures-yield-collapse-once-over-20-now-less-than-treasury-notes">3 August 2026</a> (English). K33 Research, <a href="https://k33.com/research/articles/paying-attention-to-cme-traders-can-pay-off"><em>Paying attention to CME traders can pay off</em></a>, September 2023 (English). Schmeling et al. (above) on carry predicting crashes.</p>
+<p><strong>Author-reported evidence.</strong> K33: after a CME day with rising open interest and a rising basis, BTC averaged +0.65% the next day (median +0.39%). After rising open interest with a falling basis, it averaged −0.54% (median −0.31%). Their sample is the CME history to September 2023. There is no cost model, and it is a one-day conditional mean, not a strategy. Glassnode's basis-below-Treasuries observation rests on <strong>two</strong> episodes.</p>
+<p><strong>Offline approximation.</strong> Not tested here. We had no Treasury series loaded, and the two-episode history would not support a backtest. The crowding direction is E4's, and <a href="../funding-basis-carry/#2-normalize-the-clock-before-you-rank-funding">funding-basis-carry §2</a> already specifies how to normalize the funding clock.</p>
+<p><strong>Plausibility at 10 bp.</strong> As a slow regime gate that trades rarely, yes. As K33's one-day rule, no: 0.65% on the good days minus a 20 bp round trip is thin, and it needs CME data.</p>
+<p><strong>Correlation.</strong> Unknown. A basis floor would likely fire near trend bottoms, when the trend sleeves are flat, which is the useful kind of low correlation.</p>
+<p><strong>New platform capability needed.</strong> F1's perp klines and funding history as a <strong>data column</strong> (without trading the perp), a basis column built with <strong>F2</strong> (perp close over spot close minus one), and an outside daily series for the Treasury yield (for example FRED <code>DGS2</code>).</p>
+<p><strong>AlgoDaemon testability:</strong> Can't be tested. There is no perp or funding series and no external data.</p>
+<hr />
+<h2 id="s3-coinbase-premium-gate">S3. Coinbase premium gate<a class="headerlink" href="#s3-coinbase-premium-gate" title="Permanent link">&para;</a></h2>
+<p><strong>Rule in plain words.</strong> Be long BTC only when US spot buyers on Coinbase are paying more than offshore USDT buyers, relative to recent history. Otherwise stay flat.</p>
+<p><strong>Parameters.</strong> Premium = Coinbase BTC-USD daily close ÷ Binance (or Bybit) BTCUSDT close − 1. Smooth it with an N-day mean, N in {3, 5, 7, 10, 14, 21}, then take a Z-day z-score, Z in {60, 90, 180}. Go long when the z-score is above 0. Optionally divide by USDT-USD to strip out Tether's own premium.</p>
+<p><strong>Sources.</strong> TradeWize, <a href="https://tradewize.io/blog/how-to-read-the-coinbase-premium"><em>Coinbase Premium: what 9 years of hourly data say it actually measures</em></a> (English). The premium is also mentioned in passing in the <a href="../japanese-korean-sources/#ranked-ideas">Japanese and Korean page</a>, rank 3, where a Korean note found that premium flips were followed by roughly flat returns.</p>
+<p><strong>Author-reported evidence.</strong> TradeWize: the premium ranged from −37 to +518 bp in 2017 and from −16 to +3 bp in 2026, and it is mostly a Tether-price artefact. Top-decile days follow a month that gained 14.6% and precede +3.8% a month, against +0.3% for the bottom decile. Once Tether is adjusted out, the two deciles are the same. The author reads it as descriptive, not predictive.</p>
+<p><strong>Offline approximation</strong> (BTC, long or flat, next-day fill, 10 bp; the window starts 2021-07-01, so buy and hold is Sharpe 0.42 in train, 0.73 in test, and −0.51 over the last 12 months):</p>
+<table>
+<thead>
+<tr>
+<th>Variant (18 grid cells each)</th>
+<th>Median train Sharpe</th>
+<th>Median test Sharpe</th>
+<th>Median last-12m Sharpe</th>
+<th>Cells beating buy and hold in test</th>
+<th>Time in market</th>
+<th>Corr. to blend</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Raw premium</td>
+<td>0.74</td>
+<td>0.94</td>
+<td>0.60</td>
+<td>14 of 18</td>
+<td>about 48%</td>
+<td>0.31–0.42</td>
+</tr>
+<tr>
+<td>USDT-adjusted premium</td>
+<td>0.18</td>
+<td>1.04</td>
+<td>0.41</td>
+<td>15 of 18</td>
+<td>about 47%</td>
+<td>0.35–0.39</td>
+</tr>
+</tbody>
+</table>
+<p>The 7-day / 90-day raw cell by year (buy and hold in brackets): 2019 0.57 (1.31), 2020 1.19 (2.25), 2021 0.75 (0.98), 2022 −0.36 (−1.29), 2023 2.84 (2.35), 2024 1.65 (1.76), 2025 0.28 (0.05), 2026 January–August 1.24 (−0.12). Most of the gain comes from sitting out bad years, not from beating good ones. The USDT-adjusted version is weaker in the train period, which supports TradeWize's point that much of the raw signal is the price of USDT offshore, not US demand. Mean premium from mid-2021: +0.2 bp raw, +0.4 bp adjusted.</p>
+<p><strong>Plausibility at 10 bp.</strong> Moderate. The rule is in the market about half the time and switches every few days on short smoothing windows. Longer windows (14–21 days) switch less and held up about as well.</p>
+<p><strong>Correlation.</strong> About 0.3–0.4 with the blend. That is lower than another trend variant, but not low.</p>
+<p><strong>New platform capability needed.</strong> <strong>F2</strong>: an outside daily series (Coinbase BTC-USD and, for the adjusted version, USDT-USD, both from free Coinbase Exchange candles) and a <strong>ratio expression</strong> against the traded BTCUSDT close, usable as a factor column. The existing Bollinger z-score then serves as the z-score.</p>
+<p><strong>AlgoDaemon testability:</strong> Can't be tested. There is no external series and no ratio column.</p>
+<hr />
+<h2 id="s4-taker-flow-imbalance-on-daily-bars">S4. Taker-flow imbalance on daily bars<a class="headerlink" href="#s4-taker-flow-imbalance-on-daily-bars" title="Permanent link">&para;</a></h2>
+<p><strong>Rule in plain words.</strong> Be long when aggressive buyers (the taker-buy share of volume) have been unusually active over the last N days. A variant first strips out the part of the flow explained by same-day returns.</p>
+<p><strong>Parameters.</strong> Taker-buy share = taker-buy base volume ÷ total volume. Smooth over N days (7 or 30), then take a 180-day z-score. Go long when it is above 0.</p>
+<p><strong>Sources.</strong> Anastasopoulos et al., <a href="https://www.sciencedirect.com/science/article/pii/S1386418126000029"><em>Order flow and cryptocurrency returns</em></a>, <em>Journal of Financial Markets</em> 2026 (English, abstract and summary). QuantScopeX, <a href="https://www.quantscopex.com/research/strategy/bitcoin-order-flow-statistical-evaluation"><em>We tested 3.08 billion BTC order-flow records</em></a> (English).</p>
+<p><strong>Author-reported evidence.</strong> The journal paper reports that world order flow has explanatory and predictive power for crypto returns and says the result survives transaction costs. In the version we read, flow predicts daily and weekly returns only after lagged returns are controlled for (t = 2.58), and lagged returns themselves predict with a negative sign (t = −3.25). QuantScopeX finds that most order-flow signals, including cumulative volume delta, explain the present bar and not the next one.</p>
+<p><strong>Offline approximation</strong> (next-day fill, 10 bp):</p>
+<table>
+<thead>
+<tr>
+<th>Coin, variant</th>
+<th>Train Sharpe (2019–2023)</th>
+<th>Test Sharpe</th>
+<th>Buy-and-hold train / test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BTC, 7-day share</td>
+<td>0.86</td>
+<td>0.16</td>
+<td>1.06 / 0.73</td>
+</tr>
+<tr>
+<td>BTC, 30-day share</td>
+<td>1.14</td>
+<td>0.40</td>
+<td>1.06 / 0.73</td>
+</tr>
+<tr>
+<td>BTC, 7-day residual</td>
+<td>0.73</td>
+<td>−0.15</td>
+<td>1.06 / 0.73</td>
+</tr>
+<tr>
+<td>ETH, 30-day share</td>
+<td>0.82</td>
+<td>0.92</td>
+<td>1.10 / 0.38</td>
+</tr>
+<tr>
+<td>ETH, 7-day residual</td>
+<td>0.87</td>
+<td>0.27</td>
+<td>1.10 / 0.38</td>
+</tr>
+<tr>
+<td>BNB, 30-day share</td>
+<td>1.22</td>
+<td>0.29</td>
+<td>1.29 / 0.83</td>
+</tr>
+</tbody>
+</table>
+<p>Only ETH on the 30-day share beat buy and hold in the test window. The rest decayed, and correlation to the blend was about 0.3–0.5.</p>
+<p><strong>Plausibility at 10 bp.</strong> Low as a stand-alone rule. The flow restates price, which the trend sleeves already hold.</p>
+<p><strong>Correlation.</strong> About 0.3–0.5.</p>
+<p><strong>New platform capability needed.</strong> <strong>F4</strong>: native taker-buy volume as a data column, plus a share indicator (a column over a column, which is also <strong>F2</strong>). Bybit's kline endpoint does not split taker volume, so the platform would need Binance klines or its own aggregation of Bybit's public trade archive. We did not verify the Bybit archive from our network.</p>
+<p><strong>AlgoDaemon testability:</strong> Can't be tested. Taker-buy volume is not a column (only <code>Volume</code> is, per <a href="../../design/2026-09-27-bug-verification-round3-4/#7-b26-volume-limited-to-a-raw-input-column">B26</a>).</p>
+<hr />
+<h2 id="s5-implied-volatility-dvol-sizing-and-vrp-gates">S5. Implied volatility (DVOL): sizing and VRP gates<a class="headerlink" href="#s5-implied-volatility-dvol-sizing-and-vrp-gates" title="Permanent link">&para;</a></h2>
+<p><strong>Rule in plain words.</strong> Three ways the offline check used Deribit's 30-day implied-vol index. A volatility target, a cap, and a flat-gate level are a rule the application reads, and a run records which rule it applied. This page does not set them.</p>
+<ol>
+<li><strong>Size</strong> the position from a volatility target over DVOL.</li>
+<li><strong>Gate</strong>: stay flat when DVOL is in the high tail of its past year.</li>
+<li><strong>Variance risk premium (VRP) gate</strong>: stay long only while DVOL is above trailing realized vol.</li>
+</ol>
+<p><strong>What the offline check ran.</strong> The variants are the table below. They are a record of that check, not settings to apply.</p>
+<p><strong>Sources.</strong></p>
+<ul>
+<li>Penev, TradeWize, <a href="https://tradewize.io/blog/how-to-read-implied-volatility"><em>How to read implied volatility: scoring 5 years of Bitcoin's DVOL</em></a>, September 2026 (English).</li>
+<li>Amberdata, <a href="https://insights.deribit.com/industry/bitcoin-options-finding-edge-in-four-years-of-volatility-regimes/"><em>Bitcoin options: finding edge in four years of volatility regimes</em></a>, on Deribit Insights (English).</li>
+<li><a href="https://arxiv.org/abs/2410.15195">arXiv:2410.15195</a>, <em>Risk premia in the Bitcoin market</em> (English).</li>
+<li>Alexander and Imeraj, <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3383734">SSRN 3383734</a>, a Bitcoin VIX (English).</li>
+<li>Moreira and Muir's vol-managed portfolios are already on <a href="../volatility-and-cross-section/#1-volatility-managed-portfolios-the-mechanism">Volatility and the cross-section</a>.</li>
+</ul>
+<p><strong>Author-reported evidence.</strong></p>
+<ul>
+<li>TradeWize (2021–2026): DVOL was above the next 30 days' realized vol on 72% of days, by a median 10 points. The premium shrank from 21 points in 2021 to 5 in 2026. Top-decile DVOL said nothing about direction: 49% of subsequent months were up, against 50% for the bottom decile. From the top decile, DVOL fell about 14 points a month, and the biggest misses started from <strong>low</strong> DVOL.</li>
+<li>Amberdata (2019–2022): the options term structure was in contango 77.5% of the time, with a VRP of about +15 points in contango. Systematic short straddles earned well at mark prices. That needs options, which are out of scope here.</li>
+<li>arXiv 2410.15195: the BTC variance risk premium is larger than the S&amp;P 500's and, unlike in equities, is negatively related to BTC returns.</li>
+</ul>
+<p><strong>Offline approximation</strong> (BTC, window from 2021-04-15, next-day fill, 10 bp; buy and hold over this window: train Sharpe 0.07 with max DD −76.6%, test 0.73 with −53.0%):</p>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Train Sharpe</th>
+<th>Train max DD</th>
+<th>Test Sharpe</th>
+<th>Test max DD</th>
+<th>Corr. to blend</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Size = min(1, 40% ÷ DVOL)</td>
+<td>0.17</td>
+<td>−55.2%</td>
+<td>0.60</td>
+<td>−51.8%</td>
+<td>0.39 / 0.40</td>
+</tr>
+<tr>
+<td>Size = min(1, 40% ÷ 30-day realized vol)</td>
+<td>0.17</td>
+<td>−64.7%</td>
+<td>0.70</td>
+<td>−50.9%</td>
+<td>0.41 / 0.42</td>
+</tr>
+<tr>
+<td>Size = min(1, 60% ÷ DVOL)</td>
+<td>0.08</td>
+<td>−71.2%</td>
+<td>0.73</td>
+<td>−52.8%</td>
+<td>0.39 / 0.41</td>
+</tr>
+<tr>
+<td>BTC trend sleeve × min(1, 60% ÷ DVOL)</td>
+<td>1.41</td>
+<td>−8.7%</td>
+<td>1.28</td>
+<td>−6.3%</td>
+<td>0.59 / 0.62</td>
+</tr>
+<tr>
+<td>Flat when DVOL percentile &gt; 0.8</td>
+<td>0.31</td>
+<td>−75.9%</td>
+<td>0.74</td>
+<td>−50.8%</td>
+<td>0.34 / 0.33</td>
+</tr>
+<tr>
+<td>Long when VRP z-score &gt; 0</td>
+<td>−0.03</td>
+<td>−69.2%</td>
+<td>0.69</td>
+<td>−31.0%</td>
+<td>0.31 / 0.33</td>
+</tr>
+</tbody>
+</table>
+<p>The mean gap between DVOL and the next 30 days' realized vol was 8.7 points, close to TradeWize's median. DVOL sizing cut the train drawdown but did not beat realized-vol sizing and did not improve the trend sleeve (1.29 → 1.28 in test).</p>
+<p><strong>Plausibility at 10 bp.</strong> Fine for sizing, since DVOL moves slowly. There is no directional edge to trade.</p>
+<p><strong>Correlation.</strong> As a sizing layer it inherits the sleeve's correlation. It does not diversify.</p>
+<p><strong>New platform capability needed.</strong> <strong>F5</strong>: the Deribit DVOL daily series (BTC and ETH; no BNB index exists) as an external column. Using it for sizing depends on <a href="../../design/2026-09-26-fractional-sizing-stateful-exits/#proposal-a-fractional-weights">Proposal A</a>. A realized-vol version needs only Proposal A and existing prices, which makes DVOL low priority.</p>
+<p><strong>AlgoDaemon testability:</strong> Can't be tested. There is no external series and no fractional weight. A realized-vol gate in binary form is already <a href="../sharpe-ideas-index/#algodaemon-hand-off">hand-off row 5</a>.</p>
+<hr />
+<h2 id="s6-ethbtc-and-bnbbtc-ratio-trades">S6. ETH/BTC and BNB/BTC ratio trades<a class="headerlink" href="#s6-ethbtc-and-bnbbtc-ratio-trades" title="Permanent link">&para;</a></h2>
+<p><strong>Rule in plain words.</strong> Trade the ratio of two coins instead of either coin in dollars. Either follow its trend (hold ETH while ETH/BTC is above its moving average, otherwise hold BTC or the short side of the ratio), or fade its extremes (mean reversion on a z-score).</p>
+<p><strong>Parameters.</strong> Trend: SMA 20, 50, or 100 on the ratio. Mean reversion: a 30-day z-score at ±1.5 or a 60-day z-score at ±2.0.</p>
+<p><strong>Sources.</strong></p>
+<ul>
+<li>百亿财经 (baiyi.com), <a href="https://www.baiyi.com/market/6797fb6691994173b82a497662baa9fb.html">如何用 ETH/BTC 比率制定双币轮动交易策略</a> ("How to build a two-coin rotation on the ETH/BTC ratio") (Chinese; describes the SMA-50 rotation).</li>
+<li>Validated Strategies, <a href="https://validatedstrategies.com/strategy/PAR"><em>Pairs trading ETH/BTC cointegration backtest: why it failed (2018–2026)</em></a> (English).</li>
+<li>Fil and Kristoufek, <a href="https://ieeexplore.ieee.org/document/9200323"><em>Pairs trading in cryptocurrency markets</em></a>, <em>IEEE Access</em> 2020 (English).</li>
+</ul>
+<p><strong>Author-reported evidence.</strong></p>
+<ul>
+<li>Validated Strategies: profit factor 0.69, Sharpe 0.10, max drawdown −93%. Sign-flipped placebos beat the real rule 58% of the time. ETH/BTC was cointegrated in only 7.6% of rolling windows, with a spread half-life of about 486 days.</li>
+<li>Fil and Kristoufek (26 Binance coins, January 2018 to September 2019): daily pairs trading mostly failed. Higher frequencies did better but were very sensitive to costs.</li>
+<li>baiyi.com gives the rule without a backtest table that we could verify.</li>
+</ul>
+<p><strong>Offline approximation</strong> (next-day fill, 10 bp per unit via the cross pair; train 2019–2023):</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>ETH/BTC train → test Sharpe</th>
+<th>BNB/BTC train → test Sharpe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Long/short the ratio, SMA 20</td>
+<td>0.26 → −0.09</td>
+<td>0.97 → −0.13</td>
+</tr>
+<tr>
+<td>Long/short the ratio, SMA 50</td>
+<td>0.00 → 0.09</td>
+<td>1.17 → 0.22</td>
+</tr>
+<tr>
+<td>Long ratio or flat, SMA 50</td>
+<td>0.28 → −0.18</td>
+<td>1.17 → 0.38</td>
+</tr>
+<tr>
+<td>Mean reversion, z60 at ±2.0</td>
+<td>−0.74 → 0.13</td>
+<td>−0.91 → 0.17</td>
+</tr>
+</tbody>
+</table>
+<p>Correlation to the blend was about 0 for ETH/BTC and about 0.1–0.5 for BNB/BTC. Nothing survived into the test window, which agrees with the published failures.</p>
+<p><strong>Plausibility at 10 bp.</strong> Low. The ratios trend for long stretches (BNB/BTC before 2022) and then stop.</p>
+<p><strong>Correlation.</strong> Near zero, the one attractive property.</p>
+<p><strong>New platform capability needed.</strong> <strong>F2</strong> (a ratio column as a signal source), plus <strong>F8</strong> (a spread position: long one coin and short the other, or trading a cross pair such as ETHBTC) to trade the ratio itself. A rotation between ETH and BTC also needs a rule that holds one of two coins, which the one-instrument engine cannot do.</p>
+<p><strong>AlgoDaemon testability:</strong> Can't be tested. There is no ratio column and no second instrument per strategy.</p>
+<hr />
+<h2 id="s7-capitulation-volume-reversal-with-a-time-stop">S7. Capitulation-volume reversal with a time stop<a class="headerlink" href="#s7-capitulation-volume-reversal-with-a-time-stop" title="Permanent link">&para;</a></h2>
+<p><strong>Rule in plain words.</strong> After a day that falls much more than usual on much heavier than usual volume, buy the next close and hold for a fixed number of days, whatever the signal says in between.</p>
+<p><strong>Parameters.</strong> Event: daily return below −2 × its 60-day standard deviation, and quote volume above 2 × its 20-day average. Hold 3 or 7 days.</p>
+<p><strong>Sources.</strong> Gate Research, <a href="https://www.gate.com/research/article/gate-research-can-deleveraging-predict-a-rebound-a-time-series-analysis-of-btc-price-oi-funding-and-liquidation-volume"><em>Can deleveraging predict a rebound?</em></a>, September 2026 (English; the Chinese Gate academy mirror was blocked). MarketTrace, <a href="https://markettrace.ai/blog/open-interest-analysis"><em>What does open interest indicate? We tested 136,000 hours</em></a>, September 2026 (English). Both concern the related OI-flush events in S8. The volume-spike definition is ours.</p>
+<p><strong>Author-reported evidence.</strong> Gate Research (January 2025 to August 2026): deleveraging alone did not predict a rebound. Only events confirmed by a green close had positive forward returns: an OI flush with a green close (13 events) averaged +0.38%, +2.00%, +1.45%, and +2.10% at 1, 3, 7, and 14 days. None survived their multiple-testing correction.</p>
+<p><strong>Offline approximation</strong> (next-day fill, 10 bp):</p>
+<table>
+<thead>
+<tr>
+<th>Coin</th>
+<th>Events, train / test</th>
+<th>Hold 3 days, train → test Sharpe</th>
+<th>Hold 7 days, train → test Sharpe</th>
+<th>Corr. to blend</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BTC</td>
+<td>12 / 9</td>
+<td>−0.83 → 0.61</td>
+<td>0.06 → 0.51</td>
+<td>about 0.0</td>
+</tr>
+<tr>
+<td>ETH</td>
+<td>17 / 7</td>
+<td>−0.42 → 0.38</td>
+<td>0.22 → 0.50</td>
+<td>about 0.0</td>
+</tr>
+<tr>
+<td>BNB</td>
+<td>15 / 10</td>
+<td>−0.63 → 0.49</td>
+<td>0.07 → 0.84</td>
+<td>0.02–0.19</td>
+</tr>
+</tbody>
+</table>
+<p>The sign flips between train and test on 7–17 events per window. This is noise until more events accumulate.</p>
+<p><strong>Plausibility at 10 bp.</strong> Fine per trade: one round trip per event against multi-percent moves. The problem is sample size.</p>
+<p><strong>Correlation.</strong> About zero, because the rule fires when the trend sleeves are flat.</p>
+<p><strong>New platform capability needed.</strong> <strong>F3</strong> (hold for N bars after an event; the engine's signals are stateless and cannot remember the entry day), plus a return-over-volatility indicator on the price column. The existing Bollinger z-score is close enough. The volume leg works today through <code>data_column: "Volume"</code>.</p>
+<p><strong>AlgoDaemon testability:</strong> Needs adapting. Only a one-day version can run today; see <a href="#testable-on-algodaemon-today">below</a>.</p>
+<hr />
+<h2 id="s8-open-interest-flush-and-leverage-events">S8. Open-interest flush and leverage events<a class="headerlink" href="#s8-open-interest-flush-and-leverage-events" title="Permanent link">&para;</a></h2>
+<p><strong>Rule in plain words.</strong> Buy after a sharp drop in open interest (leverage flushed out), ideally only when the same day closes green. Read open interest in coin units, not dollars.</p>
+<p><strong>Parameters.</strong> 24-hour OI change ≤ −8% (MarketTrace). Price confirmation: a green close (Gate Research). Hold 3–14 days.</p>
+<p><strong>Sources.</strong> MarketTrace, <a href="https://markettrace.ai/blog/open-interest-analysis"><em>What does open interest indicate?</em></a>, 16 September 2026 (English). Gate Research (above).</p>
+<p><strong>Author-reported evidence.</strong> MarketTrace (136,000 hours of Binance BTC, ETH, and SOL): the four OI-and-price quadrants did not predict direction. Continuation ran 43–53%, and the sign flipped from year to year. Rising OI predicted a <strong>wider</strong> next-day range (on BTC, about +16% range per +10 percentage points of OI), not a direction. An OI flush of 8% or more was followed by a higher close 72 hours later 57% of the time (median +0.92%, p = 0.045), which the authors call a lean, not a rule. Dollar OI is mostly price, so they measure OI in coin units. Gate Research's figures are under S7.</p>
+<p><strong>Offline approximation.</strong> Not tested. Binance's API was geo-blocked, and we did not load its archive's OI files.</p>
+<p><strong>Plausibility at 10 bp.</strong> Per-trade costs are fine. The published edge is marginal.</p>
+<p><strong>Correlation.</strong> Probably low, as with S7.</p>
+<p><strong>New platform capability needed.</strong> <strong>F6</strong> (an OI series in coin units per coin) and <strong>F3</strong> (hold for N bars).</p>
+<p><strong>AlgoDaemon testability:</strong> Can't be tested. There is no OI series.</p>
+<hr />
+<h2 id="s9-time-of-day-and-weekday-seasonality">S9. Time-of-day and weekday seasonality<a class="headerlink" href="#s9-time-of-day-and-weekday-seasonality" title="Permanent link">&para;</a></h2>
+<p><strong>Rule in plain words.</strong> Hold BTC only during the hours or days that have historically been strongest. Quantpedia's version buys at 21:00 UTC and sells at 23:00 UTC every day.</p>
+<p><strong>Parameters.</strong> Hour window 21:00–23:00 UTC. Weekend-only or single weekdays.</p>
+<p><strong>Sources.</strong></p>
+<ul>
+<li>Padyšák and Vojtko, Quantpedia, <a href="https://quantpedia.com/are-there-seasonal-intraday-or-overnight-anomalies-in-bitcoin/"><em>Are there seasonal intraday or overnight anomalies in Bitcoin?</em></a> (English).</li>
+<li>Mueller, <a href="https://www.sciencedirect.com/science/article/pii/S1544612324004598"><em>Revisiting seasonality in cryptocurrencies</em></a>, <em>Finance Research Letters</em> 2024 (English).</li>
+<li>The <a href="../chinshum-review/#overnight-seasonality">Chin Shum review</a> already rejected a US-overnight hold offline (out-of-sample Sharpe −0.66 at 10 bp). Weekday and month effects from Money Partners are on the <a href="../japanese-korean-sources/#ranked-ideas">Japanese and Korean page</a>.</li>
+</ul>
+<p><strong>Author-reported evidence.</strong> Quantpedia (Gemini data, October 2015 to February 2022): the 22:00 and 23:00 UTC hours had the most significant returns. The 21:00–23:00 hold earned about 33% a year with 20.9% volatility and a −22.45% max drawdown, and an update to June 2023 gave 40.64% a year with a Calmar of 1.79. Costs are not clearly included. Mueller (500 coins): return seasonality is not robust, the BTC Monday effect did not persist after 2015, and the only stable weekend pattern is lower activity.</p>
+<p><strong>Offline approximation</strong> (Binance BTCUSDT hourly):</p>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Train Sharpe</th>
+<th>Test Sharpe</th>
+<th>Corr. to blend</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hold 21:00–23:00 UTC, 0 bp</td>
+<td>1.76</td>
+<td>2.13</td>
+<td>0.06–0.08</td>
+</tr>
+<tr>
+<td>Same, 5 bp per side</td>
+<td>−0.27</td>
+<td>−0.69</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Same, 10 bp per side</td>
+<td>−2.31</td>
+<td>−3.52</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Weekend only, 10 bp</td>
+<td>−0.04</td>
+<td>−0.25</td>
+<td>0.15–0.18</td>
+</tr>
+</tbody>
+</table>
+<p>The two hours average about +3.8 bp each in both train and test, so the effect is real before costs. At 10 bp per side, one round trip a day costs 20 bp against about 7.6 bp of gross edge. Weekday means flipped sign between train and test (Tuesday +8.3 bp → −25.4 bp, for example).</p>
+<p><strong>Plausibility at 10 bp.</strong> None. It would need a maker fee below about 4 bp per side, or a way to hold only on days with a large expected move.</p>
+<p><strong>Correlation.</strong> About 0.1, the lowest of anything here, which is why it keeps coming back.</p>
+<p><strong>New platform capability needed.</strong> <strong>F7</strong> (an hour-of-day or weekday column usable as a gate), on the existing hourly bars.</p>
+<p><strong>AlgoDaemon testability:</strong> Can't be tested. There is no calendar factor, and the fee kills it anyway.</p>
+<hr />
+<h2 id="considered-and-not-ranked">Considered and not ranked<a class="headerlink" href="#considered-and-not-ranked" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>MVRV and other on-chain valuation.</strong> Already on <a href="../microstructure-onchain-unusual/#4-on-chain-value-spent-coins-and-a-price-to-utility-ratio">Microstructure, on-chain, and unusual</a>. Offline, "flat when MVRV &gt; 3.0" never triggered in the test window (the peak was 2.78), so it matched buy and hold. At &gt; 2.5 it cut test Sharpe from 0.73 to 0.54. Low value.</li>
+<li><strong>HMM or machine-learning regime allocation.</strong> Bysik and Ślepaczuk, <a href="https://arxiv.org/abs/2606.00060">arXiv:2606.00060</a> (English, hourly BTC 2018–2025, walk-forward): naive ML strategies collapsed at 10 bp. A filter that trades only when the forecast beats the cost restored a long-only Sharpe above 1, but bootstrap tests did not show it beating buy and hold. Large build, weak case.</li>
+<li><strong>Short options and VRP harvesting.</strong> Amberdata's straddle results need an options instrument. Out of scope for a spot platform.</li>
+<li><strong>Cross-sectional momentum or reversal on a wider universe.</strong> Covered on <a href="../volatility-and-cross-section/#2-cross-sectional-size-momentum-volume-volatility">Volatility and the cross-section</a>. It needs dozens of coins and a long-short basket, which is a bigger change than anything above.</li>
+<li><strong>Portfolio drawdown brake.</strong> Needs the multi-sleeve combiner first (<a href="../../design/2026-09-26-fractional-sizing-stateful-exits/#proposal-b-an-average-then-a-volatility-weight">Proposal B</a>). No outside evidence was found that it adds Sharpe, as opposed to cutting drawdown.</li>
+</ul>
+<hr />
+<h2 id="testable-on-algodaemon-today">Testable on AlgoDaemon today<a class="headerlink" href="#testable-on-algodaemon-today" title="Permanent link">&para;</a></h2>
+<p>None of the new ideas is both expressible and promising. The one that is expressible:</p>
+<p><strong>Capitulation bounce, one-day hold.</strong> On the traded coin, daily bars, <code>fee_bps</code> 10, conjunction <strong>FILTER</strong> (two factors only, so <a href="../../design/2026-09-27-algodaemon-bug-report/#b1-two-factor-and-behaves-like-or-for-long-only-factors">B1</a> does not apply):</p>
+<ul>
+<li>Factor 1: <code>get_bollinger_band</code> on <code>price</code>, signal <code>reversion_long</code>, window 20–60 (step 10), signal 2.0–3.0 (step 0.25). Long when the price z-score is below −signal.</li>
+<li>Factor 2: <code>get_bollinger_band</code> on <code>Volume</code>, signal <code>momentum_long</code>, window 20–30 (step 5), signal 1.5–3.0 (step 0.5). Long when the volume z-score is above +signal.</li>
+</ul>
+<p>Because signals are stateless, this holds for one bar only. <strong>Offline approximation:</strong> over a 54-cell grid per coin from 2021-07 to 2026-08, there were about 14 long days in five years. Median full-sample Sharpe was 0.11 (BTC), −0.18 (ETH), and 0.05 (BNB) with same-close fill, and −0.14, −0.11, and −0.26 with next-day fill. Only run it as a negative control, or as a baseline to compare against once F3 lets it hold 3–7 days.</p>
+<hr />
+<h2 id="sources-that-were-blocked-or-not-read">Sources that were blocked or not read<a class="headerlink" href="#sources-that-were-blocked-or-not-read" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Zhihu (知乎) answers and columns: HTTP 403.</li>
+<li>ScienceDirect full texts (a CEX/DEX funding-arbitrage paper, the order-flow paper): Cloudflare challenge; abstracts only.</li>
+<li>The Chinese Gate academy (Gate 学院) article on deleveraging: access denied. The English Gate Research version was read.</li>
+<li>The BIS <em>Crypto Carry</em> PDF: an HTML challenge instead of the file. The abstract page was read.</li>
+<li>The Binance REST API (HTTP 451) and the Bybit REST API (HTTP 403): geo-blocked from our network. The Binance public data archive, Deribit, Coinbase Exchange, and Coin Metrics community APIs worked.</li>
+<li>JoinQuant (聚宽) and Xueqiu (雪球) were not examined in the time available. Paid communities were not accessed.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mermaid.min.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+    
+  </body>
+</html>
