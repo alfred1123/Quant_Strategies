@@ -24,6 +24,7 @@ from quant.schemas.backtest import (
 )
 from quant.strategy.optimizer import ParametersOptimization
 from quant.strategy.performance import Performance
+from quant.strategy.risk_rule import read_risk_rule, record_for_run
 from quant.strategy.signals import StrategyConfig, SubStrategy, resolve_signal_func
 from quant.strategy.walk_forward import WalkForward
 
@@ -575,6 +576,9 @@ def require_scoreable_sample(data_dict: dict[str, pd.DataFrame], req: OptimizeRe
 
 
 def run_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache=None, bar_services=None) -> OptimizeResponse:
+    # Read before any search. A missing rule raises and this function
+    # returns nothing, so the worker does not store a result.
+    rule = read_risk_rule()
     data_dict = _build_data_dict(req, cache, inst_cache, bt_cache, bar_services)
     require_scoreable_sample(data_dict, req, cache)
     config = build_config(req, cache)
@@ -615,6 +619,7 @@ def run_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache=None, ba
         performance=perf_resp,
         walk_forward=wf_resp,
         walk_forward_error=wf_error,
+        risk_rule=record_for_run(rule),
     )
 
 
