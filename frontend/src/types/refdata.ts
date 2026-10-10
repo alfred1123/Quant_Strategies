@@ -57,6 +57,8 @@ export interface AppRow {
   display_name: string;
   class_name: string;
   is_exchange_ind: 'Y' | 'N';
+  /** Y: the Refresh dataset checkbox may call this source. N: it may not. */
+  refresh_dataset_ind?: 'Y' | 'N';
   description: string | null;
 }
 

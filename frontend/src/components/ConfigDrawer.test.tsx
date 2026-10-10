@@ -34,7 +34,8 @@ const dataColumns: DataColumnRow[] = [
 ];
 const apps: AppRow[] = [
   { app_id: 1, name: 'yahoo', display_name: 'Yahoo Finance', class_name: 'YahooFinance', is_exchange_ind: 'N', description: null },
-  { app_id: 34, name: 'bybit', display_name: 'Bybit', class_name: 'Bybit', is_exchange_ind: 'Y', description: null },
+  { app_id: 2, name: 'glassnode', display_name: 'Glassnode', class_name: 'Glassnode', is_exchange_ind: 'N', refresh_dataset_ind: 'N', description: null },
+  { app_id: 34, name: 'bybit', display_name: 'Bybit', class_name: 'Bybit', is_exchange_ind: 'Y', refresh_dataset_ind: 'N', description: null },
 ];
 const tmIntervals: TmIntervalRow[] = [
   { tm_interval_id: 1, name: 'DAILY', display_name: 'Daily', period_length: '1 day', description: null },
@@ -314,6 +315,23 @@ describe('ConfigDrawer — the captured range decides the dates', () => {
       tm_interval_id: 1,
       source_app_id: 34,
     });
+  });
+
+  it('leaves Refresh dataset on for Yahoo', () => {
+    renderWithProviders(<Host initial={baseCfg} observer={vi.fn()} />);
+    expect(screen.getByRole('checkbox', { name: 'Refresh dataset' })).not.toBeDisabled();
+  });
+
+  it('turns Refresh dataset off for Glassnode', () => {
+    const observer = vi.fn();
+    renderWithProviders(
+      <Host initial={{ ...baseCfg, dataSource: 'glassnode', refreshDataset: true }} observer={observer} />,
+    );
+    const box = screen.getByRole('checkbox', { name: 'Refresh dataset' });
+    expect(box).toBeDisabled();
+    expect(box).not.toBeChecked();
+    const last = observer.mock.calls.at(-1)?.[0] as BacktestConfig;
+    expect(last.refreshDataset).toBe(false);
   });
 
   it('leaves a provider source alone', () => {

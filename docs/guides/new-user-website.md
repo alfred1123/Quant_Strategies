@@ -56,7 +56,7 @@ You can optionally add a second factor by clicking **+ Add Factor** and choosing
 ## 6) Other Options (Optional)
 
 - **Fee (bps)** — trading fee in basis points. Default **10** is Bybit VIP-0 spot taker. Set **5.5** if the run is a USDT perpetual. See [Transaction Costs](indicators-strategies.md#transaction-costs).
-- **Refresh dataset** — check this to re-download fresh data; leave unchecked to use cached data.
+- **Refresh dataset** — check this to re-download fresh data; leave unchecked to use cached data. Glassnode and Bybit do not use this checkbox. Yahoo does.
 - **Walk-Forward** — runs an overfitting test that splits data into training and testing periods. **On by default**; uncheck to skip.
 
 ## 7) Run the Backtest

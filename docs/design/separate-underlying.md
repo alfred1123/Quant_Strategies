@@ -352,7 +352,7 @@ This means the full history of every subscription is retained — each VID is a 
 | `read_payload(*, app_id, app_metric_id, internal_cusip, range_start, range_end, ...)` | Read-only. Returns the cached slice if the cached range fully covers the request, otherwise raises `BacktestCache.CacheMissError` (translated to HTTP 400 by the service layer). Never calls the provider, never writes. |
 | `refresh_payload(*, app_id, app_metric_id, internal_cusip, range_start, range_end, fetcher, ...)` | Fetch + persist as a single transactional unit. Calls `fetcher(range_start, range_end)` for the **full** requested range and inserts a new version via `SP_INS_API_REQUEST` (re-using the cached `api_req_id` so the SP bumps `API_REQ_VID`). **SP write failures propagate** — callers must not swallow. |
 
-The mode is driven by a single UI checkbox **"Refresh dataset"** on the trading-product card. When unchecked, the service calls `read_payload` so no provider calls and no DB writes occur — versions of `BT.API_REQUEST` only grow when the user explicitly opts in. This keeps `API_REQUEST_PAYLOAD` row count bounded and old partitions easy to drop.
+The mode is driven by a single UI checkbox **"Refresh dataset"** on the trading-product card. When unchecked, the service calls `read_payload` so no provider calls and no DB writes occur — versions of `BT.API_REQUEST` only grow when the user explicitly opts in. This keeps `API_REQUEST_PAYLOAD` row count bounded and old partitions easy to drop. `REFDATA.APP.REFRESH_DATASET_IND` is `N` for a source the checkbox must not call. Glassnode and Bybit are `N`. Yahoo is `Y`.
 
 ### Cache flow
 

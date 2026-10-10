@@ -33,5 +33,6 @@
     <include file="releases/1.27.0-app-issue-fee.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.28.0-glassnode-app-metric.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.29.0-glassnode-metric-names.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.30.0-app-refresh-dataset.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

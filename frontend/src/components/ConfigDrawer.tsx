@@ -57,6 +57,7 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   // obtainable, and would talk a user out of a range they could have had.
   const tradedApp = apps.find(a => a.name === config.dataSource);
   const isExchangeSource = tradedApp?.is_exchange_ind === 'Y';
+  const refreshOff = tradedApp?.refresh_dataset_ind === 'N';
   const sortedIntervals = useMemo(
     () => [...tmIntervals].sort((a, b) => a.tm_interval_id - b.tm_interval_id),
     [tmIntervals],
@@ -180,6 +181,11 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
   const set = (patch: Partial<BacktestConfig>) =>
     onChange(prev => ({ ...prev, ...patch }));
 
+  useEffect(() => {
+    if (!refreshOff || !config.refreshDataset) return;
+    onChange(prev => (prev.refreshDataset ? { ...prev, refreshDataset: false } : prev));
+  }, [refreshOff, config.refreshDataset, onChange]);
+
   // ── factor list mutators ──
   // Functional updaters: ProductSelector can fire symbol + vendor in one
   // click, and a stale `config.factors` would drop the first patch.
@@ -289,6 +295,8 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
               if ('dataSource' in patch) {
                 const nextSource = patch.dataSource ?? '';
                 next.dataSource = nextSource;
+                const nextApp = apps.find(a => a.name === nextSource);
+                if (nextApp?.refresh_dataset_ind === 'N') next.refreshDataset = false;
                 next.factors = next.factors.map(f => (
                   !f.data_source || f.data_source === prev.dataSource
                     ? { ...f, data_source: nextSource || undefined }
@@ -382,12 +390,16 @@ export default function ConfigDrawer({ open, onClose, config, onChange, onRun, i
         <FormControlLabel
           control={
             <Checkbox
-              size="small" checked={config.refreshDataset}
+              size="small"
+              checked={refreshOff ? false : config.refreshDataset}
+              disabled={refreshOff}
               onChange={e => set({ refreshDataset: e.target.checked })}
             />
           }
           label={<Typography variant="body2">Refresh dataset</Typography>}
-          title="When checked, refetch all product+factor data from the provider and store a new version. When unchecked, serve from cache only."
+          title={refreshOff
+            ? "This data source is filled on its own schedule. This checkbox does not call it."
+            : "When checked, refetch all product+factor data from the provider and store a new version. When unchecked, serve from cache only."}
         />
         <FormControlLabel
           control={

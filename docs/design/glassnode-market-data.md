@@ -52,7 +52,7 @@ The real 2026-10-03 bodies stay outside the repo so a later fetch of the same wi
 
 A provider interval shorter than one day is refused before that call. The class will forward `i=1h` if something calls it directly (the unit test does). The backtest path will not.
 
-`refresh_dataset` false reads `BT.API_REQUEST` through `BacktestCache.read_payload` and does not call Glassnode. `refresh_dataset` true fetches the full requested range and inserts a new version. The payload-table comment says the app fetches a delta and merges. The Python replaces the whole range. `SP_GET_API_REQUEST` returns the current row (`TRANSACT_TO_TS = 9999-12-31`) inner-joined to its payload. Closed versions are not what the next backtest reads.
+A Glassnode backtest reads `BT.API_REQUEST` through `BacktestCache.read_payload` and does not call Glassnode. `REFDATA.APP.REFRESH_DATASET_IND` says whether the Refresh dataset checkbox may call that source. Release `refdata/1.30.0` sets Glassnode and Bybit to `N` and every other app to `Y`. The drawer disables the checkbox when the traded app is `N`. A request that still sends `refresh_dataset` true does not refresh an `N` source. Context is `refdata,prod-deploy`. The payload-table comment says the app fetches a delta and merges. The Python replaces the whole range when a provider refresh does run. `SP_GET_API_REQUEST` returns the current row (`TRANSACT_TO_TS = 9999-12-31`) inner-joined to its payload. Closed versions are not what the next backtest reads.
 
 ## What a strategy can use
 

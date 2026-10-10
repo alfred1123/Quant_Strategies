@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.30.0-001-app-refresh-dataset" author="alfcheun" context="refdata,prod-deploy">
+        <comment>REFDATA.APP.REFRESH_DATASET_IND. Glassnode and Bybit are N. Every other app is Y.</comment>
+        <sql>
+            ALTER TABLE REFDATA.APP ADD COLUMN IF NOT EXISTS REFRESH_DATASET_IND CHAR(1);
+        </sql>
+        <sqlFile path="../data/APP_REFRESH_DATASET.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 stripComments="true"/>
+        <sql>
+            ALTER TABLE REFDATA.APP ALTER COLUMN REFRESH_DATASET_IND SET NOT NULL;
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE REFDATA.APP DROP COLUMN IF EXISTS REFRESH_DATASET_IND;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

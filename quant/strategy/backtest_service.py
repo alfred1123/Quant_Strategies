@@ -368,14 +368,23 @@ def _build_param_ranges(req):
 # ── Inline result builders ──
 
 
+def _app_allows_refresh(cache, data_source: str) -> bool:
+    """True when ``REFDATA.APP.REFRESH_DATASET_IND`` is ``Y`` for this source."""
+    if cache is None:
+        return False
+    for row in cache.get("app"):
+        if row.get("name") == data_source:
+            return row.get("refresh_dataset_ind") == "Y"
+    return False
+
+
 def _build_data_dict(req, cache, inst_cache=None, bt_cache=None, bar_services=None) -> dict[str, pd.DataFrame]:
     """Fetch the main product and any cross-product factor data.
 
-    Honours ``req.refresh_dataset``: when True, every product + factor is
-    refetched from the provider so they share the same snapshot date
-    range. When False, all are served from cache only — a miss on any
-    one ticker raises HTTP 400 (so the user knows to tick *Refresh
-    dataset*).
+    Honours ``req.refresh_dataset`` for sources whose
+    ``REFRESH_DATASET_IND`` is ``Y``. An ``N`` source is read from cache.
+    When the flag is false, every source is served from cache only — a
+    miss on any one ticker raises HTTP 400.
 
     After fetching, the **intersection** of available datetime indexes
     across all tickers is enforced. If the intersection does not span
@@ -386,10 +395,11 @@ def _build_data_dict(req, cache, inst_cache=None, bt_cache=None, bar_services=No
     refresh = bool(getattr(req, "refresh_dataset", False))
 
     def _fetch(sym: str, ds: str) -> pd.DataFrame:
+        source_refresh = refresh and _app_allows_refresh(cache, ds)
         try:
             return fetch_df(
                 sym, req.start, req.end, ds, cache, inst_cache, bt_cache,
-                refresh=refresh, bar_services=bar_services,
+                refresh=source_refresh, bar_services=bar_services,
                 tm_interval_id=req.tm_interval_id,
             )
         except BacktestCache.CacheMissError as exc:

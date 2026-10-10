@@ -386,3 +386,43 @@ class TestGlassnodeUsesTheCatalogPath:
 
         bt_cache.reserve_api_call.assert_not_called()
         src.get_historical_price.assert_not_called()
+
+
+def test_refresh_dataset_skips_glassnode_and_still_refreshes_yahoo():
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    from quant.strategy.backtest_service import _build_data_dict
+
+    seen = []
+    cache = MagicMock()
+    cache.get.return_value = [
+        {"name": "yahoo", "refresh_dataset_ind": "Y"},
+        {"name": "glassnode", "refresh_dataset_ind": "N"},
+    ]
+
+    def fake_fetch(symbol, start, end, data_source, *args, **kwargs):
+        seen.append((data_source, kwargs["refresh"]))
+        return pd.DataFrame(
+            {"price": [1.0, 1.0, 1.0, 1.0, 1.0]},
+            index=pd.to_datetime(
+                ["2020-04-01", "2020-04-02", "2020-04-03", "2020-04-04", "2020-04-05"],
+                utc=True,
+            ),
+        )
+
+    req = SimpleNamespace(
+        refresh_dataset=True,
+        symbol="btcusdt.crypto",
+        start="2020-04-01",
+        end="2020-04-05",
+        data_source="yahoo",
+        tm_interval_id=1,
+        factors=[SimpleNamespace(
+            symbol="ethusdt.crypto", vendor_symbol=None, data_source="glassnode",
+        )],
+    )
+    with patch("quant.strategy.backtest_service.fetch_df", side_effect=fake_fetch):
+        _build_data_dict(req, cache=cache)
+
+    assert seen == [("yahoo", True), ("glassnode", False)]
