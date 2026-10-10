@@ -106,7 +106,7 @@ Official schedule: [Bybit Trading Fees](https://www.bybit.com/en-GB/announcement
 |---|---|---|
 | Yahoo Finance | None | Unofficial scraper — may break. No API key needed. |
 | AlphaVantage (free) | 1 req/sec, 25/day | Compact mode returns ~100 most recent trading days |
-| Glassnode | Short window 600, about 20s reset; 160,000 calls/month shared | Professional plan active since 28 Sep 2026. The client still requests only `market/price_usd_close`. [Glassnode market data](../design/glassnode-market-data.md) |
+| Glassnode | 160,000 calls per 30 days for the one API key. Short window 600, about 20s reset, is a response header and not a stored row | Professional plan active since 28 Sep 2026. Release `config/1.2.0` stores the monthly cap. The client reads the catalog path and does not call the limit check. [Glassnode market data](../design/glassnode-market-data.md) |
 | Futu OpenD | N/A | Requires local desktop gateway running |
 
 - `YahooFinance` lazy-imports `yfinance` (avoids import-time network calls), retry logic (3 attempts, 2s backoff)

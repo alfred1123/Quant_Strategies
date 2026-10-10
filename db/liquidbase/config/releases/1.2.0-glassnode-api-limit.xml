@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.2.0-001-glassnode-api-limit" author="alfcheun" context="config,prod-deploy">
+        <comment>Glassnode Professional is 160000 calls per 30 days. Drop the free-tier rows.</comment>
+        <sqlFile path="../data/API_LIMIT_GLASSNODE.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 stripComments="true"/>
+        <rollback>
+            <sql>
+                DELETE FROM CONFIG.API_LIMIT
+                 WHERE APP_ID = 2 AND LIMIT_TYPE = 'requests_per_month';
+                INSERT INTO CONFIG.API_LIMIT (
+                    APP_ID, LIMIT_TYPE, MAX_VALUE, TIME_WINDOW_SEC, DESCRIPTION, USER_ID, UPDATED_AT
+                ) VALUES
+                    (2, 'requests_per_window', 10, 60, 'Free tier: 10 calls/minute', 'alfcheun', now()),
+                    (2, 'requests_per_day', 200, 86400, 'Free tier: 200 calls/day', 'alfcheun', now());
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

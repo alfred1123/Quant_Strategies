@@ -121,7 +121,7 @@ Three facts in the source make this a poor place to put more Glassnode series.
 
 **The header comment and the design-doc index are ahead of the DDL.** The payload file still says to join on `IS_CURRENT_IND = 'Y'`. The table has no such column; currency is `TRANSACT_TO_TS`. [Separate underlying](separate-underlying.md) shows a partial unique index `UX_API_REQUEST_CURRENT_SUBSCRIPTION`. That index is not in `API_REQUEST.sql`. `SP_GET_API_REQUEST` can return more than one current row, and `BacktestCache` uses the first.
 
-The limit guard does not protect the shared cap. `SP_GET_API_LIMIT_CHK` counts `API_REQUEST` rows with `TRANSACT_TO_TS = 9999-12-31` and `CREATED_AT` inside the window. A refresh closes the previous row, so it leaves the count. Repeated refreshes of one subscription do not add up. The seed in `API_LIMIT.sql` is still the free tier: 10 calls per 60 seconds and 200 per day, and the comment still says "Glassnode (free tier)". The procedure reads `CONFIG.API_LIMIT` after the policy-table move. `Glassnode.get_historical_price` never calls the procedure. The 3 Oct short window (600, reset around 20 seconds) and the shared 160,000 calls/month are not what that seed expresses. The monthly cap was not a response header.
+The limit guard does not protect the cap. `SP_GET_API_LIMIT_CHK` counts `API_REQUEST` rows with `TRANSACT_TO_TS = 9999-12-31` and `CREATED_AT` inside the window. A refresh closes the previous row, so it leaves the count. Repeated refreshes of one subscription do not add up. The archived seed in `API_LIMIT.sql` is the free tier. Release `config/1.2.0` replaces the Glassnode rows with `requests_per_month` = 160000 over 2592000 seconds (30 days) for `APP_ID = 2`, the one API key. The procedure reads `CONFIG.API_LIMIT`. `Glassnode.get_historical_price` never calls the procedure. The 3 Oct short window (600, reset around 20 seconds) is still only a response header. The monthly cap was not a response header.
 
 Logging already tripped over the blob. `quant/shared/db.py` truncates a logged parameter at 200 characters because one `API_REQUEST` write was a JSON string of every bar and pushed the neighbouring lines out of `docker logs`.
 
@@ -270,7 +270,17 @@ Keeping that history is not the point-in-time series. Point-in-time is a differe
 
 The external copies are the log of a rewrite. The `*_pit` paths are separate Glassnode series, already named in the sleeve note.
 
-Related, and also not decided here: the call counter that would enforce 160,000/month and the short window. `SP_GET_API_LIMIT_CHK` is not that counter. Updating the free-tier seed without changing the count would still not see a refresh.
+The monthly row is release `config/1.2.0` (decision #93). The call counter below is the design. It is not built. `SP_GET_API_LIMIT_CHK` still counts current subscription rows.
+
+## Call count
+
+`CONFIG.API_LIMIT` is the threshold. `BT.API_REQUEST` is the stored series. The count is a third fact: one row for each request that is about to leave the process.
+
+`BT.API_CALL` is append-only. `API_CALL_ID` is an identity primary key. `APP_ID` is the provider. `USER_ID` and `CREATED_AT` are the usual audit columns. There is no `UPDATED_AT`, no payload, and no version. An index on `(APP_ID, CREATED_AT)` is what the 30-day count reads. A cache hit does not insert a row.
+
+`BT.SP_RESERVE_API_CALL(IN_APP_ID)` does the check and the insert in one transaction. It takes an advisory lock for that `APP_ID`, counts `BT.API_CALL` rows whose `CREATED_AT` falls inside each `CONFIG.API_LIMIT` window for that app, and inserts one row only when every window is still under `MAX_VALUE`. The outs match `SP_GET_API_LIMIT_CHK`: allowed or not, and which rule blocked. Two workers cannot both pass the last slot. `SP_GET_API_LIMIT_CHK` stays as it is until the other providers reserve the same way. Pointing it at `BT.API_CALL` now would make Yahoo and Nasdaq look unused, because they write no call row.
+
+`fetch_df` calls the reserve on the provider path, immediately before `get_historical_price`. Allowed means the row exists, then the HTTP call runs. A 4xx, a 5xx, or an empty body still counts, because Glassnode has already been asked. `read_payload` does not reserve. `Glassnode` stays a client: it has no database handle, and a direct call that skips `fetch_df` is outside this count. The short window of 600 is still only a response header. The reserve enforces the rows in `CONFIG.API_LIMIT`, which for Glassnode is the 160,000 calls per 30 days.
 
 ## What this change does not do
 
