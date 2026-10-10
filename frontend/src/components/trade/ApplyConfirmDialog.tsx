@@ -54,7 +54,12 @@ function ResultView({ report }: { report: ApplyReport }) {
       {report.vendor_order_id && <Row label="Order ID" value={report.vendor_order_id} />}
       {report.filled_qty != null && <Row label="Filled qty" value={report.filled_qty} />}
       {report.avg_price != null && <Row label="Avg price" value={report.avg_price} />}
-      {report.fee != null && <Row label="Fee" value={report.fee} />}
+      {report.fee != null && (
+        <Row
+          label="Fee"
+          value={report.fee_ccy ? `${report.fee} ${report.fee_ccy}` : report.fee}
+        />
+      )}
     </Stack>
   );
 }
