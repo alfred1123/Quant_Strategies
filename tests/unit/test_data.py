@@ -968,6 +968,15 @@ class TestBacktestCacheGetOrFetch:
             )
         c._insert_api_request.assert_not_called()
 
+    def test_reserve_api_call_increments_the_limit_row(self):
+        c = self._make_cache()
+        c._call_write = MagicMock(return_value=())
+
+        c.reserve_api_call(2)
+        sql, params = c._call_write.call_args.args
+        assert "BT.SP_RESERVE_API_CALL" in sql
+        assert params == (2,)
+
     # ── refresh=True: full fetch + insert ──────────────────────────────
 
     def test_refresh_full_fetch_when_cache_empty(self):

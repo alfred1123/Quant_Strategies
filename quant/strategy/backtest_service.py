@@ -251,6 +251,9 @@ def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_ca
                     f"{app['name']} has no METRIC_PATH for {metric_nm!r}. "
                     f"The path is the REFDATA.APP_METRIC row for this data source."
                 )
+        if bt_cache is not None:
+            bt_cache.reserve_api_call(app["app_id"])
+        if takes_path:
             price = fn(ticker, s, e, metric_path=metric_path)
         else:
             price = fn(ticker, s, e)

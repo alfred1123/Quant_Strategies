@@ -25,5 +25,6 @@
     <include file="releases/1.0.0-move-policy-tables.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.1.0-sp-get-enum.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.2.0-glassnode-api-limit.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.3.0-api-limit-call-count.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

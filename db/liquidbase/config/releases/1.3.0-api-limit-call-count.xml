@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.3.0-001-api-limit-call-count" author="alfcheun" context="config,prod-deploy">
+        <comment>Each API_LIMIT row keeps the calls reserved in its open window.</comment>
+        <sql>
+            ALTER TABLE CONFIG.API_LIMIT ADD COLUMN IF NOT EXISTS CALL_COUNT INTEGER;
+            ALTER TABLE CONFIG.API_LIMIT ADD COLUMN IF NOT EXISTS WINDOW_FROM_TS TIMESTAMPTZ;
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE CONFIG.API_LIMIT DROP COLUMN IF EXISTS CALL_COUNT;
+                ALTER TABLE CONFIG.API_LIMIT DROP COLUMN IF EXISTS WINDOW_FROM_TS;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

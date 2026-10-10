@@ -44,7 +44,7 @@ The real 2026-10-03 bodies stay outside the repo so a later fetch of the same wi
 
 ## What the client does
 
-`Glassnode` in `quant/data/sources.py` has one method, `get_historical_price`. It GETs `https://api.glassnode.com/v1/metrics/` plus the `metric_path` argument, with query params `a`, `s`, `u`, `i` and the key in the `X-Api-Key` header. `GLASSNODE_API_KEY` is already in the process environment: `load_config()` loads it from SSM when `USE_SSM=1`, otherwise from `.env`. The class reads that variable and does not load a file. The default `i` is `24h`. `fetch_df` takes that path from the `REFDATA.APP_METRIC` row for the data source the request named. Choosing Glassnode in the UI is that request. The method does not fill in a path when the row has none. It then calls `raise_for_status()` and `pd.read_json`. There is no page loop, no read of the rate-limit headers, and no call to `BT.SP_GET_API_LIMIT_CHK`.
+`Glassnode` in `quant/data/sources.py` has one method, `get_historical_price`. It GETs `https://api.glassnode.com/v1/metrics/` plus the `metric_path` argument, with query params `a`, `s`, `u`, `i` and the key in the `X-Api-Key` header. `GLASSNODE_API_KEY` is already in the process environment: `load_config()` loads it from SSM when `USE_SSM=1`, otherwise from `.env`. The class reads that variable and does not load a file. The default `i` is `24h`. `fetch_df` takes that path from the `REFDATA.APP_METRIC` row for the data source the request named. Choosing Glassnode in the UI is that request. The method does not fill in a path when the row has none. It then calls `raise_for_status()` and `pd.read_json`. There is no page loop and no read of the rate-limit headers. `fetch_df` increments `CONFIG.API_LIMIT.CALL_COUNT` before this method on the provider path. The method itself does not.
 
 `s` and `u` are built with `time.mktime`, which is the machine's local timezone. The 3 Oct window was UTC unix time. The harness stores that unix window and does not call `mktime`. A backtest on a host that is not UTC asks Glassnode for a different window than the fixture.
 
@@ -270,17 +270,15 @@ Keeping that history is not the point-in-time series. Point-in-time is a differe
 
 The external copies are the log of a rewrite. The `*_pit` paths are separate Glassnode series, already named in the sleeve note.
 
-The monthly row is release `config/1.2.0` (decision #93). The call counter below is the design. It is not built. `SP_GET_API_LIMIT_CHK` still counts current subscription rows.
+The monthly row is release `config/1.2.0` (decision #93). The counter columns are release `config/1.3.0`, and `BT.SP_RESERVE_API_CALL` is release `bt/1.27.0` (decision #94). Contexts are `config,prod-deploy` and `bt,prod-deploy`. `SP_GET_API_LIMIT_CHK` still counts current subscription rows.
 
 ## Call count
 
-`CONFIG.API_LIMIT` is the threshold. `BT.API_REQUEST` is the stored series. The count is a third fact: one row for each request that is about to leave the process.
+`CONFIG.API_LIMIT` holds the threshold and the count on the same row. `CALL_COUNT` is how many calls have been reserved since `WINDOW_FROM_TS`. `BT.API_REQUEST` stays the stored series. There is no row per call.
 
-`BT.API_CALL` is append-only. `API_CALL_ID` is an identity primary key. `APP_ID` is the provider. `USER_ID` and `CREATED_AT` are the usual audit columns. There is no `UPDATED_AT`, no payload, and no version. An index on `(APP_ID, CREATED_AT)` is what the 30-day count reads. A cache hit does not insert a row.
+`BT.SP_RESERVE_API_CALL` takes the app id and updates that app's limit rows. An open window adds one to `CALL_COUNT`. An elapsed window, or a null `WINDOW_FROM_TS`, sets the count to 1 and `WINDOW_FROM_TS` to the transaction time. The procedure does not take a user id and does not refuse the call. The whole window resets together.
 
-`BT.SP_RESERVE_API_CALL(IN_APP_ID)` does the check and the insert in one transaction. It takes an advisory lock for that `APP_ID`, counts `BT.API_CALL` rows whose `CREATED_AT` falls inside each `CONFIG.API_LIMIT` window for that app, and inserts one row only when every window is still under `MAX_VALUE`. The outs match `SP_GET_API_LIMIT_CHK`: allowed or not, and which rule blocked. Two workers cannot both pass the last slot. `SP_GET_API_LIMIT_CHK` stays as it is until the other providers reserve the same way. Pointing it at `BT.API_CALL` now would make Yahoo and Nasdaq look unused, because they write no call row.
-
-`fetch_df` calls the reserve on the provider path, immediately before `get_historical_price`. Allowed means the row exists, then the HTTP call runs. A 4xx, a 5xx, or an empty body still counts, because Glassnode has already been asked. `read_payload` does not reserve. `Glassnode` stays a client: it has no database handle, and a direct call that skips `fetch_df` is outside this count. The short window of 600 is still only a response header. The reserve enforces the rows in `CONFIG.API_LIMIT`, which for Glassnode is the 160,000 calls per 30 days.
+`fetch_df` calls `BacktestCache.reserve_api_call` on the provider path, after the catalog path is known and immediately before `get_historical_price`. A missing path does not reserve. `read_payload` does not reserve. `Glassnode` stays a client: it has no database handle, and a direct call that skips `fetch_df` is outside this count. The short window of 600 is still only a response header. The 160,000 calls per 30 days stay the `MAX_VALUE` on the Glassnode row. This procedure does not read that maximum.
 
 ## What this change does not do
 

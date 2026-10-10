@@ -76,6 +76,14 @@ class BacktestCache(DbGateway):
             (app_id, app_metric_id, tm_interval_id, internal_cusip),
         )
 
+    def reserve_api_call(self, app_id: int) -> None:
+        """Add one to this app's ``CONFIG.API_LIMIT.CALL_COUNT``."""
+        self._call_write(
+            "CALL BT.SP_RESERVE_API_CALL("
+            "%s::integer, NULL::text, NULL::text, NULL::text)",
+            (app_id,),
+        )
+
     def _insert_api_request(self, api_req_id, app_id, app_metric_id, tm_interval_id, product_grp_id, start_ts, end_ts, payload_json, internal_cusip):
         # Deployed BT.SP_INS_API_REQUEST signature:
         #   (uuid, integer, integer, integer, integer, timestamptz, timestamptz, jsonb, text, text)

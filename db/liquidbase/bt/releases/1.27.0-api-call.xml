@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.27.0-001-sp-reserve-api-call" author="alfcheun" context="bt,prod-deploy">
+        <comment>Reserve a call by updating CONFIG.API_LIMIT.CALL_COUNT.</comment>
+        <sqlFile path="../procedures/SP_RESERVE_API_CALL.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback>
+            <sql>
+                DROP PROCEDURE IF EXISTS BT.SP_RESERVE_API_CALL(
+                    IN INTEGER,
+                    OUT TEXT, OUT TEXT, OUT TEXT
+                );
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.27.0-002-grant-sp-reserve-api-call" author="alfcheun" context="bt,prod-deploy">
+        <comment>quant_app may reserve a call once the role exists.</comment>
+        <sql splitStatements="false" stripComments="false"><![CDATA[
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quant_app') THEN
+                    GRANT EXECUTE ON PROCEDURE BT.SP_RESERVE_API_CALL(
+                        IN INTEGER,
+                        OUT TEXT, OUT TEXT, OUT TEXT
+                    ) TO quant_app;
+                END IF;
+            END $$;
+        ]]></sql>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

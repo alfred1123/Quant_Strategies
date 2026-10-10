@@ -352,6 +352,7 @@ class TestGlassnodeUsesTheCatalogPath:
             )
 
         refdata.resolve_metric_path.assert_called_once_with(2, "sopr")
+        bt_cache.reserve_api_call.assert_called_once_with(2)
         src.get_historical_price.assert_called_once_with(
             "BTC", "2020-04-01", "2020-04-05", metric_path="indicators/sopr",
         )
@@ -383,4 +384,5 @@ class TestGlassnodeUsesTheCatalogPath:
                     refdata, inst_cache, bt_cache, refresh=True,
                 )
 
+        bt_cache.reserve_api_call.assert_not_called()
         src.get_historical_price.assert_not_called()
