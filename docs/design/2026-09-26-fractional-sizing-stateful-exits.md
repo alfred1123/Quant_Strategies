@@ -37,11 +37,11 @@ No Concretum backtest was run for this page. No database was queried.
 - Exit when the close is at or below a trailing stop.
 - Otherwise keep yesterday's position.
 - The stop used tomorrow is `max(today's stop, today's Donchian mid)`. It never moves down. On a new entry the stop starts at that day's mid. While flat, the stop is irrelevant and the next entry starts it again.
-- Size `w_n = min(0.25 / σ_t, 2) × Pos_n`. `σ_t` is the asset's own 90-day annualized volatility, shared across lookbacks. The paper's only cap is 200%.
+- Size `w_n = min(target_vol / σ_t, cap) × Pos_n`. `σ_t` is the asset's own volatility over the paper's volatility window, shared across lookbacks. The paper prints a target and a cap. A weight and a cap are a rule the application reads, and a run records which rule it applied. This page does not set them.
 - The book is the equal-weight average of the nine `w_n`, not a vote. The weight at the close of day `t` earns the asset's return on day `t+1`.
-- Rebalance when a trend signal changes, immediately. Rebalance a volatility-driven gap only when it exceeds 20%. Results after the paper's §5.1 are net of 10 bps plus that threshold.
+- Rebalance when a trend signal changes, immediately. Rebalance a volatility-driven gap only when it passes the band the paper states. Results after the paper's §5.1 are net of 10 bps plus that band. A rebalance band is a rule the application reads, and a run records which rule it applied. This page does not set the band.
 
-**Spec**, authors' own figures, net of 10 bps and the 20% threshold, full sample (their Table 3):
+**Spec**, authors' own figures, net of 10 bps and the paper's rebalance band, full sample (their Table 3):
 
 | Coin | From | CAGR | Vol | Sharpe | Sortino | Max drawdown | MAR |
 |------|------|------|-----|--------|---------|--------------|-----|
@@ -53,7 +53,7 @@ BTC's sample in the paper runs from 1 Jan 2015 to 19 Mar 2025. ETH and BNB start
 
 Gross of costs, their Table 1 Combo on BTC is CAGR 30%, vol 17%, Sharpe 1.58, Sortino 2.03, max drawdown 19%. The same note flags three inconsistencies inside the paper, which a reproduction should leave as printed: Combo MAR is 0.88 in Table 1 and 1.15 in Table 3 while 30/19 is about 1.58 either way; BTC Combo Sortino falls from 2.03 to 1.23 when Sharpe barely moves; the text's 5-day gross CAGR (34%) does not match Table 1 (36%).
 
-**Spec**, the note's own calculation, not the authors': on Binance spot daily closes from 2017 through 26 Sep 2026, `0.25 / σ_90` with simple returns, sample standard deviation, and √365 never exceeded 1 for BTC, ETH, or BNB (max raw weights 0.90, 0.82, 0.96). A spot cap of 1× is then almost the same model as the paper's 200% cap, at a 25% target, on those three coins, in that window. The 200% cap can still bind in a quieter sample the note did not measure (BTC 2015–2016 is the obvious one). Raising the target vol is when a 1× cap starts to bind.
+**Spec**, the note's own calculation, not the authors': on Binance spot daily closes from 2017 through 26 Sep 2026, the paper's printed volatility weight, with simple returns, sample standard deviation, and √365, never exceeded 1 for BTC, ETH, or BNB (max raw weights 0.90, 0.82, 0.96). A cap is a rule the application reads, and a run records which rule it applied. This page does not set one. The authors' own cap can still bind in a quieter sample the note did not measure (BTC 2015–2016 is the obvious one).
 
 ## What the engine does today
 
@@ -76,7 +76,7 @@ Gross of costs, their Table 1 Combo on BTC is CAGR 30%, vol 17%, Sharpe 1.58, So
 
 `Objective._sharpe` in `quant/strategy/objective.py` uses the same turnover and the same `prior × chg − fee` line, then the same Sharpe (`mean / std × sqrt(trading_period)`, sample std, undefined below `Performance.MIN_METRIC_OBS` of 60).
 
-**Read.** For a weight that is exactly 0 or exactly 1, the weight of a fully invested book does not drift: 100% of NAV stays in the coin without a trade, and 0% stays in cash. The formula never marks a weight between those two. Putting a fraction such as 0.4 into `FinalPosition` and leaving the formula unchanged would earn `0.4 × chg` and would charge the fee on every change of that number. It would also put the book back on 0.4 at every bar, with no extra fee, whenever the signal repeats 0.4. That is a free rebalance back to the target. The paper's 20% band exists so that rebalance is not free and not daily.
+**Read.** For a weight that is exactly 0 or exactly 1, the weight of a fully invested book does not drift: 100% of NAV stays in the coin without a trade, and 0% stays in cash. The formula never marks a weight between those two. Putting a fraction such as 0.4 into `FinalPosition` and leaving the formula unchanged would earn `0.4 × chg` and would charge the fee on every change of that number. It would also put the book back on 0.4 at every bar, with no extra fee, whenever the signal repeats 0.4. That is a free rebalance back to the target. The paper's rebalance band exists so that rebalance is not free and not daily. A band is a rule the application reads, and a run records which rule it applied. This page does not set it.
 
 **Inferred.** The drift of a weight `w` after a simple return `r`, with the rest of NAV in cash, is `w * (1+r) / (1 + w*r)`, provided `1 + w*r > 0`. At `w` of 0 or 1 this equals `w` again. At `w = 0.5` and `r = 0.10` it is about 0.524. The code does not compute it.
 
@@ -135,7 +135,7 @@ That run is one factor, all-in or all-out, long while the stochastic is above a 
 
 ## Proposal A — fractional weights
 
-**Proposal.** `FinalPosition` may be any real number in **[−1, 1]**. A spot, long-only book clips the target to **[0, 1]** before the fee and the threshold. The paper's 200% cap stays out of scope: this engine's general range remains [−1, 1], and the spot book cannot borrow to reach 2.
+**Proposal.** `FinalPosition` may be any real number in **[−1, 1]**. A spot, long-only book clips the target to **[0, 1]** before the fee and the threshold. The paper's leverage cap stays out of scope: this engine's general range remains [−1, 1], and a spot book cannot borrow. A cap is a rule the application reads, and a run records which rule it applied. This page does not set one.
 
 The fee stays the one already in `_compute_pnl_columns`: charge `fee_bps / 10_000` times the absolute change in weight. What changes is which weight is "current."
 
@@ -145,8 +145,8 @@ The fee stays the one already in `_compute_pnl_columns`: charge `fee_bps / 10_00
 2. After that return, the drifted weight is `w * (1+r) / (1 + w*r)`. At 0 and at 1 this equals `w`, so a unit long/flat book does not move and does not trade because of price drift.
 3. The target is computed from the close of bar `t`.
 4. Trade to the target when a **position state** changes (any sub-model enters or exits), even if the weight gap is inside the band. Also trade when the gap is a volatility-driven drift past the threshold. Otherwise the held weight becomes the drifted weight, and the fee on that bar is zero.
-5. Default threshold: relative, on the combined target, `|w_drift − w_target| / max(|w_target|, ε) > 0.20`. An exit to a zero target is a position-state change, so the ratio is not how an exit fires.
-6. On a signal-change bar, trade to the full new target, including whatever volatility gap has accumulated. The paper requires the signal change to trade immediately. Whether that trade also absorbs the volatility gap is **Spec** unstated; this is the choice the reproduction note recommends, and it is the one to implement first. An absolute band of 0.20 of NAV is a second setting, not the default. The paper does not say which definition it used.
+5. A volatility-only rebalance band is a rule the application reads, and a run records which rule it applied. This page does not set the band. An exit to a zero target is a position-state change, so the band is not how an exit fires.
+6. On a signal-change bar, trade to the full new target, including whatever volatility gap has accumulated. The paper requires the signal change to trade immediately. Whether that trade also absorbs the volatility gap is **Spec** unstated; this is the choice the reproduction note recommends, and it is the one to implement first. The paper does not say whether the band is relative to the target or an absolute share of NAV.
 
 **Proposal.** When every weight is in {−1, 0, +1} and no threshold is configured, the pnl series matches today's `_compute_pnl_columns` and `Objective._sharpe`, including the unpaid first entry after NaN. That keeps stored unit-position Sharpes comparable. The [hygiene proposal](2026-09-25-backtest-data-hygiene-proposal.md) is what a formula change does to old `BT.RESULT` rows; this slice should not create another one.
 
@@ -167,10 +167,10 @@ w_n = min(target_vol / σ_t, cap) × Pos_n
 ```
 
 - `σ_t`: sample standard deviation of simple close-to-close returns over `vol_lookback` bars, times `sqrt(trading_period)`. Pandas `rolling.std` and `Objective._sharpe` already use sample std (`ddof=1`). Crypto `trading_period` is 365. The paper does not state return type, sample versus population, or √365 versus √252. Matching the engine's existing std and year length is the default. √252 is a sensitivity, not a second engine.
-- `target_vol` default 0.25. `vol_lookback` default 90. Spot `cap` default 1.0. The general signed cap default 1.0, so the product stays inside [−1, 1]. The paper's cap of 2.0 is a recorded alternative, not the spot default.
+- `target_vol`, `vol_lookback`, and `cap` are inputs the application reads, and a run records which rule it applied. This page does not set them. The signed book stays inside [−1, 1] because that is the position range Proposal A already states.
 - `σ_t` is the asset's volatility, one series for every lookback. It is not the volatility of the strategy's own pnl.
 
-**Inferred.** With one shared `σ` and one shared cap, `w = min(0.25/σ, cap) × (fraction of sub-models long)`. The average and the sizer commute in that case. They stop commuting if each sub-model ever gets its own cap or its own `σ`. Implement scale-then-average anyway, so a later per-model cap does not silently change the definition.
+**Inferred.** With one shared `σ` and one shared cap, `w = min(target_vol / σ, cap) × (fraction of sub-models long)`. The average and the sizer commute in that case. They stop commuting if each sub-model ever gets its own cap or its own `σ`. Implement scale-then-average anyway, so a later per-model cap does not silently change the definition.
 
 The UI change is the factor cap in `ConfigDrawer`: a fixed ensemble of nine is a recipe, not nine clicks on Add Factor. How that recipe is selected (a REFDATA strategy template versus raising the cap to nine) can wait until C and A score one lookback. Raising the cap without a template would invite a nine-axis grid.
 
@@ -244,7 +244,7 @@ The in-sample search, if it runs at all, still sees only the in-sample bars. A f
 
 **Read.** `extract_shredded_metrics` in `quant/queue/result_metrics.py` stores five strategy numbers and five buy-and-hold numbers: total return, annualized return, Sharpe, max drawdown, Calmar. They are defined on a simple-return pnl series. A, B, and C can keep that contract if they only change how `pnl` is built. D does not change pnl on its own.
 
-**Inferred.** A book that is typically 0.3× to 0.5× invested can post a Sharpe that ranks above a 1× book with a larger payoff. Promotion compares Sharpe across current rows of one strategy lineage. A new conjunction is a new `STRATEGY_NM` and, by decision #63, a new `STRATEGY_ID`. Leave it that way so a vol-targeted ensemble is not a later VID of a unit Bollinger lineage.
+**Inferred.** A book that is only partly invested can post a Sharpe that ranks above a fully invested book with a larger payoff. Promotion compares Sharpe across current rows of one strategy lineage. A new conjunction is a new `STRATEGY_NM` and, by decision #63, a new `STRATEGY_ID`. Leave it that way so a vol-targeted ensemble is not a later VID of a unit Bollinger lineage.
 
 Sortino and the paper's MAR are not stored. The review already lists Sortino as a nice-to-have. Matching Table 3's Sortino waits on that. Our Calmar is CAGR over max drawdown; do not rename it to agree with the paper's MAR, which the spec already shows is inconsistent with CAGR/MDD.
 
@@ -258,7 +258,7 @@ Backtest parity first, in `tests/unit/test_perf.py`, `tests/unit/test_objective.
 |------|--------|
 | Weights exactly −1, 0, +1, no threshold | Same pnl as today's `Performance` and `Objective`, including a NaN prior that pays no fee |
 | Held weight 0.5, asset return 10%, no trade | Bar pnl 0.05. Next held weight about 0.524, not 0.5 |
-| Target moves 0.50 → 0.52, relative band 0.20, position state unchanged | No trade, fee 0, held weight follows the drift |
+| Target moves by a volatility gap that stays inside the band the application read, position state unchanged | No trade, fee 0, held weight follows the drift |
 | Position state flips while the weight gap is inside the band | Trade to the full new target. Fee is `fee × \|target − drifted\|` |
 | Spot clip | A negative target becomes 0. A target above 1 becomes 1. Signed mode still allows −0.4 |
 | Two weights 1 and 0, average combiner | 0.5. The strengths-based AND of the same long-only pair stays +1, so the new combiner is what changed |
@@ -289,8 +289,8 @@ Recommended order: D and the hysteresis half of C together, at weight 1, so a si
 
 ### Risks that are easy to miss
 
-- **Paper gaps, marked as choices.** Annualization, the exact 20% (relative or absolute, combo or sub-model, drifted or not), and same-bar entry are **Spec** unstated. The defaults above are proposals. A match to Table 3 is not evidence that the unstated choice was the authors'.
-- **1× versus 200%.** At a 25% target and √365, the spec's own 2017–2026 check says the spot cap rarely binds on BTC, ETH, and BNB. That check is not the authors' result, and it does not cover 2015–2016 BTC.
+- **Paper gaps, marked as choices.** Annualization, whether the rebalance band is relative or absolute, and same-bar entry are **Spec** unstated. This page does not set the band, the target, or the cap. A match to Table 3 is not evidence that an unstated choice was the authors'.
+- **Cap.** The spec's own 2017–2026 check, using the paper's printed weight and √365, says that weight stayed at or under 1 on BTC, ETH, and BNB. A cap is a rule the application reads. That check is not the authors' result, and it does not cover 2015–2016 BTC.
 - **Next-bar timing.** The engine already earns tomorrow's return on today's position. That matches the paper's primary timing (weight at the signal close, earn the next day's return). A one-bar delay is a research sensitivity, not a change this proposal requires.
 - **AND left as it is.** Long-only AND on the strengths path behaves as OR. FILTER is the AND that works. Fixing AND is a separate decision; doing it inside B would move every stored two-factor long-only result.
 - **Identity and promotion.** New combiner, new name, new `STRATEGY_ID`. Do not replay old unit-position rows through the drift formula.
@@ -303,7 +303,7 @@ The authors' Table 3 cannot be matched on the Bybit spot bars this platform stor
 
 **Researcher.** Bybit spot BNB history available for this work starts in June 2021. That month is not in this tree. This page did not query `PRICE_BAR`.
 
-The missing stretch is the start of each published sample, including the quieter BTC years where a 200% cap might have bound. A run should say the overlap that was actually stored. A Sharpe from 2020 or 2021 onward is not the 1.56 in the table.
+The missing stretch is the start of each published sample, including the quieter BTC years where the authors' cap might have bound. A run should say the overlap that was actually stored. A Sharpe from 2020 or 2021 onward is not the 1.56 in the table.
 
 ## What this page did not read
 

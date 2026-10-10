@@ -26,7 +26,7 @@ This page records both, and a practitioner attempt to combine factors with volat
 
 ```text
 rv_t = stdev(log returns over L bars)       # they use variance; L is a month in the equity paper
-scale_t = min(cap, target_vol / rv_t)       # cap = 1 for a spot book that cannot lever
+scale_t = min(cap, target_vol / rv_t)       # cap and target_vol are a rule the application reads; this page does not set them
 position_t = sign_or_signal_t * scale_t
 
 # smaller version that does not need a sizing layer:
@@ -38,7 +38,7 @@ position_t = signal_t * gate_t
 
 **Reported performance.** The abstract says Sharpe ratios increase. It does not state a cryptocurrency Sharpe, and none is inferred here.
 
-**Risks.** A target-vol rule levers up in quiet markets. Quiet crypto markets have ended in gaps; a cap at 1× (spot) avoids that leverage but also gives away the "buy calm" side of the equity result. Thresholds on `rv` overfit. Realized vol is itself noisy on daily bars. The strategy takes less risk in the periods that look like recessions, which Moreira and Muir flag as contrary to a simple risk-premium story — the same pattern in crypto may be a bull-market artifact.
+**Risks.** A target-vol rule levers up in quiet markets. Quiet crypto markets have ended in gaps. A cap is a rule the application reads, and a run records which rule it applied. This page does not set one. Thresholds on `rv` overfit. Realized vol is itself noisy on daily bars. The strategy takes less risk in the periods that look like recessions, which Moreira and Muir flag as contrary to a simple risk-premium story — the same pattern in crypto may be a bull-market artifact.
 
 **Fit here.** Not expressible. Positions are {−1, 0, +1} and the PnL line has no size multiplier (`quant/strategy/performance.py`). The binary gate is the version to build first: one realized-vol or ATR indicator, used as a FILTER, leaving the baseline signal untouched. Continuous sizing also changes turnover fees and live order quantity, which is why the [baseline note](crypto-spot-baseline-improvements.md#6-suggested-order-if-this-is-pursued) ranks full ATR targeting as a large change. Ranked third on the [try-first list](sharpe-ideas-index.md#try-these-first) as the gate, not as the scaler.
 
