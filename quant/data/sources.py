@@ -18,7 +18,6 @@ from functools import lru_cache
 import futu
 import pandas as pd
 import requests
-from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +26,10 @@ class FutuOpenD:
     """Retrieve equity data from Futu OpenD gateway."""
 
     def __init__(self) -> None:
-        load_dotenv()
         self.__host = os.getenv('FUTU_HOST')
         port_str = os.getenv('FUTU_PORT')
         if not self.__host or not port_str:
-            raise ValueError("FUTU_HOST and FUTU_PORT must be set in .env")
+            raise ValueError("FUTU_HOST and FUTU_PORT are not set")
         self.__port = int(port_str)
         self.quote_ctx = futu.OpenQuoteContext(host=self.__host, port=self.__port)
 
@@ -64,23 +62,30 @@ class FutuOpenD:
 
 
 class Glassnode:
-    """Retrieve on-chain crypto metrics from Glassnode."""
+    """Retrieve on-chain crypto metrics from Glassnode.
+
+    ``GLASSNODE_API_KEY`` is read from the process environment. ``load_config()``
+    puts it there from SSM or ``.env``. This class does not load a file.
+    """
 
     def __init__(self) -> None:
-        load_dotenv()
         self.__api_key = os.getenv('GLASSNODE_API_KEY')
         if not self.__api_key:
-            raise ValueError("GLASSNODE_API_KEY must be set in .env")
+            raise ValueError("GLASSNODE_API_KEY is not set")
 
     @lru_cache(maxsize=32)
-    def get_historical_price(self, symbol, start_date, end_date, resolution='24h'):
-        """Fetch historical close price from Glassnode.
+    def get_historical_price(self, symbol, start_date, end_date, resolution='24h', *, metric_path: str):
+        """Fetch one Glassnode series.
+
+        ``metric_path`` is ``REFDATA.APP_METRIC.METRIC_PATH`` for the app the
+        caller selected. The fetch does not substitute a path of its own.
 
         Args:
             symbol: Crypto asset (e.g. 'BTC').
             start_date: Start date (YYYY-MM-DD).
             end_date: End date (YYYY-MM-DD).
             resolution: Data interval. Defaults to '24h'.
+            metric_path: Path under ``/v1/metrics/``.
 
         Returns:
             DataFrame with columns ['t', 'v'].
@@ -92,7 +97,7 @@ class Glassnode:
         until = int(time.mktime(time.strptime(end_date, "%Y-%m-%d")))
 
         res = requests.get(
-            "https://api.glassnode.com/v1/metrics/market/price_usd_close",
+            f"https://api.glassnode.com/v1/metrics/{metric_path}",
             params={"a": symbol, "s": since, "u": until, "i": resolution},
             headers={"X-Api-Key": self.__api_key},
             timeout=30,
@@ -109,10 +114,9 @@ class AlphaVantage:
     BASE_URL = "https://www.alphavantage.co/query"
 
     def __init__(self) -> None:
-        load_dotenv()
         self.__api_key = os.getenv('ALPHAVANTAGE_API_KEY')
         if not self.__api_key:
-            raise ValueError("ALPHAVANTAGE_API_KEY must be set in .env")
+            raise ValueError("ALPHAVANTAGE_API_KEY is not set")
 
     @lru_cache(maxsize=32)
     def get_historical_price(self, symbol, start_date, end_date, resolution='daily'):
@@ -240,10 +244,9 @@ class NasdaqDataLink:
     """
 
     def __init__(self) -> None:
-        load_dotenv()
         self.__api_key = os.getenv('NASDAQ_DATA_LINK_API_KEY')
         if not self.__api_key:
-            raise ValueError("NASDAQ_DATA_LINK_API_KEY must be set in .env")
+            raise ValueError("NASDAQ_DATA_LINK_API_KEY is not set")
         import nasdaqdatalink
         nasdaqdatalink.ApiConfig.api_key = self.__api_key
 
@@ -297,6 +300,9 @@ class NasdaqDataLink:
 
 
 if __name__ == "__main__":
+    from quant.shared.config import load_config
+
+    load_config()
     start = time.time()
     av = AlphaVantage()
     data = av.get_historical_price('BTC', '2020-05-11', '2021-04-03')

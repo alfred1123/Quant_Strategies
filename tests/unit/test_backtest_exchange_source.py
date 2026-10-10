@@ -319,3 +319,68 @@ class TestAProviderHasNoIntradayBars:
             )
 
         bt_cache.read_payload.assert_not_called()
+
+
+class TestGlassnodeUsesTheCatalogPath:
+    def test_metric_nm_selects_the_path_and_the_cache_row(self, inst_cache):
+        from unittest.mock import patch
+
+        refdata = MagicMock()
+        refdata.get.return_value = [{
+            "app_id": 2,
+            "name": "glassnode",
+            "class_name": "Glassnode",
+            "is_exchange_ind": "N",
+        }]
+        refdata.resolve_metric_path.return_value = "indicators/sopr"
+        inst_cache.resolve_internal_cusip.return_value = "BTC"
+        src = MagicMock()
+        src.get_historical_price.return_value = pd.DataFrame({
+            "t": pd.to_datetime(["2020-04-01"]),
+            "v": [1.0],
+        })
+        bt_cache = MagicMock()
+        bt_cache.refdata.resolve_app_metric_id.return_value = 11
+        bt_cache.refresh_payload.side_effect = lambda **kwargs: kwargs["fetcher"](
+            "2020-04-01", "2020-04-05",
+        )
+
+        with patch("quant.data.sources.Glassnode", return_value=src):
+            fetch_df(
+                "btcusdt.crypto", "2020-04-01", "2020-04-05", "glassnode",
+                refdata, inst_cache, bt_cache, refresh=True, metric_nm="sopr",
+            )
+
+        refdata.resolve_metric_path.assert_called_once_with(2, "sopr")
+        src.get_historical_price.assert_called_once_with(
+            "BTC", "2020-04-01", "2020-04-05", metric_path="indicators/sopr",
+        )
+        bt_cache.refdata.resolve_app_metric_id.assert_called_once_with(2, "sopr")
+        assert bt_cache.refresh_payload.call_args.kwargs["app_metric_id"] == 11
+
+    def test_a_missing_catalog_path_is_not_replaced(self, inst_cache):
+        from unittest.mock import patch
+
+        refdata = MagicMock()
+        refdata.get.return_value = [{
+            "app_id": 2,
+            "name": "glassnode",
+            "class_name": "Glassnode",
+            "is_exchange_ind": "N",
+        }]
+        refdata.resolve_metric_path.return_value = None
+        inst_cache.resolve_internal_cusip.return_value = "BTC"
+        src = MagicMock()
+        bt_cache = MagicMock()
+        bt_cache.refresh_payload.side_effect = lambda **kwargs: kwargs["fetcher"](
+            "2020-04-01", "2020-04-05",
+        )
+
+        with patch("quant.data.sources.Glassnode", return_value=src):
+            with pytest.raises(BacktestError, match="no METRIC_PATH"):
+                fetch_df(
+                    "btcusdt.crypto", "2020-04-01", "2020-04-05", "glassnode",
+                    refdata, inst_cache, bt_cache, refresh=True,
+                )
+
+        src.get_historical_price.assert_not_called()

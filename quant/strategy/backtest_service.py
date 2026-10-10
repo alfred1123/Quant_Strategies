@@ -4,6 +4,7 @@ Shared by the FastAPI layer and the queue worker. Raises ``BacktestError``
 for client-facing validation and data issues (HTTP layer maps status codes).
 """
 
+import inspect
 import logging
 from datetime import timedelta
 
@@ -167,7 +168,7 @@ def _fetch_exchange_df(
     return df
 
 
-def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_cache=None, bt_cache=None, refresh: bool = False, bar_services=None, tm_interval_id: int | None = None) -> pd.DataFrame:
+def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_cache=None, bt_cache=None, refresh: bool = False, bar_services=None, tm_interval_id: int | None = None, metric_nm: str = "price") -> pd.DataFrame:
     """Fetch prices using the data source registered in REFDATA.APP.
 
     If *symbol* is an internal_cusip registered in INST.PRODUCT, the vendor
@@ -238,7 +239,21 @@ def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_ca
 
     def _provider_fetch(s: str, e: str) -> pd.DataFrame:
         """Hit the upstream provider for an arbitrary sub-range."""
-        price = src.get_historical_price(ticker, s, e)
+        fn = src.get_historical_price
+        metric_path = cache.resolve_metric_path(app["app_id"], metric_nm)
+        params = inspect.signature(fn).parameters
+        takes_path = "metric_path" in params or any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()
+        )
+        if takes_path:
+            if not metric_path:
+                raise BacktestError(
+                    f"{app['name']} has no METRIC_PATH for {metric_nm!r}. "
+                    f"The path is the REFDATA.APP_METRIC row for this data source."
+                )
+            price = fn(ticker, s, e, metric_path=metric_path)
+        else:
+            price = fn(ticker, s, e)
         if hasattr(src.get_historical_price, "cache_clear"):
             src.get_historical_price.cache_clear()
         df = pd.DataFrame({
@@ -253,7 +268,7 @@ def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_ca
     # DB-backed cache path
     if bt_cache is not None:
         app_id = app["app_id"]
-        app_metric_id = bt_cache.refdata.resolve_app_metric_id(app_id, "price")
+        app_metric_id = bt_cache.refdata.resolve_app_metric_id(app_id, metric_nm)
         if app_metric_id is not None:
             if refresh:
                 return bt_cache.refresh_payload(

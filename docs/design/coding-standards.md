@@ -102,6 +102,7 @@ These are the working standards for every change. Reviewers flag departures from
 ### Secrets
 
 - No secrets in code, tests, fixtures, logs, or pull request text. Keys live in `.env` (gitignored) locally and in SSM in production.
+- Process entry points call `load_config()` once. That loads SSM (`USE_SSM=1`) or `.env` into the environment. Library code, including data-source classes, reads `os.environ` and does not call `load_dotenv()`.
 - Do not log credentials or encrypted keys. `DbGateway` already redacts Fernet tokens in procedure logs; do not add a log line that bypasses it.
 
 ### Docstrings

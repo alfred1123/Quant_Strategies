@@ -21,7 +21,6 @@ import socket
 from dataclasses import dataclass
 
 import futu
-from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +50,10 @@ class FutuTrader:
         self, *, paper: bool = True, timeout: int | None = None,
         market: str = "US",
     ) -> None:
-        load_dotenv()
         host = os.getenv("FUTU_HOST")
         port_str = os.getenv("FUTU_PORT")
         if not host or not port_str:
-            raise ValueError("FUTU_HOST and FUTU_PORT must be set in .env")
+            raise ValueError("FUTU_HOST and FUTU_PORT are not set")
 
         self._host = host
         self._port = int(port_str)

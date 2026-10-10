@@ -13,7 +13,7 @@ The variables below cover the core runtime set. See `.env.example` for the full 
 | Variable | Required? | Description |
 |---|---|---|
 | `ALPHAVANTAGE_API_KEY` | Optional | Free key from [alphavantage.co](https://www.alphavantage.co/support/#api-key). Limited to 25 req/day. |
-| `GLASSNODE_API_KEY` | Optional | On-chain crypto metrics. Only if you use the Glassnode data source. |
+| `GLASSNODE_API_KEY` | Optional | On-chain crypto metrics. Only if you use the Glassnode data source. `load_config()` loads it from `.env`, or from SSM `/quant/<env>/GLASSNODE_API_KEY` when `USE_SSM=1`. |
 | `NASDAQ_DATA_LINK_API_KEY` | Optional | Free key from [data.nasdaq.com](https://data.nasdaq.com/account/profile). |
 | `FUTU_HOST` / `FUTU_PORT` | Optional | Only if using Futu OpenD gateway for HK/US equities. Default `127.0.0.1:11111`. |
 

@@ -26,7 +26,9 @@ class TestGlassnode:
         from quant.data.sources import Glassnode
         gn = Glassnode()
         gn.get_historical_price.cache_clear()
-        df = gn.get_historical_price("BTC", "2020-05-11", "2020-05-13")
+        df = gn.get_historical_price(
+            "BTC", "2020-05-11", "2020-05-13", metric_path="market/price_usd_close",
+        )
 
         assert isinstance(df, pd.DataFrame)
         assert "t" in df.columns
@@ -45,10 +47,13 @@ class TestGlassnode:
         from quant.data.sources import Glassnode
         gn = Glassnode()
         gn.get_historical_price.cache_clear()
-        gn.get_historical_price("ETH", "2021-01-01", "2021-01-02", "1h")
+        gn.get_historical_price(
+            "ETH", "2021-01-01", "2021-01-02", "1h", metric_path="market/price_usd_close",
+        )
 
         mock_get.assert_called_once()
         call_kwargs = mock_get.call_args
+        assert call_kwargs.args[0] == "https://api.glassnode.com/v1/metrics/market/price_usd_close"
         params = call_kwargs.kwargs.get("params") or call_kwargs[1].get("params")
         assert params["a"] == "ETH"
         assert params["i"] == "1h"
@@ -68,13 +73,30 @@ class TestGlassnode:
         from quant.data.sources import Glassnode
         gn = Glassnode()
         gn.get_historical_price.cache_clear()
-        gn.get_historical_price("BTC", "2020-05-11", "2020-05-12")
+        gn.get_historical_price(
+            "BTC", "2020-05-11", "2020-05-12", metric_path="market/price_usd_close",
+        )
 
         params = mock_get.call_args.kwargs.get("params") or mock_get.call_args[1].get("params")
         assert params["i"] == "24h"
 
+    @patch.dict("os.environ", {"GLASSNODE_API_KEY": "test_key"})
+    @patch("quant.data.sources.pd.read_json", return_value=pd.DataFrame({"t": ["x"], "v": [1]}))
+    @patch("quant.data.sources.requests.get")
+    def test_metric_path_is_the_request_url(self, mock_get, _):
+        mock_response = MagicMock()
+        mock_response.text = "[]"
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        from quant.data.sources import Glassnode
+        gn = Glassnode()
+        gn.get_historical_price.cache_clear()
+        gn.get_historical_price("BTC", "2020-05-11", "2020-05-12", metric_path="indicators/sopr")
+
+        assert mock_get.call_args.args[0] == "https://api.glassnode.com/v1/metrics/indicators/sopr"
+
     def test_init_raises_without_api_key(self, monkeypatch):
-        monkeypatch.setattr("quant.data.sources.load_dotenv", lambda *a, **kw: None)
         monkeypatch.delenv("GLASSNODE_API_KEY", raising=False)
         from quant.data.sources import Glassnode
         with pytest.raises(ValueError, match="GLASSNODE_API_KEY"):
@@ -82,7 +104,6 @@ class TestGlassnode:
 
 
 class TestFutuOpenD:
-    @patch("quant.data.sources.load_dotenv", lambda *a, **kw: None)
     @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
     @patch("quant.data.sources.futu.OpenQuoteContext")
     def test_init_loads_env(self, mock_ctx):
@@ -91,7 +112,6 @@ class TestFutuOpenD:
         assert futu_src._FutuOpenD__host == "127.0.0.1"
         assert futu_src._FutuOpenD__port == 11111
 
-    @patch("quant.data.sources.load_dotenv", lambda *a, **kw: None)
     @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
     @patch("quant.data.sources.futu.OpenQuoteContext")
     def test_get_historical_data_calls_api(self, mock_ctx_cls):
@@ -109,7 +129,6 @@ class TestFutuOpenD:
 
         assert isinstance(result, pd.DataFrame)
 
-    @patch("quant.data.sources.load_dotenv", lambda *a, **kw: None)
     @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})
     @patch("quant.data.sources.futu.OpenQuoteContext")
     def test_get_historical_data_raises_on_error(self, mock_ctx_cls):
@@ -125,7 +144,6 @@ class TestFutuOpenD:
         with pytest.raises(RuntimeError, match="Futu API error"):
             futu_src.get_historical_data("HK.00700", "2021-01-01", "2021-01-31")
 
-    @patch("quant.data.sources.load_dotenv", lambda *a, **kw: None)
     def test_init_raises_without_env_vars(self, monkeypatch):
         monkeypatch.delenv("FUTU_HOST", raising=False)
         monkeypatch.delenv("FUTU_PORT", raising=False)
@@ -219,7 +237,6 @@ class TestAlphaVantage:
             av.get_historical_price("INVALID", "2021-01-01", "2021-01-02")
 
     def test_init_raises_without_api_key(self, monkeypatch):
-        monkeypatch.setattr("quant.data.sources.load_dotenv", lambda *a, **kw: None)
         monkeypatch.delenv("ALPHAVANTAGE_API_KEY", raising=False)
         from quant.data.sources import AlphaVantage
         with pytest.raises(ValueError, match="ALPHAVANTAGE_API_KEY"):
@@ -452,7 +469,6 @@ class TestNasdaqDataLink:
             src.get_historical_price("INVALID/CODE", "2021-01-01", "2021-01-02")
 
     def test_init_raises_without_api_key(self, monkeypatch):
-        monkeypatch.setattr("quant.data.sources.load_dotenv", lambda *a, **kw: None)
         monkeypatch.delenv("NASDAQ_DATA_LINK_API_KEY", raising=False)
         from quant.data.sources import NasdaqDataLink
         with pytest.raises(ValueError, match="NASDAQ_DATA_LINK_API_KEY"):

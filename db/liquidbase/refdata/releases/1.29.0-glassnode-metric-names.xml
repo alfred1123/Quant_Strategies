@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.29.0-001-glassnode-metric-names" author="alfcheun" context="refdata,prod-deploy">
+        <comment>Glassnode METRIC_NM follows DISPLAY_NAME. DATA_CATEGORY is the subject, not ONCHAIN.</comment>
+        <sqlFile path="../data/APP_METRIC_GLASSNODE_NAMES.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 stripComments="true"/>
+        <rollback>
+            <sql>
+                UPDATE REFDATA.APP_METRIC
+                   SET METRIC_NM = 'active_count', DATA_CATEGORY = 'ONCHAIN', UPDATED_AT = now()
+                 WHERE APP_ID = 2 AND METRIC_NM = 'active_address_count';
+                UPDATE REFDATA.APP_METRIC
+                   SET METRIC_NM = 'transfers_volume_to_exchanges_sum', DATA_CATEGORY = 'ONCHAIN', UPDATED_AT = now()
+                 WHERE APP_ID = 2 AND METRIC_NM = 'exchange_inflow_volume';
+                UPDATE REFDATA.APP_METRIC
+                   SET METRIC_NM = 'transfers_volume_exchanges_net_pit', DATA_CATEGORY = 'ONCHAIN', UPDATED_AT = now()
+                 WHERE APP_ID = 2 AND METRIC_NM = 'exchange_netflow_pit';
+                UPDATE REFDATA.APP_METRIC
+                   SET DATA_CATEGORY = 'ONCHAIN', UPDATED_AT = now()
+                 WHERE APP_ID = 2
+                   AND METRIC_NM IN (
+                       'sopr', 'mvrv', 'sopr_pit', 'mvrv_z_score_pit', 'hash_rate_mean',
+                       'exchange_net_position_change', 'exchange_net_position_change_pit'
+                   );
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

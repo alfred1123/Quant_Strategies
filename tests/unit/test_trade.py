@@ -12,9 +12,8 @@ from quant.trade.futu_trader import FutuTrader, OrderResult
 
 @pytest.fixture
 def mock_env():
-    """Provide required env vars and suppress load_dotenv."""
-    with patch("quant.trade.futu_trader.load_dotenv"), \
-         patch.dict("os.environ", {
+    """Provide the host and port load_config() would have set."""
+    with patch.dict("os.environ", {
              "FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111",
          }):
         yield
@@ -60,14 +59,12 @@ class TestFutuTraderInit:
             FutuTrader(paper=True, market="INVALID")
 
     def test_init_raises_without_env(self):
-        with patch("quant.trade.futu_trader.load_dotenv"), \
-             patch.dict("os.environ", {}, clear=True):
+        with patch.dict("os.environ", {}, clear=True):
             with pytest.raises(ValueError, match="FUTU_HOST and FUTU_PORT"):
                 FutuTrader(paper=True)
 
     def test_init_raises_missing_port(self):
-        with patch("quant.trade.futu_trader.load_dotenv"), \
-             patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1"}, clear=True):
+        with patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1"}, clear=True):
             with pytest.raises(ValueError, match="FUTU_HOST and FUTU_PORT"):
                 FutuTrader(paper=True)
 

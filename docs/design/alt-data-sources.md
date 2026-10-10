@@ -60,10 +60,11 @@ and crypto strategies. Each provider will be integrated as a new class in
 on-chain paths below were written when Professional was **$799/mo**, which
 failed C6. That cost reason is stale. The Professional plan has been active
 since 28 Sep 2026 18:00 HKT. On 3 Oct 2026 the close-price path and the five
-on-chain paths in the sketch answered for BTC at `24h`. The class still only
-requests `market/price_usd_close`. `REFDATA.APP_METRIC` seeds the on-chain
-and sleeve series in `refdata/1.28.0` (context `refdata,prod-deploy`). The
-class ignores `METRIC_PATH`, so those rows do not change a fetch. Where the
+on-chain paths in the sketch answered for BTC at `24h`. `REFDATA.APP_METRIC`
+seeds the on-chain and sleeve series in `refdata/1.28.0` (context
+`refdata,prod-deploy`). The class requests the `METRIC_PATH` it is given. A
+backtest still resolves metric name `price`, so that run still requests
+`market/price_usd_close`. Where the
 series should be stored, and how a revision of history would be kept, is the
 open draft in
 [Glassnode market data](glassnode-market-data.md). The sketch below is not
@@ -136,10 +137,9 @@ class FMP:
     """Retrieve macro/economic data from Financial Modeling Prep."""
 
     def __init__(self) -> None:
-        load_dotenv()
         self.__api_key = os.getenv("FMP_API_KEY")
         if not self.__api_key:
-            raise ValueError("FMP_API_KEY must be set in .env")
+            raise ValueError("FMP_API_KEY is not set")
 
     @lru_cache(maxsize=32)
     def get_historical_price(self, symbol, start_date, end_date):
@@ -190,10 +190,9 @@ class NasdaqDataLink:
     """Retrieve economic/industrial data from Nasdaq Data Link (Quandl)."""
 
     def __init__(self) -> None:
-        load_dotenv()
         self.__api_key = os.getenv("NASDAQ_DATA_LINK_API_KEY")
         if not self.__api_key:
-            raise ValueError("NASDAQ_DATA_LINK_API_KEY must be set in .env")
+            raise ValueError("NASDAQ_DATA_LINK_API_KEY is not set")
 
     @lru_cache(maxsize=32)
     def get_historical_price(self, dataset, start_date, end_date):
@@ -250,10 +249,9 @@ class MarineTraffic:
     """Retrieve port call and vessel data from MarineTraffic API."""
 
     def __init__(self) -> None:
-        load_dotenv()
         self.__api_key = os.getenv("MARINETRAFFIC_API_KEY")
         if not self.__api_key:
-            raise ValueError("MARINETRAFFIC_API_KEY must be set in .env")
+            raise ValueError("MARINETRAFFIC_API_KEY is not set")
 
     @lru_cache(maxsize=32)
     def get_port_calls(self, port_id, start_date, end_date):
@@ -298,10 +296,9 @@ class Aviationstack:
     """Retrieve daily flight data from Aviationstack."""
 
     def __init__(self) -> None:
-        load_dotenv()
         self.__api_key = os.getenv("AVIATIONSTACK_API_KEY")
         if not self.__api_key:
-            raise ValueError("AVIATIONSTACK_API_KEY must be set in .env")
+            raise ValueError("AVIATIONSTACK_API_KEY is not set")
 
     @lru_cache(maxsize=32)
     def get_historical_price(self, airport_iata, start_date, end_date):
@@ -362,7 +359,7 @@ All new sources follow the existing `data.py` duck-typed interface:
 ```python
 class <Source>:
     def __init__(self) -> None:
-        # Load API key from .env, raise ValueError if missing
+        # Read the API key load_config() already put in the environment.
 
     @lru_cache(maxsize=32)
     def get_historical_price(self, symbol, start_date, end_date) -> pd.DataFrame:

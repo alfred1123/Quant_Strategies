@@ -44,7 +44,7 @@ The real 2026-10-03 bodies stay outside the repo so a later fetch of the same wi
 
 ## What the client does
 
-`Glassnode` in `quant/data/sources.py` has one method, `get_historical_price`. It always GETs `https://api.glassnode.com/v1/metrics/market/price_usd_close` with query params `a`, `s`, `u`, `i` and the key in the `X-Api-Key` header. The default `i` is `24h`. The method then calls `raise_for_status()` and `pd.read_json`. There is no page loop, no read of the rate-limit headers, and no call to `BT.SP_GET_API_LIMIT_CHK`.
+`Glassnode` in `quant/data/sources.py` has one method, `get_historical_price`. It GETs `https://api.glassnode.com/v1/metrics/` plus the `metric_path` argument, with query params `a`, `s`, `u`, `i` and the key in the `X-Api-Key` header. `GLASSNODE_API_KEY` is already in the process environment: `load_config()` loads it from SSM when `USE_SSM=1`, otherwise from `.env`. The class reads that variable and does not load a file. The default `i` is `24h`. `fetch_df` takes that path from the `REFDATA.APP_METRIC` row for the data source the request named. Choosing Glassnode in the UI is that request. The method does not fill in a path when the row has none. It then calls `raise_for_status()` and `pd.read_json`. There is no page loop, no read of the rate-limit headers, and no call to `BT.SP_GET_API_LIMIT_CHK`.
 
 `s` and `u` are built with `time.mktime`, which is the machine's local timezone. The 3 Oct window was UTC unix time. The harness stores that unix window and does not call `mktime`. A backtest on a host that is not UTC asks Glassnode for a different window than the fixture.
 
@@ -58,14 +58,16 @@ A provider interval shorter than one day is refused before that call. The class 
 
 | Metric path | In `Glassnode` | In `REFDATA.APP_METRIC` | In the alt-data page | Seen 2026-10-03 |
 |---|---|---|---|---|
-| `market/price_usd_close` | yes, the only URL | yes, `metric_nm = price` | price client already existed | 200, 14 points, anchors retained |
+| `market/price_usd_close` | yes, when `metric_nm` is `price` | yes, `metric_nm = price` | price client already existed | 200, 14 points, anchors retained |
 | `indicators/sopr` | no | yes, `metric_nm = sopr`, release `1.28.0` | sketch only | 200, `{t, v}`, anchors retained |
 | `market/mvrv` | no | yes, `metric_nm = mvrv`, release `1.28.0` | sketch only | 200, `{t, v}`, values not retained |
-| `addresses/active_count` | no | yes, `metric_nm = active_count`, release `1.28.0` | sketch only | 200, `{t, v}`, values not retained |
-| `transactions/transfers_volume_to_exchanges_sum` | no | yes, `metric_nm = transfers_volume_to_exchanges_sum`, release `1.28.0` | sketch only | 200, `{t, v}`, values not retained |
+| `addresses/active_count` | no | yes, `metric_nm = active_address_count`, release `1.29.0` | sketch only | 200, `{t, v}`, values not retained |
+| `transactions/transfers_volume_to_exchanges_sum` | no | yes, `metric_nm = exchange_inflow_volume`, release `1.29.0` | sketch only | 200, `{t, v}`, values not retained |
 | `mining/hash_rate_mean` | no | yes, `metric_nm = hash_rate_mean`, release `1.28.0` | sketch only | 200, `{t, v}`, values not retained |
 
-`get_onchain_metric` exists only as a sketch in [Alternative data sources](alt-data-sources.md). It is not a method on the class. Adding a row to `APP_METRIC` would not change the URL: the class ignores `METRIC_PATH`.
+`METRIC_NM` is snake_case of `DISPLAY_NAME`. A parenthetical qualifier is a suffix, so "(point-in-time)" is `_pit`. It is not the vendor path. `METRIC_PATH` is that path. `DATA_CATEGORY` is the subject — `PRICE`, `VALUATION`, `NETWORK`, `FLOW` — and a later provider of the same series uses the same subject. Close price stays `metric_nm = price` on every app that has a close.
+
+`get_onchain_metric` exists only as a sketch in [Alternative data sources](alt-data-sources.md). It is not a method on the class. The class requests the `METRIC_PATH` it is given. A backtest still resolves metric name `price`, so another catalog row is not what that run fetches.
 
 `fetch_df` always asks for the metric name `price`. `REFDATA.DATA_COLUMN` offers `price` (column `price`) and `Volume` (column `Volume`). A Glassnode frame has `price` and `factor`. A factor whose `data_column` is `Volume` looks that column up on the frame in `Performance._factor_series_for_sub` and will not find it.
 
@@ -97,22 +99,15 @@ SOPR and MVRV z-score stay a from-July-2025 check only.
 
 The harness locks this rule without restating it; the wording under [Sleeve factors](#sleeve-factors) is the source.
 
-None of these paths is a method on `Glassnode`. Release `refdata/1.28.0` seeds them on `REFDATA.APP_METRIC`. The class ignores `METRIC_PATH`, so the rows do not change a fetch. Wiring them waits on the later store. It is not built here.
+None of these paths is a method on `Glassnode`. Release `refdata/1.28.0` seeds them on `REFDATA.APP_METRIC`. `fetch_df` requests the `METRIC_PATH` of the `metric_nm` it is given. A backtest passes `price`, so these rows are not what that run fetches. The later store is not built here.
 
 ### One request for the window, then local bars
 
 Price already works this way when the cache hits. One refresh is one HTTP call for the whole window (the client does not paginate, and the captured bodies are one JSON list). `refresh_payload` stores that frame. The next run with refresh off slices it. The indicator walks the column in memory. There is no HTTP call per bar on this path.
 
-An on-chain series would be the same shape, once it is wired:
+An on-chain series is the same shape. `fetch_df` already takes `metric_nm` and passes that row's `METRIC_PATH` to `get_historical_price`, and the cache key is that row's `APP_METRIC_ID`. A backtest passes `price`. The points still go through `refresh_payload` as one JSON document. A place to put `{t, v}` that is not that document is not built here.
 
-1. The cache key already has `APP_METRIC_ID`. `fetch_df` would pass the metric the factor asked for, instead of the literal `"price"`.
-2. One GET of `/v1/metrics/{path}` for that asset, interval, and window.
-3. Store the points.
-4. Align them onto the price index the way `_factor_series_for_sub` already reindexes a column.
-
-That is one request per metric per refresh, then local math. It is not a request per bar. The missing piece is the metric dimension on the fetch, and a place to put `{t, v}` that is not a full-history JSON blob. Neither is built here.
-
-The [alt-data page](alt-data-sources.md) deferred the five on-chain paths because Professional was $799/mo. That reason is stale. The plan has been active since 28 Sep 2026 18:00 HKT, and those five paths plus close price answered on 3 Oct 2026. The class still only requests close price. `REFDATA.APP_METRIC` seeds the series in release `refdata/1.28.0` (context `refdata,prod-deploy`). Cost is no longer what blocks a strategy from reading SOPR. The fetch and the store are.
+The [alt-data page](alt-data-sources.md) deferred the five on-chain paths because Professional was $799/mo. That reason is stale. The plan has been active since 28 Sep 2026 18:00 HKT, and those five paths plus close price answered on 3 Oct 2026. A backtest still requests close price. `REFDATA.APP_METRIC` seeds the series in release `refdata/1.28.0` (context `refdata,prod-deploy`). `fetch_df(..., metric_nm=...)` is the call that requests another row's path. Cost is no longer what blocks a strategy from reading SOPR. The fetch and the store are.
 
 ## API_REQUEST, as it is
 
@@ -281,5 +276,5 @@ Related, and also not decided here: the call counter that would enforce 160,000/
 
 - No new HTTP calls, no new `API_REQUEST` writes, no migration, no purge SQL.
 - No metric table, no changeset, and no purge SQL. The later store is a later pull request.
-- No edit to `Glassnode.get_historical_price`.
+- `get_historical_price` takes the catalog path. A backtest still requests close price. The narrower store and the purge are not built.
 - No API key. Tracked files have a placeholder in `.env.example` (`your_key_here`). No live key was found in tracked files.

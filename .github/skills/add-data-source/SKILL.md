@@ -25,11 +25,10 @@ class <SourceName>:
     """
 
     def __init__(self) -> None:
-        load_dotenv()
-        # Validate required env vars (skip if no API key needed)
+        # load_config() already loaded SSM or .env. Read the variable.
         self.__api_key = os.getenv('<SOURCE>_API_KEY')
         if not self.__api_key:
-            raise ValueError("<SOURCE>_API_KEY must be set in .env")
+            raise ValueError("<SOURCE>_API_KEY is not set")
 
     @lru_cache(maxsize=32)
     def get_historical_price(self, symbol, start_date, end_date):
@@ -94,7 +93,6 @@ class Test<SourceName>:
 
     def test_init_raises_without_api_key(self, monkeypatch):
         """Verify ValueError when env var missing. Skip if no key needed."""
-        monkeypatch.setattr("data.load_dotenv", lambda *a, **kw: None)
         monkeypatch.delenv("<SOURCE>_API_KEY", raising=False)
 
     @patch("<mock target>")
@@ -104,7 +102,7 @@ class Test<SourceName>:
 
 **Test rules:**
 - Mock all network calls — never hit real APIs in unit tests
-- Mock `load_dotenv` + use `monkeypatch.delenv()` for "missing key" tests (not `clear=True`)
+- Use `monkeypatch.delenv()` for "missing key" tests (not `clear=True`). Do not call `load_dotenv` in the class.
 - Clear `@lru_cache` with `.cache_clear()` in each test
 - Mock responses must mirror real API structure — cite source docs in a comment
 
@@ -212,7 +210,7 @@ UI request \u2014\u2192 BacktestCache.read_payload | refresh_payload(fetcher=...
 
 A new data-source class therefore needs:
 
-1. **Constructor** — load the API key from `.env`, validate, hold any session/client.
+1. **Constructor** — read the API key from the environment `load_config()` already filled, validate, hold any session/client.
 2. **`get_historical_price(symbol, start_date, end_date)`** — fetch directly from the provider, normalise to a DataFrame with at least columns `t` (date) and `v` (price). No DB calls.
 3. **Optional rate-limit guard** — for paid/rate-limited providers, call `BT.SP_GET_API_LIMIT_CHK(APP_ID)` at the top of `get_historical_price` and raise `RateLimitError` if `OUT_ALLOWED='N'`. This is independent of the cache — it protects the provider quota even when *Refresh dataset* is ticked.
 
@@ -222,10 +220,9 @@ class PaidSourceExample:
     APP_ID = 4  # nasdaq_data_link \u2014 must match REFDATA.APP seed
 
     def __init__(self) -> None:
-        load_dotenv()
         self._api_key = os.getenv("NDL_API_KEY")
         if not self._api_key:
-            raise ValueError("NDL_API_KEY must be set in .env")
+            raise ValueError("NDL_API_KEY is not set")
         # Optional: hold a DB conninfo only if you implement the rate-limit guard.
 
     def get_historical_price(self, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:

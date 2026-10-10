@@ -114,15 +114,29 @@ class RedisRefData:
                 return int(r["app_id"])
         return None
 
-    def resolve_app_metric_id(self, app_id: int, metric_nm: str = "price") -> int | None:
+    def _app_metric_row(self, app_id: int, metric_nm: str) -> dict | None:
         try:
             rows = self.get("app_metric")
         except ValueError:
             return None
         for r in rows:
             if int(r["app_id"]) == int(app_id) and r["metric_nm"] == metric_nm:
-                return int(r["app_metric_id"])
+                return r
         return None
+
+    def resolve_app_metric_id(self, app_id: int, metric_nm: str = "price") -> int | None:
+        row = self._app_metric_row(app_id, metric_nm)
+        if row is None:
+            return None
+        return int(row["app_metric_id"])
+
+    def resolve_metric_path(self, app_id: int, metric_nm: str = "price") -> str | None:
+        """``REFDATA.APP_METRIC.METRIC_PATH`` for one provider metric."""
+        row = self._app_metric_row(app_id, metric_nm)
+        if row is None:
+            return None
+        path = row.get("metric_path")
+        return str(path) if path else None
 
     def get_promotion_metrics(self) -> list[dict]:
         """Return PROMOTION_METRIC rows sorted by priority.
