@@ -531,6 +531,7 @@ CREATE TABLE TRADE.TRANSACTION (
     PRICE               NUMERIC,
     NOTIONAL_AMT        NUMERIC,
     FEE_AMT             NUMERIC,
+    FEE_CCY_CD          TEXT,                  -- coin FEE_AMT was charged in
     VENDOR_ORDER_ID     TEXT,
     USER_ID             TEXT NOT NULL,
     CREATED_AT          TIMESTAMPTZ NOT NULL

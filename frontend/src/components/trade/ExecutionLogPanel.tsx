@@ -156,6 +156,12 @@ const FILL_COLUMNS: GridColDef<TransactionRow>[] = [
     valueFormatter: (value) => formatNum(value as string | null, 4),
   },
   {
+    field: 'fee_ccy_cd',
+    headerName: 'Fee ccy',
+    width: 90,
+    valueFormatter: (value) => (value ? String(value) : '—'),
+  },
+  {
     field: 'vendor_order_id',
     headerName: 'Order ID',
     flex: 1,

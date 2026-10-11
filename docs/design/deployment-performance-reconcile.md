@@ -253,7 +253,7 @@ Managed bars on either side of a pause are joined into one series. That is corre
 | Gap | Where | Fix |
 |---|---|---|
 | Snapshot tables not built | `TRADE.INTENT` records each strategy's target (trade `1.10.0`) | `DEPLOYMENT_PERFORMANCE` and `ACCOUNT_PERFORMANCE` in this page are still proposed |
-| Fee currency is dropped | `_extract_fee` in `quant/trade/brokers/ccxt/confirm.py` keeps `fee.cost` and discards `fee.currency`. Bybit spot charges a buy fee in the base coin and a sell fee in the quote, so `FEE_AMT` mixes units. | Record the fee currency on `TRADE.TRANSACTION` and convert base fees at the fill price |
+| Base-coin fees are stored, not yet converted | `FEE_CCY_CD` is written with the fill from trade `1.11.0` (context `trade,prod-deploy`). `FEE_AMT` stays the raw cost. Rows already in `TRADE.TRANSACTION` have a null fee currency | Convert a base-coin fee at the fill price when the bar is priced. A missing currency, or any coin other than the quote or the base, leaves that bar's fee term null when the cost is non-zero |
 | Reads have no time filter | `SP_GET_TRANSACTION` and `SP_GET_EXECUTION_EVENT` return the newest `IN_LIMIT` rows | Add a from-timestamp parameter to those two procedures |
 | Spot holdings missing from the snapshot positions | `fetch_open_positions` lists contracts; a spot holding appears only as a balance, with no mark or notional | Add spot holdings as position rows, read from the base balance the way `fetch_position_qty` already does for spot |
 | Fill ↔ attempt link | `TRANSACTION` joins to `EXECUTION_EVENT` only by `VENDOR_ORDER_ID` | Sufficient for ccxt; confirm Futu fills carry the same id |

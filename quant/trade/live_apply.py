@@ -239,6 +239,7 @@ class LiveApplyOrchestrator:
             filled_qty=result.filled_qty if result else None,
             avg_price=result.avg_price if result else None,
             fee=result.fee if result else None,
+            fee_ccy=result.fee_ccy if result else None,
             message=result.message if result else outcome.no_order_message,
             reject_reason=result.reason if result else None,
         )
@@ -311,6 +312,7 @@ class LiveApplyOrchestrator:
                 price=result.avg_price,
                 notional_amt=notional,
                 fee_amt=result.fee,
+                fee_ccy_cd=result.fee_ccy,
                 vendor_order_id=result.vendor_order_id,
             )
         except Exception:

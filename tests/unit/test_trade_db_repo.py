@@ -449,3 +449,23 @@ class TestCallMatchesProcedureDdl:
         repo.sp_get_transaction(app_user_id=uuid4(), deployment_id=uuid4(), limit=10)
         sql = mock_get.call_args.args[0]
         assert _call_arg_count(sql) == _ddl_param_count("SP_GET_TRANSACTION.sql")
+
+    @patch.object(TradeRepo, "validate_transaction")
+    @patch.object(TradeRepo, "_call_write")
+    def test_ins_transaction_records_fee_currency(self, mock_write, _validate, repo):
+        repo.sp_ins_transaction(
+            transaction_id=uuid4(),
+            app_user_id=uuid4(),
+            deployment_id=uuid4(),
+            app_id=10,
+            internal_cusip="btcusdt.crypto",
+            buy_sell_cd="BUY",
+            trans_ccy_cd="USDT",
+            user_id="alice",
+            fee_amt=Decimal("0.001"),
+            fee_ccy_cd="BTC",
+        )
+        sql = mock_write.call_args.args[0]
+        params = mock_write.call_args.args[1]
+        assert _call_arg_count(sql) == _ddl_param_count("SP_INS_TRANSACTION.sql")
+        assert params[params.index(Decimal("0.001")) + 1] == "BTC"

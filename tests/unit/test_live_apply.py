@@ -212,6 +212,7 @@ class TestLiveApplyOrchestrator:
                     filled_qty=0.01,
                     avg_price=64000.0,
                     fee=0.256,
+                    fee_ccy="USDT",
                 )
             ),
         )
@@ -225,6 +226,9 @@ class TestLiveApplyOrchestrator:
         orch._repo.sp_ins_transaction.assert_called_once()
         tx_kwargs = orch._repo.sp_ins_transaction.call_args.kwargs
         assert tx_kwargs["trans_ccy_cd"] == "USDT"
+        assert tx_kwargs["fee_amt"] == 0.256
+        assert tx_kwargs["fee_ccy_cd"] == "USDT"
+        assert report.fee_ccy == "USDT"
         orch._notifier.send.assert_not_called()
 
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))

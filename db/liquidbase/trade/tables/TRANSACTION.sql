@@ -1,8 +1,11 @@
 -- TRADE.TRANSACTION — append-only broker-confirmed fills per deployment.
 --
 -- Structured trade economics (qty, price, fees). Order submit errors and
--- pre-fill events live in TRADE.EXECUTION_EVENT. UI reconcile (Phase 2.x)
--- reads from here.
+-- pre-fill events live in TRADE.EXECUTION_EVENT.
+--
+-- FEE_AMT is the raw broker cost. FEE_CCY_CD is the coin that cost was
+-- charged in. TRANS_CCY_CD is the product quote, not the fee coin. A row
+-- written before FEE_CCY_CD existed has a null fee currency.
 CREATE TABLE TRADE.TRANSACTION (
     TRANSACTION_ID      UUID NOT NULL,
     DEPLOYMENT_ID       UUID NOT NULL,
@@ -17,6 +20,7 @@ CREATE TABLE TRADE.TRANSACTION (
     PRICE               NUMERIC,
     NOTIONAL_AMT        NUMERIC,
     FEE_AMT             NUMERIC,
+    FEE_CCY_CD          TEXT,
     VENDOR_ORDER_ID     TEXT,
     USER_ID             TEXT NOT NULL,
     CREATED_AT          TIMESTAMPTZ NOT NULL,

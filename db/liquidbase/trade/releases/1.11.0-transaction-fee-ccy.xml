@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      FEE_CCY_CD on TRADE.TRANSACTION.
+
+      FEE_AMT stays the raw broker cost. FEE_CCY_CD is the coin that cost
+      was charged in, so a later bar price can convert a base-coin fee at
+      the fill price. Context includes prod-deploy, so a push to main
+      queues this release for the production migrate.
+
+      CREATE OR REPLACE with a longer SP_INS_TRANSACTION argument list adds
+      an overload and leaves the old signature in place. The drop changeset
+      removes that old signature after the new body exists.
+    -->
+
+    <changeSet id="1.11.0-001-transaction-fee-ccy" author="alfcheun" context="trade,prod-deploy">
+        <comment>FEE_CCY_CD on TRADE.TRANSACTION — coin the raw FEE_AMT was charged in</comment>
+        <sql splitStatements="true" stripComments="true">
+            ALTER TABLE TRADE.TRANSACTION ADD COLUMN IF NOT EXISTS FEE_CCY_CD TEXT;
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE TRADE.TRANSACTION DROP COLUMN IF EXISTS FEE_CCY_CD;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.11.0-002-sp-ins-transaction-fee-ccy" author="alfcheun" context="trade,prod-deploy">
+        <comment>SP_INS_TRANSACTION — persist IN_FEE_CCY_CD</comment>
+        <sqlFile path="../procedures/SP_INS_TRANSACTION.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.11.0-003-drop-sp-ins-transaction-overload" author="alfcheun" context="trade,prod-deploy">
+        <comment>Drop the pre-FEE_CCY_CD SP_INS_TRANSACTION overload</comment>
+        <sql splitStatements="true" stripComments="true">
+            DROP PROCEDURE IF EXISTS TRADE.SP_INS_TRANSACTION(
+                UUID, UUID, INTEGER, INTEGER, INTEGER, TEXT, TEXT, TEXT, TEXT,
+                NUMERIC, NUMERIC, NUMERIC, NUMERIC, TEXT, TEXT,
+                OUT TEXT, OUT TEXT, OUT TEXT
+            );
+        </sql>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.11.0-004-sp-get-transaction-fee-ccy" author="alfcheun" context="trade,prod-deploy">
+        <comment>SP_GET_TRANSACTION — return FEE_CCY_CD with the fill</comment>
+        <sqlFile path="../procedures/SP_GET_TRANSACTION.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

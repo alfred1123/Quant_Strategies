@@ -166,7 +166,7 @@ PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, 
 | `DEPLOYMENT_SCHEDULE_STATUS` | Per-tick schedule cursor — `NEXT_SCHEDULED_TS` advance after each apply pass |
 | `INTENT` | Append-only target per deployment per apply. `TARGET_QTY` is signed `SIGNAL_VALUE × QTY`. Written before the order. Joins `EXECUTION_EVENT` on `(DEPLOYMENT_ID, TRANSACT_AT)`; one intent can have several attempts. No version column — a changed deployment writes a new intent with the new `DEPLOYMENT_VID`. Side stays on `EXECUTION_EVENT`, because each retry re-reads the book ([netting §5.1](../design/multi-strategy-netting.md#why-buy-and-sell-stay-on-the-execution-row)) |
 | `EXECUTION_EVENT` | Append-only submit / error diary; `TRANSACT_AT` = tick time, `CREATED_AT` = audit insert, `POSITION_QTY` = signed broker position the attempt decided against |
-| `TRANSACTION` | Append-only broker-confirmed fills |
+| `TRANSACTION` | Append-only broker-confirmed fills. `FEE_AMT` is the raw cost; `FEE_CCY_CD` is the coin that cost was charged in (`1.11.0`). `TRANS_CCY_CD` stays the product quote |
 
 | Procedure | Purpose |
 |-----------|---------|
@@ -181,8 +181,8 @@ PK: `(API_CREDENTIAL_ID, API_CREDENTIAL_VID)`. Multiple rows per `(APP_USER_ID, 
 | `SP_GET_INTENT` | Read intents (owner-scoped, optional deployment and time range, REFCURSOR) |
 | `SP_INS_EXECUTION_EVENT` | Append execution event, incl. the position it decided against — see [Recording the position an apply saw](#recording-the-position-an-apply-saw) |
 | `SP_GET_EXECUTION_EVENT` | Read execution diary (owner-scoped, REFCURSOR) |
-| `SP_INS_TRANSACTION` | Append fill row |
-| `SP_GET_TRANSACTION` | Read fill history (owner-scoped, REFCURSOR) |
+| `SP_INS_TRANSACTION` | Append fill row, including `FEE_CCY_CD` |
+| `SP_GET_TRANSACTION` | Read fill history (owner-scoped, REFCURSOR), including `FEE_CCY_CD` |
 
 Validation: Python `TradeRepo` before SP calls. See [Plan to Profit §1.2](../design/plan-to-profit.md#phase-12-trade-schema-apply-api).
 
@@ -374,8 +374,8 @@ The worker claims in `WorkerLoopRepo.claim_next` (`quant/queue/worker_loop.py`):
 | `SP_GET_INTENT` | `TRADE` | Owner-scoped read. Optional `IN_DEPLOYMENT_ID`, `IN_FROM_TS`, `IN_TO_TS`. Newest tick first |
 | `SP_INS_EXECUTION_EVENT` | `TRADE` | Append event; diary only, no scheduler side effects. `IN_POSITION_QTY` since `1.7.0` — see [Recording the position an apply saw](#recording-the-position-an-apply-saw) |
 | `SP_GET_EXECUTION_EVENT` | `TRADE` | Read execution diary (owner-scoped, REFCURSOR) |
-| `SP_INS_TRANSACTION` | `TRADE` | Append fill row |
-| `SP_GET_TRANSACTION` | `TRADE` | Read fill history (owner-scoped, REFCURSOR) |
+| `SP_INS_TRANSACTION` | `TRADE` | Append fill row. `IN_FEE_CCY_CD` since `1.11.0`; the release drops the previous signature |
+| `SP_GET_TRANSACTION` | `TRADE` | Read fill history (owner-scoped, REFCURSOR). Includes `FEE_CCY_CD` |
 | `SP_INS_PRICE_BAR` | `MARKET_DATA` | Insert one OHLCV bar (one row per call). **Writes no audit row** — a 10,000-bar backfill pass logged 10,000 of them |
 | `SP_GET_PRICE_BAR` | `MARKET_DATA` | Range read by `(INTERNAL_CUSIP, TM_INTERVAL_ID, SOURCE_APP_ID, start, end)` |
 | `SP_GET_PRICE_BAR_COVERAGE` | `MARKET_DATA` | `MIN`/`MAX` timestamps via index `LIMIT 1` probes |

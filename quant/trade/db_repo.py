@@ -582,6 +582,7 @@ class TradeRepo(DbGateway):
         price: float | Decimal | None = None,
         notional_amt: float | Decimal | None = None,
         fee_amt: float | Decimal | None = None,
+        fee_ccy_cd: str | None = None,
         vendor_order_id: str | None = None,
     ) -> None:
         self.validate_transaction(
@@ -597,7 +598,8 @@ class TradeRepo(DbGateway):
             "CALL trade.sp_ins_transaction("
             "%s::uuid, %s::uuid, %s::integer, %s::integer, %s::integer,"
             " %s::text, %s::text, %s::text, %s::text,"
-            " %s::numeric, %s::numeric, %s::numeric, %s::numeric, %s::text, %s::text,"
+            " %s::numeric, %s::numeric, %s::numeric, %s::numeric,"
+            " %s::text, %s::text, %s::text,"
             " NULL::text, NULL::text, NULL::text)",
             (
                 str(transaction_id),
@@ -613,6 +615,7 @@ class TradeRepo(DbGateway):
                 price,
                 notional_amt,
                 fee_amt,
+                fee_ccy_cd,
                 vendor_order_id,
                 user_id,
             ),
