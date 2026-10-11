@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Close current products that are not btcusdt, ethusdt, or bnbusdt,
+      when nothing trades or stores them. Context includes prod-deploy, so a
+      push to main queues this release for the production migrate.
+    -->
+
+    <changeSet id="1.7.0-001-sp-upd-product-is-current" author="alfcheun" context="inst,prod-deploy">
+        <comment>SP_UPD_PRODUCT_IS_CURRENT — set IS_CURRENT_IND to N and close open xrefs</comment>
+        <sqlFile path="../procedures/SP_UPD_PRODUCT_IS_CURRENT.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+        <rollback>
+            <sql>DROP PROCEDURE IF EXISTS INST.SP_UPD_PRODUCT_IS_CURRENT(TEXT, TEXT, OUT TEXT, OUT TEXT, OUT TEXT);</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.7.0-002-close-unused-products" author="alfcheun" context="inst,prod-deploy">
+        <comment>Close current products that are not the traded crypto pairs</comment>
+        <sqlFile path="../data/CLOSE_UNUSED_PRODUCTS.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

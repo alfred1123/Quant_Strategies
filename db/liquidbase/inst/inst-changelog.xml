@@ -28,5 +28,7 @@
     <!-- 1.4.0 applied on prod 2026-09-05 and archived. -->
 
     <include file="releases/1.5.0-product-issue-type.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.6.0-glassnode-btc-xref.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.7.0-close-unused-products.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

@@ -63,6 +63,8 @@ INST.PRODUCT_XREF     app_id=1  (yahoo)   → BTC-USD   (research proxy)
 INST.PRODUCT_XREF     app_id=2  (glassnode) → BTC
 ```
 
+The Glassnode row is release `inst/1.6.0` (`db/liquidbase/inst/data/XREF_GLASSNODE_BTC.sql`). Context is `inst,prod-deploy`. ETH and BNB are not in that seed.
+
 `TRADE.DEPLOYMENT` stores `internal_cusip` + `app_id` (which broker). Live apply resolves xref for that pair, fetches bars from that venue, and places orders there. A deployment moved from Bybit to Binance keeps the same cusip — only `app_id` and xref change.
 
 **Anti-patterns**
@@ -86,7 +88,7 @@ Current operating model:
 
 | Table | Versioned? | Rationale |
 |---|---|---|
-| `PRODUCT` | **Yes** — `PRODUCT_VID` + `IS_CURRENT_IND` | Product attributes (CCY, description, asset type, `ISSUE_TYPE`) can change. `ISSUE_TYPE` is free text, nullable; release `inst/1.5.0` adds it and stamps the current rows |
+| `PRODUCT` | **Yes** — `PRODUCT_VID` + `IS_CURRENT_IND` | Product attributes (CCY, description, asset type, `ISSUE_TYPE`) can change. `ISSUE_TYPE` is free text, nullable; release `inst/1.5.0` adds it and stamps the current rows. `SP_UPD_PRODUCT_IS_CURRENT` sets `IS_CURRENT_IND` to `N` and closes the open xrefs, with no successor row, so the picker stops listing it. Release `inst/1.7.0` does that for every current product other than `btcusdt.crypto`, `ethusdt.crypto`, and `bnbusdt.crypto` that has no deployment, captured bars, subscription, group membership, or current strategy. Context is `inst,prod-deploy` |
 | `PRODUCT_XREF` | **Yes** — `PRODUCT_XREF_VID` + `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` | Vendor symbols can change; current row is the open-ended transaction-time record |
 | `PRODUCT_GRP` | **No** — uses `UPDATED_AT` | Hierarchy versioning is impractical; rare admin-only edits |
 | `PRODUCT_GRP_MEMBER` | **No** — add/remove only | Junction table; `CREATED_AT` audit is sufficient |

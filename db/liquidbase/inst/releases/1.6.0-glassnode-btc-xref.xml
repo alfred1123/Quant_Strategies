@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      One Glassnode PRODUCT_XREF so the 06:15 UTC fill has a product.
+      Context includes prod-deploy, so a push to main queues this release
+      for the production migrate.
+    -->
+
+    <changeSet id="1.6.0-001-glassnode-btc-xref" author="alfcheun" context="inst,prod-deploy">
+        <comment>Glassnode xref: btcusdt.crypto → BTC (decision #21)</comment>
+        <sqlFile path="../data/XREF_GLASSNODE_BTC.sql" relativeToChangelogFile="true"
+                 splitStatements="false" stripComments="false"/>
+        <rollback>
+            <sql>
+                UPDATE INST.PRODUCT_XREF
+                   SET TRANSACT_TO_TS = NOW()
+                 WHERE APP_ID = (SELECT APP_ID FROM REFDATA.APP WHERE NAME = 'glassnode')
+                   AND PRODUCT_ID = (
+                        SELECT PRODUCT_ID FROM INST.PRODUCT
+                         WHERE INTERNAL_CUSIP = 'btcusdt.crypto'
+                           AND IS_CURRENT_IND = 'Y'
+                   )
+                   AND VENDOR_SYMBOL = 'BTC'
+                   AND TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00';
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
