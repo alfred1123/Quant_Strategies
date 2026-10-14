@@ -147,4 +147,8 @@ export interface CreatedInstrument {
   vendor_symbol: string;
   product_xref_id: number;
   product_xref_vid: number;
+  /** Glassnode asset written from the venue base, when the asset list confirms it. */
+  glassnode_vendor_symbol?: string | null;
+  /** Why no Glassnode xref was written. Absent when the listing is not a ccxt pair. */
+  glassnode_skip_reason?: string | null;
 }
