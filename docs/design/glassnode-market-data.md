@@ -52,9 +52,45 @@ The real 2026-10-03 bodies stay outside the repo so a later fetch of the same wi
 
 A provider interval shorter than one day is refused before that call. The class will forward `i=1h` if something calls it directly (the unit test does). The backtest path will not.
 
-A Glassnode backtest reads `BT.API_REQUEST` through `BacktestCache.read_payload` and does not call Glassnode. `REFDATA.APP.REFRESH_DATASET_IND` says whether the Refresh dataset checkbox may call that source. Release `refdata/1.30.0` sets Glassnode and Bybit to `N` and every other app to `Y`. The drawer disables the checkbox when the traded app is `N`. A request that still sends `refresh_dataset` true does not refresh an `N` source. The daily job `fill_scheduled_providers` does: every non-exchange app whose flag is `N`, every catalog metric that has a `METRIC_PATH`, and every product with a vendor symbol for that app. It calls `fetch_df` with refresh on from the schedule's `since` (`2010-01-01`) through today, which replaces that window. It runs at 06:15 UTC. The daily point is stamped 00:00 UTC, and that stamp is not the publish time. Context is `refdata,prod-deploy`. The payload-table comment says the app fetches a delta and merges. The Python replaces the whole range when a provider refresh does run. `SP_GET_API_REQUEST` returns the current row (`TRANSACT_TO_TS = 9999-12-31`) inner-joined to its payload. Closed versions are not what the next backtest reads.
+A Glassnode backtest reads `BT.API_REQUEST` through `BacktestCache.read_payload` and does not call Glassnode. `REFDATA.APP.REFRESH_DATASET_IND` says whether the Refresh dataset checkbox may call that source. Release `refdata/1.30.0` sets Glassnode and Bybit to `N` and every other app to `Y`. The drawer disables the checkbox when the traded app is `N`. A request that still sends `refresh_dataset` true does not refresh an `N` source. The daily job `fill_scheduled_providers` does: every non-exchange app whose flag is `N`, every catalog metric that has a `METRIC_PATH`, and every product with a vendor symbol for that app. It calls `fetch_df` with refresh on from the schedule's `since` (`2010-01-01`) through today, which replaces that window. It runs at 06:15 UTC. The daily point is stamped 00:00 UTC, and that stamp is not the publish time. The pull clock is [When to fetch](#when-to-fetch). Context is `refdata,prod-deploy`. The payload-table comment says the app fetches a delta and merges. The Python replaces the whole range when a provider refresh does run. `SP_GET_API_REQUEST` returns the current row (`TRANSACT_TO_TS = 9999-12-31`) inner-joined to its payload. Closed versions are not what the next backtest reads.
 
 The job skips an app that has no current `INST.PRODUCT_XREF` row, so Provider series stays on whatever a normal cache write already stored (Yahoo Close) until Glassnode has one. Add instrument cannot write that row: the dialog lists exchange apps only (`IS_EXCHANGE_IND = Y`). Release `inst/1.6.0` seeds the current `btcusdt.crypto` product to vendor symbol `BTC` (decision #21). Context is `inst,prod-deploy`. ETH and BNB are not seeded: BNB is not a valid asset on the netflow metric, and ETH does not cover the 2021 to mid-2024 window.
+
+## When to fetch
+
+The daily point is stamped `00:00 UTC`. That stamp is the start of the interval, through `23:59 UTC` the same calendar day. It is not the time Glassnode publishes the point ([Timestamps and resolutions](https://docs.glassnode.com/data/timestamps-and-resolutions)).
+
+Daily metric updaters run at a full hour between `00:00 UTC` and `03:00 UTC`. Computation usually takes 1 to 10 minutes. Entity-related BTC metrics that exist only at `1d` can take up to an hour ([New data availability](https://docs.glassnode.com/data/data-availability)). The same page's general line, that a new point is often up within 10 minutes of the interval end, is the rule they state before the Bitcoin case. Bitcoin is the longer lag below, so the operator window follows that table.
+
+Bitcoin availability in that note is a combined lag from the end of the interval until the point can be requested. The published model assumes one confirming block and an average updater runtime of 5 minutes:
+
+| Published figure | Lag |
+|---|---|
+| Mean | 25:00 min |
+| 25th percentile | 14:30 min |
+| Median | 22:10 min |
+| 75th percentile | 32:30 min |
+| 90th percentile | 44:10 min |
+| 95th percentile | 53:10 min |
+| 99th percentile | 1:12 h |
+
+Those rows are Glassnode's published model. This repo did not measure them. For a daily interval that ended at `00:00 UTC`, the mean is about `00:25 UTC` and the 99th percentile is about `01:12 UTC`.
+
+The operator pull for the prior UTC day is **01:00–02:00 UTC** (**09:00–10:00 HKT**). That sits past the published mean and covers the published 99th percentile (about `01:12 UTC`). The window opens at the one-hour bound Glassnode gives for entity-related BTC metrics that exist only at `1d`, and it runs through `02:00 UTC`. A pull at `00:00 UTC` meets the updater trigger, before that lag has elapsed.
+
+The latest point can still move after it first appears. For a Bitcoin `1d` metric, Glassnode triggers the updater at `00:00 UTC` and runs it again one hour later, and that later pass can change the last value once a missing block is confirmed. More than half of datapoints settle within the first 20 minutes. The same note recommends waiting two hours after the initial release before treating the latest point as fully converged ([Datapoint finalization](https://docs.glassnode.com/data/data-finalization)). `01:00–02:00 UTC` is the window in which the prior day has usually been published. Counted from a first release at the published mean (about `00:25 UTC`), their two-hour wait lands at about `02:25 UTC`. That `02:25` is arithmetic on those two published numbers, not a third Glassnode statistic.
+
+Price is a different published clock on that same page. The preceding day's `1d` price series is expected complete at `00:00 UTC` the next day. The nightly gap backfill that finishes by `04:00 UTC` is the `10m` and `1h` pass. The 25-minute mean and the 1:12 99th percentile are the Bitcoin on-chain model, not that price backfill. The operator window above is still after the `1d` price completeness time.
+
+`fill_scheduled_providers` is later than this minimum. The file `config/scheduler/fill_scheduled_providers.yml` is `cron(15 6 * * ? *)`, **06:15 UTC** (14:15 HKT). The job fills non-exchange apps with `REFRESH_DATASET_IND = N`. Release `refdata/1.30.0` sets Glassnode to `N`. The current schedule is later than the `01:00–02:00 UTC` window. That is the schedule, not a defect this page is fixing. The cron stays at 06:15 UTC.
+
+A one-hour integrity poll on 2026-10-11 (local snapshots, seven BTC series, 13 pulls and 91 calls, all HTTP 200, no rewrite versus the first pull) found no quiet rewrite in that short window, and that check is not long-term reliability proof.
+
+### Point-in-time and the day-boundary clock
+
+A backtest where look-ahead matters should read the Glassnode point-in-time series (`*_pit`). The restated series can change after the fact. Glassnode's note for systematic use and historical backtests is the point-in-time series ([Point-in-time metrics](https://docs.glassnode.com/data/point-in-time-metrics)). Which path covers 2021 to mid-2024 is already in [Sleeve factors](#sleeve-factors). This page does not wire the netflow 0/1 child.
+
+The apply clock fires before that day's metric exists. Crypto daily apply runs five minutes before the bar close, at `23:55 UTC` ([decision #81](../decisions.md), [When we apply today](ccxt-bar-timezones.md#when-we-apply-today-platform-schedule)). The Glassnode day stamped `00:00 UTC` that morning covers through `23:59 UTC` and is published after the following midnight, on the lag above. At `23:55 UTC` that day's metric is not available. The platform backtest fills a signal on the same close ([A signal is filled on the same close](2026-09-27-bug-verification-round3-4.md#4-a-signal-is-filled-on-the-same-close)). When the lag is in the way, trade one day later, after the metric is available. This page does not move the apply clock.
 
 ## What a strategy can use
 
