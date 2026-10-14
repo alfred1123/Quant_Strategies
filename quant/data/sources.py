@@ -107,6 +107,41 @@ class Glassnode:
         logger.info("Glassnode: fetched %d rows for %s", len(df), symbol)
         return df
 
+    def list_asset_symbols(self) -> list[str]:
+        """Assets Glassnode lists, from ``GET /v1/metadata/assets``.
+
+        The ``symbol`` on each ``data`` row is the asset a metric's ``a``
+        parameter accepts. An empty ``data`` array is an empty catalog. A
+        body without that array is not an empty catalog — a shape change
+        must not be read as "nothing is listed".
+
+        Raises:
+            requests.HTTPError: The asset list could not be read.
+            RuntimeError: The body has no ``data`` array.
+        """
+        api_key = self.__api_key
+        if not api_key:
+            raise ValueError("GLASSNODE_API_KEY is not set")
+        res = requests.get(
+            "https://api.glassnode.com/v1/metadata/assets",
+            headers={"X-Api-Key": api_key},
+            timeout=30,
+        )
+        res.raise_for_status()
+        body = res.json()
+        rows = body.get("data") if isinstance(body, dict) else None
+        if rows is None or not isinstance(rows, list):
+            raise RuntimeError("Glassnode asset list has no data array")
+        symbols: list[str] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            symbol = row.get("symbol")
+            if isinstance(symbol, str) and symbol.strip():
+                symbols.append(symbol.strip())
+        logger.info("Glassnode: asset list has %d symbol(s)", len(symbols))
+        return symbols
+
 
 class AlphaVantage:
     """Retrieve equity and crypto price data from Alpha Vantage."""

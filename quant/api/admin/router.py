@@ -18,6 +18,8 @@ from quant.api.admin.schemas import (
 )
 from quant.api.auth.dependencies import require_user_or_service
 from quant.api.deps import get_data_caches
+from quant.api.glassnode_xrefs import apply_listing_glassnode_xrefs
+from quant.data.glassnode_xref import glassnode_xref_report
 from quant.data.provider_fill import fill_scheduled_providers
 from quant.refdata.bundle import DataCaches
 
@@ -105,6 +107,31 @@ def fill_providers(
         "since": body.since.isoformat(),
         "errors": report.errors,
     }
+
+
+@router.post("/glassnode/product-xrefs")
+def backfill_glassnode_product_xrefs(
+    request: Request,
+    caller: str = Depends(require_user_or_service),
+    caches: DataCaches = Depends(get_data_caches),
+) -> dict:
+    """Write Glassnode xrefs for exchange-listed products that do not have one.
+
+    One pass over the products already in the cache. A current row for that
+    product and the Glassnode app is left alone. This is not a schedule:
+    ``fill_scheduled_providers`` stays at 06:15 UTC and fills whatever xrefs
+    exist after this pass.
+    """
+    outcomes = apply_listing_glassnode_xrefs(caches, request.app.state.price_bars)
+    report = glassnode_xref_report(outcomes)
+    logger.info(
+        "glassnode/product-xrefs: mapped=%d already=%d skipped=%d caller=%s",
+        len(report["mapped"]),
+        len(report["already_mapped"]),
+        len(report["skipped"]),
+        caller,
+    )
+    return report
 
 
 @router.post("/log-proc-summary/summarize")

@@ -63,7 +63,7 @@ INST.PRODUCT_XREF     app_id=1  (yahoo)   → BTC-USD   (research proxy)
 INST.PRODUCT_XREF     app_id=2  (glassnode) → BTC
 ```
 
-The Glassnode row is release `inst/1.6.0` (`db/liquidbase/inst/data/XREF_GLASSNODE_BTC.sql`). Context is `inst,prod-deploy`. ETH and BNB are not in that seed.
+The Glassnode row for `btcusdt.crypto` is release `inst/1.6.0` (`db/liquidbase/inst/data/XREF_GLASSNODE_BTC.sql`). Context is `inst,prod-deploy`. ETH and BNB are not in that seed. A ccxt listing writes further Glassnode rows from the venue market base after the asset list confirms it (decision #99). The seed is left in place; the pass does not version a row that is already current.
 
 `TRADE.DEPLOYMENT` stores `internal_cusip` + `app_id` (which broker). Live apply resolves xref for that pair, fetches bars from that venue, and places orders there. A deployment moved from Bybit to Binance keeps the same cusip — only `app_id` and xref change.
 
