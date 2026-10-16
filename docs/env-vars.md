@@ -14,6 +14,7 @@ The variables below cover the core runtime set. See `.env.example` for the full 
 |---|---|---|
 | `ALPHAVANTAGE_API_KEY` | Optional | Free key from [alphavantage.co](https://www.alphavantage.co/support/#api-key). Limited to 25 req/day. |
 | `GLASSNODE_API_KEY` | Optional | On-chain crypto metrics. Only if you use the Glassnode data source. `load_config()` loads it from `.env`, or from SSM `/quant/<env>/GLASSNODE_API_KEY` when `USE_SSM=1`. |
+| `GLASSNODE_ASSET_LIST_TIMEOUT_S` | Optional | Seconds for `GET /v1/metadata/assets` on the Glassnode xref pass. Default `2`. Process tuning: create will not wait longer than this on a cold asset list or a cold venue market table. A blank value uses the default. A non-positive value is refused. Not a secret. |
 | `NASDAQ_DATA_LINK_API_KEY` | Optional | Free key from [data.nasdaq.com](https://data.nasdaq.com/account/profile). |
 | `FUTU_HOST` / `FUTU_PORT` | Optional | Only if using Futu OpenD gateway for HK/US equities. Default `127.0.0.1:11111`. |
 

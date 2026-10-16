@@ -123,8 +123,11 @@ def create_product(
 
     When the new listing is on a ccxt venue, the venue's base is checked
     against Glassnode's asset list and, if listed, written as a second xref.
-    That second write is not part of the instrument: a failure there is a
-    skip reason on this 201, not an error status.
+    That check uses the cached asset list and venue markets already loaded
+    in this process. A miss runs on a background thread. This request waits
+    at most ``GLASSNODE_ASSET_LIST_TIMEOUT_S`` and still returns 201. That
+    second write is not part of the instrument: a failure there is a skip
+    reason on this 201, not an error status.
     """
     created = caches.instrument_cache.create_instrument(
         internal_cusip=req.internal_cusip,

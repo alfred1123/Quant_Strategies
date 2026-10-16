@@ -60,6 +60,9 @@ class FakeFetcher:
         self.earliest_calls.append({"vendor_symbol": vendor_symbol, "period": period})
         return self.bars[0].bar_timestamp if self.bars else None
 
+    def cached_venue_symbols(self):
+        return None
+
 
 def build_service(*, stored_bars=(), coverage_max=None, coverage_min=None, exchange_bars=()):
     repo = MagicMock()
@@ -74,6 +77,13 @@ def build_service(*, stored_bars=(), coverage_max=None, coverage_min=None, excha
     fetcher = FakeFetcher(list(exchange_bars))
     service = PriceBarService(repo, FakeRefData(), instruments, fetcher)
     return service, repo, fetcher
+
+
+def test_cached_venue_symbols_delegates_and_does_not_fetch():
+    service, _repo, fetcher = build_service()
+
+    assert service.cached_venue_symbols() is None
+    assert fetcher.calls == []
 
 
 def _ensure(service, lookback=3):

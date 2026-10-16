@@ -102,6 +102,13 @@ async def lifespan(app: FastAPI):
 
         app.state.price_bars = PriceBarServiceFactory(DB_CONNINFO, caches)
 
+        from quant.api.glassnode_xrefs import warm_glassnode_asset_cache
+
+        # A catalog fetch must not delay boot. The thread is not joined;
+        # create reads whatever the cache holds and does not wait past the
+        # asset-list timeout.
+        warm_glassnode_asset_cache()
+
         from quant.api.routers.deployments import build_trade_service
         from quant.queue.repo import BtQueueRepo
         from quant.trade.db_repo import TradeRepo

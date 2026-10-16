@@ -11,6 +11,9 @@ stays unmapped. Being listed is not a promise that every metric accepts the
 asset; a metric that rejects it still fails at fetch time.
 
 The write is ``InstrumentCache.sp_ins_product_xref`` (``INST.SP_INS_PRODUCT_XREF``).
+
+This module does not construct a Glassnode client and does not call a venue.
+The caller passes the asset catalog and the markets it already holds.
 """
 
 from __future__ import annotations
@@ -20,7 +23,6 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 
 from quant.data.instruments import InstrumentCache
-from quant.data.sources import Glassnode
 from quant.market_data.fetcher import VenueMarket
 from quant.refdata.reader import RedisRefData
 from quant.shared.db import ProcedureError
@@ -87,20 +89,46 @@ def venue_market_base(
     return None
 
 
-def read_glassnode_asset_symbols() -> list[str] | None:
-    """Symbols from the Glassnode asset catalog, or None if it cannot be read.
+def read_glassnode_asset_symbols(
+    listed_symbols: Collection[object] | None = None,
+    *,
+    reader: Callable[[], Collection[object] | None] | None = None,
+) -> list[str] | None:
+    """The asset catalog, or None when it could not be read.
 
-    None is not an empty catalog. An empty catalog means nothing is listed,
-    so a base is not on Glassnode. An unread catalog must not be treated as
-    that, and nothing is written until the list has been read. The exchange
-    listing that triggered this pass is already stored; this read must not
-    fail that request. The traceback is logged.
+    ``listed_symbols`` is a catalog the caller already holds, including an
+    empty one. Nothing is fetched, and ``reader`` is not called. When only
+    ``reader`` is set, that callable is what reaches the network — this
+    function does not construct a client. None is not an empty catalog. An
+    empty catalog means nothing is listed, so a base is not on Glassnode. An
+    unread catalog must not be treated as that, and nothing is written until
+    the list has been read. The exchange listing that triggered this pass is
+    already stored; a failed read must not fail that request. The traceback
+    is logged.
     """
+    if listed_symbols is not None:
+        return _symbol_list(listed_symbols)
+    if reader is None:
+        return None
     try:
-        return Glassnode().list_asset_symbols()
+        loaded = reader()
     except Exception:
         logger.exception("Glassnode asset list could not be read")
         return None
+    if loaded is None:
+        return None
+    return _symbol_list(loaded)
+
+
+def _symbol_list(symbols: Collection[object]) -> list[str]:
+    cleaned: list[str] = []
+    for symbol in symbols:
+        if not isinstance(symbol, str):
+            continue
+        text = symbol.strip()
+        if text:
+            cleaned.append(text)
+    return cleaned
 
 
 def load_venue_markets(
@@ -144,6 +172,10 @@ def map_glassnode_xrefs(
 
     ``listed_symbols`` None means the catalog could not be read. No xref is
     written in that case. An empty collection means Glassnode lists nothing.
+
+    The instrument cache is reloaded once, after every write in the pass. A
+    reload that fails is logged. The outcomes still return, because the rows
+    are already committed.
     """
     exchange_ids = {int(app_id) for app_id in exchange_app_ids}
     failed = {int(app_id) for app_id in failed_app_ids}
@@ -153,32 +185,47 @@ def map_glassnode_xrefs(
         products = [row for row in products if int(row["product_id"]) == int(product_id)]
 
     outcomes: list[GlassnodeXrefOutcome] = []
-    for product in products:
-        outcome, wrote = _outcome_for_product(
-            cache,
-            product,
-            glassnode_app_id=glassnode_app_id,
-            exchange_ids=exchange_ids,
-            markets_by_app=markets_by_app,
-            failed=failed,
-            catalog=catalog,
-        )
-        if outcome is None:
-            continue
-        # Reload before the next product. A later failure must not leave this
-        # process serving a cache that does not contain a row already committed.
-        if wrote:
-            cache.refresh()
-        outcomes.append(outcome)
-        logger.info(
-            "glassnode xref product_id=%s cusip=%s wrote=%s symbol=%s reason=%s",
-            outcome.product_id,
-            outcome.internal_cusip,
-            outcome.wrote,
-            outcome.vendor_symbol,
-            outcome.skip_reason,
-        )
-    return outcomes
+    wrote_any = False
+    try:
+        for product in products:
+            outcome, wrote = _outcome_for_product(
+                cache,
+                product,
+                glassnode_app_id=glassnode_app_id,
+                exchange_ids=exchange_ids,
+                markets_by_app=markets_by_app,
+                failed=failed,
+                catalog=catalog,
+            )
+            if outcome is None:
+                continue
+            if wrote:
+                wrote_any = True
+            outcomes.append(outcome)
+            logger.info(
+                "glassnode xref product_id=%s cusip=%s wrote=%s symbol=%s reason=%s",
+                outcome.product_id,
+                outcome.internal_cusip,
+                outcome.wrote,
+                outcome.vendor_symbol,
+                outcome.skip_reason,
+            )
+        return outcomes
+    finally:
+        # One reload for the whole pass. Refreshing after every insert reloads
+        # every product and xref, and a failed reload aborted the products
+        # still waiting. The rows are already committed; this publish is so
+        # the process serves them. A failed reload is logged and the outcomes
+        # still return — the same window as a failed ``POST /api/v1/inst/refresh``.
+        # The unique-violation path refreshes on its own, because that read
+        # has to see the row that won the race.
+        if wrote_any:
+            try:
+                cache.refresh()
+            except Exception:
+                logger.exception(
+                    "instrument cache refresh after glassnode xref writes failed"
+                )
 
 
 def glassnode_xref_report(
@@ -279,14 +326,10 @@ def _distinct_bases(bases: Sequence[str]) -> list[str]:
     return list(distinct.values())
 
 
-def _catalog(listed_symbols: Collection[str]) -> dict[str, str]:
+def _catalog(listed_symbols: Collection[object]) -> dict[str, str]:
     catalog: dict[str, str] = {}
-    for symbol in listed_symbols:
-        if not isinstance(symbol, str):
-            continue
-        cleaned = symbol.strip()
-        if cleaned:
-            catalog.setdefault(cleaned.casefold(), cleaned)
+    for symbol in _symbol_list(listed_symbols):
+        catalog.setdefault(symbol.casefold(), symbol)
     return catalog
 
 
@@ -326,6 +369,8 @@ def _insert(
     except ProcedureError as exc:
         if exc.sqlstate != _CURRENT_XREF_SQLSTATE:
             raise
+        # The pass publishes its own writes once, at the end. This reload is
+        # only so the outcome can name the row that won the race.
         cache.refresh()
         existing = cache.resolve_vendor_symbol(product_id, glassnode_app_id)
         if existing:

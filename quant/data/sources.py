@@ -107,7 +107,7 @@ class Glassnode:
         logger.info("Glassnode: fetched %d rows for %s", len(df), symbol)
         return df
 
-    def list_asset_symbols(self) -> list[str]:
+    def list_asset_symbols(self, *, timeout_s: float) -> list[str]:
         """Assets Glassnode lists, from ``GET /v1/metadata/assets``.
 
         The ``symbol`` on each ``data`` row is the asset a metric's ``a``
@@ -115,8 +115,13 @@ class Glassnode:
         body without that array is not an empty catalog — a shape change
         must not be read as "nothing is listed".
 
+        ``timeout_s`` is the caller's bound. This method does not pick a
+        long default: a catalog read that sits for half a minute is how a
+        create request used to hold a worker.
+
         Raises:
             requests.HTTPError: The asset list could not be read.
+            requests.Timeout: The catalog did not answer within ``timeout_s``.
             RuntimeError: The body has no ``data`` array.
         """
         api_key = self.__api_key
@@ -125,7 +130,7 @@ class Glassnode:
         res = requests.get(
             "https://api.glassnode.com/v1/metadata/assets",
             headers={"X-Api-Key": api_key},
-            timeout=30,
+            timeout=timeout_s,
         )
         res.raise_for_status()
         body = res.json()

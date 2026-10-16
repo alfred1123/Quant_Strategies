@@ -85,6 +85,8 @@ class BarFetcher(Protocol):
 
     def venue_symbols(self) -> list[VenueMarket]: ...
 
+    def cached_venue_symbols(self) -> list[VenueMarket] | None: ...
+
 
 class CcxtBarFetcher:
     """Public OHLCV reads over ccxt, paginated across the requested window."""
@@ -95,6 +97,7 @@ class CcxtBarFetcher:
         self._exchange_id = exchange_id
         self._exchange = exchange
         self._default_type = default_type
+        self._loaded_markets: dict | None = None
 
     @property
     def exchange(self):
@@ -120,6 +123,23 @@ class CcxtBarFetcher:
             self.exchange.options = {"defaultType": default_type}
         else:
             options["defaultType"] = default_type
+
+    def cached_venue_symbols(self) -> list[VenueMarket] | None:
+        """Tickers already held on this client, or None if none have been loaded.
+
+        None means ``load_markets`` has not run for this process. An empty
+        list means it ran and the venue lists nothing. Create reads this so a
+        cold market table cannot sit on the request that just committed a
+        product. The add-instrument form's venue-symbol request is what loads
+        the table.
+        """
+        markets = self._loaded_markets
+        if markets is None:
+            markets = self._markets_already_on_the_client()
+            if markets is None:
+                return None
+            self._loaded_markets = markets
+        return self._venues_from_market_table(markets)
 
     def venue_symbols(self) -> list[VenueMarket]:
         """Every ticker this venue currently prints, so a form can offer them.
@@ -147,7 +167,30 @@ class CcxtBarFetcher:
             raise BarFetchError(
                 f"could not list markets on {self._exchange_id}: {exc}"
             ) from exc
+        self._loaded_markets = markets
+        listed = self._venues_from_market_table(markets)
+        logger.info(
+            "%s lists %d symbol(s) across %d market(s)",
+            self._exchange_id, len(listed), len(markets),
+        )
+        return listed
 
+    def _markets_already_on_the_client(self) -> dict | None:
+        """The ccxt table, when some other call on this client already loaded it.
+
+        ``load_markets`` is not called. A MagicMock ``markets`` attribute is
+        not a table, so a stand-in client stays "not loaded" until
+        :meth:`venue_symbols` runs.
+        """
+        exchange = self._exchange
+        if exchange is None:
+            return None
+        live = getattr(exchange, "markets", None)
+        if isinstance(live, dict) and live:
+            return live
+        return None
+
+    def _venues_from_market_table(self, markets: dict) -> list[VenueMarket]:
         by_id: dict[str, list[dict]] = {}
         for market in markets.values():
             if not market.get("active"):
@@ -157,8 +200,7 @@ class CcxtBarFetcher:
             raw = market.get("id")
             if raw:
                 by_id.setdefault(raw, []).append(market)
-
-        listed = [
+        return [
             VenueMarket(
                 vendor_symbol=raw,
                 base=group[0].get("base"),
@@ -169,11 +211,6 @@ class CcxtBarFetcher:
             )
             for raw, group in sorted(by_id.items())
         ]
-        logger.info(
-            "%s lists %d symbol(s) across %d market(s)",
-            self._exchange_id, len(listed), len(markets),
-        )
-        return listed
 
     def fetch_bars(
         self,

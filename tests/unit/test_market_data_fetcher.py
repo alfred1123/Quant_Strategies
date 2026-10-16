@@ -253,6 +253,32 @@ class TestVenueSymbols:
             "BTCUSDT", "ETHUSDT", "SOLUSDT",
         ]
 
+    def test_cached_venue_symbols_does_not_load_markets(self, fetcher, exchange):
+        exchange.markets = None
+
+        assert fetcher.cached_venue_symbols() is None
+        exchange.load_markets.assert_not_called()
+
+        exchange.load_markets.return_value = {
+            "BTC/USDT": _market("BTCUSDT", "BTC/USDT", "spot", "BTC", "USDT"),
+        }
+        assert [m.vendor_symbol for m in fetcher.venue_symbols()] == ["BTCUSDT"]
+        exchange.load_markets.reset_mock()
+
+        cached = fetcher.cached_venue_symbols()
+
+        exchange.load_markets.assert_not_called()
+        assert [m.vendor_symbol for m in cached] == ["BTCUSDT"]
+
+    def test_an_empty_loaded_table_is_empty_not_unloaded(self, fetcher, exchange):
+        exchange.load_markets.return_value = {}
+
+        assert fetcher.venue_symbols() == []
+        exchange.load_markets.reset_mock()
+
+        assert fetcher.cached_venue_symbols() == []
+        exchange.load_markets.assert_not_called()
+
     def test_an_unreachable_venue_is_wrapped(self, fetcher, exchange):
         exchange.load_markets.side_effect = ccxt.NetworkError("timeout")
 
