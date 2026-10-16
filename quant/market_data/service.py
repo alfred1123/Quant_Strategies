@@ -484,6 +484,15 @@ class PriceBarService:
         """
         return self._fetcher.venue_symbols()
 
+    def cached_venue_symbols(self) -> list[VenueMarket] | None:
+        """Tickers this process has already loaded for the venue, or None.
+
+        None means the market table has not been fetched. Create uses that
+        so a cold ``load_markets`` cannot sit on the request that just
+        committed a product.
+        """
+        return self._fetcher.cached_venue_symbols()
+
     def find_gaps(
         self,
         *,

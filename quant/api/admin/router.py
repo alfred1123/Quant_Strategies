@@ -19,7 +19,7 @@ from quant.api.admin.schemas import (
 from quant.api.auth.dependencies import require_user_or_service
 from quant.api.deps import get_data_caches
 from quant.api.glassnode_xrefs import apply_listing_glassnode_xrefs
-from quant.data.glassnode_xref import glassnode_xref_report
+from quant.data.glassnode_xref import XREF_NOT_WRITTEN, glassnode_xref_report
 from quant.data.provider_fill import fill_scheduled_providers
 from quant.refdata.bundle import DataCaches
 
@@ -121,14 +121,34 @@ def backfill_glassnode_product_xrefs(
     product and the Glassnode app is left alone. This is not a schedule:
     ``fill_scheduled_providers`` stays at 06:15 UTC and fills whatever xrefs
     exist after this pass.
+
+    A Glassnode or venue failure must not 500 this call. The pass reloads the
+    instrument cache once after its writes; one blip used to abort the rest
+    and turn the batch into an error the caller could only retry blind. The
+    body carries ``error`` when the pass itself did not finish. The traceback
+    is logged.
     """
-    outcomes = apply_listing_glassnode_xrefs(caches, request.app.state.price_bars)
-    report = glassnode_xref_report(outcomes)
+    try:
+        outcomes = apply_listing_glassnode_xrefs(caches, request.app.state.price_bars)
+    except Exception:
+        logger.exception("glassnode/product-xrefs failed")
+        report: dict[str, object] = {
+            "mapped": [],
+            "already_mapped": [],
+            "skipped": [],
+            "error": XREF_NOT_WRITTEN,
+        }
+    else:
+        report = {**glassnode_xref_report(outcomes), "error": None}
+    mapped = report["mapped"]
+    already = report["already_mapped"]
+    skipped = report["skipped"]
     logger.info(
-        "glassnode/product-xrefs: mapped=%d already=%d skipped=%d caller=%s",
-        len(report["mapped"]),
-        len(report["already_mapped"]),
-        len(report["skipped"]),
+        "glassnode/product-xrefs: mapped=%d already=%d skipped=%d error=%s caller=%s",
+        len(mapped) if isinstance(mapped, list) else 0,
+        len(already) if isinstance(already, list) else 0,
+        len(skipped) if isinstance(skipped, list) else 0,
+        report["error"],
         caller,
     )
     return report

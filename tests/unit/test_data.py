@@ -118,10 +118,11 @@ class TestGlassnode:
         mock_get.return_value = mock_response
 
         from quant.data.sources import Glassnode
-        symbols = Glassnode().list_asset_symbols()
+        symbols = Glassnode().list_asset_symbols(timeout_s=2)
 
         assert symbols == ["BTC", "ETH"]
         assert mock_get.call_args.args[0] == "https://api.glassnode.com/v1/metadata/assets"
+        assert mock_get.call_args.kwargs["timeout"] == 2
         headers = mock_get.call_args.kwargs["headers"]
         assert headers["X-Api-Key"] == "test_key"
         assert "api_key" not in (mock_get.call_args.kwargs.get("params") or {})
@@ -135,7 +136,7 @@ class TestGlassnode:
         mock_get.return_value = mock_response
 
         from quant.data.sources import Glassnode
-        assert Glassnode().list_asset_symbols() == []
+        assert Glassnode().list_asset_symbols(timeout_s=2) == []
 
     @patch.dict("os.environ", {"GLASSNODE_API_KEY": "test_key"})
     @patch("quant.data.sources.requests.get")
@@ -147,7 +148,7 @@ class TestGlassnode:
 
         from quant.data.sources import Glassnode
         with pytest.raises(RuntimeError, match="data array"):
-            Glassnode().list_asset_symbols()
+            Glassnode().list_asset_symbols(timeout_s=2)
 
 
 class TestFutuOpenD:

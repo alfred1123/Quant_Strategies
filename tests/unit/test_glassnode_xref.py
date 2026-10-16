@@ -447,6 +447,41 @@ class TestBackfill:
         assert _map(cache, {BYBIT: [BTC_MARKET]}, ["BTC"]) == []
         assert cache.inserted == []
 
+    def test_two_writes_reload_the_cache_once(self):
+        cache = FakeInstruments(
+            [_product(1, "btcusdt.crypto"), _product(2, "ethusdt.crypto")],
+            [
+                {"product_id": 1, "app_id": BYBIT, "vendor_symbol": "BTCUSDT"},
+                {"product_id": 2, "app_id": BYBIT, "vendor_symbol": "ETHUSDT"},
+            ],
+        )
+
+        outcomes = _map(cache, {BYBIT: [BTC_MARKET, ETH_MARKET]}, ["BTC", "ETH"])
+
+        assert [outcome.wrote for outcome in outcomes] == [True, True]
+        assert cache.refreshed == 1
+
+    def test_a_failed_cache_reload_does_not_skip_the_next_product(self):
+        cache = FakeInstruments(
+            [_product(1, "btcusdt.crypto"), _product(2, "ethusdt.crypto")],
+            [
+                {"product_id": 1, "app_id": BYBIT, "vendor_symbol": "BTCUSDT"},
+                {"product_id": 2, "app_id": BYBIT, "vendor_symbol": "ETHUSDT"},
+            ],
+        )
+
+        def refresh():
+            cache.refreshed += 1
+            raise RuntimeError("cache reload failed")
+
+        cache.refresh = refresh
+
+        outcomes = _map(cache, {BYBIT: [BTC_MARKET, ETH_MARKET]}, ["BTC", "ETH"])
+
+        assert cache.refreshed == 1
+        assert [row["vendor_symbol"] for row in cache.inserted] == ["BTC", "ETH"]
+        assert [outcome.wrote for outcome in outcomes] == [True, True]
+
     def test_a_product_id_the_cache_does_not_hold_is_an_empty_pass(self):
         cache = FakeInstruments(
             [_product(1, "btcusdt.crypto")],
@@ -478,7 +513,48 @@ class TestVenueMarketLoad:
 
 
 class TestAssetListRead:
+    def test_the_decision_module_does_not_construct_a_client(self):
+        import inspect
+
+        import quant.data.glassnode_xref as decision
+
+        assert "Glassnode(" not in inspect.getsource(decision)
+
+    def test_a_caller_can_pass_the_asset_catalog(self):
+        def reader():
+            raise AssertionError("reader must not be called")
+
+        # Spelling is the caller's, after a strip. Casefold happens at lookup.
+        assert read_glassnode_asset_symbols(["BTC", " eth "], reader=reader) == ["BTC", "eth"]
+
+    def test_no_reader_and_no_catalog_is_unread(self):
+        assert read_glassnode_asset_symbols() is None
+        assert read_glassnode_asset_symbols(None) is None
+
+    def test_an_empty_catalog_is_empty_not_unread(self):
+        assert read_glassnode_asset_symbols([]) == []
+
+    def test_one_symbol_is_kept(self):
+        assert read_glassnode_asset_symbols(["BTC"]) == ["BTC"]
+
+    def test_a_blank_and_a_non_string_are_dropped(self):
+        assert read_glassnode_asset_symbols(["", "  ", 1, "BTC"]) == ["BTC"]
+
+    def test_a_reader_failure_is_an_unread_catalog(self):
+        def reader():
+            raise ValueError("GLASSNODE_API_KEY is not set")
+
+        assert read_glassnode_asset_symbols(reader=reader) is None
+
+    def test_none_from_the_reader_is_unread(self):
+        assert read_glassnode_asset_symbols(reader=lambda: None) is None
+
     def test_a_missing_key_is_an_unread_catalog(self, monkeypatch):
         monkeypatch.delenv("GLASSNODE_API_KEY", raising=False)
 
-        assert read_glassnode_asset_symbols() is None
+        def reader():
+            from quant.data.sources import Glassnode
+
+            return Glassnode().list_asset_symbols(timeout_s=2)
+
+        assert read_glassnode_asset_symbols(reader=reader) is None
