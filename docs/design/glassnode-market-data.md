@@ -195,7 +195,7 @@ Keep calling `SP_INS_API_REQUEST` with the full JSON body for every refresh, and
 | Cost | What happens |
 |---|---|
 | Database growth | Every refresh inserts another full document and leaves the previous one. Closed documents are unread by the cache and sit in the yearly `CREATED_AT` partition with the current one. |
-| 160,000 / month | One refresh is one HTTP call today, because there is no page loop. The cap is shared and nothing in the Glassnode path counts it. Turning on five more metrics multiplies calls by five, still one call per series per refresh, still uncounted. |
+| 160,000 / month | One refresh is one HTTP call today, because there is no page loop. The cap is shared. Turning on five more metrics multiplies calls by five, still one call per series per refresh. The provider path now increments `CONFIG.API_LIMIT.CALL_COUNT` via `SP_RESERVE_API_CALL`; it does not block at `MAX_VALUE`. `SP_GET_API_LIMIT_CHK` still counts current subscription rows. See [Call count](#call-count). |
 | Single IP | The call is `requests.get` from whichever host runs the API or the worker. There is no backoff. A bug that refreshes in a loop spends the short window (600, reset around 20 seconds) and then the monthly cap from that one address. A 429 body was not captured, so the failure shape is unknown. |
 | Reproducibility | A cache hit replays the current document. A refresh replaces it, including any rewrite Glassnode made, and the next backtest silently uses the new series. Old versions are stored and not read. |
 
@@ -208,7 +208,7 @@ Keep `API_REQUEST` as the subscription header. Stop inserting the document.
 | Cost | What happens |
 |---|---|
 | Database growth | Header rows stay small. Payload growth stops only if nothing else still needs the document. |
-| 160,000 / month | Unchanged until a replacement cache serves the second request. With no document and no other store, every backtest misses and calls Glassnode again. |
+| 160,000 / month | A replacement cache is what stops the second request. With no document and no other store, every backtest misses and calls Glassnode again. The provider path now increments `CONFIG.API_LIMIT.CALL_COUNT` via `SP_RESERVE_API_CALL`; it does not block at `MAX_VALUE`. `SP_GET_API_LIMIT_CHK` still counts current subscription rows. See [Call count](#call-count). |
 | Single IP | A cache that cannot answer is a fetch. Misses from one host are the blocking risk. |
 | Reproducibility | `SP_GET_API_REQUEST` inner-joins the payload. No payload means no series to replay. |
 
@@ -221,7 +221,7 @@ Keep the saved-copy layout the harness already reads: request identity, status, 
 | Cost | What happens |
 |---|---|
 | Database growth | New Glassnode bytes stay out of Postgres. Existing `API_REQUEST` rows stay. |
-| 160,000 / month | One fetch fills one copy. A second host that cannot see the file fetches again. The cap is still uncounted in the app. |
+| 160,000 / month | One fetch fills one copy. A second host that cannot see the file fetches again. The provider path now increments `CONFIG.API_LIMIT.CALL_COUNT` via `SP_RESERVE_API_CALL`; it does not block at `MAX_VALUE`. `SP_GET_API_LIMIT_CHK` still counts current subscription rows. See [Call count](#call-count). |
 | Single IP | Same client, same host, unless the cache actually hits. A shared laptop disk does not exist in the deployed API and worker. |
 | Reproducibility | A backtest can pin the body hash. Two copies with the same points and different bytes are a formatting difference, which the harness reports and does not treat as a rewrite. The pin has to be written down with the result, or the next read is whatever file is there now. |
 
@@ -234,7 +234,7 @@ One row per `(metric, asset, interval, timestamp)` with `v`, written and read th
 | Cost | What happens |
 |---|---|
 | Database growth | A point is a timestamp and a number. A refresh of an unchanged day does not store a second copy of the whole history. When a value changes, the later store keeps that history. Alfred's archive path is a purge of closed copies, not a delete of the live rows and not a vague archive. That purge is not built here. |
-| 160,000 / month | Still one HTTP call per series per refresh. The series is then reused from the table, which is the same "one request, then local bars" path price already has on a cache hit. The cap still needs a counter that counts calls, which `SP_GET_API_LIMIT_CHK` does not. |
+| 160,000 / month | Still one HTTP call per series per refresh. The series is then reused from the table, which is the same "one request, then local bars" path price already has on a cache hit. The provider path now increments `CONFIG.API_LIMIT.CALL_COUNT` via `SP_RESERVE_API_CALL`; it does not block at `MAX_VALUE`. `SP_GET_API_LIMIT_CHK` still counts current subscription rows. See [Call count](#call-count). |
 | Single IP | The fetch stays on one host. The store does not add calls. A loop that ignores the table would. Shipping the store without a call counter leaves that loop possible. |
 | Reproducibility | A backtest that reads the live table sees the current points. The later store keeps history. Alfred's archive path is a purge of closed copies, not a delete of the live rows and not a vague archive. That store is a later pull request and is not built here. Keeping that history is not the point-in-time series. Point-in-time is a different Glassnode series. The copies outside the repo stay the log of a rewrite. Exchange bars stay on `PRICE_BAR` under their own `SOURCE_APP_ID`, so a Glassnode close and a Bybit close do not share a key. |
 
