@@ -44,7 +44,7 @@ The real 2026-10-03 bodies stay outside the repo so a later fetch of the same wi
 
 ## What the client does
 
-`Glassnode` in `quant/data/sources.py` fetches series with `get_historical_price`. It GETs `https://api.glassnode.com/v1/metrics/` plus the `metric_path` argument, with query params `a`, `s`, `u`, `i` and the key in the `X-Api-Key` header. `list_asset_symbols` reads the asset catalog the xref pass checks; see [Glassnode product xref](#glassnode-product-xref). `GLASSNODE_API_KEY` is already in the process environment: `load_config()` loads it from SSM when `USE_SSM=1`, otherwise from `.env`. The class reads that variable and does not load a file. The default `i` is `24h`. `fetch_df` takes that path from the `REFDATA.APP_METRIC` row for the data source the request named. Choosing Glassnode in the UI is that request. The method does not fill in a path when the row has none. It then calls `raise_for_status()` and `pd.read_json`. There is no page loop and no read of the rate-limit headers. `fetch_df` increments `CONFIG.API_LIMIT.CALL_COUNT` before this method on the provider path. The method itself does not.
+`Glassnode` in `quant/data/sources.py` has one method, `get_historical_price`. It GETs `https://api.glassnode.com/v1/metrics/` plus the `metric_path` argument, with query params `a`, `s`, `u`, `i` and the key in the `X-Api-Key` header. `GLASSNODE_API_KEY` is already in the process environment: `load_config()` loads it from SSM when `USE_SSM=1`, otherwise from `.env`. The class reads that variable and does not load a file. The default `i` is `24h`. `fetch_df` takes that path from the `REFDATA.APP_METRIC` row for the data source the request named. Choosing Glassnode in the UI is that request. The method does not fill in a path when the row has none. It then calls `raise_for_status()` and `pd.read_json`. There is no page loop and no read of the rate-limit headers. `fetch_df` increments `CONFIG.API_LIMIT.CALL_COUNT` before this method on the provider path. The method itself does not.
 
 `s` and `u` are built with `time.mktime`, which is the machine's local timezone. The 3 Oct window was UTC unix time. The harness stores that unix window and does not call `mktime`. A backtest on a host that is not UTC asks Glassnode for a different window than the fixture.
 
@@ -54,26 +54,7 @@ A provider interval shorter than one day is refused before that call. The class 
 
 A Glassnode backtest reads `BT.API_REQUEST` through `BacktestCache.read_payload` and does not call Glassnode. `REFDATA.APP.REFRESH_DATASET_IND` says whether the Refresh dataset checkbox may call that source. Release `refdata/1.30.0` sets Glassnode and Bybit to `N` and every other app to `Y`. The drawer disables the checkbox when the traded app is `N`. A request that still sends `refresh_dataset` true does not refresh an `N` source. The daily job `fill_scheduled_providers` does: every non-exchange app whose flag is `N`, every catalog metric that has a `METRIC_PATH`, and every product with a vendor symbol for that app. It calls `fetch_df` with refresh on from the schedule's `since` (`2010-01-01`) through today, which replaces that window. It runs at 06:15 UTC. The daily point is stamped 00:00 UTC, and that stamp is not the publish time. The pull clock is [When to fetch](#when-to-fetch). Context is `refdata,prod-deploy`. The payload-table comment says the app fetches a delta and merges. The Python replaces the whole range when a provider refresh does run. `SP_GET_API_REQUEST` returns the current row (`TRANSACT_TO_TS = 9999-12-31`) inner-joined to its payload. Closed versions are not what the next backtest reads.
 
-The job skips an app that has no current `INST.PRODUCT_XREF` row, so Provider series stays on whatever a normal cache write already stored (Yahoo Close) until Glassnode has one. The dialog still lists exchange apps only (`IS_EXCHANGE_IND = Y`). A ccxt listing now also writes the Glassnode xref when the venue base is on the asset list ([Glassnode product xref](#glassnode-product-xref), decision #99). Release `inst/1.6.0` seeds the current `btcusdt.crypto` product to vendor symbol `BTC` (decision #21). Context is `inst,prod-deploy`. That seed stays. ETH and BNB are not in it. A later pass writes them when Glassnode lists the venue base. BNB on the asset list is still not a valid asset on the netflow metric, and ETH's netflow series does not cover the 2021 to mid-2024 window. Those failures stay at fetch time.
-
-## Glassnode product xref
-
-The symbol stored for Glassnode is the venue market base, not the pair and not a trim of `INTERNAL_CUSIP`. `BTCUSDT` and `BTCUSDC` are both base `BTC`. `1000PEPEUSDT` is base `1000PEPE`. `WETHUSDT` is base `WETH`. Decision #21 already said the Glassnode vendor string is the asset.
-
-`Glassnode.list_asset_symbols` reads `GET /v1/metadata/assets` and keeps each `data[].symbol`. The key is `GLASSNODE_API_KEY`, the same variable `get_historical_price` reads, loaded by `load_config()` from SSM or `.env`. Nothing in the repo stores that key.
-
-The pass then calls `INST.SP_INS_PRODUCT_XREF` for the Glassnode app (`REFDATA.APP.NAME = glassnode`) when all of these hold:
-
-- The product has a current xref on a ccxt exchange.
-- Those listings agree on one base. A ticker the venue does not list has no base, and the cusip is not used instead.
-- The asset list contains that base. The row stores Glassnode's spelling of it.
-- No current xref for that product and the Glassnode app exists. A row that exists is left alone, including the `btcusdt.crypto` → `BTC` row from `inst/1.6.0`.
-
-Otherwise nothing is written. The create response carries `glassnode_skip_reason`, and the dialog stays open on it. `1000PEPE is not on Glassnode` is that sentence when the leveraged base is absent from the list. A lookalike (`WETH` against a list that has `ETH`) is the same outcome. An unread asset list is not treated as an empty one, and no symbol is written.
-
-Two callers share that pass. `POST /api/v1/inst/products` runs it for the product just created, after the exchange listing has committed. A Glassnode failure does not change the 201: the cusip would 409 on a retry. `POST /api/v1/admin/glassnode/product-xrefs` runs it once over every product already in the cache. It is not on the scheduler. `fill_scheduled_providers` stays `cron(15 6 * * ? *)`. Provider series on the Data tab still lists stored `BT.API_REQUEST` rows after that job runs. The xref is only the gate that lets the job include the product.
-
-The gate is the asset. A metric can still reject an asset Glassnode lists. BNB on the asset list does not make exchange netflow accept BNB. That error stays on the fill, per series.
+The job skips an app that has no current `INST.PRODUCT_XREF` row, so Provider series stays on whatever a normal cache write already stored (Yahoo Close) until Glassnode has one. Add instrument cannot write that row: the dialog lists exchange apps only (`IS_EXCHANGE_IND = Y`). Release `inst/1.6.0` seeds the current `btcusdt.crypto` product to vendor symbol `BTC` (decision #21). Context is `inst,prod-deploy`. ETH and BNB are not seeded: BNB is not a valid asset on the netflow metric, and ETH does not cover the 2021 to mid-2024 window.
 
 ## When to fetch
 

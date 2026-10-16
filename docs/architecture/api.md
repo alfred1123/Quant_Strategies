@@ -341,14 +341,6 @@ dropdown without a separate `POST /inst/refresh`.
 which also enables and retargets. Repeating it for the same cusip is a 409, not
 a second instrument.
 
-When the new listing is on a ccxt venue, the response also carries
-`glassnode_vendor_symbol` and `glassnode_skip_reason` (decision #99). The
-venue market base is written as a Glassnode xref when `GET /v1/metadata/assets`
-lists it. A base that is not listed leaves `glassnode_skip_reason` set — the
-dialog shows that sentence and does not treat the instrument as failed. A
-listing that is not a ccxt pair leaves both fields null. A failure of the
-Glassnode call does not change the 201.
-
 Neither procedure validates its input. `CreateInstrumentRequest` is the only
 thing that checks a field is present and well-formed, and the DDL is the only
 thing that checks uniqueness — `NOT NULL` on the columns,
@@ -371,7 +363,6 @@ These routers are mounted with `require_user_or_service` so the EventBridge Lamb
 | `POST` | `/api/v1/admin/db/terminate-stale-connections` | Service or session | Terminate `quant_app` Postgres sessions idle longer than `idle_seconds` (default 3600). Posts to `SLACK_WEBHOOK_URL` when any stale session is found. EventBridge job `term_stale_connections`. |
 | `POST` | `/api/v1/admin/db/detach-api-request-payload` | Service or session | Detach `API_REQUEST_PAYLOAD` partitions whose range ended more than `retention_days` ago (default 14). Does not write `API_REQUEST`. EventBridge job `detach_api_request_payload`. |
 | `POST` | `/api/v1/admin/providers/fill` | Service or session | Insert a fresh window for every non-exchange app whose Refresh dataset flag is `N`. EventBridge job `fill_scheduled_providers`. |
-| `POST` | `/api/v1/admin/glassnode/product-xrefs` | Service or session | One pass: write a Glassnode xref for each ccxt-listed product whose venue base is on the Glassnode asset list. A current row is left alone. Not a schedule — `fill_scheduled_providers` stays at 06:15 UTC. |
 | `POST` | `/api/v1/market-data/price-bars/sync` | Service or session | Pre-fetch bars for every series a scheduled deployment or a subscription wants (bar warmer). |
 | `POST` | `/api/v1/scheduler/tick` | Service or session | Apply every deployment currently due across all intervals (hourly platform sweep). |
 

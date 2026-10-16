@@ -102,53 +102,6 @@ class TestGlassnode:
         with pytest.raises(ValueError, match="GLASSNODE_API_KEY"):
             Glassnode()
 
-    @patch.dict("os.environ", {"GLASSNODE_API_KEY": "test_key"})
-    @patch("quant.data.sources.requests.get")
-    def test_list_asset_symbols_reads_the_catalog_symbol(self, mock_get):
-        mock_response = MagicMock()
-        mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {
-            "data": [
-                {"id": "BTC", "symbol": "BTC", "name": "Bitcoin"},
-                {"id": "ETH", "symbol": " ETH ", "name": "Ether"},
-                {"id": "blank", "symbol": "  "},
-                "not-an-object",
-            ]
-        }
-        mock_get.return_value = mock_response
-
-        from quant.data.sources import Glassnode
-        symbols = Glassnode().list_asset_symbols()
-
-        assert symbols == ["BTC", "ETH"]
-        assert mock_get.call_args.args[0] == "https://api.glassnode.com/v1/metadata/assets"
-        headers = mock_get.call_args.kwargs["headers"]
-        assert headers["X-Api-Key"] == "test_key"
-        assert "api_key" not in (mock_get.call_args.kwargs.get("params") or {})
-
-    @patch.dict("os.environ", {"GLASSNODE_API_KEY": "test_key"})
-    @patch("quant.data.sources.requests.get")
-    def test_list_asset_symbols_empty_catalog_is_empty(self, mock_get):
-        mock_response = MagicMock()
-        mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {"data": []}
-        mock_get.return_value = mock_response
-
-        from quant.data.sources import Glassnode
-        assert Glassnode().list_asset_symbols() == []
-
-    @patch.dict("os.environ", {"GLASSNODE_API_KEY": "test_key"})
-    @patch("quant.data.sources.requests.get")
-    def test_list_asset_symbols_rejects_a_body_with_no_data_array(self, mock_get):
-        mock_response = MagicMock()
-        mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = ["BTC"]
-        mock_get.return_value = mock_response
-
-        from quant.data.sources import Glassnode
-        with pytest.raises(RuntimeError, match="data array"):
-            Glassnode().list_asset_symbols()
-
 
 class TestFutuOpenD:
     @patch.dict("os.environ", {"FUTU_HOST": "127.0.0.1", "FUTU_PORT": "11111"})

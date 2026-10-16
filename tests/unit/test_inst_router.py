@@ -7,7 +7,6 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from quant.data.glassnode_xref import XREF_NOT_WRITTEN, GlassnodeXrefOutcome
 from quant.market_data.fetcher import BarFetchError, VenueMarket
 from quant.shared.db import ProcedureError
 
@@ -50,9 +49,6 @@ def client_and_cache(price_bars):
         # Only Bybit is a ccxt venue here; NASDAQ lists products but publishes
         # no market table, which is the case the empty answer is for.
         side_effect=lambda app_id, refdata=None: "bybit" if app_id == BYBIT else None,
-    ), patch(
-        "quant.api.routers.inst.apply_listing_glassnode_xrefs",
-        return_value=[],
     ):
         from quant.api.auth.dependencies import require_user
         from quant.api.auth.models import CurrentUser
@@ -247,41 +243,6 @@ class TestCreateInstrument:
         cache.create_instrument.return_value = CREATED
 
         assert _post(client).status_code == 201
-
-    def test_a_base_glassnode_does_not_list_is_on_the_response(self, client_and_cache):
-        """The instrument was created. The missing Glassnode row is the reason."""
-        client, cache = client_and_cache
-        cache.create_instrument.return_value = CREATED
-        outcome = GlassnodeXrefOutcome(
-            product_id=7,
-            internal_cusip="solusdt.crypto",
-            vendor_symbol=None,
-            skip_reason="SOL is not on Glassnode",
-            wrote=False,
-        )
-        with patch(
-            "quant.api.routers.inst.apply_listing_glassnode_xrefs",
-            return_value=[outcome],
-        ) as mapped:
-            body = _post(client).json()
-
-        assert body["glassnode_skip_reason"] == "SOL is not on Glassnode"
-        assert body["glassnode_vendor_symbol"] is None
-        assert mapped.call_args.kwargs["product_id"] == 7
-
-    def test_a_glassnode_failure_does_not_fail_the_instrument(self, client_and_cache):
-        """The cusip is already committed, so a 500 would only make the retry a 409."""
-        client, cache = client_and_cache
-        cache.create_instrument.return_value = CREATED
-        with patch(
-            "quant.api.routers.inst.apply_listing_glassnode_xrefs",
-            side_effect=RuntimeError("asset list down"),
-        ):
-            resp = _post(client)
-
-        assert resp.status_code == 201
-        assert resp.json()["product_id"] == 7
-        assert resp.json()["glassnode_skip_reason"] == XREF_NOT_WRITTEN
 
 
 class TestCusipNormalisation:

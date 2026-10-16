@@ -152,9 +152,3 @@ class CreatedInstrument(BaseModel):
     vendor_symbol: str
     product_xref_id: int
     product_xref_vid: int
-    #: Glassnode asset written for this product, when the venue base is listed.
-    #: Absent when the listing is not a ccxt pair, or when a row was not written.
-    glassnode_vendor_symbol: str | None = None
-    #: Why no Glassnode xref was written. ``None`` when one was written, when
-    #: one was already there, or when this listing is not a ccxt pair.
-    glassnode_skip_reason: str | None = None

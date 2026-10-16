@@ -153,7 +153,6 @@ function CreateInstrumentDialogContent({
   const [description, setDescription] = useState('');
   const [issueType, setIssueType] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
-  const [glassnodeNotice, setGlassnodeNotice] = useState<string | null>(null);
 
   // The cusip is an identifier, so what is stored is the normalised form
   // rather than what was typed — a stray capital or space makes a second
@@ -170,7 +169,7 @@ function CreateInstrumentDialogContent({
   const handleSubmit = async () => {
     setFormError(null);
     try {
-      const created = await create.mutateAsync({
+      await create.mutateAsync({
         internal_cusip: cusip,
         display_nm: displayNm.trim(),
         asset_type_id: Number(assetTypeId),
@@ -181,12 +180,6 @@ function CreateInstrumentDialogContent({
         app_id: Number(appId),
         vendor_symbol: vendorSymbol.trim(),
       });
-      // The instrument exists. A base Glassnode does not list stays unmapped,
-      // and that reason has to stay on screen — closing here would hide it.
-      if (created.glassnode_skip_reason) {
-        setGlassnodeNotice(`Added ${cusip}. ${created.glassnode_skip_reason}`);
-        return;
-      }
       onSuccess();
     } catch (e: unknown) {
       setFormError(e instanceof Error ? e.message : 'Could not create the instrument');
@@ -351,29 +344,20 @@ function CreateInstrumentDialogContent({
             mapping is invisible to every venue-scoped list.
           </Typography>
 
-          {glassnodeNotice && <Alert severity="info">{glassnodeNotice}</Alert>}
           {formError && <Alert severity="error">{formError}</Alert>}
         </Stack>
       </DialogContent>
       <DialogActions>
-        {glassnodeNotice ? (
-          <Button variant="contained" onClick={onClose}>
-            Close
-          </Button>
-        ) : (
-          <>
-            <Button onClick={onClose} disabled={create.isPending}>
-              Cancel
-            </Button>
-            <Button
-              variant="contained"
-              onClick={handleSubmit}
-              disabled={!canSubmit || create.isPending}
-            >
-              Add instrument
-            </Button>
-          </>
-        )}
+        <Button onClick={onClose} disabled={create.isPending}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleSubmit}
+          disabled={!canSubmit || create.isPending}
+        >
+          Add instrument
+        </Button>
       </DialogActions>
     </Dialog>
   );

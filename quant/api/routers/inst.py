@@ -15,8 +15,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from quant.api.auth.dependencies import require_user
 from quant.api.auth.models import CurrentUser
 from quant.api.deps import get_data_caches
-from quant.api.glassnode_xrefs import apply_listing_glassnode_xrefs
-from quant.data.glassnode_xref import XREF_NOT_WRITTEN
 from quant.refdata.bundle import DataCaches
 from quant.schemas.inst import CreatedInstrument, CreateInstrumentRequest, VenueSymbol
 from quant.trade.registry import exchange_id_for_app
@@ -105,7 +103,6 @@ def get_venue_symbols(
 )
 def create_product(
     req: CreateInstrumentRequest,
-    request: Request,
     user: CurrentUser = Depends(require_user),
     caches: DataCaches = Depends(get_data_caches),
 ) -> CreatedInstrument:
@@ -120,11 +117,6 @@ def create_product(
     and not a ceiling, so a write must not depend on how it happens to be
     mounted today. It checks that somebody is signed in and nothing more —
     there is no owner to compare against.
-
-    When the new listing is on a ccxt venue, the venue's base is checked
-    against Glassnode's asset list and, if listed, written as a second xref.
-    That second write is not part of the instrument: a failure there is a
-    skip reason on this 201, not an error status.
     """
     created = caches.instrument_cache.create_instrument(
         internal_cusip=req.internal_cusip,
@@ -137,46 +129,11 @@ def create_product(
         app_id=req.app_id,
         vendor_symbol=req.vendor_symbol,
     )
-    # The product and its exchange xref are already committed. A Glassnode
-    # failure must not turn this into a 500: the cusip would then 409 on
-    # retry, and the Glassnode row would still be missing. The skip reason
-    # is the record. The traceback is logged.
-    glassnode_symbol, glassnode_reason = _glassnode_for_new_listing(
-        caches, request, int(created["product_id"]),
-    )
     logger.info(
         "instrument %s created by %s, listed on app %d as %s",
         req.internal_cusip, user.username, req.app_id, req.vendor_symbol,
     )
-    return CreatedInstrument(
-        **created,
-        glassnode_vendor_symbol=glassnode_symbol,
-        glassnode_skip_reason=glassnode_reason,
-    )
-
-
-def _glassnode_for_new_listing(
-    caches: DataCaches,
-    request: Request,
-    product_id: int,
-) -> tuple[str | None, str | None]:
-    """Glassnode symbol written for this listing, and why it was not if so."""
-    try:
-        outcomes = apply_listing_glassnode_xrefs(
-            caches,
-            request.app.state.price_bars,
-            product_id=product_id,
-        )
-    except Exception:
-        logger.exception(
-            "Glassnode xref was not written for product_id=%s",
-            product_id,
-        )
-        return None, XREF_NOT_WRITTEN
-    for outcome in outcomes:
-        if outcome.product_id == product_id:
-            return outcome.vendor_symbol, outcome.skip_reason
-    return None, None
+    return CreatedInstrument(**created)
 
 
 @router.post("/refresh", status_code=204)

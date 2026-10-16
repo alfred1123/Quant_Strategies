@@ -287,23 +287,6 @@ describe('CreateInstrumentDialog submit', () => {
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
   });
-
-  it('stays open when the asset is not on Glassnode', async () => {
-    // The instrument was created. Closing over the reason would leave the
-    // product looking fully mapped when the daily fill will skip it.
-    setup();
-    createMutate.mockResolvedValue({
-      glassnode_skip_reason: '1000PEPE is not on Glassnode',
-    });
-    await fillRequired();
-
-    await userEvent.click(submitButton());
-
-    expect(await screen.findByText(/Added btcusdt.crypto/)).toBeInTheDocument();
-    expect(screen.getByText(/1000PEPE is not on Glassnode/)).toBeInTheDocument();
-    expect(onSuccess).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
-  });
 });
 
 describe('CreateInstrumentDialog failure', () => {
