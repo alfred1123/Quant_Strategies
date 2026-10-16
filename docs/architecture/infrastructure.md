@@ -362,7 +362,7 @@ added back.
 
 ## Trade scheduler (EventBridge + Lambda)
 
-Phase 1.9 AWS side — see [Scheduler & Price Bars](../design/scheduler-price-bars.md).
+See [Scheduler & Price Bars](../design/scheduler-price-bars.md).
 
 ```
 EventBridge Scheduler (one schedule per task, not per deployment)

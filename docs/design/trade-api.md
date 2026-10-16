@@ -180,7 +180,7 @@ Endpoints use JWT auth (`require_user`); the user's `app_user_id` scopes all dat
 
     | Do | Don't |
     |----|-------|
-    | New `quant/api/strategies/` module + `GET /api/v1/strategies` | Put list logic in `quant/strategy/backtest_service.py` (execution only) |
+    | `quant/api/routers/strategies.py` + `quant/api/services/strategies.py` and `GET /api/v1/strategies` | Put list logic in `quant/strategy/backtest_service.py` (execution only) |
     | New `StrategyPicker` + `useStrategies()` on Trade Apply | Reuse Backtest `ConfigDrawer` / `FactorCard` (REFDATA signal-type builder) |
     | Read `BT.STRATEGY` via **`BT.SP_GET_STRATEGY_LIST`** (release `1.12.0`) | `GET /api/v1/strategies` — BT artifact shared by queue and trade |
 
@@ -323,9 +323,9 @@ These checks run **before every order** in the Trade API. They are non-negotiabl
 |-------|-------------|---------|
 | **Kill switch** | `deployment.enabled` must be `true` | — |
 | **Paper-first** | New deployments default to `paper=true` when the flag is omitted. The Trade UI toolbar and deploy dialog start on **live**; the server still requires `confirm_live` for `paper=false`. | `true` |
-| **Max position** | Reject if position value > `max_position_usd` | $10,000 |
-| **Max daily trades** | Reject if trade count today > `max_daily_trades` | 10 |
-| **Stop loss** | Flatten position if unrealized loss > `stop_loss_pct` | 5% |
+| **Max position** | Reject if position value > `max_position_usd` | application-owned when built; not a number to apply from this page |
+| **Max daily trades** | Reject if trade count today > `max_daily_trades` | application-owned when built; not a number to apply from this page |
+| **Stop loss** | Flatten position if unrealized loss > `stop_loss_pct` | application-owned when built; not a number to apply from this page |
 | **Cash check** | Query broker for available cash before placing order | — |
 | **Signal validation** | Signal must be in `{-1, 0, 1}` — reject anything else | — |
 | **Duplicate guard** | Don't place order if same signal was already acted on | — |
@@ -344,7 +344,7 @@ paper=false → Require explicit user confirmation + trade password
 ## 5. Trade Adapter Interface
 
 Abstract the broker so new exchanges can be added without changing signal logic.
-The canonical interface is defined in [Futu Trading §3.4](futu-trading.md#34-abstract-interfaces) and will live in `quant/trade/adapters/base.py`.
+The canonical interface is defined in [Futu Trading §3.4](futu-trading.md#34-abstract-interfaces) and lives in `quant/trade/adapters/base.py`.
 
 ```python
 class BrokerSession(ABC):
@@ -550,7 +550,7 @@ CREATE TABLE TRADE.TRANSACTION (
 Implemented in `quant/strategy/signals.py` — `strategy_to_json()` and `backtest_results_to_json()`.
 
 ```python
-from strat import StrategyConfig, SubStrategy, strategy_to_json, backtest_results_to_json
+from quant.strategy.signals import StrategyConfig, SubStrategy, strategy_to_json, backtest_results_to_json
 
 # Single-factor (uses StrategyConfig.single for self-describing config):
 cfg = StrategyConfig.single(
@@ -589,18 +589,18 @@ pass `window` and `signal` explicitly to `strategy_to_json(cfg, window=20, signa
 | 2 | `strategy_to_json()` + `backtest_results_to_json()` serializers | done | Step 1 |
 | 3 | DB schema + Liquibase migrations (`db/liquidbase/trade/`) | done | Step 1 |
 | 4 | FastAPI Trade API (`quant/api/routers/deployments.py`) | done (GET/POST) | Steps 1–3 |
-| 5 | Credentials API (`/api/v1/credentials`) — Phase 1.1 | — | Step 3 |
+| 5 | Credentials API (`/api/v1/credentials`) — Phase 1.1 | done — see §2.3 | Step 3 |
 | 6 | `TradeAdapter` interface + `FutuAdapter` + `AdapterRegistry` | — | Step 4 — [futu-trading.md](futu-trading.md) |
 | 7 | Signal execution loop + scheduler (`DeploymentExecutor`) | — | Steps 5–6 |
 | 8 | Risk checks module (`RiskRules`) | — | Step 7 |
 | 9 | Deploy / Apply in React Trade UI | — (shell exists) | Steps 5–8 |
-| 10 | Execution log + monitoring dashboard (Phase 1.8) | — | Step 7 |
+| 10 | Execution log + monitoring dashboard (Phase 1.8) | done — see §2.4 | Step 7 |
 
 ---
 
 ## 10. Open Questions
 
-1. **Scheduler**: Use APScheduler (Python) or system cron? APScheduler keeps state in-process; cron is simpler but stateless.
+1. ~~**Scheduler**: Use APScheduler (Python) or system cron? APScheduler keeps state in-process; cron is simpler but stateless.~~ **Resolved:** EventBridge Scheduler + `quant-scheduled-task` Lambda ([Infrastructure — Trade scheduler](../architecture/infrastructure.md#trade-scheduler-eventbridge-lambda)).
 2. ~~**Multi-ticker**: Should one deployment handle multiple tickers, or one deployment per ticker?~~ **Resolved:** one deployment = one ticker (`INTERNAL_CUSIP`).
 3. **Position sizing**: Current design is fixed `qty`. Future: fractional/proportional sizing based on portfolio value.
 4. **Rebalance frequency**: `daily_close` is straightforward. Intraday signals need streaming data — significantly more complex.
@@ -610,82 +610,4 @@ pass `window` and `signal` explicitly to `strategy_to_json(cfg, window=20, signa
 
 ## 11. AWS Infrastructure
 
-### Compute — EC2 t4g.medium (Graviton ARM)
-
-| Spec | Value |
-|------|-------|
-| vCPU | 2 |
-| RAM | 4 GB |
-| Architecture | ARM64 (Graviton) |
-| On-Demand | ~$24/mo |
-| Reserved 1yr | ~$14/mo |
-
-**Current prod:** `t4g.medium` per decision #34 — headroom for api + worker + redis + future trade service. See [phase-0.2-capacity.md](../archive/phase-0/phase-0.2-capacity.md).
-
-### Database — Aurora PostgreSQL 17.9 (Serverless v2)
-
-| Spec | Value |
-|------|-------|
-| Engine | Aurora PostgreSQL 17.9 |
-| Min ACU | 0.5 |
-| Max ACU | 2 |
-| Cost | ~$0.12/ACU-hour when active |
-| Storage | gp3 (~$2.30/mo) |
-
-**Why Postgres over SQLite**:
-- Native `CREATE SCHEMA` — `BT.`, `TRADE.`, `REFDATA.` schemas work natively
-- `jsonb` type for `CONFIG_JSON`, `METRICS_JSON` — queryable and indexable
-- Native `UUID` column type (not text)
-- Concurrent writes (Trade API + backtest don't collide)
-- Serverless v2 scales to zero — near-$0 when idle
-
-**Why not DynamoDB**: Data is relational (joins: strategy → results → deployments). Wrong fit for key-value.
-
-### Architecture Diagram
-
-```
-┌───────────────────────────────────────────────┐
-│  EC2 t4g.medium (Docker Compose)               │
-│  nginx + api + worker + redis (+ trade later) │
-└───────────┼───────────────────────────────────┘
-            │
-            ▼
-┌───────────────────────┐          ┌──────────┐
-│  Aurora PostgreSQL    │          │ Exchange │
-│  17.9 Serverless v2   │          │ (Futu /  │
-│  ┌─────────────────┐  │          │  Bybit)  │
-│  │ BT.*            │  │          └──────────┘
-│  │ TRADE.*         │  │               ▲
-│  │ REFDATA.*       │  │               │
-│  └─────────────────┘  │         Orders/Fills
-│  DB: Quant             │               │
-└───────────────────────┘     ◄─────────┘
-```
-
-### Local Development
-
-Use SQLite or Docker Postgres locally. Switch via environment variable:
-
-```bash
-# .env
-DB_URL=sqlite:///db/store/quant.db               # local dev
-DB_URL=postgresql://user:pass@host/quant          # AWS
-```
-
-### Estimated Monthly Cost
-
-| Resource | Cost |
-|----------|------|
-| EC2 t4g.medium (reserved 1yr) | ~$14 |
-| RDS Serverless v2 (mostly idle) | ~$5–15 |
-| EBS 20 GB gp3 | ~$1.60 |
-| **Total** | **~$15–25** |
-
-### Upgrade Path
-
-| Trigger | Action |
-|---------|--------|
-| Grid search too slow on burstable | Upgrade to `t4g.medium` or `c7g.medium` (sustained compute) |
-| Multi-user or high-frequency signals | Move to ECS Fargate or EKS |
-| DB exceeds 2 ACU regularly | Increase Max ACU or switch to provisioned RDS |
-| Python 3.14 stable (Oct 2026) | Drop `uuid7` package, use stdlib `uuid.uuid7()` |
+AWS sizing and deploy: [Infrastructure](../architecture/infrastructure.md).

@@ -15,16 +15,16 @@ and crypto strategies. Each provider will be integrated as a new class in
 (`get_historical_price()` → DataFrame `['t', 'v']`).
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                        Backtest Pipeline                        │
-│                                                                 │
-│  Glassnode (on-chain) ──┐                                       │
-│  FMP ──┤                                                        │
-│  Nasdaq Data Link ──┤                                           │
-│  MarineTraffic ──┼──► data.py ──► strat.py ──► perf.py         │
-│  Aviationstack ──┤                                              │
-│  (future: sat/foot traffic) ──┘                                 │
-└──────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                        Backtest Pipeline                           │
+│                                                                    │
+│  Glassnode (on-chain) ──┐                                          │
+│  FMP ──┤                                                           │
+│  Nasdaq Data Link ──┤                                              │
+│  MarineTraffic ──┼──► sources.py ──► signals.py ──► performance.py │
+│  Aviationstack ──┤                                                 │
+│  (future: sat/foot traffic) ──┘                                    │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -52,28 +52,22 @@ and crypto strategies. Each provider will be integrated as a new class in
 | **Historical depth** | 10+ years (BTC data since 2009 genesis block) |
 | **Resolution** | Daily (`24h`) |
 | **API limits** | Tier-dependent; free tier covers ~20 core metrics |
-| **Cost** | List price was Free / $29/mo (Advanced) / $799/mo (Professional). Professional has been the plan in use since 28 Sep 2026 18:00 HKT |
+| **Cost** | Professional is the plan in use. List price and the store: [Glassnode market data](glassnode-market-data.md) |
 | **Key endpoints** | `/v1/metrics/indicators/sopr`, `/v1/metrics/market/mvrv`, `/v1/metrics/addresses/active_count`, `/v1/metrics/transactions/transfers_volume_to_exchanges_sum`, `/v1/metrics/mining/hash_rate_mean` |
 | **Criteria met** | C1 ✓ C2 ✓ C3 ✓ C4 ✓. C6 was the old objection (list price $799/mo). The plan is already active; storage is the open question |
 
-**Why this used to be deferred:** The free tier is extremely limited, and the
-on-chain paths below were written when Professional was **$799/mo**, which
-failed C6. That cost reason is stale. The Professional plan has been active
-since 28 Sep 2026 18:00 HKT. On 3 Oct 2026 the close-price path and the five
-on-chain paths in the sketch answered for BTC at `24h`. `REFDATA.APP_METRIC`
-seeds the on-chain and sleeve series in `refdata/1.28.0` (context
-`refdata,prod-deploy`). The class requests the `METRIC_PATH` it is given. A
-backtest still resolves metric name `price`, so that run still requests
-`market/price_usd_close`. Where the
-series should be stored, and how a revision of history would be kept, is the
-open draft in
-[Glassnode market data](glassnode-market-data.md). The sketch below is not
-implemented.
+**Why this used to be deferred:** List price **$799/mo** failed C6. That cost
+reason is stale. The Professional plan, the 3 Oct BTC `24h` answers, and where
+the series is stored are on [Glassnode market data](glassnode-market-data.md).
+`REFDATA.APP_METRIC` seeds the on-chain and sleeve series in `refdata/1.28.0`
+(context `refdata,prod-deploy`). The class requests the `METRIC_PATH` it is
+given. A backtest still resolves metric name `price`, so that run still
+requests `market/price_usd_close`. The sketch below is not implemented.
 
 **Integration sketch** (extend existing class):
 
 ```python
-# Add to existing Glassnode class in data.py
+# Add to existing Glassnode class in sources.py
 
 @lru_cache(maxsize=32)
 def get_onchain_metric(self, metric_path, symbol, start_date, end_date, resolution='24h'):
@@ -336,7 +330,7 @@ this data.
 | **P2** | Nasdaq Data Link | $0–50/mo | 50+ yr | Low — Python SDK | ★★★★☆ |
 | **P3** | MarineTraffic | £10–100/mo | 15+ yr | Medium — event aggregation | ★★★☆☆ |
 | **P4** | Aviationstack | $50/mo | <10 yr | Medium — pagination + aggregation | ★★☆☆☆ |
-| **—** | Glassnode (on-chain) | Professional, active since 28 Sep 2026 | 10+ yr | Client still price-only; store undecided | [Open draft](glassnode-market-data.md) |
+| **—** | Glassnode (on-chain) | Professional, active since 28 Sep 2026 | 10+ yr | catalog path client; backtest still requests `price`; store undecided — [Glassnode market data](glassnode-market-data.md) | [Open draft](glassnode-market-data.md) |
 | **—** | Satellite/Foot Traffic | $400–5K/mo | Varies | High — CV/enterprise | Deferred |
 
 **Recommended order:** FMP → Nasdaq Data Link → MarineTraffic → Aviationstack.
@@ -354,7 +348,7 @@ question is the store, in [Glassnode market data](glassnode-market-data.md).
 
 ## 5. Integration Pattern
 
-All new sources follow the existing `data.py` duck-typed interface:
+All new sources follow the existing `sources.py` duck-typed interface:
 
 ```python
 class <Source>:
@@ -411,15 +405,15 @@ The frontend's `useApps()` hook will pick them up automatically after `POST /api
 | Q1 | Should alternative data metrics use the same `['t', 'v']` interface or extend to multi-column? | Interface design — affects all downstream modules |
 | Q2 | Store fetched alternative data in PostgreSQL for caching, or rely on `@lru_cache` only? | Cost control — reduces API calls on repeated backtests |
 | Q3 | How to handle mixed frequencies (some series skip weekends/holidays)? | Data alignment with market price series |
-| Q4 | Should MarineTraffic aggregation (events → daily counts) happen at fetch time or in `strat.py`? | Separation of concerns |
+| Q4 | Should MarineTraffic aggregation (events → daily counts) happen at fetch time or in `signals.py`? | Separation of concerns |
 
 ---
 
 ## 8. Next Steps
 
 1. **Sign up for FMP API key** — verify endpoint responses against docs.
-2. **Implement `FMP` class** in `data.py` with treasury rate + economic indicator methods.
+2. **Implement `FMP` class** in `sources.py` with treasury rate + economic indicator methods.
 3. **Add FMP unit tests** with mocked API responses.
 4. **Build macro overlay strategy** — e.g. BTC + Treasury yield regime filter.
 5. **Repeat for Nasdaq Data Link** (P2) once FMP is validated.
-6. **Glassnode on-chain** — Professional is active. Storage is the open draft in [Glassnode market data](glassnode-market-data.md). The class still fetches close price only.
+6. **Glassnode on-chain** — catalog path client; backtest still requests `price`. Store: [Glassnode market data](glassnode-market-data.md).

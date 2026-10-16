@@ -894,16 +894,16 @@ what every downstream "newest closed bar" derives from.
 | `db/liquidbase/market_data/procedures/SP_INS_PRICE_BAR.sql` | Single-row insert |
 | `db/liquidbase/market_data/procedures/SP_GET_PRICE_BAR_COVERAGE.sql` | Stored min/max via index `LIMIT 1` (freshness + catch-up) |
 | `db/liquidbase/market_data/procedures/SP_GET_PRICE_BAR.sql` | Range read |
-| `db/liquidbase/market_data/releases/1.0.0-price-bars.xml` | `PRICE_BAR` table + insert / range-read / coverage SPs |
-| `db/liquidbase/refdata/data/TM_INTERVAL.sql` + `releases/1.5.0-tm-interval.xml` | Seed `DAILY` / `1H` rows + `PERIOD_LENGTH` |
-| `db/liquidbase/refdata/releases/1.7.0-tm-interval-display-name.xml` | `TM_INTERVAL.DISPLAY_NAME` — dropdown label for the schedule control (§3.1) |
+| `db/liquidbase/market_data/releases/archive/1.0.0-price-bars.xml` | `PRICE_BAR` table + insert / range-read / coverage SPs |
+| `db/liquidbase/refdata/data/TM_INTERVAL.sql` + `releases/archive/1.5.0-tm-interval.xml` | Seed `DAILY` / `1H` rows + `PERIOD_LENGTH` |
+| `db/liquidbase/refdata/releases/archive/1.7.0-tm-interval-display-name.xml` | `TM_INTERVAL.DISPLAY_NAME` — dropdown label for the schedule control (§3.1) |
 | `db/liquidbase/market_data/market_data-changelog.xml` | Liquibase changelog |
 | `db/liquidbase/trade/procedures/SP_GET_MISSED_DUE_DEPLOYMENTS.sql` | Poller — apply-now rows |
 | `db/liquidbase/trade/procedures/SP_GET_NEXT_DUE_DEPLOYMENTS.sql` | UI / ops — not-yet-due preview |
 | `db/liquidbase/trade/procedures/SP_GET_SCHEDULED_INSTRUMENTS.sql` | Bar warmer — distinct `(interval, cusip, app)` to warm |
-| `db/liquidbase/trade/releases/1.6.0-scheduled-instruments.xml` | `SP_GET_SCHEDULED_INSTRUMENTS` |
-| `db/liquidbase/trade/releases/1.7.0-execution-event-position.xml` | `EXECUTION_EVENT.POSITION_QTY` + `SP_INS_EXECUTION_EVENT` overload swap |
-| `db/liquidbase/trade/releases/1.4.0-deployment-scheduler.xml` | `SCHEDULE_TM_INTERVAL_ID`, `EXECUTION_EVENT.TRANSACT_AT`, `DEPLOYMENT_SCHEDULE_STATUS` + scheduler SPs |
+| `db/liquidbase/trade/releases/archive/1.6.0-scheduled-instruments.xml` | `SP_GET_SCHEDULED_INSTRUMENTS` |
+| `db/liquidbase/trade/releases/archive/1.7.0-execution-event-position.xml` | `EXECUTION_EVENT.POSITION_QTY` + `SP_INS_EXECUTION_EVENT` overload swap |
+| `db/liquidbase/trade/releases/archive/1.4.0-deployment-scheduler.xml` | `SCHEDULE_TM_INTERVAL_ID`, `EXECUTION_EVENT.TRANSACT_AT`, `DEPLOYMENT_SCHEDULE_STATUS` + scheduler SPs |
 
 ### Modified (DDL)
 
