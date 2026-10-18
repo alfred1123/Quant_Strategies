@@ -365,10 +365,13 @@ describe('MarketDataPage data kinds', () => {
     setup();
     vi.mocked(useProviderSeries).mockReturnValue({
       data: [{
+        provider_subscr_id: '11111111-1111-1111-1111-111111111111',
         app_id: 2,
         app_metric_id: 11,
         tm_interval_id: 1,
         internal_cusip: 'btcusdt.crypto',
+        is_enabled_ind: 'Y',
+        backfill_from_ts: null,
         range_start_ts: '2010-01-01T00:00:00Z',
         range_end_ts: '2026-10-10T00:00:00Z',
         has_payload_ind: 'Y',

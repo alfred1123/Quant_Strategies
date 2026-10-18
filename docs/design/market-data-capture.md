@@ -453,11 +453,15 @@ xref is invisible to this very dropdown — see decision #62 and
 The app-mode control is labeled **Data**. Exchange bars are the capture table
 on this page: first bar, last bar, gaps, and an unavailable chip when the venue
 cannot be asked. Provider series are the other kind. `GET /api/v1/market-data/provider-series`
-lists current `BT.API_REQUEST` windows — source, metric, product, and the stored
-range — and does not return the JSON body. A header whose payload partition was
-dropped still appears, marked unavailable. The list is not filtered by user.
-Release `bt/1.29.0` has context `bt,prod-deploy`.
-Recorded as [decision #98](../decisions.md).
+lists current `MARKET_DATA.PROVIDER_SUBSCR` rows. The stored window is a
+left join to `BT.API_REQUEST` on `PROVIDER_SUBSCR_ID`. Source, metric, product,
+and the stored range come back, without the JSON body. A subscription that
+has not been fetched yet is on the list, and its range is null. A header whose
+payload partition was dropped is marked unavailable. A stored window with a
+null id is not on the list. The list is not filtered by user.
+Releases `bt/1.30.0` and `market_data/1.6.0`. Contexts are `bt,prod-deploy`
+and `market_data,prod-deploy`.
+Recorded as [decision #100](../decisions.md), which amends [#98](../decisions.md).
 
 ## 7. The backtest seam (built)
 

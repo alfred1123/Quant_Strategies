@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      BT.API_REQUEST.PROVIDER_SUBSCR_ID — the stored window joins the
+      subscription on this id. Runs before market_data/1.6.0, which reads it.
+    -->
+
+    <changeSet id="1.30.0-001-api-request-provider-subscr" author="alfcheun" context="bt,prod-deploy">
+        <comment>BT.API_REQUEST.PROVIDER_SUBSCR_ID and the open-window index</comment>
+        <sqlFile path="../tables/API_REQUEST_PROVIDER_SUBSCR.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 stripComments="true"/>
+        <rollback>
+            <sql>
+                DROP INDEX IF EXISTS BT.UQ_API_REQUEST_SUBSCR_OPEN;
+                ALTER TABLE BT.API_REQUEST DROP COLUMN IF EXISTS PROVIDER_SUBSCR_ID;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

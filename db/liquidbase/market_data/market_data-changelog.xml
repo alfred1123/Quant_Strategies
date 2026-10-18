@@ -27,5 +27,6 @@
     <!-- 1.4.0 applied on prod 2026-09-04 and archived. -->
 
     <include file="releases/1.5.0-truncate-price-bar.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.6.0-provider-subscr.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

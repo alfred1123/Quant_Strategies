@@ -15,15 +15,19 @@ export interface Coverage {
   error: string | null;
 }
 
-/** One stored provider window. The JSON body is not on this row. */
+/** One provider subscription. The stored window is null until a fetch writes it. */
 export interface ProviderSeriesRow {
+  provider_subscr_id: string;
   app_id: number;
   app_metric_id: number;
-  tm_interval_id: number | null;
-  internal_cusip: string | null;
+  tm_interval_id: number;
+  internal_cusip: string;
+  is_enabled_ind: 'Y' | 'N';
+  backfill_from_ts: string | null;
   range_start_ts: string | null;
   range_end_ts: string | null;
-  has_payload_ind: 'Y' | 'N';
+  /** Null when nothing has been fetched. `N` when the payload is gone. */
+  has_payload_ind: 'Y' | 'N' | null;
 }
 
 export interface BarSubscriptionRow {

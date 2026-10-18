@@ -13,7 +13,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `MARKET_CALENDAR`, …) and `REFDATA.SP_GET_ENUM`, which reads only this schema. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and **`REFRESH_DATASET_IND`** (`Y` = the Refresh dataset checkbox may call it, `N` = it may not; Glassnode and Bybit are `N`) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `MARKET_CALENDAR` is session/timezone by **`LISTING_EXCHANGE`** (`INST.PRODUCT.EXCHANGE`; `''` = default crypto). |
 | `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `PROMOTION`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert/get procedures |
 | `TRADE` | Live trading: `DEPLOYMENT`, `DEPLOYMENT_SCHEDULE_STATUS`, `INTENT`, `EXECUTION_EVENT`, `TRANSACTION` + SPs |
-| `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows) — see [Scheduler & Price Bars](../design/scheduler-price-bars.md) — plus `BAR_SUBSCRIPTION`, standing capture requests with no deployment behind them ([Market data capture](../design/market-data-capture.md)) |
+| `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows) — see [Scheduler & Price Bars](../design/scheduler-price-bars.md) — plus `BAR_SUBSCRIPTION` and `PROVIDER_SUBSCR`, standing capture requests with no deployment behind them ([Market data capture](../design/market-data-capture.md)) |
 | `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) — `REFDATA.TICKER_MAPPING` has been dropped |
 
 ## Conventions
@@ -31,7 +31,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `<TABLE>_ID` | `STRATEGY_ID` | Primary key |
 | `<TABLE>_VID` | `STRATEGY_VID` | Soft-version ID |
 | `<TABLE>_NM` | `STRATEGY_NM` | Name column |
-| `USER_ID` | — | Audit: who created. One exception — `MARKET_DATA.BAR_SUBSCRIPTION` omits it, because the procedure logs the caller to `CORE_ADMIN.LOG_PROC_DETAIL` and a row copy would be a second record of the same fact ([decision #50](../decisions.md)) |
+| `USER_ID` | — | Audit: who created. Two exceptions — `MARKET_DATA.BAR_SUBSCRIPTION` and `MARKET_DATA.PROVIDER_SUBSCR` omit it, because the procedure logs the caller to `CORE_ADMIN.LOG_PROC_DETAIL` and a row copy would be a second record of the same fact ([decision #50](../decisions.md), [decision #100](../decisions.md)) |
 | `CREATED_AT` | — | Audit: when created (`TIMESTAMPTZ`) |
 | `IS_CURRENT_IND` | — | Soft-versioning flag (`CHAR(1)` Y/N) — **deprecated** in `BT.STRATEGY`, replaced by `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` |
 | `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` | — | Transaction-time window (`TIMESTAMPTZ`). Active row: `TRANSACT_TO_TS = '9999-12-31'` |
@@ -383,7 +383,8 @@ The worker claims in `WorkerLoopRepo.claim_next` (`quant/queue/worker_loop.py`):
 | `SP_GET_PRICE_BAR_COVERAGE` | `MARKET_DATA` | `MIN`/`MAX` timestamps via index `LIMIT 1` probes |
 | `SP_INS_BAR_SUBSCRIPTION` | `MARKET_DATA` | Version a capture request — create, enable, disable, retarget |
 | `SP_GET_BAR_SUBSCRIPTION` | `MARKET_DATA` | Current subscriptions, for the Data tab (not user-scoped — bars are shared) |
-| `SP_GET_API_REQUEST_AVAILABILITY` | `BT` | Current provider windows without the JSON body. A missing payload is `HAS_PAYLOAD_IND = N`. No user filter. Release `bt/1.29.0`, context `bt,prod-deploy` |
+| `SP_GET_API_REQUEST_AVAILABILITY` | `BT` | Current provider windows without the JSON body. A missing payload is `HAS_PAYLOAD_IND = N`. No user filter. Release `bt/1.29.0`, context `bt,prod-deploy`. The Data tab no longer calls it ([decision #100](../decisions.md)) |
+| `SP_GET_PROVIDER_SUBSCR` | `MARKET_DATA` | Current provider subscriptions left-joined to the current `API_REQUEST` window on `PROVIDER_SUBSCR_ID`. No user filter. Release `market_data/1.6.0`, context `market_data,prod-deploy` |
 | `SP_GET_ACTIVE_BAR_SUBSCRIPTIONS` | `MARKET_DATA` | Enabled series for the bar warmer, shaped like `TRADE.SP_GET_SCHEDULED_INSTRUMENTS` |
 
 ### Reading a result without the queue

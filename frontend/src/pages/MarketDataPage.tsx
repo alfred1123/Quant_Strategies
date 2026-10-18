@@ -321,14 +321,13 @@ function ProviderAvailability({
             <TableRow>
               <TableCell colSpan={4}>
                 <Typography variant="body2" color="text.secondary">
-                  No provider series is stored yet. The daily fill writes one for each
-                  product that has a vendor symbol.
+                  No provider series is subscribed yet.
                 </Typography>
               </TableCell>
             </TableRow>
           )}
           {rows.map(row => (
-            <TableRow key={`${row.app_id}-${row.app_metric_id}-${row.internal_cusip}`}>
+            <TableRow key={row.provider_subscr_id}>
               <TableCell>{row.internal_cusip ?? '—'}</TableCell>
               <TableCell>{appNameById.get(row.app_id) ?? row.app_id}</TableCell>
               <TableCell>{metricNameById.get(row.app_metric_id) ?? row.app_metric_id}</TableCell>
