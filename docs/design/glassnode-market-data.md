@@ -223,7 +223,7 @@ The later store is a later pull request. This page does not add a table, a chang
 
 ## Scheduled detach
 
-[Separate underlying](separate-underlying.md#scheduled-detach-of-old-payload-partitions) is the drop. `BT.SP_DETACH_API_REQUEST_PAYLOAD` drops a payload partition whose range has ended. It does not read or write `API_REQUEST`. Prod's 2026 partition runs through `2027-01-01` and holds the current payload with the closed copies, so that partition stays until 14 days after that date. Release `bt/1.28.0`. Context is `bt,prod-deploy`. The narrower metric store is still a later pull request.
+[Separate underlying](separate-underlying.md#scheduled-detach-of-old-payload-partitions) is the drop. `MARKET_DATA.SP_DETACH_API_REQUEST_PAYLOAD` drops a payload partition whose range has ended. It does not read or write `API_REQUEST`. Prod's 2026 partition runs through `2027-01-01` and holds the current payload with the closed copies, so that partition stays until 14 days after that date. Release `bt/1.28.0`. Context is `bt,prod-deploy`. The narrower metric store is still a later pull request.
 
 ## Revisions
 

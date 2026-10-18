@@ -375,7 +375,7 @@ exchange rate limit on behalf of a user who did not ask.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET`  | `/api/v1/market-data/subscriptions` | Every bar subscription with its coverage (first bar, last bar, gap count) and the venue's own `vendor_symbol`. |
-| `GET`  | `/api/v1/market-data/provider-series` | Current provider windows (`APP_ID`, metric, product, range) without the JSON body. A header whose payload is gone comes back as unavailable. |
+| `GET`  | `/api/v1/market-data/provider-series` | Current `PROVIDER_SUBSCR` rows, left-joined to the stored window on `PROVIDER_SUBSCR_ID`. A subscription with no fetch yet has a null range. A header whose payload is gone comes back as unavailable. |
 | `POST` | `/api/v1/market-data/subscriptions` | Create a subscription, or version one — enable, disable, retarget. |
 | `GET`  | `/api/v1/market-data/price-bars/coverage` | `MIN`/`MAX` stored bar plus gap count for one series — what is **held**. |
 | `GET`  | `/api/v1/market-data/price-bars/venue-depth` | Oldest bar the venue serves, how many bars that is, and the fill ceiling — what **exists**. |

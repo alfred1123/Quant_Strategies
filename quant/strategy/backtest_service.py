@@ -179,7 +179,7 @@ def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_ca
     Two stores, chosen by what the source *is*. An **exchange**
     (``IS_EXCHANGE_IND = 'Y'``) serves its own prints, which live in
     ``MARKET_DATA.PRICE_BAR`` — read them, and skip the vendor class and the
-    ``BT.API_REQUEST`` cache entirely, because the bar table already is the
+    ``MARKET_DATA.API_REQUEST`` cache entirely, because the bar table already is the
     cache and copying it would create a second version of the same fact. Every
     other source is a **provider** and keeps the path it always had.
 

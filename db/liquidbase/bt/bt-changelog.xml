@@ -34,5 +34,6 @@
     <include file="releases/1.27.0-api-call.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.28.0-detach-api-request-payload.xml" relativeToChangelogFile="true"/>
     <include file="releases/1.29.0-api-request-availability.xml" relativeToChangelogFile="true"/>
+    <include file="releases/1.30.0-api-request-provider-subscr.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

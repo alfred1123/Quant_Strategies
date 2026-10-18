@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      MARKET_DATA.PROVIDER_SUBSCR — which provider series the platform keeps.
+      The Data tab joins MARKET_DATA.API_REQUEST on PROVIDER_SUBSCR_ID.
+      bt/1.30.0 moves that table and adds the column before this release runs.
+    -->
+
+    <changeSet id="1.6.0-001-provider-subscr" author="alfcheun" context="market_data,prod-deploy">
+        <comment>MARKET_DATA.PROVIDER_SUBSCR — id, series uniqueness, current-id index</comment>
+        <sqlFile path="../tables/PROVIDER_SUBSCR.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 stripComments="true"/>
+        <rollback>
+            <sql>DROP TABLE IF EXISTS MARKET_DATA.PROVIDER_SUBSCR;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.6.0-002-sp-get-provider-subscr" author="alfcheun" context="market_data,prod-deploy">
+        <comment>SP_GET_PROVIDER_SUBSCR — current rows left-joined to the stored window</comment>
+        <sqlFile path="../procedures/SP_GET_PROVIDER_SUBSCR.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback>
+            <sql>
+                DROP PROCEDURE IF EXISTS MARKET_DATA.SP_GET_PROVIDER_SUBSCR(
+                    OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+                );
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -39,16 +39,16 @@ class ConnectionMaintenanceRepo(DbGateway):
 
 
 class ApiRequestPayloadRepo(DbGateway):
-    """Drop old ``BT.API_REQUEST_PAYLOAD`` partitions."""
+    """Drop old ``MARKET_DATA.API_REQUEST_PAYLOAD`` partitions."""
 
     def detach(self, *, retention_days: int) -> int:
-        """Call ``BT.SP_DETACH_API_REQUEST_PAYLOAD``.
+        """Call ``MARKET_DATA.SP_DETACH_API_REQUEST_PAYLOAD``.
 
         Returns how many partitions were dropped. The procedure does not
         write ``API_REQUEST``.
         """
         tail = self._call_write(
-            "CALL BT.SP_DETACH_API_REQUEST_PAYLOAD("
+            "CALL MARKET_DATA.SP_DETACH_API_REQUEST_PAYLOAD("
             "%s::integer, NULL::text, NULL::text, NULL::text, NULL::integer)",
             (retention_days,),
         )

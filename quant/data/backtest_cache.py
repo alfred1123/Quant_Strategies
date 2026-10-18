@@ -70,16 +70,9 @@ class BacktestCache(DbGateway):
 
     # ── proc wrappers ──────────────────────────────────────────────────
 
-    def list_availability(self) -> list[dict]:
-        """Current provider windows, without the JSON body."""
-        return self._call_get(
-            "CALL BT.SP_GET_API_REQUEST_AVAILABILITY(NULL, NULL, NULL, NULL)",
-            (),
-        )
-
     def _get_api_request(self, app_id, app_metric_id, tm_interval_id, internal_cusip) -> list[dict]:
         return self._call_get(
-            "CALL BT.SP_GET_API_REQUEST(%s, %s, %s, %s, NULL, NULL, NULL, NULL)",
+            "CALL MARKET_DATA.SP_GET_API_REQUEST(%s, %s, %s, %s, NULL, NULL, NULL, NULL)",
             (app_id, app_metric_id, tm_interval_id, internal_cusip),
         )
 
@@ -92,10 +85,10 @@ class BacktestCache(DbGateway):
         )
 
     def _insert_api_request(self, api_req_id, app_id, app_metric_id, tm_interval_id, product_grp_id, start_ts, end_ts, payload_json, internal_cusip):
-        # Deployed BT.SP_INS_API_REQUEST signature:
+        # MARKET_DATA.SP_INS_API_REQUEST signature:
         #   (uuid, integer, integer, integer, integer, timestamptz, timestamptz, jsonb, text, text)
         self._call_write(
-            "CALL BT.SP_INS_API_REQUEST("
+            "CALL MARKET_DATA.SP_INS_API_REQUEST("
             "%s::uuid, %s::integer, %s::integer, %s::integer, %s::integer, "
             "%s::timestamptz, %s::timestamptz, %s::jsonb, %s::text, %s::text, "
             "NULL::text, NULL::text, NULL::text)",

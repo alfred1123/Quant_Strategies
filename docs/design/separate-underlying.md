@@ -340,8 +340,8 @@ This means the full history of every subscription is retained — each VID is a 
 
 | Procedure | Direction | Status | Purpose |
 |-----------|-----------|--------|---------|
-| `BT.SP_INS_API_REQUEST` | Write | **Deployed** | Combined header + payload insert (steps 1–5 above) |
-| `BT.SP_GET_API_REQUEST` | Read | **Deployed** | Return current rows filtered by (APP_ID, APP_METRIC_ID, TM_INTERVAL_ID, INTERNAL_CUSIP), joined with payload |
+| `MARKET_DATA.SP_INS_API_REQUEST` | Write | **Deployed** | Combined header + payload insert (steps 1–5 above). Moved from `BT` in `bt/1.30.0` |
+| `MARKET_DATA.SP_GET_API_REQUEST` | Read | **Deployed** | Return current rows filtered by (APP_ID, APP_METRIC_ID, TM_INTERVAL_ID, INTERNAL_CUSIP), joined with payload. Moved from `BT` in `bt/1.30.0` |
 
 ### Python layer — `BacktestCache`
 
@@ -390,7 +390,7 @@ Not in scope for this PR — flagged here so the next data-layer change can targ
 
 ### Scheduled detach of old payload partitions
 
-`BT.SP_DETACH_API_REQUEST_PAYLOAD` detaches a child partition and drops it when the partition's upper bound is older than the retention the caller passes. The bound decides. The procedure does not read or write `API_REQUEST`. Release `bt/1.28.0`, context `bt,prod-deploy`. The daily job `detach_api_request_payload` passes 14 days at 03:15 UTC.
+`MARKET_DATA.SP_DETACH_API_REQUEST_PAYLOAD` detaches a child partition and drops it when the partition's upper bound is older than the retention the caller passes. The bound decides. The procedure does not read or write `API_REQUEST`. Release `bt/1.28.0`, context `bt,prod-deploy`. The daily job `detach_api_request_payload` passes 14 days at 03:15 UTC.
 
 Prod partitions are yearly on `CREATED_AT`. The 2026 child runs through `2027-01-01`, so that partition stays until 14 days after that date. Closed header rows stay in `API_REQUEST`.
 
@@ -400,7 +400,7 @@ The FastAPI lifespan (`quant/api/main.py`) builds `DataCaches`, which constructs
 
 ### Partition maintenance
 
-`API_REQUEST_PAYLOAD` is partitioned by `CREATED_AT` (yearly, via `pg_partman`). `BT.SP_DETACH_API_REQUEST_PAYLOAD` drops a child whose range has ended. See [Scheduled detach of old payload partitions](#scheduled-detach-of-old-payload-partitions).
+`API_REQUEST_PAYLOAD` is partitioned by `CREATED_AT` (yearly, via `pg_partman`). `MARKET_DATA.SP_DETACH_API_REQUEST_PAYLOAD` drops a child whose range has ended. See [Scheduled detach of old payload partitions](#scheduled-detach-of-old-payload-partitions).
 
 ## Data Flow (after)
 

@@ -104,15 +104,22 @@ class BackfillPlan(BaseModel):
 
 
 class ProviderSeriesRow(BaseModel):
-    """One current provider window. The JSON body is not included."""
+    """One current provider subscription, with the stored window if a fetch has run.
 
+    ``has_payload_ind`` is null when no window exists yet, ``N`` when the
+    header's payload is gone, and ``Y`` when the points are stored.
+    """
+
+    provider_subscr_id: UUID
     app_id: int
     app_metric_id: int
-    tm_interval_id: int | None = None
-    internal_cusip: str | None = None
+    tm_interval_id: int
+    internal_cusip: str
+    is_enabled_ind: Literal["Y", "N"]
+    backfill_from_ts: datetime | None = None
     range_start_ts: datetime | None = None
     range_end_ts: datetime | None = None
-    has_payload_ind: Literal["Y", "N"]
+    has_payload_ind: Literal["Y", "N"] | None = None
 
 
 class BackfillRequest(BaseModel):
