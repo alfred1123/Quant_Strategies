@@ -66,15 +66,20 @@ class Glassnode:
 
     ``GLASSNODE_API_KEY`` is read from the process environment. ``load_config()``
     puts it there from SSM or ``.env``. This class does not load a file.
+    Every Glassnode HTTP call goes through :meth:`_get`.
     """
 
+    BASE_URL = "https://api.glassnode.com"
+    _TIMEOUT_S = 30
+
     def __init__(self) -> None:
-        self.__api_key = os.getenv('GLASSNODE_API_KEY')
-        if not self.__api_key:
+        api_key = os.getenv("GLASSNODE_API_KEY")
+        if not api_key:
             raise ValueError("GLASSNODE_API_KEY is not set")
+        self.__api_key = api_key
 
     @lru_cache(maxsize=32)
-    def get_historical_price(self, symbol, start_date, end_date, resolution='24h', *, metric_path: str):
+    def get_historical_price(self, symbol, start_date, end_date, resolution="24h", *, metric_path: str):
         """Fetch one Glassnode series.
 
         ``metric_path`` is ``REFDATA.APP_METRIC.METRIC_PATH`` for the app the
@@ -95,17 +100,58 @@ class Glassnode:
         """
         since = int(time.mktime(time.strptime(start_date, "%Y-%m-%d")))
         until = int(time.mktime(time.strptime(end_date, "%Y-%m-%d")))
-
-        res = requests.get(
-            f"https://api.glassnode.com/v1/metrics/{metric_path}",
-            params={"a": symbol, "s": since, "u": until, "i": resolution},
-            headers={"X-Api-Key": self.__api_key},
-            timeout=30,
+        res = self._get(
+            f"/v1/metrics/{metric_path}",
+            {"a": symbol, "s": since, "u": until, "i": resolution},
         )
-        res.raise_for_status()
-        df = pd.read_json(res.text, convert_dates=['t'])
+        df = pd.read_json(res.text, convert_dates=["t"])
         logger.info("Glassnode: fetched %d rows for %s", len(df), symbol)
         return df
+
+    def list_asset_symbols(self) -> list[str]:
+        """Assets this provider lists, from ``GET /v1/metadata/assets``.
+
+        ``symbol`` on each ``data`` row is the asset a metric's ``a``
+        parameter accepts. An empty ``data`` array is an empty catalog. A
+        body without that array is not an empty catalog.
+
+        Raises:
+            requests.HTTPError: The asset list could not be read.
+            RuntimeError: The body has no ``data`` array.
+        """
+        symbols = self._asset_symbols(self._get("/v1/metadata/assets").json())
+        logger.info("Glassnode: asset list has %d symbol(s)", len(symbols))
+        return symbols
+
+    def _get(self, path: str, params: dict | None = None) -> requests.Response:
+        """One authenticated GET. Callers pass a path under :attr:`BASE_URL`."""
+        res = requests.get(
+            f"{self.BASE_URL}{path}",
+            params=params,
+            headers={"X-Api-Key": self.__api_key},
+            timeout=self._TIMEOUT_S,
+        )
+        res.raise_for_status()
+        return res
+
+    @staticmethod
+    def _asset_symbols(body: object) -> list[str]:
+        """``symbol`` values from a metadata-assets body.
+
+        Raises:
+            RuntimeError: ``body`` has no ``data`` array.
+        """
+        rows = body.get("data") if isinstance(body, dict) else None
+        if rows is None or not isinstance(rows, list):
+            raise RuntimeError("Glassnode asset list has no data array")
+        symbols: list[str] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            symbol = row.get("symbol")
+            if isinstance(symbol, str) and symbol.strip():
+                symbols.append(symbol.strip())
+        return symbols
 
 
 class AlphaVantage:

@@ -20,6 +20,7 @@ from quant.api.auth.dependencies import require_user_or_service
 from quant.api.deps import get_data_caches
 from quant.data.provider_fill import fill_scheduled_providers
 from quant.refdata.bundle import DataCaches
+from quant.trade.registry import ccxt_apps
 
 logger = logging.getLogger(__name__)
 
@@ -79,18 +80,36 @@ def detach_api_request_payload(
     return {"dropped": dropped, "retention_days": body.retention_days}
 
 
+def _venue_markets(request: Request, app_id: int) -> list[tuple[str, str | None]] | None:
+    """``(vendor_symbol, base)`` for one ccxt app, or None when the table is unread."""
+    try:
+        markets = request.app.state.price_bars.for_app(app_id).venue_symbols()
+    except Exception:
+        logger.exception("venue markets unavailable for app_id=%s", app_id)
+        return None
+    return [(market.vendor_symbol, market.base) for market in markets]
+
+
 @router.post("/providers/fill")
 def fill_providers(
+    request: Request,
     body: FillScheduledProvidersRequest,
     caller: str = Depends(require_user_or_service),
     caches: DataCaches = Depends(get_data_caches),
 ) -> dict:
-    """Insert a fresh window for every provider the checkbox does not call."""
+    """Insert a fresh window for every provider the checkbox does not call.
+
+    A missing provider xref is written first when the exchange base is on
+    that provider's asset list. The fetch then reads the xref.
+    """
+    exchange_app_ids = [app_id for app_id, _preset in ccxt_apps(caches.refdata)]
     report = fill_scheduled_providers(
         caches.refdata,
         caches.instrument_cache,
         caches.backtest_cache,
         since=body.since,
+        exchange_app_ids=exchange_app_ids,
+        markets_for_app=lambda app_id: _venue_markets(request, app_id),
     )
     logger.info(
         "providers/fill: filled=%d failed=%d since=%s caller=%s",
