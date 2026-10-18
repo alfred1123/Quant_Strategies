@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Move the stored window into MARKET_DATA, then add PROVIDER_SUBSCR_ID.
+      The window procedures move to MARKET_DATA and the BT copies are dropped.
+      SP_GET_API_LIMIT_CHK stays in BT. It counts the moved table.
+      Runs before market_data/1.6.0, which joins the window.
+    -->
+
+    <changeSet id="1.30.0-001-api-request-provider-subscr" author="alfcheun" context="bt,prod-deploy">
+        <comment>MARKET_DATA.API_REQUEST and its payload, plus PROVIDER_SUBSCR_ID</comment>
+        <sqlFile path="../tables/API_REQUEST_PROVIDER_SUBSCR.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback>
+            <sql splitStatements="false" stripComments="false"><![CDATA[
+                DROP INDEX IF EXISTS MARKET_DATA.UQ_API_REQUEST_SUBSCR_OPEN;
+                ALTER TABLE MARKET_DATA.API_REQUEST DROP COLUMN IF EXISTS PROVIDER_SUBSCR_ID;
+                ALTER TABLE MARKET_DATA.API_REQUEST_PAYLOAD SET SCHEMA BT;
+                ALTER TABLE MARKET_DATA.API_REQUEST SET SCHEMA BT;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.30.0-002-sp-ins-api-request" author="alfcheun" context="bt,prod-deploy">
+        <comment>MARKET_DATA.SP_INS_API_REQUEST replaces the BT procedure</comment>
+        <sqlFile path="../procedures/SP_INS_API_REQUEST.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.30.0-003-sp-get-api-request" author="alfcheun" context="bt,prod-deploy">
+        <comment>MARKET_DATA.SP_GET_API_REQUEST replaces the BT procedure</comment>
+        <sqlFile path="../procedures/SP_GET_API_REQUEST.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.30.0-004-drop-sp-get-api-request-availability" author="alfcheun" context="bt,prod-deploy">
+        <comment>Drop SP_GET_API_REQUEST_AVAILABILITY. The list is SP_GET_PROVIDER_SUBSCR.</comment>
+        <sqlFile path="../tables/DROP_API_REQUEST_AVAILABILITY.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.30.0-005-sp-get-api-limit-chk" author="alfcheun" context="bt,prod-deploy">
+        <comment>SP_GET_API_LIMIT_CHK counts MARKET_DATA.API_REQUEST</comment>
+        <sqlFile path="../procedures/SP_GET_API_LIMIT_CHK_MARKET_DATA.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.30.0-006-sp-detach-api-request-payload" author="alfcheun" context="bt,prod-deploy">
+        <comment>MARKET_DATA.SP_DETACH_API_REQUEST_PAYLOAD replaces the BT procedure</comment>
+        <sqlFile path="../../market_data/procedures/SP_DETACH_API_REQUEST_PAYLOAD.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

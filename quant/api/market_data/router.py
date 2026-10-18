@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, Request
 
 from quant.api.auth.dependencies import require_user, require_user_or_service
 from quant.api.auth.models import CurrentUser
+from quant.market_data.provider_subscr import ProviderSubscrRepo
 from quant.market_data.subscriptions import (
     BarSubscriptionRepo,
     BarSubscriptionService,
@@ -29,8 +30,6 @@ from quant.market_data.subscriptions import (
 )
 from quant.market_data.warm import BarWarmer
 from quant.queue.repo import BtQueueRepo
-from quant.api.deps import get_data_caches
-from quant.refdata.bundle import DataCaches
 from quant.schemas.market_data import (
     BackfillPlan,
     BackfillReport,
@@ -117,11 +116,12 @@ def sync_price_bars(
 
 @router.get("/provider-series", response_model=list[ProviderSeriesRow])
 def list_provider_series(
+    request: Request,
     _user: CurrentUser = Depends(require_user),
-    caches: DataCaches = Depends(get_data_caches),
 ) -> list[ProviderSeriesRow]:
-    """Current provider windows. The stored JSON is not returned."""
-    return [ProviderSeriesRow(**row) for row in caches.backtest_cache.list_availability()]
+    """Current provider subscriptions. The stored JSON is not returned."""
+    repo = ProviderSubscrRepo(request.app.state.db_conninfo, user_id="system")
+    return [ProviderSeriesRow(**row) for row in repo.sp_get_provider_subscr()]
 
 
 @router.get("/subscriptions", response_model=list[BarSubscriptionRow])

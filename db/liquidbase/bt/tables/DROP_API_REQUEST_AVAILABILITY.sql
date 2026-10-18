@@ -1,0 +1,6 @@
+-- The Data tab reads MARKET_DATA.SP_GET_PROVIDER_SUBSCR.
+-- The old window list is not kept under another name.
+
+DROP PROCEDURE IF EXISTS BT.SP_GET_API_REQUEST_AVAILABILITY(
+    OUT REFCURSOR, OUT TEXT, OUT TEXT, OUT TEXT
+);

@@ -79,7 +79,7 @@ BT_PROC_DIR = (
     Path(__file__).resolve().parents[2]
     / "db"
     / "liquidbase"
-    / "bt"
+    / "market_data"
     / "procedures"
 )
 

@@ -11,9 +11,9 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `CORE_ADMIN` | App users (`APP_USER`), proc audit log (`LOG_PROC_DETAIL`), exchange API credentials (`API_CREDENTIAL`) |
 | `CONFIG` | Policy (`APP_ISSUE_FEE`, `APP_APPLY_TIMING`, `API_LIMIT`, `PROMOTION_METRIC`) and `CONFIG.SP_GET_ENUM`, which reads only this schema. Redis prefix `config:<table>` and stamp `config:version`. |
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `MARKET_CALENDAR`, …) and `REFDATA.SP_GET_ENUM`, which reads only this schema. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and **`REFRESH_DATASET_IND`** (`Y` = the Refresh dataset checkbox may call it, `N` = it may not; Glassnode and Bybit are `N`) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `MARKET_CALENDAR` is session/timezone by **`LISTING_EXCHANGE`** (`INST.PRODUCT.EXCHANGE`; `''` = default crypto). |
-| `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `PROMOTION`, `API_REQUEST`, `API_REQUEST_PAYLOAD`) + insert/get procedures |
+| `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `PROMOTION`) plus the procedures that read and write the provider window. The window tables themselves move to `MARKET_DATA` in `bt/1.30.0` ([decision #100](../decisions.md)) |
 | `TRADE` | Live trading: `DEPLOYMENT`, `DEPLOYMENT_SCHEDULE_STATUS`, `INTENT`, `EXECUTION_EVENT`, `TRANSACTION` + SPs |
-| `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows) — see [Scheduler & Price Bars](../design/scheduler-price-bars.md) — plus `BAR_SUBSCRIPTION`, standing capture requests with no deployment behind them ([Market data capture](../design/market-data-capture.md)) |
+| `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows) — see [Scheduler & Price Bars](../design/scheduler-price-bars.md) — plus `BAR_SUBSCRIPTION` and `PROVIDER_SUBSCR`, standing capture requests with no deployment behind them ([Market data capture](../design/market-data-capture.md)). `API_REQUEST` and `API_REQUEST_PAYLOAD` live here from `bt/1.30.0` |
 | `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) — `REFDATA.TICKER_MAPPING` has been dropped |
 
 ## Conventions
@@ -31,7 +31,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `<TABLE>_ID` | `STRATEGY_ID` | Primary key |
 | `<TABLE>_VID` | `STRATEGY_VID` | Soft-version ID |
 | `<TABLE>_NM` | `STRATEGY_NM` | Name column |
-| `USER_ID` | — | Audit: who created. One exception — `MARKET_DATA.BAR_SUBSCRIPTION` omits it, because the procedure logs the caller to `CORE_ADMIN.LOG_PROC_DETAIL` and a row copy would be a second record of the same fact ([decision #50](../decisions.md)) |
+| `USER_ID` | — | Audit: who created. Two exceptions — `MARKET_DATA.BAR_SUBSCRIPTION` and `MARKET_DATA.PROVIDER_SUBSCR` omit it, because the procedure logs the caller to `CORE_ADMIN.LOG_PROC_DETAIL` and a row copy would be a second record of the same fact ([decision #50](../decisions.md), [decision #100](../decisions.md)) |
 | `CREATED_AT` | — | Audit: when created (`TIMESTAMPTZ`) |
 | `IS_CURRENT_IND` | — | Soft-versioning flag (`CHAR(1)` Y/N) — **deprecated** in `BT.STRATEGY`, replaced by `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` |
 | `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` | — | Transaction-time window (`TIMESTAMPTZ`). Active row: `TRANSACT_TO_TS = '9999-12-31'` |
@@ -354,8 +354,9 @@ The worker claims in `WorkerLoopRepo.claim_next` (`quant/queue/worker_loop.py`):
 | `SP_GET_QUEUE_LATEST` | `BT` | **Queue worker**: active row for one **`QUEUE_ID`** + frozen **`CONFIG_JSON`** (`QUEUE` ⋈ **`STRATEGY`** on **`STRATEGY_VID`**) |
 | `SP_INS_RESULT` | `BT` | Inserts **`BT.RESULT`** with caller-supplied shredded strategy + buy-and-hold columns + full `PAYLOAD_JSON`; denormalizes `STRATEGY_ID`/`STRATEGY_VID` from `BT.QUEUE`; bumps `RESULT_VID` and flips prior rows' `IS_CURRENT_IND` within the same strategy VID; worker extracts metrics in Python (`quant/queue/result_metrics.py`); **`IN_RESULT_ID`** is caller-supplied UUID; OUT row is status triplet only |
 | `SP_GET_RESULT` | `BT` | One result row (REFCURSOR). `IN_QUEUE_ID` reads that submission. `IN_STRATEGY_ID` + `IN_STRATEGY_VID` reads the current row of that version. Filters are appended only when the input is present. See [Reading a result without the queue](#reading-a-result-without-the-queue) |
-| `SP_INS_API_REQUEST` | `BT` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`) |
-| `SP_DETACH_API_REQUEST_PAYLOAD` | `BT` | Detach and drop a payload partition whose range ended before `IN_RETENTION_DAYS`. Does not read or write `API_REQUEST` |
+| `SP_INS_API_REQUEST` | `MARKET_DATA` | Soft-versioning insert — combined header + JSONB payload in a single call (writes both `API_REQUEST` and the partitioned `API_REQUEST_PAYLOAD`). Moved from `BT` in `bt/1.30.0` |
+| `SP_GET_API_REQUEST` | `MARKET_DATA` | Current window joined to its payload. Moved from `BT` in `bt/1.30.0` |
+| `SP_DETACH_API_REQUEST_PAYLOAD` | `MARKET_DATA` | Detach and drop a payload partition whose range ended before `IN_RETENTION_DAYS`. Does not read or write `API_REQUEST`. Moved from `BT` in `bt/1.30.0` |
 | `SP_INS_API_CREDENTIAL` | `CORE_ADMIN` | New exchange credential or rotate keys (soft-version); status triplet OUT first |
 | `SP_GET_API_CREDENTIAL` | `CORE_ADMIN` | List/get credentials for `APP_USER_ID` (REFCURSOR) |
 | `SP_GET_CREDENTIAL_CHECK` | `CORE_ADMIN` | Validation read by `API_CREDENTIAL_ID` — no owner filter; caller checks ownership + active status |
@@ -383,7 +384,7 @@ The worker claims in `WorkerLoopRepo.claim_next` (`quant/queue/worker_loop.py`):
 | `SP_GET_PRICE_BAR_COVERAGE` | `MARKET_DATA` | `MIN`/`MAX` timestamps via index `LIMIT 1` probes |
 | `SP_INS_BAR_SUBSCRIPTION` | `MARKET_DATA` | Version a capture request — create, enable, disable, retarget |
 | `SP_GET_BAR_SUBSCRIPTION` | `MARKET_DATA` | Current subscriptions, for the Data tab (not user-scoped — bars are shared) |
-| `SP_GET_API_REQUEST_AVAILABILITY` | `BT` | Current provider windows without the JSON body. A missing payload is `HAS_PAYLOAD_IND = N`. No user filter. Release `bt/1.29.0`, context `bt,prod-deploy` |
+| `SP_GET_PROVIDER_SUBSCR` | `MARKET_DATA` | Current provider subscriptions left-joined to the current `MARKET_DATA.API_REQUEST` window on `PROVIDER_SUBSCR_ID`. No user filter. Release `market_data/1.6.0`. Replaces `SP_GET_API_REQUEST_AVAILABILITY`, which `bt/1.30.0` drops ([decision #100](../decisions.md)) |
 | `SP_GET_ACTIVE_BAR_SUBSCRIPTIONS` | `MARKET_DATA` | Enabled series for the bar warmer, shaped like `TRADE.SP_GET_SCHEDULED_INSTRUMENTS` |
 
 ### Reading a result without the queue

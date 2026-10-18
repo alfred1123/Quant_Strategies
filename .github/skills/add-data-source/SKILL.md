@@ -200,9 +200,9 @@ UI request \u2014\u2192 BacktestCache.read_payload | refresh_payload(fetcher=...
 
 | Procedure | Direction | Purpose |
 |-----------|-----------|---------|
-| `BT.SP_GET_API_REQUEST` | **Read** | Returns the current `API_REQUEST` row joined with its JSONB payload, filtered by `(APP_ID, APP_METRIC_ID, TM_INTERVAL_ID, INTERNAL_CUSIP)`. |
+| `MARKET_DATA.SP_GET_API_REQUEST` | **Read** | Returns the current `API_REQUEST` row joined with its JSONB payload, filtered by `(APP_ID, APP_METRIC_ID, TM_INTERVAL_ID, INTERNAL_CUSIP)`. |
 | `BT.SP_GET_API_LIMIT_CHK(IN_APP_ID)` | **Read** | Check all `CONFIG.API_LIMIT` rules for the provider. Returns `OUT_ALLOWED='Y'` if safe to call, `'N'` with breach details if any limit is exceeded. **Must be called before every provider API request.** |
-| `BT.SP_INS_API_REQUEST` | **Write** | Combined header + JSONB payload insert. Bumps `API_REQ_VID` and closes the prior current row in one call. |
+| `MARKET_DATA.SP_INS_API_REQUEST` | **Write** | Combined header + JSONB payload insert. Bumps `API_REQ_VID` and closes the prior current row in one call. |
 
 ### Implementation pattern
 

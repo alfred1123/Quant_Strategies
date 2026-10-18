@@ -72,7 +72,7 @@ class OptimizeRequest(BaseModel):
     # refused rather than served daily bars under an intraday label.
     tm_interval_id: int
     # Cache control — when True, refetch every product+factor from the
-    # provider and insert a new BT.API_REQUEST version. When False
+    # provider and insert a new MARKET_DATA.API_REQUEST version. When False
     # (default), serve from cache only and 400 on miss.
     refresh_dataset: bool = False
     factors: list[FactorConfig] = Field(min_length=1)
