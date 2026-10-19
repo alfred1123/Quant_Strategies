@@ -150,7 +150,7 @@ nav:
       - Strategies worth new platform features: research/feature-worthy-strategies.md
       - Strategy persistence validation: research/strategy-persistence-validation.md
       - Research workflow: research/workflow.md
-      - Risk control for the three sleeves: research/risk-control.md
+      - Risk control: research/risk-control.md
   - Archive:
       - Overview: archive/README.md
       - Trade Deployment Rollout: archive/trade-deployment-rollout.md

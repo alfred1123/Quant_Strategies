@@ -90,6 +90,7 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/strategy/signals.py` | `SignalDirection` | Generate position array `{-1, 0, 1}` from indicator vs threshold. |
 | `quant/strategy/signals.py` | `StrategyConfig`, `SubStrategy` | Immutable config carrying strategy identity. |
 | `quant/strategy/signals.py` | `combine_positions()` | AND / OR / FILTER conjunction logic with strength-based tiebreak. |
+| `quant/strategy/risk_rule.py` | `read_risk_rule`, `record_for_run` | The only copy of the sleeve-book risk rule. A run reads it and the result records it. A missing rule raises, so no result is stored. The record says the rule was not applied: the engine cannot size or combine sleeves. |
 | `quant/strategy/performance.py` | `Performance` | PnL engine — single or multi-factor, with transaction costs. Owns Sharpe sample size (`get_metric_n_obs`). Canonical path for metrics, equity curves, and live position. |
 | `quant/strategy/objective.py` | `Objective`, `IndicatorCache` | Scalar Sharpe for the search loop — indicators cached by window, numpy PnL. Tested against `Performance`. |
 | `quant/strategy/optimizer.py` | `ParametersOptimization`, `SearchStrategy` | Exhaustive Cartesian product (recorded into an optuna study) or Optuna TPE when `n_trials` is smaller than the space. See [backtest-speed.md](../archive/backtest-speed.md). |

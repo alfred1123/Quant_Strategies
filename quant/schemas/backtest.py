@@ -1,3 +1,5 @@
+from typing import Literal
+
 import numpy as np
 from pydantic import BaseModel, Field
 
@@ -146,6 +148,33 @@ class WalkForwardResponse(BaseModel):
     split_date: str
 
 
+class SleeveWeightRecord(BaseModel):
+    """One sleeve on the risk rule a run read."""
+
+    key: str
+    name: str
+    definition: str
+    weight: float
+
+
+class RiskRuleRecord(BaseModel):
+    """The risk rule a finished run stores.
+
+    ``applied`` and ``engine_can_apply`` stay false while the engine cannot
+    size or combine sleeves. ``metrics_are`` stays ``unit_position``, so the
+    performance block cannot be read as a sized blend. ``limits`` stays empty:
+    a drawdown ladder and a kill switch are not part of this rule.
+    """
+
+    rule_id: str
+    blend_name: str
+    sleeves: list[SleeveWeightRecord]
+    applied: Literal[False]
+    engine_can_apply: Literal[False]
+    metrics_are: Literal["unit_position"]
+    limits: None = None
+
+
 class OptimizeResponse(BaseModel):
     total_trials: int
     valid: int
@@ -161,3 +190,5 @@ class OptimizeResponse(BaseModel):
     # not run (the flag was off, or the search had no valid cell) or it
     # finished. The search result is still returned either way.
     walk_forward_error: str | None = None
+    # The rule this run read. Required: a response without it is not a result.
+    risk_rule: RiskRuleRecord
