@@ -26,8 +26,8 @@ LAST_BAR = datetime(2026, 8, 1, tzinfo=UTC)
 
 def _subscription_row(**overrides) -> dict:
     base = {
-        "bar_subscription_id": str(uuid.uuid4()),
-        "bar_subscription_vid": 1,
+        "series_subscr_id": str(uuid.uuid4()),
+        "series_subscr_vid": 1,
         "internal_cusip": CUSIP,
         # Resolved by the service, not selected by the procedure: an internal
         # CUSIP cannot be looked up on an exchange, so the row carries both.

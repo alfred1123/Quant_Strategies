@@ -36,7 +36,7 @@ def _ddl_param_count(proc_file: str) -> int:
 
 def _ins_kwargs(**overrides):
     base = {
-        "bar_subscription_id": uuid.uuid4(),
+        "series_subscr_id": uuid.uuid4(),
         "internal_cusip": CUSIP,
         "tm_interval_id": DAILY,
         "source_app_id": BYBIT,
@@ -54,18 +54,31 @@ class TestCallMatchesProcedureDdl:
     mismatch surfaces as missing data rather than a failure.
     """
 
-    @patch.object(BarSubscriptionRepo, "_call_get", return_value=[{"a": 1}])
+    @patch.object(BarSubscriptionRepo, "_call_get", return_value=[{
+        "series_subscr_id": "00000000-0000-4000-8000-000000000099",
+        "series_subscr_vid": 1,
+        "internal_cusip": CUSIP,
+        "tm_interval_id": DAILY,
+        "app_id": BYBIT,
+        "app_metric_id": None,
+        "is_enabled_ind": "Y",
+        "backfill_from_ts": None,
+        "transact_from_ts": "2026-01-01T00:00:00Z",
+    }])
     @patch.object(BarSubscriptionRepo, "_call_write", return_value=())
     def test_ins(self, mock_write, _get, repo):
-        repo.sp_ins_bar_subscription(**_ins_kwargs())
+        kept = uuid.UUID("00000000-0000-4000-8000-000000000099")
+        row = repo.sp_ins_bar_subscription(**_ins_kwargs(series_subscr_id=kept))
         sql = mock_write.call_args.args[0]
-        assert call_arg_count(sql) == _ddl_param_count("SP_INS_BAR_SUBSCRIPTION.sql")
+        assert call_arg_count(sql) == _ddl_param_count("SP_INS_SERIES_SUBSCR.sql")
+        assert row["source_app_id"] == BYBIT
+        assert row["series_subscr_id"] == "00000000-0000-4000-8000-000000000099"
 
     @patch.object(BarSubscriptionRepo, "_call_get", return_value=[])
     def test_get(self, mock_get, repo):
         repo.sp_get_bar_subscription()
         sql = mock_get.call_args.args[0]
-        assert call_arg_count(sql) == _ddl_param_count("SP_GET_BAR_SUBSCRIPTION.sql")
+        assert call_arg_count(sql) == _ddl_param_count("SP_GET_SERIES_SUBSCR.sql")
 
     @patch.object(BarSubscriptionRepo, "_call_get", return_value=[])
     def test_get_active(self, mock_get, repo):
@@ -78,7 +91,7 @@ class TestCallMatchesProcedureDdl:
 
 class TestRepoValidation:
     @pytest.mark.parametrize(
-        "field", ["bar_subscription_id", "internal_cusip", "tm_interval_id", "source_app_id"]
+        "field", ["series_subscr_id", "internal_cusip", "tm_interval_id", "source_app_id"]
     )
     def test_key_fields_are_required(self, repo, field):
         with pytest.raises(ValueError, match=field):
@@ -175,7 +188,7 @@ class TestSubscribeValidatesOnWrite:
         )
 
         assert isinstance(
-            repo.sp_ins_bar_subscription.call_args.kwargs["bar_subscription_id"],
+            repo.sp_ins_bar_subscription.call_args.kwargs["series_subscr_id"],
             uuid.UUID,
         )
 
@@ -188,11 +201,11 @@ class TestSubscribeValidatesOnWrite:
             tm_interval_id=DAILY,
             source_app_id=BYBIT,
             is_enabled_ind="N",
-            bar_subscription_id=existing,
+            series_subscr_id=existing,
         )
 
         kwargs = repo.sp_ins_bar_subscription.call_args.kwargs
-        assert kwargs["bar_subscription_id"] == existing
+        assert kwargs["series_subscr_id"] == existing
         assert kwargs["is_enabled_ind"] == "N"
 
 

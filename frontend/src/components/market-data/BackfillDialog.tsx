@@ -62,7 +62,7 @@ function passSummary(plan: BackfillPlan): string {
  */
 export default function BackfillDialog({ row, onClose }: BackfillDialogProps) {
   if (!row) return null;
-  return <BackfillDialogContent key={row.bar_subscription_id} row={row} onClose={onClose} />;
+  return <BackfillDialogContent key={row.series_subscr_id} row={row} onClose={onClose} />;
 }
 
 function BackfillDialogContent({

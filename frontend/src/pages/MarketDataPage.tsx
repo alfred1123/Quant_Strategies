@@ -16,8 +16,6 @@ import {
   TableHead,
   TableRow,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Toolbar,
   Tooltip,
   Typography,
@@ -168,11 +166,20 @@ function ProductCell({ row }: { row: BarSubscriptionRow }) {
   );
 }
 
+type ListedSeries =
+  | { kind: 'bar'; row: BarSubscriptionRow }
+  | { kind: 'provider'; row: ProviderSeriesRow };
+
+function listedCusip(item: ListedSeries): string {
+  return item.row.internal_cusip;
+}
+
 interface TableProps {
   label: string;
-  rows: BarSubscriptionRow[];
+  rows: ListedSeries[];
   intervalNameById: Map<number, string>;
   appNameById: Map<number, string>;
+  metricNameById: Map<number, string>;
   emptyMessage: string;
   busy: boolean;
   onBackfill: (row: BarSubscriptionRow) => void;
@@ -184,6 +191,7 @@ function SubscriptionTable({
   rows,
   intervalNameById,
   appNameById,
+  metricNameById,
   emptyMessage,
   busy,
   onBackfill,
@@ -195,9 +203,10 @@ function SubscriptionTable({
         <TableHead>
           <TableRow>
             <TableCell>Product</TableCell>
+            <TableCell>Source</TableCell>
+            <TableCell>Series</TableCell>
             <TableCell>Interval</TableCell>
-            <TableCell>Venue</TableCell>
-            <TableCell>Captured</TableCell>
+            <TableCell>Stored</TableCell>
             <TableCell>Wanted from</TableCell>
             <TableCell align="center">Actions</TableCell>
           </TableRow>
@@ -205,25 +214,46 @@ function SubscriptionTable({
         <TableBody>
           {rows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6}>
+              <TableCell colSpan={7}>
                 <Typography variant="body2" color="text.secondary">
                   {emptyMessage}
                 </Typography>
               </TableCell>
             </TableRow>
           )}
-          {rows.map(row => {
+          {rows.map(item => {
+            if (item.kind === 'provider') {
+              const row = item.row;
+              const stored = row.has_payload_ind === 'N'
+                ? <Chip size="small" color="warning" label="unavailable" />
+                : `${row.range_start_ts?.slice(0, 10) ?? '—'} → ${row.range_end_ts?.slice(0, 10) ?? '—'}`;
+              return (
+                <TableRow key={row.series_subscr_id}>
+                  <TableCell>{row.internal_cusip}</TableCell>
+                  <TableCell>{appNameById.get(row.app_id) ?? row.app_id}</TableCell>
+                  <TableCell>{metricNameById.get(row.app_metric_id) ?? row.app_metric_id}</TableCell>
+                  <TableCell>
+                    {intervalNameById.get(row.tm_interval_id) ?? row.tm_interval_id}
+                  </TableCell>
+                  <TableCell>{stored}</TableCell>
+                  <TableCell>{formatDay(row.backfill_from_ts)}</TableCell>
+                  <TableCell />
+                </TableRow>
+              );
+            }
+            const row = item.row;
             const enabled = row.is_enabled_ind === 'Y';
             return (
-              <TableRow key={`${row.bar_subscription_id}-${row.bar_subscription_vid}`}>
+              <TableRow key={`${row.series_subscr_id}-${row.series_subscr_vid}`}>
                 <TableCell>
                   <ProductCell row={row} />
                 </TableCell>
                 <TableCell>
-                  {intervalNameById.get(row.tm_interval_id) ?? row.tm_interval_id}
-                </TableCell>
-                <TableCell>
                   {appNameById.get(row.source_app_id) ?? `App ${row.source_app_id}`}
+                </TableCell>
+                <TableCell>Bars</TableCell>
+                <TableCell>
+                  {intervalNameById.get(row.tm_interval_id) ?? row.tm_interval_id}
                 </TableCell>
                 <TableCell>
                   <CoverageCell coverage={row.coverage} target={row.backfill_from_ts} />
@@ -258,18 +288,20 @@ function SubscriptionTable({
 }
 
 /** Match on either identifier — nobody remembers which one they know. */
-function matches(row: BarSubscriptionRow, needle: string): boolean {
+function matches(item: ListedSeries, needle: string): boolean {
   if (!needle) return true;
   const q = needle.trim().toLowerCase();
+  if (item.kind === 'provider') {
+    return item.row.internal_cusip.toLowerCase().includes(q);
+  }
   return (
-    row.internal_cusip.toLowerCase().includes(q)
-    || (row.vendor_symbol?.toLowerCase().includes(q) ?? false)
+    item.row.internal_cusip.toLowerCase().includes(q)
+    || (item.row.vendor_symbol?.toLowerCase().includes(q) ?? false)
   );
 }
 
 /**
- * Data — what is stored, by kind. Exchange bars are captured here.
- * Provider series are filled on their schedule.
+ * Data — every source of a product, in one list.
  *
  * The platform could only collect bars for instruments a strategy was already
  * deployed against, which made the first thing you want to do impossible:
@@ -282,78 +314,23 @@ function matches(row: BarSubscriptionRow, needle: string): boolean {
  * the operational one and must not be diluted by rows that are deliberately
  * dormant — and a status column asks the reader to filter by eye every time.
  */
-function ProviderAvailability({
-  rows,
-  loading,
-  failed,
-  appNameById,
-  metricNameById,
-}: {
-  rows: ProviderSeriesRow[];
-  loading: boolean;
-  failed: boolean;
-  appNameById: Map<number, string>;
-  metricNameById: Map<number, string>;
-}) {
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-        <CircularProgress size={28} />
-      </Box>
-    );
-  }
-  if (failed) {
-    return <Alert severity="error">Failed to load provider series</Alert>;
-  }
-  return (
-    <TableContainer component={Paper} variant="outlined">
-      <Table size="small" aria-label="Provider series">
-        <TableHead>
-          <TableRow>
-            <TableCell>Product</TableCell>
-            <TableCell>Source</TableCell>
-            <TableCell>Series</TableCell>
-            <TableCell>Stored</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={4}>
-                <Typography variant="body2" color="text.secondary">
-                  No provider series is subscribed yet.
-                </Typography>
-              </TableCell>
-            </TableRow>
-          )}
-          {rows.map(row => (
-            <TableRow key={row.provider_subscr_id}>
-              <TableCell>{row.internal_cusip ?? '—'}</TableCell>
-              <TableCell>{appNameById.get(row.app_id) ?? row.app_id}</TableCell>
-              <TableCell>{metricNameById.get(row.app_metric_id) ?? row.app_metric_id}</TableCell>
-              <TableCell>
-                {row.has_payload_ind === 'N' ? (
-                  <Chip size="small" color="warning" label="unavailable" />
-                ) : (
-                  `${row.range_start_ts?.slice(0, 10) ?? '—'} → ${row.range_end_ts?.slice(0, 10) ?? '—'}`
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
+function combine(
+  bars: BarSubscriptionRow[],
+  providers: ProviderSeriesRow[],
+): ListedSeries[] {
+  return [
+    ...bars.map(row => ({ kind: 'bar' as const, row })),
+    ...providers.map(row => ({ kind: 'provider' as const, row })),
+  ].sort((a, b) => listedCusip(a).localeCompare(listedCusip(b)));
 }
 
 export default function MarketDataPage() {
   const { data: currentUser } = useMe();
   const { data: subscriptions, isLoading, isError, error } = useSubscriptions();
   const { data: intervals = [] } = useTmIntervals();
-  const [kind, setKind] = useState<'bars' | 'provider'>('bars');
   const { data: apps = [] } = useApps();
-  const { data: metrics = [] } = useAppMetrics(kind === 'provider');
-  const providerQuery = useProviderSeries(kind === 'provider');
+  const { data: metrics = [] } = useAppMetrics(true);
+  const providerQuery = useProviderSeries(true);
   const toggle = useSubscribe();
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -378,14 +355,14 @@ export default function MarketDataPage() {
   );
 
   const { capturing, paused, hidden } = useMemo(() => {
-    const all = subscriptions ?? [];
-    const shown = all.filter(row => matches(row, needle));
+    const all = combine(subscriptions ?? [], providerQuery.data ?? []);
+    const shown = all.filter(item => matches(item, needle));
     return {
-      capturing: shown.filter(row => row.is_enabled_ind === 'Y'),
-      paused: shown.filter(row => row.is_enabled_ind === 'N'),
+      capturing: shown.filter(item => item.row.is_enabled_ind === 'Y'),
+      paused: shown.filter(item => item.row.is_enabled_ind === 'N'),
       hidden: all.length - shown.length,
     };
-  }, [subscriptions, needle]);
+  }, [subscriptions, providerQuery.data, needle]);
 
   const handleToggleEnabled = async (row: BarSubscriptionRow) => {
     const enabled = row.is_enabled_ind === 'Y';
@@ -402,7 +379,7 @@ export default function MarketDataPage() {
     setActionError(null);
     try {
       await toggle.mutateAsync({
-        bar_subscription_id: row.bar_subscription_id,
+        series_subscr_id: row.series_subscr_id,
         internal_cusip: row.internal_cusip,
         tm_interval_id: row.tm_interval_id,
         source_app_id: row.source_app_id,
@@ -447,8 +424,7 @@ export default function MarketDataPage() {
                 Data
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                What is stored. Exchange bars are captured here. Provider series are
-                filled on their schedule.
+                What is stored for each product. Every source is one row.
               </Typography>
             </Box>
             {/*
@@ -466,41 +442,18 @@ export default function MarketDataPage() {
             </Stack>
           </Stack>
 
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            value={kind}
-            onChange={(_event, next: 'bars' | 'provider' | null) => {
-              if (next) setKind(next);
-            }}
-            aria-label="Data kind"
-          >
-            <ToggleButton value="bars">Exchange bars</ToggleButton>
-            <ToggleButton value="provider">Provider series</ToggleButton>
-          </ToggleButtonGroup>
-
-          {kind === 'provider' && (
-            <ProviderAvailability
-              rows={providerQuery.data ?? []}
-              loading={providerQuery.isLoading}
-              failed={providerQuery.isError}
-              appNameById={appNameById}
-              metricNameById={metricNameById}
-            />
-          )}
-
-          {kind === 'bars' && isLoading && (
+          {(isLoading || providerQuery.isLoading) && (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
               <CircularProgress size={28} />
             </Box>
           )}
-          {kind === 'bars' && isError && (
+          {(isError || providerQuery.isError) && (
             <Alert severity="error">
               {error instanceof Error ? error.message : 'Failed to load subscriptions'}
             </Alert>
           )}
 
-          {kind === 'bars' && !isLoading && !isError && (
+          {!isLoading && !providerQuery.isLoading && !isError && !providerQuery.isError && (
             <>
               <TextField
                 size="small"
@@ -528,6 +481,7 @@ export default function MarketDataPage() {
                   rows={capturing}
                   intervalNameById={intervalNameById}
                   appNameById={appNameById}
+                  metricNameById={metricNameById}
                   busy={toggle.isPending}
                   onBackfill={setBackfillTarget}
                   onToggle={handleToggleEnabled}
@@ -555,6 +509,7 @@ export default function MarketDataPage() {
                     rows={paused}
                     intervalNameById={intervalNameById}
                     appNameById={appNameById}
+                    metricNameById={metricNameById}
                     busy={toggle.isPending}
                     onBackfill={setBackfillTarget}
                     onToggle={handleToggleEnabled}

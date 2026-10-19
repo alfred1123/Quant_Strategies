@@ -5,9 +5,10 @@
 -- warmer can concatenate the two reads instead of translating between them.
 --
 -- No DISTINCT, unlike the deployment-side read: a deployment is per user and a
--- dozen can name one instrument, whereas UQ_BAR_SUBSCRIPTION_OPEN already
--- allows only one open row per series. Duplicates across the two sources are
--- still possible and are folded downstream by PriceBarService.sync.
+-- dozen can name one instrument, whereas UQ_SERIES_SUBSCR_ID_OPEN allows
+-- one open row per id. Venue bars are the rows whose metric is null.
+-- Two ids can name the same venue series. Duplicates across the two
+-- sources are still folded downstream by PriceBarService.sync.
 CREATE OR REPLACE PROCEDURE MARKET_DATA.SP_GET_ACTIVE_BAR_SUBSCRIPTIONS(
     OUT OUT_RESULT          REFCURSOR,
     OUT OUT_SQLSTATE        TEXT,
@@ -32,15 +33,16 @@ BEGIN
     OPEN OUT_RESULT FOR
         SELECT s.TM_INTERVAL_ID,
                s.INTERNAL_CUSIP,
-               s.SOURCE_APP_ID AS APP_ID
-          FROM MARKET_DATA.BAR_SUBSCRIPTION s
+               s.APP_ID
+          FROM MARKET_DATA.SERIES_SUBSCR s
           -- Inner join, matching the deployment-side read: an interval with no
           -- PERIOD_LENGTH has no computable bar boundary, so it is not warmable.
           JOIN REFDATA.TM_INTERVAL ti
             ON ti.TM_INTERVAL_ID = s.TM_INTERVAL_ID
          WHERE s.IS_ENABLED_IND = 'Y'
+           AND s.APP_METRIC_ID IS NULL
            AND s.TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31 00:00:00+00'
-         ORDER BY s.TM_INTERVAL_ID, s.INTERNAL_CUSIP, APP_ID;
+         ORDER BY s.TM_INTERVAL_ID, s.INTERNAL_CUSIP, s.APP_ID;
 
     OUT_SQLMSG := '20';
     CALL CORE_ADMIN.CORE_INS_LOG_PROC(

@@ -17,7 +17,7 @@ export interface Coverage {
 
 /** One provider subscription. The stored window is null until a fetch writes it. */
 export interface ProviderSeriesRow {
-  provider_subscr_id: string;
+  series_subscr_id: string;
   app_id: number;
   app_metric_id: number;
   tm_interval_id: number;
@@ -31,8 +31,8 @@ export interface ProviderSeriesRow {
 }
 
 export interface BarSubscriptionRow {
-  bar_subscription_id: string;
-  bar_subscription_vid: number;
+  series_subscr_id: string;
+  series_subscr_vid: number;
   internal_cusip: string;
   /** What the venue itself prints, e.g. `BTCUSDT`. Null if the xref is gone. */
   vendor_symbol: string | null;
@@ -47,7 +47,7 @@ export interface BarSubscriptionRow {
 /**
  * Create a subscription, or version one that exists.
  *
- * Sending `bar_subscription_id` edits that row — enable, disable, retarget —
+ * Sending `series_subscr_id` edits that row — enable, disable, retarget —
  * rather than creating a second request for the same series.
  */
 export interface SubscribeRequest {
@@ -56,7 +56,7 @@ export interface SubscribeRequest {
   source_app_id: number;
   is_enabled_ind?: 'Y' | 'N';
   backfill_from_ts?: string | null;
-  bar_subscription_id?: string;
+  series_subscr_id?: string;
 }
 
 /**

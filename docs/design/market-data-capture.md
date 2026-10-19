@@ -463,6 +463,8 @@ Releases `bt/1.30.0` and `market_data/1.6.0`. Contexts are `bt,prod-deploy`
 and `market_data,prod-deploy`.
 Recorded as [decision #100](../decisions.md), which amends [#98](../decisions.md).
 
+The table is `MARKET_DATA.SERIES_SUBSCR`. `1.6.0` created it as `PROVIDER_SUBSCR`; this release renames it, and the id is `SERIES_SUBSCR_ID` on the row and on `API_REQUEST`. A subscription is written by `MARKET_DATA.SP_INS_SERIES_SUBSCR`. The series is `(APP_ID, APP_METRIC_ID, TM_INTERVAL_ID, INTERNAL_CUSIP)`. A venue's bars are a row with a null metric. A later call for that id versions it. Enable, disable, and a new backfill target are that version. `IN_USER_ID` is the procedure log, not a column. Existing `BAR_SUBSCRIPTION` rows move into this table and that table is dropped. The Data tab lists every source of a product together. Release `market_data/1.7.0`. Context is `market_data,prod-deploy`. Recorded as [decision #102](../decisions.md), which amends [#101](../decisions.md). The 06:15 job still does not read this table.
+
 ## 7. The backtest seam (built)
 
 Backtest used to read the provider and only the provider. `_build_data_dict`

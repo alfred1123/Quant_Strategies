@@ -26,6 +26,7 @@ import uuid
 from datetime import datetime
 from uuid import UUID
 
+from quant.market_data.series_subscr import GET_SQL, INS_SQL
 from quant.market_data.service import (
     MAX_BACKFILL_BARS,
     BackfillPlan,
@@ -50,13 +51,27 @@ def _require(value, name: str) -> None:
         raise ValueError(f"{name} is required")
 
 
+def _bar_row(row: dict) -> dict:
+    """A venue row from ``PROVIDER_SUBSCR``, named the way capture reads it."""
+    return {
+        "series_subscr_id": row["series_subscr_id"],
+        "series_subscr_vid": row["series_subscr_vid"],
+        "internal_cusip": row["internal_cusip"],
+        "tm_interval_id": row["tm_interval_id"],
+        "source_app_id": row["app_id"],
+        "is_enabled_ind": row["is_enabled_ind"],
+        "backfill_from_ts": row.get("backfill_from_ts"),
+        "transact_from_ts": row["transact_from_ts"],
+    }
+
+
 class BarSubscriptionRepo(DbGateway):
-    """SP wrappers for ``MARKET_DATA.BAR_SUBSCRIPTION``."""
+    """Venue rows in ``MARKET_DATA.PROVIDER_SUBSCR`` (a null metric)."""
 
     def sp_ins_bar_subscription(
         self,
         *,
-        bar_subscription_id: UUID,
+        series_subscr_id: UUID,
         internal_cusip: str,
         tm_interval_id: int,
         source_app_id: int,
@@ -67,9 +82,9 @@ class BarSubscriptionRepo(DbGateway):
 
         Read-back rather than OUT columns, matching ``TradeRepo.write_deployment``:
         the caller wants the row as the UI will see it, including the VID the
-        procedure chose.
+        procedure chose. The series lives in ``PROVIDER_SUBSCR`` with no metric.
         """
-        _require(bar_subscription_id, "bar_subscription_id")
+        _require(series_subscr_id, "series_subscr_id")
         _require(internal_cusip, "internal_cusip")
         _require(tm_interval_id, "tm_interval_id")
         _require(source_app_id, "source_app_id")
@@ -77,38 +92,38 @@ class BarSubscriptionRepo(DbGateway):
             raise ValueError(f"is_enabled_ind must be Y or N, got {is_enabled_ind!r}")
 
         self._call_write(
-            "CALL market_data.sp_ins_bar_subscription("
-            "%s::uuid, %s::text, %s::integer, %s::integer,"
-            " %s::char(1), %s::timestamptz, %s::text,"
-            " NULL::text, NULL::text, NULL::text)",
+            INS_SQL,
             (
-                str(bar_subscription_id),
+                str(series_subscr_id),
                 internal_cusip,
-                tm_interval_id,
                 source_app_id,
+                None,
+                tm_interval_id,
                 is_enabled_ind,
                 backfill_from_ts,
                 self.user_id,
             ),
         )
-        rows = self.sp_get_bar_subscription(bar_subscription_id=bar_subscription_id)
+        rows = self.sp_get_bar_subscription(series_subscr_id=series_subscr_id)
         if not rows:
             raise RuntimeError(
-                "SP_INS_BAR_SUBSCRIPTION succeeded but SP_GET returned no row: "
-                f"{bar_subscription_id}"
+                "SP_INS_SERIES_SUBSCR succeeded but SP_GET returned no row "
+                f"for {series_subscr_id}"
             )
         return rows[0]
 
     def sp_get_bar_subscription(
-        self, *, bar_subscription_id: UUID | None = None
+        self, *, series_subscr_id: UUID | None = None
     ) -> list[dict]:
-        """Current rows, disabled ones included."""
-        return self._call_get(
-            "CALL market_data.sp_get_bar_subscription("
-            "%s::uuid,"
-            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
-            (str(bar_subscription_id) if bar_subscription_id else None,),
-        )
+        """Current venue rows, disabled ones included."""
+        rows = self._call_get(GET_SQL, ())
+        wanted = str(series_subscr_id) if series_subscr_id else None
+        return [
+            _bar_row(row)
+            for row in rows
+            if row.get("app_metric_id") is None
+            and (wanted is None or str(row["series_subscr_id"]) == wanted)
+        ]
 
     def sp_get_active_bar_subscriptions(self) -> list[dict]:
         """Enabled (tm_interval_id, internal_cusip, app_id) rows, for the warmer."""
@@ -150,7 +165,7 @@ class BarSubscriptionService:
         source_app_id: int,
         is_enabled_ind: str = "Y",
         backfill_from_ts: datetime | None = None,
-        bar_subscription_id: UUID | None = None,
+        series_subscr_id: UUID | None = None,
     ) -> dict:
         """Create a subscription, or version an existing one.
 
@@ -165,7 +180,7 @@ class BarSubscriptionService:
         )
         try:
             return self._repo.sp_ins_bar_subscription(
-                bar_subscription_id=bar_subscription_id or uuid.uuid4(),
+                series_subscr_id=series_subscr_id or uuid.uuid4(),
                 internal_cusip=internal_cusip,
                 tm_interval_id=tm_interval_id,
                 source_app_id=source_app_id,

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      One subscription table for every source. Venue bars move in with a
+      null metric, then BAR_SUBSCRIPTION and its procedures are dropped.
+    -->
+
+    <changeSet id="1.7.0-001-provider-subscr-all-sources" author="alfcheun" context="market_data,prod-deploy">
+        <comment>PROVIDER_SUBSCR holds every source. Venue rows have a null metric.</comment>
+        <sqlFile path="../tables/PROVIDER_SUBSCR_ALL_SOURCES.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.7.0-002-sp-get-provider-subscr" author="alfcheun" context="market_data,prod-deploy">
+        <comment>SP_GET_SERIES_SUBSCR returns every source, including the version columns</comment>
+        <sqlFile path="../procedures/SP_GET_SERIES_SUBSCR.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="1.7.0-003-sp-ins-provider-subscr" author="alfcheun" context="market_data,prod-deploy">
+        <comment>SP_INS_SERIES_SUBSCR versions the open series, source included</comment>
+        <sqlFile path="../procedures/SP_INS_SERIES_SUBSCR.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback>
+            <sql>
+                DROP PROCEDURE IF EXISTS MARKET_DATA.SP_INS_SERIES_SUBSCR(
+                    UUID, TEXT, INTEGER, INTEGER, INTEGER, CHAR(1), TIMESTAMPTZ, TEXT,
+                    OUT TEXT, OUT TEXT, OUT TEXT
+                );
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.7.0-004-sp-get-active-bar-subscriptions" author="alfcheun" context="market_data,prod-deploy">
+        <comment>The warmer reads enabled venue rows from SERIES_SUBSCR</comment>
+        <sqlFile path="../procedures/SP_GET_ACTIVE_BAR_SUBSCRIPTIONS.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="false"
+                 stripComments="false"/>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>
