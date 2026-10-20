@@ -1,9 +1,15 @@
-"""Business logic for ``GET /api/v1/strategies`` — Phase 1.6."""
+"""Strategy catalog and lifecycle — read, promote, logically delete.
+
+The routes live under ``/strategies`` and ``/backtest/jobs/strategies/{id}``;
+the logic lives here because every one of them is about a ``BT.STRATEGY``
+lineage, not about a queue row.
+"""
 
 import json
 from typing import Any, Literal
 from uuid import UUID
 
+from quant.promotion.repo import PromotionRepo
 from quant.queue.repo import BtQueueRepo
 
 StrategyListVersions = Literal["best", "all"]
@@ -25,8 +31,18 @@ def _as_object(value: Any) -> dict | None:
 class StrategiesService:
     """Read-only strategy catalog for the Trade picker — caller-owned rows only."""
 
-    def __init__(self, repo: BtQueueRepo) -> None:
+    def __init__(self, repo: BtQueueRepo, promotion: PromotionRepo | None = None) -> None:
         self._repo = repo
+        self._promotion = promotion
+
+    def _require_owned_lineage(self, user_id: str, strategy_id: UUID) -> None:
+        """The caller must have a queue row for this ``strategy_id``.
+
+        The ownership gate for every lifecycle write; a strategy nobody
+        enqueued under this user is not theirs to promote or hide.
+        """
+        if not self._repo.sp_get_queue(strategy_id=strategy_id, user_id=user_id, limit=1):
+            raise StrategyNotFound(str(strategy_id))
 
     def get_result(self, strategy_id: UUID, strategy_vid: int) -> dict:
         """Stored backtest for one version.
@@ -60,4 +76,33 @@ class StrategiesService:
             user_id=user_id,
             limit=limit,
             is_best_ind=is_best_ind,
+        )
+
+    # ── lifecycle writes ──────────────────────────────────────────────
+
+    def promote(self, user_id: str, strategy_id: UUID, strategy_vid: int) -> None:
+        """Promote one VID to ``IS_BEST_IND = 'Y'`` through ``PromotionRepo``."""
+        self._require_owned_lineage(user_id, strategy_id)
+        if self._promotion is None:
+            raise RuntimeError("PromotionRepo not configured")
+        self._promotion.flip_best(
+            strategy_id=strategy_id,
+            strategy_vid=strategy_vid,
+            user_id=user_id,
+        )
+
+    def set_logical_delete(
+        self,
+        user_id: str,
+        strategy_id: UUID,
+        logical_delete_ind: str,
+        strategy_vid: int | None = None,
+    ) -> None:
+        """Set ``LOGICAL_DELETE_IND`` on a lineage, or on one VID."""
+        self._require_owned_lineage(user_id, strategy_id)
+        self._repo.sp_upd_strategy_logical_delete(
+            strategy_id=strategy_id,
+            strategy_vid=strategy_vid,
+            logical_delete_ind=logical_delete_ind,
+            user_id=user_id,
         )

@@ -166,9 +166,8 @@ class TestFetchOpenPositions:
 
 
 def _service_args(**overrides):
-    credential_repo = MagicMock()
-    credential_repo.get_credential.return_value = {"app_id": 34}
     credential_service = MagicMock()
+    credential_service.app_id_of.return_value = 34
     credential_service.decrypt_credential.return_value = ("key", "secret")
     adapter = MagicMock()
     adapter.get_balances.return_value = [
@@ -186,7 +185,6 @@ def _service_args(**overrides):
         "api_credential_id": 7,
         "paper": True,
         "credential_service": credential_service,
-        "credential_repo": credential_repo,
         "adapter_registry": registry,
         "data_caches": MagicMock(),
     }
@@ -205,7 +203,7 @@ class TestFetchAccountSnapshot:
     def test_app_id_comes_from_the_credential_not_the_caller(self):
         """Otherwise a client could pair one exchange's keys with another's adapter."""
         args = _service_args()
-        args["credential_repo"].get_credential.return_value = {"app_id": 99}
+        args["credential_service"].app_id_of.return_value = 99
 
         snap = fetch_account_snapshot(**args)
 
@@ -214,7 +212,7 @@ class TestFetchAccountSnapshot:
 
     def test_unknown_credential_is_404(self):
         args = _service_args()
-        args["credential_repo"].get_credential.return_value = None
+        args["credential_service"].app_id_of.return_value = None
 
         with pytest.raises(TradeValidationError) as exc:
             fetch_account_snapshot(**args)

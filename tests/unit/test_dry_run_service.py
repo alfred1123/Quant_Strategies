@@ -41,7 +41,6 @@ def deps():
     bt = MagicMock()
     credential_service = MagicMock()
     credential_service.decrypt_credential.return_value = ("key", "secret")
-    credential_repo = MagicMock()
     adapter_registry = MagicMock()
     adapter = MagicMock()
     adapter.validate_for_dry_run.return_value = "BTCUSDT"
@@ -60,7 +59,6 @@ def deps():
         "repo": repo,
         "bt": bt,
         "credential_service": credential_service,
-        "credential_repo": credential_repo,
         "adapter_registry": adapter_registry,
         "data_caches": data_caches,
         "price_bars": price_bars,
@@ -84,7 +82,6 @@ class TestRunDryRun:
             repo=deps["repo"],
             bt=deps["bt"],
             credential_service=deps["credential_service"],
-            credential_repo=deps["credential_repo"],
             adapter_registry=deps["adapter_registry"],
             data_caches=deps["data_caches"],
             price_bars=deps["price_bars"],
@@ -114,7 +111,6 @@ class TestRunDryRun:
                 repo=deps["repo"],
                 bt=deps["bt"],
                 credential_service=deps["credential_service"],
-                credential_repo=deps["credential_repo"],
                 adapter_registry=deps["adapter_registry"],
                 data_caches=deps["data_caches"],
                 price_bars=deps["price_bars"],
@@ -132,7 +128,6 @@ class TestRunDryRun:
                 repo=deps["repo"],
                 bt=deps["bt"],
                 credential_service=deps["credential_service"],
-                credential_repo=deps["credential_repo"],
                 adapter_registry=deps["adapter_registry"],
                 data_caches=deps["data_caches"],
                 price_bars=deps["price_bars"],
@@ -148,7 +143,6 @@ class TestRunDryRun:
                 repo=deps["repo"],
                 bt=deps["bt"],
                 credential_service=deps["credential_service"],
-                credential_repo=deps["credential_repo"],
                 adapter_registry=deps["adapter_registry"],
                 data_caches=deps["data_caches"],
                 price_bars=deps["price_bars"],
@@ -163,7 +157,6 @@ class TestRunDryRun:
             repo=deps["repo"],
             bt=deps["bt"],
             credential_service=deps["credential_service"],
-            credential_repo=deps["credential_repo"],
             adapter_registry=deps["adapter_registry"],
             data_caches=deps["data_caches"],
             price_bars=deps["price_bars"],
@@ -187,7 +180,6 @@ class TestPreviewReadsWhatTheApplyWillRead:
             repo=deps["repo"],
             bt=deps["bt"],
             credential_service=deps["credential_service"],
-            credential_repo=deps["credential_repo"],
             adapter_registry=deps["adapter_registry"],
             data_caches=deps["data_caches"],
             price_bars=deps["price_bars"],
@@ -215,7 +207,6 @@ class TestPreviewReadsWhatTheApplyWillRead:
             repo=deps["repo"],
             bt=deps["bt"],
             credential_service=deps["credential_service"],
-            credential_repo=deps["credential_repo"],
             adapter_registry=deps["adapter_registry"],
             data_caches=deps["data_caches"],
             price_bars=deps["price_bars"],
@@ -242,7 +233,6 @@ class TestPreviewReadsWhatTheApplyWillRead:
                 repo=deps["repo"],
                 bt=deps["bt"],
                 credential_service=deps["credential_service"],
-                credential_repo=deps["credential_repo"],
                 adapter_registry=deps["adapter_registry"],
                 data_caches=deps["data_caches"],
                 price_bars=deps["price_bars"],

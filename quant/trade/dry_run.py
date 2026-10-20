@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from quant.api.credentials.repo import ApiCredentialRepo
 from quant.api.credentials.service import CredentialService
 from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
@@ -29,7 +28,6 @@ def run_dry_run(
     repo: TradeRepo,
     bt: BtQueueRepo,
     credential_service: CredentialService,
-    credential_repo: ApiCredentialRepo,
     adapter_registry: AdapterRegistry,
     data_caches: DataCaches,
     price_bars: PriceBarServiceFactory | None = None,
@@ -61,9 +59,7 @@ def run_dry_run(
             f"no broker adapter registered for app_id={req.app_id}"
         )
 
-    keys = credential_service.decrypt_credential(
-        credential_repo, app_user_id, req.api_credential_id
-    )
+    keys = credential_service.decrypt_credential(app_user_id, req.api_credential_id)
     if keys is None:
         raise TradeValidationError(
             "API credential not found or not owned", status_code=404

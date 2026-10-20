@@ -30,7 +30,8 @@ def crypto() -> CredentialCrypto:
 
 @pytest.fixture()
 def svc(crypto: CredentialCrypto) -> CredentialService:
-    return CredentialService(crypto)
+    """Service over a mock repo; tests reach the repo through ``svc._repo``."""
+    return CredentialService(crypto, MagicMock())
 
 
 def _fake_row(crypto: CredentialCrypto, **overrides) -> dict:
@@ -118,13 +119,11 @@ class TestCredentialServiceMask:
 
 class TestCredentialServiceCRUD:
     def test_create_returns_masked(self, svc: CredentialService):
-        repo = MagicMock()
+        repo = svc._repo
         repo.insert_credential.return_value = (1, 1)
         user_id = uuid4()
 
-        resp = svc.create_credential(
-            repo,
-            app_user_id=user_id,
+        resp = svc.create_credential(app_user_id=user_id,
             app_id=4,
             label="Test",
             api_key="KEY123456789",
@@ -139,52 +138,52 @@ class TestCredentialServiceCRUD:
         assert call_args.kwargs["api_key_ciphertext"] != "KEY123456789"
 
     def test_list_returns_masked(self, svc: CredentialService, crypto: CredentialCrypto):
-        repo = MagicMock()
+        repo = svc._repo
         repo.list_credentials.return_value = [_fake_row(crypto), _fake_row(crypto, api_credential_id=2)]
         user_id = uuid4()
 
-        creds = svc.list_credentials(repo, user_id)
+        creds = svc.list_credentials(user_id)
         assert len(creds) == 2
         for c in creds:
             assert "ciphertext" not in c.model_dump_json().lower()
 
     def test_get_not_found_returns_none(self, svc: CredentialService):
-        repo = MagicMock()
+        repo = svc._repo
         repo.get_credential.return_value = None
-        assert svc.get_credential(repo, uuid4(), 999) is None
+        assert svc.get_credential(uuid4(), 999) is None
 
     def test_rotate_not_found_returns_none(self, svc: CredentialService):
-        repo = MagicMock()
+        repo = svc._repo
         repo.get_credential.return_value = None
-        assert svc.rotate_credential(repo, uuid4(), 999, "k", "s") is None
+        assert svc.rotate_credential(uuid4(), 999, "k", "s") is None
 
     def test_rotate_returns_bumped_vid(self, svc: CredentialService, crypto: CredentialCrypto):
-        repo = MagicMock()
+        repo = svc._repo
         repo.get_credential.return_value = _fake_row(crypto)
         repo.insert_credential.return_value = (1, 2)
         user_id = uuid4()
 
-        resp = svc.rotate_credential(repo, user_id, 1, "NEW-KEY", "NEW-SEC")
+        resp = svc.rotate_credential(user_id, 1, "NEW-KEY", "NEW-SEC")
         assert resp is not None
         assert resp.api_credential_vid == 2
         assert resp.api_key_masked.endswith("-KEY")
 
     def test_revoke_not_found_returns_false(self, svc: CredentialService):
-        repo = MagicMock()
+        repo = svc._repo
         repo.get_credential.return_value = None
-        assert svc.revoke_credential(repo, uuid4(), 999) is False
+        assert svc.revoke_credential(uuid4(), 999) is False
 
     def test_revoke_success(self, svc: CredentialService, crypto: CredentialCrypto):
-        repo = MagicMock()
+        repo = svc._repo
         repo.get_credential.return_value = _fake_row(crypto)
         repo.revoke_credential.return_value = 2
-        assert svc.revoke_credential(repo, uuid4(), 1) is True
+        assert svc.revoke_credential(uuid4(), 1) is True
         repo.revoke_credential.assert_called_once()
 
     def test_decrypt_credential(self, svc: CredentialService, crypto: CredentialCrypto):
-        repo = MagicMock()
+        repo = svc._repo
         repo.get_credential.return_value = _fake_row(crypto)
-        result = svc.decrypt_credential(repo, uuid4(), 1)
+        result = svc.decrypt_credential(uuid4(), 1)
         assert result is not None
         api_key, api_secret = result
         assert api_key == "REAL-KEY-12345678"

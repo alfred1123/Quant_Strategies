@@ -17,6 +17,7 @@ from quant.api.services.strategies import (
     StrategyListVersions,
     StrategyNotFound,
 )
+from quant.promotion.repo import PromotionRepo
 from quant.queue.repo import BtQueueRepo
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,8 @@ router = APIRouter(prefix="/strategies", tags=["strategies"])
 
 def get_strategies_service(request: Request) -> StrategiesService:
     conninfo = request.app.state.db_conninfo
-    return StrategiesService(repo=BtQueueRepo(conninfo, user_id="system"))
+    repo = BtQueueRepo(conninfo, user_id="system")
+    return StrategiesService(repo=repo, promotion=PromotionRepo(conninfo, bt=repo))
 
 
 @router.get("", response_model=list[StrategyListRow])

@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from quant.api.credentials.repo import ApiCredentialRepo
 from quant.api.credentials.service import CredentialService
 from quant.refdata.bundle import DataCaches
 from quant.schemas.account import AccountSnapshot, BalanceRow, PositionRow
@@ -27,7 +26,6 @@ def fetch_account_snapshot(
     api_credential_id: int,
     paper: bool,
     credential_service: CredentialService,
-    credential_repo: ApiCredentialRepo,
     adapter_registry: AdapterRegistry,
     data_caches: DataCaches,
 ) -> AccountSnapshot:
@@ -36,19 +34,16 @@ def fetch_account_snapshot(
     ``app_id`` comes off the credential row rather than the caller, so a client
     cannot ask for one exchange's account using another's adapter.
     """
-    row = credential_repo.get_credential(app_user_id, api_credential_id)
-    if row is None:
+    app_id = credential_service.app_id_of(app_user_id, api_credential_id)
+    if app_id is None:
         raise TradeValidationError(
             "API credential not found or not owned", status_code=404
         )
-    app_id = int(row["app_id"])
 
     if not adapter_registry.has_adapter(app_id):
         raise AdapterNotFoundError(f"no broker adapter registered for app_id={app_id}")
 
-    keys = credential_service.decrypt_credential(
-        credential_repo, app_user_id, api_credential_id
-    )
+    keys = credential_service.decrypt_credential(app_user_id, api_credential_id)
     if keys is None:
         raise TradeValidationError(
             "API credential not found or not owned", status_code=404

@@ -62,7 +62,6 @@ def orchestrator():
         repo=MagicMock(),
         bt=bt,
         credential_service=MagicMock(),
-        credential_repo=MagicMock(),
         adapter_registry=MagicMock(),
         data_caches=data_caches,
         notifier=MagicMock(),

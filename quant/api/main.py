@@ -24,7 +24,6 @@ from quant.api.auth.dependencies import require_user, require_user_or_service  #
 from quant.api.auth.router import limiter as auth_limiter, router as auth_router  # noqa: E402
 from quant.api.auth.service import AuthService  # noqa: E402
 from quant.api.credentials.router import limiter as credentials_limiter, router as credentials_router  # noqa: E402
-from quant.api.credentials.service import CredentialService  # noqa: E402
 from quant.api.admin.router import router as admin_router  # noqa: E402
 from quant.api.market_data.router import router as market_data_router  # noqa: E402
 from quant.api.scheduler.router import router as scheduler_router  # noqa: E402
@@ -53,7 +52,6 @@ async def lifespan(app: FastAPI):
 
         from quant.shared.secrets_crypto import CredentialCrypto
         app.state.credential_crypto = CredentialCrypto()
-        app.state.credential_service = CredentialService(app.state.credential_crypto)
 
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
         try:

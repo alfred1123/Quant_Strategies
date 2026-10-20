@@ -9,7 +9,6 @@ from decimal import Decimal
 from typing import NamedTuple
 from uuid import UUID
 
-from quant.api.credentials.repo import ApiCredentialRepo
 from quant.api.credentials.service import CredentialService
 from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
@@ -60,7 +59,6 @@ class LiveApplyOrchestrator:
         repo: TradeRepo,
         bt: BtQueueRepo,
         credential_service: CredentialService,
-        credential_repo: ApiCredentialRepo,
         adapter_registry: AdapterRegistry,
         data_caches: DataCaches,
         *,
@@ -72,7 +70,6 @@ class LiveApplyOrchestrator:
         self._repo = repo
         self._bt = bt
         self._credential_service = credential_service
-        self._credential_repo = credential_repo
         self._adapter_registry = adapter_registry
         self._data_caches = data_caches
         self._price_bars = price_bars
@@ -94,7 +91,7 @@ class LiveApplyOrchestrator:
                 f"no broker adapter registered for app_id={deployment.app_id}"
             )
         keys = self._credential_service.decrypt_credential(
-            self._credential_repo, app_user_id, deployment.api_credential_id
+            app_user_id, deployment.api_credential_id
         )
         if keys is None:
             raise TradeValidationError(

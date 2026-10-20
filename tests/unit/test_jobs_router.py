@@ -41,6 +41,7 @@ def client_and_svc():
         from quant.api.auth.models import CurrentUser
         from quant.api.main import app
         from quant.api.routers.jobs import get_jobs_service
+        from quant.api.routers.strategies import get_strategies_service
 
         app.state.db_conninfo = "postgresql://stub"
         app.state.data_caches = MagicMock()
@@ -48,6 +49,8 @@ def client_and_svc():
 
         svc = MagicMock()
         app.dependency_overrides[get_jobs_service] = lambda: svc
+        # promote / logical-delete are StrategiesService routes mounted here.
+        app.dependency_overrides[get_strategies_service] = lambda: svc
         user = CurrentUser(app_user_id=uuid.uuid4(), username="t", session_gen=1)
         app.dependency_overrides[require_user] = lambda: user
 
@@ -305,7 +308,7 @@ class TestPromote:
 
     def test_not_found_returns_404(self, client_and_svc):
         client, svc, _ = client_and_svc
-        from quant.api.services.jobs import StrategyNotFound
+        from quant.api.services.strategies import StrategyNotFound
         svc.promote.side_effect = StrategyNotFound("missing")
 
         resp = client.post(
@@ -348,7 +351,7 @@ class TestLogicalDelete:
 
     def test_not_found_returns_404(self, client_and_svc):
         client, svc, _ = client_and_svc
-        from quant.api.services.jobs import StrategyNotFound
+        from quant.api.services.strategies import StrategyNotFound
         svc.set_logical_delete.side_effect = StrategyNotFound("missing")
 
         resp = client.post(

@@ -25,9 +25,9 @@ from quant.api.services.jobs import (
     RateLimitError,
     ReenqueueNotAllowed,
     StrategyNameMismatch,
-    StrategyNotFound,
 )
-from quant.promotion.repo import PromotionRepo
+from quant.api.routers.strategies import get_strategies_service
+from quant.api.services.strategies import StrategiesService, StrategyNotFound
 from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
 
@@ -50,7 +50,6 @@ def get_jobs_service(
         repo=repo,
         refdata=caches.refdata,
         redis_client=_get_redis(request),
-        promotion_repo=PromotionRepo(conninfo, bt=repo),
     )
 
 
@@ -163,7 +162,7 @@ def promote_strategy(
     strategy_id: UUID,
     req: PromoteRequest,
     user: CurrentUser = Depends(require_user),
-    svc: JobsService = Depends(get_jobs_service),
+    svc: StrategiesService = Depends(get_strategies_service),
 ) -> dict:
     """Promote a specific VID to IS_BEST_IND = 'Y'."""
     try:
@@ -184,7 +183,7 @@ def logical_delete_strategy(
     strategy_id: UUID,
     req: LogicalDeleteRequest,
     user: CurrentUser = Depends(require_user),
-    svc: JobsService = Depends(get_jobs_service),
+    svc: StrategiesService = Depends(get_strategies_service),
 ) -> dict:
     """Set LOGICAL_DELETE_IND on a strategy lineage (or one VID)."""
     try:

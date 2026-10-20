@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from quant.api.auth.dependencies import require_user
 from quant.api.auth.models import CurrentUser
 from quant.api.credentials.repo import ApiCredentialRepo
+from quant.api.credentials.service import CredentialService
 from quant.queue.repo import BtQueueRepo
 from quant.schemas.account import AccountSnapshot
 from quant.schemas.apply import ApplyReport
@@ -46,8 +47,7 @@ def build_trade_service(state) -> TradeService:
     return TradeService(
         repo=repo,
         bt=bt,
-        credential_service=state.credential_service,
-        credential_repo=credentials,
+        credential_service=CredentialService(state.credential_crypto, credentials),
         adapter_registry=state.adapter_registry,
         data_caches=state.data_caches,
         price_bars=state.price_bars,

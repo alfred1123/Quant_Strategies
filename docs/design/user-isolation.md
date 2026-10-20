@@ -69,8 +69,9 @@ Implementation: `quant/trade/db_repo.py`, `quant/api/routers/deployments.py`.
 
 - Enqueue / list / cancel / SSE use `str(user.app_user_id)`.
 - `SP_GET_QUEUE` filters by `USER_ID` when provided.
+- Promote and logical-delete (`StrategiesService.promote` / `set_logical_delete`) first require a queue row for the caller's `USER_ID` and the `strategy_id`; otherwise 404.
 
-Implementation: `quant/api/routers/jobs.py`, `quant/api/services/jobs.py`.
+Implementation: `quant/api/routers/jobs.py`, `quant/api/services/jobs.py`, `quant/api/services/strategies.py`.
 
 ---
 

@@ -586,7 +586,7 @@ quant/api/
 ├── routers/
 │   ├── backtest.py      # /api/v1/backtest/* endpoints
 │   ├── deployments.py   # /api/v1/trade/deployments/* + execution diary reads
-│   ├── jobs.py          # /api/v1/backtest/jobs/* + manual promote
+│   ├── jobs.py          # /api/v1/backtest/jobs/* (promote / logical-delete routes call StrategiesService)
 │   ├── promotion.py     # /api/v1/backtest/promotions
 │   ├── strategies.py    # /api/v1/strategies (Phase 1.6)
 │   ├── refdata.py       # /api/v1/refdata/* catalogs
@@ -598,8 +598,8 @@ quant/api/
 │   └── strategies.py
 └── services/
     ├── jobs.py          # Enqueue, list, cancel, SSE broker
-    ├── promotion.py
-    └── strategies.py
+    ├── promotion.py     # Promotion log reads
+    └── strategies.py    # Catalog reads + promote / logical-delete (PromotionRepo injected)
 
 quant/shared/config.py              # Settings, env/SSM loading (not under api/)
 quant/shared/secrets_crypto.py      # CredentialCrypto — EXCHANGE_SECRETS_KEY + Fernet

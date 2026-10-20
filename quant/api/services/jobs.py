@@ -17,7 +17,6 @@ from quant.api.schemas.jobs import (
     EnqueueRequest,
     EnqueueResponse,
 )
-from quant.promotion.repo import PromotionRepo
 from quant.queue.repo import BtQueueRepo
 from quant.queue.wake import publish_wake
 from quant.refdata.reader import RedisRefData
@@ -35,10 +34,6 @@ class RateLimitError(Exception):
 
 class JobNotFound(Exception):
     """Router maps to HTTP 404."""
-
-
-class StrategyNotFound(Exception):
-    """Router maps to HTTP 404 for promote endpoint."""
 
 
 class CancelNotAllowed(Exception):
@@ -61,12 +56,10 @@ class JobsService:
         repo: BtQueueRepo,
         refdata: RedisRefData,
         redis_client: redis.Redis,
-        promotion_repo: PromotionRepo | None = None,
     ) -> None:
         self._repo = repo
         self._refdata = refdata
         self._redis = redis_client
-        self._promo = promotion_repo
 
     # ── helpers ─────────────────────────────────────────────────────────
 
@@ -222,53 +215,6 @@ class JobsService:
 
         pos = self._repo.queued_position(new_queue_id, queued_id)
         return EnqueueResponse(queue_id=new_queue_id, queue_pos=pos)
-
-    # ── promote ─────────────────────────────────────────────────────────
-
-    def promote(self, user_id: str, strategy_id: uuid.UUID, strategy_vid: int) -> None:
-        """Promote a specific VID to IS_BEST_IND = 'Y'.
-
-        Verifies the user owns at least one queue row referencing this
-        ``strategy_id`` before allowing the promotion.
-        """
-        ownership = self._repo.sp_get_queue(
-            strategy_id=strategy_id, user_id=user_id, limit=1,
-        )
-        if not ownership:
-            raise StrategyNotFound(str(strategy_id))
-
-        if self._promo is None:
-            raise RuntimeError("PromotionRepo not configured")
-        self._promo.flip_best(
-            strategy_id=strategy_id,
-            strategy_vid=strategy_vid,
-            user_id=user_id,
-        )
-
-    def set_logical_delete(
-        self,
-        user_id: str,
-        strategy_id: uuid.UUID,
-        logical_delete_ind: str,
-        strategy_vid: int | None = None,
-    ) -> None:
-        """Set ``LOGICAL_DELETE_IND`` on a strategy (or one VID).
-
-        Same ownership gate as :meth:`promote`: the caller must have a queue
-        row for this ``strategy_id``.
-        """
-        ownership = self._repo.sp_get_queue(
-            strategy_id=strategy_id, user_id=user_id, limit=1,
-        )
-        if not ownership:
-            raise StrategyNotFound(str(strategy_id))
-
-        self._repo.sp_upd_strategy_logical_delete(
-            strategy_id=strategy_id,
-            strategy_vid=strategy_vid,
-            logical_delete_ind=logical_delete_ind,
-            user_id=user_id,
-        )
 
     # ── SSE polling ─────────────────────────────────────────────────────
 

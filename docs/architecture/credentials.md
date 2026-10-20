@@ -19,9 +19,13 @@ gates these routes.
 | Crypto | `quant/shared/secrets_crypto.py` (`CredentialCrypto`) | Fernet encrypt / decrypt / mask |
 | Schemas | `quant/api/credentials/schemas.py` | Request/response models — **responses never carry ciphertext** |
 
-`CredentialCrypto` and `CredentialService` are built **once** at FastAPI
-startup (`lifespan` in `quant/api/main.py`) and stored
-on `app.state`. The repo is built per-request against `app.state.db_conninfo`.
+`CredentialCrypto` is built **once** at FastAPI startup (`lifespan` in
+`quant/api/main.py`) and stored on `app.state.credential_crypto`.
+`ApiCredentialRepo` is built per-request against `app.state.db_conninfo`, and
+`CredentialService(crypto, repo)` is built around it — the service owns its
+repo, so callers pass only `app_user_id` and the credential id. `TradeService`
+and the account snapshot reach the credential table through the service
+(`decrypt_credential`, `app_id_of`), never through the repo.
 
 ---
 

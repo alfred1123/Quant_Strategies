@@ -69,7 +69,7 @@ def client_and_svc():
 
         app.state.db_conninfo = "postgresql://stub"
         app.state.data_caches = MagicMock()
-        app.state.credential_service = MagicMock()
+        app.state.credential_crypto = MagicMock()
         app.state.adapter_registry = MagicMock()
 
         svc = MagicMock()

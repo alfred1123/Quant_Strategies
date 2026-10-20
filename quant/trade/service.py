@@ -5,7 +5,6 @@ import uuid
 from decimal import Decimal
 from uuid import UUID
 
-from quant.api.credentials.repo import ApiCredentialRepo
 from quant.api.credentials.service import CredentialService
 from quant.queue.repo import BtQueueRepo
 from quant.refdata.bundle import DataCaches
@@ -42,7 +41,6 @@ class TradeService:
         repo: TradeRepo,
         bt: BtQueueRepo,
         credential_service: CredentialService,
-        credential_repo: ApiCredentialRepo,
         adapter_registry: AdapterRegistry,
         data_caches: DataCaches,
         price_bars: PriceBarServiceFactory | None = None,
@@ -50,7 +48,6 @@ class TradeService:
         self._repo = repo
         self._bt = bt
         self._credential_service = credential_service
-        self._credential_repo = credential_repo
         self._adapter_registry = adapter_registry
         self._data_caches = data_caches
         self._price_bars = price_bars
@@ -58,7 +55,6 @@ class TradeService:
             repo,
             bt,
             credential_service,
-            credential_repo,
             adapter_registry,
             data_caches,
             price_bars=price_bars,
@@ -329,7 +325,6 @@ class TradeService:
             repo=self._repo,
             bt=self._bt,
             credential_service=self._credential_service,
-            credential_repo=self._credential_repo,
             adapter_registry=self._adapter_registry,
             data_caches=self._data_caches,
             price_bars=self._price_bars,
@@ -348,7 +343,6 @@ class TradeService:
             api_credential_id=api_credential_id,
             paper=paper,
             credential_service=self._credential_service,
-            credential_repo=self._credential_repo,
             adapter_registry=self._adapter_registry,
             data_caches=self._data_caches,
         )

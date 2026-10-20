@@ -134,9 +134,8 @@ def paper_api_keys(conninfo, require_secrets_key, itest_params):
     from quant.shared.secrets_crypto import CredentialCrypto
 
     repo = ApiCredentialRepo(conninfo, user_id="pytest")
-    svc = CredentialService(CredentialCrypto())
+    svc = CredentialService(CredentialCrypto(), repo)
     keys = svc.decrypt_credential(
-        repo,
         itest_params["app_user_id"],
         itest_params["api_credential_id"],
     )
@@ -304,7 +303,7 @@ class TestCcxtDeploymentDryRun:
 
         cred_repo = ApiCredentialRepo(conninfo, user_id="pytest")
         repo = TradeRepo(conninfo, bt=bt, credentials=cred_repo, user_id="pytest")
-        cred_svc = CredentialService(CredentialCrypto())
+        cred_svc = CredentialService(CredentialCrypto(), cred_repo)
 
         req = DryRunRequest(
             strategy_id=params["strategy_id"],
@@ -322,7 +321,6 @@ class TestCcxtDeploymentDryRun:
             repo=repo,
             bt=bt,
             credential_service=cred_svc,
-            credential_repo=cred_repo,
             adapter_registry=adapter_registry,
             data_caches=data_caches,
         )

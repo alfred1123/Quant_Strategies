@@ -36,12 +36,12 @@ limiter = Limiter(key_func=get_remote_address)
 
 # ── dependencies ────────────────────────────────────────────────────────
 
-def _get_repo(request: Request) -> ApiCredentialRepo:
-    return ApiCredentialRepo(request.app.state.db_conninfo, user_id="system")
-
-
 def _get_service(request: Request) -> CredentialService:
-    return request.app.state.credential_service
+    """Per-request service over a per-request repo; the crypto is app-wide."""
+    return CredentialService(
+        request.app.state.credential_crypto,
+        ApiCredentialRepo(request.app.state.db_conninfo, user_id="system"),
+    )
 
 
 # ── routes ──────────────────────────────────────────────────────────────
@@ -49,11 +49,10 @@ def _get_service(request: Request) -> CredentialService:
 @router.get("", response_model=CredentialListResponse)
 def list_credentials(
     user: CurrentUser = Depends(require_user),
-    repo: ApiCredentialRepo = Depends(_get_repo),
     svc: CredentialService = Depends(_get_service),
 ) -> CredentialListResponse:
     """List all active credentials for the current user (masked)."""
-    creds = svc.list_credentials(repo, user.app_user_id)
+    creds = svc.list_credentials(user.app_user_id)
     return CredentialListResponse(credentials=creds)
 
 
@@ -61,11 +60,10 @@ def list_credentials(
 def get_credential(
     api_credential_id: int,
     user: CurrentUser = Depends(require_user),
-    repo: ApiCredentialRepo = Depends(_get_repo),
     svc: CredentialService = Depends(_get_service),
 ) -> CredentialResponse:
     """Get a single credential by id (masked).  404 if not found or not owned."""
-    cred = svc.get_credential(repo, user.app_user_id, api_credential_id)
+    cred = svc.get_credential(user.app_user_id, api_credential_id)
     if cred is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     return cred
@@ -77,7 +75,6 @@ def create_credential(
     request: Request,
     body: CreateCredentialRequest,
     user: CurrentUser = Depends(require_user),
-    repo: ApiCredentialRepo = Depends(_get_repo),
     svc: CredentialService = Depends(_get_service),
 ) -> CredentialResponse:
     """Save a new exchange account (encrypted at rest)."""
@@ -88,7 +85,6 @@ def create_credential(
         body.label,
     )
     return svc.create_credential(
-        repo,
         app_user_id=user.app_user_id,
         app_id=body.app_id,
         label=body.label,
@@ -104,7 +100,6 @@ def rotate_credential(
     api_credential_id: int,
     body: RotateCredentialRequest,
     user: CurrentUser = Depends(require_user),
-    repo: ApiCredentialRepo = Depends(_get_repo),
     svc: CredentialService = Depends(_get_service),
 ) -> CredentialResponse:
     """Rotate keys on an existing credential (soft-version bump)."""
@@ -114,7 +109,6 @@ def rotate_credential(
         user.app_user_id,
     )
     cred = svc.rotate_credential(
-        repo,
         app_user_id=user.app_user_id,
         api_credential_id=api_credential_id,
         api_key=body.api_key,
@@ -129,7 +123,6 @@ def rotate_credential(
 def revoke_credential(
     api_credential_id: int,
     user: CurrentUser = Depends(require_user),
-    repo: ApiCredentialRepo = Depends(_get_repo),
     svc: CredentialService = Depends(_get_service),
 ) -> None:
     """Soft-revoke a credential (sets IS_ACTIVE_IND='N', clears ciphertext)."""
@@ -138,6 +131,6 @@ def revoke_credential(
         api_credential_id,
         user.app_user_id,
     )
-    ok = svc.revoke_credential(repo, user.app_user_id, api_credential_id)
+    ok = svc.revoke_credential(user.app_user_id, api_credential_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
