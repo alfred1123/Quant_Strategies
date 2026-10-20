@@ -13,7 +13,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `MARKET_CALENDAR`, …) and `REFDATA.SP_GET_ENUM`, which reads only this schema. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and **`REFRESH_DATASET_IND`** (`Y` = the Refresh dataset checkbox may call it, `N` = it may not; Glassnode and Bybit are `N`) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `MARKET_CALENDAR` is session/timezone by **`LISTING_EXCHANGE`** (`INST.PRODUCT.EXCHANGE`; `''` = default crypto). |
 | `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `PROMOTION`) plus the procedures that read and write the provider window. The window tables themselves move to `MARKET_DATA` in `bt/1.30.0` ([decision #100](../decisions.md)) |
 | `TRADE` | Live trading: `DEPLOYMENT`, `DEPLOYMENT_SCHEDULE_STATUS`, `INTENT`, `EXECUTION_EVENT`, `TRANSACTION` + SPs |
-| `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows) — see [Scheduler & Price Bars](../design/scheduler-price-bars.md) — plus `BAR_SUBSCRIPTION` and `PROVIDER_SUBSCR`, standing capture requests with no deployment behind them ([Market data capture](../design/market-data-capture.md)). `API_REQUEST` and `API_REQUEST_PAYLOAD` live here from `bt/1.30.0` |
+| `MARKET_DATA` | Normalized price bars for live apply: `PRICE_BAR` (OHLCV rows) — see [Scheduler & Price Bars](../design/scheduler-price-bars.md) — plus `SERIES_SUBSCR`, the standing request for every source of a product ([Market data capture](../design/market-data-capture.md)). A venue row has a null metric. `API_REQUEST` and `API_REQUEST_PAYLOAD` live here from `bt/1.30.0` |
 | `INST` | Instrument / product master (`PRODUCT`, `PRODUCT_XREF`, `PRODUCT_GRP`, `PRODUCT_GRP_MEMBER`) — `REFDATA.TICKER_MAPPING` has been dropped |
 
 ## Conventions
@@ -31,7 +31,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | `<TABLE>_ID` | `STRATEGY_ID` | Primary key |
 | `<TABLE>_VID` | `STRATEGY_VID` | Soft-version ID |
 | `<TABLE>_NM` | `STRATEGY_NM` | Name column |
-| `USER_ID` | — | Audit: who created. Two exceptions — `MARKET_DATA.BAR_SUBSCRIPTION` and `MARKET_DATA.PROVIDER_SUBSCR` omit it, because the procedure logs the caller to `CORE_ADMIN.LOG_PROC_DETAIL` and a row copy would be a second record of the same fact ([decision #50](../decisions.md), [decision #100](../decisions.md)) |
+| `USER_ID` | — | Audit: who created. `MARKET_DATA.SERIES_SUBSCR` omits it, because the procedure logs the caller to `CORE_ADMIN.LOG_PROC_DETAIL` and a row copy would be a second record of the same fact ([decision #50](../decisions.md), [decision #100](../decisions.md)) |
 | `CREATED_AT` | — | Audit: when created (`TIMESTAMPTZ`) |
 | `IS_CURRENT_IND` | — | Soft-versioning flag (`CHAR(1)` Y/N) — **deprecated** in `BT.STRATEGY`, replaced by `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` |
 | `TRANSACT_FROM_TS` / `TRANSACT_TO_TS` | — | Transaction-time window (`TIMESTAMPTZ`). Active row: `TRANSACT_TO_TS = '9999-12-31'` |
@@ -382,10 +382,9 @@ The worker claims in `WorkerLoopRepo.claim_next` (`quant/queue/worker_loop.py`):
 | `SP_INS_PRICE_BAR` | `MARKET_DATA` | Insert one OHLCV bar (one row per call). **Writes no audit row** — a 10,000-bar backfill pass logged 10,000 of them |
 | `SP_GET_PRICE_BAR` | `MARKET_DATA` | Range read by `(INTERNAL_CUSIP, TM_INTERVAL_ID, SOURCE_APP_ID, start, end)` |
 | `SP_GET_PRICE_BAR_COVERAGE` | `MARKET_DATA` | `MIN`/`MAX` timestamps via index `LIMIT 1` probes |
-| `SP_INS_BAR_SUBSCRIPTION` | `MARKET_DATA` | Version a capture request — create, enable, disable, retarget |
-| `SP_GET_BAR_SUBSCRIPTION` | `MARKET_DATA` | Current subscriptions, for the Data tab (not user-scoped — bars are shared) |
-| `SP_GET_PROVIDER_SUBSCR` | `MARKET_DATA` | Current provider subscriptions left-joined to the current `MARKET_DATA.API_REQUEST` window on `PROVIDER_SUBSCR_ID`. No user filter. Release `market_data/1.6.0`. Replaces `SP_GET_API_REQUEST_AVAILABILITY`, which `bt/1.30.0` drops ([decision #100](../decisions.md)) |
-| `SP_GET_ACTIVE_BAR_SUBSCRIPTIONS` | `MARKET_DATA` | Enabled series for the bar warmer, shaped like `TRADE.SP_GET_SCHEDULED_INSTRUMENTS` |
+| `SP_INS_SERIES_SUBSCR` | `MARKET_DATA` | Version one source of a product — create, enable, disable, retarget. A venue row has a null metric. The write versions the id it is given. Release `market_data/1.7.0` ([decision #102](../decisions.md)) |
+| `SP_GET_SERIES_SUBSCR` | `MARKET_DATA` | Current subscriptions, every source, left-joined to the current `MARKET_DATA.API_REQUEST` window on `SERIES_SUBSCR_ID`. A venue row has a null range. No user filter. Release `market_data/1.7.0` ([decision #102](../decisions.md)) |
+| `SP_GET_ACTIVE_BAR_SUBSCRIPTIONS` | `MARKET_DATA` | Enabled venue rows (`APP_METRIC_ID` null) for the bar warmer, shaped like `TRADE.SP_GET_SCHEDULED_INSTRUMENTS`. Release `market_data/1.7.0` |
 
 ### Reading a result without the queue
 

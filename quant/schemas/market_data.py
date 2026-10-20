@@ -25,10 +25,10 @@ class Coverage(BaseModel):
 
 
 class BarSubscriptionRow(BaseModel):
-    """One current ``MARKET_DATA.BAR_SUBSCRIPTION`` row with its coverage."""
+    """One venue row in ``MARKET_DATA.SERIES_SUBSCR``, with its coverage."""
 
-    bar_subscription_id: UUID
-    bar_subscription_vid: int
+    series_subscr_id: UUID
+    series_subscr_vid: int
     internal_cusip: str
     #: The ticker the venue itself prints, e.g. ``BTCUSDT`` for
     #: ``btcusdt.crypto`` on Bybit. ``None`` when the ``INST.PRODUCT_XREF`` row
@@ -46,7 +46,7 @@ class BarSubscriptionRow(BaseModel):
 class SubscribeRequest(BaseModel):
     """Create a subscription, or version an existing one.
 
-    Sending ``bar_subscription_id`` edits that subscription — enable, disable
+    Sending ``series_subscr_id`` edits that subscription — enable, disable
     or retarget — rather than creating a second one; omitting it creates.
     """
 
@@ -59,7 +59,7 @@ class SubscribeRequest(BaseModel):
     #: How far back history is wanted. Intent only — nothing crawls toward it;
     #: it gives the page a target to show and to offer filling toward.
     backfill_from_ts: datetime | None = None
-    bar_subscription_id: UUID | None = None
+    series_subscr_id: UUID | None = None
 
 
 class VenueDepth(BaseModel):
@@ -110,7 +110,7 @@ class ProviderSeriesRow(BaseModel):
     header's payload is gone, and ``Y`` when the points are stored.
     """
 
-    provider_subscr_id: UUID
+    series_subscr_id: UUID
     app_id: int
     app_metric_id: int
     tm_interval_id: int

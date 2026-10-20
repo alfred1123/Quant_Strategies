@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, Request
 
 from quant.api.auth.dependencies import require_user, require_user_or_service
 from quant.api.auth.models import CurrentUser
-from quant.market_data.provider_subscr import ProviderSubscrRepo
+from quant.market_data.series_subscr import SeriesSubscrRepo
 from quant.market_data.subscriptions import (
     BarSubscriptionRepo,
     BarSubscriptionService,
@@ -120,8 +120,12 @@ def list_provider_series(
     _user: CurrentUser = Depends(require_user),
 ) -> list[ProviderSeriesRow]:
     """Current provider subscriptions. The stored JSON is not returned."""
-    repo = ProviderSubscrRepo(request.app.state.db_conninfo, user_id="system")
-    return [ProviderSeriesRow(**row) for row in repo.sp_get_provider_subscr()]
+    repo = SeriesSubscrRepo(request.app.state.db_conninfo, user_id="system")
+    return [
+        ProviderSeriesRow(**row)
+        for row in repo.sp_get_series_subscr()
+        if row.get("app_metric_id") is not None
+    ]
 
 
 @router.get("/subscriptions", response_model=list[BarSubscriptionRow])
@@ -151,7 +155,7 @@ def subscribe(
         source_app_id=req.source_app_id,
         is_enabled_ind=req.is_enabled_ind,
         backfill_from_ts=req.backfill_from_ts,
-        bar_subscription_id=req.bar_subscription_id,
+        series_subscr_id=req.series_subscr_id,
     )
     return BarSubscriptionRow(
         **row,

@@ -6,7 +6,7 @@ import { renderWithProviders } from '../test/wrapper';
 import { useProviderSeries, useSubscribe, useSubscriptions } from '../api/marketData';
 import { useAppMetrics, useApps, useTmIntervals } from '../api/refdata';
 import { useMe } from '../api/auth';
-import type { BarSubscriptionRow } from '../types/marketData';
+import type { BarSubscriptionRow, ProviderSeriesRow } from '../types/marketData';
 
 vi.mock('../api/marketData');
 vi.mock('../api/refdata', async () => {
@@ -23,8 +23,8 @@ vi.mock('../components/market-data/BackfillDialog', () => ({
 }));
 
 const ROW: BarSubscriptionRow = {
-  bar_subscription_id: 'e6f1c0d2-0000-4000-8000-000000000001',
-  bar_subscription_vid: 1,
+  series_subscr_id: 'e6f1c0d2-0000-4000-8000-000000000001',
+  series_subscr_vid: 1,
   internal_cusip: 'btcusdt.crypto',
   vendor_symbol: 'BTCUSDT',
   tm_interval_id: 1,
@@ -42,7 +42,7 @@ const ROW: BarSubscriptionRow = {
 
 const PAUSED: BarSubscriptionRow = {
   ...ROW,
-  bar_subscription_id: 'e6f1c0d2-0000-4000-8000-000000000002',
+  series_subscr_id: 'e6f1c0d2-0000-4000-8000-000000000002',
   internal_cusip: 'ethusdt.crypto',
   vendor_symbol: 'ETHUSDT',
   is_enabled_ind: 'N',
@@ -50,7 +50,10 @@ const PAUSED: BarSubscriptionRow = {
 
 const mutateAsync = vi.fn();
 
-function setup(rows: BarSubscriptionRow[] = [ROW]) {
+function setup(
+  rows: BarSubscriptionRow[] = [ROW],
+  providers: ProviderSeriesRow[] = [],
+) {
   vi.mocked(useMe).mockReturnValue({ data: null } as never);
   vi.mocked(useSubscriptions).mockReturnValue({
     data: rows,
@@ -59,17 +62,22 @@ function setup(rows: BarSubscriptionRow[] = [ROW]) {
     error: null,
   } as never);
   vi.mocked(useProviderSeries).mockReturnValue({
-    data: [],
+    data: providers,
     isLoading: false,
     isError: false,
   } as never);
-  vi.mocked(useAppMetrics).mockReturnValue({ data: [] } as never);
+  vi.mocked(useAppMetrics).mockReturnValue({
+    data: [{ app_metric_id: 11, app_id: 2, metric_nm: 'price', display_name: 'Price' }],
+  } as never);
   vi.mocked(useSubscribe).mockReturnValue({ mutateAsync, isPending: false } as never);
   vi.mocked(useTmIntervals).mockReturnValue({
     data: [{ tm_interval_id: 1, name: 'DAILY', display_name: 'Daily' }],
   } as never);
   vi.mocked(useApps).mockReturnValue({
-    data: [{ app_id: 34, display_name: 'Bybit', is_exchange_ind: 'Y' }],
+    data: [
+      { app_id: 34, display_name: 'Bybit', is_exchange_ind: 'Y' },
+      { app_id: 2, display_name: 'Glassnode', is_exchange_ind: 'N' },
+    ],
   } as never);
   return renderWithProviders(<MarketDataPage />);
 }
@@ -170,7 +178,7 @@ describe('MarketDataPage', () => {
 
     expect(mutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({
-        bar_subscription_id: ROW.bar_subscription_id,
+        series_subscr_id: ROW.series_subscr_id,
         is_enabled_ind: 'Y',
       }),
     );
@@ -360,42 +368,26 @@ describe('MarketDataPage distance from the target', () => {
 describe('MarketDataPage data kinds', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('names the page Data and lists a stored provider series', async () => {
-    const user = userEvent.setup();
-    setup();
-    vi.mocked(useProviderSeries).mockReturnValue({
-      data: [{
-        provider_subscr_id: '11111111-1111-1111-1111-111111111111',
-        app_id: 2,
-        app_metric_id: 11,
-        tm_interval_id: 1,
-        internal_cusip: 'btcusdt.crypto',
-        is_enabled_ind: 'Y',
-        backfill_from_ts: null,
-        range_start_ts: '2010-01-01T00:00:00Z',
-        range_end_ts: '2026-10-10T00:00:00Z',
-        has_payload_ind: 'Y',
-      }],
-      isLoading: false,
-      isError: false,
-    } as never);
-    vi.mocked(useAppMetrics).mockReturnValue({
-      data: [{ app_metric_id: 11, app_id: 2, metric_nm: 'price', display_name: 'Price' }],
-    } as never);
-    vi.mocked(useApps).mockReturnValue({
-      data: [
-        { app_id: 34, display_name: 'Bybit', is_exchange_ind: 'Y' },
-        { app_id: 2, display_name: 'Glassnode', is_exchange_ind: 'N' },
-      ],
-    } as never);
+  it('names the page Data and lists a stored provider series beside the venue', () => {
+    setup([ROW], [{
+      series_subscr_id: '11111111-1111-1111-1111-111111111111',
+      app_id: 2,
+      app_metric_id: 11,
+      tm_interval_id: 1,
+      internal_cusip: 'btcusdt.crypto',
+      is_enabled_ind: 'Y',
+      backfill_from_ts: null,
+      range_start_ts: '2010-01-01T00:00:00Z',
+      range_end_ts: '2026-10-10T00:00:00Z',
+      has_payload_ind: 'Y',
+    }]);
 
     expect(screen.getByRole('heading', { name: 'Data' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Provider series' }));
 
-    const table = screen.getByRole('table', { name: 'Provider series' });
-    expect(within(table).getByText('btcusdt.crypto')).toBeInTheDocument();
+    const table = screen.getByRole('table', { name: 'Capturing series' });
     expect(within(table).getByText('Glassnode')).toBeInTheDocument();
     expect(within(table).getByText('Price')).toBeInTheDocument();
+    expect(within(table).getByText('Bars')).toBeInTheDocument();
     expect(within(table).getByText('2010-01-01 → 2026-10-10')).toBeInTheDocument();
   });
 });

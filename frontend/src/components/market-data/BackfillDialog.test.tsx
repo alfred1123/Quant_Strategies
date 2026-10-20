@@ -49,8 +49,8 @@ const NOTHING_LEFT: BackfillPlan = {
 
 function subscription(overrides: Partial<BarSubscriptionRow> = {}): BarSubscriptionRow {
   return {
-    bar_subscription_id: 'a1b2c3d4-0000-4000-8000-000000000001',
-    bar_subscription_vid: 1,
+    series_subscr_id: 'a1b2c3d4-0000-4000-8000-000000000001',
+    series_subscr_vid: 1,
     internal_cusip: 'btcusdt.crypto',
     vendor_symbol: 'BTCUSDT',
     tm_interval_id: 1,
