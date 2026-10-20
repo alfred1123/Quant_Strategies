@@ -154,12 +154,6 @@ class WalkForward:
         perf.enrich_performance()
         return perf.get_strategy_performance()
 
-    def _run_single(self, window_tuple, signal_tuple):
-        return self.run(window_tuple, signal_tuple)
-
-    def _run_multi(self, window_ranges, signal_ranges):
-        return self.run(window_ranges, signal_ranges)
-
     @staticmethod
     def _overfitting_ratio(is_metrics, oos_metrics):
         is_sharpe = is_metrics['Sharpe Ratio']

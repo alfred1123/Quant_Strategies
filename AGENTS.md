@@ -52,7 +52,7 @@ Keep `V_START_TS TIMESTAMPTZ := CURRENT_TIMESTAMP;` for `TRANSACT_FROM_TS` / `TR
 - Logging format and level are configured **once** in `quant/shared/logging.py` (`setup_logging()`). Do **not** call `logging.basicConfig()` anywhere else.
 - **Entry points only** (`quant/cli.py`, `quant/shared/config.py` via `load_config()`) call `setup_logging()`.
 - Library modules **never** call `setup_logging` — they only emit via `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`.
-- Do **not** use `print()` for status output — use the logger at the appropriate level.
+- Do **not** use `print()` for status output — use the logger at the appropriate level. The one exception is `BacktestWorker._emit` in `quant/queue/worker.py`: stdout is the worker's newline-delimited JSON event protocol to its parent (`docs/design/backtest-queue.md` §10.3), so that `print` is the protocol, not status output.
 
 ## Safety
 

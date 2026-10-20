@@ -7,7 +7,6 @@ business logic only.
 
 import logging
 import uuid
-from typing import Any
 
 import redis
 
@@ -230,7 +229,3 @@ class JobsService:
             "queue_status_id": int(row["queue_status_id"]),
             "error_text": row.get("error_text"),
         }
-
-
-def _to_payload(row: Any) -> Any:
-    return row

@@ -10,7 +10,7 @@ from uuid import UUID
 
 from quant.api.credentials.repo import ApiCredentialRepo
 from quant.queue.repo import BtQueueRepo
-from quant.shared.db import DbGateway
+from quant.shared.db import DbGateway, require_arg
 from quant.trade.errors import TradeValidationError
 
 logger = logging.getLogger(__name__)
@@ -20,15 +20,17 @@ SCHEDULE_STATUSES = frozenset({"PENDING", "SUCCESS", "FAILED"})
 
 
 def _require(value: Any, name: str) -> None:
-    if value is None:
-        raise TradeValidationError(f"{name} is required")
-    if isinstance(value, str) and not value.strip():
-        raise TradeValidationError(f"{name} is required")
+    require_arg(value, name, error=TradeValidationError)
 
 
 def _require_all(**fields: Any) -> None:
     for name, val in fields.items():
         _require(val, name)
+
+
+def _clamp_limit(limit: int, ceiling: int = 200) -> int:
+    """Row cap for the diary reads — at least one, never past the ceiling."""
+    return max(1, min(int(limit), ceiling))
 
 
 class TradeRepo(DbGateway):
@@ -113,6 +115,23 @@ class TradeRepo(DbGateway):
             (str(deployment_id),),
         )
 
+    @staticmethod
+    def _assert_owner(dep: dict, app_user_id: UUID) -> None:
+        if str(dep["app_user_id"]) != str(app_user_id):
+            raise TradeValidationError(
+                "deployment does not belong to user", status_code=403
+            )
+
+    def _owned_deployment_version(
+        self, deployment_id: UUID, deployment_vid: int, app_user_id: UUID
+    ) -> dict:
+        """The deployment version, or 404 / 403 — the gate every write shares."""
+        dep = self._fetch_deployment_version(deployment_id, deployment_vid)
+        if dep is None:
+            raise TradeValidationError("deployment not found", status_code=404)
+        self._assert_owner(dep, app_user_id)
+        return dep
+
     def validate_create_deployment(
         self,
         *,
@@ -194,13 +213,7 @@ class TradeRepo(DbGateway):
             is_success_ind=is_success_ind, user_id=user_id,
         )
 
-        dep = self._fetch_deployment_version(deployment_id, deployment_vid)
-        if dep is None:
-            raise TradeValidationError("deployment not found", status_code=404)
-        if str(dep["app_user_id"]) != str(app_user_id):
-            raise TradeValidationError(
-                "deployment does not belong to user", status_code=403
-            )
+        self._owned_deployment_version(deployment_id, deployment_vid, app_user_id)
 
     def validate_transaction(
         self,
@@ -225,10 +238,7 @@ class TradeRepo(DbGateway):
             raise TradeValidationError(
                 "deployment not found or not current", status_code=404
             )
-        if str(dep["app_user_id"]) != str(app_user_id):
-            raise TradeValidationError(
-                "deployment does not belong to user", status_code=403
-            )
+        self._assert_owner(dep, app_user_id)
         if dep["app_id"] != app_id:
             raise TradeValidationError(
                 "app_id does not match deployment", status_code=400
@@ -447,13 +457,7 @@ class TradeRepo(DbGateway):
             tm_interval_id=tm_interval_id, bar_timestamp=bar_timestamp,
             bar_source=bar_source, user_id=user_id,
         )
-        dep = self._fetch_deployment_version(deployment_id, deployment_vid)
-        if dep is None:
-            raise TradeValidationError("deployment not found", status_code=404)
-        if str(dep["app_user_id"]) != str(app_user_id):
-            raise TradeValidationError(
-                "deployment does not belong to user", status_code=403
-            )
+        self._owned_deployment_version(deployment_id, deployment_vid, app_user_id)
 
     def sp_ins_intent(
         self,
@@ -514,7 +518,7 @@ class TradeRepo(DbGateway):
     ) -> list[dict]:
         """Target rows for one user, newest tick first."""
         _require(app_user_id, "app_user_id")
-        clamped = max(1, min(int(limit), 200))
+        clamped = _clamp_limit(limit)
         return self._call_get(
             "CALL trade.sp_get_intent("
             "%s::uuid, %s::uuid, %s::timestamptz, %s::timestamptz, %s::integer,"
@@ -688,7 +692,7 @@ class TradeRepo(DbGateway):
     ) -> list[dict]:
         """Recent execution diary rows for one user."""
         _require(app_user_id, "app_user_id")
-        clamped = max(1, min(int(limit), 200))
+        clamped = _clamp_limit(limit)
         return self._call_get(
             "CALL trade.sp_get_execution_event("
             "%s::uuid, %s::uuid, %s::integer,"
@@ -709,7 +713,7 @@ class TradeRepo(DbGateway):
     ) -> list[dict]:
         """Recent broker-confirmed fills for one user."""
         _require(app_user_id, "app_user_id")
-        clamped = max(1, min(int(limit), 200))
+        clamped = _clamp_limit(limit)
         return self._call_get(
             "CALL trade.sp_get_transaction("
             "%s::uuid, %s::uuid, %s::integer,"
