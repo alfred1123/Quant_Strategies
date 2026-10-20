@@ -27,18 +27,40 @@ class OrderRejectReason(StrEnum):
     #: The venue will not offer this product to the account (e.g. Bybit 10024).
     REGION_RESTRICTED = "REGION_RESTRICTED"
     KEY_READ_ONLY = "KEY_READ_ONLY"
+    #: The venue refused the key and said no more than that (revoked, no
+    #: trade permission — Bybit 10005). Typed by the gateway's auth path.
+    KEY_REFUSED = "KEY_REFUSED"
+    #: ``ccxt.InsufficientFunds`` on submit.
+    INSUFFICIENT_FUNDS = "INSUFFICIENT_FUNDS"
+    #: ``ccxt.InvalidOrder`` on submit — the venue would never accept this shape.
+    INVALID_ORDER = "INVALID_ORDER"
+    #: The order reached the book and the venue ended it unfilled.
+    VENUE_REJECTED = "VENUE_REJECTED"
+    #: ``create_order`` answered without an id; nothing to confirm or cancel.
+    NOT_ACKNOWLEDGED = "NOT_ACKNOWLEDGED"
 
     @property
     def requires_operator_fix(self) -> bool:
-        """True when no retry can succeed until someone changes something.
+        """True when no retry can succeed until someone changes a setting.
 
         Both the retry executor (give up after one attempt) and the scheduler
         (pause rather than spend the tick budget) ask this, so the answer lives
-        with the reason instead of being decided twice. Every reason so far is
-        a setting — a deployment's qty, or a key's allowlist, permissions, or
-        account region — that the next tick would meet unchanged.
+        with the reason instead of being decided twice. The settings-type
+        reasons — a deployment's qty, a key's allowlist, permissions, or
+        account region — are ones the next tick would meet unchanged. The
+        others end the executor's attempt loop (a typed reject is final for
+        the attempt) but leave the tick budget alone: funds can arrive and a
+        venue reject can be a passing condition.
         """
-        return True
+        return self in _OPERATOR_FIX
+
+
+_OPERATOR_FIX = frozenset({
+    OrderRejectReason.SIZE_BELOW_MINIMUM,
+    OrderRejectReason.IP_NOT_ALLOWED,
+    OrderRejectReason.REGION_RESTRICTED,
+    OrderRejectReason.KEY_READ_ONLY,
+})
 
 
 class IntendedAction(StrEnum):

@@ -247,6 +247,8 @@ class TestGatewayRouting:
     @staticmethod
     def _connected(exchange, mock_ccxt):
         mock_ccxt.AuthenticationError = ccxt.AuthenticationError
+        mock_ccxt.InsufficientFunds = ccxt.InsufficientFunds
+        mock_ccxt.InvalidOrder = ccxt.InvalidOrder
         mock_ccxt.BaseError = ccxt.BaseError
         exchange.markets = {}
         exchange.has = {}
@@ -281,6 +283,37 @@ class TestGatewayRouting:
         with pytest.raises(BrokerAuthError) as info:
             gateway.fetch_api_key_info()
         assert info.value.reason is OrderRejectReason.IP_NOT_ALLOWED
+
+    @patch("quant.trade.brokers.ccxt.gateway.ccxt")
+    def test_an_unclassified_denial_is_still_a_typed_key_refusal(self, mock_ccxt):
+        """Bybit 10005 is not in the venue map; the auth path types it anyway."""
+        exchange = MagicMock()
+        exchange.private_get_v5_user_query_api.side_effect = ccxt.PermissionDenied(
+            'bybit {"retCode":10005,"retMsg":"permission denied"}'
+        )
+        gateway = self._connected(exchange, mock_ccxt)
+
+        with pytest.raises(BrokerAuthError) as info:
+            gateway.fetch_api_key_info()
+        assert info.value.reason is OrderRejectReason.KEY_REFUSED
+        assert not info.value.reason.requires_operator_fix
+
+    @patch("quant.trade.brokers.ccxt.gateway.ccxt")
+    @pytest.mark.parametrize(
+        ("exc", "reason"),
+        [
+            (ccxt.InsufficientFunds("not enough USDT"), OrderRejectReason.INSUFFICIENT_FUNDS),
+            (ccxt.InvalidOrder("qty precision"), OrderRejectReason.INVALID_ORDER),
+        ],
+    )
+    def test_submit_refusals_are_typed_by_the_gateway(self, mock_ccxt, exc, reason):
+        exchange = MagicMock()
+        exchange.create_order.side_effect = exc
+        gateway = self._connected(exchange, mock_ccxt)
+
+        with pytest.raises(BrokerConnectionError) as info:
+            gateway.create_market_order("BTCUSDT", "buy", 0.01)
+        assert info.value.reason is reason
 
     @patch("quant.trade.brokers.ccxt.gateway.ccxt")
     def test_venue_outage_is_a_connection_error(self, mock_ccxt):
@@ -750,10 +783,13 @@ class TestPlaceOrder:
             adapter.place_order(req)
 
     def test_place_order_broker_error_returns_failed_result(self, inst_cache):
+        """The gateway's typed reason rides onto the result unchanged."""
         adapter = self._adapter(inst_cache)
         with patch.object(
             adapter.gateway, "create_market_order",
-            side_effect=BrokerConnectionError("insufficient funds"),
+            side_effect=BrokerConnectionError(
+                "insufficient funds", reason=OrderRejectReason.INSUFFICIENT_FUNDS,
+            ),
         ):
             req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
             result = adapter.place_order(req)
@@ -762,6 +798,7 @@ class TestPlaceOrder:
         assert result.vendor_order_id is None
         assert result.side == OrderSide.BUY
         assert result.requested_qty == 0.01
+        assert result.reason is OrderRejectReason.INSUFFICIENT_FUNDS
         assert "insufficient funds" in result.message
 
     def test_place_order_no_order_id_returns_failed(self, inst_cache):
@@ -774,6 +811,7 @@ class TestPlaceOrder:
             result = adapter.place_order(req)
 
         assert result.success is False
+        assert result.reason is OrderRejectReason.NOT_ACKNOWLEDGED
         assert "no order id" in result.message
 
     def test_size_reject_never_reaches_the_venue(self, inst_cache):

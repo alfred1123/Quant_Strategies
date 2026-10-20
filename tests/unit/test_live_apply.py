@@ -276,6 +276,7 @@ class TestLiveApplyOrchestrator:
                     success=False,
                     vendor_order_id="order-3",
                     message="insufficient funds",
+                    reason=OrderRejectReason.INSUFFICIENT_FUNDS,
                     side=OrderSide.BUY,
                     requested_qty=0.01,
                 )

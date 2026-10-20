@@ -153,21 +153,16 @@ class OrderRetryResult:
 
 
 class OrderRetryPolicy:
-    """Classify order failures and decide retry vs fail-fast."""
+    """Decide retry vs fail-fast from what the broker layer typed.
 
-    # Fallback for broker prose we never classified at the source. A reject that
-    # arrives with an OrderRejectReason is judged from that instead.
-    _PERMANENT_MARKERS = (
-        "permission denied",
-        "10005",
-        "10024",
-        "regulatory",
-        "insufficient funds",
-        "invalid order",
-        "not supported",
-        "order rejected",
-        "create_order returned no order id",
-    )
+    A refusal arrives with an :class:`OrderRejectReason` set where it was
+    decided — the gateway, the fill poller, the adapter — and any typed reject
+    is final for this apply. Only a failure nobody could classify (a dropped
+    connection, a timeout) is judged from its prose, and then only to tell a
+    transient fault from an unknown one.
+    """
+
+    _TRANSIENT_MARKERS = ("unreachable", "rate", "timeout")
 
     def __init__(self, *, max_attempts: int = 5, backoff_s: float = 2.0) -> None:
         self._max_attempts = max_attempts
@@ -187,19 +182,17 @@ class OrderRetryPolicy:
         return "fill unconfirmed" in msg or "requires manual reconciliation" in msg
 
     def is_retryable(self, result: OrderResult) -> bool:
-        """Transient / ambiguous failures may be retried; permanent ones fail fast."""
+        """Transient / ambiguous failures may be retried; a typed reject fails fast."""
         if result.success:
             return False
-        if result.reason is not None and result.reason.requires_operator_fix:
-            return False
-        msg = result.message.lower()
-        if any(marker in msg for marker in self._PERMANENT_MARKERS):
+        if result.reason is not None:
             return False
         if self.is_unconfirmed(result):
             return True
-        if result.vendor_order_id and "rejected" not in msg:
+        if result.vendor_order_id:
             return True
-        return "unreachable" in msg or "rate" in msg or "timeout" in msg
+        msg = result.message.lower()
+        return any(marker in msg for marker in self._TRANSIENT_MARKERS)
 
 
 class OrderRetryExecutor:

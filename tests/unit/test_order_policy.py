@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from quant.trade.models.order import (
     IntendedAction,
     OrderRejectReason,
@@ -119,11 +121,25 @@ class TestOrderRetryPolicy:
     def test_success_not_retryable(self):
         assert not self.policy.is_retryable(_result("ok", success=True))
 
-    def test_insufficient_funds_permanent(self):
-        assert not self.policy.is_retryable(_result("insufficient funds: ..."))
+    @pytest.mark.parametrize("reason", list(OrderRejectReason))
+    def test_every_typed_reject_is_final_for_the_attempt(self, reason):
+        assert not self.policy.is_retryable(_result("whatever the venue said", reason=reason))
 
-    def test_permission_denied_permanent(self):
-        assert not self.policy.is_retryable(_result("10005 permission denied"))
+    def test_the_policy_holds_no_copy_of_the_venue_codes(self):
+        """Bybit 10005/10024 are classified in the gateway; the policy never greps them."""
+        import inspect
+
+        from quant.trade import order_policy
+
+        src = inspect.getsource(order_policy)
+        for marker in ("10005", "10024", "insufficient funds", "order rejected", "regulatory"):
+            assert marker not in src, marker
+
+    def test_prose_alone_cannot_make_a_failure_permanent(self):
+        """An untyped 'insufficient funds' is just unknown — neither retried nor typed."""
+        result = _result("insufficient funds: ...", vendor_order_id=None)
+        assert result.reason is None
+        assert not self.policy.is_retryable(result)
 
     def test_unconfirmed_retryable(self):
         assert self.policy.is_retryable(
@@ -162,7 +178,7 @@ class TestApplyAttempt:
         assert attempt.buy_sell_cd == "SELL"
 
     def test_failed_attempt(self):
-        attempt = ApplyAttempt(IntendedAction.BUY, 0.0, _result("insufficient funds"))
+        attempt = ApplyAttempt(IntendedAction.BUY, 0.0, _result("insufficient funds", reason=OrderRejectReason.INSUFFICIENT_FUNDS))
         assert attempt.is_success_ind == "N"
         assert attempt.quantity(0.01) == 0.01  # falls back to requested_qty
         assert attempt.vendor_order_id == "1"
@@ -202,7 +218,7 @@ class TestOrderRetryExecutor:
         assert len(outcome.attempts) == 1
 
     def test_permanent_failure_no_retry(self):
-        adapter = _adapter(_result("insufficient funds"))
+        adapter = _adapter(_result("insufficient funds", reason=OrderRejectReason.INSUFFICIENT_FUNDS))
         outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 1.0, 0.01)
         assert outcome.permanent_failure
         assert len(outcome.attempts) == 1

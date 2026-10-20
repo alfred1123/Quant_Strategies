@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from quant.trade.brokers.ccxt.gateway import CcxtTradeGateway
 from quant.trade.errors import BrokerConnectionError, OrderNotFoundError
-from quant.trade.models.order import OrderRequest, OrderResult
+from quant.trade.models.order import OrderRejectReason, OrderRequest, OrderResult
 
 _CONFIRM_DELAYS_S = (0.3, 0.6, 1.2, 2.4, 3.5)
 
@@ -20,6 +20,7 @@ class _FillStatus:
     vendor_order_id: str | None
     message: str
     raw_status: str | None
+    reason: OrderRejectReason | None = None
     filled_qty: float | None = None
     avg_price: float | None = None
     fee: float | None = None
@@ -73,6 +74,7 @@ def _parse_terminal(order: dict, *, vendor_order_id: str | None) -> _FillStatus 
             vendor_order_id=oid,
             message=f"order rejected status={status or 'unknown'}",
             raw_status=status,
+            reason=OrderRejectReason.VENUE_REJECTED,
         )
     return None
 
@@ -110,6 +112,7 @@ def confirm_market_order(
                 success=fill.success,
                 vendor_order_id=fill.vendor_order_id,
                 message=fill.message,
+                reason=fill.reason,
                 raw_status=fill.raw_status,
                 side=req.side,
                 requested_qty=req.qty,

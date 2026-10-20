@@ -16,6 +16,7 @@ from quant.trade.errors import (
 )
 from quant.trade.models.key_profile import ApiKeyInfo
 from quant.trade.models.market import MarketLimits
+from quant.trade.models.order import OrderRejectReason
 from quant.trade.models.session import BrokerSessionState
 
 logger = logging.getLogger(__name__)
@@ -135,9 +136,12 @@ class CcxtTradeGateway:
     def _auth_error(self, exc: ccxt.AuthenticationError, *, phase: str) -> BrokerAuthError:
         venue = self._config.preset.venue
         hint = venue.auth_hint(self._config.connect_params)
+        # The venue names the refusal when its code says which one (an IP the
+        # key does not allow, a product the account may not trade); otherwise
+        # the fact that the key was refused is itself the typed reason.
         return BrokerAuthError(
             f"authentication failed during {phase}: {exc}.{hint}",
-            reason=venue.classify_denial(exc),
+            reason=venue.classify_denial(exc) or OrderRejectReason.KEY_REFUSED,
         )
 
     def disconnect(self) -> None:
@@ -251,9 +255,13 @@ class CcxtTradeGateway:
         try:
             return self.exchange.create_order(vendor_symbol, "market", side, qty)
         except ccxt.InsufficientFunds as exc:
-            raise BrokerConnectionError(f"insufficient funds: {exc}") from exc
+            raise BrokerConnectionError(
+                f"insufficient funds: {exc}", reason=OrderRejectReason.INSUFFICIENT_FUNDS,
+            ) from exc
         except ccxt.InvalidOrder as exc:
-            raise BrokerConnectionError(f"invalid order: {exc}") from exc
+            raise BrokerConnectionError(
+                f"invalid order: {exc}", reason=OrderRejectReason.INVALID_ORDER,
+            ) from exc
         except ccxt.AuthenticationError as exc:
             raise self._auth_error(exc, phase="create_order") from exc
         except ccxt.BaseError as exc:

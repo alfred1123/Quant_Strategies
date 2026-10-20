@@ -228,6 +228,7 @@ class CcxtTradeAdapter(TradeAdapter):
             return OrderResult(
                 success=False, vendor_order_id=None,
                 message="create_order returned no order id",
+                reason=OrderRejectReason.NOT_ACKNOWLEDGED,
                 raw_status=raw.get("status"),
                 side=req.side, requested_qty=req.qty,
             )

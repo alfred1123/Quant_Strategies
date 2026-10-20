@@ -8,7 +8,7 @@ from quant.trade.brokers.ccxt.confirm import (
     confirm_market_order,
 )
 from quant.trade.errors import BrokerConnectionError, OrderNotFoundError
-from quant.trade.models.order import OrderRequest, OrderSide
+from quant.trade.models.order import OrderRejectReason, OrderRequest, OrderSide
 
 
 class TestExtractFee:
@@ -64,6 +64,7 @@ class TestParseTerminal:
         result = _parse_terminal(order, vendor_order_id="o4")
         assert result is not None
         assert result.success is False
+        assert result.reason is OrderRejectReason.VENUE_REJECTED
 
     def test_open_order_returns_none(self):
         order = {"id": "o5", "status": "open", "filled": 0}
