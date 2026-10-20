@@ -102,6 +102,7 @@ async def lifespan(app: FastAPI):
 
         app.state.price_bars = PriceBarServiceFactory(DB_CONNINFO, caches)
 
+        from quant.api.credentials.repo import ApiCredentialRepo
         from quant.api.routers.deployments import build_trade_service
         from quant.queue.repo import BtQueueRepo
         from quant.trade.db_repo import TradeRepo
@@ -111,7 +112,12 @@ async def lifespan(app: FastAPI):
         tick_bt = BtQueueRepo(DB_CONNINFO, user_id="system")
         app.state.schedule_sweeper = ScheduleSweeper(
             ScheduleTickRunner(
-                TradeRepo(DB_CONNINFO, bt=tick_bt, user_id="system"),
+                TradeRepo(
+                    DB_CONNINFO,
+                    bt=tick_bt,
+                    credentials=ApiCredentialRepo(DB_CONNINFO, user_id="system"),
+                    user_id="system",
+                ),
                 lambda app_user_id, deployment_id: build_trade_service(
                     app.state
                 ).apply_deployment(app_user_id, deployment_id),

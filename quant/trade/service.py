@@ -84,18 +84,17 @@ class TradeService:
             )
         return self._data_caches.venue_limits.get(app_id, vendor_symbol, default_type)
 
-    def _fitted_interval_id(self, strategy_id: UUID, strategy_vid: int) -> int:
+    def _fitted_interval_id(
+        self, app_user_id: UUID, strategy_id: UUID, strategy_vid: int
+    ) -> int:
         """The interval this strategy was fitted on — the only one it may schedule.
 
         Read from the strategy's own ``CONFIG_JSON`` so an hourly-fitted
         strategy is offered hourly, not the platform's old daily assumption.
+        Owner-gated by the repo, like every other strategy-derived read.
         """
-        rows = self._bt.sp_get_strategy(strategy_id, strategy_vid=strategy_vid)
-        if not rows:
-            raise TradeValidationError(
-                "strategy_id / strategy_vid not found", status_code=404
-            )
-        return fitted_interval_id(rows[0].get("config_json"))
+        row = self._repo.strategy_owned_by(strategy_id, strategy_vid, app_user_id)
+        return fitted_interval_id(row.get("config_json"))
 
     def _listing_exchange(self, internal_cusip: str) -> str | None:
         """``INST.PRODUCT.EXCHANGE`` — empty for ``.crypto``, which uses the 24/7 calendar."""
@@ -139,7 +138,7 @@ class TradeService:
         require_fitted_interval(
             req.schedule_tm_interval_id,
             fitted_interval_id=self._fitted_interval_id(
-                req.strategy_id, req.strategy_vid
+                app_user_id, req.strategy_id, req.strategy_vid
             ),
             refdata=self._data_caches.refdata,
         )
@@ -180,19 +179,12 @@ class TradeService:
         """The one cadence a deployment of this strategy may be scheduled on.
 
         Owner-checked: the reply is derived from someone's strategy, so it is
-        gated the same way every other strategy read is.
+        gated the same way every other strategy read is — by the repo.
         """
-        rows = self._bt.sp_get_strategy(strategy_id, strategy_vid=strategy_vid)
-        if not rows:
-            raise TradeValidationError(
-                "strategy_id / strategy_vid not found", status_code=404
-            )
-        if str(rows[0]["user_id"]) != str(app_user_id):
-            raise TradeValidationError(
-                "strategy does not belong to user", status_code=403
-            )
         return ScheduleOptions(
-            tm_interval_ids=[fitted_interval_id(rows[0].get("config_json"))]
+            tm_interval_ids=[
+                self._fitted_interval_id(app_user_id, strategy_id, strategy_vid)
+            ]
         )
 
     def get_deployment(
@@ -224,7 +216,7 @@ class TradeService:
             require_fitted_interval(
                 req.schedule_tm_interval_id,
                 fitted_interval_id=self._fitted_interval_id(
-                    current.strategy_id, current.strategy_vid
+                    app_user_id, current.strategy_id, current.strategy_vid
                 ),
                 refdata=self._data_caches.refdata,
             )

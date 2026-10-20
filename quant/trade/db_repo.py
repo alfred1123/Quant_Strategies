@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from quant.api.credentials.repo import ApiCredentialRepo
 from quant.queue.repo import BtQueueRepo
 from quant.shared.db import DbGateway
 from quant.trade.errors import TradeValidationError
@@ -33,19 +34,14 @@ def _require_all(**fields: Any) -> None:
 class TradeRepo(DbGateway):
     """TRADE.DEPLOYMENT / EXECUTION_EVENT / TRANSACTION — validates then CALLs SPs."""
 
-    def __init__(self, conninfo: str, bt: BtQueueRepo, **kwargs) -> None:
+    def __init__(
+        self, conninfo: str, bt: BtQueueRepo, credentials: ApiCredentialRepo, **kwargs
+    ) -> None:
         super().__init__(conninfo, **kwargs)
         self._bt = bt
+        self._credentials = credentials
 
-    # ── validation reads (via stored procedures) ──────────────────────
-
-    def _fetch_credential(self, api_credential_id: int) -> dict | None:
-        return self._call_get_one(
-            "CALL core_admin.sp_get_credential_check("
-            "%s::integer,"
-            " NULL::refcursor, NULL::text, NULL::text, NULL::text)",
-            (api_credential_id,),
-        )
+    # ── validation reads (via the owning repos' procedures) ───────────
 
     def _fetch_strategy(
         self, strategy_id: UUID, strategy_vid: int
@@ -53,10 +49,16 @@ class TradeRepo(DbGateway):
         rows = self._bt.sp_get_strategy(strategy_id, strategy_vid=strategy_vid)
         return rows[0] if rows else None
 
-    def _assert_strategy_owned(
+    def strategy_owned_by(
         self, strategy_id: UUID, strategy_vid: int, app_user_id: UUID
     ) -> dict:
-        """Fetch the strategy row and enforce ownership; returns the row."""
+        """The strategy row, once it is *app_user_id*'s to deploy.
+
+        404 when the version does not exist, 403 when it is someone else's,
+        400 when it is logically deleted. Every trade read derived from a
+        strategy — deployment create, dry run, schedule options — is gated
+        here and nowhere else.
+        """
         row = self._fetch_strategy(strategy_id, strategy_vid)
         if row is None:
             raise TradeValidationError(
@@ -76,7 +78,7 @@ class TradeRepo(DbGateway):
         self, api_credential_id: int, app_user_id: UUID, app_id: int
     ) -> dict:
         """Fetch the credential and enforce active/ownership/app; returns the row."""
-        cred = self._fetch_credential(api_credential_id)
+        cred = self._credentials.credential_check(api_credential_id)
         if cred is None:
             raise TradeValidationError(
                 "API credential not found or not current", status_code=404
@@ -144,7 +146,7 @@ class TradeRepo(DbGateway):
             )
 
         self._assert_credential_usable(api_credential_id, app_user_id, app_id)
-        self._assert_strategy_owned(strategy_id, strategy_vid, app_user_id)
+        self.strategy_owned_by(strategy_id, strategy_vid, app_user_id)
 
         current = self._fetch_current_deployment(deployment_id)
         if current is not None and str(current["app_user_id"]) != str(app_user_id):
@@ -174,7 +176,7 @@ class TradeRepo(DbGateway):
         )
 
         self._assert_credential_usable(api_credential_id, app_user_id, app_id)
-        return self._assert_strategy_owned(strategy_id, strategy_vid, app_user_id)
+        return self.strategy_owned_by(strategy_id, strategy_vid, app_user_id)
 
     def validate_execution_event(
         self,

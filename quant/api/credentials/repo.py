@@ -36,6 +36,21 @@ class ApiCredentialRepo(DbGateway):
             (str(app_user_id), api_credential_id),
         )
 
+    def credential_check(self, api_credential_id: int) -> dict | None:
+        """The current row's ``app_user_id``/``app_id``/``is_active_ind``, owner-unscoped.
+
+        ``SP_GET_API_CREDENTIAL`` answers "this user's active credential" and
+        returns nothing for every other case. A deployment needs to tell those
+        cases apart — 404 absent, 403 someone else's, 400 inactive or wrong app
+        — so it reads this instead and judges the row itself
+        (``TradeRepo._assert_credential_usable``). No ciphertext is returned.
+        """
+        return self._call_get_one(
+            "CALL CORE_ADMIN.SP_GET_CREDENTIAL_CHECK("
+            "%s::integer, NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (api_credential_id,),
+        )
+
     # ------------------------------------------------------------------
     # WRITE
     # ------------------------------------------------------------------

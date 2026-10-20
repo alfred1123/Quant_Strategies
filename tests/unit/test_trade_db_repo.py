@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import pytest
 
+from quant.api.credentials.repo import ApiCredentialRepo
 from quant.queue.repo import BtQueueRepo
 from quant.trade.db_repo import TradeRepo
 from quant.trade.errors import TradeValidationError
@@ -21,7 +22,9 @@ PROC_DIR = (
 @pytest.fixture
 def repo():
     bt = BtQueueRepo("postgresql://test")
-    return TradeRepo("postgresql://test", bt=bt)
+    return TradeRepo(
+        "postgresql://test", bt=bt, credentials=ApiCredentialRepo("postgresql://test")
+    )
 
 
 def _deployment_kwargs(**overrides):
@@ -52,14 +55,14 @@ class TestValidateCreateDeployment:
         with pytest.raises(TradeValidationError, match="deployment_id"):
             repo.validate_create_deployment(**_deployment_kwargs(deployment_id=None))
 
-    @patch.object(TradeRepo, "_fetch_credential", return_value=None)
+    @patch.object(ApiCredentialRepo, "credential_check", return_value=None)
     def test_unknown_credential(self, mock_cred, repo):
         with pytest.raises(TradeValidationError, match="API credential") as exc:
             repo.validate_create_deployment(**_deployment_kwargs())
         assert exc.value.status_code == 404
         mock_cred.assert_called_once()
 
-    @patch.object(TradeRepo, "_fetch_credential")
+    @patch.object(ApiCredentialRepo, "credential_check")
     @patch.object(TradeRepo, "_fetch_strategy", return_value=None)
     def test_unknown_strategy(self, _strat, mock_cred, repo):
         uid = uuid4()
@@ -73,7 +76,7 @@ class TestValidateCreateDeployment:
             repo.validate_create_deployment(**_deployment_kwargs(app_user_id=uid))
         assert exc.value.status_code == 404
 
-    @patch.object(TradeRepo, "_fetch_credential")
+    @patch.object(ApiCredentialRepo, "credential_check")
     @patch.object(TradeRepo, "_fetch_strategy")
     def test_strategy_owner_mismatch(self, mock_strat, mock_cred, repo):
         owner = uuid4()
@@ -89,7 +92,7 @@ class TestValidateCreateDeployment:
             repo.validate_create_deployment(**_deployment_kwargs(app_user_id=owner))
         assert exc.value.status_code == 403
 
-    @patch.object(TradeRepo, "_fetch_credential")
+    @patch.object(ApiCredentialRepo, "credential_check")
     @patch.object(TradeRepo, "_fetch_strategy")
     @patch.object(TradeRepo, "_fetch_current_deployment")
     def test_deployment_owner_mismatch(self, mock_current, mock_strat, mock_cred, repo):
@@ -108,7 +111,7 @@ class TestValidateCreateDeployment:
         assert exc.value.status_code == 403
 
 
-    @patch.object(TradeRepo, "_fetch_credential")
+    @patch.object(ApiCredentialRepo, "credential_check")
     def test_live_without_confirm_rejected(self, mock_cred, repo):
         uid = uuid4()
         mock_cred.return_value = {
@@ -123,7 +126,7 @@ class TestValidateCreateDeployment:
             )
         assert exc.value.status_code == 400
 
-    @patch.object(TradeRepo, "_fetch_credential")
+    @patch.object(ApiCredentialRepo, "credential_check")
     @patch.object(TradeRepo, "_fetch_strategy")
     @patch.object(TradeRepo, "_fetch_current_deployment", return_value=None)
     def test_live_with_confirm_accepted(self, _dep, mock_strat, mock_cred, repo):
@@ -141,7 +144,7 @@ class TestValidateCreateDeployment:
         )
 
 
-    @patch.object(TradeRepo, "_fetch_credential")
+    @patch.object(ApiCredentialRepo, "credential_check")
     @patch.object(TradeRepo, "_fetch_strategy")
     def test_logically_deleted_strategy_rejected(self, mock_strat, mock_cred, repo):
         uid = uuid4()
@@ -173,7 +176,7 @@ class TestValidateDryRun:
                 qty=Decimal("0.01"),
             )
 
-    @patch.object(TradeRepo, "_fetch_credential")
+    @patch.object(ApiCredentialRepo, "credential_check")
     @patch.object(TradeRepo, "_fetch_strategy")
     def test_returns_strategy_row(self, mock_strat, mock_cred, repo):
         uid = uuid4()

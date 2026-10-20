@@ -28,6 +28,7 @@ from quant.market_data.subscriptions import (
     SubscriptionInstrumentSource,
 )
 from quant.market_data.warm import BarWarmer
+from quant.api.credentials.repo import ApiCredentialRepo
 from quant.queue.repo import BtQueueRepo
 from quant.schemas.market_data import (
     BackfillPlan,
@@ -61,7 +62,10 @@ def _get_bar_warmer(request: Request) -> BarWarmer:
     """
     conninfo = request.app.state.db_conninfo
     bt = BtQueueRepo(conninfo, user_id="system")
-    trade = TradeRepo(conninfo, bt=bt, user_id="system")
+    trade = TradeRepo(
+        conninfo, bt=bt, credentials=ApiCredentialRepo(conninfo, user_id="system"),
+        user_id="system",
+    )
     return BarWarmer(
         [
             DeploymentInstrumentSource(trade),

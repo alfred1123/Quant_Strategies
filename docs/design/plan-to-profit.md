@@ -1088,7 +1088,7 @@ Full matrix, phased backlog, and Futu/Bybit split: **[User isolation requirement
 |-------|--------------|-----------------|
 | RBAC | **None** — any logged-in user can save credentials, create deployments, and (1.7) live apply | Second user who is not fully trusted |
 | Strategy visibility (Trade) | Picker returns the caller's rows only (`SP_GET_STRATEGY_LIST`) | Promotion log is still unscoped |
-| Strategy deploy | Ownership is checked (`_assert_strategy_owned`, 403) | |
+| Strategy deploy | Ownership is checked (`TradeRepo.strategy_owned_by`, 403) | |
 | Paper vs live | **`is_paper_ind` on server** — client toolbar filter is UX only |
 
 #### Secrets at rest and in transit

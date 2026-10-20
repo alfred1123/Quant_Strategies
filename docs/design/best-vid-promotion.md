@@ -283,7 +283,7 @@ Flipped in place by `SP_UPD_STRATEGY_LOGICAL_DELETE` (one VID, or the whole `STR
 
 Decision #42 described a shared pool. The Trade path does not do that:
 
-- `SP_GET_STRATEGY_LIST` and `_assert_strategy_owned` keep the picker and deploy on the caller's `BT.STRATEGY` rows.
+- `SP_GET_STRATEGY_LIST` and `TradeRepo.strategy_owned_by` keep the picker and deploy on the caller's `BT.STRATEGY` rows.
 - The promotion **log** is not owner-filtered (`SP_GET_PROMOTION`).
 - Deployments stay scoped by `APP_USER_ID`. Credentials stay the caller's.
 

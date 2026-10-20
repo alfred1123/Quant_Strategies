@@ -62,14 +62,16 @@ def svc():
     }
     data_caches.instrument_cache.resolve_internal_cusip.return_value = "BTCUSDT"
     bt = MagicMock()
+    repo = MagicMock()
     # Every deployment's strategy is fitted on DAILY (interval 1) by default, so
-    # the cadence guard reads a real interval instead of a MagicMock. A test
-    # that cares about an hourly-fitted strategy overrides this return value.
-    bt.sp_get_strategy.return_value = [
-        {"config_json": {"tm_interval_id": 1}, "user_id": "alice"}
-    ]
+    # the cadence guard reads a real interval instead of a MagicMock. The repo
+    # owns the ownership gate (strategy_owned_by); a test that cares about an
+    # hourly-fitted strategy overrides this return value.
+    repo.strategy_owned_by.return_value = {
+        "config_json": {"tm_interval_id": 1}, "user_id": "alice"
+    }
     return TradeService(
-        repo=MagicMock(),
+        repo=repo,
         bt=bt,
         credential_service=MagicMock(),
         credential_repo=MagicMock(),
@@ -211,9 +213,9 @@ class TestCreateDeployment:
 
     def test_an_hourly_fitted_strategy_may_be_scheduled_hourly(self, svc):
         """The cadence is the strategy's own, not the platform's old daily guess."""
-        svc._bt.sp_get_strategy.return_value = [
-            {"config_json": {"tm_interval_id": 2}, "user_id": "alice"}
-        ]
+        svc._repo.strategy_owned_by.return_value = {
+            "config_json": {"tm_interval_id": 2}, "user_id": "alice"
+        }
         app_user_id = uuid4()
         svc._repo.sp_ins_deployment.return_value = _sp_row(
             app_user_id=app_user_id, schedule_tm_interval_id=2
@@ -233,9 +235,9 @@ class TestCreateDeployment:
         assert svc._repo.sp_ins_deployment.call_args.kwargs["schedule_tm_interval_id"] == 2
 
     def test_daily_is_refused_for_an_hourly_fitted_strategy(self, svc):
-        svc._bt.sp_get_strategy.return_value = [
-            {"config_json": {"tm_interval_id": 2}, "user_id": "alice"}
-        ]
+        svc._repo.strategy_owned_by.return_value = {
+            "config_json": {"tm_interval_id": 2}, "user_id": "alice"
+        }
         req = CreateDeploymentRequest(
             strategy_id=uuid4(),
             strategy_vid=1,
@@ -254,26 +256,23 @@ class TestCreateDeployment:
 
 class TestScheduleOptions:
     def test_returns_the_strategy_fitted_interval(self, svc):
-        uid = uuid4()
-        svc._bt.sp_get_strategy.return_value = [
-            {"config_json": {"tm_interval_id": 2}, "user_id": str(uid)}
-        ]
-        options = svc.schedule_options(uid, uuid4(), 1)
+        uid, strategy_id = uuid4(), uuid4()
+        svc._repo.strategy_owned_by.return_value = {
+            "config_json": {"tm_interval_id": 2}, "user_id": str(uid)
+        }
+        options = svc.schedule_options(uid, strategy_id, 1)
         assert options.tm_interval_ids == [2]
+        svc._repo.strategy_owned_by.assert_called_once_with(strategy_id, 1, uid)
 
-    def test_unknown_strategy_is_404(self, svc):
-        svc._bt.sp_get_strategy.return_value = []
-        with pytest.raises(TradeValidationError) as exc:
-            svc.schedule_options(uuid4(), uuid4(), 1)
-        assert exc.value.status_code == 404
-
-    def test_another_users_strategy_is_403(self, svc):
-        svc._bt.sp_get_strategy.return_value = [
-            {"config_json": {"tm_interval_id": 1}, "user_id": "someone-else"}
-        ]
+    def test_the_repo_gate_is_the_only_gate(self, svc):
+        """404 / 403 come from TradeRepo.strategy_owned_by; the service adds no copy."""
+        svc._repo.strategy_owned_by.side_effect = TradeValidationError(
+            "strategy does not belong to user", status_code=403
+        )
         with pytest.raises(TradeValidationError) as exc:
             svc.schedule_options(uuid4(), uuid4(), 1)
         assert exc.value.status_code == 403
+        svc._bt.sp_get_strategy.assert_not_called()
 
     def test_schedule_defaults_to_manual_only(self, svc):
         app_user_id = uuid4()

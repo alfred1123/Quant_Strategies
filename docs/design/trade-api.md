@@ -204,7 +204,7 @@ DELETE /api/v1/strategies/{id}           → Soft-delete
 
 Create/update remain on the jobs/backtest path until a dedicated editor is needed.
 
-**Ownership:** the list is caller-owned (`SP_GET_STRATEGY_LIST` filters `USER_ID`). Deployment create and dry-run call `_assert_strategy_owned` and return **403** for another user's strategy. See [User isolation](user-isolation.md).
+**Ownership:** the list is caller-owned (`SP_GET_STRATEGY_LIST` filters `USER_ID`). Deployment create, dry-run and schedule options call `TradeRepo.strategy_owned_by` — the one gate — and return **403** for another user's strategy. See [User isolation](user-isolation.md).
 
 ### 2.2 Deployment (one-click deploy)
 

@@ -302,8 +302,8 @@ class TestCcxtDeploymentDryRun:
             conninfo=conninfo,
         )
 
-        repo = TradeRepo(conninfo, bt=bt, user_id="pytest")
         cred_repo = ApiCredentialRepo(conninfo, user_id="pytest")
+        repo = TradeRepo(conninfo, bt=bt, credentials=cred_repo, user_id="pytest")
         cred_svc = CredentialService(CredentialCrypto())
 
         req = DryRunRequest(

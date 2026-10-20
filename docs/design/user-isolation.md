@@ -78,7 +78,7 @@ Implementation: `quant/api/routers/jobs.py`, `quant/api/services/jobs.py`.
 
 | Check | Rule |
 |-------|------|
-| **Strategy ownership** | `BT.STRATEGY.USER_ID` must match the caller. `_assert_strategy_owned` on dry-run and deploy (403 otherwise). Decision #42's shared pool is not what the picker does. |
+| **Strategy ownership** | `BT.STRATEGY.USER_ID` must match the caller. `TradeRepo.strategy_owned_by` on dry-run and deploy (403 otherwise). Decision #42's shared pool is not what the picker does. |
 | **Credential ownership** | Already enforced |
 | **Deployment ownership** | Already enforced on get/list |
 | **Paper vs live** | `is_paper_ind` enforced on server — `confirm_live=true` required for live deployments |
