@@ -48,7 +48,7 @@ The real 2026-10-03 bodies stay outside the repo so a later fetch of the same wi
 
 `s` and `u` are `utc_epoch(start_date)` and `utc_epoch(end_date)`: midnight UTC on each date, so the request window is the same whatever zone the host runs in. They were once built with `time.mktime`, which is the machine's local timezone; the 3 Oct window was UTC unix time, and a backtest on a non-UTC host asked Glassnode for a different window than the fixture. `tests/unit/test_data.py` pins the epoch under three `TZ` values.
 
-`fetch_df` in `quant/strategy/backtest_service.py` resolves the metric name `"price"` and, when refresh is on, calls the provider once for the whole `[start, end]`. It then clears the method's `lru_cache`. The frame it stores has `price` and `factor`, both set from `v`. Columns `Open`, `High`, `Low`, `Close`, and `Volume` are copied only when the provider frame already has them. Glassnode's `{t, v}` body does not.
+`fetch_df` in `quant/strategy/backtest_service.py` resolves the metric name `"price"` and, when refresh is on, calls the provider once for the whole `[start, end]`. The frame it stores has `price` and `factor`, both set from `v`. Columns `Open`, `High`, `Low`, `Close`, and `Volume` are copied only when the provider frame already has them. Glassnode's `{t, v}` body does not.
 
 A provider interval shorter than one day is refused before that call. The class will forward `i=1h` if something calls it directly (the unit test does). The backtest path will not.
 

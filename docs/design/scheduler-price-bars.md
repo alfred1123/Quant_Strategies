@@ -927,7 +927,7 @@ what every downstream "newest closed bar" derives from.
 | `quant/trade/scheduler/sweep.py` | `ScheduleSweeper` — one tick per interval, plus the boundary settle. Shared by the endpoint and the poller (§6.2) |
 | `quant/trade/scheduler/poller.py` | `SchedulePoller` — dev asyncio loop supplying wakeups, with a startup catch-up drain |
 | `quant/market_data/warm.py` | `BarWarmer` — the `price_bar_sync` task: scheduled instruments ∪ subscriptions → grouped `PriceBarService.sync` (§7.8) |
-| `quant/market_data/subscriptions.py` | `BarSubscriptionService` over `SeriesSubscrRepo` (decision #103) — capture requests with no deployment behind them ([market-data-capture.md](market-data-capture.md)) |
+| `quant/market_data/subscriptions.py` | `BarSubscriptionService` over `SeriesSubscrRepo` (decision #106) — capture requests with no deployment behind them ([market-data-capture.md](market-data-capture.md)) |
 | `quant/api/market_data/router.py` | `POST /api/v1/market-data/price-bars/sync` — service-token gated |
 | `quant/api/scheduler/router.py` | `POST /api/v1/scheduler/tick` — service-token gated; the platform's own wakeup |
 | `config/scheduler/price_bar_sync.yml` | Hourly warm schedule, on the boundary |

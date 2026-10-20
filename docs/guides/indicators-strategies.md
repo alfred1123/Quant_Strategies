@@ -110,4 +110,4 @@ Official schedule: [Bybit Trading Fees](https://www.bybit.com/en-GB/announcement
 | Futu OpenD | N/A | Requires local desktop gateway running |
 
 - `YahooFinance` lazy-imports `yfinance` (avoids import-time network calls), retry logic (3 attempts, 2s backoff)
-- Results are cached with `@lru_cache` — clear with `.cache_clear()` if re-fetching
+- Fetch methods are not memoised; every call reaches the provider (decision #110)

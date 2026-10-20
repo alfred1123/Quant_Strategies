@@ -104,7 +104,7 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/trade/scheduler/sweep.py` | `ScheduleSweeper` | Hourly platform tick — one pass per interval. |
 | `quant/trade/scheduler/tick.py` | `ScheduleTickRunner` | Apply one due deployment per interval pass. Three failed applies auto-pause the deployment. |
 | `quant/market_data/warm.py` | `BarWarmer`, `InstrumentSource` | Pre-fetch bars for every series a deployment or a subscription wants. |
-| `quant/market_data/series_subscr.py` | `SeriesSubscrRepo` | The only wrapper of the `MARKET_DATA.SERIES_SUBSCR` procedures (decision #103). |
+| `quant/market_data/series_subscr.py` | `SeriesSubscrRepo` | The only wrapper of the `MARKET_DATA.SERIES_SUBSCR` procedures (decision #106). |
 | `quant/market_data/subscriptions.py` | `BarSubscriptionService` | Capture requests with no deployment behind them, plus coverage and backfill. Its venue list is the `SERIES_SUBSCR` rows with no metric. |
 | `quant/trade/order_policy.py` | `intended_action`, `order_for`, `OrderRetryExecutor` | Signal × position → action → `OrderRequest`; the adapter only places (decision #104). |
 | `quant/strategy/live_service.py` | `bars_loader`, `load_window` | Live signal computation from `MARKET_DATA.PRICE_BAR`. |
