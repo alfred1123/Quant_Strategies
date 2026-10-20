@@ -208,6 +208,7 @@ class TestSubscribeProvider:
         with patch(
             "quant.api.market_data.router.SeriesSubscrRepo.subscribe",
             return_value=row,
+            autospec=True,
         ) as subscribe:
             resp = client.post(
                 "/api/v1/market-data/provider-series",
@@ -223,6 +224,9 @@ class TestSubscribeProvider:
         assert resp.json()["app_metric_id"] == 11
         assert resp.json()["has_payload_ind"] is None
         assert subscribe.call_args.kwargs["app_id"] == 2
+        # The row's USER_ID is the person who clicked, not a fixed "system".
+        repo = subscribe.call_args.args[0]
+        assert repo.user_id == "alice"
 
 
 class TestCoverage:

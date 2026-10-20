@@ -49,12 +49,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/market-data", tags=["market-data"])
 
 
-def _series_subscr_repo(request: Request) -> SeriesSubscrRepo:
-    """The one wrapper over ``MARKET_DATA.SERIES_SUBSCR`` — venue and provider rows alike."""
-    return SeriesSubscrRepo(request.app.state.db_conninfo, user_id="system")
+def _series_subscr_repo(
+    request: Request, caller: str = Depends(require_user_or_service)
+) -> SeriesSubscrRepo:
+    """The one wrapper over ``MARKET_DATA.SERIES_SUBSCR`` — venue and provider rows alike.
+
+    ``SP_INS_SERIES_SUBSCR`` audits ``USER_ID`` from the repo, so the repo is
+    built for whoever is calling: the signed-in username on a subscribe, the
+    scheduler label on a sync. The routes that must not admit the service
+    token still add ``require_user`` themselves.
+    """
+    return SeriesSubscrRepo(request.app.state.db_conninfo, user_id=caller)
 
 
-def _get_bar_warmer(request: Request) -> BarWarmer:
+def _get_bar_warmer(
+    request: Request, series: SeriesSubscrRepo = Depends(_series_subscr_repo)
+) -> BarWarmer:
     """The warmer over both answers to "which instruments matter".
 
     Deployments and subscriptions are unioned rather than kept in step, so a
@@ -69,7 +79,7 @@ def _get_bar_warmer(request: Request) -> BarWarmer:
     return BarWarmer(
         [
             DeploymentInstrumentSource(trade),
-            SubscriptionInstrumentSource(_series_subscr_repo(request)),
+            SubscriptionInstrumentSource(series),
         ],
         # Application-scoped: the factory holds a long-lived bar repo connection
         # and a ccxt client per venue, so it must not be rebuilt per request.
@@ -77,9 +87,11 @@ def _get_bar_warmer(request: Request) -> BarWarmer:
     )
 
 
-def _get_subscriptions(request: Request) -> BarSubscriptionService:
+def _get_subscriptions(
+    request: Request, series: SeriesSubscrRepo = Depends(_series_subscr_repo)
+) -> BarSubscriptionService:
     return BarSubscriptionService(
-        _series_subscr_repo(request),
+        series,
         request.app.state.data_caches.instrument_cache,
         request.app.state.price_bars,
     )

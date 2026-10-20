@@ -27,17 +27,28 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-def _get_log_proc_repo(request: Request) -> LogProcRepo:
-    return LogProcRepo(request.app.state.db_conninfo, user_id="system")
+# Each maintenance procedure audits IN_USER_ID from the repo, so the repo is
+# built for whoever got in: the username on a UI click, "scheduler" on the
+# EventBridge call (require_user_or_service names the caller either way).
 
 
-def _get_api_request_payload_repo(request: Request) -> ApiRequestPayloadRepo:
-    return ApiRequestPayloadRepo(request.app.state.db_conninfo, user_id="system")
+def _get_log_proc_repo(
+    request: Request, caller: str = Depends(require_user_or_service)
+) -> LogProcRepo:
+    return LogProcRepo(request.app.state.db_conninfo, user_id=caller)
 
 
-def _get_connection_maintenance_service(request: Request) -> ConnectionMaintenanceService:
+def _get_api_request_payload_repo(
+    request: Request, caller: str = Depends(require_user_or_service)
+) -> ApiRequestPayloadRepo:
+    return ApiRequestPayloadRepo(request.app.state.db_conninfo, user_id=caller)
+
+
+def _get_connection_maintenance_service(
+    request: Request, caller: str = Depends(require_user_or_service)
+) -> ConnectionMaintenanceService:
     return ConnectionMaintenanceService(
-        ConnectionMaintenanceRepo(request.app.state.db_conninfo, user_id="system"),
+        ConnectionMaintenanceRepo(request.app.state.db_conninfo, user_id=caller),
     )
 
 
