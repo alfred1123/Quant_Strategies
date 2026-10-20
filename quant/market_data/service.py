@@ -28,6 +28,7 @@ import pandas as pd
 
 from quant.market_data.fetcher import BarFetcher, VenueMarket
 from quant.market_data.repo import PriceBarRepo
+from quant.schemas.market_data import BackfillPlan
 from quant.shared.db import ProcedureError
 from quant.shared.intervals import as_utc, bar_starts, floor_to_period, last_closed_bar
 
@@ -75,34 +76,6 @@ class SyncResult:
     instruments: int
     inserted: int
     failures: dict[str, str]
-
-
-@dataclass(frozen=True)
-class BackfillPlan:
-    """The next pass toward ``target``, and how many more it would take.
-
-    ``MAX_BACKFILL_BARS`` makes deep intraday history unreachable in one call,
-    and the advice that replaced it — fill a nearer date and repeat — does not
-    work, because every fill runs to the last closed bar. For an hourly series
-    already holding a year, *no* start both reaches further back and stays
-    under the ceiling: the nearer the start, the more of the range is bars
-    already stored, and the span is counted either way.
-
-    Working backwards fixes that. Each pass ends where coverage currently
-    begins, so it spans only bars that are actually absent, and the next pass
-    starts from the ground the last one gained. ``start``/``end`` are ``None``
-    when the target is already reached — the caller has nothing to do.
-    """
-
-    start: datetime | None
-    end: datetime | None
-    bars: int
-    passes_remaining: int
-    target: datetime
-
-    @property
-    def is_complete(self) -> bool:
-        return self.start is None
 
 
 @dataclass(frozen=True)

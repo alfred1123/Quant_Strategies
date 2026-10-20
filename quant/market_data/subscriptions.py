@@ -29,10 +29,10 @@ from uuid import UUID
 from quant.market_data.series_subscr import SeriesSubscrRepo
 from quant.market_data.service import (
     MAX_BACKFILL_BARS,
-    BackfillPlan,
     BackfillResult,
     BarServiceFactory,
 )
+from quant.schemas.market_data import BackfillPlan
 
 logger = logging.getLogger(__name__)
 

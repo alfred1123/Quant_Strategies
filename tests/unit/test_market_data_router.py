@@ -11,10 +11,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from quant.market_data.service import (
-    BackfillPlan as BackfillPlanResult,
-)
 from quant.market_data.service import BackfillResult, BackfillTooLargeError
+from quant.schemas.market_data import BackfillPlan as BackfillPlanResult
 from quant.market_data.subscriptions import SubscriptionError
 
 DAILY = 1

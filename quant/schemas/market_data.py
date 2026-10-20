@@ -91,6 +91,9 @@ class BackfillPlan(BaseModel):
     span keeps counting the bars already stored. Each pass here instead ends
     where coverage begins, spanning only what is absent, and the next resumes
     from what the last one gained.
+
+    Built by ``BarService.plan_backfill`` and returned by the router as is —
+    one shape, no transport copy.
     """
 
     #: ``None`` when the target is already reached — there is nothing to run.
@@ -101,6 +104,10 @@ class BackfillPlan(BaseModel):
     #: Passes still needed to reach ``target``, counting this one.
     passes_remaining: int
     target: datetime
+
+    @property
+    def is_complete(self) -> bool:
+        return self.start is None
 
 
 class SubscribeProviderRequest(BaseModel):

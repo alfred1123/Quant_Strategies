@@ -275,15 +275,11 @@ def price_bar_backfill_plan(
     second exchange call for a question this endpoint answers from stored
     bars alone.
     """
-    return BackfillPlan(
-        **vars(
-            svc.plan_backfill(
-                internal_cusip=internal_cusip,
-                tm_interval_id=tm_interval_id,
-                source_app_id=source_app_id,
-                target=target,
-            )
-        )
+    return svc.plan_backfill(
+        internal_cusip=internal_cusip,
+        tm_interval_id=tm_interval_id,
+        source_app_id=source_app_id,
+        target=target,
     )
 
 

@@ -24,6 +24,7 @@ Usage:
 """
 
 import logging
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -34,18 +35,17 @@ from quant.strategy.performance import Performance
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class WalkForwardResult:
     """Container for walk-forward test results."""
 
-    def __init__(self, best_window, best_signal,
-                 is_metrics, oos_metrics, overfitting_ratio,
-                 full_equity_df=None):
-        self.best_window = best_window
-        self.best_signal = best_signal
-        self.is_metrics = is_metrics    # pd.Series
-        self.oos_metrics = oos_metrics  # pd.Series
-        self.overfitting_ratio = overfitting_ratio
-        self.full_equity_df = full_equity_df  # pd.DataFrame, full-period enriched data
+    best_window: float
+    best_signal: float
+    is_metrics: pd.Series
+    oos_metrics: pd.Series
+    overfitting_ratio: float
+    #: Full-period enriched data.
+    full_equity_df: pd.DataFrame | None = None
 
     def summary(self):
         """Return a DataFrame comparing in-sample vs out-of-sample."""
