@@ -259,5 +259,4 @@ class TestFetchAccountSnapshot:
 
         adapter = args["adapter_registry"].create.return_value
         adapter.place_order.assert_not_called()
-        adapter.apply_signal.assert_not_called()
-        adapter.execute_action.assert_not_called()
+        adapter.cancel_order.assert_not_called()

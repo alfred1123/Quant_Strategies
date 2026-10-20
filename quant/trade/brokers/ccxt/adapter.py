@@ -17,7 +17,6 @@ from quant.trade.errors import (
 from quant.trade.brokers.ccxt.routing import KeyRouter
 from quant.trade.models.key_profile import KeyProfile
 from quant.trade.models.order import (
-    IntendedAction,
     OrderRejectReason,
     OrderRequest,
     OrderResult,
@@ -254,28 +253,3 @@ class CcxtTradeAdapter(TradeAdapter):
 
     def get_open_orders(self, symbol: str | None = None) -> list[dict]:
         return self._gateway.fetch_open_orders(symbol)
-
-    def execute_action(
-        self,
-        symbol: str,
-        action: IntendedAction,
-        qty: float,
-        position_qty: float,
-    ) -> OrderResult | None:
-        """Translate a precomputed action + position into at most one order."""
-        match action:
-            case IntendedAction.HOLD:
-                return None
-            case IntendedAction.BUY:
-                order_req = OrderRequest(symbol=symbol, qty=qty, side=OrderSide.BUY)
-            case IntendedAction.OPEN_SHORT:
-                order_req = OrderRequest(symbol=symbol, qty=qty, side=OrderSide.SELL)
-            case IntendedAction.SELL:
-                order_req = OrderRequest(symbol=symbol, qty=abs(position_qty), side=OrderSide.SELL)
-            case IntendedAction.CLOSE_SHORT:
-                order_req = OrderRequest(symbol=symbol, qty=abs(position_qty), side=OrderSide.BUY)
-            case _:  # pragma: no cover — exhaustive per IntendedAction
-                raise ValueError(f"unhandled intended_side action: {action!r}")
-        if order_req.qty <= 0:
-            return None
-        return self.place_order(order_req)

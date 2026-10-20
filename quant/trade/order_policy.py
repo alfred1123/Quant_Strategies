@@ -1,4 +1,10 @@
-"""Live-apply retry classification and execution — policy layer above broker mechanics."""
+"""What to place, and how often to try — the policy layer above broker mechanics.
+
+A :class:`~quant.trade.adapters.base.TradeAdapter` places the order it is
+handed. Deciding that order from a signal and a live position is this
+module's job, so a second broker cannot grow its own reading of ``+1`` on a
+short position.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +12,81 @@ import time
 from dataclasses import dataclass
 
 from quant.trade.adapters.base import TradeAdapter
-from quant.trade.models.order import IntendedAction, OrderResult
+from quant.trade.models.order import (
+    IntendedAction,
+    OrderRequest,
+    OrderResult,
+    OrderSide,
+)
+
+# Positions smaller than this are float noise, not real exposure — treat as flat.
+_FLAT_EPS = 1e-9
+
+
+def intended_action(signal: float, position_qty: float) -> IntendedAction:
+    """Map ``(signal, signed_position)`` to an action.
+
+    Handles long, flat, and short positions::
+
+        signal  position   →  action
+        ──────  ─────────  ─  ──────
+         +1      0 (flat)  →  BUY
+         +1     >0 (long)  →  HOLD          (already long)
+         +1     <0 (short) →  CLOSE_SHORT   (cover before buying)
+          0     >0 (long)  →  SELL           (flatten)
+          0      0 (flat)  →  HOLD
+          0     <0 (short) →  CLOSE_SHORT    (flatten)
+         -1     >0 (long)  →  SELL
+         -1      0 (flat)  →  OPEN_SHORT     (enter short)
+         -1     <0 (short) →  HOLD           (already short)
+
+    Positions within ``_FLAT_EPS`` of zero are treated as flat so float
+    dust never triggers a flatten order the exchange would reject.
+    """
+    sig = int(round(signal))
+    if abs(position_qty) <= _FLAT_EPS:
+        position_qty = 0.0
+    if sig > 0:
+        if position_qty < 0:
+            return IntendedAction.CLOSE_SHORT
+        return IntendedAction.BUY if position_qty == 0 else IntendedAction.HOLD
+    if sig == 0:
+        if position_qty > 0:
+            return IntendedAction.SELL
+        if position_qty < 0:
+            return IntendedAction.CLOSE_SHORT
+        return IntendedAction.HOLD
+    # sig < 0
+    if position_qty > 0:
+        return IntendedAction.SELL
+    if position_qty == 0:
+        return IntendedAction.OPEN_SHORT
+    return IntendedAction.HOLD
+
+
+def order_for(
+    symbol: str, action: IntendedAction, qty: float, position_qty: float,
+) -> OrderRequest | None:
+    """At most one market order for *action*, or ``None`` when nothing is due.
+
+    ``position_qty`` must be the same reading *action* was derived from:
+    a flatten sells what is held, so sizing it from a second broker read
+    could place an order that no longer matches the decision.
+    """
+    match action:
+        case IntendedAction.HOLD:
+            return None
+        case IntendedAction.BUY:
+            req = OrderRequest(symbol=symbol, qty=qty, side=OrderSide.BUY)
+        case IntendedAction.OPEN_SHORT:
+            req = OrderRequest(symbol=symbol, qty=qty, side=OrderSide.SELL)
+        case IntendedAction.SELL:
+            req = OrderRequest(symbol=symbol, qty=abs(position_qty), side=OrderSide.SELL)
+        case IntendedAction.CLOSE_SHORT:
+            req = OrderRequest(symbol=symbol, qty=abs(position_qty), side=OrderSide.BUY)
+        case _:  # pragma: no cover — exhaustive per IntendedAction
+            raise ValueError(f"unhandled intended action: {action!r}")
+    return req if req.qty > 0 else None
 
 
 @dataclass(frozen=True)
@@ -144,13 +224,14 @@ class OrderRetryExecutor:
 
         for attempt_num in range(1, policy.max_attempts + 1):
             position_qty = adapter.get_position_qty(vendor_symbol)
-            action = adapter.intended_side(signal, position_qty)
+            action = intended_action(signal, position_qty)
+            req = order_for(vendor_symbol, action, qty, position_qty)
 
-            if action is IntendedAction.HOLD:
+            if req is None:
                 attempts.append(ApplyAttempt(action, position_qty, None))
                 return self._outcome(action, position_qty, None, attempts)
 
-            result = adapter.apply_signal(vendor_symbol, signal, qty)
+            result = adapter.place_order(req)
             attempts.append(ApplyAttempt(action, position_qty, result))
 
             if result is None or result.success:

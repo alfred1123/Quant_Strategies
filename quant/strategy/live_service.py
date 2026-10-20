@@ -40,10 +40,6 @@ class LiveEvaluationError(ValueError):
     """Live strategy evaluation failed (maps to HTTP 400 in dry-run)."""
 
 
-def _default_data_source(internal_cusip: str) -> str:
-    return "glassnode" if internal_cusip.endswith(".crypto") else "yahoo"
-
-
 def _resolve_config_and_params(
     config_json: dict,
     result_payload: dict | None,
@@ -79,9 +75,18 @@ def _data_sources(
     may override the request-level source, and the key must be
     ``vendor_symbol or symbol`` because that is what ``build_config`` writes
     onto the substrategy and therefore what ``Performance`` looks up.
+
+    The source is the strategy's, recorded when it was saved. A config with
+    no ``data_source`` is refused rather than guessed: ``REFDATA.APP`` names
+    the providers, and a rule like "``.crypto`` means Glassnode" is a second
+    catalog that drifts from it.
     """
     if optimize_req is None:
-        return {c: _default_data_source(c) for c in config.get_internal_cusips()}
+        raise LiveEvaluationError(
+            f"strategy {config.internal_cusip!r} names no data_source — it was "
+            f"saved without one. Re-run the backtest from the form so the "
+            f"provider is recorded with the strategy"
+        )
 
     default = optimize_req.data_source
     sources = {config.internal_cusip: default}
@@ -130,7 +135,11 @@ def provider_loader(
     sources = _data_sources(config, optimize_req)
 
     def load(cusip: str) -> pd.DataFrame:
-        data_source = sources.get(cusip) or _default_data_source(cusip)
+        data_source = sources.get(cusip)
+        if data_source is None:
+            raise LiveEvaluationError(
+                f"strategy names no data_source for {cusip!r}"
+            )
         try:
             return fetch_df(cusip, start, end, data_source, cache, inst_cache, bt_cache)
         except BacktestCache.CacheMissError:

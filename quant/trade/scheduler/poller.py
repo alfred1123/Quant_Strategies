@@ -19,7 +19,7 @@ would reach the same position but erase it.
 Every pass reads the *current* bars, so a catch-up apply trades today's signal
 at today's price. It does not replay the missed period, and cannot: an order
 placed now fills now. Repeated applies converge instead of stacking, because
-``intended_side`` compares the signal against the live broker position and
+``intended_action`` compares the signal against the live broker position and
 returns ``HOLD`` once the position already matches.
 """
 

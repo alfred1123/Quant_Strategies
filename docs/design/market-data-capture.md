@@ -197,7 +197,7 @@ B was a **move, not a rewrite**: the grouping, the settle, the per-group
 `except` and `WarmResult` are unchanged; only where the rows come from moved
 behind the protocol. `DeploymentInstrumentSource` (in `quant/trade/bar_source.py`,
 the module that already composes trade and market data) wraps `TradeRepo`;
-`SubscriptionInstrumentSource` wraps the new repo; the route handler wires both.
+`SubscriptionInstrumentSource` wraps `SeriesSubscrRepo`, the one wrapper of the `SERIES_SUBSCR` procedures (decision #103); the route handler wires both.
 The route stays `POST /api/v1/market-data/price-bars/sync`, which was *already*
 under `market-data` despite the handler living in `quant/trade/` — a mismatch
 this resolves.

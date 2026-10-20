@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 
 from quant.data.sources import AlphaVantage
 from quant.strategy.indicators import TechnicalAnalysis
-from quant.strategy.signals import Strategy
+from quant.strategy.signals import SignalDirection
 from quant.strategy.performance import Performance
 
 # Load .env so we can check for the key
@@ -110,7 +110,7 @@ class TestFullPipelineE2E:
         ta = TechnicalAnalysis(ibm_data)
         perf = Performance(
             ta.data, 252, ta.get_sma,
-            Strategy.momentum_band_signal, 20, 0.5,
+            SignalDirection.momentum_band_signal, 20, 0.5,
         )
         result = perf.get_strategy_performance()
 
@@ -123,7 +123,7 @@ class TestFullPipelineE2E:
         ta = TechnicalAnalysis(ibm_data)
         perf = Performance(
             ta.data, 252, ta.get_bollinger_band,
-            Strategy.reversion_band_signal, 20, 1.0,
+            SignalDirection.reversion_band_signal, 20, 1.0,
         )
         result = perf.get_strategy_performance()
 
@@ -134,7 +134,7 @@ class TestFullPipelineE2E:
         ta = TechnicalAnalysis(ibm_data)
         perf = Performance(
             ta.data, 252, ta.get_sma,
-            Strategy.momentum_band_signal, 20, 0.5,
+            SignalDirection.momentum_band_signal, 20, 0.5,
         )
         bh = perf.get_buy_hold_performance()
 

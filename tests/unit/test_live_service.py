@@ -7,6 +7,8 @@ import pandas as pd
 import pytest
 
 from quant.queue.repo import BtQueueRepo
+from quant.schemas.backtest import OptimizeRequest
+from quant.strategy.backtest_service import build_config
 from quant.strategy.live_service import (
     LiveEvaluationError,
     bars_loader,
@@ -15,7 +17,7 @@ from quant.strategy.live_service import (
     provider_loader,
 )
 from quant.strategy.performance import live_lookback_bars, live_lookback_days
-from quant.strategy.signals import Strategy, StrategyConfig, config_from_json, strategy_to_json
+from quant.strategy.signals import StrategyConfig, config_from_json, strategy_to_json, SignalDirection
 
 
 def _sample_df(n: int = 120) -> pd.DataFrame:
@@ -29,13 +31,38 @@ def strategy_json_doc():
     cfg = StrategyConfig.single(
         "btcusdt.crypto",
         "get_bollinger_band",
-        Strategy.momentum_band_signal,
+        SignalDirection.momentum_band_signal,
         365,
         window=20,
         signal=1.0,
         strategy_id=str(uuid4()),
     )
     return strategy_to_json(cfg)
+
+
+@pytest.fixture
+def optimize_json_doc():
+    """The form's shape: the provider is recorded with the strategy."""
+    return {
+        "symbol": "btcusdt.crypto",
+        "start": "2020-01-01",
+        "end": "2024-01-01",
+        "trading_period": 365,
+        "data_source": "glassnode",
+        "tm_interval_id": 1,
+        "factors": [
+            {
+                "indicator": "get_bollinger_band",
+                "strategy": "momentum",
+                "data_column": "price",
+                "window_range": {"min": 20, "max": 20, "step": 1},
+                "signal_range": {"min": 1.0, "max": 1.0, "step": 0.1},
+            }
+        ],
+    }
+
+
+BEST_20_1 = {"best": {"window": 20, "signal": 1.0, "sharpe": 1.2}}
 
 
 @pytest.fixture
@@ -68,20 +95,21 @@ class TestBuildDataDictForSignal:
     @patch("quant.strategy.live_service.fetch_df")
     @patch("quant.strategy.backtest_service._enforce_date_sync")
     def test_does_not_use_backtest_date_sync(
-        self, mock_sync, mock_fetch, strategy_json_doc, data_caches
+        self, mock_sync, mock_fetch, optimize_json_doc, data_caches
     ):
         mock_fetch.return_value = _sample_df()
-        cfg = config_from_json(strategy_json_doc)
+        req = OptimizeRequest.model_validate(optimize_json_doc)
         cache = {
             "app": data_caches.refdata.get("app"),
             "indicator": data_caches.refdata.get("indicator"),
             "signal_type": data_caches.refdata.get("signal_type"),
         }
+        cfg = build_config(req, cache)
         build_data_dict_for_signal(
             cfg,
             provider_loader(
                 cfg,
-                None,
+                req,
                 start="2024-01-01",
                 end="2024-06-01",
                 cache=cache,
@@ -91,20 +119,33 @@ class TestBuildDataDictForSignal:
         )
         mock_sync.assert_not_called()
 
+    def test_a_strategy_saved_without_a_provider_is_refused_not_guessed(
+        self, strategy_json_doc, data_caches
+    ):
+        """``.crypto`` is not a provider. REFDATA.APP names them; the strategy records one."""
+        cfg = config_from_json(strategy_json_doc)
+        with pytest.raises(LiveEvaluationError, match="names no data_source"):
+            provider_loader(
+                cfg,
+                None,
+                start="2024-01-01",
+                end="2024-06-01",
+                cache={},
+                inst_cache=data_caches.instrument_cache,
+                bt_cache=None,
+            )
+
 
 class TestComputeLatestPosition:
     @patch("quant.strategy.live_service.fetch_df")
-    def test_strategy_json_format(self, mock_fetch, strategy_json_doc, data_caches):
-        mock_fetch.return_value = _sample_df()
-
-        position, as_of = compute_latest_position(
-            strategy_json_doc,
-            result_payload=None,
-            caches=data_caches,
-        )
-
-        assert position in (-1.0, 0.0, 1.0)
-        assert as_of
+    def test_legacy_json_cannot_pick_a_provider(self, mock_fetch, strategy_json_doc, data_caches):
+        with pytest.raises(LiveEvaluationError, match="names no data_source"):
+            compute_latest_position(
+                strategy_json_doc,
+                result_payload=None,
+                caches=data_caches,
+            )
+        mock_fetch.assert_not_called()
 
     @patch("quant.strategy.live_service.fetch_df")
     def test_optimize_format_requires_result(self, mock_fetch, data_caches):
@@ -300,15 +341,16 @@ class TestComputeLatestPositionFromBars:
 
     @patch("quant.strategy.live_service.fetch_df")
     def test_without_a_loader_the_provider_path_is_unchanged(
-        self, mock_fetch, strategy_json_doc, data_caches
+        self, mock_fetch, optimize_json_doc, data_caches
     ):
         mock_fetch.return_value = _sample_df()
 
         compute_latest_position(
-            strategy_json_doc, result_payload=None, caches=data_caches
+            optimize_json_doc, result_payload=BEST_20_1, caches=data_caches
         )
 
         mock_fetch.assert_called()
+        assert mock_fetch.call_args.args[3] == "glassnode"
 
 
 class TestFetchResultPayload:

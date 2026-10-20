@@ -96,6 +96,108 @@ def _latest_final_position(final_position: pd.Series) -> tuple[float, str]:
     return float(series.iloc[-1]), str(series.index[-1])
 
 
+def strategy_pnl(
+    position: np.ndarray, chg: np.ndarray, transaction_cost: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """``(prior_position, turnover, pnl)`` per bar, from a position series.
+
+    The bar's return accrues to the position held *entering* it. A fee is
+    charged only on a change between two **known** positions: a missing prior
+    is not a trade — the series is still warming up, or a gap just ended —
+    and a missing current position has no PnL at all. ``Performance`` writes
+    these as columns and ``Objective`` reduces them to one Sharpe; both must
+    read the same rule, which is why it lives here once.
+    """
+    pos = np.asarray(position, dtype=float)
+    prior = np.empty_like(pos)
+    prior[0] = np.nan
+    prior[1:] = pos[:-1]
+    both_known = ~np.isnan(pos) & ~np.isnan(prior)
+    turnover = np.where(both_known, np.abs(pos - prior), 0.0)
+    turnover = np.where(np.isnan(pos), np.nan, turnover)
+    pnl = prior * np.asarray(chg, dtype=float) - turnover * transaction_cost
+    return prior, turnover, pnl
+
+
+def sharpe_ratio(pnl, trading_period: int, *, min_obs: int) -> float:
+    """Annualised Sharpe of a per-bar return series, or ``nan`` when undefined.
+
+    Undefined below ``min_obs`` finite bars — ``mean * period`` over a lucky
+    week is not a Sharpe (decision #63) — and when the return has no spread.
+    Sample standard deviation (``ddof=1``), the pandas default the metric
+    was first written with.
+    """
+    finite = np.asarray(pnl, dtype=float)
+    finite = finite[~np.isnan(finite)]
+    if finite.size < min_obs:
+        logger.debug("Sharpe undefined (%d finite bars, need %d)", finite.size, min_obs)
+        return np.nan
+    std = finite.std(ddof=1)
+    if std == 0 or np.isnan(std):
+        logger.debug("Sharpe undefined (zero or NaN std)")
+        return np.nan
+    return float(finite.mean() / std * np.sqrt(trading_period))
+
+
+class FactorFrames:
+    """The series a strategy reads, resolved the same way for every engine.
+
+    A substrategy's factor may come from the traded product's own frame or
+    from another product's. Which frame, how it is aligned, and when another
+    product is too sparse to be a factor are one set of rules; backtest
+    (``Performance``) and search (``Objective``) both read them from here
+    rather than carrying a copy each.
+    """
+
+    # A factor with fewer trading days than the main product (a 252-day equity
+    # factor on a 365-day crypto product) leaves NaN gaps after ``reindex``
+    # that make the indicator unreliable. Below this share of main dates
+    # covered, the factor is refused.
+    MIN_COVERAGE = 0.80
+
+    def __init__(self, all_data: dict, config) -> None:
+        self._all = all_data
+        self._config = config
+        self.main = all_data[config.internal_cusip]
+
+    def factor(self, sub) -> pd.Series:
+        """``sub``'s factor column, aligned to the traded product's index."""
+        sub_cusip = sub.internal_cusip or self._config.internal_cusip
+        sub_df = self._all[sub_cusip]
+        if sub_cusip != self._config.internal_cusip:
+            self._require_coverage(sub_df, sub_cusip)
+        return sub_df[sub.data_column].reindex(self.main.index)
+
+    def single_factor_frame(self) -> pd.DataFrame:
+        """A copy of the main frame whose ``factor`` column is the one substrategy's.
+
+        The main frame already carries a ``factor`` column when the product's
+        own price is the factor. It is replaced only when the substrategy
+        reads another product, or names a column the main frame has — the
+        same product's volume, say.
+        """
+        sub = self._config.get_substrategies()[0]
+        sub_cusip = sub.internal_cusip or self._config.internal_cusip
+        frame = self.main.copy()
+        if sub_cusip != self._config.internal_cusip or sub.data_column in self._all[sub_cusip].columns:
+            frame["factor"] = self.factor(sub)
+        return frame
+
+    def _require_coverage(self, factor_df: pd.DataFrame, factor_cusip: str) -> None:
+        main_dates = set(self.main.index)
+        factor_dates = set(factor_df.index)
+        missing = main_dates - factor_dates
+        coverage = 1.0 - len(missing) / len(main_dates) if main_dates else 1.0
+        if coverage < self.MIN_COVERAGE:
+            raise ValueError(
+                f"Factor '{factor_cusip}' covers only {coverage:.0%} of main product "
+                f"'{self._config.internal_cusip}' dates "
+                f"({len(factor_dates)} vs {len(main_dates)} trading days). "
+                f"Cannot use a product with fewer trading days as a factor "
+                f"for a product with more trading days."
+            )
+
+
 class Performance:
 
     DEFAULT_FEE_BPS = 10.0  # Bybit VIP-0 spot taker; per unit of turnover
@@ -113,7 +215,8 @@ class Performance:
         self._is_multi = len(self._subs) > 1
 
         self.all_data = data
-        self.data = data[config.internal_cusip].copy()
+        self._frames = FactorFrames(data, config)
+        self.data = self._frames.main.copy()
 
         if window is not None and signal is not None:
             # Legacy/grid-search caller: window/signal passed explicitly
@@ -156,22 +259,14 @@ class Performance:
     def compute_latest_position(self) -> tuple[float, str]:
         """Latest ``FinalPosition`` using the same math as backtest enrichment."""
         if self._is_multi:
-            _, _, final_position, _ = self._compute_multi_factor_outputs()
+            _, _, final_position = self._compute_multi_factor_outputs()
         else:
-            _, final_position, _ = self._compute_single_factor_outputs()
+            _, final_position = self._compute_single_factor_outputs()
         return _latest_final_position(final_position)
 
     def _trade_latest_final_position(self) -> tuple[float, str]:
         """Return ``(position, data_as_of)`` after :meth:`_trade_enrich_positions`."""
         return _latest_final_position(self.data["FinalPosition"])
-
-    def _factor_series_for_sub(self, sub, main_index: pd.Index) -> pd.Series:
-        """Factor column for *sub*, aligned to *main_index*."""
-        sub_cusip = sub.internal_cusip or self.config.internal_cusip
-        sub_df = self.all_data[sub_cusip]
-        if sub_cusip != self.config.internal_cusip:
-            self._validate_factor_coverage(sub_df, sub_cusip)
-        return sub_df[sub.data_column].reindex(main_index)
 
     def _indicator_and_position(
         self,
@@ -180,43 +275,31 @@ class Performance:
         window: int,
         signal: float,
     ) -> tuple[pd.Series, pd.Series]:
-        sub_data = pd.DataFrame({"factor": factor_vals})
-        ta = TechnicalAnalysis(sub_data)
-        indicator_func = getattr(ta, sub.indicator_name)
-        indicator_vals = indicator_func(window).reindex(factor_vals.index)
+        ta = TechnicalAnalysis(pd.DataFrame({"factor": factor_vals}))
+        indicator_vals = ta.indicator(sub.indicator_name, window)
         pos = sub.resolve_signal_func()(indicator_vals, signal)
         return indicator_vals, pos
 
-    def _compute_single_factor_outputs(self) -> tuple[pd.DataFrame, pd.Series, object]:
+    def _compute_single_factor_outputs(self) -> tuple[pd.DataFrame, pd.Series]:
         """Shared single-factor indicator → position math (backtest + trade)."""
-        sub = self._subs[0]
-        sub_cusip = sub.internal_cusip or self.config.internal_cusip
-        data = self.data.copy()
-        source = self.all_data[sub_cusip]
-        if sub_cusip != self.config.internal_cusip or sub.data_column in source.columns:
-            data["factor"] = self._factor_series_for_sub(sub, data.index)
+        data = self._frames.single_factor_frame()
         ta = TechnicalAnalysis(data)
-        data = ta.data
-        indicator_func = getattr(ta, self.config.indicator_name)
         data["factor1"] = data["factor"]
-        data["indicator1"] = indicator_func(self._windows[0])
+        data["indicator1"] = ta.indicator(self.config.indicator_name, self._windows[0])
         data["position1"] = self.config.signal_func(
             data["indicator1"], self._signals[0],
         )
-        return data, data["position1"], indicator_func
+        return data, data["position1"]
 
     def _compute_multi_factor_outputs(
         self,
-    ) -> tuple[pd.DataFrame, list[tuple[pd.Series, pd.Series, pd.Series]], pd.Series, object]:
+    ) -> tuple[pd.DataFrame, list[tuple[pd.Series, pd.Series, pd.Series]], pd.Series]:
         """Shared multi-factor indicator → position math (backtest + trade)."""
-        ta_base = TechnicalAnalysis(self.data.copy())
-        data = ta_base.data
-        indicator_func = getattr(ta_base, self._subs[0].indicator_name)
-        main_index = data.index
+        data = TechnicalAnalysis(self.data.copy()).data
         positions = []
         factor_outputs: list[tuple[pd.Series, pd.Series, pd.Series]] = []
         for i, sub in enumerate(self._subs):
-            factor_vals = self._factor_series_for_sub(sub, main_index)
+            factor_vals = self._frames.factor(sub)
             indicator_vals, pos = self._indicator_and_position(
                 sub, factor_vals, self._windows[i], self._signals[i],
             )
@@ -228,19 +311,17 @@ class Performance:
             positions, self.config.conjunction, strengths=indicator_strengths,
         )
         final_position = pd.Series(combined, index=data.index)
-        return data, factor_outputs, final_position, indicator_func
+        return data, factor_outputs, final_position
 
     def _enrich_single_factor(self):
-        data, final_position, indicator_func = self._compute_single_factor_outputs()
+        data, final_position = self._compute_single_factor_outputs()
         self.data = data
-        self.indicator_func = indicator_func
         self.data["chg"] = self.data["price"].pct_change()
         self.data["FinalPosition"] = final_position
 
     def _enrich_multi_factor(self):
-        data, factor_outputs, final_position, indicator_func = self._compute_multi_factor_outputs()
+        data, factor_outputs, final_position = self._compute_multi_factor_outputs()
         self.data = data
-        self.indicator_func = indicator_func
         self.data["chg"] = self.data["price"].pct_change()
         for i, (factor_vals, indicator_vals, pos) in enumerate(factor_outputs, start=1):
             self.data[f"factor{i}"] = factor_vals
@@ -248,40 +329,19 @@ class Performance:
             self.data[f"position{i}"] = pos
         self.data["FinalPosition"] = final_position
 
-    def _validate_factor_coverage(self, factor_df, factor_cusip):
-        """Raise if the factor has fewer trading days than the main product.
-
-        A factor with fewer trading days (e.g. 252-day equity factor for a
-        365-day crypto product) would produce excessive NaN gaps after
-        ``reindex``, making indicator/signal calculations unreliable.
-        """
-        main_dates = set(self.data.index)
-        factor_dates = set(factor_df.index)
-        missing = main_dates - factor_dates
-        coverage = 1.0 - len(missing) / len(main_dates) if main_dates else 1.0
-        if coverage < 0.80:
-            raise ValueError(
-                f"Factor '{factor_cusip}' covers only {coverage:.0%} of main product "
-                f"'{self.config.internal_cusip}' dates "
-                f"({len(factor_dates)} vs {len(main_dates)} trading days). "
-                f"Cannot use a product with fewer trading days as a factor "
-                f"for a product with more trading days."
-            )
-
     def _compute_pnl_columns(self):
-        prior = self.data['FinalPosition'].shift(1)
+        prior, turnover, pnl = strategy_pnl(
+            self.data['FinalPosition'].to_numpy(),
+            self.data['chg'].to_numpy(),
+            self.transaction_cost,
+        )
         self.data['FinalPosition_x1'] = prior
-        # Fee only on a change between two known positions. A missing prior
-        # is not a trade: the series is still warming up, or a gap just ended.
-        changed = self.data['FinalPosition'].notna() & prior.notna()
-        self.data['trade'] = abs(self.data['FinalPosition'] - prior).where(changed, 0.0)
-        self.data.loc[~changed & self.data['FinalPosition'].isna(), 'trade'] = np.nan
-        self.data['pnl'] = (self.data['FinalPosition_x1'] * self.data['chg']
-                            - self.data['trade'] * self.transaction_cost)
+        self.data['trade'] = turnover
+        self.data['pnl'] = pnl
         self.data['cumu'], self.data['dd'] = _compound(self.data['pnl'])
 
         self.data['buy_hold'] = self.data['chg']
-        self.data.loc[prior.isna(), 'buy_hold'] = np.nan
+        self.data.loc[self.data['FinalPosition_x1'].isna(), 'buy_hold'] = np.nan
         self.data['buy_hold_cumu'], self.data['buy_hold_dd'] = _compound(self.data['buy_hold'])
 
 
@@ -310,17 +370,9 @@ class Performance:
         return _cagr(self._metric_col("pnl"), self.trading_period)
 
     def get_sharpe_ratio(self):
-        n = self.get_metric_n_obs()
-        if n < self.MIN_METRIC_OBS:
-            logger.debug("Sharpe ratio undefined (%d finite pnl bars, need %d)",
-                         n, self.MIN_METRIC_OBS)
-            return np.nan
-        pnl = self._metric_col("pnl")
-        std = pnl.std()
-        if std == 0 or np.isnan(std):
-            logger.debug("Sharpe ratio undefined (zero or NaN std for pnl)")
-            return np.nan
-        return pnl.mean() / std * np.sqrt(self.trading_period)
+        return sharpe_ratio(
+            self._metric_col("pnl"), self.trading_period, min_obs=self.MIN_METRIC_OBS,
+        )
 
     def get_max_drawdown(self):
         max_drawdown = self.data['dd'].max()
@@ -347,17 +399,9 @@ class Performance:
         return _cagr(self._metric_col("buy_hold"), self.trading_period)
 
     def get_buy_hold_sharpe_ratio(self):
-        n = self.get_metric_n_obs()
-        if n < self.MIN_METRIC_OBS:
-            logger.debug("Buy-hold Sharpe undefined (%d finite pnl bars, need %d)",
-                         n, self.MIN_METRIC_OBS)
-            return np.nan
-        bh = self._metric_col("buy_hold")
-        std = bh.std()
-        if std == 0 or np.isnan(std):
-            logger.debug("Buy-hold Sharpe ratio undefined (zero or NaN std)")
-            return np.nan
-        return bh.mean() / std * np.sqrt(self.trading_period)
+        return sharpe_ratio(
+            self._metric_col("buy_hold"), self.trading_period, min_obs=self.MIN_METRIC_OBS,
+        )
 
     def get_buy_hold_max_drawdown(self):
         max_drawdown = self.data['buy_hold_dd'].max()

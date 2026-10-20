@@ -1,9 +1,12 @@
 """Scalar Sharpe objective for parameter search.
 
-A twin of ``Performance`` that returns one number per ``(window, signal)``
-set. Indicators and ``pct_change`` are computed once; the search loop only
-looks up arrays and does numpy arithmetic. ``Performance`` remains the
-engine for metrics, equity curves, and trade-time positions.
+Returns one number per ``(window, signal)`` set. Indicators and
+``pct_change`` are computed once; the search loop only looks up arrays and
+does numpy arithmetic. The rules it applies — which series a factor reads,
+how PnL nets fees, when a Sharpe is undefined — are ``Performance``'s
+(``FactorFrames``, ``strategy_pnl``, ``sharpe_ratio``); this module adds
+only the per-window cache. ``Performance`` remains the engine for metrics,
+equity curves, and trade-time positions.
 """
 
 from __future__ import annotations
@@ -15,24 +18,24 @@ import numpy as np
 import pandas as pd
 
 from quant.strategy.indicators import TechnicalAnalysis
-from quant.strategy.performance import Performance
+from quant.strategy.performance import (
+    FactorFrames,
+    Performance,
+    sharpe_ratio,
+    strategy_pnl,
+)
 from quant.strategy.signals import combine_positions
 
 logger = logging.getLogger(__name__)
 
 
 class IndicatorCache:
-    """``{window: ndarray}`` for one factor, computed eagerly.
-
-    Each array is ``reindex``-aligned to *frame* so a short indicator
-    (``get_rsi`` drops the first row) cannot shift the position series.
-    """
+    """``{window: ndarray}`` for one factor, computed eagerly."""
 
     def __init__(self, frame: pd.DataFrame, indicator_name: str, windows) -> None:
         ta = TechnicalAnalysis(frame)
-        func = getattr(ta, indicator_name)
         self._arrays = {
-            int(w): func(w).reindex(frame.index).to_numpy()
+            int(w): ta.indicator(indicator_name, w).to_numpy()
             for w in windows
         }
 
@@ -48,13 +51,12 @@ class Objective(ABC):
 
     def __init__(self, data: dict, config, *, fee_bps=None) -> None:
         self._config = config
-        self._all_data = data
-        self._main = data[config.internal_cusip]
+        self._frames = FactorFrames(data, config)
         fee = Performance.DEFAULT_FEE_BPS if fee_bps is None else fee_bps
         self.transaction_cost = fee / 10_000
         self.trading_period = config.trading_period
         # Same pandas call Performance uses — do not re-derive the series.
-        self.chg = self._main["price"].pct_change().to_numpy()
+        self.chg = self._frames.main["price"].pct_change().to_numpy()
 
     @staticmethod
     def for_config(data, config, window_values, *, fee_bps=None) -> "Objective":
@@ -72,48 +74,13 @@ class Objective(ABC):
         """Sharpe for one parameter set. Tuples even for a single factor."""
 
     def _sharpe(self, position, metric_window: int) -> float:
-        """Numpy form of ``Performance.get_sharpe_ratio`` (decision #63)."""
-        pos = np.asarray(position, dtype=float)
-        pos_x1 = np.empty_like(pos)
-        pos_x1[0] = np.nan
-        pos_x1[1:] = pos[:-1]
-        # Same rule as Performance._compute_pnl_columns: a fee needs two
-        # known positions. A missing prior contributes no turnover.
-        both = ~np.isnan(pos) & ~np.isnan(pos_x1)
-        trade = np.where(both, np.abs(pos - pos_x1), 0.0)
-        trade = np.where(np.isnan(pos), np.nan, trade)
-        pnl = pos_x1 * self.chg - trade * self.transaction_cost
-        sl = pnl[int(metric_window):]
-        finite = sl[~np.isnan(sl)]
-        if finite.size < Performance.MIN_METRIC_OBS:
-            return np.nan
-        std = finite.std(ddof=1)
-        if std == 0 or np.isnan(std):
-            return np.nan
-        return float(finite.mean() / std * np.sqrt(self.trading_period))
-
-    def _factor_series_for_sub(self, sub) -> pd.Series:
-        """Factor column for *sub*, aligned to the traded product's index."""
-        sub_cusip = sub.internal_cusip or self._config.internal_cusip
-        sub_df = self._all_data[sub_cusip]
-        if sub_cusip != self._config.internal_cusip:
-            self._validate_factor_coverage(sub_df, sub_cusip)
-        return sub_df[sub.data_column].reindex(self._main.index)
-
-    def _validate_factor_coverage(self, factor_df, factor_cusip) -> None:
-        """Same 80 % rule as ``Performance._validate_factor_coverage``."""
-        main_dates = set(self._main.index)
-        factor_dates = set(factor_df.index)
-        missing = main_dates - factor_dates
-        coverage = 1.0 - len(missing) / len(main_dates) if main_dates else 1.0
-        if coverage < 0.80:
-            raise ValueError(
-                f"Factor '{factor_cusip}' covers only {coverage:.0%} of main product "
-                f"'{self._config.internal_cusip}' dates "
-                f"({len(factor_dates)} vs {len(main_dates)} trading days). "
-                f"Cannot use a product with fewer trading days as a factor "
-                f"for a product with more trading days."
-            )
+        """``Performance.get_sharpe_ratio`` on arrays, after indicator warmup."""
+        _, _, pnl = strategy_pnl(position, self.chg, self.transaction_cost)
+        return sharpe_ratio(
+            pnl[int(metric_window):],
+            self.trading_period,
+            min_obs=Performance.MIN_METRIC_OBS,
+        )
 
 
 class SingleFactorObjective(Objective):
@@ -121,15 +88,9 @@ class SingleFactorObjective(Objective):
 
     def __init__(self, data, config, windows, *, fee_bps=None) -> None:
         super().__init__(data, config, fee_bps=fee_bps)
-        sub = config.get_substrategies()[0]
-        sub_cusip = sub.internal_cusip or config.internal_cusip
-        source = self._all_data[sub_cusip]
-        if sub_cusip != config.internal_cusip or sub.data_column in source.columns:
-            frame = self._main.copy()
-            frame["factor"] = self._factor_series_for_sub(sub)
-        else:
-            frame = self._main
-        self._cache = IndicatorCache(frame, config.indicator_name, windows)
+        self._cache = IndicatorCache(
+            self._frames.single_factor_frame(), config.indicator_name, windows,
+        )
         self._signal_func = config.signal_func
 
     def __call__(self, windows, signals) -> float:
@@ -148,8 +109,7 @@ class MultiFactorObjective(Objective):
         self._caches = []
         self._signal_funcs = []
         for sub, windows in zip(config.get_substrategies(), window_ranges):
-            factor_vals = self._factor_series_for_sub(sub)
-            frame = pd.DataFrame({"factor": factor_vals})
+            frame = pd.DataFrame({"factor": self._frames.factor(sub)})
             self._caches.append(IndicatorCache(frame, sub.indicator_name, windows))
             self._signal_funcs.append(sub.resolve_signal_func())
 

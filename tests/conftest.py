@@ -20,6 +20,35 @@ APP_APPLY_TIMING_ROWS = [
     {"app_id": 10, "tm_interval_id": 2, "execute_offset": "0:05:00"},
 ]
 
+#: ``REFDATA.INDICATOR`` / ``SIGNAL_TYPE`` / ``ASSET_TYPE`` as seeded in
+#: ``db/liquidbase/refdata/data/`` — what the CLI and ``build_config`` read.
+INDICATOR_ROWS = [
+    {"name": "bollinger", "display_name": "Bollinger Band (z-score)", "method_name": "get_bollinger_band",
+     "win_min": 10, "win_max": 100, "win_step": 5, "sig_min": 0.25, "sig_max": 2.50, "sig_step": 0.25,
+     "is_bounded_ind": "N"},
+    {"name": "sma", "display_name": "SMA", "method_name": "get_sma",
+     "win_min": 5, "win_max": 200, "win_step": 5, "sig_min": 0.00, "sig_max": 0.10, "sig_step": 0.01,
+     "is_bounded_ind": "N"},
+    {"name": "ema", "display_name": "EMA", "method_name": "get_ema",
+     "win_min": 5, "win_max": 200, "win_step": 5, "sig_min": 0.00, "sig_max": 0.10, "sig_step": 0.01,
+     "is_bounded_ind": "N"},
+    {"name": "rsi", "display_name": "RSI", "method_name": "get_rsi",
+     "win_min": 5, "win_max": 50, "win_step": 1, "sig_min": None, "sig_max": None, "sig_step": 5.00,
+     "is_bounded_ind": "Y"},
+]
+
+SIGNAL_TYPE_ROWS = [
+    {"name": "momentum", "display_name": "Momentum",
+     "func_name_band": "momentum_band_signal", "func_name_bounded": "momentum_bounded_signal"},
+    {"name": "reversion", "display_name": "Reversion",
+     "func_name_band": "reversion_band_signal", "func_name_bounded": "reversion_bounded_signal"},
+]
+
+ASSET_TYPE_ROWS = [
+    {"name": "crypto", "display_name": "Crypto (365 days/year)", "trading_period": 365},
+    {"name": "equity", "display_name": "Equity (252 trading days/year)", "trading_period": 252},
+]
+
 TM_INTERVAL_ROWS = [
     {
         "tm_interval_id": 1,
@@ -55,6 +84,12 @@ class StubRefData(RedisRefData):
             return MARKET_CALENDAR_ROWS
         if table == "app":
             return []
+        if table == "indicator":
+            return INDICATOR_ROWS
+        if table == "signal_type":
+            return SIGNAL_TYPE_ROWS
+        if table == "asset_type":
+            return ASSET_TYPE_ROWS
         raise AssertionError(f"unexpected REFDATA table {table!r}")
 
     def get_config(self, table: str) -> list[dict]:

@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 import ccxt
 import pytest
 
-from quant.trade.adapters.base import TradeAdapter
 from quant.trade.brokers.ccxt.adapter import CcxtTradeAdapter, create_ccxt_adapter
 from quant.trade.brokers.ccxt.config import (
     CCXT_PRESETS,
@@ -87,45 +86,6 @@ class TestExchangeWiring:
         venue = CcxtVenue()
         assert venue.auth_hint(ConnectParams(paper=True)) == ""
         assert venue.classify_denial(ccxt.PermissionDenied('{"retCode":10010}')) is None
-
-
-class TestIntendedSide:
-    """TradeAdapter.intended_side — covers long, flat, and short positions."""
-
-    def test_long_signal_flat_position(self):
-        assert TradeAdapter.intended_side(1.0, 0.0) == "BUY"
-
-    def test_long_signal_existing_long(self):
-        assert TradeAdapter.intended_side(1.0, 0.01) == "HOLD"
-
-    def test_long_signal_existing_short(self):
-        assert TradeAdapter.intended_side(1.0, -0.5) == "CLOSE_SHORT"
-
-    def test_flat_signal_with_long(self):
-        assert TradeAdapter.intended_side(0.0, 0.01) == "SELL"
-
-    def test_flat_signal_no_position(self):
-        assert TradeAdapter.intended_side(0.0, 0.0) == "HOLD"
-
-    def test_flat_signal_with_short(self):
-        assert TradeAdapter.intended_side(0.0, -0.5) == "CLOSE_SHORT"
-
-    def test_sell_signal_with_long(self):
-        assert TradeAdapter.intended_side(-1.0, 1.0) == "SELL"
-
-    def test_sell_signal_flat(self):
-        assert TradeAdapter.intended_side(-1.0, 0.0) == "OPEN_SHORT"
-
-    def test_sell_signal_already_short(self):
-        assert TradeAdapter.intended_side(-1.0, -0.5) == "HOLD"
-
-    def test_returns_intended_action_enum(self):
-        assert TradeAdapter.intended_side(1.0, 0.0) is IntendedAction.BUY
-
-    def test_float_dust_position_treated_as_flat(self):
-        assert TradeAdapter.intended_side(1.0, 1e-12) == "BUY"
-        assert TradeAdapter.intended_side(0.0, -1e-12) == "HOLD"
-        assert TradeAdapter.intended_side(-1.0, 1e-12) == "OPEN_SHORT"
 
 
 class TestIntendedActionOrderSide:
@@ -904,86 +864,3 @@ class TestPlaceOrder:
             orders = adapter.get_open_orders("BTCUSDT")
         mock_fetch.assert_called_once_with("BTCUSDT")
         assert orders == [{"id": "1"}]
-
-
-class TestApplySignal:
-    def _adapter(self, inst_cache):
-        adapter = create_ccxt_adapter(
-            preset=CCXT_PRESETS["bybit"],
-            api_key="k",
-            api_secret="s",
-            paper=True,
-            inst_cache=inst_cache,
-        )
-        adapter.pin_instrument("btcusdt.crypto")
-        return adapter
-
-    def test_buy_signal_flat_position_opens_long(self, inst_cache):
-        adapter = self._adapter(inst_cache)
-        with patch.object(adapter, "get_position_qty", return_value=0.0), \
-             patch.object(adapter, "place_order") as mock_place:
-            mock_place.return_value = OrderResult(success=True, vendor_order_id="1", message="ok")
-            result = adapter.apply_signal("BTCUSDT", 1.0, 0.01)
-
-        req = mock_place.call_args[0][0]
-        assert req.side == OrderSide.BUY and req.qty == 0.01
-        assert result.success is True
-
-    def test_hold_signal_places_no_order(self, inst_cache):
-        adapter = self._adapter(inst_cache)
-        with patch.object(adapter, "get_position_qty", return_value=0.01), \
-             patch.object(adapter, "place_order") as mock_place:
-            result = adapter.apply_signal("BTCUSDT", 1.0, 0.01)
-
-        mock_place.assert_not_called()
-        assert result is None
-
-    def test_flat_signal_with_long_position_sells_full_qty(self, inst_cache):
-        adapter = self._adapter(inst_cache)
-        with patch.object(adapter, "get_position_qty", return_value=0.03), \
-             patch.object(adapter, "place_order") as mock_place:
-            mock_place.return_value = OrderResult(success=True, vendor_order_id="2", message="ok")
-            adapter.apply_signal("BTCUSDT", 0.0, 0.01)
-
-        req = mock_place.call_args[0][0]
-        assert req.side == OrderSide.SELL and req.qty == 0.03
-
-    def test_sell_signal_flat_opens_short(self, inst_cache):
-        adapter = self._adapter(inst_cache)
-        with patch.object(adapter, "get_position_qty", return_value=0.0), \
-             patch.object(adapter, "place_order") as mock_place:
-            mock_place.return_value = OrderResult(success=True, vendor_order_id="3", message="ok")
-            adapter.apply_signal("BTCUSDT", -1.0, 0.01)
-
-        req = mock_place.call_args[0][0]
-        assert req.side == OrderSide.SELL and req.qty == 0.01
-
-    def test_buy_signal_with_short_position_closes_short(self, inst_cache):
-        adapter = self._adapter(inst_cache)
-        with patch.object(adapter, "get_position_qty", return_value=-0.02), \
-             patch.object(adapter, "place_order") as mock_place:
-            mock_place.return_value = OrderResult(success=True, vendor_order_id="4", message="ok")
-            adapter.apply_signal("BTCUSDT", 1.0, 0.01)
-
-        req = mock_place.call_args[0][0]
-        assert req.side == OrderSide.BUY and req.qty == 0.02
-
-    def test_execute_action_uses_passed_position_without_refetch(self, inst_cache):
-        """The caller's position reading drives sizing — no second broker read."""
-        adapter = self._adapter(inst_cache)
-        with patch.object(adapter, "get_position_qty") as mock_pos, \
-             patch.object(adapter, "place_order") as mock_place:
-            mock_place.return_value = OrderResult(success=True, vendor_order_id="5", message="ok")
-            adapter.execute_action("BTCUSDT", IntendedAction.SELL, 0.01, 0.04)
-
-        mock_pos.assert_not_called()
-        req = mock_place.call_args[0][0]
-        assert req.side == OrderSide.SELL and req.qty == 0.04
-
-    def test_execute_action_zero_position_close_returns_none(self, inst_cache):
-        adapter = self._adapter(inst_cache)
-        with patch.object(adapter, "place_order") as mock_place:
-            result = adapter.execute_action("BTCUSDT", IntendedAction.SELL, 0.01, 0.0)
-
-        mock_place.assert_not_called()
-        assert result is None

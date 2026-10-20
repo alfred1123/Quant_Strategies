@@ -42,7 +42,7 @@ class OrderRejectReason(StrEnum):
 
 
 class IntendedAction(StrEnum):
-    """Position-aware action from ``TradeAdapter.intended_side``.
+    """Position-aware action from ``quant.trade.order_policy.intended_action``.
 
     Richer than :class:`OrderSide` — OPEN_SHORT/CLOSE_SHORT carry the position
     context; execution collapses them back to a raw buy/sell order side.

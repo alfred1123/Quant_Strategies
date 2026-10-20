@@ -6,9 +6,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from quant.market_data.series_subscr import SeriesSubscrRepo
 from quant.market_data.service import MAX_BACKFILL_BARS
 from quant.market_data.subscriptions import (
-    BarSubscriptionRepo,
     BarSubscriptionService,
     SubscriptionInstrumentSource,
     SubscriptionError,
@@ -23,38 +23,9 @@ FIRST_BAR = datetime(2026, 1, 1, tzinfo=UTC)
 LAST_BAR = datetime(2026, 8, 1, tzinfo=UTC)
 
 
-@pytest.fixture
-def repo():
-    instance = BarSubscriptionRepo.__new__(BarSubscriptionRepo)
-    instance.user_id = "tester"
-    return instance
-
-
-def _ddl_param_count(proc_file: str) -> int:
-    return procedure_param_count("market_data", proc_file)
-
-
-def _ins_kwargs(**overrides):
+def _series_row(**overrides) -> dict:
+    """A ``SP_GET_SERIES_SUBSCR`` row as the procedure returns it."""
     base = {
-        "series_subscr_id": uuid.uuid4(),
-        "internal_cusip": CUSIP,
-        "tm_interval_id": DAILY,
-        "source_app_id": BYBIT,
-        "is_enabled_ind": "Y",
-    }
-    base.update(overrides)
-    return base
-
-
-class TestCallMatchesProcedureDdl:
-    """CALL argument count must track the procedure DDL.
-
-    Postgres treats a changed parameter list as a new overload instead of an
-    error, so a stale CALL keeps resolving to the old signature and the
-    mismatch surfaces as missing data rather than a failure.
-    """
-
-    @patch.object(BarSubscriptionRepo, "_call_get", return_value=[{
         "series_subscr_id": "00000000-0000-4000-8000-000000000099",
         "series_subscr_vid": 1,
         "internal_cusip": CUSIP,
@@ -64,50 +35,34 @@ class TestCallMatchesProcedureDdl:
         "is_enabled_ind": "Y",
         "backfill_from_ts": None,
         "transact_from_ts": "2026-01-01T00:00:00Z",
-    }])
-    @patch.object(BarSubscriptionRepo, "_call_write", return_value=())
-    def test_ins(self, mock_write, _get, repo):
-        kept = uuid.UUID("00000000-0000-4000-8000-000000000099")
-        row = repo.sp_ins_bar_subscription(**_ins_kwargs(series_subscr_id=kept))
-        sql = mock_write.call_args.args[0]
-        assert call_arg_count(sql) == _ddl_param_count("SP_INS_SERIES_SUBSCR.sql")
-        assert row["source_app_id"] == BYBIT
-        assert row["series_subscr_id"] == "00000000-0000-4000-8000-000000000099"
+    }
+    base.update(overrides)
+    return base
 
-    @patch.object(BarSubscriptionRepo, "_call_get", return_value=[])
-    def test_get(self, mock_get, repo):
-        repo.sp_get_bar_subscription()
-        sql = mock_get.call_args.args[0]
-        assert call_arg_count(sql) == _ddl_param_count("SP_GET_SERIES_SUBSCR.sql")
 
-    @patch.object(BarSubscriptionRepo, "_call_get", return_value=[])
-    def test_get_active(self, mock_get, repo):
+class TestOneOwnerOfTheProcedures:
+    """``SeriesSubscrRepo`` is the only wrapper over ``SERIES_SUBSCR``.
+
+    Postgres treats a changed parameter list as a new overload instead of an
+    error, so a stale CALL keeps resolving to the old signature and the
+    mismatch surfaces as missing data rather than a failure — one place to
+    keep in step, not two.
+    """
+
+    def test_the_venue_module_has_no_repo_of_its_own(self):
+        import quant.market_data.subscriptions as venue
+
+        assert not hasattr(venue, "BarSubscriptionRepo")
+        assert "DbGateway" not in vars(venue)
+
+    @patch.object(SeriesSubscrRepo, "_call_get", return_value=[])
+    def test_get_active_matches_the_ddl(self, mock_get):
+        repo = SeriesSubscrRepo("postgresql://test", user_id="tester")
         repo.sp_get_active_bar_subscriptions()
         sql = mock_get.call_args.args[0]
-        assert call_arg_count(sql) == _ddl_param_count(
-            "SP_GET_ACTIVE_BAR_SUBSCRIPTIONS.sql"
+        assert call_arg_count(sql) == procedure_param_count(
+            "market_data", "SP_GET_ACTIVE_BAR_SUBSCRIPTIONS.sql"
         )
-
-
-class TestRepoValidation:
-    @pytest.mark.parametrize(
-        "field", ["series_subscr_id", "internal_cusip", "tm_interval_id", "source_app_id"]
-    )
-    def test_key_fields_are_required(self, repo, field):
-        with pytest.raises(ValueError, match=field):
-            repo.sp_ins_bar_subscription(**_ins_kwargs(**{field: None}))
-
-    def test_enabled_flag_must_be_y_or_n(self, repo):
-        with pytest.raises(ValueError, match="is_enabled_ind"):
-            repo.sp_ins_bar_subscription(**_ins_kwargs(is_enabled_ind="true"))
-
-    @patch.object(BarSubscriptionRepo, "_call_get", return_value=[])
-    @patch.object(BarSubscriptionRepo, "_call_write", return_value=())
-    def test_a_write_that_reads_back_nothing_is_a_bug_not_an_empty_result(
-        self, _write, _get, repo
-    ):
-        with pytest.raises(RuntimeError, match="returned no row"):
-            repo.sp_ins_bar_subscription(**_ins_kwargs())
 
 
 class TestInstrumentSource:
@@ -131,7 +86,8 @@ class TestInstrumentSource:
 
 
 def build_service(*, bounds=(FIRST_BAR, LAST_BAR), gaps=(), vendor_symbol="BTCUSDT"):
-    repo = MagicMock()
+    repo = MagicMock(spec=SeriesSubscrRepo)
+    repo.sp_ins_series_subscr.return_value = _series_row()
     instruments = MagicMock()
     instruments.resolve_internal_cusip.return_value = vendor_symbol
 
@@ -157,7 +113,7 @@ class TestSubscribeValidatesOnWrite:
             service.subscribe(
                 internal_cusip=CUSIP, tm_interval_id=DAILY, source_app_id=99
             )
-        repo.sp_ins_bar_subscription.assert_not_called()
+        repo.sp_ins_series_subscr.assert_not_called()
 
     def test_unmapped_symbol_is_refused(self):
         service, repo, _factory, _bar = build_service(vendor_symbol=None)
@@ -166,7 +122,7 @@ class TestSubscribeValidatesOnWrite:
             service.subscribe(
                 internal_cusip=CUSIP, tm_interval_id=DAILY, source_app_id=BYBIT
             )
-        repo.sp_ins_bar_subscription.assert_not_called()
+        repo.sp_ins_series_subscr.assert_not_called()
 
     def test_a_valid_series_is_written(self):
         service, repo, _factory, _bar = build_service()
@@ -175,10 +131,31 @@ class TestSubscribeValidatesOnWrite:
             internal_cusip=CUSIP, tm_interval_id=DAILY, source_app_id=BYBIT
         )
 
-        kwargs = repo.sp_ins_bar_subscription.call_args.kwargs
+        kwargs = repo.sp_ins_series_subscr.call_args.kwargs
         assert kwargs["internal_cusip"] == CUSIP
-        assert kwargs["source_app_id"] == BYBIT
+        assert kwargs["app_id"] == BYBIT
+        assert kwargs["app_metric_id"] is None
         assert kwargs["is_enabled_ind"] == "Y"
+
+    def test_the_written_row_comes_back_named_for_capture(self):
+        """The procedure says ``app_id``; the Data tab reads ``source_app_id``."""
+        service, _repo, _factory, _bar = build_service()
+
+        row = service.subscribe(
+            internal_cusip=CUSIP, tm_interval_id=DAILY, source_app_id=BYBIT
+        )
+
+        assert row["source_app_id"] == BYBIT
+        assert "app_id" not in row
+
+    def test_provider_rows_are_not_venue_subscriptions(self):
+        service, repo, _factory, _bar = build_service()
+        repo.sp_get_series_subscr.return_value = [
+            _series_row(),
+            _series_row(app_id=2, app_metric_id=11, internal_cusip="btc.glassnode"),
+        ]
+
+        assert [r["internal_cusip"] for r in service.venue_rows()] == [CUSIP]
 
     def test_an_id_is_generated_when_none_is_given(self):
         service, repo, _factory, _bar = build_service()
@@ -188,7 +165,7 @@ class TestSubscribeValidatesOnWrite:
         )
 
         assert isinstance(
-            repo.sp_ins_bar_subscription.call_args.kwargs["series_subscr_id"],
+            repo.sp_ins_series_subscr.call_args.kwargs["series_subscr_id"],
             uuid.UUID,
         )
 
@@ -204,7 +181,7 @@ class TestSubscribeValidatesOnWrite:
             series_subscr_id=existing,
         )
 
-        kwargs = repo.sp_ins_bar_subscription.call_args.kwargs
+        kwargs = repo.sp_ins_series_subscr.call_args.kwargs
         assert kwargs["series_subscr_id"] == existing
         assert kwargs["is_enabled_ind"] == "N"
 
@@ -212,7 +189,7 @@ class TestSubscribeValidatesOnWrite:
 class TestDuplicateSubscription:
     def test_a_second_open_row_reports_the_series_not_the_constraint(self):
         service, repo, _factory, _bar = build_service()
-        repo.sp_ins_bar_subscription.side_effect = ProcedureError(
+        repo.sp_ins_series_subscr.side_effect = ProcedureError(
             proc="SP_INS_BAR_SUBSCRIPTION",
             sqlstate="23505",
             message="duplicate key value violates unique constraint",
@@ -225,7 +202,7 @@ class TestDuplicateSubscription:
 
     def test_any_other_procedure_error_is_not_reinterpreted(self):
         service, repo, _factory, _bar = build_service()
-        repo.sp_ins_bar_subscription.side_effect = ProcedureError(
+        repo.sp_ins_series_subscr.side_effect = ProcedureError(
             proc="SP_INS_BAR_SUBSCRIPTION", sqlstate="42883", message="no such function"
         )
 
@@ -281,13 +258,7 @@ class TestCoverage:
 
     def test_a_dead_venue_degrades_one_row_instead_of_the_list(self):
         service, repo, factory, _bar = build_service()
-        repo.sp_get_bar_subscription.return_value = [
-            {
-                "internal_cusip": CUSIP,
-                "tm_interval_id": DAILY,
-                "source_app_id": BYBIT,
-            }
-        ]
+        repo.sp_get_series_subscr.return_value = [_series_row()]
         factory.for_app.side_effect = RuntimeError("venue gone")
 
         rows = service.list_subscriptions()
@@ -300,10 +271,9 @@ class TestCoverage:
 class TestListing:
     def test_every_row_carries_its_coverage(self):
         service, repo, _factory, _bar = build_service()
-        repo.sp_get_bar_subscription.return_value = [
-            {"internal_cusip": CUSIP, "tm_interval_id": DAILY, "source_app_id": BYBIT},
-            {"internal_cusip": "ethusdt.crypto", "tm_interval_id": DAILY,
-             "source_app_id": BYBIT},
+        repo.sp_get_series_subscr.return_value = [
+            _series_row(),
+            _series_row(internal_cusip="ethusdt.crypto"),
         ]
 
         rows = service.list_subscriptions()
@@ -313,11 +283,11 @@ class TestListing:
     def test_the_read_is_not_scoped_to_a_caller(self):
         """Bars are shared facts, so the list is the platform's, not a user's."""
         service, repo, _factory, _bar = build_service()
-        repo.sp_get_bar_subscription.return_value = []
+        repo.sp_get_series_subscr.return_value = []
 
         service.list_subscriptions()
 
-        assert repo.sp_get_bar_subscription.call_args.kwargs == {}
+        assert repo.sp_get_series_subscr.call_args == ((), {})
 
 
 class TestVendorSymbolOnEveryRow:
@@ -325,9 +295,7 @@ class TestVendorSymbolOnEveryRow:
 
     def test_each_row_carries_the_symbol_the_venue_prints(self):
         service, repo, _factory, _bar = build_service(vendor_symbol="BTCUSDT")
-        repo.sp_get_bar_subscription.return_value = [
-            {"internal_cusip": CUSIP, "tm_interval_id": DAILY, "source_app_id": BYBIT}
-        ]
+        repo.sp_get_series_subscr.return_value = [_series_row()]
 
         rows = service.list_subscriptions()
 
@@ -336,9 +304,7 @@ class TestVendorSymbolOnEveryRow:
     def test_resolution_is_scoped_to_the_row_s_own_venue(self):
         """The same product is a different ticker on a different exchange."""
         service, repo, _factory, _bar = build_service()
-        repo.sp_get_bar_subscription.return_value = [
-            {"internal_cusip": CUSIP, "tm_interval_id": DAILY, "source_app_id": BYBIT}
-        ]
+        repo.sp_get_series_subscr.return_value = [_series_row()]
 
         service.list_subscriptions()
 
@@ -347,9 +313,7 @@ class TestVendorSymbolOnEveryRow:
     def test_a_withdrawn_xref_is_none_rather_than_a_broken_list(self):
         """Capture is broken, and the list is exactly where you would see why."""
         service, repo, _factory, _bar = build_service(vendor_symbol=None)
-        repo.sp_get_bar_subscription.return_value = [
-            {"internal_cusip": CUSIP, "tm_interval_id": DAILY, "source_app_id": BYBIT}
-        ]
+        repo.sp_get_series_subscr.return_value = [_series_row()]
 
         rows = service.list_subscriptions()
 

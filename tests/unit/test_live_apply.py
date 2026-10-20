@@ -75,7 +75,6 @@ def _adapter_mock(**overrides) -> MagicMock:
     adapter.__exit__ = MagicMock(return_value=False)
     adapter.validate_for_dry_run.return_value = "BTCUSDT"
     adapter.get_position_qty.return_value = 0.0
-    adapter.intended_side.return_value = IntendedAction.BUY
     for key, val in overrides.items():
         setattr(adapter, key, val)
     return adapter
@@ -118,7 +117,6 @@ class TestLiveApplyOrchestrator:
 
         adapter = _adapter_mock(
             get_position_qty=MagicMock(return_value=0.01),
-            intended_side=MagicMock(return_value=IntendedAction.HOLD),
         )
         orch._adapter_registry.create.return_value = adapter
 
@@ -127,7 +125,7 @@ class TestLiveApplyOrchestrator:
         assert report.action == IntendedAction.HOLD
         assert report.order_success is None
         assert "HOLD" in report.message
-        adapter.apply_signal.assert_not_called()
+        adapter.place_order.assert_not_called()
         orch._repo.sp_ins_execution_event.assert_called_once()
         intent = orch._repo.sp_ins_intent.call_args.kwargs
         assert intent["signal_value"] == 1.0
@@ -201,7 +199,7 @@ class TestLiveApplyOrchestrator:
         orch._credential_service.decrypt_credential.return_value = ("k", "s")
 
         adapter = _adapter_mock(
-            apply_signal=MagicMock(
+            place_order=MagicMock(
                 return_value=OrderResult(
                     success=True,
                     vendor_order_id="order-1",
@@ -222,7 +220,9 @@ class TestLiveApplyOrchestrator:
 
         assert report.action == IntendedAction.BUY
         assert report.order_success is True
-        adapter.apply_signal.assert_called_once_with("BTCUSDT", 1.0, 0.01)
+        req = adapter.place_order.call_args.args[0]
+        assert adapter.place_order.call_count == 1
+        assert (req.symbol, req.side, req.qty) == ("BTCUSDT", OrderSide.BUY, 0.01)
         orch._repo.sp_ins_transaction.assert_called_once()
         tx_kwargs = orch._repo.sp_ins_transaction.call_args.kwargs
         assert tx_kwargs["trans_ccy_cd"] == "USDT"
@@ -244,7 +244,7 @@ class TestLiveApplyOrchestrator:
         }
 
         adapter = _adapter_mock(
-            apply_signal=MagicMock(
+            place_order=MagicMock(
                 return_value=OrderResult(
                     success=True,
                     vendor_order_id="order-2",
@@ -271,7 +271,7 @@ class TestLiveApplyOrchestrator:
         orch._credential_service.decrypt_credential.return_value = ("k", "s")
 
         adapter = _adapter_mock(
-            apply_signal=MagicMock(
+            place_order=MagicMock(
                 return_value=OrderResult(
                     success=False,
                     vendor_order_id="order-3",
@@ -301,7 +301,7 @@ class TestLiveApplyOrchestrator:
         orch._adapter_registry.has_adapter.return_value = True
         orch._credential_service.decrypt_credential.return_value = ("k", "s")
         orch._adapter_registry.create.return_value = _adapter_mock(
-            apply_signal=MagicMock(
+            place_order=MagicMock(
                 return_value=OrderResult(
                     success=False,
                     vendor_order_id=None,
@@ -335,7 +335,7 @@ class TestLiveApplyOrchestrator:
             requested_qty=0.01,
         )
         adapter = _adapter_mock(
-            apply_signal=MagicMock(return_value=unconfirmed),
+            place_order=MagicMock(return_value=unconfirmed),
             cancel_order=MagicMock(
                 return_value=OrderResult(
                     success=True,
@@ -349,7 +349,7 @@ class TestLiveApplyOrchestrator:
         report = orch.run(dep.app_user_id, dep, "alice")
 
         assert report.order_success is False
-        assert adapter.apply_signal.call_count == 5
+        assert adapter.place_order.call_count == 5
         assert adapter.cancel_order.call_count == 5
         assert orch._repo.sp_ins_execution_event.call_count == 5
         orch._notifier.send.assert_called_once()
@@ -368,7 +368,7 @@ class TestLiveApplyOrchestrator:
         orch._credential_service.decrypt_credential.return_value = ("k", "s")
 
         adapter = _adapter_mock(
-            apply_signal=MagicMock(
+            place_order=MagicMock(
                 return_value=OrderResult(
                     success=False,
                     vendor_order_id="order-t",
@@ -405,7 +405,7 @@ class TestLiveApplyOrchestrator:
         orch._credential_service.decrypt_credential.return_value = ("k", "s")
 
         adapter = _adapter_mock(
-            apply_signal=MagicMock(
+            place_order=MagicMock(
                 return_value=OrderResult(
                     success=True,
                     vendor_order_id="order-4",
@@ -531,7 +531,7 @@ class TestSignalDataSource:
         orch._adapter_registry.has_adapter.return_value = True
         orch._credential_service.decrypt_credential.return_value = ("k", "s")
         orch._adapter_registry.create.return_value = _adapter_mock(
-            apply_signal=MagicMock(
+            place_order=MagicMock(
                 return_value=OrderResult(
                     success=True,
                     vendor_order_id="order-9",

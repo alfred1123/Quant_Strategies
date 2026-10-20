@@ -24,7 +24,6 @@ from quant.api.auth.dependencies import require_user, require_user_or_service
 from quant.api.auth.models import CurrentUser
 from quant.market_data.series_subscr import SeriesSubscrRepo
 from quant.market_data.subscriptions import (
-    BarSubscriptionRepo,
     BarSubscriptionService,
     SubscriptionInstrumentSource,
 )
@@ -49,8 +48,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/market-data", tags=["market-data"])
 
 
-def _subscription_repo(request: Request) -> BarSubscriptionRepo:
-    return BarSubscriptionRepo(request.app.state.db_conninfo, user_id="system")
+def _series_subscr_repo(request: Request) -> SeriesSubscrRepo:
+    """The one wrapper over ``MARKET_DATA.SERIES_SUBSCR`` — venue and provider rows alike."""
+    return SeriesSubscrRepo(request.app.state.db_conninfo, user_id="system")
 
 
 def _get_bar_warmer(request: Request) -> BarWarmer:
@@ -65,7 +65,7 @@ def _get_bar_warmer(request: Request) -> BarWarmer:
     return BarWarmer(
         [
             DeploymentInstrumentSource(trade),
-            SubscriptionInstrumentSource(_subscription_repo(request)),
+            SubscriptionInstrumentSource(_series_subscr_repo(request)),
         ],
         # Application-scoped: the factory holds a long-lived bar repo connection
         # and a ccxt client per venue, so it must not be rebuilt per request.
@@ -75,7 +75,7 @@ def _get_bar_warmer(request: Request) -> BarWarmer:
 
 def _get_subscriptions(request: Request) -> BarSubscriptionService:
     return BarSubscriptionService(
-        _subscription_repo(request),
+        _series_subscr_repo(request),
         request.app.state.data_caches.instrument_cache,
         request.app.state.price_bars,
     )
@@ -118,15 +118,14 @@ def sync_price_bars(
 @router.post("/provider-series", response_model=ProviderSeriesRow)
 def subscribe_provider_series(
     req: SubscribeProviderRequest,
-    request: Request,
     _user: CurrentUser = Depends(require_user),
+    repo: SeriesSubscrRepo = Depends(_series_subscr_repo),
 ) -> ProviderSeriesRow:
     """Record one provider series, or version the open row for it.
 
     Subscribing does not fetch. The 06:15 job still does not read this table,
     so the stored range stays empty until that job is pointed at the row.
     """
-    repo = SeriesSubscrRepo(request.app.state.db_conninfo, user_id="system")
     return ProviderSeriesRow(**repo.subscribe(
         internal_cusip=req.internal_cusip,
         app_id=req.app_id,
@@ -140,11 +139,10 @@ def subscribe_provider_series(
 
 @router.get("/provider-series", response_model=list[ProviderSeriesRow])
 def list_provider_series(
-    request: Request,
     _user: CurrentUser = Depends(require_user),
+    repo: SeriesSubscrRepo = Depends(_series_subscr_repo),
 ) -> list[ProviderSeriesRow]:
     """Current provider subscriptions. The stored JSON is not returned."""
-    repo = SeriesSubscrRepo(request.app.state.db_conninfo, user_id="system")
     return [
         ProviderSeriesRow(**row)
         for row in repo.sp_get_series_subscr()

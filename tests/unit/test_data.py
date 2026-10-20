@@ -57,9 +57,25 @@ class TestGlassnode:
         params = call_kwargs.kwargs.get("params") or call_kwargs[1].get("params")
         assert params["a"] == "ETH"
         assert params["i"] == "1h"
+        # The window is midnight UTC on each date, whatever zone the host runs in.
+        assert params["s"] == 1609459200
+        assert params["u"] == 1609545600
         # API key now sent via header, not query params
         headers = call_kwargs.kwargs.get("headers") or call_kwargs[1].get("headers")
         assert headers["X-Api-Key"] == "test_key"
+
+    @pytest.mark.parametrize("tz", ["UTC", "Asia/Hong_Kong", "America/New_York"])
+    def test_window_bounds_do_not_depend_on_the_host_zone(self, monkeypatch, tz):
+        import time as _time
+        from quant.data.sources import utc_epoch
+
+        monkeypatch.setenv("TZ", tz)
+        _time.tzset()
+        try:
+            assert utc_epoch("2021-01-01") == 1609459200
+        finally:
+            monkeypatch.delenv("TZ", raising=False)
+            _time.tzset()
 
     @patch.dict("os.environ", {"GLASSNODE_API_KEY": "test_key"})
     @patch("quant.data.sources.pd.read_json", return_value=pd.DataFrame({"t": ["x"], "v": [1]}))

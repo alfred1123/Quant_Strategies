@@ -6,12 +6,12 @@ import pytest
 
 from quant.schemas.backtest import OptimizeRequest
 from quant.strategy.backtest_service import _build_wf_response, run_optimize
-from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, SignalDirection
+from quant.strategy.signals import StrategyConfig, SubStrategy, SignalDirection
 from quant.strategy.walk_forward import WalkForward, WalkForwardResult
 
 
 _BOLLINGER_CONFIG = StrategyConfig("test", "get_bollinger_band",
-                                   Strategy.momentum_band_signal, 252)
+                                   SignalDirection.momentum_band_signal, 252)
 
 
 def _make_synthetic_data(n=500, seed=42):
@@ -158,7 +158,7 @@ class TestWalkForwardWithConfig:
     def test_run_produces_result(self):
         df = _make_synthetic_data()
         config = StrategyConfig("test", "get_bollinger_band",
-                                Strategy.momentum_band_signal, 252)
+                                SignalDirection.momentum_band_signal, 252)
         wf = WalkForward({config.internal_cusip: df.copy()}, 0.5, config)
         result = wf.run((20,), (1.0,))
         assert isinstance(result, WalkForwardResult)
@@ -167,7 +167,7 @@ class TestWalkForwardWithConfig:
     def test_fee_propagates(self):
         df = _make_synthetic_data()
         config = StrategyConfig("test", "get_bollinger_band",
-                                Strategy.momentum_band_signal, 252)
+                                SignalDirection.momentum_band_signal, 252)
         wf = WalkForward({config.internal_cusip: df}, 0.5, config, fee_bps=15.0)
         assert wf.fee_bps == 15.0
 

@@ -378,14 +378,20 @@ class TradeAdapter(BrokerSession):
     @abstractmethod
     def get_open_orders(self, symbol: str | None = None) -> list[dict]: ...
     @abstractmethod
-    def get_position_qty(self, symbol: str) -> int: ...
-    @abstractmethod
-    def apply_signal(self, symbol: str, signal: float, qty: int) -> OrderResult | None:
-        """Translate {-1,0,1} signal to orders; None if no action."""
+    def get_position_qty(self, symbol: str) -> float: ...
 ```
 
 `TradeAdapter` extends `BrokerSession` so the worker can use `with adapter:` uniformly.
 Value objects `OrderRequest`, `OrderResult`, `BrokerSessionState` live in `quant/trade/models/`.
+
+The adapter **places, cancels and reads**. Turning a `{-1, 0, 1}` signal into an
+order is not on it (decision #104): `quant/trade/order_policy.py` owns
+`intended_action(signal, position_qty) -> IntendedAction` (the signal × position
+table; HOLD when the book already agrees) and `order_for(symbol, action, qty,
+position_qty) -> OrderRequest | None` (open the deployment `qty`, close
+`abs(position_qty)`). `OrderRetryExecutor.execute` reads the position once per
+attempt, calls both, and hands the adapter the request — or records a HOLD
+without a broker call. `DryRunService` calls `intended_action` directly.
 
 **Adapter registry:** `AdapterRegistry.get(app_id)` resolves `REFDATA.APP` → adapter class (see [Futu Trading §3.1](futu-trading.md#31-principles)).
 
@@ -431,11 +437,12 @@ def execute_deployment(deployment, strategy):
         log_rejected(deployment, final_signal)
         return
 
-    # 5. Execute
+    # 5. Execute — the policy decides, the adapter places (decision #104)
     adapter = get_adapter(deployment.broker)
-    result = adapter.apply_signal(
-        deployment.ticker, final_signal, deployment.qty
-    )
+    position_qty = adapter.get_position_qty(deployment.ticker)
+    action = intended_action(final_signal, position_qty)
+    req = order_for(deployment.ticker, action, deployment.qty, position_qty)
+    result = adapter.place_order(req) if req is not None else None
 
     # 6. Persist audit rows. Live apply writes TRADE.INTENT before this order
     #    (decision #90). This sketch is the older in-memory shape.

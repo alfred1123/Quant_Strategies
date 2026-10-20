@@ -80,13 +80,13 @@ cd frontend && npm test
 For running backtests without the UI:
 
 ```bash
-python -m quant.cli                          # Default: BTC-USD, Bollinger + momentum
-python -m quant.cli --no-grid                # Skip grid search
-python -m quant.cli --symbol AAPL --asset equity --window 50 --signal 1.5
-python -m quant.cli --walk-forward --split 0.7
+python -m quant.cli --indicator bollinger --strategy momentum --asset crypto            # BTC-USD, full grid search
+python -m quant.cli --indicator bollinger --strategy momentum --asset crypto --no-grid  # Skip grid search
+python -m quant.cli --indicator sma --strategy reversion --asset equity --symbol AAPL --window 50 --signal 1.5
+python -m quant.cli --indicator bollinger --strategy momentum --asset crypto --walk-forward --split 0.7
 ```
 
-Run `python -m quant.cli --help` for all options. See [CLI Backtest guide](https://alfred1123.github.io/Quant_Strategies/guides/cli-backtest/) for full documentation.
+`--indicator`, `--strategy` and `--asset` are the `REFDATA` names (`INDICATOR`, `SIGNAL_TYPE`, `ASSET_TYPE`), read from the Redis snapshot the API publishes — the CLI keeps no list of its own, and the grid defaults are the indicator's `WIN_*`/`SIG_*` columns. Run `python -m quant.cli --help` for all options. See [CLI Backtest guide](https://alfred1123.github.io/Quant_Strategies/guides/cli-backtest/) for full documentation.
 
 ---
 

@@ -133,7 +133,7 @@ tick cannot classify keeps all 3 attempts.
 
 **What resolving it achieves:**
 
-- **`POST /deployments/{id}/pause`** (or equivalent): run apply with **`signal=0`** (existing `intended_side` → SELL / CLOSE_SHORT on full broker qty), then `PAUSED` + disabled.
+- **`POST /deployments/{id}/pause`** (or equivalent): run apply with **`signal=0`** (existing `intended_action` → SELL / CLOSE_SHORT on full broker qty), then `PAUSED` + disabled.
 - UI pause icon calls flatten+pause, not bare `PATCH enabled=false`.
 - **Stop** vs **pause:** stop = disable without flatten (or optionally flatten too — product decision).
 

@@ -302,10 +302,6 @@ class SignalDirection:
         )
 
 
-# Pre-existing alias kept for callers that import the symbol ``Strategy``.
-Strategy = SignalDirection
-
-
 def resolve_signal_func(signal_name: str, indicator_name: str,
                         indicator_rows: list[dict],
                         signal_type_rows: list[dict]) -> Callable:

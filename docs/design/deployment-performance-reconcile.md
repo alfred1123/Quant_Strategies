@@ -100,7 +100,7 @@ These are listed so the UI labels them instead of blaming the strategy. The engi
 
 - **Fill timing.** Live fills `EXECUTE_OFFSET` before the close on the forming candle (decision #81). The fill gap column measures it directly.
 - **Signal on the forming candle.** Near a band edge the live signal can differ from the closed-bar signal. It shows up as `TARGET_POSITION ≠ BACKTEST_POSITION`.
-- **Reversal in two steps.** `intended_side` maps signal −1 on a long to `SELL` (flatten), and the short opens on the next slot. The backtest reverses in one bar and pays 2× fee there.
+- **Reversal in two steps.** `intended_action` maps signal −1 on a long to `SELL` (flatten), and the short opens on the next slot. The backtest reverses in one bar and pays 2× fee there.
 - **Fees.** The broker fee against the single `fee_bps`: taker, VIP tier, fee coin.
 - **Slippage, partial fills, funding.** Slippage lands in the fill gap. A partial fill leaves the account short of the target and shows at the account level. Funding needs its own column once a perp deployment exists.
 

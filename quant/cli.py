@@ -3,40 +3,42 @@ Backtest pipeline: fetch data, compute indicators, run strategy,
 measure performance, and optimize parameters via grid search.
 
 Usage:
-    python -m quant.cli [OPTIONS]
+    python -m quant.cli --indicator NAME --strategy NAME --asset NAME [OPTIONS]
+
+Indicator, strategy and asset are ``REFDATA`` names — ``REFDATA.INDICATOR.NAME``,
+``REFDATA.SIGNAL_TYPE.NAME`` and ``REFDATA.ASSET_TYPE.NAME`` — read from the
+Redis snapshot the API publishes (``REDIS_URL``). The grid search bounds
+default to that indicator's ``WIN_*`` / ``SIG_*`` columns, the same defaults
+the Backtest drawer offers.
 
 Examples:
-    # Run with defaults (BTC-USD, Bollinger + Momentum, crypto 365)
-    python -m quant.cli
+    # Bollinger + momentum on BTC-USD, crypto calendar
+    python -m quant.cli --indicator bollinger --strategy momentum --asset crypto
 
     # Equity backtest with custom window/signal
-    python -m quant.cli --symbol AAPL --asset equity --window 50 --signal 1.5
+    python -m quant.cli --symbol AAPL --asset equity --indicator sma --strategy reversion \
+                   --window 50 --signal 1.5
 
     # Custom date range + grid search bounds
-    python -m quant.cli --symbol ETH-USD --start 2020-01-01 --end 2026-01-01 \
+    python -m quant.cli --indicator bollinger --strategy momentum --asset crypto \
+                   --symbol ETH-USD --start 2020-01-01 --end 2026-01-01 \
                    --win-min 10 --win-max 60 --win-step 10
 
-    # Different indicator + strategy combination
-    python -m quant.cli --indicator sma --strategy reversion
-
     # Skip grid search (single backtest only)
-    python -m quant.cli --no-grid
-
-    # Custom output directory
-    python -m quant.cli --outdir /tmp/results
+    python -m quant.cli --indicator bollinger --strategy momentum --asset crypto --no-grid
 
 Options:
     --symbol        Yahoo Finance ticker              (default: BTC-USD)
     --start         Backtest start date YYYY-MM-DD    (default: 2016-01-01)
     --end           Backtest end date YYYY-MM-DD      (default: 2026-04-01)
-    --asset         Asset type: crypto | equity       (default: crypto)
-    --indicator     Indicator: bollinger|sma|ema|rsi  (default: bollinger)
-    --strategy      Strategy: momentum | reversion    (default: momentum)
+    --asset         REFDATA.ASSET_TYPE name           (required)
+    --indicator     REFDATA.INDICATOR name            (required)
+    --strategy      REFDATA.SIGNAL_TYPE name          (required)
     --window        Single backtest window            (default: 20)
     --signal        Single backtest signal threshold   (default: 1.0)
     --no-grid       Skip parameter optimization        (default: False)
-    --win-min/max/step   Grid search window range     (default: 5/100/5)
-    --sig-min/max/step   Grid search signal range     (default: 0.25/2.50/0.25)
+    --win-min/max/step   Grid search window range     (default: the indicator's WIN_*)
+    --sig-min/max/step   Grid search signal range     (default: the indicator's SIG_*)
     --outdir        Output directory for results       (default: ../results)
 '''
 
@@ -52,33 +54,34 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from quant.data.sources import NasdaqDataLink, YahooFinance
+from quant.data.sources import YahooFinance
+from quant.refdata.reader import RedisRefData
+from quant.shared.config import get_redis_url
 from quant.shared.logging import setup_logging
 from quant.strategy.optimizer import ParametersOptimization
 from quant.strategy.performance import Performance
-from quant.strategy.signals import SignalDirection, StrategyConfig
+from quant.strategy.signals import StrategyConfig, resolve_signal_func
 from quant.strategy.walk_forward import WalkForward
 
 logger = logging.getLogger(__name__)
 
-# ── Registries ──────────────────────────────────────────────────────
 
-INDICATORS = {
-    'bollinger': 'get_bollinger_band',
-    'sma':       'get_sma',
-    'ema':       'get_ema',
-    'rsi':       'get_rsi',
-}
+def _refdata_row(rows: list[dict], name: str, table: str) -> dict:
+    """The catalog row named *name*, or a ``SystemExit`` naming the valid names."""
+    row = next((r for r in rows if r["name"] == name), None)
+    if row is None:
+        valid = ", ".join(sorted(r["name"] for r in rows))
+        raise SystemExit(f"unknown {table} {name!r}; REFDATA.{table.upper()} has: {valid}")
+    return row
 
-STRATEGIES = {
-    'momentum':  SignalDirection.momentum_band_signal,
-    'reversion': SignalDirection.reversion_band_signal,
-}
 
-ASSET_TRADING_PERIODS = {
-    'crypto': 365,   # 24/7/365
-    'equity': 252,   # NYSE/NASDAQ trading days
-}
+def _grid_bound(given, default, flag: str):
+    """An explicit flag wins; otherwise the indicator's REFDATA column, which must exist."""
+    if given is not None:
+        return given
+    if default is None:
+        raise SystemExit(f"{flag} has no REFDATA default for this indicator; pass it explicitly")
+    return default
 
 
 def parse_args(argv=None):
@@ -93,17 +96,14 @@ def parse_args(argv=None):
                    help='Start date YYYY-MM-DD (default: %(default)s)')
     p.add_argument('--end', default='2026-04-01',
                    help='End date YYYY-MM-DD (default: %(default)s)')
-    p.add_argument('--asset', default='crypto',
-                   choices=ASSET_TRADING_PERIODS.keys(),
-                   help='Asset type (default: %(default)s)')
+    p.add_argument('--asset', required=True,
+                   help='REFDATA.ASSET_TYPE name (e.g. crypto, equity)')
 
-    # Indicator / strategy
-    p.add_argument('--indicator', default='bollinger',
-                   choices=INDICATORS.keys(),
-                   help='Technical indicator (default: %(default)s)')
-    p.add_argument('--strategy', default='momentum',
-                   choices=STRATEGIES.keys(),
-                   help='Trading strategy (default: %(default)s)')
+    # Indicator / strategy — REFDATA names, resolved in main()
+    p.add_argument('--indicator', required=True,
+                   help='REFDATA.INDICATOR name (e.g. bollinger, sma)')
+    p.add_argument('--strategy', required=True,
+                   help='REFDATA.SIGNAL_TYPE name (e.g. momentum, reversion)')
 
     # Single backtest
     p.add_argument('--window', type=int, default=20,
@@ -111,21 +111,21 @@ def parse_args(argv=None):
     p.add_argument('--signal', type=float, default=1.0,
                    help='Signal threshold for single backtest (default: %(default)s)')
 
-    # Grid search
+    # Grid search — bounds default to the indicator's REFDATA.INDICATOR WIN_* / SIG_*
     p.add_argument('--no-grid', action='store_true',
                    help='Skip parameter optimisation grid search')
-    p.add_argument('--win-min', type=int, default=5,
-                   help='Grid: window min (default: %(default)s)')
-    p.add_argument('--win-max', type=int, default=100,
-                   help='Grid: window max (default: %(default)s)')
-    p.add_argument('--win-step', type=int, default=5,
-                   help='Grid: window step (default: %(default)s)')
-    p.add_argument('--sig-min', type=float, default=0.25,
-                   help='Grid: signal min (default: %(default)s)')
-    p.add_argument('--sig-max', type=float, default=2.50,
-                   help='Grid: signal max (default: %(default)s)')
-    p.add_argument('--sig-step', type=float, default=0.25,
-                   help='Grid: signal step (default: %(default)s)')
+    p.add_argument('--win-min', type=int, default=None,
+                   help='Grid: window min (default: REFDATA.INDICATOR.WIN_MIN)')
+    p.add_argument('--win-max', type=int, default=None,
+                   help='Grid: window max (default: REFDATA.INDICATOR.WIN_MAX)')
+    p.add_argument('--win-step', type=int, default=None,
+                   help='Grid: window step (default: REFDATA.INDICATOR.WIN_STEP)')
+    p.add_argument('--sig-min', type=float, default=None,
+                   help='Grid: signal min (default: REFDATA.INDICATOR.SIG_MIN)')
+    p.add_argument('--sig-max', type=float, default=None,
+                   help='Grid: signal max (default: REFDATA.INDICATOR.SIG_MAX)')
+    p.add_argument('--sig-step', type=float, default=None,
+                   help='Grid: signal step (default: REFDATA.INDICATOR.SIG_STEP)')
 
     # Output
     p.add_argument('--outdir', default='../results',
@@ -146,7 +146,22 @@ def parse_args(argv=None):
     return p.parse_args(argv)
 
 
-def main(args=None):
+def _grid_axes(args, indicator_method: str, refdata) -> tuple[tuple, tuple]:
+    """``(window_list, signal_list)`` from the flags, or the indicator's REFDATA defaults."""
+    d = refdata.get_indicator_defaults()[indicator_method]
+    win_min = _grid_bound(args.win_min, d["win_min"], "--win-min")
+    win_max = _grid_bound(args.win_max, d["win_max"], "--win-max")
+    win_step = _grid_bound(args.win_step, d["win_step"], "--win-step")
+    sig_min = _grid_bound(args.sig_min, d["sig_min"], "--sig-min")
+    sig_max = _grid_bound(args.sig_max, d["sig_max"], "--sig-max")
+    sig_step = _grid_bound(args.sig_step, d["sig_step"], "--sig-step")
+    window_list = tuple(range(int(win_min), int(win_max) + 1, int(win_step)))
+    signal_list = tuple(np.arange(sig_min, sig_max + sig_step / 2, sig_step))
+    return window_list, signal_list
+
+
+def main(args=None, *, refdata=None):
+    """Run the pipeline. ``refdata`` is the REFDATA reader; the Redis snapshot by default."""
     if args is None:
         args = parse_args()
 
@@ -159,9 +174,18 @@ def main(args=None):
     os.makedirs(args.outdir, exist_ok=True)
     tag = f"{args.symbol.lower().replace('-', '')}_{args.indicator}"
 
-    trading_period = ASSET_TRADING_PERIODS[args.asset]
-    indicator_method = INDICATORS[args.indicator]
-    strategy_func = STRATEGIES[args.strategy]
+    if refdata is None:
+        refdata = RedisRefData(get_redis_url())
+    indicator_rows = refdata.get("indicator")
+    signal_type_rows = refdata.get("signal_type")
+    indicator_method = _refdata_row(indicator_rows, args.indicator, "indicator")["method_name"]
+    _refdata_row(signal_type_rows, args.strategy, "signal_type")
+    strategy_func = resolve_signal_func(
+        args.strategy, indicator_method, indicator_rows, signal_type_rows,
+    )
+    trading_period = int(
+        _refdata_row(refdata.get("asset_type"), args.asset, "asset_type")["trading_period"]
+    )
 
     cusip = args.symbol.lower()
     config = StrategyConfig(
@@ -208,10 +232,7 @@ def main(args=None):
 
     # ── Parameter optimisation ──────────────────────────────────────
     if not args.no_grid:
-        window_list = tuple(range(args.win_min, args.win_max + 1, args.win_step))
-        signal_list = tuple(np.arange(args.sig_min,
-                                      args.sig_max + args.sig_step / 2,
-                                      args.sig_step))
+        window_list, signal_list = _grid_axes(args, indicator_method, refdata)
 
         param_opt = ParametersOptimization(
             data_dict, config, fee_bps=args.fee,
@@ -244,10 +265,7 @@ def main(args=None):
 
     # ── Walk-forward overfitting test ───────────────────────────────
     if args.walk_forward:
-        window_list = tuple(range(args.win_min, args.win_max + 1, args.win_step))
-        signal_list = tuple(np.arange(args.sig_min,
-                                      args.sig_max + args.sig_step / 2,
-                                      args.sig_step))
+        window_list, signal_list = _grid_axes(args, indicator_method, refdata)
 
         wf_df = pd.DataFrame({
             'datetime': pd.to_datetime(price['t']),
@@ -276,18 +294,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

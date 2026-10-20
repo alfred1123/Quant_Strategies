@@ -6,6 +6,8 @@ Pure pandas/numpy — no I/O, no external state.
 
 import logging
 
+import pandas as pd
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,6 +21,15 @@ class TechnicalAnalysis:
             raise ValueError("DataFrame must contain a 'factor' column")
         self.data = data
         logger.debug("TechnicalAnalysis initialized with %d rows", len(data))
+
+    def indicator(self, name: str, period) -> pd.Series:
+        """The indicator ``REFDATA.INDICATOR.METHOD_NAME`` names, aligned to the frame.
+
+        One lookup for every engine. A short indicator (``get_rsi`` drops its
+        first row) is reindexed here so no caller can shift a position series
+        by forgetting to.
+        """
+        return getattr(self, name)(period).reindex(self.data.index)
 
     def get_sma(self, period):
         """Simple moving average."""

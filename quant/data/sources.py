@@ -13,6 +13,7 @@ Live exchange OHLCV and ccxt trading live in ``quant/market_data/`` and ``quant/
 import logging
 import os
 import time
+from datetime import datetime, timezone
 from functools import lru_cache
 
 import futu
@@ -20,6 +21,16 @@ import pandas as pd
 import requests
 
 logger = logging.getLogger(__name__)
+
+
+def utc_epoch(day: str) -> int:
+    """Seconds since the epoch at ``00:00 UTC`` on *day* (``YYYY-MM-DD``).
+
+    A vendor window is a UTC fact. ``time.mktime`` would read the same date
+    in the host's zone, so one request asked for different bars on a UTC
+    server and on a laptop in Hong Kong.
+    """
+    return int(datetime.strptime(day, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
 
 
 class FutuOpenD:
@@ -98,8 +109,8 @@ class Glassnode:
         Raises:
             requests.HTTPError: If the API request fails.
         """
-        since = int(time.mktime(time.strptime(start_date, "%Y-%m-%d")))
-        until = int(time.mktime(time.strptime(end_date, "%Y-%m-%d")))
+        since = utc_epoch(start_date)
+        until = utc_epoch(end_date)
         res = self._get(
             f"/v1/metrics/{metric_path}",
             {"a": symbol, "s": since, "u": until, "i": resolution},

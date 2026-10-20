@@ -423,7 +423,7 @@ bumps `RESULT_VID` and flips the prior row.
 
 `TRADE.EXECUTION_EVENT.POSITION_QTY` is the signed broker position — negative
 for short — read immediately before an order attempt. It is not a diagnostic
-extra: `intended_side(signal, position_qty)` answers HOLD when the position
+extra: `intended_action(signal, position_qty)` answers HOLD when the position
 already agrees with the signal, so it is half of every trade decision, and it is
 what stops repeated applies from stacking.
 

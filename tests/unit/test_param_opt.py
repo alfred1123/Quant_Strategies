@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, SignalDirection
+from quant.strategy.signals import StrategyConfig, SubStrategy, SignalDirection
 from quant.strategy.optimizer import (
     BayesianSearch,
     ExhaustiveSearch,
@@ -12,7 +12,7 @@ from quant.strategy.optimizer import (
 
 
 _BOLLINGER_CONFIG = StrategyConfig("test", "get_bollinger_band",
-                                   Strategy.momentum_band_signal, 252)
+                                   SignalDirection.momentum_band_signal, 252)
 
 
 class TestParametersOptimization:
@@ -79,13 +79,13 @@ class TestParametersOptimization:
 class TestParametersOptimizationWithConfig:
     def test_config_stored(self, sample_ohlc_df):
         config = StrategyConfig("test", "get_bollinger_band",
-                                Strategy.momentum_band_signal, 252)
+                                SignalDirection.momentum_band_signal, 252)
         opt = ParametersOptimization({config.internal_cusip: sample_ohlc_df.copy()}, config)
         assert opt.config is config
 
     def test_fee_propagates(self, sample_ohlc_df):
         config = StrategyConfig("test", "get_bollinger_band",
-                                Strategy.momentum_band_signal, 252)
+                                SignalDirection.momentum_band_signal, 252)
         opt = ParametersOptimization({config.internal_cusip: sample_ohlc_df.copy()}, config, fee_bps=20.0)
         assert opt.fee_bps == 20.0
 

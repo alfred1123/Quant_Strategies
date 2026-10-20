@@ -2,12 +2,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quant.strategy.signals import Strategy, StrategyConfig, SubStrategy, SignalDirection
+from quant.strategy.signals import StrategyConfig, SubStrategy, SignalDirection
 from quant.strategy.performance import Performance, _cagr, _compound, live_lookback_days
 
 
 _BOLLINGER_CONFIG = StrategyConfig("test", "get_bollinger_band",
-                                   Strategy.momentum_band_signal, 252)
+                                   SignalDirection.momentum_band_signal, 252)
 
 
 def _make_performance(df, window=5, signal=0.5, config=None):
@@ -101,7 +101,7 @@ class TestComputeLatestPositionParity:
             "get_sma", "momentum_band_signal", 20, 1.0, internal_cusip="eth-usd",
         )
         config = StrategyConfig(
-            "btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
+            "btc-usd", "get_sma", SignalDirection.momentum_band_signal, 365,
             substrategies=(sub,),
         )
         enrich = Performance(data, config, 20, 1.0)
@@ -120,7 +120,7 @@ class TestComputeLatestPositionParity:
             "get_sma", "reversion_band_signal", 10, 0.5, internal_cusip="eth-usd",
         )
         config = StrategyConfig(
-            "btc-usd", "get_sma", Strategy.momentum_band_signal, 365,
+            "btc-usd", "get_sma", SignalDirection.momentum_band_signal, 365,
             conjunction="AND", substrategies=(sub_btc, sub_eth),
         )
         enrich = Performance(data, config)
@@ -397,27 +397,27 @@ class TestTrendingMarkets:
 class TestPerformanceWithConfig:
     def test_config_stored(self, sample_ohlc_df):
         config = StrategyConfig("test", "get_bollinger_band",
-                                Strategy.momentum_band_signal, 252)
+                                SignalDirection.momentum_band_signal, 252)
         perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5)
         assert perf.config is config
         assert perf.trading_period == 252
 
     def test_fee_bps(self, sample_ohlc_df):
         config = StrategyConfig("test", "get_bollinger_band",
-                                Strategy.momentum_band_signal, 252)
+                                SignalDirection.momentum_band_signal, 252)
         perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5, fee_bps=5.5)
         assert perf.fee_bps == 5.5
 
     def test_default_fee_is_spot_taker(self, sample_ohlc_df):
         config = StrategyConfig("test", "get_bollinger_band",
-                                Strategy.momentum_band_signal, 252)
+                                SignalDirection.momentum_band_signal, 252)
         perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5)
         assert perf.fee_bps == Performance.DEFAULT_FEE_BPS
         assert perf.fee_bps == 10.0
 
     def test_different_indicator(self, sample_ohlc_df):
         config = StrategyConfig("test", "get_sma",
-                                Strategy.momentum_band_signal, 252)
+                                SignalDirection.momentum_band_signal, 252)
         perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
@@ -527,7 +527,7 @@ class TestMultiFactorPerformance:
     def test_single_factor_backward_compat(self, sample_ohlc_df):
         """Single-factor path produces identical results when window is not a tuple."""
         config = StrategyConfig("test", "get_bollinger_band",
-                                Strategy.momentum_band_signal, 252)
+                                SignalDirection.momentum_band_signal, 252)
         perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5)
         perf.enrich_performance()
         assert perf._metric_window == 5

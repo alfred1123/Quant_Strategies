@@ -42,5 +42,5 @@ class TestMinNotional:
 
 class TestNoOrder:
     def test_zero_qty_is_not_judged(self):
-        """``execute_action`` already declines a zero-qty order."""
+        """``order_for`` already declines a zero-qty order."""
         assert MarketLimits("BTCUSDT", min_qty=0.001).undersized(0.0) is None

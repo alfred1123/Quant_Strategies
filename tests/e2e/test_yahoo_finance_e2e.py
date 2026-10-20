@@ -16,7 +16,7 @@ import pandas as pd
 import pytest
 
 from quant.data.sources import YahooFinance
-from quant.strategy.signals import Strategy, StrategyConfig
+from quant.strategy.signals import StrategyConfig, SignalDirection
 from quant.strategy.performance import Performance
 from quant.strategy.optimizer import ParametersOptimization
 from quant.strategy.walk_forward import WalkForward
@@ -96,7 +96,7 @@ class TestFullPipelineE2E:
     def equity_config(self):
         return StrategyConfig(internal_cusip="aapl",
             indicator_name="get_sma",
-            signal_func=Strategy.momentum_band_signal,
+            signal_func=SignalDirection.momentum_band_signal,
             trading_period=252,
         )
 
@@ -113,7 +113,7 @@ class TestFullPipelineE2E:
     def test_bollinger_reversion_produces_valid_metrics(self, aapl_data):
         config = StrategyConfig(internal_cusip="aapl",
             indicator_name="get_bollinger_band",
-            signal_func=Strategy.reversion_band_signal,
+            signal_func=SignalDirection.reversion_band_signal,
             trading_period=252,
         )
         perf = Performance(aapl_data, config, 20, 1.0)
@@ -125,7 +125,7 @@ class TestFullPipelineE2E:
     def test_ema_momentum_produces_valid_metrics(self, aapl_data):
         config = StrategyConfig(internal_cusip="aapl",
             indicator_name="get_ema",
-            signal_func=Strategy.momentum_band_signal,
+            signal_func=SignalDirection.momentum_band_signal,
             trading_period=252,
         )
         perf = Performance(aapl_data, config, 20, 0.5)
@@ -166,7 +166,7 @@ class TestParamOptE2E:
     def test_grid_search_returns_results(self, spy_data):
         config = StrategyConfig(internal_cusip="spy",
             indicator_name="get_sma",
-            signal_func=Strategy.momentum_band_signal,
+            signal_func=SignalDirection.momentum_band_signal,
             trading_period=252,
         )
         opt = ParametersOptimization(spy_data, config)
@@ -196,7 +196,7 @@ class TestWalkForwardE2E:
     def test_walk_forward_produces_result(self, spy_data):
         config = StrategyConfig(internal_cusip="spy",
             indicator_name="get_sma",
-            signal_func=Strategy.momentum_band_signal,
+            signal_func=SignalDirection.momentum_band_signal,
             trading_period=252,
         )
         wf = WalkForward(spy_data, 0.5, config)
@@ -211,7 +211,7 @@ class TestWalkForwardE2E:
     def test_walk_forward_summary_dataframe(self, spy_data):
         config = StrategyConfig(internal_cusip="spy",
             indicator_name="get_bollinger_band",
-            signal_func=Strategy.reversion_band_signal,
+            signal_func=SignalDirection.reversion_band_signal,
             trading_period=252,
         )
         wf = WalkForward(spy_data, 0.5, config)

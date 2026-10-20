@@ -1,113 +1,144 @@
+"""``quant.cli`` — argument parsing, and REFDATA as the only source of names."""
+
+from unittest.mock import MagicMock, patch
+
+import pandas as pd
 import pytest
 
-from quant.cli import parse_args, INDICATORS, STRATEGIES, ASSET_TRADING_PERIODS
+import quant.cli as cli
+from quant.cli import _grid_axes, main, parse_args
+from quant.strategy.signals import SignalDirection
+
+REQUIRED = ["--indicator", "bollinger", "--strategy", "momentum", "--asset", "crypto"]
 
 
-class TestParseArgsDefaults:
+class TestParseArgs:
     def test_defaults(self):
-        args = parse_args([])
+        args = parse_args(REQUIRED)
         assert args.symbol == "BTC-USD"
         assert args.start == "2016-01-01"
         assert args.end == "2026-04-01"
-        assert args.asset == "crypto"
-        assert args.indicator == "bollinger"
-        assert args.strategy == "momentum"
         assert args.window == 20
         assert args.signal == 1.0
         assert args.no_grid is False
-        assert args.win_min == 5
-        assert args.win_max == 100
-        assert args.win_step == 5
-        assert args.sig_min == 0.25
-        assert args.sig_max == 2.50
-        assert args.sig_step == 0.25
         assert args.outdir == "../results"
         assert args.fee == 10.0
 
+    def test_grid_bounds_default_to_refdata_not_the_parser(self):
+        """No window or signal range lives in the CLI; the indicator row owns them."""
+        args = parse_args(REQUIRED)
+        assert (args.win_min, args.win_max, args.win_step) == (None, None, None)
+        assert (args.sig_min, args.sig_max, args.sig_step) == (None, None, None)
+
+    @pytest.mark.parametrize("flag", ["--indicator", "--strategy", "--asset"])
+    def test_catalog_names_are_required(self, flag):
+        at = REQUIRED.index(flag)
+        argv = REQUIRED[:at] + REQUIRED[at + 2:]
+        with pytest.raises(SystemExit):
+            parse_args(argv)
+
+    def test_the_parser_holds_no_catalog(self):
+        """Any name parses; REFDATA decides in ``main``."""
+        args = parse_args(["--indicator", "macd", "--strategy", "random", "--asset", "forex"])
+        assert (args.indicator, args.strategy, args.asset) == ("macd", "random", "forex")
+        for name in ("INDICATORS", "STRATEGIES", "ASSET_TRADING_PERIODS"):
+            assert not hasattr(cli, name)
+
     def test_custom_symbol(self):
-        args = parse_args(["--symbol", "AAPL"])
-        assert args.symbol == "AAPL"
-
-    def test_asset_equity(self):
-        args = parse_args(["--asset", "equity"])
-        assert args.asset == "equity"
-
-    def test_asset_invalid_rejected(self):
-        with pytest.raises(SystemExit):
-            parse_args(["--asset", "forex"])
-
-    def test_indicator_choices(self):
-        for ind in INDICATORS:
-            args = parse_args(["--indicator", ind])
-            assert args.indicator == ind
-
-    def test_indicator_invalid_rejected(self):
-        with pytest.raises(SystemExit):
-            parse_args(["--indicator", "macd"])
-
-    def test_strategy_choices(self):
-        for strat in STRATEGIES:
-            args = parse_args(["--strategy", strat])
-            assert args.strategy == strat
-
-    def test_strategy_invalid_rejected(self):
-        with pytest.raises(SystemExit):
-            parse_args(["--strategy", "random"])
+        assert parse_args([*REQUIRED, "--symbol", "AAPL"]).symbol == "AAPL"
 
     def test_no_grid_flag(self):
-        args = parse_args(["--no-grid"])
-        assert args.no_grid is True
+        assert parse_args([*REQUIRED, "--no-grid"]).no_grid is True
 
     def test_custom_grid_bounds(self):
         args = parse_args([
+            *REQUIRED,
             "--win-min", "10", "--win-max", "50", "--win-step", "10",
             "--sig-min", "0.5", "--sig-max", "2.0", "--sig-step", "0.5",
         ])
-        assert args.win_min == 10
-        assert args.win_max == 50
-        assert args.win_step == 10
+        assert (args.win_min, args.win_max, args.win_step) == (10, 50, 10)
         assert args.sig_min == pytest.approx(0.5)
         assert args.sig_max == pytest.approx(2.0)
         assert args.sig_step == pytest.approx(0.5)
 
     def test_custom_fee(self):
-        args = parse_args(["--fee", "5.5"])
-        assert args.fee == pytest.approx(5.5)
+        assert parse_args([*REQUIRED, "--fee", "5.5"]).fee == pytest.approx(5.5)
 
     def test_verbose_flag(self):
-        args = parse_args(["-v"])
-        assert args.verbose is True
+        assert parse_args([*REQUIRED, "-v"]).verbose is True
 
     def test_custom_dates(self):
-        args = parse_args(["--start", "2020-01-01", "--end", "2025-01-01"])
-        assert args.start == "2020-01-01"
-        assert args.end == "2025-01-01"
+        args = parse_args([*REQUIRED, "--start", "2020-01-01", "--end", "2025-01-01"])
+        assert (args.start, args.end) == ("2020-01-01", "2025-01-01")
 
 
-class TestRegistries:
-    def test_indicators_registry_keys(self):
-        expected = {"bollinger", "sma", "ema", "rsi"}
-        assert set(INDICATORS.keys()) == expected
+class TestGridAxes:
+    def test_refdata_columns_are_the_default(self, refdata_stub):
+        args = parse_args(REQUIRED)
+        windows, signals = _grid_axes(args, "get_bollinger_band", refdata_stub)
+        assert windows == tuple(range(10, 101, 5))
+        assert signals[0] == pytest.approx(0.25)
+        assert signals[-1] == pytest.approx(2.50)
 
-    def test_indicators_registry_values_are_method_names(self):
-        for key, method_name in INDICATORS.items():
-            assert isinstance(method_name, str)
-            assert method_name.startswith("get_")
+    def test_an_explicit_flag_wins(self, refdata_stub):
+        args = parse_args([*REQUIRED, "--win-min", "20", "--win-max", "30", "--win-step", "10"])
+        windows, _ = _grid_axes(args, "get_bollinger_band", refdata_stub)
+        assert windows == (20, 30)
 
-    def test_strategies_registry_keys(self):
-        expected = {"momentum", "reversion"}
-        assert set(STRATEGIES.keys()) == expected
+    def test_a_null_refdata_bound_must_be_passed(self, refdata_stub):
+        """RSI seeds no SIG_MIN; the CLI says so instead of inventing one."""
+        args = parse_args(["--indicator", "rsi", "--strategy", "momentum", "--asset", "crypto"])
+        with pytest.raises(SystemExit, match="--sig-min"):
+            _grid_axes(args, "get_rsi", refdata_stub)
 
-    def test_strategies_registry_values_are_callable(self):
-        for key, func in STRATEGIES.items():
-            assert callable(func)
 
-    def test_asset_trading_periods_keys(self):
-        expected = {"crypto", "equity"}
-        assert set(ASSET_TRADING_PERIODS.keys()) == expected
+def _price_frame(n: int = 120) -> pd.DataFrame:
+    return pd.DataFrame({
+        "t": pd.date_range("2021-01-01", periods=n, freq="D").strftime("%Y-%m-%d"),
+        "v": [100 + i * 0.5 for i in range(n)],
+    })
 
-    def test_asset_trading_periods_crypto(self):
-        assert ASSET_TRADING_PERIODS["crypto"] == 365
 
-    def test_asset_trading_periods_equity(self):
-        assert ASSET_TRADING_PERIODS["equity"] == 252
+class TestMainResolvesThroughRefdata:
+    def _run(self, argv, refdata, tmp_path):
+        with patch("quant.cli.YahooFinance") as yf_cls, \
+             patch("quant.cli.Performance") as perf_cls:
+            yf_cls.return_value.get_historical_price.return_value = _price_frame()
+            perf_cls.return_value.data = pd.DataFrame({"x": [1]})
+            main(parse_args([*argv, "--no-grid", "--outdir", str(tmp_path)]), refdata=refdata)
+            return perf_cls.call_args
+
+    def test_names_resolve_to_catalog_values(self, refdata_stub, tmp_path):
+        call = self._run(
+            ["--indicator", "sma", "--strategy", "reversion", "--asset", "equity"],
+            refdata_stub, tmp_path,
+        )
+        config = call.args[1]
+        assert config.indicator_name == "get_sma"
+        assert config.signal_func is SignalDirection.reversion_band_signal
+        assert config.trading_period == 252
+
+    def test_a_bounded_indicator_picks_the_bounded_signal(self, refdata_stub, tmp_path):
+        call = self._run(
+            ["--indicator", "rsi", "--strategy", "momentum", "--asset", "crypto"],
+            refdata_stub, tmp_path,
+        )
+        assert call.args[1].signal_func is SignalDirection.momentum_bounded_signal
+
+    @pytest.mark.parametrize("argv, table", [
+        (["--indicator", "macd", "--strategy", "momentum", "--asset", "crypto"], "INDICATOR"),
+        (["--indicator", "sma", "--strategy", "random", "--asset", "crypto"], "SIGNAL_TYPE"),
+        (["--indicator", "sma", "--strategy", "momentum", "--asset", "forex"], "ASSET_TYPE"),
+    ])
+    def test_a_name_refdata_lacks_is_refused_by_name(self, argv, table, refdata_stub, tmp_path):
+        with pytest.raises(SystemExit, match=f"REFDATA.{table}"):
+            self._run(argv, refdata_stub, tmp_path)
+
+    def test_the_default_reader_is_the_redis_snapshot(self, tmp_path):
+        reader = MagicMock()
+        reader.get.side_effect = AssertionError("stop here")
+        with patch("quant.cli.RedisRefData", return_value=reader) as redis_cls, \
+             patch("quant.cli.get_redis_url", return_value="redis://unit"), \
+             pytest.raises(AssertionError, match="stop here"):
+            main(parse_args([*REQUIRED, "--outdir", str(tmp_path)]))
+        redis_cls.assert_called_once_with("redis://unit")

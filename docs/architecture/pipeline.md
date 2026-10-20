@@ -90,8 +90,8 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/strategy/signals.py` | `SignalDirection` | Generate position array `{-1, 0, 1}` from indicator vs threshold. |
 | `quant/strategy/signals.py` | `StrategyConfig`, `SubStrategy` | Immutable config carrying strategy identity. |
 | `quant/strategy/signals.py` | `combine_positions()` | AND / OR / FILTER conjunction logic with strength-based tiebreak. |
-| `quant/strategy/performance.py` | `Performance` | PnL engine — single or multi-factor, with transaction costs. Owns Sharpe sample size (`get_metric_n_obs`). Canonical path for metrics, equity curves, and live position. |
-| `quant/strategy/objective.py` | `Objective`, `IndicatorCache` | Scalar Sharpe for the search loop — indicators cached by window, numpy PnL. Tested against `Performance`. |
+| `quant/strategy/performance.py` | `Performance`, `FactorFrames`, `strategy_pnl`, `sharpe_ratio` | PnL engine — single or multi-factor, with transaction costs. Owns Sharpe sample size (`get_metric_n_obs`). Canonical path for metrics, equity curves, and live position. `FactorFrames` resolves each factor's frame (own product or cross-product, 80 % coverage); `strategy_pnl` and `sharpe_ratio` are the one definition of the arithmetic. |
+| `quant/strategy/objective.py` | `Objective`, `IndicatorCache` | Scalar Sharpe for the search loop — indicators cached by window, numpy PnL. Composes `FactorFrames`, `strategy_pnl` and `sharpe_ratio` from `performance.py` rather than re-deriving them; tested against `Performance`. |
 | `quant/strategy/optimizer.py` | `ParametersOptimization`, `SearchStrategy` | Exhaustive Cartesian product (recorded into an optuna study) or Optuna TPE when `n_trials` is smaller than the space. See [backtest-speed.md](../archive/backtest-speed.md). |
 | `quant/strategy/walk_forward.py` | `WalkForward` | IS/OOS split, optimize on IS, evaluate on OOS. |
 | `quant/trade/futu_trader.py` | `FutuTrader` | Paper/live order execution via Futu OpenD (CLI / legacy). |
@@ -104,14 +104,16 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/trade/scheduler/sweep.py` | `ScheduleSweeper` | Hourly platform tick — one pass per interval. |
 | `quant/trade/scheduler/tick.py` | `ScheduleTickRunner` | Apply one due deployment per interval pass. Three failed applies auto-pause the deployment. |
 | `quant/market_data/warm.py` | `BarWarmer`, `InstrumentSource` | Pre-fetch bars for every series a deployment or a subscription wants. |
-| `quant/market_data/subscriptions.py` | `BarSubscriptionRepo`, `BarSubscriptionService` | Capture requests with no deployment behind them, plus coverage and backfill. |
+| `quant/market_data/series_subscr.py` | `SeriesSubscrRepo` | The only wrapper of the `MARKET_DATA.SERIES_SUBSCR` procedures (decision #103). |
+| `quant/market_data/subscriptions.py` | `BarSubscriptionService` | Capture requests with no deployment behind them, plus coverage and backfill. Its venue list is the `SERIES_SUBSCR` rows with no metric. |
+| `quant/trade/order_policy.py` | `intended_action`, `order_for`, `OrderRetryExecutor` | Signal × position → action → `OrderRequest`; the adapter only places (decision #104). |
 | `quant/strategy/live_service.py` | `bars_loader`, `load_window` | Live signal computation from `MARKET_DATA.PRICE_BAR`. |
 | `quant/promotion/evaluate.py` | promotion gates | HARD/SOFT metric evaluation for auto-promote. |
 | `quant/promotion/repo.py` | `PromotionRepo` | `CALL BT.SP_INS_PROMOTION` via `DbGateway`. |
 | `quant/api/credentials/service.py` | `CredentialService` | Fernet encrypt/decrypt; masks keys in API responses (Phase 1.1). |
 | `quant/api/credentials/repo.py` | `ApiCredentialRepo` | `CALL CORE_ADMIN.SP_*_API_CREDENTIAL` via `DbGateway`. |
 | `quant/shared/secrets_crypto.py` | `CredentialCrypto` | Resolves `EXCHANGE_SECRETS_KEY` (prod fail-fast); Fernet wrapper. |
-| `quant/cli.py` | `main()` | CLI entry point (`python -m quant.cli`) — orchestrates the full pipeline for single-symbol scripted runs. |
+| `quant/cli.py` | `main()` | CLI entry point (`python -m quant.cli`) — orchestrates the full pipeline for single-symbol scripted runs. Indicator, strategy and asset names, and the grid defaults, resolve through `RedisRefData` (`REFDATA.INDICATOR` / `SIGNAL_TYPE` / `ASSET_TYPE`); nothing is hardcoded. |
 | `quant/queue/worker_loop.py` | `main()` | Long-lived daemon — orphan recovery, `claim_next`, spawn worker subprocesses, mark a crashed child `FAILED` while its row is still `RUNNING`, BLPOP wake channel. |
 | `quant/queue/worker.py` | `WorkerRepo`, `main()` | Per-job backtest worker (`python -m quant.queue.worker <queue_id>`) — reads frozen `CONFIG_JSON`, runs optimize, writes `BT.RESULT`, drives `BT.QUEUE` terminal transitions. |
 

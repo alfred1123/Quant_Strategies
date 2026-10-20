@@ -15,6 +15,7 @@ from quant.trade.adapters.base import TradeAdapter
 from quant.trade.bar_source import PriceBarServiceFactory, resolve_signal_source
 from quant.trade.db_repo import TradeRepo
 from quant.trade.errors import AdapterNotFoundError, TradeValidationError
+from quant.trade.order_policy import intended_action
 from quant.trade.registry import AdapterRegistry
 from quant.trade.schedule_policy import fitted_interval_id
 
@@ -117,7 +118,7 @@ def _broker_report(
     """Build dry-run report; caller must manage adapter lifecycle via context manager."""
     vendor_symbol = adapter.validate_for_dry_run(req.internal_cusip, req.app_id)
     position_qty = adapter.get_position_qty(vendor_symbol)
-    intended = adapter.intended_side(signal, position_qty)
+    intended = intended_action(signal, position_qty)
 
     price = adapter.get_last_price(vendor_symbol)
     notional = float(req.qty) * price if price is not None else None

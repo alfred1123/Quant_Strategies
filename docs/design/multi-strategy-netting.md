@@ -143,7 +143,7 @@ nothing to correct.
 
 The side is not part of what the strategy asked for. `OrderRetryExecutor` keeps
 the pass's signal and, before every attempt, re-reads the account position and
-calls `intended_side(signal, position_qty)`. The side is the target measured
+calls `intended_action(signal, position_qty)`. The side is the target measured
 against the book at that moment, so it can change inside one pass:
 
 1. The account is flat and the signal is `+1`. The attempt sends a `BUY`.

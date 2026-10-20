@@ -7,7 +7,6 @@ from uuid import uuid4
 import pytest
 
 from quant.schemas.dry_run import DryRunReport, DryRunRequest
-from quant.trade.adapters.base import TradeAdapter
 from quant.trade.dry_run import run_dry_run
 from quant.trade.errors import SymbolMappingError, TradeValidationError
 from quant.trade.models.key_profile import ApiKeyInfo, KeyProfile
@@ -48,7 +47,6 @@ def deps():
     adapter.validate_for_dry_run.return_value = "BTCUSDT"
     adapter.get_position_qty.return_value = 0.0
     adapter.get_last_price.return_value = 60000.0
-    adapter.intended_side = TradeAdapter.intended_side
     adapter.key_profile = KeyProfile(route="uk", info=ApiKeyInfo(kyc_region="GBR"))
     adapter.__enter__ = MagicMock(return_value=adapter)
     adapter.__exit__ = MagicMock(return_value=False)

@@ -26,14 +26,13 @@ import uuid
 from datetime import datetime
 from uuid import UUID
 
-from quant.market_data.series_subscr import GET_SQL, INS_SQL
+from quant.market_data.series_subscr import SeriesSubscrRepo
 from quant.market_data.service import (
     MAX_BACKFILL_BARS,
     BackfillPlan,
     BackfillResult,
     BarServiceFactory,
 )
-from quant.shared.db import DbGateway
 
 logger = logging.getLogger(__name__)
 
@@ -44,15 +43,8 @@ class SubscriptionError(ValueError):
     """The subscription cannot be honoured — the caller has to change it."""
 
 
-def _require(value, name: str) -> None:
-    if value is None:
-        raise ValueError(f"{name} is required")
-    if isinstance(value, str) and not value.strip():
-        raise ValueError(f"{name} is required")
-
-
 def _bar_row(row: dict) -> dict:
-    """A venue row from ``PROVIDER_SUBSCR``, named the way capture reads it."""
+    """A venue row from ``SERIES_SUBSCR``, named the way capture reads it."""
     return {
         "series_subscr_id": row["series_subscr_id"],
         "series_subscr_vid": row["series_subscr_vid"],
@@ -65,79 +57,10 @@ def _bar_row(row: dict) -> dict:
     }
 
 
-class BarSubscriptionRepo(DbGateway):
-    """Venue rows in ``MARKET_DATA.PROVIDER_SUBSCR`` (a null metric)."""
-
-    def sp_ins_bar_subscription(
-        self,
-        *,
-        series_subscr_id: UUID,
-        internal_cusip: str,
-        tm_interval_id: int,
-        source_app_id: int,
-        is_enabled_ind: str,
-        backfill_from_ts: datetime | None = None,
-    ) -> dict:
-        """Append a version — create, enable, disable or retarget — and read it back.
-
-        Read-back rather than OUT columns, matching ``TradeRepo.write_deployment``:
-        the caller wants the row as the UI will see it, including the VID the
-        procedure chose. The series lives in ``PROVIDER_SUBSCR`` with no metric.
-        """
-        _require(series_subscr_id, "series_subscr_id")
-        _require(internal_cusip, "internal_cusip")
-        _require(tm_interval_id, "tm_interval_id")
-        _require(source_app_id, "source_app_id")
-        if is_enabled_ind not in ("Y", "N"):
-            raise ValueError(f"is_enabled_ind must be Y or N, got {is_enabled_ind!r}")
-
-        self._call_write(
-            INS_SQL,
-            (
-                str(series_subscr_id),
-                internal_cusip,
-                source_app_id,
-                None,
-                tm_interval_id,
-                is_enabled_ind,
-                backfill_from_ts,
-                self.user_id,
-            ),
-        )
-        rows = self.sp_get_bar_subscription(series_subscr_id=series_subscr_id)
-        if not rows:
-            raise RuntimeError(
-                "SP_INS_SERIES_SUBSCR succeeded but SP_GET returned no row "
-                f"for {series_subscr_id}"
-            )
-        return rows[0]
-
-    def sp_get_bar_subscription(
-        self, *, series_subscr_id: UUID | None = None
-    ) -> list[dict]:
-        """Current venue rows, disabled ones included."""
-        rows = self._call_get(GET_SQL, ())
-        wanted = str(series_subscr_id) if series_subscr_id else None
-        return [
-            _bar_row(row)
-            for row in rows
-            if row.get("app_metric_id") is None
-            and (wanted is None or str(row["series_subscr_id"]) == wanted)
-        ]
-
-    def sp_get_active_bar_subscriptions(self) -> list[dict]:
-        """Enabled (tm_interval_id, internal_cusip, app_id) rows, for the warmer."""
-        return self._call_get(
-            "CALL market_data.sp_get_active_bar_subscriptions("
-            "NULL::refcursor, NULL::text, NULL::text, NULL::text)",
-            (),
-        )
-
-
 class SubscriptionInstrumentSource:
     """The subscribed half of the warmer's instrument list."""
 
-    def __init__(self, repo: BarSubscriptionRepo) -> None:
+    def __init__(self, repo: SeriesSubscrRepo) -> None:
         self._repo = repo
 
     def instruments(self) -> list[dict]:
@@ -145,11 +68,16 @@ class SubscriptionInstrumentSource:
 
 
 class BarSubscriptionService:
-    """Subscribe, list with coverage, and fill history on request."""
+    """Subscribe, list with coverage, and fill history on request.
+
+    The venue view of ``MARKET_DATA.SERIES_SUBSCR``: the rows with no metric.
+    The procedures are :class:`SeriesSubscrRepo`'s; this class only chooses
+    the venue rows and names their columns the way capture reads them.
+    """
 
     def __init__(
         self,
-        repo: BarSubscriptionRepo,
+        repo: SeriesSubscrRepo,
         instruments,
         bar_services: BarServiceFactory,
     ) -> None:
@@ -179,11 +107,12 @@ class BarSubscriptionService:
             internal_cusip=internal_cusip, source_app_id=source_app_id
         )
         try:
-            return self._repo.sp_ins_bar_subscription(
+            row = self._repo.sp_ins_series_subscr(
                 series_subscr_id=series_subscr_id or uuid.uuid4(),
                 internal_cusip=internal_cusip,
+                app_id=source_app_id,
+                app_metric_id=None,
                 tm_interval_id=tm_interval_id,
-                source_app_id=source_app_id,
                 is_enabled_ind=is_enabled_ind,
                 backfill_from_ts=backfill_from_ts,
             )
@@ -198,6 +127,15 @@ class BarSubscriptionService:
                 f"{source_app_id} is already being captured — edit that "
                 f"subscription instead of creating a second one"
             ) from exc
+        return _bar_row(row)
+
+    def venue_rows(self) -> list[dict]:
+        """Current venue rows, disabled ones included — the series with no metric."""
+        return [
+            _bar_row(row)
+            for row in self._repo.sp_get_series_subscr()
+            if row.get("app_metric_id") is None
+        ]
 
     def list_subscriptions(self) -> list[dict]:
         """Every subscription, each with what has actually been captured.
@@ -211,7 +149,6 @@ class BarSubscriptionService:
         anything: `btcusdt.crypto` on Bybit is `BTCUSDT`, and the ticker a venue
         actually prints is the one worth reading beside a venue name.
         """
-        rows = self._repo.sp_get_bar_subscription()
         return [
             row | {
                 "coverage": self._coverage(row),
@@ -220,7 +157,7 @@ class BarSubscriptionService:
                     source_app_id=int(row["source_app_id"]),
                 ),
             }
-            for row in rows
+            for row in self.venue_rows()
         ]
 
     def vendor_symbol(self, *, internal_cusip: str, source_app_id: int) -> str | None:

@@ -4,6 +4,10 @@ Every source is a row in ``MARKET_DATA.SERIES_SUBSCR``. A venue's bars
 have a null metric. A provider series names its metric. The Data tab reads
 :meth:`SeriesSubscrRepo.sp_get_series_subscr`. Capture writes a venue
 row through the same insert.
+
+This is the only wrapper over the table's procedures. The venue view
+(:class:`~quant.market_data.subscriptions.BarSubscriptionService`) and the
+warmer inject this repo rather than calling the procedures themselves.
 """
 
 from __future__ import annotations
@@ -142,4 +146,12 @@ class SeriesSubscrRepo(DbGateway):
     def sp_get_series_subscr(self) -> list[dict]:
         """Current rows, including one whose window is not stored yet."""
         return self._call_get(GET_SQL, ())
+
+    def sp_get_active_bar_subscriptions(self) -> list[dict]:
+        """Enabled venue ``(tm_interval_id, internal_cusip, app_id)`` rows, for the warmer."""
+        return self._call_get(
+            "CALL market_data.sp_get_active_bar_subscriptions("
+            "NULL::refcursor, NULL::text, NULL::text, NULL::text)",
+            (),
+        )
 

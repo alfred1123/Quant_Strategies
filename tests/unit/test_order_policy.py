@@ -12,7 +12,81 @@ from quant.trade.order_policy import (
     ApplyAttempt,
     OrderRetryExecutor,
     OrderRetryPolicy,
+    intended_action,
+    order_for,
 )
+
+
+class TestIntendedAction:
+    """``intended_action`` — covers long, flat, and short positions."""
+
+    def test_long_signal_flat_position(self):
+        assert intended_action(1.0, 0.0) == "BUY"
+
+    def test_long_signal_existing_long(self):
+        assert intended_action(1.0, 0.01) == "HOLD"
+
+    def test_long_signal_existing_short(self):
+        assert intended_action(1.0, -0.5) == "CLOSE_SHORT"
+
+    def test_flat_signal_with_long(self):
+        assert intended_action(0.0, 0.01) == "SELL"
+
+    def test_flat_signal_no_position(self):
+        assert intended_action(0.0, 0.0) == "HOLD"
+
+    def test_flat_signal_with_short(self):
+        assert intended_action(0.0, -0.5) == "CLOSE_SHORT"
+
+    def test_sell_signal_with_long(self):
+        assert intended_action(-1.0, 1.0) == "SELL"
+
+    def test_sell_signal_flat(self):
+        assert intended_action(-1.0, 0.0) == "OPEN_SHORT"
+
+    def test_sell_signal_already_short(self):
+        assert intended_action(-1.0, -0.5) == "HOLD"
+
+    def test_returns_intended_action_enum(self):
+        assert intended_action(1.0, 0.0) is IntendedAction.BUY
+
+    def test_float_dust_position_treated_as_flat(self):
+        assert intended_action(1.0, 1e-12) == "BUY"
+        assert intended_action(0.0, -1e-12) == "HOLD"
+        assert intended_action(-1.0, 1e-12) == "OPEN_SHORT"
+
+
+class TestOrderFor:
+    """``order_for`` sizes the one order an action calls for, or none."""
+
+    def test_hold_is_no_order(self):
+        assert order_for("BTCUSDT", IntendedAction.HOLD, 0.01, 0.0) is None
+
+    def test_buy_opens_the_deployment_qty(self):
+        req = order_for("BTCUSDT", IntendedAction.BUY, 0.01, 0.0)
+        assert (req.side, req.qty) == (OrderSide.BUY, 0.01)
+
+    def test_open_short_sells_the_deployment_qty(self):
+        req = order_for("BTCUSDT", IntendedAction.OPEN_SHORT, 0.01, 0.0)
+        assert (req.side, req.qty) == (OrderSide.SELL, 0.01)
+
+    def test_sell_flattens_what_is_held(self):
+        req = order_for("BTCUSDT", IntendedAction.SELL, 0.01, 0.03)
+        assert (req.side, req.qty) == (OrderSide.SELL, 0.03)
+
+    def test_close_short_buys_back_what_is_short(self):
+        req = order_for("BTCUSDT", IntendedAction.CLOSE_SHORT, 0.01, -0.02)
+        assert (req.side, req.qty) == (OrderSide.BUY, 0.02)
+
+    def test_flattening_nothing_is_no_order(self):
+        assert order_for("BTCUSDT", IntendedAction.SELL, 0.01, 0.0) is None
+
+    def test_adapter_contract_has_no_decision_surface(self):
+        """Placing is the adapter's; deciding is this module's."""
+        from quant.trade.adapters.base import TradeAdapter
+
+        for name in ("intended_side", "apply_signal", "execute_action"):
+            assert not hasattr(TradeAdapter, name)
 
 
 def _result(
@@ -94,23 +168,31 @@ class TestApplyAttempt:
         assert attempt.vendor_order_id == "1"
 
 
-def _adapter(apply_result: OrderResult | None, action: IntendedAction = IntendedAction.BUY) -> MagicMock:
+def _adapter(place_result: OrderResult | None, position_qty: float = 0.0) -> MagicMock:
     adapter = MagicMock()
-    adapter.get_position_qty.return_value = 0.0
-    adapter.intended_side.return_value = action
-    adapter.apply_signal.return_value = apply_result
+    adapter.get_position_qty.return_value = position_qty
+    adapter.place_order.return_value = place_result
     return adapter
 
 
 class TestOrderRetryExecutor:
     def test_hold_short_circuits(self):
-        adapter = _adapter(None, action=IntendedAction.HOLD)
+        adapter = _adapter(None)
         outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 0.0, 0.01)
         assert outcome.action is IntendedAction.HOLD
         assert outcome.result is None
         assert len(outcome.attempts) == 1
         assert "HOLD" in outcome.no_order_message
-        adapter.apply_signal.assert_not_called()
+        adapter.place_order.assert_not_called()
+
+    def test_the_position_read_once_sizes_the_order(self):
+        """One broker read drives both the decision and the flatten size."""
+        adapter = _adapter(_result("filled", success=True), position_qty=0.03)
+        outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 0.0, 0.01)
+        assert outcome.action is IntendedAction.SELL
+        assert adapter.get_position_qty.call_count == 1
+        req = adapter.place_order.call_args.args[0]
+        assert (req.side, req.qty) == (OrderSide.SELL, 0.03)
 
     def test_success_returns_first_attempt(self):
         adapter = _adapter(_result("filled", success=True))
@@ -135,7 +217,7 @@ class TestOrderRetryExecutor:
             )
         )
         outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 1.0, 0.0001)
-        assert adapter.apply_signal.call_count == 1
+        assert adapter.place_order.call_count == 1
         assert outcome.permanent_failure
         assert outcome.result is not None
         assert outcome.result.reason is OrderRejectReason.SIZE_BELOW_MINIMUM
