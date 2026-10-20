@@ -7,6 +7,7 @@ import type {
   BarSubscriptionRow,
   ProviderSeriesRow,
   Coverage,
+  SubscribeProviderRequest,
   SubscribeRequest,
   VenueDepth,
 } from '../types/marketData';
@@ -45,6 +46,16 @@ async function subscribe(req: SubscribeRequest): Promise<BarSubscriptionRow> {
   return data;
 }
 
+async function subscribeProvider(
+  req: SubscribeProviderRequest,
+): Promise<ProviderSeriesRow> {
+  const { data } = await apiClient.post<ProviderSeriesRow>(
+    '/market-data/provider-series',
+    req,
+  );
+  return data;
+}
+
 async function backfill(req: BackfillRequest): Promise<BackfillReport> {
   const { data } = await apiClient.post<BackfillReport>(
     '/market-data/price-bars/backfill',
@@ -75,6 +86,16 @@ export function useSubscribe() {
     mutationFn: subscribe,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: SUBSCRIPTIONS_QUERY_KEY });
+    },
+  });
+}
+
+export function useSubscribeProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: subscribeProvider,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: PROVIDER_SERIES_QUERY_KEY });
     },
   });
 }
@@ -217,4 +238,4 @@ export function useBackfill() {
   });
 }
 
-export { listSubscriptions, subscribe, backfill };
+export { listSubscriptions, subscribe, subscribeProvider, backfill };

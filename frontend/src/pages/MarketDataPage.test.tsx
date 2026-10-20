@@ -3,7 +3,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MarketDataPage from './MarketDataPage';
 import { renderWithProviders } from '../test/wrapper';
-import { useProviderSeries, useSubscribe, useSubscriptions } from '../api/marketData';
+import { useProviderSeries, useSubscribe, useSubscribeProvider, useSubscriptions } from '../api/marketData';
 import { useAppMetrics, useApps, useTmIntervals } from '../api/refdata';
 import { useMe } from '../api/auth';
 import type { BarSubscriptionRow, ProviderSeriesRow } from '../types/marketData';
@@ -70,6 +70,7 @@ function setup(
     data: [{ app_metric_id: 11, app_id: 2, metric_nm: 'price', display_name: 'Price' }],
   } as never);
   vi.mocked(useSubscribe).mockReturnValue({ mutateAsync, isPending: false } as never);
+  vi.mocked(useSubscribeProvider).mockReturnValue({ mutateAsync, isPending: false } as never);
   vi.mocked(useTmIntervals).mockReturnValue({
     data: [{ tm_interval_id: 1, name: 'DAILY', display_name: 'Daily' }],
   } as never);

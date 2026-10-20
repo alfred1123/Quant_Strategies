@@ -103,6 +103,23 @@ class BackfillPlan(BaseModel):
     target: datetime
 
 
+class SubscribeProviderRequest(BaseModel):
+    """Create a provider series, or version the open one.
+
+    ``series_subscr_id`` edits that row. Omitting it creates, unless an open
+    row already has this source, metric, interval and product — that id is
+    reused.
+    """
+
+    internal_cusip: str
+    app_id: int
+    app_metric_id: int
+    tm_interval_id: int
+    is_enabled_ind: Literal["Y", "N"] = "Y"
+    backfill_from_ts: datetime | None = None
+    series_subscr_id: UUID | None = None
+
+
 class ProviderSeriesRow(BaseModel):
     """One current provider subscription, with the stored window if a fetch has run.
 

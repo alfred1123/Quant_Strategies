@@ -2,20 +2,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SubscriptionDialog from './SubscriptionDialog';
-import { useSubscribe, useVenueDepth } from '../../api/marketData';
-import { useAppProducts } from '../../api/inst';
-import { useExchangeApps, useTmIntervals } from '../../api/refdata';
+import { useSubscribe, useSubscribeProvider, useVenueDepth } from '../../api/marketData';
+import { useAppProducts, useProducts } from '../../api/inst';
+import { useAppMetrics, useApps, useTmIntervals } from '../../api/refdata';
 import type { VenueDepth } from '../../types/marketData';
 
 vi.mock('../../api/marketData', () => ({
   useSubscribe: vi.fn(),
+  useSubscribeProvider: vi.fn(),
   useVenueDepth: vi.fn(),
 }));
-vi.mock('../../api/inst', () => ({ useAppProducts: vi.fn() }));
+vi.mock('../../api/inst', () => ({ useAppProducts: vi.fn(), useProducts: vi.fn() }));
 // Real intervalLabel — only the data hooks are stubbed.
 vi.mock('../../api/refdata', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/refdata')>()),
-  useExchangeApps: vi.fn(),
+  useApps: vi.fn(),
+  useAppMetrics: vi.fn(),
   useTmIntervals: vi.fn(),
 }));
 
@@ -26,6 +28,7 @@ const BYBIT_DAILY: VenueDepth = {
 };
 
 let subscribeMutate: ReturnType<typeof vi.fn>;
+let providerMutate: ReturnType<typeof vi.fn>;
 
 // `null` means the venue gave no answer. Not `undefined`, which a default
 // parameter would quietly replace with the happy-path fixture.
@@ -40,17 +43,35 @@ function setup({
   isFetching = false,
   listed = LISTED,
   productsFetching = false,
+  glassnode = false,
 }: {
   depth?: VenueDepth | null;
   isFetching?: boolean;
   listed?: typeof LISTED;
   productsFetching?: boolean;
+  glassnode?: boolean;
 } = {}) {
   subscribeMutate = vi.fn().mockResolvedValue({});
+  providerMutate = vi.fn().mockResolvedValue({});
   vi.mocked(useSubscribe).mockReturnValue({
     mutateAsync: subscribeMutate,
     isPending: false,
   } as unknown as ReturnType<typeof useSubscribe>);
+  vi.mocked(useSubscribeProvider).mockReturnValue({
+    mutateAsync: providerMutate,
+    isPending: false,
+  } as unknown as ReturnType<typeof useSubscribeProvider>);
+  vi.mocked(useProducts).mockReturnValue({
+    data: glassnode
+      ? [{ internal_cusip: 'btcusdt.crypto', display_nm: 'Bitcoin' }]
+      : [],
+    isFetching: false,
+  } as unknown as ReturnType<typeof useProducts>);
+  vi.mocked(useAppMetrics).mockReturnValue({
+    data: glassnode
+      ? [{ app_metric_id: 11, app_id: 2, metric_nm: 'price', display_name: 'Price' }]
+      : [],
+  } as unknown as ReturnType<typeof useAppMetrics>);
   vi.mocked(useVenueDepth).mockReturnValue({
     data: depth ?? undefined,
     isFetching,
@@ -70,12 +91,15 @@ function setup({
       },
     ],
   } as unknown as ReturnType<typeof useTmIntervals>);
-  vi.mocked(useExchangeApps).mockReturnValue({
+  vi.mocked(useApps).mockReturnValue({
     data: [
-      { app_id: 34, display_name: 'Bybit' },
-      { app_id: 35, display_name: 'Binance' },
+      { app_id: 34, display_name: 'Bybit', is_exchange_ind: 'Y' },
+      { app_id: 35, display_name: 'Binance', is_exchange_ind: 'Y' },
+      ...(glassnode
+        ? [{ app_id: 2, display_name: 'Glassnode', is_exchange_ind: 'N' as const }]
+        : []),
     ],
-  } as unknown as ReturnType<typeof useExchangeApps>);
+  } as unknown as ReturnType<typeof useApps>);
 
   render(<SubscriptionDialog open onClose={vi.fn()} onSuccess={vi.fn()} />);
 }
@@ -292,5 +316,29 @@ describe('SubscriptionDialog capture target', () => {
     await waitFor(() => expect(subscribeMutate).toHaveBeenCalled());
     const sent = subscribeMutate.mock.calls[0][0];
     expect(sent.backfill_from_ts).toContain('2020-03-25');
+  });
+});
+
+describe('SubscriptionDialog provider series', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('records a catalog metric instead of an exchange bar series', async () => {
+    setup({ glassnode: true });
+
+    await pick('Venue', 'Glassnode');
+    await pick('Metric', 'Price');
+    await userEvent.click(productBox());
+    await userEvent.click(await screen.findByRole('option', { name: /Bitcoin/ }));
+    await pick('Bar interval', 'Daily');
+    await userEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
+
+    await waitFor(() => expect(providerMutate).toHaveBeenCalled());
+    expect(providerMutate.mock.calls[0][0]).toMatchObject({
+      app_id: 2,
+      app_metric_id: 11,
+      internal_cusip: 'btcusdt.crypto',
+      tm_interval_id: 1,
+    });
+    expect(subscribeMutate).not.toHaveBeenCalled();
   });
 });

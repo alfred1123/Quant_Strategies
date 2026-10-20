@@ -59,6 +59,16 @@ export interface SubscribeRequest {
   series_subscr_id?: string;
 }
 
+export interface SubscribeProviderRequest {
+  internal_cusip: string;
+  app_id: number;
+  app_metric_id: number;
+  tm_interval_id: number;
+  is_enabled_ind?: 'Y' | 'N';
+  backfill_from_ts?: string | null;
+  series_subscr_id?: string;
+}
+
 /**
  * How far back a venue will actually serve one series.
  *

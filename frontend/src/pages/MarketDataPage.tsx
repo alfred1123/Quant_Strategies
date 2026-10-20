@@ -26,7 +26,7 @@ import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import SearchIcon from '@mui/icons-material/Search';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useMe } from '../api/auth';
-import { useProviderSeries, useSubscribe, useSubscriptions } from '../api/marketData';
+import { useProviderSeries, useSubscribe, useSubscribeProvider, useSubscriptions } from '../api/marketData';
 import { intervalLabel, useAppMetrics, useApps, useTmIntervals } from '../api/refdata';
 import AppModeSwitch from '../components/AppModeSwitch';
 import BrandMark from '../components/BrandMark';
@@ -184,6 +184,7 @@ interface TableProps {
   busy: boolean;
   onBackfill: (row: BarSubscriptionRow) => void;
   onToggle: (row: BarSubscriptionRow) => void;
+  onToggleProvider: (row: ProviderSeriesRow) => void;
 }
 
 function SubscriptionTable({
@@ -196,6 +197,7 @@ function SubscriptionTable({
   busy,
   onBackfill,
   onToggle,
+  onToggleProvider,
 }: TableProps) {
   return (
     <TableContainer component={Paper} variant="outlined">
@@ -237,7 +239,20 @@ function SubscriptionTable({
                   </TableCell>
                   <TableCell>{stored}</TableCell>
                   <TableCell>{formatDay(row.backfill_from_ts)}</TableCell>
-                  <TableCell />
+                  <TableCell align="center">
+                    <Tooltip title={row.is_enabled_ind === 'Y' ? 'Pause capture' : 'Resume capture'}>
+                      <IconButton
+                        size="small"
+                        color={row.is_enabled_ind === 'Y' ? 'warning' : 'success'}
+                        onClick={() => onToggleProvider(row)}
+                        disabled={busy}
+                      >
+                        {row.is_enabled_ind === 'Y'
+                          ? <PauseCircleIcon fontSize="small" />
+                          : <PlayCircleIcon fontSize="small" />}
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
                 </TableRow>
               );
             }
@@ -332,6 +347,7 @@ export default function MarketDataPage() {
   const { data: metrics = [] } = useAppMetrics(true);
   const providerQuery = useProviderSeries(true);
   const toggle = useSubscribe();
+  const toggleProvider = useSubscribeProvider();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createInstrumentOpen, setCreateInstrumentOpen] = useState(false);
@@ -383,6 +399,32 @@ export default function MarketDataPage() {
         internal_cusip: row.internal_cusip,
         tm_interval_id: row.tm_interval_id,
         source_app_id: row.source_app_id,
+        is_enabled_ind: enabled ? 'N' : 'Y',
+        backfill_from_ts: row.backfill_from_ts,
+      });
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : 'Update failed');
+    }
+  };
+
+  const handleToggleProvider = async (row: ProviderSeriesRow) => {
+    const enabled = row.is_enabled_ind === 'Y';
+    if (
+      enabled &&
+      !window.confirm(
+        'Pause this series? It is shared, so it stops for everyone.',
+      )
+    ) {
+      return;
+    }
+    setActionError(null);
+    try {
+      await toggleProvider.mutateAsync({
+        series_subscr_id: row.series_subscr_id,
+        internal_cusip: row.internal_cusip,
+        app_id: row.app_id,
+        app_metric_id: row.app_metric_id,
+        tm_interval_id: row.tm_interval_id,
         is_enabled_ind: enabled ? 'N' : 'Y',
         backfill_from_ts: row.backfill_from_ts,
       });
@@ -482,9 +524,10 @@ export default function MarketDataPage() {
                   intervalNameById={intervalNameById}
                   appNameById={appNameById}
                   metricNameById={metricNameById}
-                  busy={toggle.isPending}
+                  busy={toggle.isPending || toggleProvider.isPending}
                   onBackfill={setBackfillTarget}
                   onToggle={handleToggleEnabled}
+                  onToggleProvider={handleToggleProvider}
                   emptyMessage={
                     needle
                       ? 'No capturing series matches that search.'
@@ -510,9 +553,10 @@ export default function MarketDataPage() {
                     intervalNameById={intervalNameById}
                     appNameById={appNameById}
                     metricNameById={metricNameById}
-                    busy={toggle.isPending}
+                    busy={toggle.isPending || toggleProvider.isPending}
                     onBackfill={setBackfillTarget}
                     onToggle={handleToggleEnabled}
+                  onToggleProvider={handleToggleProvider}
                     emptyMessage="No paused series matches that search."
                   />
                 </Box>

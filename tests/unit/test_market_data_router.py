@@ -189,6 +189,42 @@ class TestSubscribe:
         assert "venue is not an exchange" in caplog.text
 
 
+class TestSubscribeProvider:
+    def test_records_the_metric_and_returns_the_row(self, client_and_svc):
+        client, _svc, _warmer = client_and_svc
+        series_id = str(uuid.uuid4())
+        row = {
+            "series_subscr_id": series_id,
+            "app_id": 2,
+            "app_metric_id": 11,
+            "tm_interval_id": DAILY,
+            "internal_cusip": CUSIP,
+            "is_enabled_ind": "Y",
+            "backfill_from_ts": None,
+            "range_start_ts": None,
+            "range_end_ts": None,
+            "has_payload_ind": None,
+        }
+        with patch(
+            "quant.api.market_data.router.SeriesSubscrRepo.subscribe",
+            return_value=row,
+        ) as subscribe:
+            resp = client.post(
+                "/api/v1/market-data/provider-series",
+                json={
+                    "internal_cusip": CUSIP,
+                    "app_id": 2,
+                    "app_metric_id": 11,
+                    "tm_interval_id": DAILY,
+                },
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["app_metric_id"] == 11
+        assert resp.json()["has_payload_ind"] is None
+        assert subscribe.call_args.kwargs["app_id"] == 2
+
+
 class TestCoverage:
     def test_answers_for_a_series_nobody_subscribed_to(self, client_and_svc):
         client, svc, _warmer = client_and_svc

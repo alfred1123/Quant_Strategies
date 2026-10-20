@@ -13,11 +13,17 @@ import {
   Typography,
 } from '@mui/material';
 import { useMemo, useState } from 'react';
-import { useSubscribe, useVenueDepth } from '../../api/marketData';
-import { useAppProducts } from '../../api/inst';
-import { intervalLabel, useExchangeApps, useTmIntervals } from '../../api/refdata';
+import { useSubscribe, useSubscribeProvider, useVenueDepth } from '../../api/marketData';
+import { useAppProducts, useProducts } from '../../api/inst';
+import { intervalLabel, useAppMetrics, useApps, useTmIntervals } from '../../api/refdata';
 import type { VenueDepth } from '../../types/marketData';
-import type { ListedProduct } from '../../types/refdata';
+import type { AppRow } from '../../types/refdata';
+
+interface ProductOption {
+  internal_cusip: string;
+  display_nm: string;
+  vendor_symbol: string;
+}
 
 interface SubscriptionDialogProps {
   open: boolean;
@@ -87,8 +93,16 @@ function productHelp(
   venue: string,
   loading: boolean,
   count: number,
+  provider: boolean,
 ): string {
   if (!venue) return 'Pick a venue first — it decides which products exist here.';
+  if (provider) {
+    if (loading) return 'Loading products…';
+    if (count === 0) {
+      return 'No products yet — add one on an exchange first.';
+    }
+    return `${count.toLocaleString()} products. This source's symbol is written when the series is filled.`;
+  }
   if (loading) return 'Loading what this venue lists…';
   if (count === 0) {
     return 'This venue lists nothing yet — use "Add an instrument" to map one to it.';
@@ -96,22 +110,47 @@ function productHelp(
   return `${count.toLocaleString()} products listed on this venue.`;
 }
 
+function isProvider(app: AppRow | undefined): boolean {
+  return app?.is_exchange_ind === 'N';
+}
+
 function SubscriptionDialogContent({
   onClose,
   onSuccess,
 }: Omit<SubscriptionDialogProps, 'open'>) {
   const { data: intervals = [] } = useTmIntervals();
-  const { data: exchanges = [] } = useExchangeApps();
+  const { data: apps = [] } = useApps();
+  const { data: metrics = [] } = useAppMetrics();
+  const catalog = useProducts();
   const create = useSubscribe();
+  const createProvider = useSubscribeProvider();
 
   const [internalCusip, setInternalCusip] = useState('');
   const [intervalId, setIntervalId] = useState('');
   const [sourceAppId, setSourceAppId] = useState('');
+  const [metricId, setMetricId] = useState('');
 
   // Scoped to the venue, so the options are things this exchange can actually
   // serve rather than every instrument the platform knows.
-  const productsQuery = useAppProducts(sourceAppId ? Number(sourceAppId) : null);
-  const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
+  const selectedApp = apps.find(a => String(a.app_id) === sourceAppId);
+  const provider = isProvider(selectedApp);
+  const productsQuery = useAppProducts(
+    !provider && sourceAppId ? Number(sourceAppId) : null,
+  );
+  const appMetrics = useMemo(
+    () => metrics.filter(m => String(m.app_id) === sourceAppId),
+    [metrics, sourceAppId],
+  );
+  const products = useMemo((): ProductOption[] => {
+    if (provider) {
+      return (catalog.data ?? []).map(p => ({
+        internal_cusip: p.internal_cusip,
+        display_nm: p.display_nm,
+        vendor_symbol: '',
+      }));
+    }
+    return productsQuery.data ?? [];
+  }, [provider, catalog.data, productsQuery.data]);
   /** `null` until the user picks a date; the venue's floor stands in. */
   const [chosenTarget, setChosenTarget] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -129,11 +168,11 @@ function SubscriptionDialogContent({
 
   // Only once all three are chosen is there a series to ask the venue about.
   const depthQuery = useVenueDepth({
-    internal_cusip: internalCusip || undefined,
-    tm_interval_id: intervalId ? Number(intervalId) : undefined,
-    source_app_id: sourceAppId ? Number(sourceAppId) : undefined,
+    internal_cusip: provider ? undefined : internalCusip || undefined,
+    tm_interval_id: provider || !intervalId ? undefined : Number(intervalId),
+    source_app_id: provider || !sourceAppId ? undefined : Number(sourceAppId),
   });
-  const depth = depthQuery.data;
+  const depth = provider ? undefined : depthQuery.data;
   const venueEarliest = depth?.earliest ? depth.earliest.slice(0, 10) : '';
 
   // Adopt the venue's floor as the target, so the default is "everything this
@@ -150,17 +189,30 @@ function SubscriptionDialogContent({
     venueEarliest && backfillFrom && backfillFrom < venueEarliest,
   );
 
-  const canSubmit = internalCusip !== '' && intervalId !== '' && sourceAppId !== '';
+  const canSubmit = internalCusip !== '' && intervalId !== '' && sourceAppId !== ''
+    && (!provider || metricId !== '');
+  const pending = create.isPending || createProvider.isPending;
 
   const handleSubmit = async () => {
     setFormError(null);
+    const from = backfillFrom ? new Date(backfillFrom).toISOString() : null;
     try {
-      await create.mutateAsync({
-        internal_cusip: internalCusip,
-        tm_interval_id: Number(intervalId),
-        source_app_id: Number(sourceAppId),
-        backfill_from_ts: backfillFrom ? new Date(backfillFrom).toISOString() : null,
-      });
+      if (provider) {
+        await createProvider.mutateAsync({
+          internal_cusip: internalCusip,
+          app_id: Number(sourceAppId),
+          app_metric_id: Number(metricId),
+          tm_interval_id: Number(intervalId),
+          backfill_from_ts: from,
+        });
+      } else {
+        await create.mutateAsync({
+          internal_cusip: internalCusip,
+          tm_interval_id: Number(intervalId),
+          source_app_id: Number(sourceAppId),
+          backfill_from_ts: from,
+        });
+      }
       onSuccess();
     } catch (e: unknown) {
       setFormError(e instanceof Error ? e.message : 'Could not subscribe');
@@ -170,11 +222,13 @@ function SubscriptionDialogContent({
   return (
     <Dialog
       open
-      onClose={create.isPending ? undefined : onClose}
+      onClose={pending ? undefined : onClose}
       maxWidth="sm"
       fullWidth
     >
-      <DialogTitle>Capture a price series</DialogTitle>
+      <DialogTitle>
+        {provider ? 'Capture a provider series' : 'Capture a price series'}
+      </DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2} sx={{ pt: 1 }}>
           {/*
@@ -189,18 +243,38 @@ function SubscriptionDialogContent({
             value={sourceAppId}
             onChange={e => {
               setSourceAppId(e.target.value);
+              setMetricId('');
               // A product listed here may not be listed there.
               setInternalCusip('');
             }}
-            helperText="Bars are a fact from one exchange — this picks which order book you capture."
+            helperText={provider
+              ? 'A catalog source. Pick the metric this row should keep.'
+              : 'Bars are a fact from one exchange — this picks which order book you capture.'}
             fullWidth
           >
-            {exchanges.map(a => (
+            {apps.map(a => (
               <MenuItem key={a.app_id} value={String(a.app_id)}>
                 {a.display_name}
               </MenuItem>
             ))}
           </TextField>
+
+          {provider && (
+            <TextField
+              select
+              label="Metric"
+              value={metricId}
+              onChange={e => setMetricId(e.target.value)}
+              helperText="One catalog metric. The nightly fill does not read this row yet, so nothing is stored until it does."
+              fullWidth
+            >
+              {appMetrics.map(m => (
+                <MenuItem key={m.app_metric_id} value={String(m.app_metric_id)}>
+                  {m.display_name}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
 
           {/*
             A search box over what this venue lists, not a dropdown over
@@ -211,7 +285,7 @@ function SubscriptionDialogContent({
             The label carries name, CUSIP and vendor symbol, so MUI's default
             filter matches any of the three without a custom `filterOptions`.
           */}
-          <Autocomplete<ListedProduct>
+          <Autocomplete<ProductOption>
             options={products}
             value={selectedProduct}
             onChange={(_, val) => setInternalCusip(val?.internal_cusip ?? '')}
@@ -229,8 +303,9 @@ function SubscriptionDialogContent({
                 placeholder="Search by name, CUSIP or venue symbol…"
                 helperText={productHelp(
                   sourceAppId,
-                  productsQuery.isFetching,
+                  provider ? catalog.isFetching : productsQuery.isFetching,
                   products.length,
+                  provider,
                 )}
               />
             )}
@@ -270,7 +345,9 @@ function SubscriptionDialogContent({
               inputLabel: { shrink: true },
               htmlInput: venueEarliest ? { min: venueEarliest } : undefined,
             }}
-            helperText={venueDepthHelp(depthQuery.isFetching, depth, venueEarliest)}
+            helperText={provider
+              ? 'How far back this metric should be kept, once the nightly fill reads this row.'
+              : venueDepthHelp(depthQuery.isFetching, depth, venueEarliest)}
             error={unreachable}
             fullWidth
           />
@@ -294,13 +371,13 @@ function SubscriptionDialogContent({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={create.isPending}>
+        <Button onClick={onClose} disabled={pending}>
           Cancel
         </Button>
         <Button
           variant="contained"
           onClick={handleSubmit}
-          disabled={!canSubmit || create.isPending}
+          disabled={!canSubmit || pending}
         >
           Subscribe
         </Button>

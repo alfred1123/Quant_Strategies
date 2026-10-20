@@ -8,6 +8,7 @@ row through the same insert.
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from uuid import UUID
 
@@ -83,6 +84,60 @@ class SeriesSubscrRepo(DbGateway):
                 f"for {wanted}"
             )
         return rows[0]
+
+    def subscribe(
+        self,
+        *,
+        internal_cusip: str,
+        app_id: int,
+        app_metric_id: int,
+        tm_interval_id: int,
+        is_enabled_ind: str,
+        backfill_from_ts: datetime | None = None,
+        series_subscr_id: UUID | None = None,
+    ) -> dict:
+        """Create a provider series, or version the open row for that series.
+
+        The table's open row is unique on the id, not on the series. A second
+        subscribe for the same source, metric, interval and product reuses
+        the id already open so the list does not grow a duplicate.
+        """
+        _require(app_metric_id, "app_metric_id")
+        chosen = series_subscr_id or self._open_provider_id(
+            internal_cusip=internal_cusip,
+            app_id=app_id,
+            app_metric_id=app_metric_id,
+            tm_interval_id=tm_interval_id,
+        )
+        return self.sp_ins_series_subscr(
+            series_subscr_id=chosen or uuid.uuid4(),
+            internal_cusip=internal_cusip,
+            app_id=app_id,
+            app_metric_id=app_metric_id,
+            tm_interval_id=tm_interval_id,
+            is_enabled_ind=is_enabled_ind,
+            backfill_from_ts=backfill_from_ts,
+        )
+
+    def _open_provider_id(
+        self,
+        *,
+        internal_cusip: str,
+        app_id: int,
+        app_metric_id: int,
+        tm_interval_id: int,
+    ) -> UUID | None:
+        for row in self.sp_get_series_subscr():
+            if row.get("app_metric_id") is None:
+                continue
+            if (
+                row["internal_cusip"] == internal_cusip
+                and int(row["app_id"]) == int(app_id)
+                and int(row["app_metric_id"]) == int(app_metric_id)
+                and int(row["tm_interval_id"]) == int(tm_interval_id)
+            ):
+                return UUID(str(row["series_subscr_id"]))
+        return None
 
     def sp_get_series_subscr(self) -> list[dict]:
         """Current rows, including one whose window is not stored yet."""

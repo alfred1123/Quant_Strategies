@@ -37,6 +37,7 @@ from quant.schemas.market_data import (
     BarSubscriptionRow,
     Coverage,
     ProviderSeriesRow,
+    SubscribeProviderRequest,
     SubscribeRequest,
     VenueDepth,
 )
@@ -112,6 +113,29 @@ def sync_price_bars(
             for r in report.results
         ],
     }
+
+
+@router.post("/provider-series", response_model=ProviderSeriesRow)
+def subscribe_provider_series(
+    req: SubscribeProviderRequest,
+    request: Request,
+    _user: CurrentUser = Depends(require_user),
+) -> ProviderSeriesRow:
+    """Record one provider series, or version the open row for it.
+
+    Subscribing does not fetch. The 06:15 job still does not read this table,
+    so the stored range stays empty until that job is pointed at the row.
+    """
+    repo = SeriesSubscrRepo(request.app.state.db_conninfo, user_id="system")
+    return ProviderSeriesRow(**repo.subscribe(
+        internal_cusip=req.internal_cusip,
+        app_id=req.app_id,
+        app_metric_id=req.app_metric_id,
+        tm_interval_id=req.tm_interval_id,
+        is_enabled_ind=req.is_enabled_ind,
+        backfill_from_ts=req.backfill_from_ts,
+        series_subscr_id=req.series_subscr_id,
+    ))
 
 
 @router.get("/provider-series", response_model=list[ProviderSeriesRow])
