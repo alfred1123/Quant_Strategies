@@ -26,10 +26,8 @@ pytestmark = pytest.mark.e2e
 
 @pytest.fixture(scope="module")
 def yf():
-    """YahooFinance client — clear cache for fresh data."""
-    client = YahooFinance()
-    client.get_historical_price.cache_clear()
-    return client
+    """YahooFinance client."""
+    return YahooFinance()
 
 
 # ── Contract tests: verify real API response shape ──────────────────

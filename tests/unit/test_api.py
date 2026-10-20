@@ -99,7 +99,6 @@ class TestDataEndpoint:
             "t": ["2024-01-01", "2024-01-02", "2024-01-03"],
             "v": [100.0, 101.0, 102.0],
         }))
-        mock_get.cache_clear = MagicMock()
         mock_yf.get_historical_price = mock_get
 
         resp = client.post("/api/v1/backtest/data", json={

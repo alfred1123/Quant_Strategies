@@ -257,8 +257,6 @@ def fetch_df(symbol: str, start: str, end: str, data_source: str, cache, inst_ca
             price = fn(ticker, s, e, metric_path=metric_path)
         else:
             price = fn(ticker, s, e)
-        if hasattr(src.get_historical_price, "cache_clear"):
-            src.get_historical_price.cache_clear()
         df = pd.DataFrame({
             "datetime": pd.to_datetime(price["t"]),
             "price": price["v"],

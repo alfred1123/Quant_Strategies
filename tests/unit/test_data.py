@@ -25,7 +25,6 @@ class TestGlassnode:
 
         from quant.data.sources import Glassnode
         gn = Glassnode()
-        gn.get_historical_price.cache_clear()
         df = gn.get_historical_price(
             "BTC", "2020-05-11", "2020-05-13", metric_path="market/price_usd_close",
         )
@@ -46,7 +45,6 @@ class TestGlassnode:
 
         from quant.data.sources import Glassnode
         gn = Glassnode()
-        gn.get_historical_price.cache_clear()
         gn.get_historical_price(
             "ETH", "2021-01-01", "2021-01-02", "1h", metric_path="market/price_usd_close",
         )
@@ -88,7 +86,6 @@ class TestGlassnode:
 
         from quant.data.sources import Glassnode
         gn = Glassnode()
-        gn.get_historical_price.cache_clear()
         gn.get_historical_price(
             "BTC", "2020-05-11", "2020-05-12", metric_path="market/price_usd_close",
         )
@@ -107,7 +104,6 @@ class TestGlassnode:
 
         from quant.data.sources import Glassnode
         gn = Glassnode()
-        gn.get_historical_price.cache_clear()
         gn.get_historical_price("BTC", "2020-05-11", "2020-05-12", metric_path="indicators/sopr")
 
         assert mock_get.call_args.args[0] == "https://api.glassnode.com/v1/metrics/indicators/sopr"
@@ -174,7 +170,6 @@ class TestFutuOpenD:
 
         from quant.data.sources import FutuOpenD
         futu_src = FutuOpenD()
-        futu_src.get_historical_data.cache_clear()
         result = futu_src.get_historical_data("HK.00700", "2021-01-01", "2021-01-31")
 
         assert isinstance(result, pd.DataFrame)
@@ -190,7 +185,6 @@ class TestFutuOpenD:
 
         from quant.data.sources import FutuOpenD
         futu_src = FutuOpenD()
-        futu_src.get_historical_data.cache_clear()
         with pytest.raises(RuntimeError, match="Futu API error"):
             futu_src.get_historical_data("HK.00700", "2021-01-01", "2021-01-31")
 
@@ -229,7 +223,6 @@ class TestAlphaVantage:
 
         from quant.data.sources import AlphaVantage
         av = AlphaVantage()
-        av.get_historical_price.cache_clear()
         df = av.get_historical_price("IBM", "2021-01-04", "2021-01-05")
 
         assert isinstance(df, pd.DataFrame)
@@ -248,7 +241,6 @@ class TestAlphaVantage:
 
         from quant.data.sources import AlphaVantage
         av = AlphaVantage()
-        av.get_historical_price.cache_clear()
         df = av.get_historical_price("BTC", "2021-01-04", "2021-01-05")
 
         assert isinstance(df, pd.DataFrame)
@@ -266,7 +258,6 @@ class TestAlphaVantage:
 
         from quant.data.sources import AlphaVantage
         av = AlphaVantage()
-        av.get_historical_price.cache_clear()
         df = av.get_historical_price("IBM", "2021-01-04", "2021-01-04")
 
         assert len(df) == 1
@@ -282,7 +273,6 @@ class TestAlphaVantage:
 
         from quant.data.sources import AlphaVantage
         av = AlphaVantage()
-        av.get_historical_price.cache_clear()
         with pytest.raises(ValueError, match="AlphaVantage error"):
             av.get_historical_price("INVALID", "2021-01-01", "2021-01-02")
 
@@ -302,7 +292,6 @@ class TestAlphaVantage:
 
         from quant.data.sources import AlphaVantage
         av = AlphaVantage()
-        av.get_historical_price.cache_clear()
         av.get_historical_price("IBM", "2021-01-04", "2021-01-05")
 
         params = mock_get.call_args.kwargs.get("params") or mock_get.call_args[1].get("params")
@@ -318,7 +307,6 @@ class TestAlphaVantage:
 
         from quant.data.sources import AlphaVantage
         av = AlphaVantage()
-        av.get_historical_price.cache_clear()
         av.get_historical_price("BTC", "2021-01-04", "2021-01-05")
 
         params = mock_get.call_args.kwargs.get("params") or mock_get.call_args[1].get("params")
@@ -350,7 +338,6 @@ class TestYahooFinance:
 
         from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
-        yf_src.get_historical_price.cache_clear()
         df = yf_src.get_historical_price("AAPL", "2021-01-04", "2021-01-05")
 
         assert isinstance(df, pd.DataFrame)
@@ -373,7 +360,6 @@ class TestYahooFinance:
 
         from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
-        yf_src.get_historical_price.cache_clear()
         df = yf_src.get_historical_price("MSFT", "2021-06-15", "2021-06-15")
 
         assert df.iloc[0]["t"] == "2021-06-15"
@@ -388,7 +374,6 @@ class TestYahooFinance:
 
         from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
-        yf_src.get_historical_price.cache_clear()
         yf_src.get_historical_price("AAPL", "2016-01-01", "2026-01-01")
 
         mock_ticker_cls.assert_called_once_with("AAPL")
@@ -405,7 +390,6 @@ class TestYahooFinance:
 
         from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
-        yf_src.get_historical_price.cache_clear()
         with pytest.raises(ValueError, match="no data"):
             yf_src.get_historical_price("INVALID", "2021-01-01", "2021-01-02")
 
@@ -419,7 +403,6 @@ class TestYahooFinance:
 
         from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
-        yf_src.get_historical_price.cache_clear()
         df = yf_src.get_historical_price("SPY", "2021-01-04", "2021-01-05")
 
         assert df["v"].dtype == float
@@ -436,7 +419,6 @@ class TestYahooFinance:
 
         from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
-        yf_src.get_historical_price.cache_clear()
         df = yf_src.get_historical_price("AAPL", "2021-01-04", "2021-01-04")
 
         assert len(df) == 1
@@ -451,7 +433,6 @@ class TestYahooFinance:
 
         from quant.data.sources import YahooFinance
         yf_src = YahooFinance()
-        yf_src.get_historical_price.cache_clear()
         with pytest.raises(RuntimeError, match="failed after 3 attempts"):
             yf_src.get_historical_price("AAPL", "2021-01-04", "2021-01-04")
 
@@ -478,7 +459,6 @@ class TestNasdaqDataLink:
 
         from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
-        src.get_historical_price.cache_clear()
         df = src.get_historical_price("WIKI/AAPL", "2021-01-04", "2021-01-05")
 
         assert isinstance(df, pd.DataFrame)
@@ -497,7 +477,6 @@ class TestNasdaqDataLink:
 
         from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
-        src.get_historical_price.cache_clear()
         src.get_historical_price("CHRIS/CME_CL1", "2016-01-01", "2026-01-01")
 
         mock_get.assert_called_once_with(
@@ -514,7 +493,6 @@ class TestNasdaqDataLink:
 
         from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
-        src.get_historical_price.cache_clear()
         with pytest.raises(ValueError, match="no data"):
             src.get_historical_price("INVALID/CODE", "2021-01-01", "2021-01-02")
 
@@ -534,7 +512,6 @@ class TestNasdaqDataLink:
 
         from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
-        src.get_historical_price.cache_clear()
         df = src.get_historical_price("WIKI/AAPL", "2021-01-04", "2021-01-05")
 
         assert df["v"].dtype == float
@@ -549,7 +526,6 @@ class TestNasdaqDataLink:
 
         from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
-        src.get_historical_price.cache_clear()
         df = src.get_historical_price("WIKI/MSFT", "2021-06-15", "2021-06-15")
 
         assert df.iloc[0]["t"] == "2021-06-15"
@@ -566,7 +542,6 @@ class TestNasdaqDataLink:
 
         from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
-        src.get_historical_price.cache_clear()
         df = src.get_historical_price("CHRIS/CME_CL1", "2021-01-04", "2021-01-04")
 
         # 'Close' not found → falls back to last column 'Settle'
@@ -584,7 +559,6 @@ class TestNasdaqDataLink:
 
         from quant.data.sources import NasdaqDataLink
         src = NasdaqDataLink()
-        src.get_historical_price.cache_clear()
         df = src.get_historical_price(
             "CHRIS/CME_CL1", "2021-01-04", "2021-01-04", column="Value",
         )

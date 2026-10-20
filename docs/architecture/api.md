@@ -185,7 +185,7 @@ names no cause and suggests no fix. Two classes of failure used to land there:
 
 | Raised by | Handler | Status |
 |---|---|---|
-| `psycopg.Error` — the call never reached the procedure's `OUT` row | `handle_database_error` | `_procedure_status_code(sqlstate)`, so `23*` → **409**, `22*` → **400**, otherwise **502** |
+| `DatabaseError` (`quant.shared.db`, the driver's error class) — the call never reached the procedure's `OUT` row | `handle_database_error` via `database_error_facts` | `_procedure_status_code(sqlstate)`, so `23*` → **409**, `22*` → **400**, otherwise **502** |
 | `BarFetchError` — ccxt could not be reached, or refused | `handle_bar_fetch_error` | **502** |
 
 `ProcedureError` covers a procedure that ran and reported a SQLSTATE; a dropped
@@ -608,4 +608,4 @@ quant/trade/service.py              # TradeService — deployments (Phase 1.2)
 quant/trade/db_repo.py              # TradeRepo — SP_INS/GET_DEPLOYMENT
 ```
 
-REFDATA, INST, and BT cache classes live under `quant/refdata/` and `quant/data/` (shared between the API and the worker via `quant/refdata/bundle.py::DataCaches`). All Postgres access goes through `quant/shared/db.py::DbGateway`, which borrows from the process-wide pool opened in `lifespan` ([decision #69](../decisions.md), [DB connections](../design/db-connections.md)). `/health/ready` uses the same pool. The remaining `psycopg` import outside `db.py` is `exception_handlers.py` (it maps `psycopg.Error`).
+REFDATA, INST, and BT cache classes live under `quant/refdata/` and `quant/data/` (shared between the API and the worker via `quant/refdata/bundle.py::DataCaches`). All Postgres access goes through `quant/shared/db.py::DbGateway`, which borrows from the process-wide pool opened in `lifespan` ([decision #69](../decisions.md), [DB connections](../design/db-connections.md)). `/health/ready` uses the same pool. `db.py` is the only module that imports `psycopg`; `exception_handlers.py` maps the driver error through `quant.shared.db.DatabaseError` and `database_error_facts`.

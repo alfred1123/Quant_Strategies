@@ -5,13 +5,17 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import psycopg
+
 from quant.shared.db import (
     ConnectionPool,
+    DatabaseError,
     DbGateway,
     ProcedureError,
     _pool_kwargs,
     _redact,
     close_pools,
+    database_error_facts,
     open_pool,
     pool_for,
 )
@@ -34,6 +38,30 @@ def gateway():
     mock_pool.connection.return_value.__enter__.return_value = mock_conn
     with patch("quant.shared.db.pool_for", return_value=mock_pool):
         yield DbGateway("postgresql://test"), mock_conn, mock_cur, mock_pool
+
+
+class TestDatabaseErrorFacts:
+    """The driver error surface the API handler relies on, owned here."""
+
+    def test_every_driver_error_is_a_database_error(self):
+        assert issubclass(psycopg.errors.UndefinedFunction, DatabaseError)
+        assert issubclass(psycopg.OperationalError, DatabaseError)
+
+    def test_sqlstate_and_message_come_from_the_driver(self):
+        exc = psycopg.errors.UniqueViolation('duplicate key value violates "uq_x"')
+
+        sqlstate, message = database_error_facts(exc)
+
+        assert sqlstate == "23505"
+        assert "uq_x" in message
+
+    def test_a_dead_connection_has_no_sqlstate_but_keeps_its_text(self):
+        exc = psycopg.OperationalError("connection failed: Connection refused")
+
+        sqlstate, message = database_error_facts(exc)
+
+        assert sqlstate == ""
+        assert "Connection refused" in message
 
 
 class TestRedact:

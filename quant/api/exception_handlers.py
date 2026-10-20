@@ -2,14 +2,13 @@
 
 import logging
 
-import psycopg
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from quant.market_data.fetcher import BarFetchError
 from quant.market_data.service import BackfillTooLargeError, StaleBarsError
 from quant.market_data.subscriptions import SubscriptionError
-from quant.shared.db import ProcedureError
+from quant.shared.db import DatabaseError, ProcedureError, database_error_facts
 from quant.trade.errors import DeploymentNotFound, TradeValidationError
 
 logger = logging.getLogger(__name__)
@@ -56,7 +55,7 @@ async def handle_procedure_error(request: Request, exc: ProcedureError) -> JSONR
     )
 
 
-async def handle_database_error(request: Request, exc: psycopg.Error) -> JSONResponse:
+async def handle_database_error(request: Request, exc: DatabaseError) -> JSONResponse:
     """The same mapping for a call that never reached the procedure's handler.
 
     ``handle_procedure_error`` covers a procedure that ran and reported a
@@ -73,10 +72,9 @@ async def handle_database_error(request: Request, exc: psycopg.Error) -> JSONRes
     absent, which means this environment is behind on a migration and no input
     the caller changes will help.
     """
-    sqlstate = exc.sqlstate or ""
-    message = (exc.diag.message_primary or str(exc)).strip()
+    sqlstate, message = database_error_facts(exc)
     status_code = _procedure_status_code(sqlstate)
-    _log(request, status_code, f"psycopg [{sqlstate}]: {message}")
+    _log(request, status_code, f"driver [{sqlstate}]: {message}")
     return JSONResponse(
         status_code=status_code,
         content={"detail": {"sqlstate": sqlstate, "message": message}},
@@ -170,7 +168,7 @@ async def handle_backfill_too_large(
 
 def register(app: FastAPI) -> None:
     app.add_exception_handler(ProcedureError, handle_procedure_error)
-    app.add_exception_handler(psycopg.Error, handle_database_error)
+    app.add_exception_handler(DatabaseError, handle_database_error)
     app.add_exception_handler(BarFetchError, handle_bar_fetch_error)
     app.add_exception_handler(TradeValidationError, handle_trade_validation_error)
     app.add_exception_handler(DeploymentNotFound, handle_deployment_not_found)

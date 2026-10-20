@@ -40,7 +40,6 @@ def av():
     if not _has_key:
         pytest.skip("ALPHAVANTAGE_API_KEY not set — skipping E2E tests")
     client = AlphaVantage()
-    client.get_historical_price.cache_clear()
     return client
 
 

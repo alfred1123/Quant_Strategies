@@ -19,6 +19,7 @@ import os
 import re
 import threading
 
+import psycopg
 from psycopg_pool import ConnectionPool
 
 logger = logging.getLogger(__name__)
@@ -133,6 +134,23 @@ class ProcedureError(RuntimeError):
         self.sqlstate = sqlstate
         self.message = message
         super().__init__(message)
+
+
+#: The driver's own error class, for a call that failed before any OUT row:
+#: the connection is gone, or the signature called is not the one deployed.
+#: Exposed here so handlers can catch it without importing the driver.
+DatabaseError = psycopg.Error
+
+
+def database_error_facts(exc: DatabaseError) -> tuple[str, str]:
+    """``(sqlstate, message)`` from a driver error, both possibly empty.
+
+    The same two facts a procedure's OUT row carries, read from the driver's
+    diagnostics so the HTTP mapping for both paths is one function.
+    """
+    sqlstate = exc.sqlstate or ""
+    message = (exc.diag.message_primary or str(exc)).strip()
+    return sqlstate, message
 
 
 class DbGateway:

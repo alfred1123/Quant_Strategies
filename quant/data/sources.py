@@ -14,7 +14,6 @@ import logging
 import os
 import time
 from datetime import datetime, timezone
-from functools import lru_cache
 
 import futu
 import pandas as pd
@@ -44,7 +43,6 @@ class FutuOpenD:
         self.__port = int(port_str)
         self.quote_ctx = futu.OpenQuoteContext(host=self.__host, port=self.__port)
 
-    @lru_cache(maxsize=32)
     def get_historical_data(self, symbol, start_date, end_date, resolution='K_DAY'):
         """Retrieve historical kline data from Futu OpenD.
 
@@ -89,7 +87,6 @@ class Glassnode:
             raise ValueError("GLASSNODE_API_KEY is not set")
         self.__api_key = api_key
 
-    @lru_cache(maxsize=32)
     def get_historical_price(self, symbol, start_date, end_date, resolution="24h", *, metric_path: str):
         """Fetch one Glassnode series.
 
@@ -175,7 +172,6 @@ class AlphaVantage:
         if not self.__api_key:
             raise ValueError("ALPHAVANTAGE_API_KEY is not set")
 
-    @lru_cache(maxsize=32)
     def get_historical_price(self, symbol, start_date, end_date, resolution='daily'):
         """Fetch daily close prices from Alpha Vantage.
 
@@ -244,7 +240,6 @@ class YahooFinance:
     MAX_RETRIES = 3
     RETRY_DELAY = 2  # seconds between retries
 
-    @lru_cache(maxsize=32)
     def get_historical_price(self, symbol, start_date, end_date):
         """Fetch daily close prices from Yahoo Finance."""
         import yfinance as yf  # lazy import — avoids import-time network calls
@@ -307,7 +302,6 @@ class NasdaqDataLink:
         import nasdaqdatalink
         nasdaqdatalink.ApiConfig.api_key = self.__api_key
 
-    @lru_cache(maxsize=32)
     def get_historical_price(self, dataset_code, start_date, end_date,
                              column='Close'):
         """Fetch time-series data from Nasdaq Data Link."""
