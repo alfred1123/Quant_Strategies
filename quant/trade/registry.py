@@ -8,9 +8,10 @@ from typing import TYPE_CHECKING, Any
 
 from quant.trade.adapters.base import TradeAdapter
 from quant.trade.brokers.ccxt.config import CCXT_PRESETS, CcxtExchangePreset
-from quant.trade.errors import AdapterNotFoundError
+from quant.trade.errors import AdapterNotFoundError, TradeValidationError
 
 if TYPE_CHECKING:
+    from quant.data.instruments import InstrumentCache
     from quant.refdata.reader import RedisRefData
     from quant.trade.brokers.ccxt.routing import KeyRouter
 
@@ -99,3 +100,24 @@ def exchange_id_for_app(app_id: int, *, refdata: RedisRefData) -> str | None:
     """ccxt exchange id behind a ``REFDATA.APP`` id, or ``None`` if not a broker."""
     preset = preset_for_app(app_id, refdata=refdata)
     return None if preset is None else preset.exchange_id
+
+
+def instrument_default_type(
+    preset: CcxtExchangePreset, instruments: InstrumentCache, internal_cusip: str
+) -> str | None:
+    """The ccxt ``defaultType`` a session must pin for *internal_cusip* on *preset*.
+
+    ``INST.PRODUCT.ISSUE_TYPE`` selects it through ``preset.default_type_by_issue``
+    (decision #89). ``None`` when the venue does not map issue types. Raises
+    :class:`TradeValidationError` when the product is unknown or its issue type
+    has no mapping — the order session, the bar fetcher and the deployment
+    editor all refuse the same way instead of guessing a product.
+    """
+    if not preset.default_type_by_issue:
+        return None
+    product = instruments.get_product_by_cusip(internal_cusip)
+    issue_type = product.get("issue_type") if isinstance(product, dict) else None
+    try:
+        return preset.default_type_for(issue_type)
+    except ValueError as exc:
+        raise TradeValidationError(str(exc)) from exc

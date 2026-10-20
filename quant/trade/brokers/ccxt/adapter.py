@@ -24,6 +24,7 @@ from quant.trade.models.order import (
     OrderType,
 )
 from quant.trade.models.session import BrokerSessionState
+from quant.trade.registry import instrument_default_type
 
 if TYPE_CHECKING:
     from quant.data.instruments import InstrumentCache
@@ -127,14 +128,9 @@ class CcxtTradeAdapter(TradeAdapter):
         ``ISSUE_TYPE`` selects the ccxt default type. A Bybit id is shared by
         the spot pair and the perpetual, and the session must not guess.
         """
-        if not self.preset.default_type_by_issue:
+        default_type = instrument_default_type(self.preset, self._inst, internal_cusip)
+        if default_type is None:
             return
-        product = self._inst.get_product_by_cusip(internal_cusip)
-        issue_type = product.get("issue_type") if isinstance(product, dict) else None
-        try:
-            default_type = self.preset.default_type_for(issue_type)
-        except ValueError as exc:
-            raise TradeValidationError(str(exc)) from exc
         self._default_type = default_type
         self._gateway.pin_default_type(default_type)
 

@@ -16,7 +16,7 @@ from quant.market_data.service import PriceBarService
 from quant.refdata.bundle import DataCaches
 from quant.trade.db_repo import TradeRepo
 from quant.trade.errors import TradeValidationError
-from quant.trade.registry import exchange_id_for_app, preset_for_app
+from quant.trade.registry import exchange_id_for_app, instrument_default_type, preset_for_app
 
 logger = logging.getLogger(__name__)
 
@@ -48,23 +48,12 @@ class PriceBarServiceFactory:
                 f"scheduled deployment without bars from the exchange it trades on"
             )
         instruments = self._caches.instrument_cache
-
-        def default_type_for(internal_cusip: str) -> str | None:
-            if not preset.default_type_by_issue:
-                return None
-            product = instruments.get_product_by_cusip(internal_cusip)
-            issue_type = product.get("issue_type") if isinstance(product, dict) else None
-            try:
-                return preset.default_type_for(issue_type)
-            except ValueError as exc:
-                raise TradeValidationError(str(exc)) from exc
-
         service = PriceBarService(
             self._repo,
             self._caches.refdata,
             instruments,
             CcxtBarFetcher(preset.exchange_id),
-            default_type_for=default_type_for,
+            default_type_for=functools.partial(instrument_default_type, preset, instruments),
         )
         self._by_app_id[app_id] = service
         logger.info(
