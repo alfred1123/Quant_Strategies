@@ -556,7 +556,7 @@ export default function MarketDataPage() {
                     busy={toggle.isPending || toggleProvider.isPending}
                     onBackfill={setBackfillTarget}
                     onToggle={handleToggleEnabled}
-                  onToggleProvider={handleToggleProvider}
+                    onToggleProvider={handleToggleProvider}
                     emptyMessage="No paused series matches that search."
                   />
                 </Box>
