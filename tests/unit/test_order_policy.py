@@ -251,3 +251,91 @@ class TestOrderRetryExecutor:
         assert outcome.max_attempts == 3
         assert adapter.cancel_order.call_count == 3
         assert outcome.vendor_order_ids == ["1", "1", "1"]
+
+    @pytest.mark.parametrize("max_attempts", [1, 5])
+    @pytest.mark.parametrize(
+        "cancel_message",
+        [
+            "cancel_order failed: timeout",
+            pytest.param("", id="empty-message"),
+        ],
+    )
+    @patch("quant.trade.order_policy.time.sleep")
+    def test_failed_cancel_with_a_flat_book_places_once(
+        self, mock_sleep, cancel_message, max_attempts,
+    ):
+        """A cancel that returns failure is not proof the order is gone.
+
+        The book still reads flat, so another place would be a second order
+        on top of one that may still be open. One and five are the attempt
+        budget's ends: five is where the ignored return was measured.
+        """
+        adapter = _adapter(
+            _result("fill unconfirmed after 8s requires manual reconciliation"),
+            position_qty=0.0,
+        )
+        adapter.cancel_order.return_value = OrderResult(
+            success=False,
+            vendor_order_id="1",
+            message=cancel_message,
+        )
+        outcome = OrderRetryExecutor(
+            OrderRetryPolicy(max_attempts=max_attempts),
+        ).execute(adapter, "BTCUSDT", 1.0, 0.01)
+
+        assert adapter.place_order.call_count == 1
+        assert adapter.cancel_order.call_count == 1
+        assert adapter.get_position_qty.call_count == 1
+        assert adapter.get_position_qty.return_value == 0.0
+        assert outcome.permanent_failure
+        assert len(outcome.attempts) == 1
+        assert outcome.result is not None
+        assert outcome.result is outcome.attempts[0].result
+        assert outcome.result.reason is OrderRejectReason.CANCEL_FAILED
+        assert outcome.result.reason.requires_operator_fix
+        assert outcome.result.vendor_order_id == "1"
+        assert outcome.result.success is False
+        mock_sleep.assert_not_called()
+
+    @patch("quant.trade.order_policy.time.sleep")
+    def test_a_successful_cancel_still_retries(self, mock_sleep):
+        """Cancel succeeded, so the next attempt is the same retry as before."""
+        adapter = _adapter(
+            _result("fill unconfirmed after 8s requires manual reconciliation"),
+            position_qty=0.0,
+        )
+        adapter.cancel_order.return_value = OrderResult(
+            success=True,
+            vendor_order_id="1",
+            message="order canceled",
+        )
+        outcome = OrderRetryExecutor(OrderRetryPolicy(max_attempts=3)).execute(
+            adapter, "BTCUSDT", 1.0, 0.01
+        )
+
+        assert adapter.place_order.call_count == 3
+        assert adapter.cancel_order.call_count == 3
+        assert len(outcome.attempts) == 3
+        assert not outcome.permanent_failure
+        assert outcome.result is not None
+        assert outcome.result.reason is None
+        assert mock_sleep.call_count == 2
+
+    def test_a_raising_cancel_does_not_place_again(self):
+        """An exception is not a cancel result. It leaves before a second place.
+
+        The ccxt adapter turns a broker refusal into ``success=False``. A raise
+        is a broken adapter, and swallowing it would hide that.
+        """
+        adapter = _adapter(
+            _result("fill unconfirmed after 8s requires manual reconciliation"),
+            position_qty=0.0,
+        )
+        adapter.cancel_order.side_effect = RuntimeError("cancel transport died")
+
+        with pytest.raises(RuntimeError, match="cancel transport died"):
+            OrderRetryExecutor().execute(adapter, "BTCUSDT", 1.0, 0.01)
+
+        assert adapter.place_order.call_count == 1
+        assert adapter.cancel_order.call_count == 1
+        assert adapter.get_position_qty.call_count == 1

@@ -8,16 +8,20 @@ short position.
 
 from __future__ import annotations
 
+import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from quant.trade.adapters.base import TradeAdapter
 from quant.trade.models.order import (
     IntendedAction,
+    OrderRejectReason,
     OrderRequest,
     OrderResult,
     OrderSide,
 )
+
+logger = logging.getLogger(__name__)
 
 # Positions smaller than this are float noise, not real exposure — treat as flat.
 _FLAT_EPS = 1e-9
@@ -198,6 +202,12 @@ class OrderRetryPolicy:
 class OrderRetryExecutor:
     """Retry cancel-before-retry on ambiguous fills; fail fast on permanent errors.
 
+    A cancel that returns failure is final. The call is not proof the order
+    is gone: the book can still read flat while that order rests, and the
+    next place is then a second order. The result carries
+    :attr:`OrderRejectReason.CANCEL_FAILED`, which pauses the deployment
+    until someone reconciles it.
+
     The returned :class:`OrderRetryResult` carries everything callers need —
     they never reach into the nested policy.
     """
@@ -232,7 +242,17 @@ class OrderRetryExecutor:
             if not policy.is_retryable(result):
                 return self._outcome(action, position_qty, result, attempts)
             if policy.is_unconfirmed(result) and result.vendor_order_id:
-                adapter.cancel_order(result.vendor_order_id, vendor_symbol)
+                cancel = adapter.cancel_order(result.vendor_order_id, vendor_symbol)
+                if not cancel.success:
+                    logger.warning(
+                        "cancel failed vendor_order_id=%s symbol=%s — stopping retries: %s",
+                        result.vendor_order_id,
+                        vendor_symbol,
+                        cancel.message,
+                    )
+                    result = replace(result, reason=OrderRejectReason.CANCEL_FAILED)
+                    attempts[-1] = ApplyAttempt(action, position_qty, result)
+                    return self._outcome(action, position_qty, result, attempts)
             if attempt_num >= policy.max_attempts:
                 return self._outcome(action, position_qty, result, attempts)
             time.sleep(policy.backoff_s)
