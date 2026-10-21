@@ -172,6 +172,17 @@ class TestOrderRetryPolicy:
     def test_an_unclassified_timeout_stays_retryable(self):
         assert self.policy.is_retryable(_result("fetch timeout", vendor_order_id=None))
 
+    def test_an_id_makes_an_untyped_non_unconfirmed_result_retryable(self):
+        """An id alone is retryable. Cancel runs only for the unconfirmed message."""
+        message = "fetch_order failed: NetworkError"
+        bare = _result(message)
+        held = _result(message, vendor_order_id="ord-policy-8588")
+        assert bare.reason is None and held.reason is None
+        assert not self.policy.is_unconfirmed(bare)
+        assert not self.policy.is_unconfirmed(held)
+        assert not self.policy.is_retryable(bare)
+        assert self.policy.is_retryable(held)
+
     def test_defaults(self):
         assert self.policy.max_attempts == 5
         assert self.policy.backoff_s == 2.0

@@ -190,6 +190,7 @@ class TestConfirmMarketOrder:
         assert result.vendor_order_id == "ord-untyped-9"
         assert "fill unconfirmed" in result.message
         assert result.message != str(exc)
+        assert gw.fetch_order.call_count == 1
 
 
 class _ConfirmingAdapter:
@@ -337,11 +338,24 @@ class TestConfirmFailureDoesNotReplace:
             OrderRejectReason.VENUE_REJECTED,
         )
 
-    def test_fetch_timeout_does_not_replace_without_cancel(self):
-        """An untyped ccxt timeout after an id exists must not place again naked."""
-        vendor_order_id = "ord-timeout-8588c162"
+    @pytest.mark.parametrize(
+        ("error", "vendor_order_id"),
+        [
+            (ccxt.RequestTimeout("timeout"), "ord-timeout-8588c162"),
+            (ccxt.NetworkError("network down"), "ord-network-8588c162"),
+        ],
+    )
+    def test_fetch_transport_error_cancels_before_a_second_place(
+        self, error: BaseException, vendor_order_id: str,
+    ):
+        """RequestTimeout and NetworkError leave fetch_order as an untyped error.
+
+        The confirm result is the shared unconfirmed fill, so cancel of that
+        id runs before any later place_order. One fetch per place: the error
+        returns immediately.
+        """
         exchange = MagicMock()
-        exchange.fetch_order.side_effect = ccxt.RequestTimeout("timeout")
+        exchange.fetch_order.side_effect = error
         gateway = CcxtTradeGateway(
             CcxtSessionConfig(
                 api_key="k", api_secret="s", preset=CCXT_PRESETS["bybit"],
@@ -362,3 +376,7 @@ class TestConfirmFailureDoesNotReplace:
             outcome.result.reason,
             outcome.result.vendor_order_id,
         )
+        assert outcome.result.message.startswith("fill unconfirmed after ")
+        assert "fetch_order failed" not in outcome.result.message
+        places = [name for name, _ in adapter.calls if name == "place_order"]
+        assert exchange.fetch_order.call_count == len(places)
