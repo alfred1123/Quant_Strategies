@@ -125,3 +125,25 @@ def test_enqueue_refuses_a_priority_refdata_does_not_list(svc: JobsService) -> N
         svc.enqueue("user-uuid", req)
 
     svc._repo.sp_ins_queue.assert_not_called()
+
+
+def test_reenqueue_keeps_the_priority_the_source_row_was_queued_at(svc: JobsService) -> None:
+    """There is no request to read a priority from — the failed row carries it."""
+    src_id, strategy_id = uuid.uuid4(), uuid.uuid4()
+    svc._repo.get_active.return_value = {
+        "queue_status": "FAILED",
+        "strategy_id": strategy_id,
+        "strategy_vid": 3,
+        "priority": 0,
+    }
+    svc._repo.queued_position.return_value = 2
+
+    resp = svc.reenqueue("user-uuid", src_id)
+
+    kwargs = svc._repo.sp_ins_queue.call_args.kwargs
+    assert kwargs["priority"] == 0
+    assert kwargs["strategy_id"] == strategy_id
+    assert kwargs["strategy_vid"] == 3
+    assert resp.queue_id != src_id
+    assert resp.queue_pos == 2
+    svc._refdata.resolve_queue_priority.assert_not_called()

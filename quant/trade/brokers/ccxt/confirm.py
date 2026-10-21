@@ -9,6 +9,7 @@ from quant.trade.brokers.ccxt.gateway import CcxtTradeGateway
 from quant.trade.errors import BrokerConnectionError, OrderNotFoundError
 from quant.trade.models.order import OrderRejectReason, OrderRequest, OrderResult
 
+
 @dataclass(frozen=True)
 class _FillStatus:
     """Parsed terminal state from a ccxt order dict — NOT an OrderResult."""

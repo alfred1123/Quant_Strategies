@@ -208,10 +208,6 @@ class JobsService:
         max_queued = self._refdata.setting_int("max_queued_per_user")
         if self._repo.sp_get_queued_count(user_id, queued_id) >= max_queued:
             raise RateLimitError(max_queued)
-        try:
-            priority = self._refdata.resolve_queue_priority(req.priority)
-        except RuntimeError as exc:
-            raise UnknownPriority(str(exc)) from exc
 
         new_queue_id = uuid.uuid4()
         self._repo.sp_ins_queue(
