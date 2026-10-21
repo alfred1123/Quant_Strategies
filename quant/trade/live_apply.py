@@ -24,7 +24,7 @@ from quant.trade.bar_source import PriceBarServiceFactory, resolve_signal_source
 from quant.trade.errors import AdapterNotFoundError, TradeValidationError
 from quant.trade.models.order import IntendedAction, OrderResult
 from quant.trade.db_repo import TradeRepo
-from quant.trade.order_policy import OrderRetryExecutor, OrderRetryResult
+from quant.trade.order_policy import OrderRetryExecutor, OrderRetryPolicy, OrderRetryResult
 from quant.trade.registry import AdapterRegistry
 from quant.trade.schedule_policy import fitted_interval_id
 
@@ -46,9 +46,6 @@ def _as_utc(data_as_of: str) -> datetime:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=UTC)
     return parsed.astimezone(UTC)
-
-# Used only when INST.PRODUCT.CCY is not populated for the instrument.
-_FALLBACK_SETTLEMENT_CCY = "USDT"
 
 
 class LiveApplyOrchestrator:
@@ -73,7 +70,12 @@ class LiveApplyOrchestrator:
         self._adapter_registry = adapter_registry
         self._data_caches = data_caches
         self._price_bars = price_bars
-        self._retry_executor = retry_executor or OrderRetryExecutor()
+        self._retry_executor = retry_executor or OrderRetryExecutor(
+            OrderRetryPolicy(
+                max_attempts=data_caches.refdata.setting_int("order_max_attempts"),
+                backoff_s=data_caches.refdata.setting_float("order_retry_backoff_s"),
+            )
+        )
         self._alert_formatter = alert_formatter or TradeAlertFormatter()
         self._notifier = notifier or Notifier.from_env()
 
@@ -323,11 +325,12 @@ class LiveApplyOrchestrator:
         ccy = (product or {}).get("ccy")
         if ccy:
             return ccy
+        fallback = self._data_caches.refdata.setting("fallback_settlement_ccy")
         logger.warning(
             "no CCY on INST.PRODUCT for %s — falling back to %s",
-            internal_cusip, _FALLBACK_SETTLEMENT_CCY,
+            internal_cusip, fallback,
         )
-        return _FALLBACK_SETTLEMENT_CCY
+        return fallback
 
     def _send_failure_alert(
         self,

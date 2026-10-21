@@ -25,6 +25,7 @@ from quant.api.services.jobs import (
     RateLimitError,
     ReenqueueNotAllowed,
     StrategyNameMismatch,
+    UnknownPriority,
 )
 from quant.api.routers.strategies import get_strategies_service
 from quant.api.services.strategies import StrategiesService, StrategyNotFound
@@ -73,7 +74,7 @@ def enqueue(
 ) -> EnqueueResponse:
     try:
         return svc.enqueue(str(user.app_user_id), req)
-    except StrategyNameMismatch as exc:
+    except (StrategyNameMismatch, UnknownPriority) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except RateLimitError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc

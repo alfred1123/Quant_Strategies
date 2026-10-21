@@ -10,13 +10,11 @@ from uuid import UUID
 
 from quant.api.credentials.repo import ApiCredentialRepo
 from quant.queue.repo import BtQueueRepo
+from quant.refdata.reader import RedisRefData
 from quant.shared.db import DbGateway, require_arg
 from quant.trade.errors import TradeValidationError
 
 logger = logging.getLogger(__name__)
-
-# DEPLOYMENT_SCHEDULE_STATUS.STATUS has no DB check constraint — enforced here.
-SCHEDULE_STATUSES = frozenset({"PENDING", "SUCCESS", "FAILED"})
 
 
 def _require(value: Any, name: str) -> None:
@@ -37,11 +35,17 @@ class TradeRepo(DbGateway):
     """TRADE.DEPLOYMENT / EXECUTION_EVENT / TRANSACTION — validates then CALLs SPs."""
 
     def __init__(
-        self, conninfo: str, bt: BtQueueRepo, credentials: ApiCredentialRepo, **kwargs
+        self,
+        conninfo: str,
+        bt: BtQueueRepo,
+        credentials: ApiCredentialRepo,
+        refdata: RedisRefData,
+        **kwargs,
     ) -> None:
         super().__init__(conninfo, **kwargs)
         self._bt = bt
         self._credentials = credentials
+        self._refdata = refdata
 
     # ── validation reads (via the owning repos' procedures) ───────────
 
@@ -262,10 +266,12 @@ class TradeRepo(DbGateway):
             user_id=user_id,
         )
 
-        if status not in SCHEDULE_STATUSES:
-            raise TradeValidationError(
-                f"status must be one of {sorted(SCHEDULE_STATUSES)}"
-            )
+        # DEPLOYMENT_SCHEDULE_STATUS.STATUS has no DB check constraint; the
+        # catalog is REFDATA.SCHEDULE_STATUS.
+        try:
+            self._refdata.validate_schedule_status(status)
+        except RuntimeError as exc:
+            raise TradeValidationError(f"status must be one of {exc}") from exc
         if status == "PENDING" and scheduled_ts is None:
             raise TradeValidationError(
                 "scheduled_ts is required when status is PENDING — it is the next due time"

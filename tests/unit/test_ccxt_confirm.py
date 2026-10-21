@@ -10,6 +10,9 @@ from quant.trade.brokers.ccxt.confirm import (
 from quant.trade.errors import BrokerConnectionError, OrderNotFoundError
 from quant.trade.models.order import OrderRejectReason, OrderRequest, OrderSide
 
+#: The seeded CONFIG.SETTING fill_confirm_delays_s.
+_DELAYS = (0.3, 0.6, 1.2, 2.4, 3.5)
+
 
 class TestExtractFee:
     def test_dict_fee(self):
@@ -96,7 +99,7 @@ class TestConfirmMarketOrder:
             "average": 64000.0, "fee": {"cost": 0.256, "currency": "BTC"},
         }
         req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
-        result = confirm_market_order(gw, req=req, vendor_order_id="abc")
+        result = confirm_market_order(gw, req=req, vendor_order_id="abc", delays_s=_DELAYS)
 
         assert result.success is True
         assert result.filled_qty == 0.01
@@ -115,7 +118,7 @@ class TestConfirmMarketOrder:
             {"id": "abc", "status": "closed", "filled": 0.01, "average": 65000.0},
         ]
         req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.SELL)
-        result = confirm_market_order(gw, req=req, vendor_order_id="abc")
+        result = confirm_market_order(gw, req=req, vendor_order_id="abc", delays_s=_DELAYS)
 
         assert result.success is True
         assert result.side == OrderSide.SELL
@@ -126,7 +129,7 @@ class TestConfirmMarketOrder:
         gw = MagicMock()
         gw.fetch_order.return_value = {"id": "abc", "status": "open", "filled": 0}
         req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
-        result = confirm_market_order(gw, req=req, vendor_order_id="abc")
+        result = confirm_market_order(gw, req=req, vendor_order_id="abc", delays_s=_DELAYS)
 
         assert result.success is False
         assert "unconfirmed" in result.message
@@ -142,7 +145,7 @@ class TestConfirmMarketOrder:
             {"id": "abc", "status": "closed", "filled": 0.01, "average": 64000.0},
         ]
         req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
-        result = confirm_market_order(gw, req=req, vendor_order_id="abc")
+        result = confirm_market_order(gw, req=req, vendor_order_id="abc", delays_s=_DELAYS)
 
         assert result.success is True
 
@@ -151,7 +154,7 @@ class TestConfirmMarketOrder:
         gw = MagicMock()
         gw.fetch_order.side_effect = BrokerConnectionError("auth failed")
         req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
-        result = confirm_market_order(gw, req=req, vendor_order_id="abc")
+        result = confirm_market_order(gw, req=req, vendor_order_id="abc", delays_s=_DELAYS)
 
         assert result.success is False
         assert "auth failed" in result.message

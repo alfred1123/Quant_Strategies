@@ -47,10 +47,9 @@ The default home for a value is the database. Values live in reference or config
 |---|---|---|
 | `quant/strategy/optimizer.py` | `OPTUNA_MAX_TRIALS = 10_000`, `OPTUNA_SEED = 42` | Search budget and seed are research settings, fixed in code. |
 | `quant/strategy/optimizer.py`, `_build_result` | `sorted_df.head(10)` (the `top10` result size) | Result size is a literal, and the field name `top10` bakes it into the API schema. |
-| `quant/trade/live_apply.py` | `_FALLBACK_SETTLEMENT_CCY = "USDT"` | A live-trading currency guessed in code when `INST.PRODUCT.CCY` is empty. Also a fallback path, which rule 2 forbids. |
 | `quant/queue/worker_loop.py`, `WorkerLoop` | `DEFAULT_JOB_TIMEOUT_S = 6000`, `BLPOP_TIMEOUT_S = 30`, `DRAIN_TIMEOUT_S = 30`, `CANCEL_GRACE_S = 10`, `WAKE_SOCKET_MARGIN_S = 5` | The job timeout is a business limit with an env override defaulting to a code constant. The other timings are process tuning with no config at all. |
 
-Other module constants of the same shape should be classified the same way when their module is next changed, for example `DEFAULT_RETRY_BACKOFF_S` in `quant/trade/scheduler/tick.py` and `DEFAULT_SETTLE_S`, which is defined twice (`quant/market_data/warm.py` and `quant/trade/scheduler/sweep.py`).
+Other module constants of the same shape should be classified the same way when their module is next changed, for example `DEFAULT_SETTLE_S`, which is defined twice (`quant/market_data/warm.py` and `quant/trade/scheduler/sweep.py`). The scalar knobs already moved — `min_metric_obs`, `max_queued_per_user`, `default_tm_interval_id`, `fallback_settlement_ccy`, the order and tick retry budgets, and the fill-confirm poll schedule — live in `CONFIG.SETTING` and are read through `RedisRefData.setting*` (decision #111). `fallback_settlement_ccy` is still a fallback path; the row only moves the value out of code.
 
 ### 4. Thorough testing
 

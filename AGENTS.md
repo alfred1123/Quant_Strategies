@@ -110,6 +110,9 @@ All UI dropdown, radio, and selectbox values must come from `REFDATA` tables in 
 | Promotion rules (gates + soft metrics) | `CONFIG.PROMOTION_METRIC` | `DISPLAY_NAME` | `NAME` (also `METRIC_KEY`, `REQUIREMENT_TYPE`, `PRIORITY`, `THRESHOLD`) |
 | Listing session calendar | `REFDATA.MARKET_CALENDAR` | — | `LISTING_EXCHANGE`, `BAR_TIMEZONE`, `MARKET_*` (via `get_market_calendar()`; `''` = default crypto; not a UI dropdown) |
 | Scheduled apply offset (broker × cadence) | `CONFIG.APP_APPLY_TIMING` | — | `EXECUTE_OFFSET` (via `get_execute_offset()` / `get_apply_timing()`) |
+| Scalar platform knobs (metric floor, queue cap, retry budgets, confirm poll schedule, settlement fallback, default cadence) | `CONFIG.SETTING` | — | `SETTING_VALUE` by `SETTING_NM` (via `setting()` / `setting_int()` / `setting_float()` / `setting_floats()`; missing row is an error, never a code default) |
+| Queue priority label | `REFDATA.QUEUE_PRIORITY` | `DISPLAY_NAME` | `NAME` → `PRIORITY` (via `resolve_queue_priority()`) |
+| Schedule status | `REFDATA.SCHEDULE_STATUS` | `DISPLAY_NAME` | `NAME` (via `validate_schedule_status()`) |
 
 Grid defaults come from `REFDATA.INDICATOR` via `RedisRefData.get_indicator_defaults()` (`quant/refdata/reader.py`).
 

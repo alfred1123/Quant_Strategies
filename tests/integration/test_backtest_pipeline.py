@@ -42,7 +42,7 @@ class TestFullBacktestPipeline:
 
     def test_sma_momentum_pipeline(self, synthetic_market_data):
         config = StrategyConfig("test", "get_sma", SignalDirection.momentum_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 0.5)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 0.5, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -52,7 +52,7 @@ class TestFullBacktestPipeline:
 
     def test_ema_reversion_pipeline(self, synthetic_market_data):
         config = StrategyConfig("test", "get_ema", SignalDirection.reversion_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 15, 1.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 15, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -60,7 +60,7 @@ class TestFullBacktestPipeline:
 
     def test_bollinger_momentum_pipeline(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         strat_perf = perf.get_strategy_performance()
         bh_perf = perf.get_buy_hold_performance()
@@ -72,7 +72,7 @@ class TestFullBacktestPipeline:
 
     def test_rsi_momentum_pipeline(self, synthetic_market_data):
         config = StrategyConfig("test", "get_rsi", SignalDirection.momentum_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 30.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 30.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -83,7 +83,7 @@ class TestParameterOptimizationPipeline:
 
     def test_grid_search_produces_results(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
-        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config, min_metric_obs=60)
         windows = (10, 20, 30)
         signals = (0.5, 1.0, 1.5)
         results = opt.optimize(windows, signals)
@@ -94,7 +94,7 @@ class TestParameterOptimizationPipeline:
 
     def test_grid_search_can_pivot_to_heatmap(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
-        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config, min_metric_obs=60)
         results = opt.optimize((10, 20), (0.5, 1.0))
         pivot = results.grid_df.pivot(index="window", columns="signal", values="sharpe")
         assert pivot.shape == (2, 2)
@@ -106,7 +106,7 @@ class TestStrategyVsBuyHoldConsistency:
 
     def test_buy_hold_cumulative_matches_total_return(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         total = perf.get_buy_hold_total_return()
         cumu_last = perf.data["buy_hold_cumu"].iloc[-1]
@@ -114,7 +114,7 @@ class TestStrategyVsBuyHoldConsistency:
 
     def test_strategy_cumulative_matches_total_return(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         total = perf.get_total_return()
         cumu_last = perf.data["cumu"].iloc[-1]
@@ -122,7 +122,7 @@ class TestStrategyVsBuyHoldConsistency:
 
     def test_max_drawdown_within_cumulative_range(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         max_dd = perf.get_max_drawdown()
         cumu_range = perf.data["cumu"].max() - perf.data["cumu"].min()
@@ -134,7 +134,7 @@ class TestRemainingIndicatorStrategyCombos:
 
     def test_sma_reversion_pipeline(self, synthetic_market_data):
         config = StrategyConfig("test", "get_sma", SignalDirection.reversion_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 0.5)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 0.5, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -142,7 +142,7 @@ class TestRemainingIndicatorStrategyCombos:
 
     def test_ema_momentum_pipeline(self, synthetic_market_data):
         config = StrategyConfig("test", "get_ema", SignalDirection.momentum_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 15, 1.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 15, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -150,7 +150,7 @@ class TestRemainingIndicatorStrategyCombos:
 
     def test_bollinger_reversion_pipeline(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.reversion_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -158,7 +158,7 @@ class TestRemainingIndicatorStrategyCombos:
 
     def test_rsi_reversion_pipeline(self, synthetic_market_data):
         config = StrategyConfig("test", "get_rsi", SignalDirection.reversion_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 30.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 30.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -166,14 +166,14 @@ class TestRemainingIndicatorStrategyCombos:
 
     def test_stochastic_momentum_pipeline(self, synthetic_market_data):
         config = StrategyConfig("test", "get_stochastic_oscillator", SignalDirection.momentum_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 20.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 20.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
 
     def test_stochastic_reversion_pipeline(self, synthetic_market_data):
         config = StrategyConfig("test", "get_stochastic_oscillator", SignalDirection.reversion_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 20.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 20.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -184,7 +184,7 @@ class TestBoundedSignalPipeline:
 
     def test_rsi_momentum_bounded(self, synthetic_market_data):
         config = StrategyConfig("test", "get_rsi", SignalDirection.momentum_bounded_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 70.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 70.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -192,7 +192,7 @@ class TestBoundedSignalPipeline:
 
     def test_rsi_reversion_bounded(self, synthetic_market_data):
         config = StrategyConfig("test", "get_rsi", SignalDirection.reversion_bounded_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 70.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 70.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -200,21 +200,21 @@ class TestBoundedSignalPipeline:
 
     def test_stochastic_momentum_bounded(self, synthetic_market_data):
         config = StrategyConfig("test", "get_stochastic_oscillator", SignalDirection.momentum_bounded_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 80.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 80.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
 
     def test_stochastic_reversion_bounded(self, synthetic_market_data):
         config = StrategyConfig("test", "get_stochastic_oscillator", SignalDirection.reversion_bounded_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 80.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 14, 80.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
 
     def test_bounded_param_opt(self, synthetic_market_data):
         config = StrategyConfig("test", "get_rsi", SignalDirection.momentum_bounded_signal, 252)
-        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config, min_metric_obs=60)
         results = opt.optimize((10, 14), (60.0, 70.0))
         assert len(results.grid_df) == 4
         assert results.grid_df["sharpe"].notna().all()
@@ -227,10 +227,12 @@ class TestTransactionCostPipeline:
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
         perf_zero = Performance(
             {"test": synthetic_market_data.copy()}, config, 20, 1.0, fee_bps=0,
+            min_metric_obs=60,
         )
         perf_zero.enrich_performance()
         perf_high = Performance(
             {"test": synthetic_market_data.copy()}, config, 20, 1.0, fee_bps=50,
+            min_metric_obs=60,
         )
         perf_high.enrich_performance()
         assert perf_zero.get_total_return() >= perf_high.get_total_return()
@@ -239,6 +241,7 @@ class TestTransactionCostPipeline:
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
         perf = Performance(
             {"test": synthetic_market_data.copy()}, config, 20, 1.0, fee_bps=0,
+            min_metric_obs=60,
         )
         perf.enrich_performance()
         # With zero fees, pnl = position_x1 * chg (no cost adjustment)
@@ -251,11 +254,13 @@ class TestTransactionCostPipeline:
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
         opt_zero = ParametersOptimization(
             {"test": synthetic_market_data.copy()}, config, fee_bps=0,
+            min_metric_obs=60,
         )
         results_zero = opt_zero.optimize((20,), (1.0,))
 
         opt_high = ParametersOptimization(
             {"test": synthetic_market_data.copy()}, config, fee_bps=50,
+            min_metric_obs=60,
         )
         results_high = opt_high.optimize((20,), (1.0,))
 
@@ -268,11 +273,11 @@ class TestTradingPeriodVariants:
 
     def test_crypto_vs_equity_sharpe_differs(self, synthetic_market_data):
         config_crypto = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 365)
-        perf_crypto = Performance({"test": synthetic_market_data.copy()}, config_crypto, 20, 1.0)
+        perf_crypto = Performance({"test": synthetic_market_data.copy()}, config_crypto, 20, 1.0, min_metric_obs=60)
         perf_crypto.enrich_performance()
 
         config_equity = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
-        perf_equity = Performance({"test": synthetic_market_data.copy()}, config_equity, 20, 1.0)
+        perf_equity = Performance({"test": synthetic_market_data.copy()}, config_equity, 20, 1.0, min_metric_obs=60)
         perf_equity.enrich_performance()
 
         # Same daily data but different annualization → different Sharpe
@@ -282,7 +287,7 @@ class TestTradingPeriodVariants:
 
     def test_crypto_annualized_return_uses_365(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 365)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         ann_ret = perf.get_annualized_return()
         pnl = perf.data.iloc[20:]['pnl']
@@ -303,7 +308,7 @@ class TestEdgeCases:
             "High": prices + 1, "Low": prices - 1,
         }, index=pd.date_range("2020-01-01", periods=n, freq="D", name="datetime"))
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
-        perf = Performance({"test": df}, config, 20, 1.0)
+        perf = Performance({"test": df}, config, 20, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -318,7 +323,7 @@ class TestEdgeCases:
             "High": prices, "Low": prices,
         }, index=pd.date_range("2020-01-01", periods=n, freq="D", name="datetime"))
         config = StrategyConfig("test", "get_sma", SignalDirection.momentum_band_signal, 252)
-        perf = Performance({"test": df}, config, 10, 0.5)
+        perf = Performance({"test": df}, config, 10, 0.5, min_metric_obs=60)
         perf.enrich_performance()
         # No price change → zero PnL
         assert perf.get_total_return() == pytest.approx(0.0)
@@ -335,7 +340,7 @@ class TestEdgeCases:
             "High": prices + 5, "Low": prices - 5,
         }, index=pd.date_range("2020-01-01", periods=n, freq="D", name="datetime"))
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
-        perf = Performance({"test": df}, config, 20, 1.0)
+        perf = Performance({"test": df}, config, 20, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -426,7 +431,7 @@ class TestWalkForwardPipeline:
 
     def test_walk_forward_full_pipeline(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
-        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config)
+        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config, min_metric_obs=60)
         result = wf.run((10, 20, 30), (0.5, 1.0, 1.5))
 
         assert isinstance(result, WalkForwardResult)
@@ -437,7 +442,7 @@ class TestWalkForwardPipeline:
 
     def test_walk_forward_summary_table(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
-        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config)
+        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config, min_metric_obs=60)
         result = wf.run((20,), (1.0,))
         summary = result.summary()
 
@@ -451,7 +456,7 @@ class TestWalkForwardPipeline:
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
         results = {}
         for ratio in (0.3, 0.5, 0.7):
-            wf = WalkForward({"test": synthetic_market_data.copy()}, ratio, config)
+            wf = WalkForward({"test": synthetic_market_data.copy()}, ratio, config, min_metric_obs=60)
             results[ratio] = wf.run((20,), (1.0,))
 
         # All should complete without error
@@ -462,11 +467,13 @@ class TestWalkForwardPipeline:
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 252)
         wf_no_fee = WalkForward(
             {"test": synthetic_market_data.copy()}, 0.5, config, fee_bps=0,
+            min_metric_obs=60,
         )
         result_no_fee = wf_no_fee.run((20,), (1.0,))
 
         wf_fee = WalkForward(
             {"test": synthetic_market_data.copy()}, 0.5, config, fee_bps=50,
+            min_metric_obs=60,
         )
         result_fee = wf_fee.run((20,), (1.0,))
 
@@ -476,7 +483,7 @@ class TestWalkForwardPipeline:
     def test_walk_forward_crypto_period(self, synthetic_market_data):
         """Walk-forward should work with crypto trading period (365)."""
         config = StrategyConfig("test", "get_bollinger_band", SignalDirection.momentum_band_signal, 365)
-        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config)
+        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config, min_metric_obs=60)
         result = wf.run((20,), (1.0,))
         assert isinstance(result, WalkForwardResult)
         assert np.isfinite(result.is_metrics["Annualized Return"])
@@ -526,7 +533,7 @@ class TestStrategyConfigPipeline:
     def test_config_full_pipeline(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band",
                                 SignalDirection.momentum_band_signal, 252)
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -536,7 +543,7 @@ class TestStrategyConfigPipeline:
     def test_config_grid_search(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band",
                                 SignalDirection.momentum_band_signal, 252)
-        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config, min_metric_obs=60)
         results = opt.optimize((10, 20), (0.5, 1.0))
         assert len(results.grid_df) == 4
         assert results.grid_df["sharpe"].notna().all()
@@ -544,7 +551,7 @@ class TestStrategyConfigPipeline:
     def test_config_walk_forward(self, synthetic_market_data):
         config = StrategyConfig("test", "get_bollinger_band",
                                 SignalDirection.momentum_band_signal, 252)
-        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config)
+        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config, min_metric_obs=60)
         result = wf.run((10, 20), (0.5, 1.0))
         assert isinstance(result, WalkForwardResult)
         assert result.best_window in (10, 20)
@@ -554,15 +561,15 @@ class TestStrategyConfigPipeline:
         config = StrategyConfig("test", "get_sma",
                                 SignalDirection.reversion_band_signal, 365)
 
-        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 0.5)
+        perf = Performance({"test": synthetic_market_data.copy()}, config, 20, 0.5, min_metric_obs=60)
         perf.enrich_performance()
         assert isinstance(perf.get_strategy_performance(), pd.Series)
 
-        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, config, min_metric_obs=60)
         results = list(opt.optimize((20,), (0.5,)).grid_df.itertuples(index=False))
         assert len(results) == 1
 
-        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config)
+        wf = WalkForward({"test": synthetic_market_data.copy()}, 0.5, config, min_metric_obs=60)
         wf_result = wf.run((20,), (0.5,))
         assert isinstance(wf_result, WalkForwardResult)
 
@@ -576,7 +583,7 @@ class TestStrategyConfigSinglePipeline:
             SignalDirection.momentum_band_signal, 252,
             window=20, signal=1.0
         )
-        perf = Performance({"test": synthetic_market_data.copy()}, cfg, 20, 1.0)
+        perf = Performance({"test": synthetic_market_data.copy()}, cfg, 20, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -592,9 +599,9 @@ class TestStrategyConfigSinglePipeline:
             SignalDirection.momentum_band_signal, 252,
             window=20, signal=1.0, strategy_id="same"
         )
-        perf_legacy = Performance({"test": synthetic_market_data.copy()}, legacy, 20, 1.0)
+        perf_legacy = Performance({"test": synthetic_market_data.copy()}, legacy, 20, 1.0, min_metric_obs=60)
         perf_legacy.enrich_performance()
-        perf_single = Performance({"test": synthetic_market_data.copy()}, single, 20, 1.0)
+        perf_single = Performance({"test": synthetic_market_data.copy()}, single, 20, 1.0, min_metric_obs=60)
         perf_single.enrich_performance()
         pd.testing.assert_series_equal(
             perf_legacy.get_strategy_performance(),
@@ -606,7 +613,7 @@ class TestStrategyConfigSinglePipeline:
             "test", "get_sma", SignalDirection.reversion_band_signal, 252,
             window=20, signal=0.5
         )
-        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, cfg)
+        opt = ParametersOptimization({"test": synthetic_market_data.copy()}, cfg, min_metric_obs=60)
         results = opt.optimize((10, 20), (0.5, 1.0))
         assert len(results.grid_df) == 4
 
@@ -620,7 +627,7 @@ class TestJsonSerializationPipeline:
             SignalDirection.momentum_band_signal, 365,
             window=20, signal=1.0, strategy_id="json-test"
         )
-        perf = Performance({"btc-usd": synthetic_market_data.copy()}, cfg, 20, 1.0)
+        perf = Performance({"btc-usd": synthetic_market_data.copy()}, cfg, 20, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         strat_json = strategy_to_json(cfg)
         bt_json = backtest_results_to_json(
@@ -680,7 +687,7 @@ class TestMultiFactorPipeline:
             "test", "get_sma", SignalDirection.momentum_band_signal, 252,
             conjunction="AND", substrategies=(sub_a, sub_b),
         )
-        perf = Performance({"test": multi_factor_market_data.copy()}, config)
+        perf = Performance({"test": multi_factor_market_data.copy()}, config, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -698,7 +705,7 @@ class TestMultiFactorPipeline:
             "test", "get_sma", SignalDirection.momentum_band_signal, 252,
             conjunction="OR", substrategies=(sub_a, sub_b),
         )
-        perf = Performance({"test": multi_factor_market_data.copy()}, config)
+        perf = Performance({"test": multi_factor_market_data.copy()}, config, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -717,9 +724,9 @@ class TestMultiFactorPipeline:
             "test", "get_sma", SignalDirection.momentum_band_signal, 252,
             conjunction="OR", substrategies=(sub_a, sub_b),
         )
-        perf_and = Performance({"test": multi_factor_market_data.copy()}, config_and)
+        perf_and = Performance({"test": multi_factor_market_data.copy()}, config_and, min_metric_obs=60)
         perf_and.enrich_performance()
-        perf_or = Performance({"test": multi_factor_market_data.copy()}, config_or)
+        perf_or = Performance({"test": multi_factor_market_data.copy()}, config_or, min_metric_obs=60)
         perf_or.enrich_performance()
         assert perf_and.get_buy_hold_total_return() == pytest.approx(
             perf_or.get_buy_hold_total_return(), abs=1e-10
@@ -756,7 +763,7 @@ class TestMultiFactorGridSearch:
             "test", "get_sma", SignalDirection.momentum_band_signal, 252,
             conjunction="AND", substrategies=(sub_a, sub_b),
         )
-        opt = ParametersOptimization({"test": multi_factor_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": multi_factor_market_data.copy()}, config, min_metric_obs=60)
         results = opt.optimize_multi(
             [(10, 20), (10, 20)],
             [(0.5, 1.0), (0.5,)],
@@ -774,7 +781,7 @@ class TestMultiFactorGridSearch:
             "test", "get_sma", SignalDirection.momentum_band_signal, 252,
             conjunction="OR", substrategies=(sub_a, sub_b),
         )
-        opt = ParametersOptimization({"test": multi_factor_market_data.copy()}, config)
+        opt = ParametersOptimization({"test": multi_factor_market_data.copy()}, config, min_metric_obs=60)
         results = opt.optimize_multi(
             [(10, 20), (10, 20)],
             [(0.5,), (0.5,)],
@@ -791,9 +798,11 @@ class TestMultiFactorGridSearch:
         )
         opt_zero = ParametersOptimization(
             {"test": multi_factor_market_data.copy()}, config, fee_bps=0,
+            min_metric_obs=60,
         )
         opt_high = ParametersOptimization(
             {"test": multi_factor_market_data.copy()}, config, fee_bps=50.0,
+            min_metric_obs=60,
         )
         r_zero = opt_zero.optimize_multi(
             [(10,), (20,)], [(0.5,), (0.5,)],
@@ -842,7 +851,7 @@ class TestCrossProductPipeline:
             "btc-usd", "get_sma", SignalDirection.momentum_band_signal, 365,
             substrategies=(sub,),
         )
-        perf = Performance(cross_product_data, config, 20, 1.0)
+        perf = Performance(cross_product_data, config, 20, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -858,7 +867,7 @@ class TestCrossProductPipeline:
             "btc-usd", "get_sma", SignalDirection.momentum_band_signal, 365,
             conjunction="AND", substrategies=(sub_btc, sub_eth),
         )
-        perf = Performance(cross_product_data, config)
+        perf = Performance(cross_product_data, config, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -875,7 +884,7 @@ class TestCrossProductPipeline:
             "btc-usd", "get_sma", SignalDirection.momentum_band_signal, 365,
             substrategies=(sub,),
         )
-        opt = ParametersOptimization(cross_product_data, config)
+        opt = ParametersOptimization(cross_product_data, config, min_metric_obs=60)
         results = opt.optimize((10, 20), (0.5, 1.0))
         assert len(results.grid_df) == 4
         assert results.grid_df["sharpe"].notna().all()
@@ -888,7 +897,7 @@ class TestCrossProductPipeline:
             "btc-usd", "get_sma", SignalDirection.momentum_band_signal, 365,
             substrategies=(sub,),
         )
-        wf = WalkForward(cross_product_data, 0.5, config)
+        wf = WalkForward(cross_product_data, 0.5, config, min_metric_obs=60)
         result = wf.run((10, 20), (0.5, 1.0))
         assert isinstance(result, WalkForwardResult)
         assert result.best_window in (10, 20)

@@ -3,8 +3,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from quant.api.schemas.jobs import MAX_QUEUED_PER_USER
 from scripts.rerun_results import parse_args, rerun_user, stale_versions
+
+MAX_QUEUED_PER_USER = 30
 
 CUTOVER = datetime(2026, 9, 21, tzinfo=timezone.utc)
 OLD = CUTOVER - timedelta(days=30)
@@ -52,7 +53,10 @@ class TestStaleVersions:
 
 class TestRerunUser:
     def _run(self, repo, **overrides):
-        kwargs = dict(user_id="u", cutover=CUTOVER, priority=100, dry_run=False)
+        kwargs = dict(
+            user_id="u", cutover=CUTOVER, priority=100,
+            max_queued=MAX_QUEUED_PER_USER, dry_run=False,
+        )
         kwargs.update(overrides)
         return rerun_user(repo, MagicMock(), 10, **kwargs)
 
@@ -110,12 +114,12 @@ class TestRerunUser:
         repo = _repo([_strategy(1, "a")], {("sid-a", 1): OLD})
         client = MagicMock()
         rerun_user(repo, client, 10, user_id="u", cutover=CUTOVER,
-                   priority=100, dry_run=False)
+                   priority=100, max_queued=MAX_QUEUED_PER_USER, dry_run=False)
         client.lpush.assert_called_once()
 
         quiet = MagicMock()
         rerun_user(repo, quiet, 10, user_id="u", cutover=CUTOVER,
-                   priority=100, dry_run=True)
+                   priority=100, max_queued=MAX_QUEUED_PER_USER, dry_run=True)
         quiet.lpush.assert_not_called()
 
 

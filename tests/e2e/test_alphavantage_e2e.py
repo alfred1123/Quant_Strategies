@@ -110,6 +110,7 @@ class TestFullPipelineE2E:
         perf = Performance(
             ta.data, 252, ta.get_sma,
             SignalDirection.momentum_band_signal, 20, 0.5,
+            min_metric_obs=60,
         )
         result = perf.get_strategy_performance()
 
@@ -123,6 +124,7 @@ class TestFullPipelineE2E:
         perf = Performance(
             ta.data, 252, ta.get_bollinger_band,
             SignalDirection.reversion_band_signal, 20, 1.0,
+            min_metric_obs=60,
         )
         result = perf.get_strategy_performance()
 
@@ -134,6 +136,7 @@ class TestFullPipelineE2E:
         perf = Performance(
             ta.data, 252, ta.get_sma,
             SignalDirection.momentum_band_signal, 20, 0.5,
+            min_metric_obs=60,
         )
         bh = perf.get_buy_hold_performance()
 
