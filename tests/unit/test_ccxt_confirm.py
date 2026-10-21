@@ -2,13 +2,16 @@
 
 from unittest.mock import MagicMock, patch
 
+import ccxt
 import pytest
 
+from quant.trade.brokers.ccxt.config import CCXT_PRESETS
 from quant.trade.brokers.ccxt.confirm import (
     _extract_fee,
     _parse_terminal,
     confirm_market_order,
 )
+from quant.trade.brokers.ccxt.gateway import CcxtSessionConfig, CcxtTradeGateway
 from quant.trade.errors import (
     BrokerAuthError,
     BrokerConnectionError,
@@ -183,9 +186,10 @@ class TestConfirmMarketOrder:
         result = confirm_market_order(gw, req=req, vendor_order_id="ord-untyped-9")
 
         assert result.success is False
-        assert result.message == ""
         assert result.reason is None
         assert result.vendor_order_id == "ord-untyped-9"
+        assert "fill unconfirmed" in result.message
+        assert result.message != str(exc)
 
 
 class _ConfirmingAdapter:
@@ -212,6 +216,35 @@ class _ConfirmingAdapter:
         return OrderResult(
             success=True, vendor_order_id=vendor_order_id, message="order canceled",
         )
+
+
+def _assert_no_second_place_without_that_cancel(
+    calls: list[tuple[str, str | None]],
+    vendor_order_id: str,
+    actual_reason: OrderRejectReason | None,
+    actual_id: str | None,
+) -> None:
+    """A second ``place_order`` is legal only after ``cancel_order`` of this id."""
+    cancelled = False
+    seen_place = False
+    naked: list[int] = []
+    for index, (name, oid) in enumerate(calls):
+        if name == "cancel_order" and oid == vendor_order_id:
+            cancelled = True
+        elif name == "place_order":
+            if seen_place and not cancelled:
+                naked.append(index)
+            seen_place = True
+            cancelled = False
+    assert (
+        vendor_order_id != "1"
+        and actual_reason is None
+        and actual_id == vendor_order_id
+        and seen_place
+        and not naked
+    ), (
+        f"reason={actual_reason!r} id={actual_id!r} naked={naked!r} calls={calls!r}"
+    )
 
 
 def _assert_kept_reason_and_did_not_replace(
@@ -302,4 +335,30 @@ class TestConfirmFailureDoesNotReplace:
             vendor_order_id,
             outcome.result.reason,
             OrderRejectReason.VENUE_REJECTED,
+        )
+
+    def test_fetch_timeout_does_not_replace_without_cancel(self):
+        """An untyped ccxt timeout after an id exists must not place again naked."""
+        vendor_order_id = "ord-timeout-8588c162"
+        exchange = MagicMock()
+        exchange.fetch_order.side_effect = ccxt.RequestTimeout("timeout")
+        gateway = CcxtTradeGateway(
+            CcxtSessionConfig(
+                api_key="k", api_secret="s", preset=CCXT_PRESETS["bybit"],
+            )
+        )
+        gateway._exchange = exchange
+        adapter = _ConfirmingAdapter(gateway, vendor_order_id)
+        with (
+            patch("quant.trade.brokers.ccxt.confirm.time.sleep"),
+            patch("quant.trade.order_policy.time.sleep"),
+        ):
+            outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 1.0, 0.01)
+
+        assert outcome.result is not None
+        _assert_no_second_place_without_that_cancel(
+            adapter.calls,
+            vendor_order_id,
+            outcome.result.reason,
+            outcome.result.vendor_order_id,
         )

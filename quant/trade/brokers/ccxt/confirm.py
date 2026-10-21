@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 
 from quant.trade.brokers.ccxt.gateway import CcxtTradeGateway
-from quant.trade.errors import BrokerConnectionError, OrderNotFoundError
+from quant.trade.errors import BrokerConnectionError
 from quant.trade.models.order import OrderRejectReason, OrderRequest, OrderResult
 
 _CONFIRM_DELAYS_S = (0.3, 0.6, 1.2, 2.4, 3.5)
@@ -89,15 +89,19 @@ def confirm_market_order(
 
     This is the **single point** that builds ``OrderResult`` for the fill path.
     The gateway returns raw dicts; this function owns the domain translation.
+    A typed connection error is that outcome and keeps ``exc.reason``. An
+    untyped one has not learned the fill, so the poll continues and the
+    budget's unconfirmed result is what the executor cancels before placing
+    again.
     """
     last_status: str | None = None
     for delay in _CONFIRM_DELAYS_S:
         time.sleep(delay)
         try:
             order = gateway.fetch_order(vendor_order_id, req.symbol)
-        except OrderNotFoundError:
-            continue
         except BrokerConnectionError as exc:
+            if exc.reason is None:
+                continue
             return OrderResult(
                 success=False,
                 vendor_order_id=vendor_order_id,
