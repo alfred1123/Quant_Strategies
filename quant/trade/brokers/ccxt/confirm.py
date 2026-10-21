@@ -102,6 +102,7 @@ def confirm_market_order(
                 success=False,
                 vendor_order_id=vendor_order_id,
                 message=str(exc),
+                reason=exc.reason,
                 side=req.side,
                 requested_qty=req.qty,
             )

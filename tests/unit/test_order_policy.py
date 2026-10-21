@@ -95,7 +95,7 @@ def _result(
     message: str,
     *,
     success: bool = False,
-    vendor_order_id: str | None = "1",
+    vendor_order_id: str | None = None,
     reason: OrderRejectReason | None = None,
 ) -> OrderResult:
     return OrderResult(
@@ -123,7 +123,13 @@ class TestOrderRetryPolicy:
 
     @pytest.mark.parametrize("reason", list(OrderRejectReason))
     def test_every_typed_reject_is_final_for_the_attempt(self, reason):
-        assert not self.policy.is_retryable(_result("whatever the venue said", reason=reason))
+        assert not self.policy.is_retryable(
+            _result(
+                "whatever the venue said",
+                vendor_order_id="ord-typed-77",
+                reason=reason,
+            )
+        )
 
     def test_the_policy_holds_no_copy_of_the_venue_codes(self):
         """Bybit 10005/10024 are classified in the gateway; the policy never greps them."""
@@ -143,11 +149,16 @@ class TestOrderRetryPolicy:
 
     def test_unconfirmed_retryable(self):
         assert self.policy.is_retryable(
-            _result("fill unconfirmed after 8s — vendor_order_id=abc requires manual reconciliation")
+            _result(
+                "fill unconfirmed after 8s — vendor_order_id=abc requires manual reconciliation",
+                vendor_order_id=None,
+            )
         )
 
     def test_unreachable_retryable(self):
-        assert self.policy.is_retryable(_result("broker unreachable: timeout"))
+        assert self.policy.is_retryable(
+            _result("broker unreachable: timeout", vendor_order_id=None)
+        )
 
     def test_a_reject_needing_an_operator_is_not_retryable(self):
         """Classified at the source — the policy reads the reason, not the prose."""
@@ -159,7 +170,7 @@ class TestOrderRetryPolicy:
         )
 
     def test_an_unclassified_timeout_stays_retryable(self):
-        assert self.policy.is_retryable(_result("fetch timeout"))
+        assert self.policy.is_retryable(_result("fetch timeout", vendor_order_id=None))
 
     def test_defaults(self):
         assert self.policy.max_attempts == 5
@@ -178,10 +189,18 @@ class TestApplyAttempt:
         assert attempt.buy_sell_cd == "SELL"
 
     def test_failed_attempt(self):
-        attempt = ApplyAttempt(IntendedAction.BUY, 0.0, _result("insufficient funds", reason=OrderRejectReason.INSUFFICIENT_FUNDS))
+        attempt = ApplyAttempt(
+            IntendedAction.BUY,
+            0.0,
+            _result(
+                "insufficient funds",
+                vendor_order_id="ord-attempt-42",
+                reason=OrderRejectReason.INSUFFICIENT_FUNDS,
+            ),
+        )
         assert attempt.is_success_ind == "N"
         assert attempt.quantity(0.01) == 0.01  # falls back to requested_qty
-        assert attempt.vendor_order_id == "1"
+        assert attempt.vendor_order_id == "ord-attempt-42"
 
 
 def _adapter(place_result: OrderResult | None, position_qty: float = 0.0) -> MagicMock:
@@ -241,7 +260,10 @@ class TestOrderRetryExecutor:
     @patch("quant.trade.order_policy.time.sleep")
     def test_unconfirmed_cancels_and_retries_to_exhaustion(self, mock_sleep):
         adapter = _adapter(
-            _result("fill unconfirmed after 8s requires manual reconciliation")
+            _result(
+                "fill unconfirmed after 8s requires manual reconciliation",
+                vendor_order_id="ord-unconfirmed-88",
+            )
         )
         outcome = OrderRetryExecutor(OrderRetryPolicy(max_attempts=3)).execute(
             adapter, "BTCUSDT", 1.0, 0.01
@@ -250,4 +272,8 @@ class TestOrderRetryExecutor:
         assert len(outcome.attempts) == 3
         assert outcome.max_attempts == 3
         assert adapter.cancel_order.call_count == 3
-        assert outcome.vendor_order_ids == ["1", "1", "1"]
+        assert outcome.vendor_order_ids == [
+            "ord-unconfirmed-88",
+            "ord-unconfirmed-88",
+            "ord-unconfirmed-88",
+        ]
