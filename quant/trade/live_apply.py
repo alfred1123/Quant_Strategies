@@ -239,6 +239,7 @@ class LiveApplyOrchestrator:
             fee_ccy=result.fee_ccy if result else None,
             message=result.message if result else outcome.no_order_message,
             reject_reason=result.reason if result else None,
+            cancel_failed=outcome.cancel_failed,
         )
 
     def _audit_attempts(

@@ -150,7 +150,9 @@ class ScheduleTickRunner:
     (connect, bars, signal, order), where ``OrderRetryExecutor`` retries only
     the broker order inside one. A reject carrying
     :attr:`OrderRejectReason.requires_operator_fix` pauses on the first
-    attempt; nothing about a second one would be different.
+    attempt; nothing about a second one would be different. So does a failed
+    cancel (``cancel_failed``): the venue's reason may be a label that does
+    not itself pause a place, and the order may still be open.
     """
 
     def __init__(
@@ -196,6 +198,7 @@ class ScheduleTickRunner:
                 # when the venue classified the refusal (e.g. the key admits
                 # none of our egress IPs), and that pauses like a reject would.
                 error, reason = str(exc), _reject_reason_of_exception(exc)
+                cancel_failed = False
             else:
                 failure = _failed_order(report)
                 if failure is None:
@@ -204,8 +207,11 @@ class ScheduleTickRunner:
                         position_qty=_position_of(report),
                     )
                 error, reason = failure.message, failure.reason
+                # ``is True`` so a stand-in report (a test double) is not a
+                # failed cancel. A missing attribute is not one either.
+                cancel_failed = getattr(report, "cancel_failed", False) is True
 
-            if reason is not None and reason.requires_operator_fix:
+            if (reason is not None and reason.requires_operator_fix) or cancel_failed:
                 break
             if attempt < self._max_attempts:
                 logger.warning(

@@ -44,6 +44,7 @@ def _apply_report(
     position_qty: float,
     order_success: bool | None = None,
     reject_reason: OrderRejectReason | None = None,
+    cancel_failed: bool = False,
 ) -> ApplyReport:
     """A real ApplyReport, so renaming ``position_qty`` fails here."""
     return ApplyReport(
@@ -55,6 +56,7 @@ def _apply_report(
         position_qty=position_qty,
         order_success=order_success,
         reject_reason=reject_reason,
+        cancel_failed=cancel_failed,
         message=(
             "insufficient funds" if order_success is False else "no order needed (HOLD)"
         ),
@@ -269,6 +271,50 @@ class TestAttemptBudget:
         assert apply_fn.call_count == 3
         assert report.results[0].outcome is TickOutcome.PAUSED
         assert report.results[0].error == "insufficient funds"
+
+    def test_a_key_refusal_on_place_still_spends_the_budget(self, repo):
+        """A refused key on place is not an operator-fix reason (decision #107).
+
+        A failed cancel pauses for a different fact: the order may still be
+        open. That fact is not set on this report.
+        """
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(
+            return_value=_apply_report(
+                position_qty=0.0,
+                order_success=False,
+                reject_reason=OrderRejectReason.KEY_REFUSED,
+            )
+        )
+        runner = _runner(repo, apply_fn, max_attempts=3)
+
+        report = runner.run_interval(1)
+
+        assert apply_fn.call_count == 3
+        assert report.results[0].outcome is TickOutcome.PAUSED
+        assert report.results[0].attempt == 3
+
+    def test_a_failed_cancel_that_names_a_key_refusal_pauses_on_the_first_pass(self, repo):
+        """The venue's label is KEY_REFUSED. The pause is the cancel that failed."""
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(
+            return_value=_apply_report(
+                position_qty=0.0,
+                order_success=False,
+                reject_reason=OrderRejectReason.KEY_REFUSED,
+                cancel_failed=True,
+            )
+        )
+        runner = _runner(repo, apply_fn, max_attempts=3)
+
+        report = runner.run_interval(1)
+
+        apply_fn.assert_called_once()
+        assert report.results[0].outcome is TickOutcome.PAUSED
+        assert report.results[0].attempt == 1
+        kwargs = repo.write_deployment.call_args.kwargs
+        assert kwargs["is_enabled_ind"] == "N"
+        assert kwargs["deployment_status"] == "PAUSED"
 
     def test_a_size_reject_pauses_without_spending_the_budget(self, repo):
         """Every remaining tick would place the same doomed order."""

@@ -317,7 +317,34 @@ class TestLiveApplyOrchestrator:
 
         assert report.order_success is False
         assert report.reject_reason is OrderRejectReason.SIZE_BELOW_MINIMUM
+        assert report.cancel_failed is False
         assert "min qty 0.001" in report.message
+
+    def test_a_failed_cancel_reaches_the_report(self, orchestrator):
+        """The tick pauses off ``cancel_failed``, so the report has to carry it."""
+        orch, _bt = orchestrator
+        outcome = OrderRetryResult(
+            action=IntendedAction.BUY,
+            position_qty=0.0,
+            result=OrderResult(
+                success=False,
+                vendor_order_id="ord-1",
+                message="fill unconfirmed",
+                reason=OrderRejectReason.KEY_REFUSED,
+            ),
+            attempts=(),
+            max_attempts=5,
+            permanent_failure=True,
+            cancel_failed=True,
+        )
+
+        report = orch._report(
+            _deployment(), outcome, "BTCUSDT", 1.0, bar_source="provider",
+        )
+
+        assert report.reject_reason is OrderRejectReason.KEY_REFUSED
+        assert report.cancel_failed is True
+        assert report.order_success is False
 
     @patch("quant.trade.order_policy.time.sleep")
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))

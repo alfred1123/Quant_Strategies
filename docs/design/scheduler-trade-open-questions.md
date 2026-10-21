@@ -110,9 +110,12 @@ Pre-completion aborts (missing strategy, bars, credentials) still spend the in-m
 `OrderRejectReason` whose `requires_operator_fix` is true pauses on the **first**
 failed pass. Today that is a qty under the venue's min lot or notional (the
 remaining attempts would send the identical order), and a cancel that returned
-failure (`CANCEL_FAILED`, decision #111) — the order may still be open, so the
-next apply would place again on a book that still reads flat. Everything the
-tick cannot classify keeps all 3 attempts.
+failure (decision #111). The result reports the venue's typed reason when the
+cancel carried one, and `CANCEL_FAILED` when it did not (decision #112). The
+pause is the failed cancel — the order may still be open — not the venue's
+label, so a `KEY_REFUSED` cancel pauses on the first pass while a refused key
+on place still spends the budget. Everything the tick cannot classify keeps
+all 3 attempts.
 
 **What auto-pause resolves:**
 
@@ -122,7 +125,7 @@ tick cannot classify keeps all 3 attempts.
   resumes it to `ACTIVE`, since the missed-due proc skips `PAUSED` whatever the
   kill switch says.
 
-**Current state:** `ScheduleTickRunner` auto-pauses on the last failed attempt, or on the first one when the reason's `requires_operator_fix` is true (a size the venue will not accept, or a cancel that did not succeed). It does **not** flatten the broker position — that is §6. Manual **Stop** remains a separate, explicit disable.
+**Current state:** `ScheduleTickRunner` auto-pauses on the last failed attempt, or on the first one when the reason's `requires_operator_fix` is true (a size the venue will not accept) or when the apply reports `cancel_failed` (a cancel that did not succeed, whatever venue label it carried). It does **not** flatten the broker position — that is §6. Manual **Stop** remains a separate, explicit disable.
 
 ---
 

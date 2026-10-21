@@ -140,6 +140,11 @@ class OrderRetryResult:
     attempts: tuple[ApplyAttempt, ...]
     max_attempts: int
     permanent_failure: bool
+    #: The cancel returned failure, so the order may still be resting. The
+    #: tick pauses on this even when ``result.reason`` is a venue label that
+    #: does not itself require an operator (a refused key on place still does
+    #: not — that question stays open).
+    cancel_failed: bool = False
 
     @property
     def no_order_message(self) -> str:
@@ -204,9 +209,12 @@ class OrderRetryExecutor:
 
     A cancel that returns failure is final. The call is not proof the order
     is gone: the book can still read flat while that order rests, and the
-    next place is then a second order. The result carries
-    :attr:`OrderRejectReason.CANCEL_FAILED`, which pauses the deployment
-    until someone reconciles it.
+    next place is then a second order. The result keeps the cancel's typed
+    reason when the adapter set one, and carries
+    :attr:`OrderRejectReason.CANCEL_FAILED` only when it did not. The
+    outcome's ``cancel_failed`` is what pauses the deployment: overwriting a
+    typed reason with ``CANCEL_FAILED`` would hide why the cancel was refused,
+    and a reason such as ``KEY_REFUSED`` does not itself pause a place.
 
     The returned :class:`OrderRetryResult` carries everything callers need —
     they never reach into the nested policy.
@@ -250,9 +258,16 @@ class OrderRetryExecutor:
                         vendor_symbol,
                         cancel.message,
                     )
-                    result = replace(result, reason=OrderRejectReason.CANCEL_FAILED)
+                    reason = (
+                        cancel.reason
+                        if cancel.reason is not None
+                        else OrderRejectReason.CANCEL_FAILED
+                    )
+                    result = replace(result, reason=reason)
                     attempts[-1] = ApplyAttempt(action, position_qty, result)
-                    return self._outcome(action, position_qty, result, attempts)
+                    return self._outcome(
+                        action, position_qty, result, attempts, cancel_failed=True,
+                    )
             if attempt_num >= policy.max_attempts:
                 return self._outcome(action, position_qty, result, attempts)
             time.sleep(policy.backoff_s)
@@ -265,6 +280,8 @@ class OrderRetryExecutor:
         position_qty: float,
         result: OrderResult | None,
         attempts: list[ApplyAttempt],
+        *,
+        cancel_failed: bool = False,
     ) -> OrderRetryResult:
         permanent = (
             result is not None
@@ -279,4 +296,5 @@ class OrderRetryExecutor:
             attempts=tuple(attempts),
             max_attempts=self._policy.max_attempts,
             permanent_failure=permanent,
+            cancel_failed=cancel_failed,
         )
