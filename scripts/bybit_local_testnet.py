@@ -243,8 +243,8 @@ def resolve_api_keys(conninfo: str) -> tuple[str, str]:
     app_user_id = _env_uuid("CCXT_ITEST_USER_ID")
     cred_id = _env_int("CCXT_ITEST_CREDENTIAL_ID")
     repo = ApiCredentialRepo(conninfo, user_id="bybit_local_testnet")
-    svc = CredentialService(CredentialCrypto())
-    keys = svc.decrypt_credential(repo, app_user_id, cred_id)
+    svc = CredentialService(CredentialCrypto(), repo)
+    keys = svc.decrypt_credential(app_user_id, cred_id)
     if keys is None:
         raise SystemExit(
             f"Cannot decrypt credential {cred_id} — set BYBIT_TESTNET_* / BYBIT_API_KEY "
@@ -320,9 +320,8 @@ def save_credential(conninfo: str, app_user_id: UUID) -> int:
 
     app_id = _env_int("CCXT_ITEST_APP_ID") if os.getenv("CCXT_ITEST_APP_ID") else BYBIT_APP_ID
     repo = ApiCredentialRepo(conninfo, user_id="bybit_local_testnet")
-    svc = CredentialService(CredentialCrypto())
+    svc = CredentialService(CredentialCrypto(), repo)
     row = svc.create_credential(
-        repo,
         app_user_id=app_user_id,
         app_id=app_id,
         label="Bybit testnet (local script)",
@@ -496,12 +495,12 @@ def run_snapshot(paper: bool) -> None:
     cred_id = _env_int("CCXT_ITEST_CREDENTIAL_ID")
 
     caches = _load_caches(conninfo)
+    cred_repo = ApiCredentialRepo(conninfo, user_id="bybit_local_testnet")
     snap = fetch_account_snapshot(
         app_user_id=app_user_id,
         api_credential_id=cred_id,
         paper=paper,
-        credential_service=CredentialService(CredentialCrypto()),
-        credential_repo=ApiCredentialRepo(conninfo, user_id="bybit_local_testnet"),
+        credential_service=CredentialService(CredentialCrypto(), cred_repo),
         adapter_registry=build_default_registry(caches.refdata),
         data_caches=caches,
     )
@@ -884,9 +883,11 @@ def run_dry_run_report(paper: bool, *, refresh_data: bool = False):
         )
 
     bt = BtQueueRepo(conninfo, user_id="bybit_local_testnet")
-    repo = TradeRepo(conninfo, bt=bt, user_id="bybit_local_testnet")
     cred_repo = ApiCredentialRepo(conninfo, user_id="bybit_local_testnet")
-    cred_svc = CredentialService(CredentialCrypto())
+    repo = TradeRepo(
+        conninfo, bt=bt, credentials=cred_repo, user_id="bybit_local_testnet"
+    )
+    cred_svc = CredentialService(CredentialCrypto(), cred_repo)
 
     req = DryRunRequest(
         strategy_id=strategy_id,
@@ -903,7 +904,6 @@ def run_dry_run_report(paper: bool, *, refresh_data: bool = False):
         repo=repo,
         bt=bt,
         credential_service=cred_svc,
-        credential_repo=cred_repo,
         adapter_registry=registry,
         data_caches=caches,
     )
