@@ -1,6 +1,6 @@
 # Who fixes what
 
-**Updated:** 23 Oct 2026, 12:04 AM HKT. Bot Coordinator keeps this page current.
+**Updated:** 23 Oct 2026 HKT. Bot Coordinator keeps this page current.
 
 ## How to tell them apart
 
@@ -38,7 +38,7 @@ Draft pull request 89 (record the risk rule a backtest run reads) touches applic
 
 Draft pull request 91 (stage strategy-bar PnL reconcile and the fee coin) changes application code, the trade database, and the frontend. The code is `quant/trade/pnl_reconcile.py`, `quant/trade/db_repo.py`, `quant/trade/brokers/ccxt/confirm.py`, `quant/trade/live_apply.py`, and schemas. The database change is Liquibase trade release 1.11.0. It adds a `TRADE.DEPLOYMENT_PERFORMANCE` table and `SP_INS` and `SP_GET` procedures. It adds `FEE_CCY_CD` on `TRADE.TRANSACTION` and changes the `SP_INS_TRANSACTION` signature. Alfred merges it. Bots do not own it.
 
-Draft pull request 128 (Report a typed reason when a cancel is refused) stacks on #127, which has merged. #128 remains a draft. It touches the `quant/trade` adapter, live apply, the scheduler tick, schemas, docs, and tests. Application code. Alfred merges it. Bots do not own it.
+Draft pull request 128 (Report a typed reason when a cancel is refused) is still an open draft. #127 has merged, so #128 needs its branch brought up to date with main before review. That is Alfred's pull request. Do not touch its branch. It touches the `quant/trade` adapter, live apply, the scheduler tick, schemas, docs, and tests. Application code. Alfred merges it. Bots do not own it.
 
 Draft pull request 133 (Abort API startup when REFDATA publish fails) changes `quant/api/main.py` and tests, and the API and REFDATA cache docs. Application code. Alfred merges it. Bots do not own it.
 
