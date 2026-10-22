@@ -9,7 +9,7 @@ See [System Overview](overview.md) for schema relationships and [Dev vs Prod](de
 | Schema | Purpose |
 |--------|---------|
 | `CORE_ADMIN` | App users (`APP_USER`), proc audit log (`LOG_PROC_DETAIL`), exchange API credentials (`API_CREDENTIAL`) |
-| `CONFIG` | Policy (`APP_ISSUE_FEE`, `APP_APPLY_TIMING`, `API_LIMIT`, `PROMOTION_METRIC`) and `CONFIG.SP_GET_ENUM`, which reads only this schema. Redis prefix `config:<table>` and stamp `config:version`. |
+| `CONFIG` | Policy (`APP_ISSUE_FEE`, `APP_APPLY_TIMING`, `API_LIMIT`, `PROMOTION_METRIC`, `SETTING`) and `CONFIG.SP_GET_ENUM`, which reads only this schema. Redis prefix `config:<table>` and stamp `config:version`. |
 | `REFDATA` | Reference data (`APP`, `INDICATOR`, `SIGNAL_TYPE`, `CONJUNCTION`, `DATA_COLUMN`, `APP_METRIC`, `MARKET_CALENDAR`, …) and `REFDATA.SP_GET_ENUM`, which reads only this schema. `REFDATA.APP` includes **`IS_EXCHANGE_IND`** (`Y` = broker/exchange, `N` = data provider) and **`REFRESH_DATASET_IND`** (`Y` = the Refresh dataset checkbox may call it, `N` = it may not; Glassnode and Bybit are `N`) and seeds for Futu, Bybit, Binance, Yahoo, Glassnode, Nasdaq Data Link. `MARKET_CALENDAR` is session/timezone by **`LISTING_EXCHANGE`** (`INST.PRODUCT.EXCHANGE`; `''` = default crypto). |
 | `BT` | Backtest results (`STRATEGY`, `QUEUE`, `RESULT`, `PROMOTION`) plus the procedures that read and write the provider window. The window tables themselves move to `MARKET_DATA` in `bt/1.30.0` ([decision #100](../decisions.md)) |
 | `TRADE` | Live trading: `DEPLOYMENT`, `DEPLOYMENT_SCHEDULE_STATUS`, `INTENT`, `EXECUTION_EVENT`, `TRANSACTION` + SPs |
@@ -222,6 +222,24 @@ Persisted strategies (`BT.STRATEGY`) are created when backtest jobs complete —
 - **SOFT** — comparison metrics evaluated in priority order against the current best VID.
 
 Loaded at runtime via `RedisRefData.get_promotion_metrics()`. See [Best-VID Promotion §2](../design/best-vid-promotion.md#2-promotion-metric-configuration-refdata-driven).
+
+### CONFIG — platform settings
+
+`CONFIG.SETTING` is one row per scalar knob that used to be a Python literal: `SETTING_NM` (primary key), `SETTING_VALUE` (text), `DESCRIPTION`. Read through `RedisRefData.setting(name)` and the typed casts `setting_int` / `setting_float` / `setting_floats`; a missing row raises, there is no code default. Release `config/1.4.0` creates it (context `config,prod-deploy` — the API reads these rows at startup, so the migrate has to land before the containers restart).
+
+| `SETTING_NM` | Seed | Read by |
+|---|---|---|
+| `min_metric_obs` | `60` | `Performance`, `Objective`, `require_scoreable_sample` (decisions #63, #82) |
+| `max_queued_per_user` | `30` | `JobsService.enqueue`, `scripts/rerun_results.py` |
+| `default_tm_interval_id` | `1` | `BacktestCache.default_tm_interval_id()` |
+| `fallback_settlement_ccy` | `USDT` | `LiveApplyOrchestrator._settlement_ccy` when `INST.PRODUCT.CCY` is empty |
+| `order_max_attempts`, `order_retry_backoff_s` | `5`, `2.0` | `OrderRetryPolicy` built in `LiveApplyOrchestrator` |
+| `tick_max_attempts`, `tick_retry_backoff_s` | `3`, `5.0` | `ScheduleTickRunner` built in `quant/api/main.py` (decision #79) |
+| `fill_confirm_delays_s` | `0.3,0.6,1.2,2.4,3.5` | `confirm_market_order` via the ccxt adapter factory |
+
+A knob that varies by broker or cadence does not go here; it gets a typed table (`APP_APPLY_TIMING`, `APP_ISSUE_FEE`). The default fee is still `Performance.DEFAULT_FEE_BPS`: it depends on the exchange and `ISSUE_TYPE`, and `CONFIG.APP_ISSUE_FEE` is where it will be read from.
+
+Two catalogs arrived with it in `refdata/1.31.0` (context `refdata,prod-deploy`): `REFDATA.QUEUE_PRIORITY` (`NAME` → `PRIORITY`, replacing `PRIORITY_MAP`) and `REFDATA.SCHEDULE_STATUS` (the `TRADE.DEPLOYMENT_SCHEDULE_STATUS.STATUS` values, replacing `SCHEDULE_STATUSES`).
 
 ## Deployment
 

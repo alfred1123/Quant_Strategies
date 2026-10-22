@@ -8,7 +8,8 @@ import pytest
 
 from quant.schemas.backtest import FactorConfig, OptimizeRequest, RangeParam
 from quant.strategy.backtest_service import BacktestError, require_scoreable_sample
-from quant.strategy.performance import Performance
+
+MIN_METRIC_OBS = 60
 
 
 def _req(*windows: int) -> OptimizeRequest:
@@ -44,26 +45,27 @@ def _frame(n: int) -> dict[str, pd.DataFrame]:
 def _cache() -> MagicMock:
     cache = MagicMock()
     cache.interval_name.return_value = "DAILY"
+    cache.setting_int.return_value = MIN_METRIC_OBS
     return cache
 
 
 class TestRequireScoreableSample:
     def test_exact_floor_is_accepted(self):
         w = 20
-        n = w + Performance.MIN_METRIC_OBS
+        n = w + MIN_METRIC_OBS
         require_scoreable_sample(_frame(n), _req(w), _cache())
 
     def test_one_bar_short_names_the_count_window_and_interval(self):
         w = 20
-        n = w + Performance.MIN_METRIC_OBS - 1
+        n = w + MIN_METRIC_OBS - 1
         with pytest.raises(BacktestError, match=rf"series has {n} DAILY bars") as exc:
             require_scoreable_sample(_frame(n), _req(w), _cache())
         assert f"window {w}" in exc.value.detail
-        assert str(Performance.MIN_METRIC_OBS) in exc.value.detail
+        assert str(MIN_METRIC_OBS) in exc.value.detail
 
     def test_longest_factor_window_sets_the_floor(self):
         w = 40
-        n = w + Performance.MIN_METRIC_OBS - 1
+        n = w + MIN_METRIC_OBS - 1
         with pytest.raises(BacktestError, match=rf"window {w}"):
             require_scoreable_sample(_frame(n), _req(10, w), _cache())
 

@@ -201,15 +201,18 @@ class FactorFrames:
 class Performance:
 
     DEFAULT_FEE_BPS = 10.0  # Bybit VIP-0 spot taker; per unit of turnover
-    # Below this many finite PnL bars, mean * period is a lucky week, not a Sharpe
-    # (decision #63). Owned here — optimizer maps non-finite Sharpe to -inf.
-    MIN_METRIC_OBS = 60
 
-    def __init__(self, data, config, window=None, signal=None, *, fee_bps=None) -> None:
+    def __init__(
+        self, data, config, window=None, signal=None, *, fee_bps=None, min_metric_obs: int,
+    ) -> None:
+        """``min_metric_obs`` is ``CONFIG.SETTING min_metric_obs``: below this many
+        finite PnL bars, mean * period is a lucky week, not a Sharpe (decision
+        #63). The optimizer maps the resulting non-finite Sharpe to -inf."""
         self.config = config
         self.trading_period = config.trading_period
         self.fee_bps = fee_bps if fee_bps is not None else self.DEFAULT_FEE_BPS
         self.transaction_cost = self.fee_bps / 10_000  # bps → decimal
+        self.min_metric_obs = int(min_metric_obs)
 
         self._subs = config.get_substrategies()
         self._is_multi = len(self._subs) > 1
@@ -363,15 +366,15 @@ class Performance:
     # take account that nan leading zeros
     def get_annualized_return(self):
         n = self.get_metric_n_obs()
-        if n < self.MIN_METRIC_OBS:
+        if n < self.min_metric_obs:
             logger.debug("Annualized return undefined (%d finite pnl bars, need %d)",
-                         n, self.MIN_METRIC_OBS)
+                         n, self.min_metric_obs)
             return np.nan
         return _cagr(self._metric_col("pnl"), self.trading_period)
 
     def get_sharpe_ratio(self):
         return sharpe_ratio(
-            self._metric_col("pnl"), self.trading_period, min_obs=self.MIN_METRIC_OBS,
+            self._metric_col("pnl"), self.trading_period, min_obs=self.min_metric_obs,
         )
 
     def get_max_drawdown(self):
@@ -392,15 +395,15 @@ class Performance:
 
     def get_buy_hold_annualized_return(self):
         n = self.get_metric_n_obs()
-        if n < self.MIN_METRIC_OBS:
+        if n < self.min_metric_obs:
             logger.debug("Buy-hold annualized return undefined (%d finite pnl bars, need %d)",
-                         n, self.MIN_METRIC_OBS)
+                         n, self.min_metric_obs)
             return np.nan
         return _cagr(self._metric_col("buy_hold"), self.trading_period)
 
     def get_buy_hold_sharpe_ratio(self):
         return sharpe_ratio(
-            self._metric_col("buy_hold"), self.trading_period, min_obs=self.MIN_METRIC_OBS,
+            self._metric_col("buy_hold"), self.trading_period, min_obs=self.min_metric_obs,
         )
 
     def get_buy_hold_max_drawdown(self):

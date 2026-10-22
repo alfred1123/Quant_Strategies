@@ -17,7 +17,7 @@ _BOLLINGER_CONFIG = StrategyConfig("test", "get_bollinger_band",
 
 class TestParametersOptimization:
     def _make_optimizer(self, df):
-        return ParametersOptimization({_BOLLINGER_CONFIG.internal_cusip: df.copy()}, _BOLLINGER_CONFIG)
+        return ParametersOptimization({_BOLLINGER_CONFIG.internal_cusip: df.copy()}, _BOLLINGER_CONFIG, min_metric_obs=60)
 
     def test_optimize_returns_result(self, sample_ohlc_df):
         opt = self._make_optimizer(sample_ohlc_df)
@@ -68,7 +68,7 @@ class TestParametersOptimization:
     def test_starved_window_scores_nan(self, sample_ohlc_df):
         """A window that leaves too few PnL bars scores NaN via Performance."""
         opt = self._make_optimizer(sample_ohlc_df)
-        # 100 bars, window 50 → 50 remaining < Performance.MIN_METRIC_OBS
+        # 100 bars, window 50 → 50 remaining < min_metric_obs (60)
         result = opt.optimize((5, 50), (0.5,))
         starved = result.grid_df[result.grid_df["window"] == 50]
         assert starved["sharpe"].isna().all()
@@ -80,13 +80,13 @@ class TestParametersOptimizationWithConfig:
     def test_config_stored(self, sample_ohlc_df):
         config = StrategyConfig("test", "get_bollinger_band",
                                 SignalDirection.momentum_band_signal, 252)
-        opt = ParametersOptimization({config.internal_cusip: sample_ohlc_df.copy()}, config)
+        opt = ParametersOptimization({config.internal_cusip: sample_ohlc_df.copy()}, config, min_metric_obs=60)
         assert opt.config is config
 
     def test_fee_propagates(self, sample_ohlc_df):
         config = StrategyConfig("test", "get_bollinger_band",
                                 SignalDirection.momentum_band_signal, 252)
-        opt = ParametersOptimization({config.internal_cusip: sample_ohlc_df.copy()}, config, fee_bps=20.0)
+        opt = ParametersOptimization({config.internal_cusip: sample_ohlc_df.copy()}, config, fee_bps=20.0, min_metric_obs=60)
         assert opt.fee_bps == 20.0
 
 
@@ -112,7 +112,7 @@ def _multi_factor_config(**overrides):
 class TestOptimizeMulti:
     def test_returns_result(self, multi_factor_df):
         config = _multi_factor_config()
-        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config)
+        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         result = opt.optimize_multi(
             [(5, 10), (5, 10)],
             [(0.5,), (0.5,)],
@@ -124,7 +124,7 @@ class TestOptimizeMulti:
 
     def test_grid_size_correct(self, multi_factor_df):
         config = _multi_factor_config()
-        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config)
+        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         result = opt.optimize_multi(
             [(5, 10, 15), (5, 10)],
             [(0.5, 1.0), (0.5,)],
@@ -134,7 +134,7 @@ class TestOptimizeMulti:
 
     def test_covers_all_combinations(self, multi_factor_df):
         config = _multi_factor_config()
-        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config)
+        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         result = opt.optimize_multi(
             [(5, 10), (5, 10)],
             [(0.5,), (0.5,)],
@@ -147,7 +147,7 @@ class TestOptimizeMulti:
 
     def test_sharpe_is_numeric(self, multi_factor_df):
         config = _multi_factor_config()
-        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config)
+        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         result = opt.optimize_multi(
             [(5,), (10,)],
             [(0.5,), (0.5,)],
@@ -157,13 +157,13 @@ class TestOptimizeMulti:
 
     def test_mismatched_ranges_raises(self, multi_factor_df):
         config = _multi_factor_config()
-        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config)
+        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         with pytest.raises(ValueError, match="window_ranges has 2.*signal_ranges has 1"):
             opt.optimize_multi([(5,), (10,)], [(0.5,)])
 
     def test_large_grid_uses_tpe(self, multi_factor_df, caplog):
         config = _multi_factor_config()
-        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config)
+        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         # Build ranges that exceed OPTUNA_MAX_TRIALS threshold
         big_range = tuple(range(1, 201))
         import logging
@@ -178,7 +178,7 @@ class TestOptimizeMulti:
 
     def test_or_conjunction(self, multi_factor_df):
         config = _multi_factor_config(conjunction="OR")
-        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config)
+        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         result = opt.optimize_multi(
             [(5,), (10,)],
             [(0.5,), (0.5,)],
@@ -188,7 +188,7 @@ class TestOptimizeMulti:
 
     def test_best_sharpe_selection(self, multi_factor_df):
         config = _multi_factor_config()
-        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config)
+        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         result = opt.optimize_multi(
             [(5, 10, 20), (5, 10)],
             [(0.5, 1.0), (0.5,)],
@@ -197,7 +197,7 @@ class TestOptimizeMulti:
 
     def test_n_trials_limits_evaluations(self, multi_factor_df):
         config = _multi_factor_config()
-        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config)
+        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         result = opt.optimize_multi(
             [(5, 10, 20), (5, 10)],
             [(0.5, 1.0), (0.5,)],
@@ -212,20 +212,20 @@ class TestOptimizeMulti:
 
 class TestStudy:
     def test_study_set_after_optimize(self, sample_ohlc_df):
-        opt = ParametersOptimization({_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()}, _BOLLINGER_CONFIG)
+        opt = ParametersOptimization({_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()}, _BOLLINGER_CONFIG, min_metric_obs=60)
         result = opt.optimize((5, 10), (0.5, 1.0))
         assert result.study is not None
         assert len(result.study.trials) == 4
 
     def test_study_set_after_optimize_multi(self, multi_factor_df):
         config = _multi_factor_config()
-        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config)
+        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         result = opt.optimize_multi([(5, 10), (5, 10)], [(0.5,), (0.5,)])
         assert result.study is not None
         assert len(result.study.trials) == 4
 
     def test_study_independent_per_call(self, sample_ohlc_df):
-        opt = ParametersOptimization({_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()}, _BOLLINGER_CONFIG)
+        opt = ParametersOptimization({_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()}, _BOLLINGER_CONFIG, min_metric_obs=60)
         result1 = opt.optimize((5,), (0.5,))
         result2 = opt.optimize((5, 10), (0.5, 1.0))
         assert result1.study is not result2.study
@@ -238,7 +238,7 @@ class TestStudy:
 
 class TestCallbacks:
     def test_optimize_callback_called_per_trial(self, sample_ohlc_df):
-        opt = ParametersOptimization({_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()}, _BOLLINGER_CONFIG)
+        opt = ParametersOptimization({_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()}, _BOLLINGER_CONFIG, min_metric_obs=60)
         calls = []
         opt.optimize((5, 10), (0.5, 1.0),
                      callbacks=[lambda study, trial: calls.append(1)])
@@ -246,7 +246,7 @@ class TestCallbacks:
 
     def test_optimize_multi_callback_called_per_trial(self, multi_factor_df):
         config = _multi_factor_config()
-        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config)
+        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         calls = []
         opt.optimize_multi(
             [(5, 10), (5, 10)], [(0.5,), (0.5,)],
@@ -261,7 +261,7 @@ class TestCallbacks:
 
 class TestRun:
     def test_run_dispatches_single(self, sample_ohlc_df):
-        opt = ParametersOptimization({_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()}, _BOLLINGER_CONFIG)
+        opt = ParametersOptimization({_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()}, _BOLLINGER_CONFIG, min_metric_obs=60)
         result = opt.run((5, 10), (0.5, 1.0))
         assert isinstance(result, OptimizeResult)
         assert list(result.grid_df.columns) == ["window", "signal", "sharpe"]
@@ -269,7 +269,7 @@ class TestRun:
 
     def test_run_dispatches_multi(self, multi_factor_df):
         config = _multi_factor_config()
-        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config)
+        opt = ParametersOptimization({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         result = opt.run([(5, 10), (5, 10)], [(0.5,), (0.5,)])
         assert isinstance(result, OptimizeResult)
         assert "window_0" in result.grid_df.columns
@@ -277,7 +277,7 @@ class TestRun:
 
     def test_optimize_no_callbacks_default(self, sample_ohlc_df):
         """Callbacks default to None — optimization still works."""
-        opt = ParametersOptimization({_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()}, _BOLLINGER_CONFIG)
+        opt = ParametersOptimization({_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()}, _BOLLINGER_CONFIG, min_metric_obs=60)
         result = opt.optimize((5,), (0.5,))
         assert len(result.grid_df) == 1
 
@@ -309,6 +309,7 @@ class TestExhaustiveSearch:
         opt = ParametersOptimization(
             {_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()},
             _BOLLINGER_CONFIG,
+            min_metric_obs=60,
         )
         result = opt.optimize((5, 10, 15), (0.5, 1.0))
         assert len(result.grid_df) == 6
@@ -320,6 +321,7 @@ class TestExhaustiveSearch:
         opt = ParametersOptimization(
             {_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()},
             _BOLLINGER_CONFIG,
+            min_metric_obs=60,
         )
         numbers = []
         bests = []
@@ -336,6 +338,7 @@ class TestExhaustiveSearch:
         opt = ParametersOptimization(
             {_BOLLINGER_CONFIG.internal_cusip: sample_ohlc_df.copy()},
             _BOLLINGER_CONFIG,
+            min_metric_obs=60,
         )
         result = opt.optimize((5, 10), (0.5, 1.0))
         assert result.extract_plots() is not None

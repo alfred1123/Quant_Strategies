@@ -164,13 +164,3 @@ CCXT_PRESETS: dict[str, CcxtExchangePreset] = {
         default_type=None,
     ),
 }
-
-
-def preset_for_app(app_name: str) -> CcxtExchangePreset:
-    """Lookup preset by REFDATA.APP.NAME."""
-    try:
-        return CCXT_PRESETS[app_name]
-    except KeyError as exc:
-        raise KeyError(
-            f"No CCXT_PRESETS entry for REFDATA.APP name={app_name!r}"
-        ) from exc

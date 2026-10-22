@@ -39,6 +39,7 @@ def create_ccxt_adapter(
     api_secret: str,
     paper: bool,
     inst_cache: InstrumentCache,
+    confirm_delays_s: tuple[float, ...],
     demo: bool = False,
     key_router: KeyRouter | None = None,
 ) -> CcxtTradeAdapter:
@@ -52,6 +53,7 @@ def create_ccxt_adapter(
         paper=paper,
         inst_cache=inst_cache,
         preset=preset,
+        confirm_delays_s=confirm_delays_s,
         demo=demo,
         key_router=key_router or KeyRouter(None),
     )
@@ -69,9 +71,11 @@ class CcxtTradeAdapter(TradeAdapter):
         inst_cache: InstrumentCache,
         preset: CcxtExchangePreset,
         key_router: KeyRouter,
+        confirm_delays_s: tuple[float, ...],
         demo: bool = False,
     ) -> None:
         self._inst = inst_cache
+        self._confirm_delays_s = confirm_delays_s
         self._session = CcxtSessionConfig(
             api_key=api_key,
             api_secret=api_secret,
@@ -233,7 +237,10 @@ class CcxtTradeAdapter(TradeAdapter):
                 side=req.side, requested_qty=req.qty,
             )
         return confirm_market_order(
-            self._gateway, req=req, vendor_order_id=str(order_id),
+            self._gateway,
+            req=req,
+            vendor_order_id=str(order_id),
+            delays_s=self._confirm_delays_s,
         )
 
     def cancel_order(self, vendor_order_id: str, vendor_symbol: str | None = None) -> OrderResult:

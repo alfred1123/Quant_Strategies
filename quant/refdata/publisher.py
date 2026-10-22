@@ -111,7 +111,7 @@ class RefDataPublisher(DbGateway):
 
 
 def main() -> int:
-    """CLI entrypoint: python -m src.refdata_publisher."""
+    """CLI entrypoint: python -m quant.refdata.publisher."""
     from quant.shared.config import get_redis_url, load_config
 
     conninfo = load_config()

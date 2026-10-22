@@ -99,7 +99,7 @@ class TestFullPipelineE2E:
         )
 
     def test_sma_momentum_produces_valid_metrics(self, aapl_data, equity_config):
-        perf = Performance(aapl_data, equity_config, 20, 0.5)
+        perf = Performance(aapl_data, equity_config, 20, 0.5, min_metric_obs=60)
         result = perf.get_strategy_performance()
 
         assert isinstance(result, pd.Series)
@@ -114,7 +114,7 @@ class TestFullPipelineE2E:
             signal_func=SignalDirection.reversion_band_signal,
             trading_period=252,
         )
-        perf = Performance(aapl_data, config, 20, 1.0)
+        perf = Performance(aapl_data, config, 20, 1.0, min_metric_obs=60)
         result = perf.get_strategy_performance()
 
         assert isinstance(result, pd.Series)
@@ -126,14 +126,14 @@ class TestFullPipelineE2E:
             signal_func=SignalDirection.momentum_band_signal,
             trading_period=252,
         )
-        perf = Performance(aapl_data, config, 20, 0.5)
+        perf = Performance(aapl_data, config, 20, 0.5, min_metric_obs=60)
         result = perf.get_strategy_performance()
 
         assert isinstance(result, pd.Series)
         assert np.isfinite(result["Total Return"])
 
     def test_buy_hold_benchmark(self, aapl_data, equity_config):
-        perf = Performance(aapl_data, equity_config, 20, 0.5)
+        perf = Performance(aapl_data, equity_config, 20, 0.5, min_metric_obs=60)
         bh = perf.get_buy_hold_performance()
 
         assert isinstance(bh, pd.Series)
@@ -141,8 +141,8 @@ class TestFullPipelineE2E:
 
     def test_transaction_costs_reduce_returns(self, aapl_data, equity_config):
         """Higher fees should produce lower or equal total returns."""
-        perf_low = Performance(aapl_data, equity_config, 20, 0.5, fee_bps=1)
-        perf_high = Performance(aapl_data, equity_config, 20, 0.5, fee_bps=50)
+        perf_low = Performance(aapl_data, equity_config, 20, 0.5, fee_bps=1, min_metric_obs=60)
+        perf_high = Performance(aapl_data, equity_config, 20, 0.5, fee_bps=50, min_metric_obs=60)
 
         assert perf_low.get_total_return() >= perf_high.get_total_return()
 
@@ -167,7 +167,7 @@ class TestParamOptE2E:
             signal_func=SignalDirection.momentum_band_signal,
             trading_period=252,
         )
-        opt = ParametersOptimization(spy_data, config)
+        opt = ParametersOptimization(spy_data, config, min_metric_obs=60)
         results = list(opt.optimize((10, 20), (0.5, 1.0)))
 
         assert len(results) == 4  # 2 windows × 2 signals
@@ -197,7 +197,7 @@ class TestWalkForwardE2E:
             signal_func=SignalDirection.momentum_band_signal,
             trading_period=252,
         )
-        wf = WalkForward(spy_data, 0.5, config)
+        wf = WalkForward(spy_data, 0.5, config, min_metric_obs=60)
         result = wf.run((10, 20), (0.5, 1.0))
 
         assert result.best_window in (10, 20)
@@ -212,7 +212,7 @@ class TestWalkForwardE2E:
             signal_func=SignalDirection.reversion_band_signal,
             trading_period=252,
         )
-        wf = WalkForward(spy_data, 0.5, config)
+        wf = WalkForward(spy_data, 0.5, config, min_metric_obs=60)
         result = wf.run((15, 25), (0.5, 1.5))
         summary = result.summary()
 

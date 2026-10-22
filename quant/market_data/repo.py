@@ -6,16 +6,9 @@ import logging
 from datetime import datetime
 from decimal import Decimal
 
-from quant.shared.db import DbGateway
+from quant.shared.db import DbGateway, require_arg
 
 logger = logging.getLogger(__name__)
-
-
-def _require(value, name: str) -> None:
-    if value is None:
-        raise ValueError(f"{name} is required")
-    if isinstance(value, str) and not value.strip():
-        raise ValueError(f"{name} is required")
 
 
 class PriceBarRepo(DbGateway):
@@ -36,9 +29,9 @@ class PriceBarRepo(DbGateway):
         freshness gate, not a way to count what is stored. Scoped to one
         source: another venue's bars say nothing about this one's freshness.
         """
-        _require(internal_cusip, "internal_cusip")
-        _require(tm_interval_id, "tm_interval_id")
-        _require(source_app_id, "source_app_id")
+        require_arg(internal_cusip, "internal_cusip")
+        require_arg(tm_interval_id, "tm_interval_id")
+        require_arg(source_app_id, "source_app_id")
         row = self._call_get_one(
             "CALL market_data.sp_get_price_bar_coverage("
             "%s::text, %s::integer, %s::integer,"
@@ -63,11 +56,11 @@ class PriceBarRepo(DbGateway):
         One source per call — venues sharing an instrument quote different
         prices, so a blended window is not a series anyone fitted a strategy on.
         """
-        _require(internal_cusip, "internal_cusip")
-        _require(tm_interval_id, "tm_interval_id")
-        _require(source_app_id, "source_app_id")
-        _require(range_start, "range_start")
-        _require(range_end, "range_end")
+        require_arg(internal_cusip, "internal_cusip")
+        require_arg(tm_interval_id, "tm_interval_id")
+        require_arg(source_app_id, "source_app_id")
+        require_arg(range_start, "range_start")
+        require_arg(range_end, "range_end")
         return self._call_get(
             "CALL market_data.sp_get_price_bar("
             "%s::text, %s::integer, %s::integer, %s::timestamptz, %s::timestamptz,"
@@ -94,10 +87,10 @@ class PriceBarRepo(DbGateway):
         rather than being absorbed, so the caller is responsible for passing
         only bars it knows are missing.
         """
-        _require(internal_cusip, "internal_cusip")
-        _require(tm_interval_id, "tm_interval_id")
-        _require(source_app_id, "source_app_id")
-        _require(bar_timestamp, "bar_timestamp")
+        require_arg(internal_cusip, "internal_cusip")
+        require_arg(tm_interval_id, "tm_interval_id")
+        require_arg(source_app_id, "source_app_id")
+        require_arg(bar_timestamp, "bar_timestamp")
         for name, value in (
             ("open_px", open_px),
             ("high_px", high_px),
@@ -105,7 +98,7 @@ class PriceBarRepo(DbGateway):
             ("close_px", close_px),
             ("volume", volume),
         ):
-            _require(value, name)
+            require_arg(value, name)
 
         self._call_write(
             "CALL market_data.sp_ins_price_bar("
