@@ -111,7 +111,11 @@ Pre-completion aborts (missing strategy, bars, credentials) still spend the in-m
 failed pass. Today that is a qty under the venue's min lot or notional (the
 remaining attempts would send the identical order), and a cancel that returned
 failure (`CANCEL_FAILED`, decision #112) — the order may still be open, so the
-next apply would place again on a book that still reads flat. Everything the
+next apply would place again on a book that still reads flat. An unconfirmed
+fill (`UNCONFIRMED`, decision #113) is classified and is not in that set. The
+order executor cancels that id and places again inside the apply. The tick
+still spends its attempts: a later pass can see the fill, or a cancel that
+succeeded. Pausing on the first tick would skip that cancel. Everything the
 tick cannot classify keeps all 3 attempts.
 
 **What auto-pause resolves:**
@@ -122,7 +126,7 @@ tick cannot classify keeps all 3 attempts.
   resumes it to `ACTIVE`, since the missed-due proc skips `PAUSED` whatever the
   kill switch says.
 
-**Current state:** `ScheduleTickRunner` auto-pauses on the last failed attempt, or on the first one when the reason's `requires_operator_fix` is true (a size the venue will not accept, or a cancel that did not succeed). It does **not** flatten the broker position — that is §6. Manual **Stop** remains a separate, explicit disable.
+**Current state:** `ScheduleTickRunner` auto-pauses on the last failed attempt, or on the first one when the reason's `requires_operator_fix` is true (a size the venue will not accept, or a cancel that did not succeed). An unconfirmed fill is not that pause: the order executor cancels and retries, and the tick keeps its budget (decision #113). It does **not** flatten the broker position — that is §6. Manual **Stop** remains a separate, explicit disable.
 
 ---
 
