@@ -243,8 +243,8 @@ def resolve_api_keys(conninfo: str) -> tuple[str, str]:
     app_user_id = _env_uuid("CCXT_ITEST_USER_ID")
     cred_id = _env_int("CCXT_ITEST_CREDENTIAL_ID")
     repo = ApiCredentialRepo(conninfo, user_id="bybit_local_testnet")
-    svc = CredentialService(CredentialCrypto())
-    keys = svc.decrypt_credential(repo, app_user_id, cred_id)
+    svc = CredentialService(CredentialCrypto(), repo)
+    keys = svc.decrypt_credential(app_user_id, cred_id)
     if keys is None:
         raise SystemExit(
             f"Cannot decrypt credential {cred_id} — set BYBIT_TESTNET_* / BYBIT_API_KEY "
@@ -320,9 +320,8 @@ def save_credential(conninfo: str, app_user_id: UUID) -> int:
 
     app_id = _env_int("CCXT_ITEST_APP_ID") if os.getenv("CCXT_ITEST_APP_ID") else BYBIT_APP_ID
     repo = ApiCredentialRepo(conninfo, user_id="bybit_local_testnet")
-    svc = CredentialService(CredentialCrypto())
+    svc = CredentialService(CredentialCrypto(), repo)
     row = svc.create_credential(
-        repo,
         app_user_id=app_user_id,
         app_id=app_id,
         label="Bybit testnet (local script)",
@@ -336,7 +335,6 @@ def save_credential(conninfo: str, app_user_id: UUID) -> int:
 
 def run_gateway(paper: bool, *, bybit_demo: bool = False) -> None:
     """Connect to Bybit via ccxt and validate credentials."""
-    from quant.data.instruments import InstrumentCache
     from quant.trade.brokers.ccxt.adapter import create_ccxt_adapter
     from quant.trade.brokers.ccxt.config import CCXT_PRESETS
 
@@ -348,14 +346,14 @@ def run_gateway(paper: bool, *, bybit_demo: bool = False) -> None:
 
     api_key, api_secret = resolve_api_keys(conninfo)
 
-    inst_cache = InstrumentCache(conninfo)
-    inst_cache.load_all()
+    caches = _load_caches(conninfo)
     adapter = create_ccxt_adapter(
         preset=CCXT_PRESETS["bybit"],
         api_key=api_key,
         api_secret=api_secret,
         paper=paper and not bybit_demo,
-        inst_cache=inst_cache,
+        inst_cache=caches.instrument_cache,
+        confirm_delays_s=caches.refdata.setting_floats("fill_confirm_delays_s"),
         demo=bybit_demo,
     )
     try:
@@ -496,12 +494,12 @@ def run_snapshot(paper: bool) -> None:
     cred_id = _env_int("CCXT_ITEST_CREDENTIAL_ID")
 
     caches = _load_caches(conninfo)
+    cred_repo = ApiCredentialRepo(conninfo, user_id="bybit_local_testnet")
     snap = fetch_account_snapshot(
         app_user_id=app_user_id,
         api_credential_id=cred_id,
         paper=paper,
-        credential_service=CredentialService(CredentialCrypto()),
-        credential_repo=ApiCredentialRepo(conninfo, user_id="bybit_local_testnet"),
+        credential_service=CredentialService(CredentialCrypto(), cred_repo),
         adapter_registry=build_default_registry(caches.refdata),
         data_caches=caches,
     )
@@ -662,7 +660,6 @@ def run_intended_side_matrix() -> None:
 
 def probe_intended_with_live_position(paper: bool, *, bybit_demo: bool = False) -> dict:
     """Connect to Bybit, read position, show intended_side for signals -1/0/1."""
-    from quant.data.instruments import InstrumentCache
     from quant.trade.brokers.ccxt.adapter import create_ccxt_adapter
     from quant.trade.brokers.ccxt.config import CCXT_PRESETS
 
@@ -671,14 +668,14 @@ def probe_intended_with_live_position(paper: bool, *, bybit_demo: bool = False) 
     cusip = os.getenv("CCXT_ITEST_INTERNAL_CUSIP", "btcusdt.crypto")
     api_key, api_secret = resolve_api_keys(conninfo)
 
-    inst_cache = InstrumentCache(conninfo)
-    inst_cache.load_all()
+    caches = _load_caches(conninfo)
     adapter = create_ccxt_adapter(
         preset=CCXT_PRESETS["bybit"],
         api_key=api_key,
         api_secret=api_secret,
         paper=paper and not bybit_demo,
-        inst_cache=inst_cache,
+        inst_cache=caches.instrument_cache,
+        confirm_delays_s=caches.refdata.setting_floats("fill_confirm_delays_s"),
         demo=bybit_demo,
     )
     try:
@@ -711,7 +708,6 @@ def run_apply_signal(
     OPEN_SHORT/CLOSE_SHORT) can be verified against the Bybit testnet UI
     one step at a time.
     """
-    from quant.data.instruments import InstrumentCache
     from quant.trade.brokers.ccxt.adapter import create_ccxt_adapter
     from quant.trade.brokers.ccxt.config import CCXT_PRESETS
     from quant.trade.models.order import IntendedAction
@@ -721,14 +717,14 @@ def run_apply_signal(
     cusip = os.getenv("CCXT_ITEST_INTERNAL_CUSIP", "btcusdt.crypto")
     api_key, api_secret = resolve_api_keys(conninfo)
 
-    inst_cache = InstrumentCache(conninfo)
-    inst_cache.load_all()
+    caches = _load_caches(conninfo)
     adapter = create_ccxt_adapter(
         preset=CCXT_PRESETS["bybit"],
         api_key=api_key,
         api_secret=api_secret,
         paper=paper and not bybit_demo,
-        inst_cache=inst_cache,
+        inst_cache=caches.instrument_cache,
+        confirm_delays_s=caches.refdata.setting_floats("fill_confirm_delays_s"),
         demo=bybit_demo,
     )
     try:
@@ -884,9 +880,15 @@ def run_dry_run_report(paper: bool, *, refresh_data: bool = False):
         )
 
     bt = BtQueueRepo(conninfo, user_id="bybit_local_testnet")
-    repo = TradeRepo(conninfo, bt=bt, user_id="bybit_local_testnet")
     cred_repo = ApiCredentialRepo(conninfo, user_id="bybit_local_testnet")
-    cred_svc = CredentialService(CredentialCrypto())
+    repo = TradeRepo(
+        conninfo,
+        bt=bt,
+        credentials=cred_repo,
+        refdata=caches.refdata,
+        user_id="bybit_local_testnet",
+    )
+    cred_svc = CredentialService(CredentialCrypto(), cred_repo)
 
     req = DryRunRequest(
         strategy_id=strategy_id,
@@ -903,7 +905,6 @@ def run_dry_run_report(paper: bool, *, refresh_data: bool = False):
         repo=repo,
         bt=bt,
         credential_service=cred_svc,
-        credential_repo=cred_repo,
         adapter_registry=registry,
         data_caches=caches,
     )

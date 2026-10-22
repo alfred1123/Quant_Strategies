@@ -3,6 +3,7 @@ Standards: docs/design/coding-standards.md
 https://alfred1123.github.io/Quant_Strategies/design/coding-standards/
 Fill in every section. Write "n/a" with a reason rather than deleting one.
 A code PR without the testing evidence below is blocked.
+A pull request that duplicates an existing object fails review. Fill in Reused / extended.
 -->
 
 ## What
@@ -29,6 +30,18 @@ Confirm each rule and add a one-line note (for example, which class owns the cha
   Note:
 - [ ] **5. Long-term fix.** The change fixes the root cause in the owning class. The long-term check below is filled in.
   Note:
+- [ ] **6. Reuse before you write.** No new class, helper, enum member, flag, reader, repo, Liquibase table, or procedure duplicates an existing object. The Reused / extended section is filled in.
+  Note:
+
+## Reused / extended
+
+Required. Name the search, the objects reused or extended, and why each new object exists.
+
+- What was searched: <!-- Classes, helpers, enum members, flags, readers, repos, Liquibase tables and procedures, and the call sites around the change. -->
+- Reused or extended (file:line):
+  <!-- One object per line, for example `RedisRefData.setting` (`quant/refdata/reader.py:310`). Write "none" with a reason when the change adds no object and extends none. -->
+- New objects, and why no existing one fits:
+  <!-- One line per new class, helper, enum member, flag, reader, repo, Liquibase table, or procedure. Write "none" when the change adds nothing new. -->
 
 ## How did this happen? (root cause)
 
