@@ -247,7 +247,9 @@ def assert_snapshot_matches(
     ],
     ids=["setting", "queue_priority", "schedule_status"],
 )
-def test_conftest_rows_match_the_seed(snapshot, path: Path, key: str) -> None:
+def test_conftest_rows_match_the_seed(
+    snapshot: list[dict], path: Path, key: str,
+) -> None:
     assert path.is_file(), path
     assert_snapshot_matches(snapshot, parse_insert_rows(path.read_text()), key)
 
