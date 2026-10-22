@@ -150,6 +150,8 @@ class TestConfirmMarketOrder:
 
         assert result.success is False
         assert "unconfirmed" in result.message
+        assert result.reason is OrderRejectReason.UNCONFIRMED
+        assert result.reason.requires_operator_fix is False
         assert result.raw_status == "open"
         assert result.side == OrderSide.BUY
         assert result.requested_qty == 0.01
@@ -184,7 +186,7 @@ class TestConfirmMarketOrder:
         assert result.vendor_order_id == "ord-confirm-abc"
 
     @patch("quant.trade.brokers.ccxt.confirm.time.sleep")
-    def test_untyped_fetch_error_keeps_a_missing_reason(self, mock_sleep):
+    def test_untyped_fetch_error_is_unconfirmed(self, mock_sleep):
         gw = MagicMock()
         exc = BrokerConnectionError("")
         assert exc.reason is None
@@ -195,10 +197,41 @@ class TestConfirmMarketOrder:
         )
 
         assert result.success is False
-        assert result.reason is None
+        assert result.reason is OrderRejectReason.UNCONFIRMED
+        assert result.reason.requires_operator_fix is False
         assert result.vendor_order_id == "ord-untyped-9"
         assert "fill unconfirmed" in result.message
         assert result.message != str(exc)
+        assert gw.fetch_order.call_count == 1
+
+    @patch("quant.trade.brokers.ccxt.confirm.time.sleep")
+    def test_empty_poll_schedule_is_unconfirmed_without_a_fetch(self, mock_sleep):
+        gw = MagicMock()
+        req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
+        result = confirm_market_order(
+            gw, req=req, vendor_order_id="ord-empty", delays_s=(),
+        )
+
+        assert result.success is False
+        assert result.reason is OrderRejectReason.UNCONFIRMED
+        assert result.vendor_order_id == "ord-empty"
+        assert result.raw_status is None
+        gw.fetch_order.assert_not_called()
+        mock_sleep.assert_not_called()
+
+    @patch("quant.trade.brokers.ccxt.confirm.time.sleep")
+    def test_order_not_found_through_the_budget_is_unconfirmed(self, mock_sleep):
+        gw = MagicMock()
+        gw.fetch_order.side_effect = OrderNotFoundError("order not found: xxx")
+        req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
+        result = confirm_market_order(
+            gw, req=req, vendor_order_id="ord-missing", delays_s=(0.3,),
+        )
+
+        assert result.success is False
+        assert result.reason is OrderRejectReason.UNCONFIRMED
+        assert result.raw_status is None
+        assert result.vendor_order_id == "ord-missing"
         assert gw.fetch_order.call_count == 1
 
 
@@ -251,7 +284,7 @@ def _assert_no_second_place_without_that_cancel(
             cancelled = False
     assert (
         vendor_order_id != "1"
-        and actual_reason is None
+        and actual_reason is OrderRejectReason.UNCONFIRMED
         and actual_id == vendor_order_id
         and seen_place
         and not naked
