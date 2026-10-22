@@ -1,6 +1,6 @@
 # Who fixes what
 
-**Updated:** 23 Oct 2026, 12:00 AM HKT. Bot Coordinator keeps this page current.
+**Updated:** 23 Oct 2026, 12:03 AM HKT. Bot Coordinator keeps this page current.
 
 ## How to tell them apart
 
@@ -38,11 +38,11 @@ Draft pull request 89 (record the risk rule a backtest run reads) touches applic
 
 Draft pull request 91 (stage strategy-bar PnL reconcile and the fee coin) changes application code, the trade database, and the frontend. The code is `quant/trade/pnl_reconcile.py`, `quant/trade/db_repo.py`, `quant/trade/brokers/ccxt/confirm.py`, `quant/trade/live_apply.py`, and schemas. The database change is Liquibase trade release 1.11.0. It adds a `TRADE.DEPLOYMENT_PERFORMANCE` table and `SP_INS` and `SP_GET` procedures. It adds `FEE_CCY_CD` on `TRADE.TRANSACTION` and changes the `SP_INS_TRANSACTION` signature. Alfred merges it. Bots do not own it.
 
-Draft pull request 127 (Stop order retries when a cancel returns failure) changes `quant/trade/order_policy.py`, `quant/trade/models/order.py`, docs, and tests. It was ready for review and is a draft again as of 22 Oct 2026, about 11:33 PM HKT. It is not ready for review. Application code. Alfred merges it. Bots do not own it.
-
-Draft pull request 128 (Report a typed reason when a cancel is refused) stacks on #127. Review and merge #127 first. The diff against `main` includes both. It touches the `quant/trade` adapter, live apply, the scheduler tick, schemas, docs, and tests. Application code. Alfred merges it. Bots do not own it.
+Draft pull request 128 (Report a typed reason when a cancel is refused) stacks on #127, which has merged. #128 remains a draft. It touches the `quant/trade` adapter, live apply, the scheduler tick, schemas, docs, and tests. Application code. Alfred merges it. Bots do not own it.
 
 Draft pull request 133 (Abort API startup when REFDATA publish fails) changes `quant/api/main.py` and tests, and the API and REFDATA cache docs. Application code. Alfred merges it. Bots do not own it.
+
+Draft pull request 134 (Lock setting and catalog fixtures to their seed rows) changes comment text in Liquibase refdata release 1.31.0 and tests, including `tests/unit/test_seed_fixture_drift.py`. It opened as a draft on 23 Oct 2026, about 12:03 AM HKT. The changelog file is database source. Alfred merges it. Bots do not own it.
 
 ### Closed and merged
 
@@ -70,7 +70,9 @@ Pull request 124 (Fix the Bybit harness DB-key path for the M9 credential API) m
 
 Pull request 125 (Keep the typed reject reason when a fill poll fails) merged on 22 Oct 2026, about 11:57 PM HKT. It changed `quant/trade/brokers/ccxt/confirm.py` and tests. Application code. Alfred merged it. Bots do not own it.
 
-None of the open drafts #89, #91, #127, #128, and #133, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #129, and #132, is on the ordered list above.
+Pull request 127 (Stop order retries when a cancel returns failure) merged on 23 Oct 2026, about 12:02 AM HKT. It changed `quant/trade/order_policy.py`, `quant/trade/models/order.py`, docs, and tests. Application code. Alfred merged it. Bots do not own it.
+
+None of the open drafts #89, #91, #128, #133, and #134, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #129, and #132, is on the ordered list above.
 
 ## Bots, now
 
