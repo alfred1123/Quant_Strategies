@@ -67,6 +67,7 @@ def repo():
 
 
 def _runner(repo, apply_fn=None, **kwargs):
+    kwargs.setdefault("max_attempts", 3)
     kwargs.setdefault("retry_backoff_s", 0)
     return ScheduleTickRunner(repo, apply_fn or MagicMock(), **kwargs)
 

@@ -7,13 +7,10 @@ business logic only.
 
 import logging
 import uuid
-from typing import Any
 
 import redis
 
 from quant.api.schemas.jobs import (
-    MAX_QUEUED_PER_USER,
-    PRIORITY_MAP,
     EnqueueRequest,
     EnqueueResponse,
 )
@@ -46,6 +43,10 @@ class ReenqueueNotAllowed(Exception):
 
 class StrategyNameMismatch(Exception):
     """``STRATEGY_NM`` disagrees with the config it names — router maps to 400."""
+
+
+class UnknownPriority(Exception):
+    """``priority`` is not a ``REFDATA.QUEUE_PRIORITY`` name — router maps to 400."""
 
 
 class JobsService:
@@ -106,8 +107,13 @@ class JobsService:
         self._assert_cadence_in_name(req)
         queued_id = self._status("QUEUED")
 
-        if self._repo.sp_get_queued_count(user_id, queued_id) >= MAX_QUEUED_PER_USER:
-            raise RateLimitError(MAX_QUEUED_PER_USER)
+        max_queued = self._refdata.setting_int("max_queued_per_user")
+        if self._repo.sp_get_queued_count(user_id, queued_id) >= max_queued:
+            raise RateLimitError(max_queued)
+        try:
+            priority = self._refdata.resolve_queue_priority(req.priority)
+        except RuntimeError as exc:
+            raise UnknownPriority(str(exc)) from exc
 
         strategy_id, strategy_vid = self._repo.sp_ins_strategy(
             strategy_nm=req.strategy_nm,
@@ -121,7 +127,7 @@ class JobsService:
             strategy_id=strategy_id,
             strategy_vid=strategy_vid,
             status_id=queued_id,
-            priority=PRIORITY_MAP[req.priority],
+            priority=priority,
             user_id=user_id,
         )
         publish_wake(self._redis)
@@ -199,8 +205,9 @@ class JobsService:
             )
 
         queued_id = self._status("QUEUED")
-        if self._repo.sp_get_queued_count(user_id, queued_id) >= MAX_QUEUED_PER_USER:
-            raise RateLimitError(MAX_QUEUED_PER_USER)
+        max_queued = self._refdata.setting_int("max_queued_per_user")
+        if self._repo.sp_get_queued_count(user_id, queued_id) >= max_queued:
+            raise RateLimitError(max_queued)
 
         new_queue_id = uuid.uuid4()
         self._repo.sp_ins_queue(
@@ -230,7 +237,3 @@ class JobsService:
             "queue_status_id": int(row["queue_status_id"]),
             "error_text": row.get("error_text"),
         }
-
-
-def _to_payload(row: Any) -> Any:
-    return row

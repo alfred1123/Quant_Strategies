@@ -74,7 +74,7 @@ def _get_bar_warmer(
     bt = BtQueueRepo(conninfo, user_id="system")
     trade = TradeRepo(
         conninfo, bt=bt, credentials=ApiCredentialRepo(conninfo, user_id="system"),
-        user_id="system",
+        refdata=request.app.state.data_caches.refdata, user_id="system",
     )
     return BarWarmer(
         [

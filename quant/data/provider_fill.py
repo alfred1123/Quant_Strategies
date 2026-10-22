@@ -20,7 +20,6 @@ from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 
-from quant.data.backtest_cache import BacktestCache
 from quant.shared.db import ProcedureError
 
 logger = logging.getLogger(__name__)
@@ -329,7 +328,7 @@ def fill_scheduled_providers(
                     fetch_df(
                         cusip, start_s, end_s, app["name"], refdata, inst_cache, bt_cache,
                         refresh=True,
-                        tm_interval_id=BacktestCache.DEFAULT_TM_INTERVAL_ID,
+                        tm_interval_id=bt_cache.default_tm_interval_id(),
                         metric_nm=metric_nm,
                     )
                 except Exception as exc:

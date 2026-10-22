@@ -273,3 +273,38 @@ class TestSchemaCaches:
             ("refdata", "indicator"),
             ("config", "promotion_metric"),
         ]
+
+
+class TestSettings:
+    """``CONFIG.SETTING`` and the two new catalogs, read through the shipped parser."""
+
+    def _reader(self):
+        from tests.conftest import StubRefData
+
+        return StubRefData()
+
+    def test_setting_is_read_as_stored(self):
+        assert self._reader().setting("fallback_settlement_ccy") == "USDT"
+
+    def test_typed_accessors_cast(self):
+        r = self._reader()
+        assert r.setting_int("min_metric_obs") == 60
+        assert r.setting_float("order_retry_backoff_s") == 2.0
+        assert r.setting_floats("fill_confirm_delays_s") == (0.3, 0.6, 1.2, 2.4, 3.5)
+
+    def test_missing_setting_is_an_error_not_a_default(self):
+        with pytest.raises(RuntimeError, match="CONFIG.SETTING missing"):
+            self._reader().setting("no_such_knob")
+
+    def test_queue_priority_resolves_the_db_integer(self):
+        r = self._reader()
+        assert r.resolve_queue_priority("normal") == 100
+        assert r.resolve_queue_priority("high") == 0
+        with pytest.raises(RuntimeError, match="QUEUE_PRIORITY"):
+            r.resolve_queue_priority("urgent")
+
+    def test_schedule_status_catalog(self):
+        r = self._reader()
+        assert r.validate_schedule_status("PENDING") == "PENDING"
+        with pytest.raises(RuntimeError, match="SCHEDULE_STATUS"):
+            r.validate_schedule_status("RUNNING")

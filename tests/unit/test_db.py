@@ -18,6 +18,7 @@ from quant.shared.db import (
     database_error_facts,
     open_pool,
     pool_for,
+    require_arg,
 )
 
 _CIPHERTEXT = "gAAAAABqkYSOK9y-7-avVAadofsaAWhCOziTPCcZxFE5u1bq5LnAWYuZ"
@@ -38,6 +39,24 @@ def gateway():
     mock_pool.connection.return_value.__enter__.return_value = mock_conn
     with patch("quant.shared.db.pool_for", return_value=mock_pool):
         yield DbGateway("postgresql://test"), mock_conn, mock_cur, mock_pool
+
+
+class TestRequireArg:
+    @pytest.mark.parametrize("value", [None, "", "   "])
+    def test_missing_or_blank_is_refused(self, value):
+        with pytest.raises(ValueError, match="symbol is required"):
+            require_arg(value, "symbol")
+
+    @pytest.mark.parametrize("value", ["x", 0, 0.0, False, []])
+    def test_present_values_pass_including_falsy_non_strings(self, value):
+        require_arg(value, "symbol")
+
+    def test_raises_the_callers_error_type(self):
+        class Mine(Exception):
+            pass
+
+        with pytest.raises(Mine):
+            require_arg(None, "n", error=Mine)
 
 
 class TestDatabaseErrorFacts:

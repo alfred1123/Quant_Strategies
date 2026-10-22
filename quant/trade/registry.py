@@ -41,12 +41,17 @@ class AdapterRegistry:
 
 
 def _factory_for(
-    preset: CcxtExchangePreset, key_router: KeyRouter | None
+    preset: CcxtExchangePreset, key_router: KeyRouter | None, refdata: RedisRefData
 ) -> AdapterFactory:
     from quant.trade.brokers.ccxt.adapter import create_ccxt_adapter
 
     def factory(**kwargs: Any) -> TradeAdapter:
-        return create_ccxt_adapter(preset=preset, key_router=key_router, **kwargs)
+        return create_ccxt_adapter(
+            preset=preset,
+            key_router=key_router,
+            confirm_delays_s=refdata.setting_floats("fill_confirm_delays_s"),
+            **kwargs,
+        )
 
     return factory
 
@@ -78,7 +83,7 @@ def build_default_registry(
     """
     registry = AdapterRegistry()
     for app_id, preset in ccxt_apps(refdata):
-        registry.register(app_id, _factory_for(preset, key_router))
+        registry.register(app_id, _factory_for(preset, key_router, refdata))
     return registry
 
 

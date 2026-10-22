@@ -52,7 +52,7 @@ Keep `V_START_TS TIMESTAMPTZ := CURRENT_TIMESTAMP;` for `TRANSACT_FROM_TS` / `TR
 - Logging format and level are configured **once** in `quant/shared/logging.py` (`setup_logging()`). Do **not** call `logging.basicConfig()` anywhere else.
 - **Entry points only** (`quant/cli.py`, `quant/shared/config.py` via `load_config()`) call `setup_logging()`.
 - Library modules **never** call `setup_logging` — they only emit via `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`.
-- Do **not** use `print()` for status output — use the logger at the appropriate level.
+- Do **not** use `print()` for status output — use the logger at the appropriate level. The one exception is `BacktestWorker._emit` in `quant/queue/worker.py`: stdout is the worker's newline-delimited JSON event protocol to its parent (`docs/design/backtest-queue.md` §10.3), so that `print` is the protocol, not status output.
 
 ## Safety
 
@@ -110,6 +110,9 @@ All UI dropdown, radio, and selectbox values must come from `REFDATA` tables in 
 | Promotion rules (gates + soft metrics) | `CONFIG.PROMOTION_METRIC` | `DISPLAY_NAME` | `NAME` (also `METRIC_KEY`, `REQUIREMENT_TYPE`, `PRIORITY`, `THRESHOLD`) |
 | Listing session calendar | `REFDATA.MARKET_CALENDAR` | — | `LISTING_EXCHANGE`, `BAR_TIMEZONE`, `MARKET_*` (via `get_market_calendar()`; `''` = default crypto; not a UI dropdown) |
 | Scheduled apply offset (broker × cadence) | `CONFIG.APP_APPLY_TIMING` | — | `EXECUTE_OFFSET` (via `get_execute_offset()` / `get_apply_timing()`) |
+| Scalar platform knobs (metric floor, queue cap, retry budgets, confirm poll schedule, settlement fallback, default cadence) | `CONFIG.SETTING` | — | `SETTING_VALUE` by `SETTING_NM` (via `setting()` / `setting_int()` / `setting_float()` / `setting_floats()`; missing row is an error, never a code default) |
+| Queue priority label | `REFDATA.QUEUE_PRIORITY` | `DISPLAY_NAME` | `NAME` → `PRIORITY` (via `resolve_queue_priority()`) |
+| Schedule status | `REFDATA.SCHEDULE_STATUS` | `DISPLAY_NAME` | `NAME` (via `validate_schedule_status()`) |
 
 Grid defaults come from `REFDATA.INDICATOR` via `RedisRefData.get_indicator_defaults()` (`quant/refdata/reader.py`).
 

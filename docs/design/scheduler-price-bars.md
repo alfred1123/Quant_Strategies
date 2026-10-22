@@ -34,7 +34,7 @@ The table (`TM_INTERVAL_ID IDENTITY`, `NAME`, `DESCRIPTION`) exists since baseli
 
 | TM_INTERVAL_ID | NAME | PERIOD_LENGTH | DESCRIPTION |
 |----------------|------|---------------|-------------|
-| 1 | `DAILY` | `1 day` | Daily bars — matches `BacktestCache.DEFAULT_TM_INTERVAL_ID = 1` |
+| 1 | `DAILY` | `1 day` | Daily bars — `CONFIG.SETTING default_tm_interval_id` |
 | 2 | `1H` | `1 hour` | Hourly bars |
 
 `PERIOD_LENGTH` is the scheduler step (`last_run + PERIOD_LENGTH`). Poller uses `SP_GET_MISSED_DUE_DEPLOYMENTS`; UI preview may use `SP_GET_NEXT_DUE_DEPLOYMENTS` or compute in Python.

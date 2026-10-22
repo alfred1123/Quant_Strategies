@@ -268,10 +268,11 @@ class BayesianSearch(SearchStrategy):
 
 class ParametersOptimization:
 
-    def __init__(self, data, config, *, fee_bps=None):
+    def __init__(self, data, config, *, fee_bps=None, min_metric_obs: int):
         self.data = data
         self.config = config
         self.fee_bps = fee_bps
+        self.min_metric_obs = int(min_metric_obs)
 
     def optimize(self, window_values, signal_values, *, n_trials=None,
                  callbacks=None):
@@ -309,7 +310,8 @@ class ParametersOptimization:
         search, n_trials = self._select_search(space.total, n_trials)
         search.log_start(space, n_trials)
         objective = Objective.for_config(
-            self.data, self.config, space.window_spec, fee_bps=self.fee_bps,
+            self.data, self.config, space.window_spec,
+            fee_bps=self.fee_bps, min_metric_obs=self.min_metric_obs,
         )
         study = search.search(objective, space, n_trials, callbacks)
         rows = self._rows_from_study(study, space.keys)

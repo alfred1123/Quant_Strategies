@@ -110,7 +110,7 @@ Pre-completion aborts (missing strategy, bars, credentials) still spend the in-m
 `OrderRejectReason` whose `requires_operator_fix` is true pauses on the **first**
 failed pass. Today that is a qty under the venue's min lot or notional (the
 remaining attempts would send the identical order), and a cancel that returned
-failure (`CANCEL_FAILED`, decision #111) — the order may still be open, so the
+failure (`CANCEL_FAILED`, decision #112) — the order may still be open, so the
 next apply would place again on a book that still reads flat. Everything the
 tick cannot classify keeps all 3 attempts.
 

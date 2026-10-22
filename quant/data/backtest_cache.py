@@ -23,16 +23,16 @@ class BacktestCache(DbGateway):
     Uses a ``RedisRefData`` reader for denormalized ID lookups (APP_ID, etc.).
     """
 
-    # Hardcoded default — daily bars. All callers omit tm_interval_id; this
-    # constant is the single source of truth until a multi-interval UI lands.
-    DEFAULT_TM_INTERVAL_ID = 1
-
     def __init__(self, conninfo: str, refdata, user_id: str = "quant_admin") -> None:
         # ``refdata`` duck-types the legacy RefDataCache surface — only
         # ``.get(table)`` and ``.resolve_app_metric_id(...)`` are used here,
         # both of which RedisRefData implements identically.
         super().__init__(conninfo, user_id)
         self.refdata = refdata
+
+    def default_tm_interval_id(self) -> int:
+        """``CONFIG.SETTING default_tm_interval_id`` — the cadence a read assumes when none is named."""
+        return self.refdata.setting_int("default_tm_interval_id")
 
     # ── helpers ─────────────────────────────────────────────────────────
 
@@ -152,7 +152,7 @@ class BacktestCache(DbGateway):
         cover the request. **Never** calls the provider and **never** writes.
         """
         if tm_interval_id is None:
-            tm_interval_id = self.DEFAULT_TM_INTERVAL_ID
+            tm_interval_id = self.default_tm_interval_id()
 
         req_start = self._to_utc(range_start)
         req_end = self._to_utc(range_end)
@@ -209,7 +209,7 @@ class BacktestCache(DbGateway):
         wrap this in a bare ``except`` that swallows.
         """
         if tm_interval_id is None:
-            tm_interval_id = self.DEFAULT_TM_INTERVAL_ID
+            tm_interval_id = self.default_tm_interval_id()
 
         req_start = self._to_utc(range_start)
         req_end = self._to_utc(range_end)

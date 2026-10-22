@@ -10,7 +10,7 @@ Usage:
     # Single-factor
     config = StrategyConfig("BTC-USD", "get_bollinger_band",
                             SignalDirection.momentum_band_signal, 365)
-    wf = WalkForward(data, 0.5, config)
+    wf = WalkForward(data, 0.5, config, min_metric_obs=60)
     result = wf.run(window_tuple, signal_tuple)
 
     # Multi-factor — run() auto-detects from config
@@ -19,7 +19,7 @@ Usage:
     config = StrategyConfig("BTC-USD", "get_sma",
                             SignalDirection.momentum_band_signal, 365,
                             conjunction="AND", substrategies=(sub1, sub2))
-    wf = WalkForward(data, 0.5, config)
+    wf = WalkForward(data, 0.5, config, min_metric_obs=60)
     result = wf.run(window_ranges, signal_ranges)
 """
 
@@ -60,13 +60,15 @@ class WalkForwardResult:
 class WalkForward:
     """Walk-forward overfitting test for the backtest pipeline."""
 
-    def __init__(self, data, split_ratio, config, *, fee_bps=None):
+    def __init__(self, data, split_ratio, config, *, fee_bps=None, min_metric_obs: int):
         """
         Args:
             data: dict[str, DataFrame] keyed by internal_cusip.
             split_ratio: Fraction of data used for in-sample (0.0–1.0).
             config: StrategyConfig with indicator_name, signal_func, trading_period.
             fee_bps: Transaction fee in basis points.
+            min_metric_obs: ``CONFIG.SETTING min_metric_obs`` — passed to every
+                ``Performance`` and search this test runs.
         """
         if not 0.0 < split_ratio < 1.0:
             raise ValueError(f"split_ratio must be between 0 and 1, got {split_ratio}")
@@ -77,6 +79,7 @@ class WalkForward:
         self.split_ratio = split_ratio
         self.config = config
         self.fee_bps = fee_bps
+        self.min_metric_obs = int(min_metric_obs)
 
         self.split_idx = int(len(self.data) * split_ratio)
         if self.split_idx < 2 or self.split_idx >= len(self.data) - 1:
@@ -114,7 +117,8 @@ class WalkForward:
 
         # ── In-sample: optimize on training split ───────────────────
         opt_result = ParametersOptimization(
-            is_data_dict, self.config, fee_bps=self.fee_bps,
+            is_data_dict, self.config,
+            fee_bps=self.fee_bps, min_metric_obs=self.min_metric_obs,
         ).run(window_values, signal_values)
 
         best_window, best_signal = opt_result.best_params()
@@ -133,7 +137,7 @@ class WalkForward:
         # ── Full-period equity curve ─────────────────────────────────
         full_perf = Performance(
             self.all_data, self.config, best_window, best_signal,
-            fee_bps=self.fee_bps,
+            fee_bps=self.fee_bps, min_metric_obs=self.min_metric_obs,
         )
         full_perf.enrich_performance()
 
@@ -149,16 +153,11 @@ class WalkForward:
     def _evaluate(self, data, best_window, best_signal):
         """Run Performance on a data slice with fixed params and return metrics."""
         perf = Performance(
-            data, self.config, best_window, best_signal, fee_bps=self.fee_bps,
+            data, self.config, best_window, best_signal,
+            fee_bps=self.fee_bps, min_metric_obs=self.min_metric_obs,
         )
         perf.enrich_performance()
         return perf.get_strategy_performance()
-
-    def _run_single(self, window_tuple, signal_tuple):
-        return self.run(window_tuple, signal_tuple)
-
-    def _run_multi(self, window_ranges, signal_ranges):
-        return self.run(window_ranges, signal_ranges)
 
     @staticmethod
     def _overfitting_ratio(is_metrics, oos_metrics):
