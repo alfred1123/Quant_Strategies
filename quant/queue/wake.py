@@ -1,7 +1,7 @@
 """Cross-process wake signal for the backtest queue.
 
 Producers (FastAPI enqueue handler) call ``publish_wake()`` after inserting a
-new row into ``BT.QUEUE``. Long-lived workers (``src.worker_loop``) sit on
+new row into ``BT.QUEUE``. Long-lived workers (``quant.queue.worker_loop``) sit on
 ``wait_for_wake()``; the call returns when a producer fires or the timeout
 elapses (whichever comes first), so workers also poll periodically as a
 safety net against missed wakes.

@@ -29,7 +29,7 @@ class ApplyReport(BaseModel):
     reject_reason: OrderRejectReason | None = None
     # The cancel in this cycle returned failure. The order may still be open,
     # so the tick pauses on the first pass even when ``reject_reason`` is a
-    # venue label that does not itself require an operator (decision #112).
+    # venue label that does not itself require an operator (decision #113).
     cancel_failed: bool = False
     # Which price series produced `signal` — e.g. "price_bar:bybit" or
     # "provider". Strategy parameters are fitted on provider history, so a

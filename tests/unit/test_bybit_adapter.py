@@ -36,6 +36,9 @@ from quant.trade.order_policy import OrderRetryExecutor, OrderRetryPolicy
 from quant.trade.scheduler.tick import ScheduleTickRunner, TickOutcome
 from tests.unit.test_schedule_tick import _due_row
 
+#: The seeded CONFIG.SETTING fill_confirm_delays_s.
+_DELAYS = (0.3, 0.6, 1.2, 2.4, 3.5)
+
 
 @pytest.fixture
 def inst_cache():
@@ -339,7 +342,7 @@ class TestAdapterKeyRouting:
     def _adapter(self, inst_cache, router):
         return create_ccxt_adapter(
             preset=CCXT_PRESETS["bybit"], api_key="k", api_secret="s",
-            paper=False, inst_cache=inst_cache, key_router=router,
+            paper=False, inst_cache=inst_cache, confirm_delays_s=_DELAYS, key_router=router,
         )
 
     def _router(self, profile):
@@ -692,7 +695,7 @@ class TestCreateCcxtAdapter:
             api_key="k",
             api_secret="s",
             paper=True,
-            inst_cache=inst_cache,
+            inst_cache=inst_cache, confirm_delays_s=_DELAYS,
         )
         symbol = adapter.validate_for_dry_run("btcusdt.crypto", 34)
         assert symbol == "BTCUSDT"
@@ -708,7 +711,7 @@ class TestCreateCcxtAdapter:
             api_key="k",
             api_secret="s",
             paper=True,
-            inst_cache=inst_cache,
+            inst_cache=inst_cache, confirm_delays_s=_DELAYS,
         )
         symbol = adapter.validate_for_dry_run("btcusdt.crypto", 35)
         assert symbol == "BTC/USDT:USDT"
@@ -722,7 +725,7 @@ class TestCreateCcxtAdapter:
             api_key="k",
             api_secret="s",
             paper=True,
-            inst_cache=inst_cache,
+            inst_cache=inst_cache, confirm_delays_s=_DELAYS,
         )
         with pytest.raises(SymbolMappingError, match="unknown product"):
             adapter.validate_for_dry_run("missing.crypto", 34)
@@ -734,7 +737,7 @@ class TestPlaceOrder:
             api_key="k",
             api_secret="s",
             paper=True,
-            inst_cache=inst_cache,
+            inst_cache=inst_cache, confirm_delays_s=_DELAYS,
         )
         adapter.pin_instrument("btcusdt.crypto")
         return adapter
@@ -756,7 +759,7 @@ class TestPlaceOrder:
 
         mock_create.assert_called_once_with("BTCUSDT", "buy", 0.01)
         mock_confirm.assert_called_once_with(
-            adapter.gateway, req=req, vendor_order_id="abc123",
+            adapter.gateway, req=req, vendor_order_id="abc123", delays_s=_DELAYS,
         )
         assert result.success is True
         assert result.vendor_order_id == "abc123"
@@ -998,6 +1001,7 @@ class TestTypedCancelRefusal:
             api_secret="s",
             paper=True,
             inst_cache=inst_cache,
+            confirm_delays_s=_DELAYS,
         )
         adapter.pin_instrument("btcusdt.crypto")
         return adapter
@@ -1034,7 +1038,7 @@ class TestTypedCancelRefusal:
                  return_value=_unconfirmed(),
              ):
             outcome = OrderRetryExecutor(
-                OrderRetryPolicy(max_attempts=max_attempts),
+                OrderRetryPolicy(max_attempts=max_attempts, backoff_s=2.0),
             ).execute(adapter, "BTCUSDT", 1.0, 0.01)
 
         result = outcome.result
@@ -1080,7 +1084,7 @@ class TestTypedCancelRefusal:
                  return_value=_unconfirmed(),
              ):
             outcome = OrderRetryExecutor(
-                OrderRetryPolicy(max_attempts=5),
+                OrderRetryPolicy(max_attempts=5, backoff_s=2.0),
             ).execute(adapter, "BTCUSDT", 1.0, 0.01)
 
         result = outcome.result

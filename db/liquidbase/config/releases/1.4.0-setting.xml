@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1.4.0-001-setting-table" author="alfcheun" context="config,prod-deploy">
+        <comment>CONFIG.SETTING: scalar platform policy that used to be a Python literal.</comment>
+        <sqlFile path="../tables/SETTING.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 stripComments="true"/>
+        <rollback>
+            <sql>DROP TABLE IF EXISTS CONFIG.SETTING;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.4.0-002-setting-seed" author="alfcheun" context="config,prod-deploy">
+        <comment>The nine knobs the code read as literals, at the values it had.</comment>
+        <sqlFile path="../data/SETTING.sql"
+                 relativeToChangelogFile="true"
+                 splitStatements="true"
+                 stripComments="true"/>
+        <rollback>
+            <sql>DELETE FROM CONFIG.SETTING;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

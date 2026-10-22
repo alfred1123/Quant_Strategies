@@ -38,12 +38,6 @@ logger = logging.getLogger(__name__)
 # driven, without building the whole trade stack.
 ApplyDeployment = Callable[[UUID, UUID], ApplyReport]
 
-DEFAULT_MAX_ATTEMPTS = 3
-#: Long enough for a dropped connection or a venue blip to clear, short enough
-#: that three attempts stay well inside the Lambda's 110 s HTTP timeout on top
-#: of the order executor's own retries.
-DEFAULT_RETRY_BACKOFF_S = 5.0
-
 
 def _position_of(report) -> float | None:
     """``position_qty`` off an :class:`ApplyReport`, or None if unreadable.
@@ -145,7 +139,10 @@ class TickReport:
 class ScheduleTickRunner:
     """Applies the deployments due on one interval and advances their cursors.
 
-    ``max_attempts`` is spent within one pass, ``retry_backoff_s`` apart, and a
+    ``max_attempts`` (``CONFIG.SETTING tick_max_attempts``) is spent within one
+    pass, ``retry_backoff_s`` (``tick_retry_backoff_s`` — long enough for a
+    venue blip to clear, short enough that the pass stays inside the Lambda's
+    110 s HTTP timeout on top of the order executor's own retries) apart, and a
     deployment still failing at the end is paused. This wraps the whole apply
     (connect, bars, signal, order), where ``OrderRetryExecutor`` retries only
     the broker order inside one. A reject carrying
@@ -160,8 +157,8 @@ class ScheduleTickRunner:
         repo: TradeRepo,
         apply_deployment: ApplyDeployment,
         *,
-        max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-        retry_backoff_s: float = DEFAULT_RETRY_BACKOFF_S,
+        max_attempts: int,
+        retry_backoff_s: float,
     ) -> None:
         self._repo = repo
         self._apply = apply_deployment

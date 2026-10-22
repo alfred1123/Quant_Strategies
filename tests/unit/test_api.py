@@ -32,6 +32,7 @@ def client():
         from quant.api.auth.models import CurrentUser
 
         ref = MagicMock()
+        ref.setting_int.return_value = 60  # CONFIG.SETTING min_metric_obs
         inst = MagicMock()
         inst.get_product_by_cusip.return_value = None
         bt = MagicMock()

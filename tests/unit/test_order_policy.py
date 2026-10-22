@@ -108,9 +108,13 @@ def _result(
     )
 
 
+#: The seeded CONFIG.SETTING budget — what live_apply builds from the snapshot.
+_POLICY = OrderRetryPolicy(max_attempts=5, backoff_s=2.0)
+
+
 class TestOrderRetryPolicy:
     def setup_method(self) -> None:
-        self.policy = OrderRetryPolicy()
+        self.policy = OrderRetryPolicy(max_attempts=5, backoff_s=2.0)
 
     def test_unconfirmed_message(self):
         assert self.policy.is_unconfirmed(_result("fill unconfirmed after 8s"))
@@ -161,7 +165,7 @@ class TestOrderRetryPolicy:
     def test_an_unclassified_timeout_stays_retryable(self):
         assert self.policy.is_retryable(_result("fetch timeout"))
 
-    def test_defaults(self):
+    def test_carries_the_configured_budget(self):
         assert self.policy.max_attempts == 5
         assert self.policy.backoff_s == 2.0
 
@@ -194,7 +198,7 @@ def _adapter(place_result: OrderResult | None, position_qty: float = 0.0) -> Mag
 class TestOrderRetryExecutor:
     def test_hold_short_circuits(self):
         adapter = _adapter(None)
-        outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 0.0, 0.01)
+        outcome = OrderRetryExecutor(_POLICY).execute(adapter, "BTCUSDT", 0.0, 0.01)
         assert outcome.action is IntendedAction.HOLD
         assert outcome.result is None
         assert len(outcome.attempts) == 1
@@ -204,7 +208,7 @@ class TestOrderRetryExecutor:
     def test_the_position_read_once_sizes_the_order(self):
         """One broker read drives both the decision and the flatten size."""
         adapter = _adapter(_result("filled", success=True), position_qty=0.03)
-        outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 0.0, 0.01)
+        outcome = OrderRetryExecutor(_POLICY).execute(adapter, "BTCUSDT", 0.0, 0.01)
         assert outcome.action is IntendedAction.SELL
         assert adapter.get_position_qty.call_count == 1
         req = adapter.place_order.call_args.args[0]
@@ -212,14 +216,14 @@ class TestOrderRetryExecutor:
 
     def test_success_returns_first_attempt(self):
         adapter = _adapter(_result("filled", success=True))
-        outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 1.0, 0.01)
+        outcome = OrderRetryExecutor(_POLICY).execute(adapter, "BTCUSDT", 1.0, 0.01)
         assert outcome.result is not None and outcome.result.success
         assert not outcome.permanent_failure
         assert len(outcome.attempts) == 1
 
     def test_permanent_failure_no_retry(self):
         adapter = _adapter(_result("insufficient funds", reason=OrderRejectReason.INSUFFICIENT_FUNDS))
-        outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 1.0, 0.01)
+        outcome = OrderRetryExecutor(_POLICY).execute(adapter, "BTCUSDT", 1.0, 0.01)
         assert outcome.permanent_failure
         assert len(outcome.attempts) == 1
         adapter.cancel_order.assert_not_called()
@@ -232,7 +236,7 @@ class TestOrderRetryExecutor:
                 reason=OrderRejectReason.SIZE_BELOW_MINIMUM,
             )
         )
-        outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 1.0, 0.0001)
+        outcome = OrderRetryExecutor(_POLICY).execute(adapter, "BTCUSDT", 1.0, 0.0001)
         assert adapter.place_order.call_count == 1
         assert outcome.permanent_failure
         assert outcome.result is not None
@@ -243,7 +247,7 @@ class TestOrderRetryExecutor:
         adapter = _adapter(
             _result("fill unconfirmed after 8s requires manual reconciliation")
         )
-        outcome = OrderRetryExecutor(OrderRetryPolicy(max_attempts=3)).execute(
+        outcome = OrderRetryExecutor(OrderRetryPolicy(max_attempts=3, backoff_s=2.0)).execute(
             adapter, "BTCUSDT", 1.0, 0.01
         )
         assert not outcome.permanent_failure
@@ -280,7 +284,7 @@ class TestOrderRetryExecutor:
             message=cancel_message,
         )
         outcome = OrderRetryExecutor(
-            OrderRetryPolicy(max_attempts=max_attempts),
+            OrderRetryPolicy(max_attempts=max_attempts, backoff_s=2.0),
         ).execute(adapter, "BTCUSDT", 1.0, 0.01)
 
         assert adapter.place_order.call_count == 1
@@ -309,7 +313,7 @@ class TestOrderRetryExecutor:
             vendor_order_id="1",
             message="order canceled",
         )
-        outcome = OrderRetryExecutor(OrderRetryPolicy(max_attempts=3)).execute(
+        outcome = OrderRetryExecutor(OrderRetryPolicy(max_attempts=3, backoff_s=2.0)).execute(
             adapter, "BTCUSDT", 1.0, 0.01
         )
 
@@ -334,7 +338,7 @@ class TestOrderRetryExecutor:
         adapter.cancel_order.side_effect = RuntimeError("cancel transport died")
 
         with pytest.raises(RuntimeError, match="cancel transport died"):
-            OrderRetryExecutor().execute(adapter, "BTCUSDT", 1.0, 0.01)
+            OrderRetryExecutor(_POLICY).execute(adapter, "BTCUSDT", 1.0, 0.01)
 
         assert adapter.place_order.call_count == 1
         assert adapter.cancel_order.call_count == 1

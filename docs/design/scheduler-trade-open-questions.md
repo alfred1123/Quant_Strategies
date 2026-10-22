@@ -110,8 +110,8 @@ Pre-completion aborts (missing strategy, bars, credentials) still spend the in-m
 `OrderRejectReason` whose `requires_operator_fix` is true pauses on the **first**
 failed pass. Today that is a qty under the venue's min lot or notional (the
 remaining attempts would send the identical order), and a cancel that returned
-failure (decision #111). The result reports the venue's typed reason when the
-cancel carried one, and `CANCEL_FAILED` when it did not (decision #112). The
+failure (decision #112). The result reports the venue's typed reason when the
+cancel carried one, and `CANCEL_FAILED` when it did not (decision #113). The
 pause is the failed cancel — the order may still be open — not the venue's
 label, so a `KEY_REFUSED` cancel pauses on the first pass while a refused key
 on place still spends the budget. Everything the tick cannot classify keeps

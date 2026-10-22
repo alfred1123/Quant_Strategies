@@ -17,6 +17,7 @@ from quant.trade.models.order import (
     OrderSide,
 )
 from quant.trade.order_policy import OrderRetryResult
+from tests.conftest import StubRefData
 
 
 def _deployment(**overrides) -> DeploymentRow:
@@ -53,6 +54,7 @@ def orchestrator():
     ]
     bt.fetch_result_payload.return_value = {"best": {"window": 20, "signal": 0.5}}
     data_caches = MagicMock()
+    data_caches.refdata = StubRefData()
     data_caches.instrument_cache.get_product_by_cusip.return_value = {
         "product_id": 1,
         "internal_cusip": "btcusdt.crypto",

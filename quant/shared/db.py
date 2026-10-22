@@ -126,6 +126,17 @@ def _redact_one(param: object) -> object:
     return param
 
 
+def require_arg(value, name: str, *, error: type[Exception] = ValueError) -> None:
+    """Refuse ``None`` or a blank string before it reaches a procedure.
+
+    Procedures are called with every argument positional and typed, so a
+    missing one surfaces as a driver cast error far from the caller. Repos
+    check here first and raise their own error type (``error``).
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
+        raise error(f"{name} is required")
+
+
 class ProcedureError(RuntimeError):
     """Stored procedure returned a non-``00000`` SQLSTATE."""
 
