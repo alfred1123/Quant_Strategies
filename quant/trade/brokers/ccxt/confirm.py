@@ -77,6 +77,27 @@ def _parse_terminal(order: dict, *, vendor_order_id: str | None) -> _FillStatus 
     return None
 
 
+def _unconfirmed(
+    req: OrderRequest,
+    vendor_order_id: str,
+    last_status: str | None,
+    delays_s: tuple[float, ...],
+) -> OrderResult:
+    """The fill is unknown. The executor cancels this id before placing again."""
+    return OrderResult(
+        success=False,
+        vendor_order_id=vendor_order_id,
+        message=(
+            f"fill unconfirmed after {sum(delays_s):.1f}s — "
+            f"vendor_order_id={vendor_order_id} requires manual reconciliation"
+            + (f" (last status={last_status!r})" if last_status else "")
+        ),
+        raw_status=last_status,
+        side=req.side,
+        requested_qty=req.qty,
+    )
+
+
 def confirm_market_order(
     gateway: CcxtTradeGateway,
     *,
@@ -90,6 +111,8 @@ def confirm_market_order(
 
     This is the **single point** that builds ``OrderResult`` for the fill path.
     The gateway returns raw dicts; this function owns the domain translation.
+    A typed connection error is that outcome and keeps ``exc.reason``. An
+    untyped one is the same unconfirmed result as an exhausted poll.
     """
     last_status: str | None = None
     for delay in delays_s:
@@ -99,13 +122,16 @@ def confirm_market_order(
         except OrderNotFoundError:
             continue
         except BrokerConnectionError as exc:
-            return OrderResult(
-                success=False,
-                vendor_order_id=vendor_order_id,
-                message=str(exc),
-                side=req.side,
-                requested_qty=req.qty,
-            )
+            if exc.reason is not None:
+                return OrderResult(
+                    success=False,
+                    vendor_order_id=vendor_order_id,
+                    message=str(exc),
+                    reason=exc.reason,
+                    side=req.side,
+                    requested_qty=req.qty,
+                )
+            return _unconfirmed(req, vendor_order_id, last_status, delays_s)
         last_status = order.get("status")
         fill = _parse_terminal(order, vendor_order_id=vendor_order_id)
         if fill is not None:
@@ -123,15 +149,4 @@ def confirm_market_order(
                 fee_ccy=fill.fee_ccy,
             )
 
-    return OrderResult(
-        success=False,
-        vendor_order_id=vendor_order_id,
-        message=(
-            f"fill unconfirmed after {sum(delays_s):.1f}s — "
-            f"vendor_order_id={vendor_order_id} requires manual reconciliation"
-            + (f" (last status={last_status!r})" if last_status else "")
-        ),
-        raw_status=last_status,
-        side=req.side,
-        requested_qty=req.qty,
-    )
+    return _unconfirmed(req, vendor_order_id, last_status, delays_s)
