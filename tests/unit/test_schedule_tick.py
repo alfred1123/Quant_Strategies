@@ -203,9 +203,9 @@ class TestRetriesWithinThePass:
 
         report = _runner(repo, apply_fn, max_attempts=_TICK_ATTEMPTS).run_interval(1)
 
-        assert apply_fn.call_count == 3
+        assert apply_fn.call_count == _TICK_ATTEMPTS
         assert report.results[0].outcome is TickOutcome.PAUSED
-        assert report.results[0].attempt == 3
+        assert report.results[0].attempt == _TICK_ATTEMPTS
         assert report.results[0].error == "boom"
         repo.write_deployment.assert_called_once()
         repo.sp_ins_deployment_schedule_status.assert_not_called()
@@ -274,7 +274,7 @@ class TestAttemptBudget:
 
         report = runner.run_interval(1)
 
-        assert apply_fn.call_count == 3
+        assert apply_fn.call_count == _TICK_ATTEMPTS
         assert report.results[0].outcome is TickOutcome.PAUSED
         assert report.results[0].error == "insufficient funds"
 
