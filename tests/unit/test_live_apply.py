@@ -319,11 +319,15 @@ class TestLiveApplyOrchestrator:
 
         assert report.order_success is False
         assert report.reject_reason is OrderRejectReason.SIZE_BELOW_MINIMUM
-        assert report.cancel_failed is False
+        from quant.trade.models.order import OrderFailureStage
+
+        assert report.failure_stage is OrderFailureStage.PLACE
         assert "min qty 0.001" in report.message
 
     def test_a_failed_cancel_reaches_the_report(self, orchestrator):
-        """The tick pauses off ``cancel_failed``, so the report has to carry it."""
+        """The tick pauses off the failure stage, so the report has to carry it."""
+        from quant.trade.models.order import OrderFailureStage
+
         orch, _bt = orchestrator
         outcome = OrderRetryResult(
             action=IntendedAction.BUY,
@@ -337,7 +341,7 @@ class TestLiveApplyOrchestrator:
             attempts=(),
             max_attempts=5,
             permanent_failure=True,
-            cancel_failed=True,
+            failure_stage=OrderFailureStage.CANCEL,
         )
 
         report = orch._report(
@@ -345,7 +349,7 @@ class TestLiveApplyOrchestrator:
         )
 
         assert report.reject_reason is OrderRejectReason.KEY_REFUSED
-        assert report.cancel_failed is True
+        assert report.failure_stage is OrderFailureStage.CANCEL
         assert report.order_success is False
 
     @patch("quant.trade.order_policy.time.sleep")

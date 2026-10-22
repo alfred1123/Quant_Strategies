@@ -960,8 +960,11 @@ def _unconfirmed(vendor_order_id: str = "ord-1") -> OrderResult:
     )
 
 
-def _tick_paused(outcome, *, cancel_failed: bool) -> bool:
+def _tick_paused(outcome) -> bool:
     """One due deployment, paused on the first pass."""
+    from quant.trade.order_policy import OrderRetryResult
+
+    assert OrderRetryResult.pauses_deployment(outcome.failure_stage, outcome.result.reason)
     repo = MagicMock()
     repo.sp_get_missed_due_deployments.return_value = [_due_row()]
     result = outcome.result
@@ -976,7 +979,7 @@ def _tick_paused(outcome, *, cancel_failed: bool) -> bool:
         vendor_order_id=result.vendor_order_id,
         message=result.message,
         reject_reason=result.reason,
-        cancel_failed=cancel_failed,
+        failure_stage=outcome.failure_stage,
     )
     runner = ScheduleTickRunner(
         repo, lambda _user, _deployment: report, max_attempts=3, retry_backoff_s=0,
@@ -1049,10 +1052,13 @@ class TestTypedCancelRefusal:
         assert result.vendor_order_id == "ord-1"
         assert place.call_count == 1
         assert position.call_count == 1
-        assert outcome.cancel_failed
+        from quant.trade.models.order import OrderFailureStage
+        from quant.trade.order_policy import OrderRetryResult
+        assert outcome.failure_stage is OrderFailureStage.CANCEL
         assert len(outcome.attempts) == 1
         assert outcome.permanent_failure
-        assert _tick_paused(outcome, cancel_failed=outcome.cancel_failed)
+        assert OrderRetryResult.pauses_deployment(outcome.failure_stage, result.reason)
+        assert _tick_paused(outcome)
         _sleep.assert_not_called()
 
     @pytest.mark.parametrize(
@@ -1091,8 +1097,12 @@ class TestTypedCancelRefusal:
         assert result is not None
         assert result.reason is OrderRejectReason.CANCEL_FAILED
         assert result.reason.requires_operator_fix
+        from quant.trade.models.order import OrderFailureStage
+        from quant.trade.order_policy import OrderRetryResult
+        assert outcome.failure_stage is OrderFailureStage.CANCEL
         assert result.success is False
         assert place.call_count == 1
         assert len(outcome.attempts) == 1
-        assert _tick_paused(outcome, cancel_failed=False)
+        assert OrderRetryResult.pauses_deployment(outcome.failure_stage, result.reason)
+        assert _tick_paused(outcome)
         _sleep.assert_not_called()

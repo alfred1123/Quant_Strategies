@@ -14,6 +14,7 @@ from quant.trade.order_policy import (
     ApplyAttempt,
     OrderRetryExecutor,
     OrderRetryPolicy,
+    OrderRetryResult,
     intended_action,
     order_for,
 )
@@ -218,13 +219,20 @@ class TestOrderRetryExecutor:
         adapter = _adapter(_result("filled", success=True))
         outcome = OrderRetryExecutor(_POLICY).execute(adapter, "BTCUSDT", 1.0, 0.01)
         assert outcome.result is not None and outcome.result.success
+        assert outcome.failure_stage is None
         assert not outcome.permanent_failure
         assert len(outcome.attempts) == 1
 
     def test_permanent_failure_no_retry(self):
         adapter = _adapter(_result("insufficient funds", reason=OrderRejectReason.INSUFFICIENT_FUNDS))
+        from quant.trade.models.order import OrderFailureStage
+
         outcome = OrderRetryExecutor(_POLICY).execute(adapter, "BTCUSDT", 1.0, 0.01)
         assert outcome.permanent_failure
+        assert outcome.failure_stage is OrderFailureStage.PLACE
+        assert not OrderRetryResult.pauses_deployment(
+            outcome.failure_stage, outcome.result.reason,
+        )
         assert len(outcome.attempts) == 1
         adapter.cancel_order.assert_not_called()
 
@@ -236,11 +244,17 @@ class TestOrderRetryExecutor:
                 reason=OrderRejectReason.SIZE_BELOW_MINIMUM,
             )
         )
+        from quant.trade.models.order import OrderFailureStage
+
         outcome = OrderRetryExecutor(_POLICY).execute(adapter, "BTCUSDT", 1.0, 0.0001)
         assert adapter.place_order.call_count == 1
         assert outcome.permanent_failure
         assert outcome.result is not None
         assert outcome.result.reason is OrderRejectReason.SIZE_BELOW_MINIMUM
+        assert outcome.failure_stage is OrderFailureStage.PLACE
+        assert OrderRetryResult.pauses_deployment(
+            outcome.failure_stage, outcome.result.reason,
+        )
 
     @patch("quant.trade.order_policy.time.sleep")
     def test_unconfirmed_cancels_and_retries_to_exhaustion(self, mock_sleep):
@@ -297,6 +311,12 @@ class TestOrderRetryExecutor:
         assert outcome.result is outcome.attempts[0].result
         assert outcome.result.reason is OrderRejectReason.CANCEL_FAILED
         assert outcome.result.reason.requires_operator_fix
+        from quant.trade.models.order import OrderFailureStage
+
+        assert outcome.failure_stage is OrderFailureStage.CANCEL
+        assert OrderRetryResult.pauses_deployment(
+            outcome.failure_stage, outcome.result.reason,
+        )
         assert outcome.result.vendor_order_id == "1"
         assert outcome.result.success is False
         mock_sleep.assert_not_called()
@@ -304,6 +324,8 @@ class TestOrderRetryExecutor:
     @patch("quant.trade.order_policy.time.sleep")
     def test_a_successful_cancel_still_retries(self, mock_sleep):
         """Cancel succeeded, so the next attempt is the same retry as before."""
+        from quant.trade.models.order import OrderFailureStage
+
         adapter = _adapter(
             _result("fill unconfirmed after 8s requires manual reconciliation"),
             position_qty=0.0,
@@ -323,7 +345,47 @@ class TestOrderRetryExecutor:
         assert not outcome.permanent_failure
         assert outcome.result is not None
         assert outcome.result.reason is None
+        assert outcome.failure_stage is OrderFailureStage.PLACE
+        assert not OrderRetryResult.pauses_deployment(
+            outcome.failure_stage, outcome.result.reason,
+        )
         assert mock_sleep.call_count == 2
+
+    @pytest.mark.parametrize("max_attempts", [1, 5])
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "authentication failed during cancel_order: permission denied",
+            pytest.param("", id="empty-message"),
+        ],
+    )
+    @patch("quant.trade.order_policy.time.sleep")
+    def test_a_typed_cancel_reason_is_kept(self, _sleep, message, max_attempts):
+        """CANCEL_FAILED is only the cancel that arrived with no reason of its own."""
+        adapter = _adapter(
+            _result("fill unconfirmed after 8s requires manual reconciliation"),
+            position_qty=0.0,
+        )
+        adapter.cancel_order.return_value = OrderResult(
+            success=False,
+            vendor_order_id="1",
+            message=message,
+            reason=OrderRejectReason.KEY_REFUSED,
+        )
+        outcome = OrderRetryExecutor(
+            OrderRetryPolicy(max_attempts=max_attempts, backoff_s=2.0),
+        ).execute(adapter, "BTCUSDT", 1.0, 0.01)
+
+        assert outcome.result is not None
+        assert outcome.result.reason is OrderRejectReason.KEY_REFUSED
+        assert adapter.place_order.call_count == 1
+        from quant.trade.models.order import OrderFailureStage
+
+        assert outcome.failure_stage is OrderFailureStage.CANCEL
+        assert OrderRetryResult.pauses_deployment(
+            outcome.failure_stage, outcome.result.reason,
+        )
+        _sleep.assert_not_called()
 
     def test_a_raising_cancel_does_not_place_again(self):
         """An exception is not a cancel result. It leaves before a second place.
@@ -343,3 +405,22 @@ class TestOrderRetryExecutor:
         assert adapter.place_order.call_count == 1
         assert adapter.cancel_order.call_count == 1
         assert adapter.get_position_qty.call_count == 1
+
+
+class TestPausesDeployment:
+    """None, both stages, and a reason that does not pause a place."""
+
+    def test_pauses_when_the_stage_is_cancel_or_the_reason_needs_an_operator(self):
+        from quant.trade.models.order import OrderFailureStage
+
+        cases = (
+            (None, None, False),
+            (OrderFailureStage.PLACE, None, False),
+            (OrderFailureStage.PLACE, OrderRejectReason.KEY_REFUSED, False),
+            (OrderFailureStage.PLACE, OrderRejectReason.SIZE_BELOW_MINIMUM, True),
+            (OrderFailureStage.CANCEL, None, True),
+            (OrderFailureStage.CANCEL, OrderRejectReason.KEY_REFUSED, True),
+            (OrderFailureStage.CANCEL, OrderRejectReason.CANCEL_FAILED, True),
+        )
+        for stage, reason, pauses in cases:
+            assert OrderRetryResult.pauses_deployment(stage, reason) is pauses
