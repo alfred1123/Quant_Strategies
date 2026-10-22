@@ -10,7 +10,7 @@ The pull request template (`.github/pull_request_template.md`) walks through the
 
 ## Hard requirements
 
-These five rules are not negotiable. A pull request that breaks one of them is not merged, however small or urgent it is. If a rule seems to block a change you need, raise it with Alfred before you write the code, not in review.
+These six rules are not negotiable. A pull request that breaks one of them is not merged, however small or urgent it is. If a rule seems to block a change you need, raise it with Alfred before you write the code, not in review.
 
 ### 1. OOP ownership
 
@@ -69,6 +69,15 @@ The platform is meant to last. A fix that works today and breaks in a month is n
 - **How did this happen?** Every bug write-up and every fix pull request traces the cause to the point where the wrong behaviour starts, not where it shows up. The description has a "How did this happen? (root cause)" section for that trace. A fix that removes or hides bad output (dropping duplicate rows after the fact, filtering bad values, or catching and ignoring an error) must explain why that output cannot be stopped at its source. If it cannot, the bug becomes a design item under `docs/design/`, not a quick fix. Repeated top-10 rows in the optimizer are the example: they come from the TPE sampler re-proposing already-tested parameter cells, so the fix belongs in the search, not in de-duplicating `_build_result`'s output.
 - **Long-term check.** Every pull request description has a "Long-term check" section. It says whether the change fixes the root cause or a symptom, and what would break it within a month. Walk through at least these: a new strategy type, a new coin, hourly bars, a database schema change, and a new broker.
 
+### 6. Reuse before you write
+
+Before adding any new class, helper, enum member, flag, reader, repo, Liquibase table, or procedure, search for an existing object that already does the job and reuse or extend it. A review fails a pull request that duplicates an existing object.
+
+- The pull request's "Reused / extended" section records what was searched, which existing objects were reused or extended (file and line), and, for each new object, why no existing one fits.
+- Search for the object that already owns the job. Scalar knobs are rows on `CONFIG.SETTING`, read through `RedisRefData.setting`, `setting_int`, `setting_float`, and `setting_floats` (`quant/refdata/reader.py`) and published by `RefDataPublisher` (`quant/refdata/publisher.py`). Catalogs use the same reader and publisher (`get()` for `REFDATA`, `get_config()` for `CONFIG`). Repos subclass `DbGateway` (`quant/shared/db.py`). An order outcome is a field on `OrderResult` (`quant/trade/models/order.py`) or `ApplyReport` (`quant/schemas/apply.py`). A fact about why an order was refused is a property of `OrderRejectReason`, such as `requires_operator_fix`. Alerts go through `Notifier`, `prefix_alert`, and `TradeAlertFormatter` in `quant/shared/notify.py`.
+- A second signal that repeats an existing one is a duplicate. A bool flag next to a typed reason is that duplicate: the reason already carries the fact, as `OrderRejectReason.requires_operator_fix` does.
+- A catalog of labels or reasons belongs in a `REFDATA` table, on the same path as `REFDATA.QUEUE_STATUS` (rule 3). A Python or frontend constant that lists the same labels is a duplicate of that catalog.
+
 ## Professional standards
 
 These are the working standards for every change. Reviewers flag departures from them. Unlike the hard requirements, a reviewer and Alfred can agree an exception, but the pull request must say why.
@@ -121,7 +130,7 @@ These are the working standards for every change. Reviewers flag departures from
 
 - One fix per pull request. Keep diffs small enough to review in one sitting.
 - Write commit messages in the imperative mood ("Mark a crashed job FAILED"), and say what changed and why.
-- The pull request description covers what changed, why, how it was tested (with the evidence from rule 4), risk and rollback, which hard rules the change could affect, and the long-term check from rule 5. The template has a section for each.
+- The pull request description covers what changed, why, how it was tested (with the evidence from rule 4), risk and rollback, which hard rules the change could affect, the "Reused / extended" section from rule 6, and the long-term check from rule 5. The template has a section for each.
 - Update the docs in the same pull request when behaviour changes: the matching page in `docs/`, `README.md` for usage or setup, and `docs/decisions.md` for a decision. Add new pages to `nav:` in `mkdocs.yml` and keep `mkdocs build --strict` at zero warnings.
 
 ### Live trading
@@ -134,6 +143,7 @@ Anything under `quant/trade/` can place real orders. Take extra care.
 
 ## How reviews use this
 
-- Check Bugs reviews every pull request that changes app code (`quant/`, `db/`, `frontend/src/`) against this page, starting with the five hard requirements.
+- Check Bugs reviews every pull request that changes app code (`quant/`, `db/`, `frontend/src/`) against this page, starting with the six hard requirements.
+- A review fails a pull request that duplicates an existing object. The "Reused / extended" section has to name the search, the objects reused or extended (file and line), and why each new object was necessary.
 - A pull request without the testing evidence from rule 4 (the fails-on-`main` test, the full suite result, and the ruff and mypy results) is blocked until the evidence is added.
 - Alfred merges every code pull request himself.
