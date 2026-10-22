@@ -1,7 +1,8 @@
 """Smoke tests for every object ``scripts/bybit_local_testnet.py`` constructs.
 
 The real constructors are ``CredentialService(crypto, repo)``,
-``TradeRepo(..., credentials=, refdata=)``, and ``create_ccxt_adapter`` with
+``TradeRepo(..., credentials=, refdata=)``, and ``AdapterRegistry.create``
+from ``build_default_registry``. That factory passes the Bybit preset and
 ``confirm_delays_s`` from ``RedisRefData.setting_floats``. A later signature
 change fails here instead of at the next manual harness run.
 """
@@ -184,8 +185,24 @@ def test_snapshot_service_owns_the_repo(db_env, monkeypatch):
     assert captured["data_caches"] is caches
 
 
-class _Delays(StubRefData):
-    """Same reader as the suite stub, with a schedule the script cannot have copied."""
+class _BybitRefData(StubRefData):
+    """Catalog the harness reads: a Bybit ``APP`` row and a delay schedule.
+
+    ``build_default_registry`` registers a factory only for an ``APP`` name it
+    can resolve. The delay value is one the script cannot have copied.
+    """
+
+    def get(self, table: str) -> list[dict]:
+        if table == "app":
+            return [
+                {
+                    "app_id": BYBIT_APP_ID,
+                    "name": "bybit",
+                    "display_name": "Bybit",
+                    "is_broker_ind": "Y",
+                }
+            ]
+        return super().get(table)
 
     def get_config(self, table: str) -> list[dict]:
         if table == "setting":
@@ -244,10 +261,8 @@ def test_dry_run_builds_trade_repo_and_credential_service(db_env, monkeypatch):
         ),
     ],
 )
-def test_adapter_sites_build_through_create_ccxt_adapter(
-    db_env, monkeypatch, invoke
-):
-    refdata = _Delays()
+def test_adapter_sites_build_through_registry(db_env, monkeypatch, invoke):
+    refdata = _BybitRefData()
     inst = object()
     caches = SimpleNamespace(refdata=refdata, instrument_cache=inst)
     monkeypatch.setenv("BYBIT_TESTNET_API_KEY", "k")
@@ -255,21 +270,32 @@ def test_adapter_sites_build_through_create_ccxt_adapter(
     monkeypatch.setattr(
         "scripts.bybit_local_testnet._load_caches", lambda conninfo: caches
     )
-    monkeypatch.setattr(
-        "quant.data.instruments.InstrumentCache.load_all", lambda self: None
-    )
-    found: dict = {}
+    built: dict = {}
+    real_create = AdapterRegistry.create
+
+    def create(self, app_id, **kwargs):
+        adapter = real_create(self, app_id, **kwargs)
+        built["app_id"] = app_id
+        built["kwargs"] = kwargs
+        built["adapter"] = adapter
+        return adapter
 
     def connect(self):
-        found["adapter"] = self
         raise _Stop()
 
+    monkeypatch.setattr(AdapterRegistry, "create", create)
     monkeypatch.setattr(
         "quant.trade.brokers.ccxt.adapter.CcxtTradeAdapter.connect", connect
     )
     with pytest.raises(_Stop):
         invoke()
-    adapter = found["adapter"]
+    assert "adapter" in built, "script did not call AdapterRegistry.create"
+    adapter = built["adapter"]
+    assert built["app_id"] == BYBIT_APP_ID
+    assert built["kwargs"]["inst_cache"] is inst
+    assert "confirm_delays_s" not in built["kwargs"]
     assert isinstance(adapter, CcxtTradeAdapter)
     assert adapter._confirm_delays_s == refdata.setting_floats("fill_confirm_delays_s")
+    assert adapter._confirm_delays_s == (9.5, 8.5)
     assert adapter._inst is inst
+    assert adapter._session.preset.exchange_id == "bybit"
