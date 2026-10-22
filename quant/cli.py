@@ -215,8 +215,9 @@ def main(args=None, *, refdata=None):
     data_dict = {cusip: df}
 
     # ── Single backtest ─────────────────────────────────────────────
+    min_metric_obs = refdata.setting_int("min_metric_obs")
     perf = Performance(data_dict, config, args.window, args.signal,
-                       fee_bps=args.fee)
+                       fee_bps=args.fee, min_metric_obs=min_metric_obs)
     perf.enrich_performance()
 
     logger.info("\n=== Strategy Performance "
@@ -235,7 +236,7 @@ def main(args=None, *, refdata=None):
         window_list, signal_list = _grid_axes(args, indicator_method, refdata)
 
         param_opt = ParametersOptimization(
-            data_dict, config, fee_bps=args.fee,
+            data_dict, config, fee_bps=args.fee, min_metric_obs=min_metric_obs,
         )
 
         opt_result = param_opt.optimize(window_list, signal_list)
@@ -276,7 +277,8 @@ def main(args=None, *, refdata=None):
         wf_data_dict = {cusip: wf_df}
 
         wf = WalkForward(
-            wf_data_dict, args.split, config, fee_bps=args.fee,
+            wf_data_dict, args.split, config,
+            fee_bps=args.fee, min_metric_obs=min_metric_obs,
         )
         result = wf.run(window_list, signal_list)
 

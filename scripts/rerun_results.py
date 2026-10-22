@@ -47,7 +47,6 @@ from datetime import datetime, timezone
 
 import redis
 
-from quant.api.schemas.jobs import MAX_QUEUED_PER_USER, PRIORITY_MAP
 from quant.queue.repo import BtQueueRepo
 from quant.queue.wake import publish_wake
 from quant.refdata.reader import RedisRefData
@@ -89,6 +88,7 @@ def rerun_user(
     user_id: str,
     cutover: datetime,
     priority: int,
+    max_queued: int,
     dry_run: bool,
 ) -> tuple[int, int]:
     """Enqueue one user's stale versions. Returns ``(enqueued, deferred)``."""
@@ -101,7 +101,7 @@ def rerun_user(
     # A backfill has no claim to bypass it, so it takes whatever headroom is
     # free and reports the rest for the next invocation.
     in_flight = repo.sp_get_queued_count(user_id, queued_status_id)
-    budget = max(MAX_QUEUED_PER_USER - in_flight, 0)
+    budget = max(max_queued - in_flight, 0)
     batch, deferred = stale[:budget], stale[budget:]
 
     logger.info("user %s: %d stale, %d already queued, enqueuing %d",
@@ -143,8 +143,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
              "migrated. Defaults to now, which marks every existing row stale.",
     )
     parser.add_argument(
-        "--priority", choices=sorted(PRIORITY_MAP), default="normal",
-        help="Queue priority for the replayed jobs (default: normal).",
+        "--priority", default="normal",
+        help="Queue priority for the replayed jobs — a REFDATA.QUEUE_PRIORITY name (default: normal).",
     )
     parser.add_argument("--dry-run", action="store_true",
                         help="List what would be enqueued and exit.")
@@ -168,6 +168,8 @@ def main(argv: list[str] | None = None) -> int:
     redis_client = redis.Redis.from_url(redis_url)
     repo = BtQueueRepo(conninfo, user_id=AUDIT_USER)
     queued_status_id = refdata.resolve_queue_status_id("QUEUED")
+    priority = refdata.resolve_queue_priority(args.priority)
+    max_queued = refdata.setting_int("max_queued_per_user")
 
     logger.info("cutover=%s priority=%s dry_run=%s",
                 cutover.isoformat(), args.priority, args.dry_run)
@@ -178,7 +180,8 @@ def main(argv: list[str] | None = None) -> int:
             repo, redis_client, queued_status_id,
             user_id=user_id,
             cutover=cutover,
-            priority=PRIORITY_MAP[args.priority],
+            priority=priority,
+            max_queued=max_queued,
             dry_run=args.dry_run,
         )
         enqueued += done

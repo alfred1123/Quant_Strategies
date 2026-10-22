@@ -49,24 +49,27 @@ class IndicatorCache:
 class Objective(ABC):
     """Precomputed inputs plus Sharpe math shared by single- and multi-factor."""
 
-    def __init__(self, data: dict, config, *, fee_bps=None) -> None:
+    def __init__(self, data: dict, config, *, fee_bps=None, min_metric_obs: int) -> None:
         self._config = config
         self._frames = FactorFrames(data, config)
         fee = Performance.DEFAULT_FEE_BPS if fee_bps is None else fee_bps
         self.transaction_cost = fee / 10_000
+        self.min_metric_obs = int(min_metric_obs)
         self.trading_period = config.trading_period
         # Same pandas call Performance uses — do not re-derive the series.
         self.chg = self._frames.main["price"].pct_change().to_numpy()
 
     @staticmethod
-    def for_config(data, config, window_values, *, fee_bps=None) -> "Objective":
+    def for_config(
+        data, config, window_values, *, fee_bps=None, min_metric_obs: int,
+    ) -> "Objective":
         """Pick the subclass ``Performance`` would take for this config."""
         if len(config.get_substrategies()) > 1:
             return MultiFactorObjective(
-                data, config, window_values, fee_bps=fee_bps,
+                data, config, window_values, fee_bps=fee_bps, min_metric_obs=min_metric_obs,
             )
         return SingleFactorObjective(
-            data, config, window_values, fee_bps=fee_bps,
+            data, config, window_values, fee_bps=fee_bps, min_metric_obs=min_metric_obs,
         )
 
     @abstractmethod
@@ -79,15 +82,15 @@ class Objective(ABC):
         return sharpe_ratio(
             pnl[int(metric_window):],
             self.trading_period,
-            min_obs=Performance.MIN_METRIC_OBS,
+            min_obs=self.min_metric_obs,
         )
 
 
 class SingleFactorObjective(Objective):
     """One indicator cache, one signal function."""
 
-    def __init__(self, data, config, windows, *, fee_bps=None) -> None:
-        super().__init__(data, config, fee_bps=fee_bps)
+    def __init__(self, data, config, windows, *, fee_bps=None, min_metric_obs: int) -> None:
+        super().__init__(data, config, fee_bps=fee_bps, min_metric_obs=min_metric_obs)
         self._cache = IndicatorCache(
             self._frames.single_factor_frame(), config.indicator_name, windows,
         )
@@ -103,8 +106,10 @@ class SingleFactorObjective(Objective):
 class MultiFactorObjective(Objective):
     """One cache per ``SubStrategy``; ``combine_positions`` with strengths."""
 
-    def __init__(self, data, config, window_ranges, *, fee_bps=None) -> None:
-        super().__init__(data, config, fee_bps=fee_bps)
+    def __init__(
+        self, data, config, window_ranges, *, fee_bps=None, min_metric_obs: int,
+    ) -> None:
+        super().__init__(data, config, fee_bps=fee_bps, min_metric_obs=min_metric_obs)
         self._conjunction = config.conjunction
         self._caches = []
         self._signal_funcs = []

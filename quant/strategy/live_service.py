@@ -219,6 +219,7 @@ def compute_latest_position(
     try:
         position, as_of = Performance(
             data_dict, config, window, signal,
+            min_metric_obs=caches.refdata.setting_int("min_metric_obs"),
         ).compute_latest_position()
     except ValueError as exc:
         raise LiveEvaluationError(str(exc)) from exc

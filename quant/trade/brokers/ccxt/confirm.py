@@ -9,8 +9,6 @@ from quant.trade.brokers.ccxt.gateway import CcxtTradeGateway
 from quant.trade.errors import BrokerConnectionError, OrderNotFoundError
 from quant.trade.models.order import OrderRejectReason, OrderRequest, OrderResult
 
-_CONFIRM_DELAYS_S = (0.3, 0.6, 1.2, 2.4, 3.5)
-
 
 @dataclass(frozen=True)
 class _FillStatus:
@@ -84,14 +82,17 @@ def confirm_market_order(
     *,
     req: OrderRequest,
     vendor_order_id: str,
+    delays_s: tuple[float, ...],
 ) -> OrderResult:
     """Poll ``fetch_order`` until a terminal outcome or the backoff budget expires.
+
+    ``delays_s`` is the poll schedule (``CONFIG.SETTING fill_confirm_delays_s``).
 
     This is the **single point** that builds ``OrderResult`` for the fill path.
     The gateway returns raw dicts; this function owns the domain translation.
     """
     last_status: str | None = None
-    for delay in _CONFIRM_DELAYS_S:
+    for delay in delays_s:
         time.sleep(delay)
         try:
             order = gateway.fetch_order(vendor_order_id, req.symbol)
@@ -126,7 +127,7 @@ def confirm_market_order(
         success=False,
         vendor_order_id=vendor_order_id,
         message=(
-            f"fill unconfirmed after {sum(_CONFIRM_DELAYS_S):.1f}s — "
+            f"fill unconfirmed after {sum(delays_s):.1f}s — "
             f"vendor_order_id={vendor_order_id} requires manual reconciliation"
             + (f" (last status={last_status!r})" if last_status else "")
         ),

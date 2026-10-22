@@ -20,6 +20,30 @@ APP_APPLY_TIMING_ROWS = [
     {"app_id": 10, "tm_interval_id": 2, "execute_offset": "0:05:00"},
 ]
 
+#: ``CONFIG.SETTING`` as seeded in ``db/liquidbase/config/data/SETTING.sql``.
+SETTING_ROWS = [
+    {"setting_nm": "min_metric_obs", "setting_value": "60"},
+    {"setting_nm": "max_queued_per_user", "setting_value": "30"},
+    {"setting_nm": "default_tm_interval_id", "setting_value": "1"},
+    {"setting_nm": "fallback_settlement_ccy", "setting_value": "USDT"},
+    {"setting_nm": "order_max_attempts", "setting_value": "5"},
+    {"setting_nm": "order_retry_backoff_s", "setting_value": "2.0"},
+    {"setting_nm": "tick_max_attempts", "setting_value": "3"},
+    {"setting_nm": "tick_retry_backoff_s", "setting_value": "5.0"},
+    {"setting_nm": "fill_confirm_delays_s", "setting_value": "0.3,0.6,1.2,2.4,3.5"},
+]
+
+QUEUE_PRIORITY_ROWS = [
+    {"name": "normal", "display_name": "Normal", "priority": 100},
+    {"name": "high", "display_name": "High", "priority": 0},
+]
+
+SCHEDULE_STATUS_ROWS = [
+    {"name": "PENDING", "display_name": "Pending"},
+    {"name": "SUCCESS", "display_name": "Success"},
+    {"name": "FAILED", "display_name": "Failed"},
+]
+
 #: ``REFDATA.INDICATOR`` / ``SIGNAL_TYPE`` / ``ASSET_TYPE`` as seeded in
 #: ``db/liquidbase/refdata/data/`` — what the CLI and ``build_config`` read.
 INDICATOR_ROWS = [
@@ -90,11 +114,17 @@ class StubRefData(RedisRefData):
             return SIGNAL_TYPE_ROWS
         if table == "asset_type":
             return ASSET_TYPE_ROWS
+        if table == "queue_priority":
+            return QUEUE_PRIORITY_ROWS
+        if table == "schedule_status":
+            return SCHEDULE_STATUS_ROWS
         raise AssertionError(f"unexpected REFDATA table {table!r}")
 
     def get_config(self, table: str) -> list[dict]:
         if table == "app_apply_timing":
             return APP_APPLY_TIMING_ROWS
+        if table == "setting":
+            return SETTING_ROWS
         raise AssertionError(f"unexpected CONFIG table {table!r}")
 
 

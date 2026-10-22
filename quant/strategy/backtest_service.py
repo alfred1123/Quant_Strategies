@@ -460,14 +460,17 @@ def evaluate_performance(
     signal,
     *,
     fee_bps: float | None = None,
+    min_metric_obs: int,
 ) -> Performance:
     """Run full backtest enrichment (positions + PnL) at fixed params."""
-    perf = Performance(data_dict, config, window, signal, fee_bps=fee_bps)
+    perf = Performance(
+        data_dict, config, window, signal, fee_bps=fee_bps, min_metric_obs=min_metric_obs,
+    )
     perf.enrich_performance()
     return perf
 
 
-def _build_perf_response(data_dict, config, best, fee_bps) -> PerformanceResponse:
+def _build_perf_response(data_dict, config, best, fee_bps, min_metric_obs: int) -> PerformanceResponse:
     """Run Performance for the best params and return a PerformanceResponse.
 
     ``best`` may be:
@@ -488,7 +491,9 @@ def _build_perf_response(data_dict, config, best, fee_bps) -> PerformanceRespons
         window = w
         signal = s
 
-    perf = evaluate_performance(data_dict, config, window, signal, fee_bps=fee_bps)
+    perf = evaluate_performance(
+        data_dict, config, window, signal, fee_bps=fee_bps, min_metric_obs=min_metric_obs,
+    )
 
     strat_metrics = perf.get_strategy_performance().replace({np.nan: None}).to_dict()
     strat_metrics["n_obs"] = perf.get_metric_n_obs()
@@ -515,9 +520,11 @@ def _build_perf_response(data_dict, config, best, fee_bps) -> PerformanceRespons
 
 
 def _build_wf_response(data_dict, config, window_list, signal_list,
-                        split_ratio, fee_bps) -> WalkForwardResponse:
+                        split_ratio, fee_bps, min_metric_obs: int) -> WalkForwardResponse:
     """Run WalkForward and return a WalkForwardResponse."""
-    wf = WalkForward(data_dict, split_ratio, config, fee_bps=fee_bps)
+    wf = WalkForward(
+        data_dict, split_ratio, config, fee_bps=fee_bps, min_metric_obs=min_metric_obs,
+    )
     result = wf.run(window_list, signal_list)
 
     chart_df = (result.full_equity_df.dropna(subset=["cumu"])
@@ -567,18 +574,19 @@ def require_scoreable_sample(data_dict: dict[str, pd.DataFrame], req: OptimizeRe
 
     ``W`` is the longest ``window_range.max``. ``N`` is the traded series
     length after the fetch. The first ``W`` bars warm the indicator, and
-    Sharpe is undefined below ``Performance.MIN_METRIC_OBS`` (decision #63).
-    Decision #82 requires ``N >= W + MIN_METRIC_OBS``.
+    Sharpe is undefined below ``CONFIG.SETTING min_metric_obs`` (decision #63).
+    Decision #82 requires ``N >= W + min_metric_obs``.
     """
     n = len(data_dict[req.symbol])
     w = max(int(f.window_range.max) for f in req.factors)
-    need = w + Performance.MIN_METRIC_OBS
+    min_metric_obs = cache.setting_int("min_metric_obs")
+    need = w + min_metric_obs
     if n >= need:
         return
     interval = cache.interval_name(int(req.tm_interval_id))
     raise BacktestError(
         f"series has {n} {interval} bars; the grid needs at least {need} "
-        f"(window {w} + {Performance.MIN_METRIC_OBS} finite pnl bars)"
+        f"(window {w} + {min_metric_obs} finite pnl bars)"
     )
 
 
@@ -587,7 +595,10 @@ def run_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache=None, ba
     require_scoreable_sample(data_dict, req, cache)
     config = build_config(req, cache)
     window_list, signal_list = _build_param_ranges(req)
-    opt = ParametersOptimization(data_dict, config, fee_bps=req.fee_bps)
+    min_metric_obs = cache.setting_int("min_metric_obs")
+    opt = ParametersOptimization(
+        data_dict, config, fee_bps=req.fee_bps, min_metric_obs=min_metric_obs,
+    )
     result = opt.run(window_list, signal_list)
 
     # ── Inline performance for best params ──
@@ -595,7 +606,7 @@ def run_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache=None, ba
     if result.n_valid > 0 and result.best:
         try:
             perf_resp = _build_perf_response(
-                data_dict, config, result.best, req.fee_bps,
+                data_dict, config, result.best, req.fee_bps, min_metric_obs,
             )
         except Exception:
             logger.warning("Inline performance failed", exc_info=True)
@@ -607,7 +618,7 @@ def run_optimize(req: OptimizeRequest, cache, inst_cache=None, bt_cache=None, ba
         try:
             wf_resp = _build_wf_response(
                 data_dict, config, window_list, signal_list,
-                req.split_ratio, req.fee_bps,
+                req.split_ratio, req.fee_bps, min_metric_obs,
             )
         except Exception as exc:
             logger.warning("Inline walk-forward failed", exc_info=True)
@@ -645,7 +656,10 @@ def run_performance(req: PerformanceRequest, cache, inst_cache=None, bt_cache=No
     else:
         window, signal = tuple(req.windows), tuple(req.signals)
 
-    return _build_perf_response(data_dict, config, {"window": window, "signal": signal}, req.fee_bps)
+    return _build_perf_response(
+        data_dict, config, {"window": window, "signal": signal}, req.fee_bps,
+        cache.setting_int("min_metric_obs"),
+    )
 
 
 # ── Walk-Forward ──────────────────────────────────────────────────────────────
@@ -657,5 +671,5 @@ def run_walk_forward(req: WalkForwardRequest, cache, inst_cache=None, bt_cache=N
 
     return _build_wf_response(
         data_dict, config, window_list, signal_list,
-        req.split_ratio, req.fee_bps,
+        req.split_ratio, req.fee_bps, cache.setting_int("min_metric_obs"),
     )
