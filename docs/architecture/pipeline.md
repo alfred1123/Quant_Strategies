@@ -106,7 +106,7 @@ quant/data/sources.py ► quant/strategy/{indicators,signals}.py ► performance
 | `quant/market_data/warm.py` | `BarWarmer`, `InstrumentSource` | Pre-fetch bars for every series a deployment or a subscription wants. |
 | `quant/market_data/series_subscr.py` | `SeriesSubscrRepo` | The only wrapper of the `MARKET_DATA.SERIES_SUBSCR` procedures (decision #106). |
 | `quant/market_data/subscriptions.py` | `BarSubscriptionService` | Capture requests with no deployment behind them, plus coverage and backfill. Its venue list is the `SERIES_SUBSCR` rows with no metric. |
-| `quant/trade/order_policy.py` | `intended_action`, `order_for`, `OrderRetryExecutor` | Signal × position → action → `OrderRequest`; the adapter only places (decision #104). |
+| `quant/trade/order_policy.py` | `intended_action`, `order_for`, `OrderRetryExecutor` | Signal × position → action → `OrderRequest`; the adapter only places (decision #104). A cancel that returns failure ends the retry and the result carries `CANCEL_FAILED` (decision #112). |
 | `quant/strategy/live_service.py` | `bars_loader`, `load_window` | Live signal computation from `MARKET_DATA.PRICE_BAR`. |
 | `quant/promotion/evaluate.py` | promotion gates | HARD/SOFT metric evaluation for auto-promote. |
 | `quant/promotion/repo.py` | `PromotionRepo` | `CALL BT.SP_INS_PROMOTION` via `DbGateway`. |

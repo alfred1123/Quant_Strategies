@@ -38,19 +38,23 @@ class OrderRejectReason(StrEnum):
     VENUE_REJECTED = "VENUE_REJECTED"
     #: ``create_order`` answered without an id; nothing to confirm or cancel.
     NOT_ACKNOWLEDGED = "NOT_ACKNOWLEDGED"
+    #: Cancel returned failure, so the order may still be resting.
+    CANCEL_FAILED = "CANCEL_FAILED"
 
     @property
     def requires_operator_fix(self) -> bool:
-        """True when no retry can succeed until someone changes a setting.
+        """True when another attempt is unsafe until a person acts.
 
         Both the retry executor (give up after one attempt) and the scheduler
         (pause rather than spend the tick budget) ask this, so the answer lives
-        with the reason instead of being decided twice. The settings-type
-        reasons — a deployment's qty, a key's allowlist, permissions, or
-        account region — are ones the next tick would meet unchanged. The
-        others end the executor's attempt loop (a typed reject is final for
-        the attempt) but leave the tick budget alone: funds can arrive and a
-        venue reject can be a passing condition.
+        with the reason instead of being decided twice. A settings reason — a
+        deployment's qty, a key's allowlist, permissions, or account region —
+        is one the next tick would meet unchanged. ``CANCEL_FAILED`` is the
+        same pause: the cancel did not succeed, so the order may still be
+        open and the next place would send another while the book still
+        reads flat. The other reasons end the executor's attempt loop (a
+        typed reject is final for the attempt) but leave the tick budget
+        alone: funds can arrive and a venue reject can be a passing condition.
         """
         return self in _OPERATOR_FIX
 
@@ -60,6 +64,7 @@ _OPERATOR_FIX = frozenset({
     OrderRejectReason.IP_NOT_ALLOWED,
     OrderRejectReason.REGION_RESTRICTED,
     OrderRejectReason.KEY_READ_ONLY,
+    OrderRejectReason.CANCEL_FAILED,
 })
 
 

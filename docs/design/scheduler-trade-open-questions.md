@@ -107,10 +107,11 @@ refusing its PATCH would be refusing to disable it.
 Pre-completion aborts (missing strategy, bars, credentials) still spend the in-memory attempt budget today — splitting those out of the budget remains open.
 
 **One exception skips the budget (decision #76):** a reject carrying an
-`OrderRejectReason` whose `requires_operator_fix` is true — today a qty under the
-venue's min lot or notional — pauses on the **first** failed pass. The remaining
-attempts would send the identical order and collect the identical reject, an hour
-apart, so the budget only delays the pause and repeats the alert. Everything the
+`OrderRejectReason` whose `requires_operator_fix` is true pauses on the **first**
+failed pass. Today that is a qty under the venue's min lot or notional (the
+remaining attempts would send the identical order), and a cancel that returned
+failure (`CANCEL_FAILED`, decision #112) — the order may still be open, so the
+next apply would place again on a book that still reads flat. Everything the
 tick cannot classify keeps all 3 attempts.
 
 **What auto-pause resolves:**
@@ -121,7 +122,7 @@ tick cannot classify keeps all 3 attempts.
   resumes it to `ACTIVE`, since the missed-due proc skips `PAUSED` whatever the
   kill switch says.
 
-**Current state:** `ScheduleTickRunner` auto-pauses on the last failed attempt, or on the first one when the broker rejected a size no retry can fix. It does **not** flatten the broker position — that is §6. Manual **Stop** remains a separate, explicit disable.
+**Current state:** `ScheduleTickRunner` auto-pauses on the last failed attempt, or on the first one when the reason's `requires_operator_fix` is true (a size the venue will not accept, or a cancel that did not succeed). It does **not** flatten the broker position — that is §6. Manual **Stop** remains a separate, explicit disable.
 
 ---
 
