@@ -66,7 +66,7 @@ Pull request 129 (Read scalar knobs from CONFIG.SETTING, and the two label catal
 
 Pull request 132 (Docs: reuse existing utilities before adding new logic) merged on 22 Oct 2026, about 11:54 PM HKT. It changed `.github/pull_request_template.md` and `docs/design/coding-standards.md`. Docs. Alfred merged it.
 
-Pull request 124 (Fix the Bybit harness DB-key path for the M9 credential API) merged on 22 Oct 2026, about 11:54 PM HKT. It changed `scripts/bybit_local_testnet.py` and `tests/unit/test_bybit_local_testnet.py` only. Every file is on `deploy.yml` `paths-ignore`. Alfred merged it.
+Pull request 124 (Fix the Bybit harness DB-key path for the M9 credential API) merged on 22 Oct 2026, about 11:54 PM HKT. It changed only `scripts/bybit_local_testnet.py` and `tests/unit/test_bybit_local_testnet.py`. It is an offline harness that does not change live behaviour. Every file is on `deploy.yml` `paths-ignore`. Alfred merged it.
 
 None of the open drafts #89, #91, #125, #127, and #128, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #126, #129, and #132, is on the ordered list above.
 

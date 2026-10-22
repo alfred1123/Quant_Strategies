@@ -7,7 +7,7 @@ alwaysApply: true
 
 Before writing code, read `docs/design/who-fixes-what.md`.
 
-Alfred owns application logic, the database, infrastructure, and any product decision still open, and he merges those pull requests. Item 1 is draft #86. Open drafts awaiting him, not on that ordered list: #89, #91, #125, #127, and #128. #125 and #127 were ready for review and are drafts again. Review and merge #127 before #128. #126 merged on 22 Oct 2026. Alfred merged it. Bots do not own it. #129 merged on 22 Oct 2026. Alfred merged it. Bots do not own it. #124 merged on 22 Oct 2026. Alfred merged it. #132 merged on 22 Oct 2026. Alfred merged it. It is a docs change.
+Alfred owns application logic, the database, infrastructure, and any product decision still open, and he merges those pull requests. Item 1 is draft #86. Open drafts awaiting him, not on that ordered list: #89, #91, #125, #127, and #128. #125 and #127 were ready for review and are drafts again. Review and merge #127 before #128. #126 merged on 22 Oct 2026. Alfred merged it. Bots do not own it. #129 merged on 22 Oct 2026. Alfred merged it. Bots do not own it. #124 merged on 22 Oct 2026. It changed only `scripts/bybit_local_testnet.py` and `tests/unit/test_bybit_local_testnet.py`. It is an offline harness that does not change live behaviour. Alfred merged it. #132 merged on 22 Oct 2026. Alfred merged it. It is a docs change.
 
 Bots own a verified small bug, docs, research notes, and an offline harness that does not change live behaviour. A test-only pull request still goes to Alfred.
 
