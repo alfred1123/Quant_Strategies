@@ -239,7 +239,7 @@ Loaded at runtime via `RedisRefData.get_promotion_metrics()`. See [Best-VID Prom
 
 A knob that varies by broker or cadence does not go here; it gets a typed table (`APP_APPLY_TIMING`, `APP_ISSUE_FEE`). The default fee is still `Performance.DEFAULT_FEE_BPS`: it depends on the exchange and `ISSUE_TYPE`, and `CONFIG.APP_ISSUE_FEE` is where it will be read from.
 
-Two catalogs arrived with it in `refdata/1.31.0` (context `refdata,prod-deploy`): `REFDATA.QUEUE_PRIORITY` (`NAME` → `PRIORITY`, replacing `PRIORITY_MAP`) and `REFDATA.SCHEDULE_STATUS` (the `TRADE.DEPLOYMENT_SCHEDULE_STATUS.STATUS` values, replacing `SCHEDULE_STATUSES`).
+Two catalogs arrived with it in `refdata/1.31.0` (context `refdata,prod-deploy`): `REFDATA.QUEUE_PRIORITY` (`NAME` → `PRIORITY`, the integer `BT.QUEUE` stores) and `REFDATA.SCHEDULE_STATUS` (the names `TRADE.DEPLOYMENT_SCHEDULE_STATUS.STATUS` may take).
 
 ## Deployment
 
