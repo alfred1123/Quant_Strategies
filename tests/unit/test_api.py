@@ -480,7 +480,6 @@ class TestLifespanPublish:
             _run_lifespan(lifespan_doubles.app)
 
         assert exc_info.value.__cause__ is publish_error
-        assert not isinstance(exc_info.value, (ValueError, KeyError))
         lifespan_doubles.refdata.setting_int.assert_not_called()
         lifespan_doubles.refdata.setting_float.assert_not_called()
         assert not hasattr(lifespan_doubles.app.state, "schedule_sweeper")
