@@ -64,12 +64,13 @@ Pull request 126 (Refresh the frontend lockfile past the follow-redirects and vi
 
 Pull request 129 (Read scalar knobs from CONFIG.SETTING, and the two label catalogs from REFDATA) merged on 22 Oct 2026, about 11:30 PM HKT. It changed Liquibase config 1.4.0 (`CONFIG.SETTING`) and refdata 1.31.0 (`QUEUE_PRIORITY`, `SCHEDULE_STATUS`), many `quant/` modules, and docs. Those changesets use context `config,prod-deploy` and `refdata,prod-deploy`, so the merge queues the production migrate. Application code and database. Alfred merged it. Bots do not own it.
 
-None of the open drafts #89, #91, #125, #127, and #128, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #126, and #129, is on the ordered list above.
+Pull request 124 (Fix the Bybit harness DB-key path for the M9 credential API) merged on 22 Oct 2026, about 11:55 PM HKT. It changed only `scripts/bybit_local_testnet.py` and `tests/unit/test_bybit_local_testnet.py`. It is an offline harness that does not change live behaviour. Alfred merged it.
+
+None of the open drafts #89, #91, #125, #127, and #128, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #126, and #129, is on the ordered list above.
 
 ## Bots, now
 
 - **Quick Fix Bot.** Only a bug Check Bugs has verified, about 20 lines of real code, with tests. Alfred merges it. Do not edit #86 while that draft is the chosen fix.
 - **Check Bugs.** Pass or fail #86.
-- **Draft 124.** Fix the Bybit harness DB-key path for the M9 credential API. It changes `scripts/bybit_local_testnet.py` and `tests/unit/test_bybit_local_testnet.py` only. Every file is on `deploy.yml` `paths-ignore`, so a bot may merge it once review has passed and CI is green. Until then it stays a draft. It is not on Alfred's ordered list.
 - **Glassnode.** The offline harness and the sleeve note stay honest. Do not report a Sharpe. Do not build the narrower metric table — that is Alfred's later store. Do not self-merge an application-code pull request; Alfred reviews those. The scheduled fill is `fill_scheduled_providers` (decision 97). Payload partitions drop on the bound via `MARKET_DATA.SP_DETACH_API_REQUEST_PAYLOAD` (decision 96, moved in #100). Only point-in-time BTC exchange netflow covers 2021 to mid-2024. SOPR and MVRV z-score point-in-time start 27 Jun 2025. BNB is not on the netflow metric. The BNB stand-in, exchange net position change, has a point-in-time twin that starts 23 Jun 2025 and does not cover 2021 to 2024.
 - **Research, not code.** The first child is point-in-time BTC exchange netflow as factor one and BTC Bollinger 60/2.25 as factor two. The gate indicator is an SMA with window 1; the signal threshold sits strictly between 0 and 1 (do not pick a number inside the range in docs). Nothing is scored until that series is a real column the engine reads.
