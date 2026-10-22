@@ -1,13 +1,14 @@
-"""DB-key path of the Bybit harness uses the current credential APIs.
+"""Smoke tests for every object ``scripts/bybit_local_testnet.py`` constructs.
 
-``CredentialService(crypto, repo)`` owns the repo. ``decrypt_credential`` and
-``create_credential`` take the user and the credential, not a repo argument.
-``TradeRepo`` takes ``credentials=``. Account snapshot and dry run no longer
-take ``credential_repo``.
+The real constructors are ``CredentialService(crypto, repo)``,
+``TradeRepo(..., credentials=, refdata=)``, and ``create_ccxt_adapter`` with
+``confirm_delays_s`` from ``RedisRefData.setting_floats``. A later signature
+change fails here instead of at the next manual harness run.
 """
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import UUID
 
@@ -17,14 +18,20 @@ from cryptography.fernet import Fernet
 from quant.api.credentials.repo import ApiCredentialRepo
 from quant.api.credentials.service import CredentialService
 from quant.shared.secrets_crypto import CredentialCrypto
+from quant.trade.brokers.ccxt.adapter import CcxtTradeAdapter
 from quant.trade.db_repo import TradeRepo
+from quant.trade.registry import AdapterRegistry
 from scripts.bybit_local_testnet import (
     BYBIT_APP_ID,
+    probe_intended_with_live_position,
     resolve_api_keys,
+    run_apply_signal,
     run_dry_run_report,
+    run_gateway,
     run_snapshot,
     save_credential,
 )
+from tests.conftest import StubRefData
 
 USER = UUID("00000000-0000-0000-0000-000000000001")
 STRATEGY = UUID("00000000-0000-0000-0000-000000000002")
@@ -177,13 +184,30 @@ def test_snapshot_service_owns_the_repo(db_env, monkeypatch):
     assert captured["data_caches"] is caches
 
 
-def test_dry_run_trade_repo_receives_credentials(db_env, monkeypatch):
+class _Delays(StubRefData):
+    """Same reader as the suite stub, with a schedule the script cannot have copied."""
+
+    def get_config(self, table: str) -> list[dict]:
+        if table == "setting":
+            rows = super().get_config(table)
+            return [
+                {**row, "setting_value": "9.5,8.5"}
+                if row["setting_nm"] == "fill_confirm_delays_s"
+                else row
+                for row in rows
+            ]
+        return super().get_config(table)
+
+
+class _Stop(Exception):
+    """Raised from ``connect`` once the real adapter exists."""
+
+
+def test_dry_run_builds_trade_repo_and_credential_service(db_env, monkeypatch):
+    refdata = StubRefData()
+    caches = SimpleNamespace(refdata=refdata)
     monkeypatch.setattr(
-        "scripts.bybit_local_testnet._load_caches", lambda conninfo: MagicMock()
-    )
-    registry = MagicMock()
-    monkeypatch.setattr(
-        "quant.trade.registry.build_default_registry", lambda refdata: registry
+        "scripts.bybit_local_testnet._load_caches", lambda conninfo: caches
     )
     captured = {}
 
@@ -197,12 +221,55 @@ def test_dry_run_trade_repo_receives_credentials(db_env, monkeypatch):
     assert isinstance(svc, CredentialService)
     assert isinstance(captured["repo"], TradeRepo)
     assert captured["repo"]._credentials is svc._repo
+    assert captured["repo"]._refdata is refdata
     assert isinstance(svc._repo, ApiCredentialRepo)
     assert svc._repo.user_id == "bybit_local_testnet"
     assert "credential_repo" not in captured
-    assert captured["adapter_registry"] is registry
+    assert isinstance(captured["adapter_registry"], AdapterRegistry)
     assert captured["bt"] is captured["repo"]._bt
+    assert captured["data_caches"] is caches
     assert captured["app_user_id"] == USER
     assert captured["req"].paper is False
     assert captured["req"].api_credential_id == 7
     assert captured["req"].strategy_vid == 3
+
+
+@pytest.mark.parametrize(
+    "invoke",
+    [
+        pytest.param(lambda: run_gateway(True), id="gateway"),
+        pytest.param(lambda: probe_intended_with_live_position(False), id="probe"),
+        pytest.param(
+            lambda: run_apply_signal(True, 1.0, 0.01, confirm=False), id="apply"
+        ),
+    ],
+)
+def test_adapter_sites_build_through_create_ccxt_adapter(
+    db_env, monkeypatch, invoke
+):
+    refdata = _Delays()
+    inst = object()
+    caches = SimpleNamespace(refdata=refdata, instrument_cache=inst)
+    monkeypatch.setenv("BYBIT_TESTNET_API_KEY", "k")
+    monkeypatch.setenv("BYBIT_TESTNET_API_SECRET", "s")
+    monkeypatch.setattr(
+        "scripts.bybit_local_testnet._load_caches", lambda conninfo: caches
+    )
+    monkeypatch.setattr(
+        "quant.data.instruments.InstrumentCache.load_all", lambda self: None
+    )
+    found: dict = {}
+
+    def connect(self):
+        found["adapter"] = self
+        raise _Stop()
+
+    monkeypatch.setattr(
+        "quant.trade.brokers.ccxt.adapter.CcxtTradeAdapter.connect", connect
+    )
+    with pytest.raises(_Stop):
+        invoke()
+    adapter = found["adapter"]
+    assert isinstance(adapter, CcxtTradeAdapter)
+    assert adapter._confirm_delays_s == refdata.setting_floats("fill_confirm_delays_s")
+    assert adapter._inst is inst
