@@ -293,7 +293,8 @@ class TestLiveApplyOrchestrator:
         orch._notifier.send.assert_called_once()
         alert_text = orch._notifier.send.call_args.args[0]
         assert "insufficient funds" in alert_text
-        assert "permanent" in alert_text.lower()
+        assert "manual reconciliation" in alert_text.lower()
+        assert "permanent rejection" not in alert_text.lower()
 
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
     def test_reject_reason_reaches_the_report(self, mock_signal, orchestrator):
@@ -388,6 +389,74 @@ class TestLiveApplyOrchestrator:
         orch._notifier.send.assert_called_once()
         alert_text = orch._notifier.send.call_args.args[0]
         assert "manual reconciliation" in alert_text.lower()
+
+    @pytest.mark.parametrize(
+        "cancel_reason",
+        [
+            OrderRejectReason.KEY_REFUSED,
+            pytest.param(None, id="untyped"),
+        ],
+    )
+    @patch("quant.trade.order_policy.time.sleep")
+    @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))
+    def test_a_cancel_failure_on_attempt_2_alerts_the_pause(
+        self, mock_signal, mock_sleep, orchestrator, cancel_reason,
+    ):
+        """The title and the last error are the cancel, not the unconfirmed place."""
+        orch, _bt = orchestrator
+        dep = _deployment()
+        orch._adapter_registry.has_adapter.return_value = True
+        orch._credential_service.decrypt_credential.return_value = ("k", "s")
+        unconfirmed = OrderResult(
+            success=False,
+            vendor_order_id="order-u",
+            message=(
+                "fill unconfirmed after 8.0s — vendor_order_id=order-u"
+                " requires manual reconciliation"
+            ),
+            side=OrderSide.BUY,
+            requested_qty=0.01,
+        )
+        adapter = _adapter_mock(
+            place_order=MagicMock(return_value=unconfirmed),
+            cancel_order=MagicMock(
+                side_effect=[
+                    OrderResult(
+                        success=True,
+                        vendor_order_id="order-u",
+                        message="order canceled",
+                    ),
+                    OrderResult(
+                        success=False,
+                        vendor_order_id="order-u",
+                        message="",
+                        reason=cancel_reason,
+                    ),
+                ],
+            ),
+        )
+        orch._adapter_registry.create.return_value = adapter
+
+        report = orch.run(dep.app_user_id, dep, "alice")
+
+        expected = (
+            cancel_reason
+            if cancel_reason is not None
+            else OrderRejectReason.CANCEL_FAILED
+        )
+        assert adapter.place_order.call_count == 2
+        assert adapter.cancel_order.call_count == 2
+        orch._notifier.send.assert_called_once()
+        alert_text = orch._notifier.send.call_args.args[0]
+        assert "permanent rejection" in alert_text.lower()
+        assert f"last error: {expected.value}" in alert_text
+        assert "fill unconfirmed" not in alert_text
+        assert report.reject_reason is expected
+        assert report.message == expected.value
+        from quant.trade.models.order import OrderFailureStage
+
+        assert report.failure_stage is OrderFailureStage.CANCEL
+        mock_sleep.assert_called_once()
 
     @patch("quant.trade.order_policy.time.sleep")
     @patch("quant.trade.live_apply.compute_latest_position", return_value=(1.0, "2026-07-01"))

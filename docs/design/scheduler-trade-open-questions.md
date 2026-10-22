@@ -125,7 +125,7 @@ all 3 attempts.
   resumes it to `ACTIVE`, since the missed-due proc skips `PAUSED` whatever the
   kill switch says.
 
-**Current state:** `ScheduleTickRunner` auto-pauses on the last failed attempt, or on the first one when `OrderRetryResult.pauses_deployment` is true: the failure stage is CANCEL, or the reason's `requires_operator_fix` is true (a size the venue will not accept). A refused key pauses only when the stage is CANCEL. It does **not** flatten the broker position — that is §6. Manual **Stop** remains a separate, explicit disable.
+**Current state:** `ScheduleTickRunner` auto-pauses on the last failed attempt, or on the first one when `OrderRetryResult.pauses_deployment` is true: the failure stage is CANCEL, or the reason's `requires_operator_fix` is true (a size the venue will not accept). A refused key pauses only when the stage is CANCEL. The apply alert's permanence is that same check (`permanent_failure`), including a cancel that fails after an earlier attempt, and its last error is the cancel's reason (`CANCEL_FAILED` when the cancel carried none). It does **not** flatten the broker position — that is §6. Manual **Stop** remains a separate, explicit disable.
 
 ---
 

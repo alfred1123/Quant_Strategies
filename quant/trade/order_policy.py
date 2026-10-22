@@ -140,6 +140,9 @@ class OrderRetryResult:
     result: OrderResult | None
     attempts: tuple[ApplyAttempt, ...]
     max_attempts: int
+    #: The alert title reads this. It is :meth:`pauses_deployment` for this
+    #: stage and reason, so a cancel on a later attempt is the same pause
+    #: as the tick. A place that does not need an operator is not one.
     permanent_failure: bool
     #: Set when the attempt failed. PLACE is the submit; CANCEL is a withdraw
     #: that did not succeed. None when no order failed.
@@ -230,7 +233,11 @@ class OrderRetryExecutor:
     outcome's failure stage is CANCEL, and :meth:`OrderRetryResult.pauses_deployment`
     is what stops the tick: overwriting a typed reason with ``CANCEL_FAILED``
     would hide why the cancel was refused, and a reason such as
-    ``KEY_REFUSED`` does not itself pause a place.
+    ``KEY_REFUSED`` does not itself pause a place. ``permanent_failure`` is
+    that method, so the alert title — it already reads the field — does not
+    keep a second rule about how many attempts ran. The result message
+    becomes the reason, and the alert's existing last-error line is that
+    reason. The warning log still has the cancel's own message.
 
     The returned :class:`OrderRetryResult` carries everything callers need —
     they never reach into the nested policy.
@@ -281,7 +288,7 @@ class OrderRetryExecutor:
                         if cancel.reason is not None
                         else OrderRejectReason.CANCEL_FAILED
                     )
-                    result = replace(result, reason=reason)
+                    result = replace(result, reason=reason, message=reason.value)
                     attempts[-1] = ApplyAttempt(action, position_qty, result)
                     return self._outcome(
                         action, position_qty, result, attempts, OrderFailureStage.CANCEL,
@@ -302,11 +309,8 @@ class OrderRetryExecutor:
         attempts: list[ApplyAttempt],
         failure_stage: OrderFailureStage | None = None,
     ) -> OrderRetryResult:
-        permanent = (
-            result is not None
-            and not result.success
-            and len(attempts) == 1
-            and not self._policy.is_retryable(result)
+        permanent = OrderRetryResult.pauses_deployment(
+            failure_stage, None if result is None else result.reason,
         )
         return OrderRetryResult(
             action=action,

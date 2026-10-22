@@ -1047,6 +1047,7 @@ class TestTypedCancelRefusal:
         result = outcome.result
         assert result is not None
         assert result.reason is OrderRejectReason.KEY_REFUSED
+        assert result.message == OrderRejectReason.KEY_REFUSED.value
         assert not result.reason.requires_operator_fix
         assert result.success is False
         assert result.vendor_order_id == "ord-1"
@@ -1096,6 +1097,7 @@ class TestTypedCancelRefusal:
         result = outcome.result
         assert result is not None
         assert result.reason is OrderRejectReason.CANCEL_FAILED
+        assert result.message == OrderRejectReason.CANCEL_FAILED.value
         assert result.reason.requires_operator_fix
         from quant.trade.models.order import OrderFailureStage
         from quant.trade.order_policy import OrderRetryResult
