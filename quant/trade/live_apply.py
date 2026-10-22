@@ -137,9 +137,12 @@ class LiveApplyOrchestrator:
             )
 
             result = outcome.result
+            report = self._report(
+                deployment, outcome, vendor_symbol, decision.signal,
+                bar_source=decision.bar_source,
+            )
             if result is None:
-                return self._report(deployment, outcome, vendor_symbol, decision.signal,
-                                    bar_source=decision.bar_source)
+                return report
 
             if result.success:
                 self._write_transaction(
@@ -148,13 +151,8 @@ class LiveApplyOrchestrator:
                     result=result, user_id=user_id,
                 )
             else:
-                self._send_failure_alert(
-                    deployment, outcome, vendor_symbol, decision.signal, qty,
-                )
-            return self._report(
-                deployment, outcome, vendor_symbol, decision.signal,
-                bar_source=decision.bar_source,
-            )
+                self._send_failure_alert(deployment, outcome, report, qty)
+            return report
 
     def _compute_signal(self, deployment: DeploymentRow) -> SignalRead:
         """The position, the series behind it, and the bar it was read from."""
@@ -337,11 +335,16 @@ class LiveApplyOrchestrator:
         self,
         deployment: DeploymentRow,
         outcome: OrderRetryResult,
-        vendor_symbol: str,
-        signal: float,
+        report: ApplyReport,
         qty: float,
     ) -> None:
-        assert outcome.result is not None
+        """The report already holds the failure. This only formats and sends it.
+
+        ``message`` and ``reject_reason`` are the existing fields. The cancel
+        reason is on both: the message is what ``last_message`` prints, and
+        ``TradeAlertFormatter`` / ``prefix_alert`` / ``Notifier.send`` are the
+        only send path.
+        """
         title = self._alert_formatter.title_for_apply_failure(
             is_permanent=outcome.permanent_failure,
         )
@@ -351,14 +354,14 @@ class LiveApplyOrchestrator:
                 deployment_id=deployment.deployment_id,
                 strategy_id=deployment.strategy_id,
                 strategy_vid=deployment.strategy_vid,
-                symbol=vendor_symbol,
-                signal=signal,
-                action=outcome.action.value,
+                symbol=report.vendor_symbol,
+                signal=report.signal,
+                action=report.action.value,
                 qty=qty,
                 paper=deployment.is_paper_ind == "Y",
                 attempt_count=len(outcome.attempts),
                 max_attempts=outcome.max_attempts,
-                last_message=outcome.result.message,
+                last_message=report.message,
                 vendor_order_ids=outcome.vendor_order_ids,
             )
         )

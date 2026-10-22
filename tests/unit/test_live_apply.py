@@ -449,10 +449,10 @@ class TestLiveApplyOrchestrator:
         orch._notifier.send.assert_called_once()
         alert_text = orch._notifier.send.call_args.args[0]
         assert "permanent rejection" in alert_text.lower()
-        assert f"last error: {expected.value}" in alert_text
-        assert "fill unconfirmed" not in alert_text
         assert report.reject_reason is expected
         assert report.message == expected.value
+        assert f"last error: {report.message}" in alert_text
+        assert "fill unconfirmed" not in alert_text
         from quant.trade.models.order import OrderFailureStage
 
         assert report.failure_stage is OrderFailureStage.CANCEL

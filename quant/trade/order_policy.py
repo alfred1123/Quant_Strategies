@@ -236,8 +236,9 @@ class OrderRetryExecutor:
     ``KEY_REFUSED`` does not itself pause a place. ``permanent_failure`` is
     that method, so the alert title — it already reads the field — does not
     keep a second rule about how many attempts ran. The result message
-    becomes the reason, and the alert's existing last-error line is that
-    reason. The warning log still has the cancel's own message.
+    becomes the reason, and ``ApplyReport.message`` copies that field.
+    The alert prints it through the existing formatter. The warning log
+    still has the cancel's own message.
 
     The returned :class:`OrderRetryResult` carries everything callers need —
     they never reach into the nested policy.
