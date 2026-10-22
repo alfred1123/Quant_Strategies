@@ -10,21 +10,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-# Frontend label → DB priority integer (lower = runs first).
-PRIORITY_MAP: dict[str, int] = {"normal": 100, "high": 0}
-
-# Max active QUEUED jobs per user before POST returns 429.
-MAX_QUEUED_PER_USER = 30
-
-PriorityLabel = Literal["normal", "high"]
-
 
 class EnqueueRequest(BaseModel):
     """Inline-strategy enqueue: server creates BT.STRATEGY then enqueues."""
 
     strategy_nm: str = Field(..., min_length=1, max_length=200)
     config_json: dict[str, Any]
-    priority: PriorityLabel = "normal"
+    #: A ``REFDATA.QUEUE_PRIORITY.NAME``; the service resolves it to the integer.
+    priority: str = "normal"
 
 
 class EnqueueResponse(BaseModel):

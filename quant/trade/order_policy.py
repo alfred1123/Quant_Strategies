@@ -164,7 +164,7 @@ class OrderRetryPolicy:
 
     _TRANSIENT_MARKERS = ("unreachable", "rate", "timeout")
 
-    def __init__(self, *, max_attempts: int = 5, backoff_s: float = 2.0) -> None:
+    def __init__(self, *, max_attempts: int, backoff_s: float) -> None:
         self._max_attempts = max_attempts
         self._backoff_s = backoff_s
 
@@ -202,8 +202,8 @@ class OrderRetryExecutor:
     they never reach into the nested policy.
     """
 
-    def __init__(self, policy: OrderRetryPolicy | None = None) -> None:
-        self._policy = policy or OrderRetryPolicy()
+    def __init__(self, policy: OrderRetryPolicy) -> None:
+        self._policy = policy
 
     def execute(
         self,

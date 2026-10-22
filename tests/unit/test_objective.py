@@ -44,7 +44,7 @@ def _assert_sharpe_equal(left, right):
 
 
 def _perf_sharpe(data, config, window, signal, fee_bps=None):
-    perf = Performance(data, config, window, signal, fee_bps=fee_bps)
+    perf = Performance(data, config, window, signal, fee_bps=fee_bps, min_metric_obs=60)
     perf.enrich_performance()
     return perf.get_sharpe_ratio()
 
@@ -90,7 +90,7 @@ class TestObjectiveEquivalence:
                     for _ in range(10)
                 ]
                 unique_w = sorted({w for w, _ in pairs})
-                obj = SingleFactorObjective(data, config, unique_w)
+                obj = SingleFactorObjective(data, config, unique_w, min_metric_obs=60)
                 for window, signal in pairs:
                     expected = _perf_sharpe(data, config, window, signal)
                     got = obj((window,), (signal,))
@@ -124,6 +124,7 @@ class TestObjectiveEquivalence:
         expected = _perf_sharpe(data, config, windows, signals, fee_bps=10)
         got = MultiFactorObjective(
             data, config, [(20,), (14,)], fee_bps=10,
+            min_metric_obs=60,
         )(windows, signals)
         assert np.isfinite(expected)
         _assert_sharpe_equal(got, expected)
@@ -138,7 +139,7 @@ class TestObjectiveEquivalence:
                 "test", "get_sma", SignalDirection.momentum_band_signal, 252,
                 conjunction=conjunction, substrategies=(sub_a, sub_b),
             )
-            obj = MultiFactorObjective(data, config, ranges)
+            obj = MultiFactorObjective(data, config, ranges, min_metric_obs=60)
             for windows, signals in (
                 ((5, 8), (0.5, 70.0)),
                 ((10, 12), (1.0, 80.0)),
@@ -171,7 +172,7 @@ class TestObjectiveEquivalence:
             "btc-usd", "get_sma", SignalDirection.momentum_band_signal, 365,
             substrategies=(sub,),
         )
-        obj = SingleFactorObjective(data, config, (10, 20))
+        obj = SingleFactorObjective(data, config, (10, 20), min_metric_obs=60)
         for window, signal in ((10, 0.5), (20, 1.0)):
             expected = _perf_sharpe(data, config, window, signal)
             _assert_sharpe_equal(obj((window,), (signal,)), expected)
@@ -188,7 +189,7 @@ class TestObjectiveEquivalence:
             "test", "get_sma", SignalDirection.momentum_band_signal, 252,
         )
         data = {"test": df}
-        obj = SingleFactorObjective(data, config, (5,))
+        obj = SingleFactorObjective(data, config, (5,), min_metric_obs=60)
         expected = _perf_sharpe(data, config, 5, 1.0)
         _assert_sharpe_equal(obj((5,), (1.0,)), expected)
         assert np.isnan(expected)
@@ -199,7 +200,7 @@ class TestObjectiveEquivalence:
         )
         data = {"test": sample_ohlc_df}
         n = len(sample_ohlc_df)
-        obj = SingleFactorObjective(data, config, (n,))
+        obj = SingleFactorObjective(data, config, (n,), min_metric_obs=60)
         expected = _perf_sharpe(data, config, n, 1.0)
         _assert_sharpe_equal(obj((n,), (1.0,)), expected)
         assert np.isnan(expected)
@@ -210,7 +211,7 @@ class TestObjectiveEquivalence:
             SignalDirection.momentum_band_signal, 252,
         )
         data = {"test": sample_ohlc_df}
-        obj = SingleFactorObjective(data, config, (5,), fee_bps=20.0)
+        obj = SingleFactorObjective(data, config, (5,), fee_bps=20.0, min_metric_obs=60)
         expected = _perf_sharpe(data, config, 5, 1.0, fee_bps=20.0)
         _assert_sharpe_equal(obj((5,), (1.0,)), expected)
 
@@ -222,14 +223,14 @@ class TestObjectiveEquivalence:
             window=5, signal=1.0, data_column="Volume",
         )
         data = {"test": frame}
-        perf = Performance(data, config, 5, 1.0)
+        perf = Performance(data, config, 5, 1.0, min_metric_obs=60)
         perf.enrich_performance()
         volume_sma = frame["Volume"].rolling(5).mean()
         close_sma = frame["factor"].rolling(5).mean()
         got = perf.data["indicator1"].dropna()
         assert got.equals(volume_sma.loc[got.index])
         assert not got.equals(close_sma.loc[got.index])
-        obj = SingleFactorObjective(data, config, (5,))
+        obj = SingleFactorObjective(data, config, (5,), min_metric_obs=60)
         _assert_sharpe_equal(obj((5,), (1.0,)), perf.get_sharpe_ratio())
 
     def test_for_config_picks_subclass(self, sample_ohlc_df, multi_factor_df):
@@ -237,7 +238,7 @@ class TestObjectiveEquivalence:
             "test", "get_sma", SignalDirection.momentum_band_signal, 252,
         )
         assert isinstance(
-            Objective.for_config({"test": sample_ohlc_df}, single, (5, 10)),
+            Objective.for_config({"test": sample_ohlc_df}, single, (5, 10), min_metric_obs=60),
             SingleFactorObjective,
         )
         sub_a = SubStrategy("get_sma", "momentum_band_signal", 5, 0.5, "v")
@@ -248,7 +249,7 @@ class TestObjectiveEquivalence:
         )
         assert isinstance(
             Objective.for_config(
-                {"test": multi_factor_df}, multi, [(5,), (10,)],
+                {"test": multi_factor_df}, multi, [(5,), (10,)], min_metric_obs=60,
             ),
             MultiFactorObjective,
         )
@@ -285,7 +286,7 @@ class TestOptimizeGridMatchesPerformance:
         config = StrategyConfig("test", indicator, signal_func, trading_period)
         windows = (5, 10, 20)
         signals = _signals_for(signal_func)
-        result = ParametersOptimization(data, config, fee_bps=5.0).optimize(
+        result = ParametersOptimization(data, config, fee_bps=5.0, min_metric_obs=60).optimize(
             windows, signals,
         )
         assert len(result.grid_df) == len(windows) * len(signals)
@@ -304,7 +305,7 @@ class TestOptimizeGridMatchesPerformance:
         )
         windows = (5, 8, 10, 12, 15)
         signals = (0.5, 1.0, 1.5)
-        result = ParametersOptimization(data, config).optimize(
+        result = ParametersOptimization(data, config, min_metric_obs=60).optimize(
             windows, signals, n_trials=4,
         )
         assert len(result.grid_df) == 4
@@ -326,7 +327,7 @@ class TestOptimizeGridMatchesPerformance:
         )
         window_ranges = [(5, 10), (8, 14)]
         signal_ranges = [(0.5, 1.5), (70.0, 80.0)]
-        result = ParametersOptimization(data, config).optimize_multi(
+        result = ParametersOptimization(data, config, min_metric_obs=60).optimize_multi(
             window_ranges, signal_ranges,
         )
         assert len(result.grid_df) == 16
@@ -342,7 +343,7 @@ class TestOptimizeGridMatchesPerformance:
         single = StrategyConfig(
             "test", "get_ema", SignalDirection.reversion_band_signal, 252,
         )
-        single_res = ParametersOptimization(data, single).run((5, 15), (0.5, 1.5))
+        single_res = ParametersOptimization(data, single, min_metric_obs=60).run((5, 15), (0.5, 1.5))
         for row in single_res.grid_df.itertuples(index=False):
             _assert_sharpe_equal(
                 row.sharpe,
@@ -356,7 +357,7 @@ class TestOptimizeGridMatchesPerformance:
             SignalDirection.momentum_band_signal, 365,
             conjunction="AND", substrategies=(sub_a, sub_b),
         )
-        multi_res = ParametersOptimization(data, multi).run([(5,), (10,)], [(1.0,), (0.5,)])
+        multi_res = ParametersOptimization(data, multi, min_metric_obs=60).run([(5,), (10,)], [(1.0,), (0.5,)])
         row = multi_res.grid_df.iloc[0]
         _assert_sharpe_equal(
             row["sharpe"],
@@ -377,7 +378,7 @@ class TestWalkForwardOptimizeMatchesPerformance:
             SignalDirection.momentum_band_signal, 365,
         )
         windows, signals = (5, 10, 20), (0.5, 1.5)
-        wf = WalkForward(data, 0.5, config, fee_bps=5.0)
+        wf = WalkForward(data, 0.5, config, fee_bps=5.0, min_metric_obs=60)
         result = wf.run(windows, signals)
 
         is_data = {t: frame.iloc[:wf.split_idx].copy() for t, frame in data.items()}
@@ -406,7 +407,7 @@ class TestWalkForwardOptimizeMatchesPerformance:
             "test", "get_sma", SignalDirection.momentum_band_signal, 365,
             conjunction=conjunction, substrategies=(sub_a, sub_b),
         )
-        wf = WalkForward(data, 0.5, config)
+        wf = WalkForward(data, 0.5, config, min_metric_obs=60)
         result = wf.run([(5, 12), (8, 14)], [(0.5, 1.5), (70.0, 80.0)])
         is_data = {t: frame.iloc[:wf.split_idx].copy() for t, frame in data.items()}
         _assert_sharpe_equal(
@@ -435,4 +436,4 @@ class TestCoverageFailFast:
         )
         data = {"main": main, "factor": factor}
         with pytest.raises(ValueError, match="covers only"):
-            ParametersOptimization(data, config).optimize((5,), (0.5,))
+            ParametersOptimization(data, config, min_metric_obs=60).optimize((5,), (0.5,))

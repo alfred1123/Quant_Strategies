@@ -289,6 +289,41 @@ class RedisRefData:
                 return int(r["queue_status_id"])
         raise RuntimeError(f"REFDATA.QUEUE_STATUS missing NAME={name!r}")
 
+    def resolve_queue_priority(self, name: str) -> int:
+        """``BT.QUEUE.PRIORITY`` for a ``REFDATA.QUEUE_PRIORITY`` label."""
+        for r in self.get("queue_priority"):
+            if r["name"] == name:
+                return int(r["priority"])
+        raise RuntimeError(f"REFDATA.QUEUE_PRIORITY missing NAME={name!r}")
+
+    def validate_schedule_status(self, name: str) -> str:
+        """``name`` if ``REFDATA.SCHEDULE_STATUS`` lists it, else raise."""
+        valid = [r["name"] for r in self.get("schedule_status")]
+        if name not in valid:
+            raise RuntimeError(
+                f"REFDATA.SCHEDULE_STATUS missing NAME={name!r} (valid: {valid})"
+            )
+        return name
+
+    # ── CONFIG.SETTING ──────────────────────────────────────────────────
+
+    def setting(self, name: str) -> str:
+        """One ``CONFIG.SETTING`` value as stored. Missing is an error, not a default."""
+        for r in self.get_config("setting"):
+            if r["setting_nm"] == name:
+                return str(r["setting_value"])
+        raise RuntimeError(f"CONFIG.SETTING missing SETTING_NM={name!r}")
+
+    def setting_int(self, name: str) -> int:
+        return int(self.setting(name))
+
+    def setting_float(self, name: str) -> float:
+        return float(self.setting(name))
+
+    def setting_floats(self, name: str) -> tuple[float, ...]:
+        """A comma-separated ``CONFIG.SETTING`` value as floats."""
+        return tuple(float(part) for part in self.setting(name).split(",") if part.strip())
+
     def get_promotion_states(self) -> list[str]:
         """Return the valid PROMOTION_STATE names from REFDATA."""
         return [r["name"] for r in self.get("promotion_state")]

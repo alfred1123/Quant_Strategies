@@ -23,7 +23,12 @@ from quant.trade.models.order import (
     OrderResult,
     OrderSide,
 )
-from quant.trade.order_policy import OrderRetryExecutor
+from quant.trade.order_policy import OrderRetryExecutor, OrderRetryPolicy
+
+#: The seeded CONFIG.SETTING fill_confirm_delays_s.
+_DELAYS = (0.3, 0.6, 1.2, 2.4, 3.5)
+#: The seeded CONFIG.SETTING order_max_attempts and order_retry_backoff_s.
+_POLICY = OrderRetryPolicy(max_attempts=5, backoff_s=2.0)
 
 
 class TestExtractFee:
@@ -111,7 +116,7 @@ class TestConfirmMarketOrder:
             "average": 64000.0, "fee": {"cost": 0.256, "currency": "BTC"},
         }
         req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
-        result = confirm_market_order(gw, req=req, vendor_order_id="abc")
+        result = confirm_market_order(gw, req=req, vendor_order_id="abc", delays_s=_DELAYS)
 
         assert result.success is True
         assert result.filled_qty == 0.01
@@ -130,7 +135,7 @@ class TestConfirmMarketOrder:
             {"id": "abc", "status": "closed", "filled": 0.01, "average": 65000.0},
         ]
         req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.SELL)
-        result = confirm_market_order(gw, req=req, vendor_order_id="abc")
+        result = confirm_market_order(gw, req=req, vendor_order_id="abc", delays_s=_DELAYS)
 
         assert result.success is True
         assert result.side == OrderSide.SELL
@@ -141,7 +146,7 @@ class TestConfirmMarketOrder:
         gw = MagicMock()
         gw.fetch_order.return_value = {"id": "abc", "status": "open", "filled": 0}
         req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
-        result = confirm_market_order(gw, req=req, vendor_order_id="abc")
+        result = confirm_market_order(gw, req=req, vendor_order_id="abc", delays_s=_DELAYS)
 
         assert result.success is False
         assert "unconfirmed" in result.message
@@ -157,7 +162,7 @@ class TestConfirmMarketOrder:
             {"id": "abc", "status": "closed", "filled": 0.01, "average": 64000.0},
         ]
         req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
-        result = confirm_market_order(gw, req=req, vendor_order_id="abc")
+        result = confirm_market_order(gw, req=req, vendor_order_id="abc", delays_s=_DELAYS)
 
         assert result.success is True
 
@@ -169,7 +174,9 @@ class TestConfirmMarketOrder:
         )
         gw.fetch_order.side_effect = exc
         req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
-        result = confirm_market_order(gw, req=req, vendor_order_id="ord-confirm-abc")
+        result = confirm_market_order(
+            gw, req=req, vendor_order_id="ord-confirm-abc", delays_s=_DELAYS,
+        )
 
         assert result.success is False
         assert "auth failed" in result.message
@@ -183,7 +190,9 @@ class TestConfirmMarketOrder:
         assert exc.reason is None
         gw.fetch_order.side_effect = exc
         req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
-        result = confirm_market_order(gw, req=req, vendor_order_id="ord-untyped-9")
+        result = confirm_market_order(
+            gw, req=req, vendor_order_id="ord-untyped-9", delays_s=_DELAYS,
+        )
 
         assert result.success is False
         assert result.reason is None
@@ -207,7 +216,10 @@ class _ConfirmingAdapter:
     def place_order(self, req: OrderRequest) -> OrderResult:
         self.calls.append(("place_order", self._vendor_order_id))
         return confirm_market_order(
-            self._gateway, req=req, vendor_order_id=self._vendor_order_id,
+            self._gateway,
+            req=req,
+            vendor_order_id=self._vendor_order_id,
+            delays_s=_DELAYS,
         )
 
     def cancel_order(
@@ -306,7 +318,7 @@ class TestConfirmFailureDoesNotReplace:
             patch("quant.trade.brokers.ccxt.confirm.time.sleep"),
             patch("quant.trade.order_policy.time.sleep"),
         ):
-            outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 1.0, 0.01)
+            outcome = OrderRetryExecutor(_POLICY).execute(adapter, "BTCUSDT", 1.0, 0.01)
 
         assert outcome.result is not None
         assert outcome.result.vendor_order_id == vendor_order_id
@@ -327,7 +339,7 @@ class TestConfirmFailureDoesNotReplace:
             patch("quant.trade.brokers.ccxt.confirm.time.sleep"),
             patch("quant.trade.order_policy.time.sleep"),
         ):
-            outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 1.0, 0.01)
+            outcome = OrderRetryExecutor(_POLICY).execute(adapter, "BTCUSDT", 1.0, 0.01)
 
         assert outcome.result is not None
         assert outcome.result.vendor_order_id == vendor_order_id
@@ -367,7 +379,7 @@ class TestConfirmFailureDoesNotReplace:
             patch("quant.trade.brokers.ccxt.confirm.time.sleep"),
             patch("quant.trade.order_policy.time.sleep"),
         ):
-            outcome = OrderRetryExecutor().execute(adapter, "BTCUSDT", 1.0, 0.01)
+            outcome = OrderRetryExecutor(_POLICY).execute(adapter, "BTCUSDT", 1.0, 0.01)
 
         assert outcome.result is not None
         _assert_no_second_place_without_that_cancel(

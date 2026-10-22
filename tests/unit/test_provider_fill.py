@@ -37,8 +37,10 @@ def test_scheduled_apps_are_non_exchange_and_refresh_off():
 def _fill(refdata, inst, **kwargs):
     kwargs.setdefault("exchange_app_ids", [])
     kwargs.setdefault("markets_for_app", lambda _app_id: [])
+    bt_cache = MagicMock()
+    bt_cache.default_tm_interval_id.return_value = 1
     return fill_scheduled_providers(
-        refdata, inst, MagicMock(), since=date(2010, 1, 1), today=date(2026, 10, 10), **kwargs,
+        refdata, inst, bt_cache, since=date(2010, 1, 1), today=date(2026, 10, 10), **kwargs,
     )
 
 

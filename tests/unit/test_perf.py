@@ -14,7 +14,7 @@ def _make_performance(df, window=5, signal=0.5, config=None):
     """Helper to build a Performance object from a DataFrame with price & factor columns."""
     if config is None:
         config = _BOLLINGER_CONFIG
-    perf = Performance({config.internal_cusip: df.copy()}, config, window, signal)
+    perf = Performance({config.internal_cusip: df.copy()}, config, window, signal, min_metric_obs=60)
     perf.enrich_performance()
     return perf
 
@@ -22,7 +22,7 @@ def _make_performance(df, window=5, signal=0.5, config=None):
 def _make_positions(df, window=5, signal=0.5, config=None):
     if config is None:
         config = _BOLLINGER_CONFIG
-    perf = Performance({config.internal_cusip: df.copy()}, config, window, signal)
+    perf = Performance({config.internal_cusip: df.copy()}, config, window, signal, min_metric_obs=60)
     perf._trade_enrich_positions()
     return perf
 
@@ -73,11 +73,11 @@ class TestComputeLatestPositionParity:
     def test_single_factor_matches_enrich(self, sample_ohlc_df):
         config = _BOLLINGER_CONFIG
         data = {config.internal_cusip: sample_ohlc_df.copy()}
-        enrich = Performance(data, config, 5, 0.5)
+        enrich = Performance(data, config, 5, 0.5, min_metric_obs=60)
         enrich._trade_enrich_positions()
         expected_sig, expected_as_of = enrich._trade_latest_final_position()
 
-        trade = Performance(data, config, 5, 0.5)
+        trade = Performance(data, config, 5, 0.5, min_metric_obs=60)
         sig, as_of = trade.compute_latest_position()
         assert sig == expected_sig
         assert as_of == expected_as_of
@@ -86,11 +86,11 @@ class TestComputeLatestPositionParity:
     def test_multi_factor_matches_enrich(self, multi_factor_df, conjunction):
         config = _multi_factor_config(conjunction=conjunction)
         data = {config.internal_cusip: multi_factor_df.copy()}
-        enrich = Performance(data, config)
+        enrich = Performance(data, config, min_metric_obs=60)
         enrich._trade_enrich_positions()
         expected_sig, expected_as_of = enrich._trade_latest_final_position()
 
-        trade = Performance(data, config)
+        trade = Performance(data, config, min_metric_obs=60)
         sig, as_of = trade.compute_latest_position()
         assert sig == expected_sig
         assert as_of == expected_as_of
@@ -104,11 +104,11 @@ class TestComputeLatestPositionParity:
             "btc-usd", "get_sma", SignalDirection.momentum_band_signal, 365,
             substrategies=(sub,),
         )
-        enrich = Performance(data, config, 20, 1.0)
+        enrich = Performance(data, config, 20, 1.0, min_metric_obs=60)
         enrich._trade_enrich_positions()
         expected_sig, expected_as_of = enrich._trade_latest_final_position()
 
-        trade = Performance(data, config, 20, 1.0)
+        trade = Performance(data, config, 20, 1.0, min_metric_obs=60)
         sig, as_of = trade.compute_latest_position()
         assert sig == expected_sig
         assert as_of == expected_as_of
@@ -123,11 +123,11 @@ class TestComputeLatestPositionParity:
             "btc-usd", "get_sma", SignalDirection.momentum_band_signal, 365,
             conjunction="AND", substrategies=(sub_btc, sub_eth),
         )
-        enrich = Performance(data, config)
+        enrich = Performance(data, config, min_metric_obs=60)
         enrich._trade_enrich_positions()
         expected_sig, expected_as_of = enrich._trade_latest_final_position()
 
-        trade = Performance(data, config)
+        trade = Performance(data, config, min_metric_obs=60)
         sig, as_of = trade.compute_latest_position()
         assert sig == expected_sig
         assert as_of == expected_as_of
@@ -158,11 +158,11 @@ class TestComputeLatestPositionParity:
             conjunction="AND", substrategies=(sub_a, sub_b),
         )
         data = {config.internal_cusip: frame}
-        enrich = Performance(data, config)
+        enrich = Performance(data, config, min_metric_obs=60)
         enrich._trade_enrich_positions()
         assert enrich.data["position1"].iloc[-1] == 1.0
         assert enrich.data["position2"].iloc[-1] == 0.0
-        sig, as_of = Performance(data, config).compute_latest_position()
+        sig, as_of = Performance(data, config, min_metric_obs=60).compute_latest_position()
         assert sig == 0.0
         assert as_of == str(idx[-1])
 
@@ -337,7 +337,7 @@ class TestStrategyMetrics:
         perf = _make_performance(short, window=5)
         assert np.isnan(perf.get_sharpe_ratio())
         assert np.isnan(perf.get_annualized_return())
-        assert perf.get_metric_n_obs() < Performance.MIN_METRIC_OBS
+        assert perf.get_metric_n_obs() < perf.min_metric_obs
 
     def test_buy_hold_sharpe_nan_when_fewer_than_min_obs(self, sample_ohlc_df):
         short = sample_ohlc_df.iloc[:40]
@@ -398,27 +398,27 @@ class TestPerformanceWithConfig:
     def test_config_stored(self, sample_ohlc_df):
         config = StrategyConfig("test", "get_bollinger_band",
                                 SignalDirection.momentum_band_signal, 252)
-        perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5)
+        perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5, min_metric_obs=60)
         assert perf.config is config
         assert perf.trading_period == 252
 
     def test_fee_bps(self, sample_ohlc_df):
         config = StrategyConfig("test", "get_bollinger_band",
                                 SignalDirection.momentum_band_signal, 252)
-        perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5, fee_bps=5.5)
+        perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5, fee_bps=5.5, min_metric_obs=60)
         assert perf.fee_bps == 5.5
 
     def test_default_fee_is_spot_taker(self, sample_ohlc_df):
         config = StrategyConfig("test", "get_bollinger_band",
                                 SignalDirection.momentum_band_signal, 252)
-        perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5)
+        perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5, min_metric_obs=60)
         assert perf.fee_bps == Performance.DEFAULT_FEE_BPS
         assert perf.fee_bps == 10.0
 
     def test_different_indicator(self, sample_ohlc_df):
         config = StrategyConfig("test", "get_sma",
                                 SignalDirection.momentum_band_signal, 252)
-        perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5)
+        perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -456,7 +456,7 @@ def _multi_factor_config(**overrides):
 class TestMultiFactorPerformance:
     def test_columns_created(self, multi_factor_df):
         config = _multi_factor_config()
-        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config)
+        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         perf.enrich_performance()
         for col in ["chg", "factor1", "indicator1", "position1", "FinalPosition", "FinalPosition_x1", "trade",
                      "pnl", "cumu", "dd", "buy_hold", "buy_hold_cumu", "buy_hold_dd",
@@ -466,7 +466,7 @@ class TestMultiFactorPerformance:
 
     def test_per_factor_position_values_bounded(self, multi_factor_df):
         config = _multi_factor_config()
-        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config)
+        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         perf.enrich_performance()
         for col in ["position1", "position2"]:
             valid = perf.data[col].dropna().unique()
@@ -475,7 +475,7 @@ class TestMultiFactorPerformance:
 
     def test_position_values_bounded(self, multi_factor_df):
         config = _multi_factor_config()
-        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config)
+        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         perf.enrich_performance()
         valid = perf.data["FinalPosition"].dropna().unique()
         for v in valid:
@@ -483,19 +483,19 @@ class TestMultiFactorPerformance:
 
     def test_metric_window_is_max(self, multi_factor_df):
         config = _multi_factor_config()
-        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config)
+        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         assert perf._metric_window == 10
 
     def test_sharpe_ratio_is_scalar(self, multi_factor_df):
         config = _multi_factor_config()
-        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config)
+        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         perf.enrich_performance()
         sharpe = perf.get_sharpe_ratio()
         assert isinstance(sharpe, (int, float, np.floating))
 
     def test_strategy_performance_returns_series(self, multi_factor_df):
         config = _multi_factor_config()
-        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config)
+        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
@@ -503,7 +503,7 @@ class TestMultiFactorPerformance:
 
     def test_buy_hold_performance_returns_series(self, multi_factor_df):
         config = _multi_factor_config()
-        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config)
+        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_buy_hold_performance()
         assert isinstance(result, pd.Series)
@@ -511,14 +511,14 @@ class TestMultiFactorPerformance:
 
     def test_or_conjunction(self, multi_factor_df):
         config = _multi_factor_config(conjunction="OR")
-        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config)
+        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         perf.enrich_performance()
         result = perf.get_strategy_performance()
         assert isinstance(result, pd.Series)
 
     def test_drawdown_bounded(self, multi_factor_df):
         config = _multi_factor_config()
-        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config)
+        perf = Performance({config.internal_cusip: multi_factor_df.copy()}, config, min_metric_obs=60)
         perf.enrich_performance()
         dd = perf.data["dd"].dropna()
         assert (dd >= 0).all()
@@ -528,7 +528,7 @@ class TestMultiFactorPerformance:
         """Single-factor path produces identical results when window is not a tuple."""
         config = StrategyConfig("test", "get_bollinger_band",
                                 SignalDirection.momentum_band_signal, 252)
-        perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5)
+        perf = Performance({config.internal_cusip: sample_ohlc_df.copy()}, config, 5, 0.5, min_metric_obs=60)
         perf.enrich_performance()
         assert perf._metric_window == 5
         result = perf.get_strategy_performance()

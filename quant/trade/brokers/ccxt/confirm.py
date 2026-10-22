@@ -9,8 +9,6 @@ from quant.trade.brokers.ccxt.gateway import CcxtTradeGateway
 from quant.trade.errors import BrokerConnectionError, OrderNotFoundError
 from quant.trade.models.order import OrderRejectReason, OrderRequest, OrderResult
 
-_CONFIRM_DELAYS_S = (0.3, 0.6, 1.2, 2.4, 3.5)
-
 
 @dataclass(frozen=True)
 class _FillStatus:
@@ -80,14 +78,17 @@ def _parse_terminal(order: dict, *, vendor_order_id: str | None) -> _FillStatus 
 
 
 def _unconfirmed(
-    req: OrderRequest, vendor_order_id: str, last_status: str | None,
+    req: OrderRequest,
+    vendor_order_id: str,
+    last_status: str | None,
+    delays_s: tuple[float, ...],
 ) -> OrderResult:
     """The fill is unknown. The executor cancels this id before placing again."""
     return OrderResult(
         success=False,
         vendor_order_id=vendor_order_id,
         message=(
-            f"fill unconfirmed after {sum(_CONFIRM_DELAYS_S):.1f}s — "
+            f"fill unconfirmed after {sum(delays_s):.1f}s — "
             f"vendor_order_id={vendor_order_id} requires manual reconciliation"
             + (f" (last status={last_status!r})" if last_status else "")
         ),
@@ -102,8 +103,11 @@ def confirm_market_order(
     *,
     req: OrderRequest,
     vendor_order_id: str,
+    delays_s: tuple[float, ...],
 ) -> OrderResult:
     """Poll ``fetch_order`` until a terminal outcome or the backoff budget expires.
+
+    ``delays_s`` is the poll schedule (``CONFIG.SETTING fill_confirm_delays_s``).
 
     This is the **single point** that builds ``OrderResult`` for the fill path.
     The gateway returns raw dicts; this function owns the domain translation.
@@ -111,7 +115,7 @@ def confirm_market_order(
     untyped one is the same unconfirmed result as an exhausted poll.
     """
     last_status: str | None = None
-    for delay in _CONFIRM_DELAYS_S:
+    for delay in delays_s:
         time.sleep(delay)
         try:
             order = gateway.fetch_order(vendor_order_id, req.symbol)
@@ -127,7 +131,7 @@ def confirm_market_order(
                     side=req.side,
                     requested_qty=req.qty,
                 )
-            return _unconfirmed(req, vendor_order_id, last_status)
+            return _unconfirmed(req, vendor_order_id, last_status, delays_s)
         last_status = order.get("status")
         fill = _parse_terminal(order, vendor_order_id=vendor_order_id)
         if fill is not None:
@@ -145,4 +149,4 @@ def confirm_market_order(
                 fee_ccy=fill.fee_ccy,
             )
 
-    return _unconfirmed(req, vendor_order_id, last_status)
+    return _unconfirmed(req, vendor_order_id, last_status, delays_s)

@@ -16,6 +16,8 @@ def svc() -> JobsService:
     repo.queued_position.return_value = 1
     refdata = MagicMock()
     refdata.resolve_queue_status_id.return_value = 10
+    refdata.resolve_queue_priority.return_value = 100
+    refdata.setting_int.return_value = 30
     refdata.interval_name.return_value = "DAILY"
     redis_client = MagicMock()
     return JobsService(repo=repo, refdata=refdata, redis_client=redis_client)
@@ -91,3 +93,57 @@ def test_enqueue_refuses_a_config_with_no_cadence(svc: JobsService) -> None:
         svc.enqueue("user-uuid", req)
 
     svc._repo.sp_ins_strategy.assert_not_called()
+
+
+def test_enqueue_reads_priority_and_cap_from_refdata(svc: JobsService) -> None:
+    svc._repo.sp_ins_strategy.return_value = (uuid.uuid4(), 1)
+    svc._refdata.resolve_queue_priority.return_value = 0
+    req = EnqueueRequest(
+        strategy_nm="btcusdt.crypto@bybit:DAILY ← btcusdt.crypto/get_sma/momentum on c",
+        config_json={"symbol": "btcusdt.crypto", "factors": [], "tm_interval_id": 1},
+        priority="high",
+    )
+
+    svc.enqueue("user-uuid", req)
+
+    svc._refdata.resolve_queue_priority.assert_called_once_with("high")
+    svc._refdata.setting_int.assert_called_once_with("max_queued_per_user")
+    assert svc._repo.sp_ins_queue.call_args.kwargs["priority"] == 0
+
+
+def test_enqueue_refuses_a_priority_refdata_does_not_list(svc: JobsService) -> None:
+    from quant.api.services.jobs import UnknownPriority
+
+    svc._refdata.resolve_queue_priority.side_effect = RuntimeError("missing NAME='urgent'")
+    req = EnqueueRequest(
+        strategy_nm="btcusdt.crypto@bybit:DAILY ← btcusdt.crypto/get_sma/momentum on c",
+        config_json={"symbol": "btcusdt.crypto", "factors": [], "tm_interval_id": 1},
+        priority="urgent",
+    )
+
+    with pytest.raises(UnknownPriority):
+        svc.enqueue("user-uuid", req)
+
+    svc._repo.sp_ins_queue.assert_not_called()
+
+
+def test_reenqueue_keeps_the_priority_the_source_row_was_queued_at(svc: JobsService) -> None:
+    """There is no request to read a priority from — the failed row carries it."""
+    src_id, strategy_id = uuid.uuid4(), uuid.uuid4()
+    svc._repo.get_active.return_value = {
+        "queue_status": "FAILED",
+        "strategy_id": strategy_id,
+        "strategy_vid": 3,
+        "priority": 0,
+    }
+    svc._repo.queued_position.return_value = 2
+
+    resp = svc.reenqueue("user-uuid", src_id)
+
+    kwargs = svc._repo.sp_ins_queue.call_args.kwargs
+    assert kwargs["priority"] == 0
+    assert kwargs["strategy_id"] == strategy_id
+    assert kwargs["strategy_vid"] == 3
+    assert resp.queue_id != src_id
+    assert resp.queue_pos == 2
+    svc._refdata.resolve_queue_priority.assert_not_called()

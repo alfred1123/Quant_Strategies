@@ -43,7 +43,10 @@ def build_trade_service(state) -> TradeService:
     conninfo = state.db_conninfo
     bt = BtQueueRepo(conninfo, user_id="system")
     credentials = ApiCredentialRepo(conninfo, user_id="system")
-    repo = TradeRepo(conninfo, bt=bt, credentials=credentials, user_id="system")
+    repo = TradeRepo(
+        conninfo, bt=bt, credentials=credentials, refdata=state.data_caches.refdata,
+        user_id="system",
+    )
     return TradeService(
         repo=repo,
         bt=bt,

@@ -348,15 +348,3 @@ class NasdaqDataLink:
         logger.info("NasdaqDataLink: fetched %d rows from table %s",
                      len(data), table_code)
         return data
-
-
-if __name__ == "__main__":
-    from quant.shared.config import load_config
-
-    load_config()
-    start = time.time()
-    av = AlphaVantage()
-    data = av.get_historical_price('BTC', '2020-05-11', '2021-04-03')
-    end = time.time()
-    print(f"Elapsed: {end - start:.2f}s")
-    print(data.head())

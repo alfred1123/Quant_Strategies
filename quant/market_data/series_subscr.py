@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime
 from uuid import UUID
 
-from quant.shared.db import DbGateway
+from quant.shared.db import DbGateway, require_arg
 
 INS_SQL = (
     "CALL market_data.sp_ins_series_subscr("
@@ -29,13 +29,6 @@ GET_SQL = (
     "CALL market_data.sp_get_series_subscr("
     "NULL::refcursor, NULL::text, NULL::text, NULL::text)"
 )
-
-
-def _require(value, name: str) -> None:
-    if value is None:
-        raise ValueError(f"{name} is required")
-    if isinstance(value, str) and not value.strip():
-        raise ValueError(f"{name} is required")
 
 
 class SeriesSubscrRepo(DbGateway):
@@ -56,10 +49,10 @@ class SeriesSubscrRepo(DbGateway):
 
         The id is the row the system writes. A null metric is a venue's bars.
         """
-        _require(series_subscr_id, "series_subscr_id")
-        _require(internal_cusip, "internal_cusip")
-        _require(app_id, "app_id")
-        _require(tm_interval_id, "tm_interval_id")
+        require_arg(series_subscr_id, "series_subscr_id")
+        require_arg(internal_cusip, "internal_cusip")
+        require_arg(app_id, "app_id")
+        require_arg(tm_interval_id, "tm_interval_id")
         if is_enabled_ind not in ("Y", "N"):
             raise ValueError(f"is_enabled_ind must be Y or N, got {is_enabled_ind!r}")
 
@@ -106,7 +99,7 @@ class SeriesSubscrRepo(DbGateway):
         subscribe for the same source, metric, interval and product reuses
         the id already open so the list does not grow a duplicate.
         """
-        _require(app_metric_id, "app_metric_id")
+        require_arg(app_metric_id, "app_metric_id")
         chosen = series_subscr_id or self._open_provider_id(
             internal_cusip=internal_cusip,
             app_id=app_id,

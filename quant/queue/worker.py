@@ -186,7 +186,7 @@ def main(argv: list[str]) -> int:
     db_url = load_config()
 
     if len(argv) != 2:
-        logger.error("usage: python -m src.worker <queue_id>")
+        logger.error("usage: python -m quant.queue.worker <queue_id>")
         return 2
     try:
         queue_id = uuid.UUID(argv[1])
