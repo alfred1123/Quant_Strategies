@@ -5,7 +5,11 @@ Auth is bypassed via ``app.dependency_overrides[require_user]`` — every
 test runs as a synthetic CurrentUser without needing JWT cookies.
 """
 
+import asyncio
+from types import SimpleNamespace
+
 import pytest
+from tests.conftest import SETTING_ROWS
 import pandas as pd
 import numpy as np
 from uuid import uuid4
@@ -419,3 +423,86 @@ class TestConfigEndpoint:
             resp = client.post("/api/v1/config/refresh")
         assert resp.status_code == 503
         assert "redis down" in resp.json()["detail"]
+
+
+# ── lifespan publish ────────────────────────────────────────────────
+
+
+def _run_lifespan(app: SimpleNamespace) -> None:
+    from quant.api.main import lifespan
+
+    async def _enter() -> None:
+        async with lifespan(app):
+            return
+
+    asyncio.run(_enter())
+
+
+@pytest.fixture
+def lifespan_doubles():
+    """Startup collaborators, with the real knob reads left on ``refdata``.
+
+    ``resolve_app_id`` is empty so the real venue-limits publisher does not
+    open a venue session. The tick knobs stay live: if publish is swallowed,
+    ``setting_int`` / ``setting_float`` are what startup dies on.
+    """
+    refdata = MagicMock()
+    refdata.resolve_app_id.return_value = None
+    caches = MagicMock()
+    caches.refdata = refdata
+    publisher = MagicMock()
+    app = SimpleNamespace(state=SimpleNamespace())
+    with (
+        patch("quant.api.main.open_pool"),
+        patch("quant.api.main.close_pools"),
+        patch("quant.api.main.AuthService"),
+        patch("quant.shared.secrets_crypto.CredentialCrypto"),
+        patch("quant.api.main.RefDataPublisher", return_value=publisher),
+        patch("quant.api.main.DataCaches", return_value=caches),
+    ):
+        yield SimpleNamespace(
+            refdata=refdata, caches=caches, publisher=publisher, app=app
+        )
+
+
+class TestLifespanPublish:
+    def test_publish_failure_aborts_startup_with_that_error(self, lifespan_doubles):
+        publish_error = ValueError("publish_all failed: redis down")
+        lifespan_doubles.publisher.publish_all.side_effect = publish_error
+        lifespan_doubles.refdata.setting_int.side_effect = ValueError(
+            "config.setting not in Redis — publisher may not have run yet"
+        )
+        lifespan_doubles.refdata.setting_float.side_effect = KeyError(
+            "tick_retry_backoff_s"
+        )
+
+        with pytest.raises(RuntimeError, match="startup aborted") as exc_info:
+            _run_lifespan(lifespan_doubles.app)
+
+        assert exc_info.value.__cause__ is publish_error
+        assert not isinstance(exc_info.value, (ValueError, KeyError))
+        lifespan_doubles.refdata.setting_int.assert_not_called()
+        lifespan_doubles.refdata.setting_float.assert_not_called()
+        assert not hasattr(lifespan_doubles.app.state, "schedule_sweeper")
+
+    @pytest.mark.parametrize("published", [0, 1])
+    def test_publish_success_starts_normally(self, lifespan_doubles, published):
+        lifespan_doubles.publisher.publish_all.return_value = published
+        by_name = {row["setting_nm"]: row["setting_value"] for row in SETTING_ROWS}
+        lifespan_doubles.refdata.setting_int.return_value = int(
+            by_name["tick_max_attempts"]
+        )
+        lifespan_doubles.refdata.setting_float.return_value = float(
+            by_name["tick_retry_backoff_s"]
+        )
+
+        _run_lifespan(lifespan_doubles.app)
+
+        lifespan_doubles.publisher.publish_all.assert_called_once_with()
+        lifespan_doubles.refdata.setting_int.assert_called_once_with(
+            "tick_max_attempts"
+        )
+        lifespan_doubles.refdata.setting_float.assert_called_once_with(
+            "tick_retry_backoff_s"
+        )
+        assert lifespan_doubles.app.state.schedule_sweeper is not None
