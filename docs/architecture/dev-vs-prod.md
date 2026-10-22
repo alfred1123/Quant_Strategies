@@ -60,8 +60,8 @@ Developer laptop                                 Production EC2
     port-forwarding through the **prod** EC2 instance (`quant-compute` stack).
     There is no separate dev instance — do not hardcode an instance ID in docs
     or scripts; resolve it from CloudFormation (see below) or use
-    `./scripts/appctl.sh prod tunnel start`, which reads `SSM_TARGET_INSTANCE`
-    from `.env` when set. Local/dev (`DB_TARGET=local`) does not start this
+    `./scripts/appctl.sh prod tunnel start`, which resolves the instance from
+    that stack and reads `SSM_TARGET_INSTANCE` from `.env` only as an override. Local/dev (`DB_TARGET=local`) does not start this
     tunnel.
 
 ### Resolve the current prod EC2 instance ID
