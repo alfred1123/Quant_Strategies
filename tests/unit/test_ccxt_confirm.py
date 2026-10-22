@@ -24,11 +24,16 @@ from quant.trade.models.order import (
     OrderSide,
 )
 from quant.trade.order_policy import OrderRetryExecutor, OrderRetryPolicy
+from tests.conftest import StubRefData
 
-#: The seeded CONFIG.SETTING fill_confirm_delays_s.
-_DELAYS = (0.3, 0.6, 1.2, 2.4, 3.5)
-#: The seeded CONFIG.SETTING order_max_attempts and order_retry_backoff_s.
-_POLICY = OrderRetryPolicy(max_attempts=5, backoff_s=2.0)
+_REFDATA = StubRefData()
+#: ``CONFIG.SETTING fill_confirm_delays_s``, from the shared snapshot.
+_DELAYS = _REFDATA.setting_floats("fill_confirm_delays_s")
+#: ``CONFIG.SETTING order_max_attempts`` and ``order_retry_backoff_s``.
+_POLICY = OrderRetryPolicy(
+    max_attempts=_REFDATA.setting_int("order_max_attempts"),
+    backoff_s=_REFDATA.setting_float("order_retry_backoff_s"),
+)
 
 
 class TestExtractFee:

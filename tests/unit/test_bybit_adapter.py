@@ -30,9 +30,10 @@ from quant.trade.models.order import (
     OrderSide,
     OrderType,
 )
+from tests.conftest import StubRefData
 
-#: The seeded CONFIG.SETTING fill_confirm_delays_s.
-_DELAYS = (0.3, 0.6, 1.2, 2.4, 3.5)
+#: ``CONFIG.SETTING fill_confirm_delays_s``, from the shared snapshot.
+_DELAYS = StubRefData().setting_floats("fill_confirm_delays_s")
 
 
 @pytest.fixture

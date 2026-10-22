@@ -11,6 +11,7 @@ from quant.schemas.apply import ApplyReport
 from quant.trade.errors import BrokerAuthError, BrokerConnectionError
 from quant.trade.models.order import IntendedAction, OrderRejectReason
 from quant.trade.scheduler.tick import ScheduleTickRunner, TickOutcome
+from tests.conftest import StubRefData
 
 DUE_AT = datetime(2026, 8, 1, 9, 0, tzinfo=UTC)
 NEXT_DUE_AT = DUE_AT + timedelta(days=1)
@@ -67,7 +68,8 @@ def repo():
 
 
 def _runner(repo, apply_fn=None, **kwargs):
-    kwargs.setdefault("max_attempts", 3)
+    kwargs.setdefault("max_attempts", StubRefData().setting_int("tick_max_attempts"))
+    # 0 so a retry in this file returns immediately. The seeded backoff is 5 seconds.
     kwargs.setdefault("retry_backoff_s", 0)
     return ScheduleTickRunner(repo, apply_fn or MagicMock(), **kwargs)
 

@@ -6,7 +6,7 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <changeSet id="1.31.0-001-queue-priority" author="alfcheun" context="refdata,prod-deploy">
-        <comment>REFDATA.QUEUE_PRIORITY replaces PRIORITY_MAP in quant/api/schemas/jobs.py.</comment>
+        <comment>REFDATA.QUEUE_PRIORITY maps a queue label to the integer BT.QUEUE stores.</comment>
         <sqlFile path="../tables/QUEUE_PRIORITY.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
@@ -21,7 +21,7 @@
     </changeSet>
 
     <changeSet id="1.31.0-002-schedule-status" author="alfcheun" context="refdata,prod-deploy">
-        <comment>REFDATA.SCHEDULE_STATUS replaces SCHEDULE_STATUSES in quant/trade/db_repo.py.</comment>
+        <comment>REFDATA.SCHEDULE_STATUS lists the names TRADE.DEPLOYMENT_SCHEDULE_STATUS.STATUS may take.</comment>
         <sqlFile path="../tables/SCHEDULE_STATUS.sql"
                  relativeToChangelogFile="true"
                  splitStatements="true"
