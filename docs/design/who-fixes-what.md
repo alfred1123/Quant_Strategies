@@ -38,7 +38,7 @@ Draft pull request 89 (record the risk rule a backtest run reads) touches applic
 
 Draft pull request 91 (stage strategy-bar PnL reconcile and the fee coin) changes application code, the trade database, and the frontend. The code is `quant/trade/pnl_reconcile.py`, `quant/trade/db_repo.py`, `quant/trade/brokers/ccxt/confirm.py`, `quant/trade/live_apply.py`, and schemas. The database change is Liquibase trade release 1.11.0. It adds a `TRADE.DEPLOYMENT_PERFORMANCE` table and `SP_INS` and `SP_GET` procedures. It adds `FEE_CCY_CD` on `TRADE.TRANSACTION` and changes the `SP_INS_TRANSACTION` signature. Alfred merges it. Bots do not own it.
 
-Draft pull request 127 (Stop order retries when a cancel returns failure) changes `quant/trade/order_policy.py`, `quant/trade/models/order.py`, docs, and tests. It was ready for review and is a draft again as of 22 Oct 2026, about 11:33 PM HKT. Application code. Alfred merges it. Bots do not own it.
+Draft pull request 127 (Stop order retries when a cancel returns failure) changes `quant/trade/order_policy.py`, `quant/trade/models/order.py`, docs, and tests. It was ready for review and is a draft again as of 22 Oct 2026, about 11:33 PM HKT. It is not ready for review. Application code. Alfred merges it. Bots do not own it.
 
 Draft pull request 128 (Report a typed reason when a cancel is refused) stacks on #127. Review and merge #127 first. The diff against `main` includes both. It touches the `quant/trade` adapter, live apply, the scheduler tick, schemas, docs, and tests. Application code. Alfred merges it. Bots do not own it.
 
