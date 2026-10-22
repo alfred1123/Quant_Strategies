@@ -30,19 +30,27 @@ Split [`docs/architecture/refdata-cache.md`](../architecture/refdata-cache.md) s
 
 One golden result per strategy (the comparison screen), fractional position sizing, stateful exits, flagging old stored AND results (and FILTER results with 3+ factors) whose numbers changed when #76 merged, the later design for at most two filter factors for daily use (not hard-coded; more can be turned on later), and the later Glassnode narrower metric store (keeps history; purge of closed copies; no live fetch in a harness-only change). #98 (compare two jobs dialog) merged on 8 Oct 2026, so the two-job compare that [`docs/design/2026-09-29-queue-frontend-aids.md`](2026-09-29-queue-frontend-aids.md) listed next is now in the Queue tab. It overlaps the still-open comparison screen (one golden result per strategy). Whether #98 is the first step toward that screen, and any further work on it, is Alfred's decision and not bot work.
 
-### Open drafts awaiting Alfred
+### Open pull requests awaiting Alfred
 
-These drafts are not on the ordered list above. #86 stays item 1.
+These pull requests are not on the ordered list above. #86 stays item 1.
 
 Draft pull request 89 (record the risk rule a backtest run reads) touches application code. Alfred merges it. Bots do not own it.
 
 Draft pull request 91 (stage strategy-bar PnL reconcile and the fee coin) changes application code, the trade database, and the frontend. The code is `quant/trade/pnl_reconcile.py`, `quant/trade/db_repo.py`, `quant/trade/brokers/ccxt/confirm.py`, `quant/trade/live_apply.py`, and schemas. The database change is Liquibase trade release 1.11.0. It adds a `TRADE.DEPLOYMENT_PERFORMANCE` table and `SP_INS` and `SP_GET` procedures. It adds `FEE_CCY_CD` on `TRADE.TRANSACTION` and changes the `SP_INS_TRANSACTION` signature. Alfred merges it. Bots do not own it.
 
-Draft pull request 128 (Report a typed reason when a cancel is refused) is still an open draft. #127 has merged, so #128 needs its branch brought up to date with main before review. That is Alfred's pull request. Do not touch its branch. It touches the `quant/trade` adapter, live apply, the scheduler tick, schemas, docs, and tests. Application code. Alfred merges it. Bots do not own it.
+Open pull request 128 (Report a typed reason when a cancel is refused) is ready for review. #127 has merged, so #128 needs its branch brought up to date with main before review. That is Alfred's pull request. Do not touch its branch. It touches the `quant/trade` adapter, live apply, the scheduler tick, schemas, docs, and tests. Application code. Alfred merges it. Bots do not own it.
 
-Draft pull request 133 (Abort API startup when REFDATA publish fails) changes `quant/api/main.py` and tests, and the API and REFDATA cache docs. Application code. Alfred merges it. Bots do not own it.
+Open pull request 133 (Abort API startup when REFDATA publish fails) changes `quant/api/main.py` and tests, and the API and REFDATA cache docs. Application code. Alfred merges it. Bots do not own it.
 
-Draft pull request 134 (Lock setting and catalog fixtures to their seed rows) changes comment text in Liquibase refdata release 1.31.0 and tests, including `tests/unit/test_seed_fixture_drift.py`. It opened as a draft on 23 Oct 2026, about 12:03 AM HKT. The changelog file is database source. Alfred merges it. Bots do not own it.
+Open pull request 134 (Lock setting and catalog fixtures to their seed rows) changes comment text in Liquibase refdata release 1.31.0 and tests, including `tests/unit/test_seed_fixture_drift.py`. It opened on 23 Oct 2026, about 12:03 AM HKT, and is ready for review. The changelog file is database source. Alfred merges it. Bots do not own it.
+
+Open pull request 136 (Report the delays a fill poll has already slept) changes `quant/trade/brokers/ccxt/confirm.py` and `tests/unit/test_ccxt_confirm.py`. Application code. Alfred merges it. Bots do not own it.
+
+Draft pull request 137 (Type an unconfirmed fill instead of matching its sentence) changes `quant/trade` (`order.py`, `confirm.py`, `order_policy.py`), docs, and tests. Application code. It follows #128. Do not merge it before #128. After #128 merges, rebase it onto main. It stays a draft until then. Alfred merges it. Bots do not own it.
+
+Open pull request 138 (Read the seeded order budget from the snapshot) changes only `tests/unit/test_order_policy.py` and `tests/unit/test_refdata_reader.py`. Test-only. A test-only pull request still goes to Alfred. Alfred merges it. Bots do not own it.
+
+Open pull request 139 (appctl: resolve the SSM tunnel target from the quant-compute stack) changes `scripts/appctl.sh` and `docs/architecture/dev-vs-prod.md`. It is infrastructure: the prod SSM tunnel and CloudFormation instance resolution. It opened about 7:53 AM HKT on 23 Oct 2026 and is ready for review. Alfred owns infrastructure and merges it. Bots do not own it.
 
 ### Closed and merged
 
@@ -72,12 +80,12 @@ Pull request 125 (Keep the typed reject reason when a fill poll fails) merged on
 
 Pull request 127 (Stop order retries when a cancel returns failure) merged on 23 Oct 2026, about 12:02 AM HKT. It changed `quant/trade/order_policy.py`, `quant/trade/models/order.py`, docs, and tests. Application code. Alfred merged it. Bots do not own it.
 
-None of the open drafts #89, #91, #128, #133, #134, and #135, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #129, and #132, is on the ordered list above.
+None of the open drafts #89, #91, and #137, none of the open pull requests #128, #133, #134, #136, #138, and #139, none of the open bot pull request #135, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #129, and #132, is on the ordered list above.
 
 ## Bots, now
 
 - **Quick Fix Bot.** Only a bug Check Bugs has verified, about 20 lines of real code, with tests. Alfred merges it. Do not edit #86 while that draft is the chosen fix.
 - **Check Bugs.** Pass or fail #86.
-- **Draft 135.** Route the Bybit harness adapters through the registry. It changes `scripts/bybit_local_testnet.py`, `tests/unit/test_bybit_local_testnet.py`, and this page. Every file is on `deploy.yml` `paths-ignore`. It is an offline harness that does not change live behaviour. A bot may merge it once review has passed and CI is green. Until then it stays a draft. It is not on Alfred's ordered list.
+- **Open 135.** Route the Bybit harness adapters through the registry. It changes `scripts/bybit_local_testnet.py`, `tests/unit/test_bybit_local_testnet.py`, `tests/integration/test_ccxt_dry_run.py`, and adds `tests/unit/test_ccxt_dry_run_fixture.py`. Every file is on `deploy.yml` `paths-ignore` (`scripts/**`, `tests/**`). It is an offline harness that does not change live behaviour. A bot may merge it once review has passed and CI is green. It is ready for review. It is not on Alfred's ordered list.
 - **Glassnode.** The offline harness and the sleeve note stay honest. Do not report a Sharpe. Do not build the narrower metric table — that is Alfred's later store. Do not self-merge an application-code pull request; Alfred reviews those. The scheduled fill is `fill_scheduled_providers` (decision 97). Payload partitions drop on the bound via `MARKET_DATA.SP_DETACH_API_REQUEST_PAYLOAD` (decision 96, moved in #100). Only point-in-time BTC exchange netflow covers 2021 to mid-2024. SOPR and MVRV z-score point-in-time start 27 Jun 2025. BNB is not on the netflow metric. The BNB stand-in, exchange net position change, has a point-in-time twin that starts 23 Jun 2025 and does not cover 2021 to 2024.
 - **Research, not code.** The first child is point-in-time BTC exchange netflow as factor one and BTC Bollinger 60/2.25 as factor two. The gate indicator is an SMA with window 1; the signal threshold sits strictly between 0 and 1 (do not pick a number inside the range in docs). Nothing is scored until that series is a real column the engine reads.
