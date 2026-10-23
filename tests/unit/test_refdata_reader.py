@@ -5,6 +5,7 @@ from datetime import timedelta
 import pytest
 
 from quant.refdata.reader import RedisRefData
+from tests.conftest import SETTING_ROWS
 
 
 def _timing_reader(calendar_rows, timing_rows):
@@ -288,9 +289,14 @@ class TestSettings:
 
     def test_typed_accessors_cast(self):
         r = self._reader()
-        assert r.setting_int("min_metric_obs") == 60
-        assert r.setting_float("order_retry_backoff_s") == 2.0
-        assert r.setting_floats("fill_confirm_delays_s") == (0.3, 0.6, 1.2, 2.4, 3.5)
+        stored = {row["setting_nm"]: row["setting_value"] for row in SETTING_ROWS}
+        assert r.setting_int("min_metric_obs") == int(stored["min_metric_obs"])
+        assert r.setting_float("order_retry_backoff_s") == float(
+            stored["order_retry_backoff_s"]
+        )
+        assert r.setting_floats("fill_confirm_delays_s") == tuple(
+            float(part) for part in stored["fill_confirm_delays_s"].split(",") if part.strip()
+        )
 
     def test_missing_setting_is_an_error_not_a_default(self):
         with pytest.raises(RuntimeError, match="CONFIG.SETTING missing"):
