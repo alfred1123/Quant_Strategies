@@ -77,9 +77,12 @@ flowchart LR
 - `POST /api/v1/config/refresh` — rewrites the policy snapshot.
 - CLI: `python -m quant.refdata.publisher` for ad-hoc reseeding.
 
-If Redis is unreachable at startup the publisher logs the failure but the server
-still boots — REFDATA endpoints return **503** until a refresh succeeds, keeping
-`/health` useful for diagnosis.
+If `publish_all()` fails at startup the process aborts. The lifespan logs the
+failure and raises `RuntimeError` chained from the original exception, so the
+crash names the publish and `/health` does not come up. A later
+`CONFIG.SETTING` read is not where that failure is reported. A single table
+that fails inside `publish()` is still logged and stored as an empty list;
+that path does not raise, so it does not abort startup.
 
 ---
 
@@ -95,7 +98,7 @@ still boots — REFDATA endpoints return **503** until a refresh succeeds, keepi
 
 Failure modes are deliberate and fail-fast (short 2s socket timeouts):
 
-- Redis unreachable → `RuntimeError` (surfaces at the right log line, not at boot).
+- Redis unreachable → `RuntimeError` (the reader's constructor does not connect; the first `get()` raises). A failed startup `publish_all()` is not this path: the process aborts before it serves.
 - Table key missing → `ValueError` ("publisher may not have run yet").
 - Table present but empty → `ValueError` (an empty REFDATA table is a config bug).
 
