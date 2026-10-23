@@ -4,7 +4,11 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from quant.trade.models.order import IntendedAction, OrderRejectReason
+from quant.trade.models.order import (
+    IntendedAction,
+    OrderFailureStage,
+    OrderRejectReason,
+)
 
 
 class ApplyReport(BaseModel):
@@ -27,6 +31,10 @@ class ApplyReport(BaseModel):
     # described. The scheduler pauses instead of retrying a reason that no
     # retry can clear (see OrderRejectReason.requires_operator_fix).
     reject_reason: OrderRejectReason | None = None
+    # Where this cycle failed, when it did. The tick calls
+    # OrderRetryResult.pauses_deployment with this and reject_reason
+    # (decision #113). CANCEL pauses even when the venue label does not.
+    failure_stage: OrderFailureStage | None = None
     # Which price series produced `signal` — e.g. "price_bar:bybit" or
     # "provider". Strategy parameters are fitted on provider history, so a
     # scheduled apply trades on a different series than it was optimized on;

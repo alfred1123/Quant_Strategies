@@ -247,7 +247,13 @@ class CcxtTradeAdapter(TradeAdapter):
         try:
             raw = self._gateway.cancel_order(vendor_order_id, vendor_symbol)
         except BrokerConnectionError as exc:
-            return OrderResult(success=False, vendor_order_id=vendor_order_id, message=str(exc))
+            # ``reason`` is already typed on the exception (a key refusal, an
+            # IP the key does not allow). Leaving it off the result is what
+            # made every refused cancel look like an unclassified failure.
+            return OrderResult(
+                success=False, vendor_order_id=vendor_order_id,
+                message=str(exc), reason=exc.reason,
+            )
         return OrderResult(
             success=True,
             vendor_order_id=vendor_order_id,

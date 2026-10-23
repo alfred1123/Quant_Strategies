@@ -14,6 +14,20 @@ class OrderType(str, Enum):
     LIMIT = "LIMIT"
 
 
+class OrderFailureStage(StrEnum):
+    """Which step of an attempt failed.
+
+    PLACE is the submit. CANCEL is the withdraw, which can leave the order
+    resting while the book still reads flat. No order enum names those two
+    steps: :class:`OrderSide` and :class:`IntendedAction` are buy or sell,
+    :class:`OrderType` is market or limit, and :class:`OrderRejectReason` is
+    why the venue refused.
+    """
+
+    PLACE = "PLACE"
+    CANCEL = "CANCEL"
+
+
 class OrderRejectReason(StrEnum):
     """Why an order was refused, typed where the refusal was decided.
 

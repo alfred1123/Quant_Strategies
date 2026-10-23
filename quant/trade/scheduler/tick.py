@@ -31,6 +31,7 @@ from quant.schemas.apply import ApplyReport
 from quant.schemas.deployments import DeploymentStatus
 from quant.trade.db_repo import TradeRepo
 from quant.trade.models.order import OrderRejectReason
+from quant.trade.order_policy import OrderRetryResult
 
 logger = logging.getLogger(__name__)
 
@@ -146,8 +147,11 @@ class ScheduleTickRunner:
     deployment still failing at the end is paused. This wraps the whole apply
     (connect, bars, signal, order), where ``OrderRetryExecutor`` retries only
     the broker order inside one. A reject carrying
-    :attr:`OrderRejectReason.requires_operator_fix` pauses on the first
-    attempt; nothing about a second one would be different.
+    :meth:`OrderRetryResult.pauses_deployment` is the only pause check: a
+    failed cancel, or a reason whose :attr:`OrderRejectReason.requires_operator_fix`
+    is true. Nothing about a second attempt would be different. A venue
+    label such as a refused key pauses only when the failure stage is the
+    cancel.
     """
 
     def __init__(
@@ -192,7 +196,7 @@ class ScheduleTickRunner:
                 # the broker read at all. A broker error still names its reason
                 # when the venue classified the refusal (e.g. the key admits
                 # none of our egress IPs), and that pauses like a reject would.
-                error, reason = str(exc), _reject_reason_of_exception(exc)
+                error, stage, reason = str(exc), None, _reject_reason_of_exception(exc)
             else:
                 failure = _failed_order(report)
                 if failure is None:
@@ -200,9 +204,11 @@ class ScheduleTickRunner:
                         row, TickOutcome.APPLIED, attempt,
                         position_qty=_position_of(report),
                     )
-                error, reason = failure.message, failure.reason
+                error, stage, reason = (
+                    failure.message, report.failure_stage, failure.reason,
+                )
 
-            if reason is not None and reason.requires_operator_fix:
+            if OrderRetryResult.pauses_deployment(stage, reason):
                 break
             if attempt < self._max_attempts:
                 logger.warning(

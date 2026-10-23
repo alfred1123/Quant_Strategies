@@ -1,7 +1,10 @@
 """Unit tests for :mod:`quant.trade.scheduler.tick` — mocked repo, no DB."""
 
+from __future__ import annotations
+
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 from uuid import uuid4
 
@@ -10,6 +13,9 @@ import pytest
 from quant.schemas.apply import ApplyReport
 from quant.trade.errors import BrokerAuthError, BrokerConnectionError
 from quant.trade.models.order import IntendedAction, OrderRejectReason
+
+if TYPE_CHECKING:
+    from quant.trade.models.order import OrderFailureStage
 from quant.trade.scheduler.tick import ScheduleTickRunner, TickOutcome
 
 DUE_AT = datetime(2026, 8, 1, 9, 0, tzinfo=UTC)
@@ -44,6 +50,7 @@ def _apply_report(
     position_qty: float,
     order_success: bool | None = None,
     reject_reason: OrderRejectReason | None = None,
+    failure_stage: OrderFailureStage | None = None,
 ) -> ApplyReport:
     """A real ApplyReport, so renaming ``position_qty`` fails here."""
     return ApplyReport(
@@ -55,6 +62,7 @@ def _apply_report(
         position_qty=position_qty,
         order_success=order_success,
         reject_reason=reject_reason,
+        failure_stage=failure_stage,
         message=(
             "insufficient funds" if order_success is False else "no order needed (HOLD)"
         ),
@@ -270,6 +278,55 @@ class TestAttemptBudget:
         assert apply_fn.call_count == 3
         assert report.results[0].outcome is TickOutcome.PAUSED
         assert report.results[0].error == "insufficient funds"
+
+    def test_a_key_refusal_on_place_still_spends_the_budget(self, repo):
+        """A refused key on place is not an operator-fix reason (decision #107).
+
+        The failure stage is PLACE, so the tick spends the budget. A failed
+        cancel is a different stage.
+        """
+        from quant.trade.models.order import OrderFailureStage
+
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(
+            return_value=_apply_report(
+                position_qty=0.0,
+                order_success=False,
+                reject_reason=OrderRejectReason.KEY_REFUSED,
+                failure_stage=OrderFailureStage.PLACE,
+            )
+        )
+        runner = _runner(repo, apply_fn, max_attempts=3)
+
+        report = runner.run_interval(1)
+
+        assert apply_fn.call_count == 3
+        assert report.results[0].outcome is TickOutcome.PAUSED
+        assert report.results[0].attempt == 3
+
+    def test_a_failed_cancel_that_names_a_key_refusal_pauses_on_the_first_pass(self, repo):
+        """The venue's label is KEY_REFUSED. The pause is the cancel stage."""
+        from quant.trade.models.order import OrderFailureStage
+
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(
+            return_value=_apply_report(
+                position_qty=0.0,
+                order_success=False,
+                reject_reason=OrderRejectReason.KEY_REFUSED,
+                failure_stage=OrderFailureStage.CANCEL,
+            )
+        )
+        runner = _runner(repo, apply_fn, max_attempts=3)
+
+        report = runner.run_interval(1)
+
+        apply_fn.assert_called_once()
+        assert report.results[0].outcome is TickOutcome.PAUSED
+        assert report.results[0].attempt == 1
+        kwargs = repo.write_deployment.call_args.kwargs
+        assert kwargs["is_enabled_ind"] == "N"
+        assert kwargs["deployment_status"] == "PAUSED"
 
     def test_a_size_reject_pauses_without_spending_the_budget(self, repo):
         """Every remaining tick would place the same doomed order."""

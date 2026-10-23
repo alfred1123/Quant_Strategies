@@ -15,6 +15,7 @@ from dataclasses import dataclass, replace
 from quant.trade.adapters.base import TradeAdapter
 from quant.trade.models.order import (
     IntendedAction,
+    OrderFailureStage,
     OrderRejectReason,
     OrderRequest,
     OrderResult,
@@ -139,7 +140,29 @@ class OrderRetryResult:
     result: OrderResult | None
     attempts: tuple[ApplyAttempt, ...]
     max_attempts: int
+    #: The alert title reads this. It is :meth:`pauses_deployment` for this
+    #: stage and reason, so a cancel on a later attempt is the same pause
+    #: as the tick. A place that does not need an operator is not one.
     permanent_failure: bool
+    #: Set when the attempt failed. PLACE is the submit; CANCEL is a withdraw
+    #: that did not succeed. None when no order failed.
+    failure_stage: OrderFailureStage | None = None
+
+    @staticmethod
+    def pauses_deployment(
+        failure_stage: OrderFailureStage | None,
+        reason: OrderRejectReason | None,
+    ) -> bool:
+        """Whether the tick should stop on this outcome.
+
+        A failed cancel may still be resting, whatever venue label it
+        carried. A place pauses only when the reason itself needs an
+        operator. The tick has the stage and the reason on the report, not
+        this result, so both are arguments and there is one copy of the rule.
+        """
+        return failure_stage is OrderFailureStage.CANCEL or (
+            reason is not None and reason.requires_operator_fix
+        )
 
     @property
     def no_order_message(self) -> str:
@@ -204,9 +227,18 @@ class OrderRetryExecutor:
 
     A cancel that returns failure is final. The call is not proof the order
     is gone: the book can still read flat while that order rests, and the
-    next place is then a second order. The result carries
-    :attr:`OrderRejectReason.CANCEL_FAILED`, which pauses the deployment
-    until someone reconciles it.
+    next place is then a second order. The result keeps the cancel's typed
+    reason when the adapter set one, and carries
+    :attr:`OrderRejectReason.CANCEL_FAILED` only when it did not. The
+    outcome's failure stage is CANCEL, and :meth:`OrderRetryResult.pauses_deployment`
+    is what stops the tick: overwriting a typed reason with ``CANCEL_FAILED``
+    would hide why the cancel was refused, and a reason such as
+    ``KEY_REFUSED`` does not itself pause a place. ``permanent_failure`` is
+    that method, so the alert title — it already reads the field — does not
+    keep a second rule about how many attempts ran. The result message
+    becomes the reason, and ``ApplyReport.message`` copies that field.
+    The alert prints it through the existing formatter. The warning log
+    still has the cancel's own message.
 
     The returned :class:`OrderRetryResult` carries everything callers need —
     they never reach into the nested policy.
@@ -240,7 +272,9 @@ class OrderRetryExecutor:
             if result is None or result.success:
                 return self._outcome(action, position_qty, result, attempts)
             if not policy.is_retryable(result):
-                return self._outcome(action, position_qty, result, attempts)
+                return self._outcome(
+                    action, position_qty, result, attempts, OrderFailureStage.PLACE,
+                )
             if policy.is_unconfirmed(result) and result.vendor_order_id:
                 cancel = adapter.cancel_order(result.vendor_order_id, vendor_symbol)
                 if not cancel.success:
@@ -250,11 +284,20 @@ class OrderRetryExecutor:
                         vendor_symbol,
                         cancel.message,
                     )
-                    result = replace(result, reason=OrderRejectReason.CANCEL_FAILED)
+                    reason = (
+                        cancel.reason
+                        if cancel.reason is not None
+                        else OrderRejectReason.CANCEL_FAILED
+                    )
+                    result = replace(result, reason=reason, message=reason.value)
                     attempts[-1] = ApplyAttempt(action, position_qty, result)
-                    return self._outcome(action, position_qty, result, attempts)
+                    return self._outcome(
+                        action, position_qty, result, attempts, OrderFailureStage.CANCEL,
+                    )
             if attempt_num >= policy.max_attempts:
-                return self._outcome(action, position_qty, result, attempts)
+                return self._outcome(
+                    action, position_qty, result, attempts, OrderFailureStage.PLACE,
+                )
             time.sleep(policy.backoff_s)
 
         raise AssertionError("unreachable — loop always returns")
@@ -265,12 +308,10 @@ class OrderRetryExecutor:
         position_qty: float,
         result: OrderResult | None,
         attempts: list[ApplyAttempt],
+        failure_stage: OrderFailureStage | None = None,
     ) -> OrderRetryResult:
-        permanent = (
-            result is not None
-            and not result.success
-            and len(attempts) == 1
-            and not self._policy.is_retryable(result)
+        permanent = OrderRetryResult.pauses_deployment(
+            failure_stage, None if result is None else result.reason,
         )
         return OrderRetryResult(
             action=action,
@@ -279,4 +320,5 @@ class OrderRetryExecutor:
             attempts=tuple(attempts),
             max_attempts=self._policy.max_attempts,
             permanent_failure=permanent,
+            failure_stage=failure_stage,
         )

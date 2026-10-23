@@ -1,10 +1,12 @@
 """Unit tests for ccxt broker adapter and exchange wiring."""
 
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
 import ccxt
 import pytest
 
+from quant.schemas.apply import ApplyReport
 from quant.trade.brokers.ccxt.adapter import CcxtTradeAdapter, create_ccxt_adapter
 from quant.trade.brokers.ccxt.config import (
     CCXT_PRESETS,
@@ -30,6 +32,9 @@ from quant.trade.models.order import (
     OrderSide,
     OrderType,
 )
+from quant.trade.order_policy import OrderRetryExecutor, OrderRetryPolicy
+from quant.trade.scheduler.tick import ScheduleTickRunner, TickOutcome
+from tests.unit.test_schedule_tick import _due_row
 
 #: The seeded CONFIG.SETTING fill_confirm_delays_s.
 _DELAYS = (0.3, 0.6, 1.2, 2.4, 3.5)
@@ -899,9 +904,207 @@ class TestPlaceOrder:
         assert result.success is True
         assert result.vendor_order_id == "order-1"
 
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "authentication failed during cancel_order: permission denied",
+            pytest.param("", id="empty-message"),
+        ],
+    )
+    def test_cancel_order_keeps_a_typed_key_refusal(self, inst_cache, message):
+        """The refusal is typed on the exception. Dropping it here is where the cause is lost."""
+        adapter = self._adapter(inst_cache)
+        with patch.object(
+            adapter.gateway, "cancel_order",
+            side_effect=BrokerAuthError(message, reason=OrderRejectReason.KEY_REFUSED),
+        ):
+            result = adapter.cancel_order("order-1", "BTCUSDT")
+        assert result.success is False
+        assert result.vendor_order_id == "order-1"
+        assert result.reason is OrderRejectReason.KEY_REFUSED
+        assert result.message == message
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "cancel_order failed: timeout",
+            pytest.param("", id="empty-message"),
+        ],
+    )
+    def test_cancel_order_without_a_typed_reason_leaves_it_unset(self, inst_cache, message):
+        adapter = self._adapter(inst_cache)
+        with patch.object(
+            adapter.gateway, "cancel_order",
+            side_effect=BrokerConnectionError(message),
+        ):
+            result = adapter.cancel_order("order-1", "BTCUSDT")
+        assert result.success is False
+        assert result.vendor_order_id == "order-1"
+        assert result.reason is None
+
     def test_get_open_orders_delegates_to_gateway(self, inst_cache):
         adapter = self._adapter(inst_cache)
         with patch.object(adapter.gateway, "fetch_open_orders", return_value=[{"id": "1"}]) as mock_fetch:
             orders = adapter.get_open_orders("BTCUSDT")
         mock_fetch.assert_called_once_with("BTCUSDT")
         assert orders == [{"id": "1"}]
+
+
+def _unconfirmed(vendor_order_id: str = "ord-1") -> OrderResult:
+    return OrderResult(
+        success=False,
+        vendor_order_id=vendor_order_id,
+        message="fill unconfirmed after 8.0s — requires manual reconciliation",
+        side=OrderSide.BUY,
+        requested_qty=0.01,
+    )
+
+
+def _tick_paused(outcome) -> bool:
+    """One due deployment, paused on the first pass."""
+    from quant.trade.order_policy import OrderRetryResult
+
+    assert OrderRetryResult.pauses_deployment(outcome.failure_stage, outcome.result.reason)
+    repo = MagicMock()
+    repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+    result = outcome.result
+    report = ApplyReport(
+        deployment_id=uuid4(),
+        deployment_vid=1,
+        action=outcome.action,
+        vendor_symbol="BTCUSDT",
+        signal=1.0,
+        position_qty=outcome.position_qty,
+        order_success=False,
+        vendor_order_id=result.vendor_order_id,
+        message=result.message,
+        reject_reason=result.reason,
+        failure_stage=outcome.failure_stage,
+    )
+    runner = ScheduleTickRunner(
+        repo, lambda _user, _deployment: report, max_attempts=3, retry_backoff_s=0,
+    )
+    tick = runner.run_interval(1)
+    paused = tick.results[0]
+    return (
+        paused.outcome is TickOutcome.PAUSED
+        and paused.attempt == 1
+        and repo.write_deployment.call_args.kwargs["deployment_status"] == "PAUSED"
+        and repo.write_deployment.call_args.kwargs["is_enabled_ind"] == "N"
+    )
+
+
+class TestTypedCancelRefusal:
+    """A refused cancel keeps the venue's reason and still stops the retry."""
+
+    def _adapter(self, inst_cache):
+        adapter = create_ccxt_adapter(
+            preset=CCXT_PRESETS["bybit"],
+            api_key="k",
+            api_secret="s",
+            paper=True,
+            inst_cache=inst_cache,
+            confirm_delays_s=_DELAYS,
+        )
+        adapter.pin_instrument("btcusdt.crypto")
+        return adapter
+
+    @pytest.mark.parametrize("max_attempts", [1, 5])
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "authentication failed during cancel_order: permission denied",
+            pytest.param("", id="empty-message"),
+        ],
+    )
+    @patch("quant.trade.order_policy.time.sleep")
+    def test_key_refused_on_cancel_is_kept_places_once_and_pauses(
+        self, _sleep, inst_cache, message, max_attempts,
+    ):
+        adapter = self._adapter(inst_cache)
+        with patch.object(adapter, "place_order", wraps=adapter.place_order) as place, \
+             patch.object(
+                 adapter.gateway, "fetch_market_limits",
+                 return_value=MarketLimits("BTCUSDT"),
+             ), patch.object(
+                 adapter.gateway, "fetch_position_qty", return_value=0.0,
+             ) as position, patch.object(
+                 adapter.gateway, "create_market_order",
+                 return_value={"id": "ord-1"},
+             ), patch.object(
+                 adapter.gateway, "cancel_order",
+                 side_effect=BrokerAuthError(
+                     message, reason=OrderRejectReason.KEY_REFUSED,
+                 ),
+             ), patch(
+                 "quant.trade.brokers.ccxt.adapter.confirm_market_order",
+                 return_value=_unconfirmed(),
+             ):
+            outcome = OrderRetryExecutor(
+                OrderRetryPolicy(max_attempts=max_attempts, backoff_s=2.0),
+            ).execute(adapter, "BTCUSDT", 1.0, 0.01)
+
+        result = outcome.result
+        assert result is not None
+        assert result.reason is OrderRejectReason.KEY_REFUSED
+        assert result.message == OrderRejectReason.KEY_REFUSED.value
+        assert not result.reason.requires_operator_fix
+        assert result.success is False
+        assert result.vendor_order_id == "ord-1"
+        assert place.call_count == 1
+        assert position.call_count == 1
+        from quant.trade.models.order import OrderFailureStage
+        from quant.trade.order_policy import OrderRetryResult
+        assert outcome.failure_stage is OrderFailureStage.CANCEL
+        assert len(outcome.attempts) == 1
+        assert outcome.permanent_failure
+        assert OrderRetryResult.pauses_deployment(outcome.failure_stage, result.reason)
+        assert _tick_paused(outcome)
+        _sleep.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "cancel_order failed: timeout",
+            pytest.param("", id="empty-message"),
+        ],
+    )
+    @patch("quant.trade.order_policy.time.sleep")
+    def test_untyped_cancel_failure_stays_cancel_failed(
+        self, _sleep, inst_cache, message,
+    ):
+        adapter = self._adapter(inst_cache)
+        with patch.object(adapter, "place_order", wraps=adapter.place_order) as place, \
+             patch.object(
+                 adapter.gateway, "fetch_market_limits",
+                 return_value=MarketLimits("BTCUSDT"),
+             ), patch.object(
+                 adapter.gateway, "fetch_position_qty", return_value=0.0,
+             ), patch.object(
+                 adapter.gateway, "create_market_order",
+                 return_value={"id": "ord-1"},
+             ), patch.object(
+                 adapter.gateway, "cancel_order",
+                 side_effect=BrokerConnectionError(message),
+             ), patch(
+                 "quant.trade.brokers.ccxt.adapter.confirm_market_order",
+                 return_value=_unconfirmed(),
+             ):
+            outcome = OrderRetryExecutor(
+                OrderRetryPolicy(max_attempts=5, backoff_s=2.0),
+            ).execute(adapter, "BTCUSDT", 1.0, 0.01)
+
+        result = outcome.result
+        assert result is not None
+        assert result.reason is OrderRejectReason.CANCEL_FAILED
+        assert result.message == OrderRejectReason.CANCEL_FAILED.value
+        assert result.reason.requires_operator_fix
+        from quant.trade.models.order import OrderFailureStage
+        from quant.trade.order_policy import OrderRetryResult
+        assert outcome.failure_stage is OrderFailureStage.CANCEL
+        assert result.success is False
+        assert place.call_count == 1
+        assert len(outcome.attempts) == 1
+        assert OrderRetryResult.pauses_deployment(outcome.failure_stage, result.reason)
+        assert _tick_paused(outcome)
+        _sleep.assert_not_called()
