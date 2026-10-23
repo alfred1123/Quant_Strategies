@@ -290,7 +290,7 @@ Every API call to an external data provider (Yahoo Finance, Glassnode, Nasdaq Da
 ### Schema
 
 ```
-BT.API_REQUEST  (header — one current row per subscription)
+MARKET_DATA.API_REQUEST  (header — one current row per subscription)
   PK: (API_REQ_ID UUID, API_REQ_VID INTEGER)
   ──────────────────────────────────────────
   APP_ID            → REFDATA.APP           (which provider)
@@ -304,7 +304,7 @@ BT.API_REQUEST  (header — one current row per subscription)
   TRANSACT_TO_TS    TIMESTAMPTZ              (9999-12-31 when current)
   USER_ID, CREATED_AT
 
-BT.API_REQUEST_PAYLOAD  (data — JSONB, partitioned yearly via pg_partman)
+MARKET_DATA.API_REQUEST_PAYLOAD  (data — JSONB, partitioned yearly via pg_partman)
   PK: (API_REQ_ID, API_REQ_VID, CREATED_AT)
   ──────────────────────────────────────────
   PAYLOAD  JSONB                             (complete merged history)
@@ -317,7 +317,7 @@ BT.API_REQUEST_PAYLOAD  (data — JSONB, partitioned yearly via pg_partman)
 ```sql
 -- Proposed / not in source DDL:
 CREATE UNIQUE INDEX UX_API_REQUEST_CURRENT_SUBSCRIPTION
-ON BT.API_REQUEST (APP_ID, APP_METRIC_ID, TM_INTERVAL_ID, INTERNAL_CUSIP)
+ON MARKET_DATA.API_REQUEST (APP_ID, APP_METRIC_ID, TM_INTERVAL_ID, INTERNAL_CUSIP)
 NULLS NOT DISTINCT
 WHERE TRANSACT_TO_TS = TIMESTAMPTZ '9999-12-31';
 ```
@@ -352,7 +352,7 @@ This means the full history of every subscription is retained — each VID is a 
 | `read_payload(*, app_id, app_metric_id, internal_cusip, range_start, range_end, ...)` | Read-only. Returns the cached slice if the cached range fully covers the request, otherwise raises `BacktestCache.CacheMissError` (translated to HTTP 400 by the service layer). Never calls the provider, never writes. |
 | `refresh_payload(*, app_id, app_metric_id, internal_cusip, range_start, range_end, fetcher, ...)` | Fetch + persist as a single transactional unit. Calls `fetcher(range_start, range_end)` for the **full** requested range and inserts a new version via `SP_INS_API_REQUEST` (re-using the cached `api_req_id` so the SP bumps `API_REQ_VID`). **SP write failures propagate** — callers must not swallow. |
 
-The mode is driven by a single UI checkbox **"Refresh dataset"** on the trading-product card. When unchecked, the service calls `read_payload` so no provider calls and no DB writes occur — versions of `BT.API_REQUEST` only grow when the user explicitly opts in. This keeps `API_REQUEST_PAYLOAD` row count bounded and old partitions easy to drop. `REFDATA.APP.REFRESH_DATASET_IND` is `N` for a source the checkbox must not call. Glassnode and Bybit are `N`. Yahoo is `Y`.
+The mode is driven by a single UI checkbox **"Refresh dataset"** on the trading-product card. When unchecked, the service calls `read_payload` so no provider calls and no DB writes occur — versions of `MARKET_DATA.API_REQUEST` only grow when the user explicitly opts in. This keeps `API_REQUEST_PAYLOAD` row count bounded and old partitions easy to drop. `REFDATA.APP.REFRESH_DATASET_IND` is `N` for a source the checkbox must not call. Glassnode and Bybit are `N`. Yahoo is `Y`.
 
 ### Cache flow
 
@@ -390,7 +390,7 @@ Not in scope for this PR — flagged here so the next data-layer change can targ
 
 ### Scheduled detach of old payload partitions
 
-`MARKET_DATA.SP_DETACH_API_REQUEST_PAYLOAD` detaches a child partition and drops it when the partition's upper bound is older than the retention the caller passes. The bound decides. The procedure does not read or write `API_REQUEST`. Release `bt/1.28.0`, context `bt,prod-deploy`. The daily job `detach_api_request_payload` passes 14 days at 03:15 UTC.
+`MARKET_DATA.SP_DETACH_API_REQUEST_PAYLOAD` detaches a child partition and drops it when the partition's upper bound is older than the retention the caller passes. The bound decides. The procedure does not read or write `API_REQUEST`. Release `bt/1.28.0`, moved to `MARKET_DATA` in `bt/1.30.0`, context `bt,prod-deploy`. The daily job `detach_api_request_payload` passes 14 days at 03:15 UTC.
 
 Prod partitions are yearly on `CREATED_AT`. The 2026 child runs through `2027-01-01`, so that partition stays until 14 days after that date. Closed header rows stay in `API_REQUEST`.
 
