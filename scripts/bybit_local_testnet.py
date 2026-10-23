@@ -335,8 +335,7 @@ def save_credential(conninfo: str, app_user_id: UUID) -> int:
 
 def run_gateway(paper: bool, *, bybit_demo: bool = False) -> None:
     """Connect to Bybit via ccxt and validate credentials."""
-    from quant.trade.brokers.ccxt.adapter import create_ccxt_adapter
-    from quant.trade.brokers.ccxt.config import CCXT_PRESETS
+    from quant.trade.registry import build_default_registry
 
     conninfo = _local_conninfo()
     app_user_id = _env_uuid("CCXT_ITEST_USER_ID")
@@ -347,13 +346,12 @@ def run_gateway(paper: bool, *, bybit_demo: bool = False) -> None:
     api_key, api_secret = resolve_api_keys(conninfo)
 
     caches = _load_caches(conninfo)
-    adapter = create_ccxt_adapter(
-        preset=CCXT_PRESETS["bybit"],
+    adapter = build_default_registry(caches.refdata).create(
+        app_id,
         api_key=api_key,
         api_secret=api_secret,
         paper=paper and not bybit_demo,
         inst_cache=caches.instrument_cache,
-        confirm_delays_s=caches.refdata.setting_floats("fill_confirm_delays_s"),
         demo=bybit_demo,
     )
     try:
@@ -660,8 +658,7 @@ def run_intended_side_matrix() -> None:
 
 def probe_intended_with_live_position(paper: bool, *, bybit_demo: bool = False) -> dict:
     """Connect to Bybit, read position, show intended_side for signals -1/0/1."""
-    from quant.trade.brokers.ccxt.adapter import create_ccxt_adapter
-    from quant.trade.brokers.ccxt.config import CCXT_PRESETS
+    from quant.trade.registry import build_default_registry
 
     conninfo = _local_conninfo()
     app_id = _env_int("CCXT_ITEST_APP_ID")
@@ -669,13 +666,12 @@ def probe_intended_with_live_position(paper: bool, *, bybit_demo: bool = False) 
     api_key, api_secret = resolve_api_keys(conninfo)
 
     caches = _load_caches(conninfo)
-    adapter = create_ccxt_adapter(
-        preset=CCXT_PRESETS["bybit"],
+    adapter = build_default_registry(caches.refdata).create(
+        app_id,
         api_key=api_key,
         api_secret=api_secret,
         paper=paper and not bybit_demo,
         inst_cache=caches.instrument_cache,
-        confirm_delays_s=caches.refdata.setting_floats("fill_confirm_delays_s"),
         demo=bybit_demo,
     )
     try:
@@ -708,9 +704,8 @@ def run_apply_signal(
     OPEN_SHORT/CLOSE_SHORT) can be verified against the Bybit testnet UI
     one step at a time.
     """
-    from quant.trade.brokers.ccxt.adapter import create_ccxt_adapter
-    from quant.trade.brokers.ccxt.config import CCXT_PRESETS
     from quant.trade.models.order import IntendedAction
+    from quant.trade.registry import build_default_registry
 
     conninfo = _local_conninfo()
     app_id = _env_int("CCXT_ITEST_APP_ID")
@@ -718,13 +713,12 @@ def run_apply_signal(
     api_key, api_secret = resolve_api_keys(conninfo)
 
     caches = _load_caches(conninfo)
-    adapter = create_ccxt_adapter(
-        preset=CCXT_PRESETS["bybit"],
+    adapter = build_default_registry(caches.refdata).create(
+        app_id,
         api_key=api_key,
         api_secret=api_secret,
         paper=paper and not bybit_demo,
         inst_cache=caches.instrument_cache,
-        confirm_delays_s=caches.refdata.setting_floats("fill_confirm_delays_s"),
         demo=bybit_demo,
     )
     try:
