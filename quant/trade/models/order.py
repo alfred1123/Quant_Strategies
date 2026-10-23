@@ -38,6 +38,8 @@ class OrderRejectReason(StrEnum):
     VENUE_REJECTED = "VENUE_REJECTED"
     #: ``create_order`` answered without an id; nothing to confirm or cancel.
     NOT_ACKNOWLEDGED = "NOT_ACKNOWLEDGED"
+    #: The poll ended without a terminal fill. Cancel this id, then place again.
+    UNCONFIRMED = "UNCONFIRMED"
     #: Cancel returned failure, so the order may still be resting.
     CANCEL_FAILED = "CANCEL_FAILED"
 
@@ -52,9 +54,11 @@ class OrderRejectReason(StrEnum):
         is one the next tick would meet unchanged. ``CANCEL_FAILED`` is the
         same pause: the cancel did not succeed, so the order may still be
         open and the next place would send another while the book still
-        reads flat. The other reasons end the executor's attempt loop (a
-        typed reject is final for the attempt) but leave the tick budget
-        alone: funds can arrive and a venue reject can be a passing condition.
+        reads flat. ``UNCONFIRMED`` is absent: the executor cancels that id
+        and places again, and pausing the tick would skip the cancel. The
+        other reasons end the executor's attempt loop (a typed reject is
+        final for the attempt) but leave the tick budget alone: funds can
+        arrive and a venue reject can be a passing condition.
         """
         return self in _OPERATOR_FIX
 

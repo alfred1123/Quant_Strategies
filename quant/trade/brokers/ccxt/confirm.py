@@ -92,6 +92,7 @@ def _unconfirmed(
             f"vendor_order_id={vendor_order_id} requires manual reconciliation"
             + (f" (last status={last_status!r})" if last_status else "")
         ),
+        reason=OrderRejectReason.UNCONFIRMED,
         raw_status=last_status,
         side=req.side,
         requested_qty=req.qty,

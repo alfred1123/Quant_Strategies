@@ -160,10 +160,12 @@ class OrderRetryPolicy:
     """Decide retry vs fail-fast from what the broker layer typed.
 
     A refusal arrives with an :class:`OrderRejectReason` set where it was
-    decided — the gateway, the fill poller, the adapter — and any typed reject
-    is final for this apply. Only a failure nobody could classify (a dropped
-    connection, a timeout) is judged from its prose, and then only to tell a
-    transient fault from an unknown one.
+    decided — the gateway, the fill poller, the adapter. A typed reject is
+    final for this apply, except :attr:`OrderRejectReason.UNCONFIRMED`: the
+    fill is unknown, so the executor cancels that id and places again. Only a
+    failure nobody could classify (a dropped connection, a timeout) is judged
+    from its prose, and then only to tell a transient fault from an unknown
+    one.
     """
 
     _TRANSIENT_MARKERS = ("unreachable", "rate", "timeout")
@@ -181,18 +183,22 @@ class OrderRetryPolicy:
         return self._backoff_s
 
     def is_unconfirmed(self, result: OrderResult) -> bool:
-        """Fill state unknown after bounded poll — candidate for cancel + retry."""
-        msg = result.message.lower()
-        return "fill unconfirmed" in msg or "requires manual reconciliation" in msg
+        """True when the fill poll typed :attr:`OrderRejectReason.UNCONFIRMED`.
+
+        The executor cancels that vendor id before placing again. The sentence
+        on the result is for the alert; this does not read it. Not an operator
+        pause — :attr:`OrderRejectReason.requires_operator_fix` stays false.
+        """
+        return result.reason is OrderRejectReason.UNCONFIRMED
 
     def is_retryable(self, result: OrderResult) -> bool:
-        """Transient / ambiguous failures may be retried; a typed reject fails fast."""
+        """An unconfirmed fill is retried after cancel; every other typed reject fails fast."""
         if result.success:
-            return False
-        if result.reason is not None:
             return False
         if self.is_unconfirmed(result):
             return True
+        if result.reason is not None:
+            return False
         if result.vendor_order_id:
             return True
         msg = result.message.lower()
