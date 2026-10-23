@@ -17,6 +17,11 @@ from quant.trade.order_policy import (
     intended_action,
     order_for,
 )
+from tests.conftest import StubRefData
+
+_REFDATA = StubRefData()
+_ORDER_ATTEMPTS = _REFDATA.setting_int("order_max_attempts")
+_ORDER_BACKOFF_S = _REFDATA.setting_float("order_retry_backoff_s")
 
 
 class TestIntendedAction:
@@ -109,12 +114,15 @@ def _result(
 
 
 #: The seeded CONFIG.SETTING budget — what live_apply builds from the snapshot.
-_POLICY = OrderRetryPolicy(max_attempts=5, backoff_s=2.0)
+_POLICY = OrderRetryPolicy(max_attempts=_ORDER_ATTEMPTS, backoff_s=_ORDER_BACKOFF_S)
 
 
 class TestOrderRetryPolicy:
     def setup_method(self) -> None:
-        self.policy = OrderRetryPolicy(max_attempts=5, backoff_s=2.0)
+        self.policy = OrderRetryPolicy(
+            max_attempts=_ORDER_ATTEMPTS,
+            backoff_s=_ORDER_BACKOFF_S,
+        )
 
     def test_unconfirmed_message(self):
         assert self.policy.is_unconfirmed(_result("fill unconfirmed after 8s"))
@@ -188,8 +196,8 @@ class TestOrderRetryPolicy:
         assert self.policy.is_retryable(held)
 
     def test_carries_the_configured_budget(self):
-        assert self.policy.max_attempts == 5
-        assert self.policy.backoff_s == 2.0
+        assert self.policy.max_attempts == _ORDER_ATTEMPTS
+        assert self.policy.backoff_s == _ORDER_BACKOFF_S
 
 
 class TestApplyAttempt:
@@ -280,20 +288,26 @@ class TestOrderRetryExecutor:
                 vendor_order_id="ord-unconfirmed-88",
             )
         )
-        outcome = OrderRetryExecutor(OrderRetryPolicy(max_attempts=3, backoff_s=2.0)).execute(
-            adapter, "BTCUSDT", 1.0, 0.01
-        )
+        # Short budget, below order_max_attempts, so exhaustion is three places.
+        outcome = OrderRetryExecutor(
+            OrderRetryPolicy(max_attempts=3, backoff_s=_ORDER_BACKOFF_S),
+        ).execute(adapter, "BTCUSDT", 1.0, 0.01)
         assert not outcome.permanent_failure
         assert len(outcome.attempts) == 3
         assert outcome.max_attempts == 3
         assert adapter.cancel_order.call_count == 3
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [
+            _ORDER_BACKOFF_S,
+            _ORDER_BACKOFF_S,
+        ]
         assert outcome.vendor_order_ids == [
             "ord-unconfirmed-88",
             "ord-unconfirmed-88",
             "ord-unconfirmed-88",
         ]
 
-    @pytest.mark.parametrize("max_attempts", [1, 5])
+    # 1 is a single attempt. The other value is the seeded order_max_attempts.
+    @pytest.mark.parametrize("max_attempts", [1, _ORDER_ATTEMPTS])
     @pytest.mark.parametrize(
         "cancel_message",
         [
@@ -308,8 +322,9 @@ class TestOrderRetryExecutor:
         """A cancel that returns failure is not proof the order is gone.
 
         The book still reads flat, so another place would be a second order
-        on top of one that may still be open. One and five are the attempt
-        budget's ends: five is where the ignored return was measured.
+        on top of one that may still be open. One attempt and the seeded
+        budget are the ends: the seeded budget is where the ignored return
+        was measured.
         """
         adapter = _adapter(
             _result(
@@ -324,7 +339,7 @@ class TestOrderRetryExecutor:
             message=cancel_message,
         )
         outcome = OrderRetryExecutor(
-            OrderRetryPolicy(max_attempts=max_attempts, backoff_s=2.0),
+            OrderRetryPolicy(max_attempts=max_attempts, backoff_s=_ORDER_BACKOFF_S),
         ).execute(adapter, "BTCUSDT", 1.0, 0.01)
 
         assert adapter.place_order.call_count == 1
@@ -356,8 +371,9 @@ class TestOrderRetryExecutor:
             vendor_order_id="1",
             message="order canceled",
         )
+        # Short budget, below order_max_attempts, so exhaustion is three places.
         outcome = OrderRetryExecutor(
-            OrderRetryPolicy(max_attempts=3, backoff_s=2.0),
+            OrderRetryPolicy(max_attempts=3, backoff_s=_ORDER_BACKOFF_S),
         ).execute(adapter, "BTCUSDT", 1.0, 0.01)
 
         assert adapter.place_order.call_count == 3
@@ -367,6 +383,10 @@ class TestOrderRetryExecutor:
         assert outcome.result is not None
         assert outcome.result.reason is None
         assert mock_sleep.call_count == 2
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [
+            _ORDER_BACKOFF_S,
+            _ORDER_BACKOFF_S,
+        ]
 
     def test_a_raising_cancel_does_not_place_again(self):
         """An exception is not a cancel result. It leaves before a second place.
