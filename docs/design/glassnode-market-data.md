@@ -8,9 +8,9 @@ Alfred has rejected latest-only storage. The later Glassnode store keeps history
 
 ## Recommendation
 
-Store each Glassnode series in a **narrower metric store**: one row per `(metric, asset, interval, timestamp)` holding `v`. Do not write those series into `BT.API_REQUEST_PAYLOAD`.
+Store each Glassnode series in a **narrower metric store**: one row per `(metric, asset, interval, timestamp)` holding `v`. Do not write those series into `MARKET_DATA.API_REQUEST_PAYLOAD`.
 
-Leave the `BT.API_REQUEST` and `BT.API_REQUEST_PAYLOAD` rows that already exist where they are. Do not purge them, do not rewrite them, and do not drop a partition.
+Leave the `MARKET_DATA.API_REQUEST` and `MARKET_DATA.API_REQUEST_PAYLOAD` rows that already exist where they are. Do not purge them, do not rewrite them, and do not drop a partition.
 
 `MARKET_DATA.PRICE_BAR` is the wrong table for this. A price bar there is an immutable fact (see [Scheduler, price bars](scheduler-price-bars.md)). A Glassnode point is a vendor series that may be rewritten later. The first write would own the primary key, and a later correction would hit the same unique-violation path the bar service treats as a lost race.
 
@@ -44,15 +44,15 @@ The real 2026-10-03 bodies stay outside the repo so a later fetch of the same wi
 
 ## What the client does
 
-`Glassnode` in `quant/data/sources.py` has one method, `get_historical_price`. It GETs `https://api.glassnode.com/v1/metrics/` plus the `metric_path` argument, with query params `a`, `s`, `u`, `i` and the key in the `X-Api-Key` header. `GLASSNODE_API_KEY` is already in the process environment: `load_config()` loads it from SSM when `USE_SSM=1`, otherwise from `.env`. The class reads that variable and does not load a file. The default `i` is `24h`. `fetch_df` takes that path from the `REFDATA.APP_METRIC` row for the data source the request named. Choosing Glassnode in the UI is that request. The method does not fill in a path when the row has none. It then calls `raise_for_status()` and `pd.read_json`. There is no page loop and no read of the rate-limit headers. `fetch_df` increments `CONFIG.API_LIMIT.CALL_COUNT` before this method on the provider path. The method itself does not.
+`Glassnode` in `quant/data/sources.py` has two public methods: `get_historical_price` (series) and `list_asset_symbols` (asset catalog / xref). `get_historical_price` GETs `https://api.glassnode.com/v1/metrics/` plus the `metric_path` argument, with query params `a`, `s`, `u`, `i` and the key in the `X-Api-Key` header. `GLASSNODE_API_KEY` is already in the process environment: `load_config()` loads it from SSM when `USE_SSM=1`, otherwise from `.env`. The class reads that variable and does not load a file. The default `i` is `24h`. `fetch_df` takes that path from the `REFDATA.APP_METRIC` row for the data source the request named. Choosing Glassnode in the UI is that request. The method does not fill in a path when the row has none. It then calls `raise_for_status()` and `pd.read_json`. There is no page loop and no read of the rate-limit headers. `fetch_df` increments `CONFIG.API_LIMIT.CALL_COUNT` before this method on the provider path. The method itself does not.
 
-`s` and `u` are `utc_epoch(start_date)` and `utc_epoch(end_date)`: midnight UTC on each date, so the request window is the same whatever zone the host runs in. They were once built with `time.mktime`, which is the machine's local timezone; the 3 Oct window was UTC unix time, and a backtest on a non-UTC host asked Glassnode for a different window than the fixture. `tests/unit/test_data.py` pins the epoch under three `TZ` values.
+`s` and `u` are `utc_epoch(start_date)` and `utc_epoch(end_date)`: midnight UTC on each date, so the request window is the same whatever zone the host runs in. `tests/unit/test_data.py` pins the epoch under three `TZ` values.
 
 `fetch_df` in `quant/strategy/backtest_service.py` resolves the metric name `"price"` and, when refresh is on, calls the provider once for the whole `[start, end]`. The frame it stores has `price` and `factor`, both set from `v`. Columns `Open`, `High`, `Low`, `Close`, and `Volume` are copied only when the provider frame already has them. Glassnode's `{t, v}` body does not.
 
 A provider interval shorter than one day is refused before that call. The class will forward `i=1h` if something calls it directly (the unit test does). The backtest path will not.
 
-A Glassnode backtest reads `BT.API_REQUEST` through `BacktestCache.read_payload` and does not call Glassnode. `REFDATA.APP.REFRESH_DATASET_IND` says whether the Refresh dataset checkbox may call that source. Release `refdata/1.30.0` sets Glassnode and Bybit to `N` and every other app to `Y`. The drawer disables the checkbox when the traded app is `N`. A request that still sends `refresh_dataset` true does not refresh an `N` source. The daily job `fill_scheduled_providers` does: every non-exchange app whose flag is `N`, every catalog metric that has a `METRIC_PATH`, and every product with a vendor symbol for that app. It calls `fetch_df` with refresh on from the schedule's `since` (`2010-01-01`) through today, which replaces that window. It runs at 06:15 UTC. The daily point is stamped 00:00 UTC, and that stamp is not the publish time. The pull clock is [When to fetch](#when-to-fetch). Context is `refdata,prod-deploy`. The payload-table comment says the app fetches a delta and merges. The Python replaces the whole range when a provider refresh does run. `SP_GET_API_REQUEST` returns the current row (`TRANSACT_TO_TS = 9999-12-31`) inner-joined to its payload. Closed versions are not what the next backtest reads.
+A Glassnode backtest reads `MARKET_DATA.API_REQUEST` through `BacktestCache.read_payload` and does not call Glassnode. `REFDATA.APP.REFRESH_DATASET_IND` says whether the Refresh dataset checkbox may call that source. Release `refdata/1.30.0` sets Glassnode and Bybit to `N` and every other app to `Y`. The drawer disables the checkbox when the traded app is `N`. A request that still sends `refresh_dataset` true does not refresh an `N` source. The daily job `fill_scheduled_providers` does: every non-exchange app whose flag is `N`, every catalog metric that has a `METRIC_PATH`, and every product with a vendor symbol for that app. It calls `fetch_df` with refresh on from the schedule's `since` (`2010-01-01`) through today, which replaces that window. It runs at 06:15 UTC. The daily point is stamped 00:00 UTC, and that stamp is not the publish time. The pull clock is [When to fetch](#when-to-fetch). Context is `refdata,prod-deploy`. The payload-table comment says the app fetches a delta and merges. The Python replaces the whole range when a provider refresh does run. `SP_GET_API_REQUEST` returns the current row (`TRANSACT_TO_TS = 9999-12-31`) inner-joined to its payload. Closed versions are not what the next backtest reads.
 
 Before the fetch, the same job writes a missing provider xref. The symbol is the exchange market base, kept only when that provider's asset list contains it (`Glassnode.list_asset_symbols` reads `GET /v1/metadata/assets`). `BTCUSDT` and `BTCUSDC` are both `BTC`. `1000PEPE` is not rewritten to `PEPE`. The CUSIP is not parsed. An existing xref is left alone, including the `inst/1.6.0` seed of `btcusdt.crypto` → `BTC`. The fetch then reads the row through `resolve_internal_cusip`, the same read as every other app. A product with no written symbol is still skipped, so Provider series stays on Yahoo Close until this pass stores one. Add instrument still lists exchange apps only. BNB on the asset list is still not a valid asset on the netflow metric, and ETH's netflow series does not cover the 2021 to mid-2024 window. Those failures stay at fetch time.
 
@@ -149,7 +149,7 @@ The [alt-data page](alt-data-sources.md) deferred the five on-chain paths becaus
 
 ## API_REQUEST, as it is
 
-`BT.API_REQUEST` is the subscription header: app, metric, interval, cusip, range, and a version window. `BT.API_REQUEST_PAYLOAD` is supposed to hold the whole series as one JSONB document per version. `SP_INS_API_REQUEST` closes the current header (`TRANSACT_TO_TS = now`) and inserts the next version plus a payload row.
+`MARKET_DATA.API_REQUEST` is the subscription header: app, metric, interval, cusip, range, and a version window. `MARKET_DATA.API_REQUEST_PAYLOAD` is supposed to hold the whole series as one JSONB document per version. The tables moved from `BT` in `bt/1.30.0`. `SP_INS_API_REQUEST` closes the current header (`TRANSACT_TO_TS = now`) and inserts the next version plus a payload row.
 
 Three facts in the source make this a poor place to put more Glassnode series.
 
@@ -301,7 +301,7 @@ The monthly row is release `config/1.2.0` (decision #93). The counter columns ar
 
 ## Call count
 
-`CONFIG.API_LIMIT` holds the threshold and the count on the same row. `CALL_COUNT` is how many calls have been reserved since `WINDOW_FROM_TS`. `BT.API_REQUEST` stays the stored series. There is no row per call.
+`CONFIG.API_LIMIT` holds the threshold and the count on the same row. `CALL_COUNT` is how many calls have been reserved since `WINDOW_FROM_TS`. `MARKET_DATA.API_REQUEST` stays the stored series. There is no row per call.
 
 `BT.SP_RESERVE_API_CALL` takes the app id and updates that app's limit rows. An open window adds one to `CALL_COUNT`. An elapsed window, or a null `WINDOW_FROM_TS`, sets the count to 1 and `WINDOW_FROM_TS` to the transaction time. The procedure does not take a user id and does not refuse the call. The whole window resets together.
 

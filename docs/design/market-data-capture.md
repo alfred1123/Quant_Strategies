@@ -453,8 +453,8 @@ xref is invisible to this very dropdown — see decision #62 and
 The app-mode control is labeled **Data**. Exchange bars are the capture table
 on this page: first bar, last bar, gaps, and an unavailable chip when the venue
 cannot be asked. Provider series are the other kind. `GET /api/v1/market-data/provider-series`
-lists current `MARKET_DATA.PROVIDER_SUBSCR` rows. The stored window is a
-left join to `MARKET_DATA.API_REQUEST` on `PROVIDER_SUBSCR_ID`. The header and its payload move out of `BT` in release `bt/1.30.0`. Source, metric, product,
+lists current `MARKET_DATA.SERIES_SUBSCR` rows. The stored window is a
+left join to `MARKET_DATA.API_REQUEST` on `SERIES_SUBSCR_ID`. The header and its payload move out of `BT` in release `bt/1.30.0`. Source, metric, product,
 and the stored range come back, without the JSON body. A subscription that
 has not been fetched yet is on the list, and its range is null. A header whose
 payload partition was dropped is marked unavailable. A stored window with a
@@ -491,7 +491,7 @@ indicator math needed no changes at all.
 Four things follow, and each is a decision rather than a detail:
 
 - **The bar cache is bypassed on this path.** `PRICE_BAR` *is* the store.
-  Copying it into `BT.API_REQUEST` would create a second version of the same
+  Copying it into `MARKET_DATA.API_REQUEST` would create a second version of the same
   fact, free to diverge from the first.
 - **It refuses rather than substitutes.** A range the store cannot cover is an
   error naming the range it *can* — never a shorter series quietly returned
