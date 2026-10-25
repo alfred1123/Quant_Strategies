@@ -42,8 +42,9 @@ async def lifespan(app: FastAPI):
 
     Order matters: the publisher seeds ``refdata:<table>`` and ``config:<table>``
     so the bundle's ``RedisRefData`` reader (and the worker's) can resolve
-    rows immediately. If Redis is unreachable, those endpoints will 503 but
-    the server still boots so ``/health`` remains useful for diagnosis.
+    rows immediately. ``publish_all()`` has to succeed. A failure aborts
+    startup on that error, chained, so a later missing ``CONFIG.SETTING``
+    read is not what the process dies on and ``/health`` does not come up.
     """
     open_pool(DB_CONNINFO)
     try:
@@ -56,12 +57,12 @@ async def lifespan(app: FastAPI):
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
         try:
             n = RefDataPublisher(DB_CONNINFO, redis_url).publish_all()
-            logger.info("Published %d tables to Redis", n)
-        except Exception:
-            logger.exception(
-                "RefDataPublisher.publish_all() failed — catalog and policy endpoints will 503 "
-                "until POST /api/v1/refdata/refresh and POST /api/v1/config/refresh succeed",
-            )
+        except Exception as exc:
+            logger.exception("RefDataPublisher.publish_all() failed; startup aborted")
+            raise RuntimeError(
+                "RefDataPublisher.publish_all() failed; startup aborted"
+            ) from exc
+        logger.info("Published %d tables to Redis", n)
 
         caches = DataCaches(DB_CONNINFO, redis_url)
         caches.load_instruments(soft_fail=False)
