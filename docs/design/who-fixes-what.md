@@ -44,6 +44,8 @@ Open pull request 134 (Lock setting and catalog fixtures to their seed rows) cha
 
 Draft pull request 137 (Type an unconfirmed fill instead of matching its sentence) changes `quant/trade` (`order.py`, `confirm.py`, `order_policy.py`), docs, and tests. Application code. It follows #128. Do not merge it before #128. After #128 merges, rebase it onto main. It stays a draft until then. Alfred merges it. Bots do not own it.
 
+Draft pull request 143 (Raise happy-dom to ^21.0.4 and refresh the frontend lockfile past the high advisories) opened on 25 Oct 2026, about 10:03 AM HKT. It changes `frontend/package.json` and `frontend/package-lock.json`. Those are dependency files, so the change is application code (same class as #126). Alfred merges it. Bots do not own it.
+
 ### Closed and merged
 
 Pull request 90 merged on 10 Oct 2026. The docs now point at rules the application owns, not risk numbers.
@@ -82,7 +84,9 @@ Pull request 135 (Route the Bybit harness adapters through the registry) merged 
 
 Pull request 133 (Abort API startup when REFDATA publish fails) merged on 25 Oct 2026, about 9:59 AM HKT. It changed `quant/api/main.py` and tests, and the API and REFDATA cache docs. Application code. Alfred merged it. Bots do not own it.
 
-None of the open drafts #89, #91, and #137, none of the open pull requests #128 and #134, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #129, #132, #133, #135, #136, #138, and #139, is on the ordered list above.
+Pull request 140 (Docs: record 25 Oct merges on who-fixes-what) merged on 25 Oct 2026, about 10:06 AM HKT. It changed `docs/design/who-fixes-what.md` and `.cursor/rules/who-fixes-what.mdc`. Docs only. Alfred merged it.
+
+None of the open drafts #89, #91, #137, and #143, none of the open pull requests #128 and #134, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #129, #132, #133, #135, #136, #138, #139, and #140, is on the ordered list above.
 
 ## Bots, now
 
