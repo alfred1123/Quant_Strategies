@@ -14,6 +14,7 @@ import logging
 import os
 import time
 from datetime import datetime, timezone
+from io import StringIO
 
 import futu
 import pandas as pd
@@ -112,7 +113,8 @@ class Glassnode:
             f"/v1/metrics/{metric_path}",
             {"a": symbol, "s": since, "u": until, "i": resolution},
         )
-        df = pd.read_json(res.text, convert_dates=["t"])
+        # pandas 3 reads a bare string as a path, so the body has to be a buffer.
+        df = pd.read_json(StringIO(res.text), convert_dates=["t"])
         logger.info("Glassnode: fetched %d rows for %s", len(df), symbol)
         return df
 

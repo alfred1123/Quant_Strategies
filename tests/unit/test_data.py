@@ -35,6 +35,25 @@ class TestGlassnode:
         assert len(df) == 2
 
     @patch.dict("os.environ", {"GLASSNODE_API_KEY": "test_key"})
+    @patch("quant.data.sources.requests.get")
+    def test_get_historical_price_parses_the_body_it_was_sent(self, mock_get):
+        # The one test that does not mock read_json. Every scheduled fill failed
+        # on a real body with "File name too long" while these tests stayed green.
+        points = [{"t": 1279324800 + i * 86400, "v": i / 7} for i in range(400)]
+        mock_response = MagicMock()
+        mock_response.text = json.dumps(points)
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        from quant.data.sources import Glassnode
+        df = Glassnode().get_historical_price(
+            "BTC", "2010-07-17", "2011-08-21", metric_path="market/price_usd_close",
+        )
+
+        assert list(df.columns) == ["t", "v"]
+        assert len(df) == 400
+
+    @patch.dict("os.environ", {"GLASSNODE_API_KEY": "test_key"})
     @patch("quant.data.sources.pd.read_json", return_value=pd.DataFrame({"t": ["x"], "v": [1]}))
     @patch("quant.data.sources.requests.get")
     def test_get_historical_price_calls_api_with_params(self, mock_get, _):
