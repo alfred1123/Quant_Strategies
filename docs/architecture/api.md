@@ -556,7 +556,7 @@ At startup the FastAPI lifespan hook also builds `CredentialCrypto` (Fernet key 
 - **`InstrumentCache`** (`quant/data/instruments.py`) — products + xrefs from the INST schema; loaded at startup and refreshable via `POST /api/v1/inst/refresh`.
 - **`BacktestCache`** (`quant/data/backtest_cache.py`) — BT schema read/write used by the optimize/performance services for the dataset cache.
 
-If the REFDATA publish fails at startup the server still boots (REFDATA endpoints 503 until `POST /api/v1/refdata/refresh` succeeds); the instrument-cache load and missing prod secrets still fail the boot.
+If `RefDataPublisher.publish_all()` fails at startup the process aborts on that error, with the original exception chained, and `/health` does not come up. Missing prod secrets (`JWT_SECRET`, `EXCHANGE_SECRETS_KEY`) still fail the boot before publish.
 
 ## Project Structure
 

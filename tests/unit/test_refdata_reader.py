@@ -5,7 +5,7 @@ from datetime import timedelta
 import pytest
 
 from quant.refdata.reader import RedisRefData
-from tests.conftest import SETTING_ROWS
+from tests.conftest import QUEUE_PRIORITY_ROWS, SETTING_ROWS
 
 
 def _timing_reader(calendar_rows, timing_rows):
@@ -285,7 +285,11 @@ class TestSettings:
         return StubRefData()
 
     def test_setting_is_read_as_stored(self):
-        assert self._reader().setting("fallback_settlement_ccy") == "USDT"
+        stored = {row["setting_nm"]: row["setting_value"] for row in SETTING_ROWS}
+        assert (
+            self._reader().setting("fallback_settlement_ccy")
+            == stored["fallback_settlement_ccy"]
+        )
 
     def test_typed_accessors_cast(self):
         r = self._reader()
@@ -295,7 +299,9 @@ class TestSettings:
             stored["order_retry_backoff_s"]
         )
         assert r.setting_floats("fill_confirm_delays_s") == tuple(
-            float(part) for part in stored["fill_confirm_delays_s"].split(",") if part.strip()
+            float(part)
+            for part in stored["fill_confirm_delays_s"].split(",")
+            if part.strip()
         )
 
     def test_missing_setting_is_an_error_not_a_default(self):
@@ -304,8 +310,10 @@ class TestSettings:
 
     def test_queue_priority_resolves_the_db_integer(self):
         r = self._reader()
-        assert r.resolve_queue_priority("normal") == 100
-        assert r.resolve_queue_priority("high") == 0
+        # REFDATA.QUEUE_PRIORITY.PRIORITY, from the shared snapshot.
+        priority = {row["name"]: row["priority"] for row in QUEUE_PRIORITY_ROWS}
+        assert r.resolve_queue_priority("normal") == priority["normal"]
+        assert r.resolve_queue_priority("high") == priority["high"]
         with pytest.raises(RuntimeError, match="QUEUE_PRIORITY"):
             r.resolve_queue_priority("urgent")
 

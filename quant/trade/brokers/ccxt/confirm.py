@@ -83,7 +83,11 @@ def _unconfirmed(
     last_status: str | None,
     delays_s: tuple[float, ...],
 ) -> OrderResult:
-    """The fill is unknown. The executor cancels this id before placing again."""
+    """The fill is unknown. The executor cancels this id before placing again.
+
+    ``delays_s`` is the prefix already slept. Summing the schedule still
+    ahead would tell the alert a wait that did not happen.
+    """
     return OrderResult(
         success=False,
         vendor_order_id=vendor_order_id,
@@ -112,11 +116,14 @@ def confirm_market_order(
     This is the **single point** that builds ``OrderResult`` for the fill path.
     The gateway returns raw dicts; this function owns the domain translation.
     A typed connection error is that outcome and keeps ``exc.reason``. An
-    untyped one is the same unconfirmed result as an exhausted poll.
+    untyped one is the same unconfirmed result as an exhausted poll. The
+    message sums the delays already slept.
     """
     last_status: str | None = None
+    slept_s = delays_s[:0]
     for delay in delays_s:
         time.sleep(delay)
+        slept_s = delays_s[: len(slept_s) + 1]
         try:
             order = gateway.fetch_order(vendor_order_id, req.symbol)
         except OrderNotFoundError:
@@ -131,7 +138,7 @@ def confirm_market_order(
                     side=req.side,
                     requested_qty=req.qty,
                 )
-            return _unconfirmed(req, vendor_order_id, last_status, delays_s)
+            return _unconfirmed(req, vendor_order_id, last_status, slept_s)
         last_status = order.get("status")
         fill = _parse_terminal(order, vendor_order_id=vendor_order_id)
         if fill is not None:
@@ -149,4 +156,4 @@ def confirm_market_order(
                 fee_ccy=fill.fee_ccy,
             )
 
-    return _unconfirmed(req, vendor_order_id, last_status, delays_s)
+    return _unconfirmed(req, vendor_order_id, last_status, slept_s)

@@ -53,8 +53,9 @@ fi
 # command; `dev tunnel` is the same handler under the old name.
 TUNNEL_PORT="${PROD_DB_PORT:-$(db_field prod port)}"
 
-# AWS SSM port-forward target (override via .env if needed).
-SSM_TARGET_INSTANCE="${SSM_TARGET_INSTANCE:-i-09c327d8c657d79ab}"
+# AWS SSM port-forward target. Resolved from the quant-compute stack at use
+# (see ssm_target_instance); set this in .env only to override that.
+SSM_TARGET_INSTANCE="${SSM_TARGET_INSTANCE:-}"
 SSM_RDS_HOST="${SSM_RDS_HOST:-quantdb-cluster.cluster-c2pnphmnxjwr.ap-southeast-1.rds.amazonaws.com}"
 SSM_REMOTE_PORT="${SSM_REMOTE_PORT:-5432}"
 SSM_AWS_PROFILE="${SSM_AWS_PROFILE:-alfcheun}"
@@ -234,12 +235,27 @@ frontend_port() {
   printf '%s' "$DEV_FRONTEND_PORT"
 }
 
+# The instance the stack says is prod, not one pinned here. A replaced
+# instance left this script forwarding to an id that no longer exists, which
+# is why deploy.yml and liquibase-ssm-run.sh already read the CFN output.
+ssm_target_instance() {
+  [[ -n "$SSM_TARGET_INSTANCE" ]] && { printf '%s' "$SSM_TARGET_INSTANCE"; return 0; }
+  SSM_TARGET_INSTANCE=$(aws cloudformation describe-stacks \
+    --stack-name quant-compute --profile "$SSM_AWS_PROFILE" \
+    --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" \
+    --output text 2>/dev/null)
+  [[ -n "$SSM_TARGET_INSTANCE" && "$SSM_TARGET_INSTANCE" != "None" ]] \
+    || { echo "ERROR: no InstanceId from the quant-compute stack. Check AWS SSO, or set SSM_TARGET_INSTANCE in .env." >&2; return 1; }
+  printf '%s' "$SSM_TARGET_INSTANCE"
+}
+
 tunnel_command() {
   # Single canonical reconnect loop. Logs each cycle to $TUNNEL_LOG_FILE.
-  local params
+  local params target
+  target=$(ssm_target_instance) || return 1
   params=$(printf '{"host":["%s"],"portNumber":["%s"],"localPortNumber":["%s"]}' \
     "$SSM_RDS_HOST" "$SSM_REMOTE_PORT" "$TUNNEL_PORT")
-  printf '%s' "while true; do echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] starting SSM port-forward...\"; aws ssm start-session --target '$SSM_TARGET_INSTANCE' --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters '$params' --profile '$SSM_AWS_PROFILE'; echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] SSM session ended (exit \$?). Reconnecting in 5s...\"; sleep 5; done"
+  printf '%s' "while true; do echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] starting SSM port-forward...\"; aws ssm start-session --target '$target' --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters '$params' --profile '$SSM_AWS_PROFILE'; echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] SSM session ended (exit \$?). Reconnecting in 5s...\"; sleep 5; done"
 }
 
 tcp_open() {

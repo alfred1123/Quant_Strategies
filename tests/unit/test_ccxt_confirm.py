@@ -206,6 +206,68 @@ class TestConfirmMarketOrder:
         assert result.message != str(exc)
         assert gw.fetch_order.call_count == 1
 
+    @patch("quant.trade.brokers.ccxt.confirm.time.sleep")
+    def test_early_give_up_reports_time_slept(self, mock_sleep):
+        gw = MagicMock()
+        gw.fetch_order.side_effect = BrokerConnectionError(
+            "fetch_order failed: RequestTimeout",
+        )
+        req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
+        result = confirm_market_order(
+            gw, req=req, vendor_order_id="ord-early-0", delays_s=_DELAYS,
+        )
+
+        slept = sum(call.args[0] for call in mock_sleep.call_args_list)
+        assert slept == pytest.approx(sum(_DELAYS[:1]))
+        assert result.message.startswith(f"fill unconfirmed after {slept:.1f}s — ")
+        assert "fill unconfirmed" in result.message
+        assert "requires manual reconciliation" in result.message
+        assert "fetch_order failed" not in result.message
+        assert "last status" not in result.message
+        assert result.reason is None
+        assert result.vendor_order_id == "ord-early-0"
+        assert _POLICY.is_unconfirmed(result)
+        assert gw.fetch_order.call_count == 1
+
+    @patch("quant.trade.brokers.ccxt.confirm.time.sleep")
+    def test_give_up_after_an_open_poll_reports_time_slept(self, mock_sleep):
+        gw = MagicMock()
+        gw.fetch_order.side_effect = [
+            {"id": "abc", "status": "open", "filled": 0},
+            BrokerConnectionError("fetch_order failed: NetworkError"),
+        ]
+        req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
+        result = confirm_market_order(
+            gw, req=req, vendor_order_id="ord-open-1", delays_s=_DELAYS,
+        )
+
+        slept = sum(call.args[0] for call in mock_sleep.call_args_list)
+        assert slept == pytest.approx(sum(_DELAYS[:2]))
+        assert result.message.startswith(f"fill unconfirmed after {slept:.1f}s — ")
+        assert "(last status='open')" in result.message
+        assert result.raw_status == "open"
+        assert "requires manual reconciliation" in result.message
+        assert _POLICY.is_unconfirmed(result)
+        assert gw.fetch_order.call_count == 2
+
+    @patch("quant.trade.brokers.ccxt.confirm.time.sleep")
+    def test_exhausted_poll_reports_full_delay_sum(self, mock_sleep):
+        gw = MagicMock()
+        gw.fetch_order.return_value = {"id": "abc", "status": "open", "filled": 0}
+        req = OrderRequest(symbol="BTCUSDT", qty=0.01, side=OrderSide.BUY)
+        result = confirm_market_order(
+            gw, req=req, vendor_order_id="abc", delays_s=_DELAYS,
+        )
+
+        slept = sum(call.args[0] for call in mock_sleep.call_args_list)
+        assert slept == pytest.approx(sum(_DELAYS))
+        assert mock_sleep.call_count == len(_DELAYS)
+        assert result.message.startswith(f"fill unconfirmed after {slept:.1f}s — ")
+        assert "(last status='open')" in result.message
+        assert result.raw_status == "open"
+        assert "requires manual reconciliation" in result.message
+        assert _POLICY.is_unconfirmed(result)
+
 
 class _ConfirmingAdapter:
     """One place goes through the real confirm path and records broker calls."""
