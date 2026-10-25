@@ -38,13 +38,9 @@ Draft pull request 89 (record the risk rule a backtest run reads) touches applic
 
 Draft pull request 91 (stage strategy-bar PnL reconcile and the fee coin) changes application code, the trade database, and the frontend. The code is `quant/trade/pnl_reconcile.py`, `quant/trade/db_repo.py`, `quant/trade/brokers/ccxt/confirm.py`, `quant/trade/live_apply.py`, and schemas. The database change is Liquibase trade release 1.11.0. It adds a `TRADE.DEPLOYMENT_PERFORMANCE` table and `SP_INS` and `SP_GET` procedures. It adds `FEE_CCY_CD` on `TRADE.TRANSACTION` and changes the `SP_INS_TRANSACTION` signature. Alfred merges it. Bots do not own it.
 
-Open pull request 128 (Report a typed reason when a cancel is refused) is ready for review. #127 has merged, so #128 needs its branch brought up to date with main before review. That is Alfred's pull request. Do not touch its branch. It touches the `quant/trade` adapter, live apply, the scheduler tick, schemas, docs, and tests. Application code. Alfred merges it. Bots do not own it.
-
 Open pull request 134 (Lock setting and catalog fixtures to their seed rows) changes comment text in Liquibase refdata release 1.31.0 and tests, including `tests/unit/test_seed_fixture_drift.py`. It opened on 23 Oct 2026, about 12:03 AM HKT, and is ready for review. The changelog file is database source. Alfred merges it. Bots do not own it.
 
-Draft pull request 137 (Type an unconfirmed fill instead of matching its sentence) changes `quant/trade` (`order.py`, `confirm.py`, `order_policy.py`), docs, and tests. Application code. It follows #128. Do not merge it before #128. After #128 merges, rebase it onto main. It stays a draft until then. Alfred merges it. Bots do not own it.
-
-Open pull request 143 (Raise happy-dom to ^21.0.4 and refresh the frontend lockfile past the high advisories) is ready for review. It changes `frontend/package.json` and `frontend/package-lock.json`. Those are dependency files, so the change is application code, the same rule as #126. Alfred merges it. Bots do not own it.
+Draft pull request 137 (Type an unconfirmed fill instead of matching its sentence) changes `quant/trade` (`order.py`, `confirm.py`, `order_policy.py`), docs, and tests. Application code. Alfred merges it. It had followed #128. #128 is now closed without merge, so #137 is not waiting on that merge. It stays a draft until review has passed, CI is green, and nothing is waiting on a decision. Bots do not own a revive of #128 or any retarget of #137 unless Alfred asks. Do not touch its branch.
 
 ### Closed and merged
 
@@ -84,7 +80,11 @@ Pull request 135 (Route the Bybit harness adapters through the registry) merged 
 
 Pull request 133 (Abort API startup when REFDATA publish fails) merged on 25 Oct 2026, about 9:59 AM HKT. It changed `quant/api/main.py` and tests, and the API and REFDATA cache docs. Application code. Alfred merged it. Bots do not own it.
 
-None of the open drafts #89, #91, and #137, none of the open pull requests #128, #134, and #143, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #129, #132, #133, #135, #136, #138, and #139, is on the ordered list above.
+Pull request 128 (Report a typed reason when a cancel is refused) closed on 25 Oct 2026, about 10:13 AM HKT, without merge. It had been ready for review. It touched the `quant/trade` adapter, live apply, the scheduler tick, schemas, docs, and tests. Application code. Alfred owned it while it was open. Alfred said the solution seems wrong. Bots do not own a revive or a retarget unless Alfred asks.
+
+Pull request 143 (Raise happy-dom to ^21.0.4 and refresh the frontend lockfile past the high advisories) merged on 25 Oct 2026, about 10:13 AM HKT. It changed `frontend/package.json` and `frontend/package-lock.json`. Those are dependency files, so the change is application code, the same rule as #126. Alfred merged it. Bots do not own it.
+
+None of the open drafts #89, #91, and #137, none of the open pull requests #134, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #128, #129, #132, #133, #135, #136, #138, #139, and #143, is on the ordered list above. #86 stays item 1.
 
 ## Bots, now
 
