@@ -40,7 +40,7 @@ Draft pull request 91 (stage strategy-bar PnL reconcile and the fee coin) change
 
 Open pull request 134 (Lock setting and catalog fixtures to their seed rows) changes comment text in Liquibase refdata release 1.31.0 and tests, including `tests/unit/test_seed_fixture_drift.py`. It opened on 23 Oct 2026, about 12:03 AM HKT, and is ready for review. The changelog file is database source. Alfred merges it. Bots do not own it.
 
-Draft pull request 137 (Type an unconfirmed fill instead of matching its sentence) changes `quant/trade` (`order.py`, `confirm.py`, `order_policy.py`), docs, and tests. Application code. Alfred merges it. Bots do not own it.
+Draft pull request 137 (Type an unconfirmed fill instead of matching its sentence) still changes `quant/trade` (`order.py`, `confirm.py`, `order_policy.py`), docs, and tests. Application code. Alfred merges it. It had followed #128. #128 is now closed without merge. It stays a draft until review has passed, CI is green, and nothing is waiting on a decision. Bots do not own a revive of #128 or any retarget of #137 unless Alfred asks. Do not touch #137's branch. Bots do not own it.
 
 ### Closed and merged
 
@@ -84,7 +84,7 @@ Pull request 128 (Report a typed reason when a cancel is refused) closed on 25 O
 
 Pull request 143 (Raise happy-dom to ^21.0.4 and refresh the frontend lockfile past the high advisories) merged on 25 Oct 2026, about 10:13 AM HKT. It changed `frontend/package.json` and `frontend/package-lock.json`. Those are dependency files, so the change is application code, the same rule as #126. Alfred merged it. Bots do not own it.
 
-None of the open drafts #89, #91, and #137, none of the open pull requests #134, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #128, #129, #132, #133, #135, #136, #138, #139, and #143, is on the ordered list above. #86 stays item 1.
+Item 1 stays draft #86. None of the open drafts #89, #91, and #137, none of the ready pull requests #134, none of the closed-without-merge pull requests #109, #115, and #128, and none of the merged pull requests #90, #103, #110, #118, #121, #124, #125, #126, #127, #129, #132, #133, #135, #136, #138, #139, and #143, is on the ordered list above.
 
 ## Bots, now
 
