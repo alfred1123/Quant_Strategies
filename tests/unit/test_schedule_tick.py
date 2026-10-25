@@ -271,6 +271,25 @@ class TestAttemptBudget:
         assert report.results[0].outcome is TickOutcome.PAUSED
         assert report.results[0].error == "insufficient funds"
 
+    def test_an_unconfirmed_fill_spends_the_tick_budget(self, repo):
+        """Unknown fill cancels inside the apply. The tick does not pause first."""
+        repo.sp_get_missed_due_deployments.return_value = [_due_row()]
+        apply_fn = MagicMock(
+            return_value=_apply_report(
+                position_qty=0.0,
+                order_success=False,
+                reject_reason=OrderRejectReason.UNCONFIRMED,
+            )
+        )
+        runner = _runner(repo, apply_fn, max_attempts=3)
+
+        report = runner.run_interval(1)
+
+        assert apply_fn.call_count == 3
+        assert report.results[0].outcome is TickOutcome.PAUSED
+        assert report.results[0].attempt == 3
+        assert OrderRejectReason.UNCONFIRMED.requires_operator_fix is False
+
     def test_a_size_reject_pauses_without_spending_the_budget(self, repo):
         """Every remaining tick would place the same doomed order."""
         repo.sp_get_missed_due_deployments.return_value = [_due_row()]

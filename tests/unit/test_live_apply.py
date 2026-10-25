@@ -333,6 +333,7 @@ class TestLiveApplyOrchestrator:
             success=False,
             vendor_order_id="order-u",
             message="fill unconfirmed after 8.0s — vendor_order_id=order-u requires manual reconciliation",
+            reason=OrderRejectReason.UNCONFIRMED,
             side=OrderSide.BUY,
             requested_qty=0.01,
         )
@@ -351,6 +352,8 @@ class TestLiveApplyOrchestrator:
         report = orch.run(dep.app_user_id, dep, "alice")
 
         assert report.order_success is False
+        assert report.reject_reason is OrderRejectReason.UNCONFIRMED
+        assert report.reject_reason.requires_operator_fix is False
         assert adapter.place_order.call_count == 5
         assert adapter.cancel_order.call_count == 5
         assert orch._repo.sp_ins_execution_event.call_count == 5
@@ -375,6 +378,7 @@ class TestLiveApplyOrchestrator:
                     success=False,
                     vendor_order_id="order-t",
                     message="fill unconfirmed after 8.0s — requires manual reconciliation",
+                    reason=OrderRejectReason.UNCONFIRMED,
                     side=OrderSide.BUY,
                     requested_qty=0.01,
                 )
