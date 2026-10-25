@@ -40,7 +40,7 @@ Draft pull request 91 (stage strategy-bar PnL reconcile and the fee coin) change
 
 Open pull request 134 (Lock setting and catalog fixtures to their seed rows) changes comment text in Liquibase refdata release 1.31.0 and tests, including `tests/unit/test_seed_fixture_drift.py`. It opened on 23 Oct 2026, about 12:03 AM HKT, and is ready for review. The changelog file is database source. Alfred merges it. Bots do not own it.
 
-Draft pull request 137 (Type an unconfirmed fill instead of matching its sentence) changes `quant/trade` (`order.py`, `confirm.py`, `order_policy.py`), docs, and tests. Application code. Alfred merges it. It had followed #128. #128 is now closed without merge, so #137 is not waiting on that merge. It stays a draft until review has passed, CI is green, and nothing is waiting on a decision. Bots do not own a revive of #128 or any retarget of #137 unless Alfred asks. Do not touch its branch.
+Draft pull request 137 (Type an unconfirmed fill instead of matching its sentence) changes `quant/trade` (`order.py`, `confirm.py`, `order_policy.py`), docs, and tests. Application code. Alfred merges it. Bots do not own it.
 
 ### Closed and merged
 
@@ -80,7 +80,7 @@ Pull request 135 (Route the Bybit harness adapters through the registry) merged 
 
 Pull request 133 (Abort API startup when REFDATA publish fails) merged on 25 Oct 2026, about 9:59 AM HKT. It changed `quant/api/main.py` and tests, and the API and REFDATA cache docs. Application code. Alfred merged it. Bots do not own it.
 
-Pull request 128 (Report a typed reason when a cancel is refused) closed on 25 Oct 2026, about 10:13 AM HKT, without merge. It had been ready for review. It touched the `quant/trade` adapter, live apply, the scheduler tick, schemas, docs, and tests. Application code. Alfred owned it while it was open. Alfred said the solution seems wrong. Bots do not own a revive or a retarget unless Alfred asks.
+Pull request 128 (Report a typed reason when a cancel is refused) closed on 25 Oct 2026, about 10:13 AM HKT, without merge. It had been ready for review. It touched the `quant/trade` adapter, live apply, the scheduler tick, schemas, docs, and tests. Application code. Alfred closed it because the solution seemed wrong. Alfred owned it while it was open. Bots do not own a revive or a retarget unless Alfred asks.
 
 Pull request 143 (Raise happy-dom to ^21.0.4 and refresh the frontend lockfile past the high advisories) merged on 25 Oct 2026, about 10:13 AM HKT. It changed `frontend/package.json` and `frontend/package-lock.json`. Those are dependency files, so the change is application code, the same rule as #126. Alfred merged it. Bots do not own it.
 
