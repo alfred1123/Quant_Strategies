@@ -40,8 +40,6 @@ Draft pull request 91 (stage strategy-bar PnL reconcile and the fee coin) change
 
 Open pull request 128 (Report a typed reason when a cancel is refused) is ready for review. #127 has merged, so #128 needs its branch brought up to date with main before review. That is Alfred's pull request. Do not touch its branch. It touches the `quant/trade` adapter, live apply, the scheduler tick, schemas, docs, and tests. Application code. Alfred merges it. Bots do not own it.
 
-Open pull request 133 (Abort API startup when REFDATA publish fails) changes `quant/api/main.py` and tests, and the API and REFDATA cache docs. Application code. Alfred merges it. Bots do not own it.
-
 Open pull request 134 (Lock setting and catalog fixtures to their seed rows) changes comment text in Liquibase refdata release 1.31.0 and tests, including `tests/unit/test_seed_fixture_drift.py`. It opened on 23 Oct 2026, about 12:03 AM HKT, and is ready for review. The changelog file is database source. Alfred merges it. Bots do not own it.
 
 Draft pull request 137 (Type an unconfirmed fill instead of matching its sentence) changes `quant/trade` (`order.py`, `confirm.py`, `order_policy.py`), docs, and tests. Application code. It follows #128. Do not merge it before #128. After #128 merges, rebase it onto main. It stays a draft until then. Alfred merges it. Bots do not own it.
@@ -80,12 +78,15 @@ Pull request 139 (appctl: resolve the SSM tunnel target from the quant-compute s
 
 Pull request 136 (Report the delays a fill poll has already slept) merged on 25 Oct 2026, about 9:57 AM HKT. It changed `quant/trade/brokers/ccxt/confirm.py` and `tests/unit/test_ccxt_confirm.py`. Application code. Alfred merged it. Bots do not own it.
 
-None of the open drafts #89, #91, and #137, none of the open pull requests #128, #133, and #134, none of the open bot pull request #135, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #129, #132, #136, #138, and #139, is on the ordered list above.
+Pull request 135 (Route the Bybit harness adapters through the registry) merged on 25 Oct 2026, about 9:58 AM HKT. It changed `scripts/bybit_local_testnet.py`, `tests/unit/test_bybit_local_testnet.py`, `tests/integration/test_ccxt_dry_run.py`, and added `tests/unit/test_ccxt_dry_run_fixture.py`. Every file is on `deploy.yml` `paths-ignore`. It is an offline harness that does not change live behaviour. Alfred merged it.
+
+Pull request 133 (Abort API startup when REFDATA publish fails) merged on 25 Oct 2026, about 9:59 AM HKT. It changed `quant/api/main.py` and tests, and the API and REFDATA cache docs. Application code. Alfred merged it. Bots do not own it.
+
+None of the open drafts #89, #91, and #137, none of the open pull requests #128 and #134, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #129, #132, #133, #135, #136, #138, and #139, is on the ordered list above.
 
 ## Bots, now
 
 - **Quick Fix Bot.** Only a bug Check Bugs has verified, about 20 lines of real code, with tests. Alfred merges it. Do not edit #86 while that draft is the chosen fix.
 - **Check Bugs.** Pass or fail #86.
-- **Open 135.** Route the Bybit harness adapters through the registry. It changes `scripts/bybit_local_testnet.py`, `tests/unit/test_bybit_local_testnet.py`, `tests/integration/test_ccxt_dry_run.py`, and adds `tests/unit/test_ccxt_dry_run_fixture.py`. Every file is on `deploy.yml` `paths-ignore` (`scripts/**`, `tests/**`). It is an offline harness that does not change live behaviour. A bot may merge it once review has passed and CI is green. It is ready for review. It is not on Alfred's ordered list.
 - **Glassnode.** The offline harness and the sleeve note stay honest. Do not report a Sharpe. Do not build the narrower metric table — that is Alfred's later store. Do not self-merge an application-code pull request; Alfred reviews those. The scheduled fill is `fill_scheduled_providers` (decision 97). Payload partitions drop on the bound via `MARKET_DATA.SP_DETACH_API_REQUEST_PAYLOAD` (decision 96, moved in #100). Only point-in-time BTC exchange netflow covers 2021 to mid-2024. SOPR and MVRV z-score point-in-time start 27 Jun 2025. BNB is not on the netflow metric. The BNB stand-in, exchange net position change, has a point-in-time twin that starts 23 Jun 2025 and does not cover 2021 to 2024.
 - **Research, not code.** The first child is point-in-time BTC exchange netflow as factor one and BTC Bollinger 60/2.25 as factor two. The gate indicator is an SMA with window 1; the signal threshold sits strictly between 0 and 1 (do not pick a number inside the range in docs). Nothing is scored until that series is a real column the engine reads.
