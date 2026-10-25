@@ -391,7 +391,9 @@ table; HOLD when the book already agrees) and `order_for(symbol, action, qty,
 position_qty) -> OrderRequest | None` (open the deployment `qty`, close
 `abs(position_qty)`). `OrderRetryExecutor.execute` reads the position once per
 attempt, calls both, and hands the adapter the request — or records a HOLD
-without a broker call. `DryRunService` calls `intended_action` directly.
+without a broker call. A cancel that returns failure stops retries and sets
+`OrderRejectReason.CANCEL_FAILED` (`requires_operator_fix`); success still
+retries (decision #112; merge #127). `DryRunService` calls `intended_action` directly.
 
 **Adapter registry:** `AdapterRegistry.get(app_id)` resolves `REFDATA.APP` → adapter class (see [Futu Trading §3.1](futu-trading.md#31-principles)).
 

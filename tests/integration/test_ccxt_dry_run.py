@@ -176,13 +176,15 @@ def inst_cache(conninfo):
 
 
 @pytest.fixture(scope="module")
-def bybit_adapter(paper_api_keys, inst_cache, itest_params):
-    from quant.trade.brokers.ccxt.adapter import create_ccxt_adapter
-    from quant.trade.brokers.ccxt.config import CCXT_PRESETS
+def bybit_adapter(paper_api_keys, inst_cache, itest_params, adapter_registry):
+    """Bybit session from the same registry the dry-run path builds.
 
+    ``adapter_registry`` is ``build_default_registry(data_caches.refdata)``.
+    Its factory passes the preset and ``fill_confirm_delays_s``.
+    """
     api_key, api_secret = paper_api_keys
-    adapter = create_ccxt_adapter(
-        preset=CCXT_PRESETS["bybit"],
+    adapter = adapter_registry.create(
+        itest_params["app_id"],
         api_key=api_key,
         api_secret=api_secret,
         paper=itest_params["paper"],

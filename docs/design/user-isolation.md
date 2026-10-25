@@ -25,7 +25,7 @@ The FastAPI connection pool logs in as Postgres role `quant_app`. The human iden
 | `TRADE.DEPLOYMENT` audit column | `str(app_user_id)` — UUID as text (normalized) |
 | Sync backtest (`/optimize`) | Pool user / cache path — **not** per-human today |
 
-~~**Phase 1.7 ownership checks** must compare `BT.STRATEGY.USER_ID` against what jobs actually wrote (`str(caller.app_user_id)`), not username.~~ **Restored for Trade deploy** — `SP_GET_STRATEGY_LIST` and deployment create validate `BT.STRATEGY.USER_ID == str(app_user_id)`. Promotion/backtest browsing remains shared.
+~~**Ownership checks** must compare `BT.STRATEGY.USER_ID` against what jobs actually wrote (`str(caller.app_user_id)`), not username.~~ **Restored for Trade deploy** — `SP_GET_STRATEGY_LIST` and deployment create validate `BT.STRATEGY.USER_ID == str(app_user_id)`. Promotion/backtest browsing remains shared.
 
 ---
 
@@ -49,7 +49,7 @@ The FastAPI connection pool logs in as Postgres role `quant_app`. The human iden
 
 ## Enforced today
 
-### Credentials (Phase 1.1)
+### Credentials
 
 - Every SP call passes `CurrentUser.app_user_id`.
 - Cross-user `api_credential_id` → **404** (never 403 — no existence leak).
@@ -57,7 +57,7 @@ The FastAPI connection pool logs in as Postgres role `quant_app`. The human iden
 
 Implementation: `quant/api/credentials/`, `CORE_ADMIN.SP_*_API_CREDENTIAL`.
 
-### Deployments (Phase 1.2)
+### Deployments
 
 - `SP_GET_DEPLOYMENT` requires `IN_APP_USER_ID`.
 - `TradeRepo` rejects credentials and deployments that belong to another user before `CALL TRADE.SP_INS_DEPLOYMENT`.
@@ -75,7 +75,7 @@ Implementation: `quant/api/routers/jobs.py`, `quant/api/services/jobs.py`, `quan
 
 ---
 
-## Required before live apply (Phase 1.7)
+## Required before live apply
 
 | Check | Rule |
 |-------|------|
@@ -91,7 +91,7 @@ Credential ownership and the paper-vs-live gate are enforced. Strategy ownership
 
 ---
 
-## Phase 1.6 — strategy picker (read path) — Done
+## Strategy picker (read path) — Done
 
 The Trade catalog is the caller's own rows. **`BT.SP_GET_STRATEGY_LIST`** filters `USER_ID`, and `GET /api/v1/strategies` passes the caller. `IS_BEST_IND` marks the best-performing VID per strategy — see [Best-VID Promotion](best-vid-promotion.md). The promotion **log** (`SP_GET_PROMOTION`) is not filtered by owner.
 
@@ -163,4 +163,4 @@ flowchart TD
 | Invalid id format | **400** or **404** | Match existing router patterns |
 | Authenticated but not allowed (future RBAC) | **403** | Only when role model exists |
 
-Credentials API established this pattern in Phase 1.1 — reuse for deployments, strategies, and jobs.
+Credentials API established this pattern — reuse for deployments, strategies, and jobs.
