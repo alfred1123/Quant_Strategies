@@ -11,6 +11,10 @@ from quant.schemas.apply import ApplyReport
 from quant.trade.errors import BrokerAuthError, BrokerConnectionError
 from quant.trade.models.order import IntendedAction, OrderRejectReason
 from quant.trade.scheduler.tick import ScheduleTickRunner, TickOutcome
+from tests.conftest import StubRefData
+
+_TICK_ATTEMPTS = StubRefData().setting_int("tick_max_attempts")
+_TICK_BACKOFF_S = StubRefData().setting_float("tick_retry_backoff_s")
 
 DUE_AT = datetime(2026, 8, 1, 9, 0, tzinfo=UTC)
 NEXT_DUE_AT = DUE_AT + timedelta(days=1)
@@ -67,7 +71,8 @@ def repo():
 
 
 def _runner(repo, apply_fn=None, **kwargs):
-    kwargs.setdefault("max_attempts", 3)
+    kwargs.setdefault("max_attempts", _TICK_ATTEMPTS)
+    # 0 so a retry in this file returns immediately. The spacing test passes the seeded backoff.
     kwargs.setdefault("retry_backoff_s", 0)
     return ScheduleTickRunner(repo, apply_fn or MagicMock(), **kwargs)
 
@@ -184,7 +189,7 @@ class TestRetriesWithinThePass:
         repo.sp_get_missed_due_deployments.return_value = [_due_row()]
         apply_fn = MagicMock(side_effect=[RuntimeError("venue blip"), None])
 
-        report = _runner(repo, apply_fn, max_attempts=3).run_interval(1)
+        report = _runner(repo, apply_fn, max_attempts=_TICK_ATTEMPTS).run_interval(1)
 
         assert apply_fn.call_count == 2
         assert report.results[0].outcome is TickOutcome.APPLIED
@@ -196,11 +201,11 @@ class TestRetriesWithinThePass:
         repo.sp_get_missed_due_deployments.return_value = [_due_row()]
         apply_fn = MagicMock(side_effect=RuntimeError("boom"))
 
-        report = _runner(repo, apply_fn, max_attempts=3).run_interval(1)
+        report = _runner(repo, apply_fn, max_attempts=_TICK_ATTEMPTS).run_interval(1)
 
-        assert apply_fn.call_count == 3
+        assert apply_fn.call_count == _TICK_ATTEMPTS
         assert report.results[0].outcome is TickOutcome.PAUSED
-        assert report.results[0].attempt == 3
+        assert report.results[0].attempt == _TICK_ATTEMPTS
         assert report.results[0].error == "boom"
         repo.write_deployment.assert_called_once()
         repo.sp_ins_deployment_schedule_status.assert_not_called()
@@ -211,10 +216,12 @@ class TestRetriesWithinThePass:
         repo.sp_get_missed_due_deployments.return_value = [_due_row()]
         apply_fn = MagicMock(side_effect=RuntimeError("boom"))
 
-        _runner(repo, apply_fn, max_attempts=3, retry_backoff_s=5.0).run_interval(1)
+        _runner(
+            repo, apply_fn, max_attempts=_TICK_ATTEMPTS, retry_backoff_s=_TICK_BACKOFF_S,
+        ).run_interval(1)
 
         # Between attempts only: no wait after the last one, before the pause.
-        assert sleeps == [5.0, 5.0]
+        assert sleeps == [_TICK_BACKOFF_S] * (_TICK_ATTEMPTS - 1)
 
     def test_a_failing_row_does_not_stop_the_others(self, repo):
         good, bad = _due_row(), _due_row()
@@ -263,11 +270,11 @@ class TestAttemptBudget:
         apply_fn = MagicMock(
             return_value=_apply_report(position_qty=0.0, order_success=False)
         )
-        runner = _runner(repo, apply_fn, max_attempts=3)
+        runner = _runner(repo, apply_fn, max_attempts=_TICK_ATTEMPTS)
 
         report = runner.run_interval(1)
 
-        assert apply_fn.call_count == 3
+        assert apply_fn.call_count == _TICK_ATTEMPTS
         assert report.results[0].outcome is TickOutcome.PAUSED
         assert report.results[0].error == "insufficient funds"
 
@@ -281,7 +288,7 @@ class TestAttemptBudget:
                 reject_reason=OrderRejectReason.SIZE_BELOW_MINIMUM,
             )
         )
-        runner = _runner(repo, apply_fn, max_attempts=3)
+        runner = _runner(repo, apply_fn, max_attempts=_TICK_ATTEMPTS)
 
         report = runner.run_interval(1)
 
@@ -301,7 +308,7 @@ class TestAttemptBudget:
                 reason=OrderRejectReason.IP_NOT_ALLOWED,
             )
         )
-        runner = _runner(repo, apply_fn, max_attempts=3)
+        runner = _runner(repo, apply_fn, max_attempts=_TICK_ATTEMPTS)
 
         report = runner.run_interval(1)
 
@@ -312,7 +319,7 @@ class TestAttemptBudget:
     def test_an_untyped_broker_error_at_connect_is_retried(self, repo):
         repo.sp_get_missed_due_deployments.return_value = [_due_row()]
         apply_fn = MagicMock(side_effect=[BrokerConnectionError("proxy down"), None])
-        runner = _runner(repo, apply_fn, max_attempts=3)
+        runner = _runner(repo, apply_fn, max_attempts=_TICK_ATTEMPTS)
 
         report = runner.run_interval(1)
 

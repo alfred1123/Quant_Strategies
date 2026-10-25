@@ -23,14 +23,14 @@ Phase 1.7 (live apply) is synchronous — the user clicks Apply and the API runs
 |---|----------|-----------|
 | 1 | **EventBridge Scheduler + Lambda** for recurring execution | Schedule lives in AWS, survives instance restarts, idempotent per tick. Lambda is a thin HTTP caller; all business logic stays in FastAPI. |
 | 2 | **Predefined intervals only**: `MANUAL`, `1H`, `DAILY` | Matches the bar granularities we store; no arbitrary cron expressions needed for v1. 4H dropped — few metrics exist at 4H, and 1H covers intraday. New intervals are just a REFDATA seed row away. |
-| 3 | **Intervals keyed by `REFDATA.TM_INTERVAL`** — not free-text | The table already exists (used by `BT.API_REQUEST.TM_INTERVAL_ID`) but is **unseeded**; `BacktestCache.DEFAULT_TM_INTERVAL_ID = 1` hardcodes daily by convention. Seed it (`1=DAILY`, `2=1H`) and reference it from both `MARKET_DATA.PRICE_BAR` and `TRADE.DEPLOYMENT` — REFDATA stays the single source of truth for dropdowns. |
+| 3 | **Intervals keyed by `REFDATA.TM_INTERVAL`** — not free-text | The table is shared with `BT.API_REQUEST.TM_INTERVAL_ID` and is seeded (`1=DAILY`, `2=1H`). `MARKET_DATA.PRICE_BAR` and `TRADE.DEPLOYMENT` reference it. Daily, when a caller names no interval, is `CONFIG.SETTING default_tm_interval_id`. REFDATA stays the single source of truth for dropdowns. |
 | 4 | **`MARKET_DATA` schema** for price bars (separate from `BT`) | Live apply reads are distinct from backtest reads. No migration of existing JSONB data. Both coexist. |
 | 5 | **On-demand bar population** | Only products with active deployments get bars stored. No bulk ingest of all products. |
 | 6 | **Application-owned API_REQUEST refresh** | `BacktestCache.refresh_payload` fetches the caller's range and reinserts via `SP_INS_API_REQUEST`; no DB consolidation SP. |
 
 ### 2.1 REFDATA.TM_INTERVAL seed
 
-The table (`TM_INTERVAL_ID IDENTITY`, `NAME`, `DESCRIPTION`) exists since baseline but has no rows. Seed via Liquibase changeset:
+The table (`TM_INTERVAL_ID IDENTITY`, `NAME`, `DESCRIPTION`) is seeded:
 
 | TM_INTERVAL_ID | NAME | PERIOD_LENGTH | DESCRIPTION |
 |----------------|------|---------------|-------------|
@@ -42,7 +42,7 @@ The table (`TM_INTERVAL_ID IDENTITY`, `NAME`, `DESCRIPTION`) exists since baseli
 `MANUAL` is **not** a row here — it is not a time interval. Manual-only deployments are expressed as `SCHEDULE_TM_INTERVAL_ID IS NULL`.
 
 !!! note "Seeding an IDENTITY column"
-    `TM_INTERVAL_ID` is `GENERATED ALWAYS AS IDENTITY`, so the seed must pin ids explicitly (`INSERT ... OVERRIDING SYSTEM VALUE`) — `1=DAILY` must match the hardcoded `BacktestCache.DEFAULT_TM_INTERVAL_ID = 1` already in production data (`BT.API_REQUEST.TM_INTERVAL_ID = 1` rows).
+    `TM_INTERVAL_ID` is `GENERATED ALWAYS AS IDENTITY`, so the seed pins ids explicitly (`INSERT ... OVERRIDING SYSTEM VALUE`). `1=DAILY` matches `CONFIG.SETTING default_tm_interval_id` and the `BT.API_REQUEST.TM_INTERVAL_ID = 1` rows already stored.
 
 ---
 

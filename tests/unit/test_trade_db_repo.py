@@ -4,7 +4,7 @@ import re
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -13,29 +13,21 @@ from quant.api.credentials.repo import ApiCredentialRepo
 from quant.queue.repo import BtQueueRepo
 from quant.trade.db_repo import TradeRepo
 from quant.trade.errors import TradeValidationError
+from tests.conftest import StubRefData
 
 PROC_DIR = (
     Path(__file__).resolve().parents[2] / "db" / "liquidbase" / "trade" / "procedures"
 )
 
 
-def _schedule_status_catalog(name: str) -> str:
-    valid = ["PENDING", "SUCCESS", "FAILED"]
-    if name not in valid:
-        raise RuntimeError(f"REFDATA.SCHEDULE_STATUS missing NAME={name!r} (valid: {valid})")
-    return name
-
-
 @pytest.fixture
 def repo():
     bt = BtQueueRepo("postgresql://test")
-    refdata = MagicMock()
-    refdata.validate_schedule_status.side_effect = _schedule_status_catalog
     return TradeRepo(
         "postgresql://test",
         bt=bt,
         credentials=ApiCredentialRepo("postgresql://test"),
-        refdata=refdata,
+        refdata=StubRefData(),
     )
 
 
