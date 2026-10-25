@@ -44,8 +44,6 @@ Open pull request 133 (Abort API startup when REFDATA publish fails) changes `qu
 
 Open pull request 134 (Lock setting and catalog fixtures to their seed rows) changes comment text in Liquibase refdata release 1.31.0 and tests, including `tests/unit/test_seed_fixture_drift.py`. It opened on 23 Oct 2026, about 12:03 AM HKT, and is ready for review. The changelog file is database source. Alfred merges it. Bots do not own it.
 
-Open pull request 136 (Report the delays a fill poll has already slept) changes `quant/trade/brokers/ccxt/confirm.py` and `tests/unit/test_ccxt_confirm.py`. Application code. Alfred merges it. Bots do not own it.
-
 Draft pull request 137 (Type an unconfirmed fill instead of matching its sentence) changes `quant/trade` (`order.py`, `confirm.py`, `order_policy.py`), docs, and tests. Application code. It follows #128. Do not merge it before #128. After #128 merges, rebase it onto main. It stays a draft until then. Alfred merges it. Bots do not own it.
 
 ### Closed and merged
@@ -80,7 +78,9 @@ Pull request 138 (Read the seeded order budget from the snapshot) merged on 25 O
 
 Pull request 139 (appctl: resolve the SSM tunnel target from the quant-compute stack) merged on 25 Oct 2026, about 9:55 AM HKT. It changed `scripts/appctl.sh` and `docs/architecture/dev-vs-prod.md`. Infrastructure. Alfred merged it. Bots do not own it.
 
-None of the open drafts #89, #91, and #137, none of the open pull requests #128, #133, #134, and #136, none of the open bot pull request #135, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #129, #132, #138, and #139, is on the ordered list above.
+Pull request 136 (Report the delays a fill poll has already slept) merged on 25 Oct 2026, about 9:57 AM HKT. It changed `quant/trade/brokers/ccxt/confirm.py` and `tests/unit/test_ccxt_confirm.py`. Application code. Alfred merged it. Bots do not own it.
+
+None of the open drafts #89, #91, and #137, none of the open pull requests #128, #133, and #134, none of the open bot pull request #135, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #129, #132, #136, #138, and #139, is on the ordered list above.
 
 ## Bots, now
 
