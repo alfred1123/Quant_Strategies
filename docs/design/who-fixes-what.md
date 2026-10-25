@@ -1,6 +1,6 @@
 # Who fixes what
 
-**Updated:** 23 Oct 2026 HKT. Bot Coordinator keeps this page current.
+**Updated:** 25 Oct 2026 HKT. Bot Coordinator keeps this page current.
 
 ## How to tell them apart
 
@@ -48,10 +48,6 @@ Open pull request 136 (Report the delays a fill poll has already slept) changes 
 
 Draft pull request 137 (Type an unconfirmed fill instead of matching its sentence) changes `quant/trade` (`order.py`, `confirm.py`, `order_policy.py`), docs, and tests. Application code. It follows #128. Do not merge it before #128. After #128 merges, rebase it onto main. It stays a draft until then. Alfred merges it. Bots do not own it.
 
-Open pull request 138 (Read the seeded order budget from the snapshot) changes only `tests/unit/test_order_policy.py` and `tests/unit/test_refdata_reader.py`. Test-only. A test-only pull request still goes to Alfred. Alfred merges it. Bots do not own it.
-
-Open pull request 139 (appctl: resolve the SSM tunnel target from the quant-compute stack) changes `scripts/appctl.sh` and `docs/architecture/dev-vs-prod.md`. It is infrastructure: the prod SSM tunnel and CloudFormation instance resolution. It opened about 7:53 AM HKT on 23 Oct 2026 and is ready for review. Alfred owns infrastructure and merges it. Bots do not own it.
-
 ### Closed and merged
 
 Pull request 90 merged on 10 Oct 2026. The docs now point at rules the application owns, not risk numbers.
@@ -80,7 +76,11 @@ Pull request 125 (Keep the typed reject reason when a fill poll fails) merged on
 
 Pull request 127 (Stop order retries when a cancel returns failure) merged on 23 Oct 2026, about 12:02 AM HKT. It changed `quant/trade/order_policy.py`, `quant/trade/models/order.py`, docs, and tests. Application code. Alfred merged it. Bots do not own it.
 
-None of the open drafts #89, #91, and #137, none of the open pull requests #128, #133, #134, #136, #138, and #139, none of the open bot pull request #135, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #129, and #132, is on the ordered list above.
+Pull request 138 (Read the seeded order budget from the snapshot) merged on 25 Oct 2026, about 9:55 AM HKT. It changed only `tests/unit/test_order_policy.py` and `tests/unit/test_refdata_reader.py`. Test-only. Alfred merged it. Bots do not own it.
+
+Pull request 139 (appctl: resolve the SSM tunnel target from the quant-compute stack) merged on 25 Oct 2026, about 9:55 AM HKT. It changed `scripts/appctl.sh` and `docs/architecture/dev-vs-prod.md`. Infrastructure. Alfred merged it. Bots do not own it.
+
+None of the open drafts #89, #91, and #137, none of the open pull requests #128, #133, #134, and #136, none of the open bot pull request #135, and none of the closed or merged pull requests #90, #103, #109, #110, #115, #118, #121, #124, #125, #126, #127, #129, #132, #138, and #139, is on the ordered list above.
 
 ## Bots, now
 
