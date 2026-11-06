@@ -37,8 +37,9 @@ pg_isready -h 127.0.0.1 -p 5433
 ```
 
 The forward is laptop `:5433` → Aurora `:5432` through the **prod** EC2 SSM
-jump host. Target instance ID is `SSM_TARGET_INSTANCE` in `.env` or the
-default in `appctl.sh` — see [Dev vs Prod — resolve instance ID](../architecture/dev-vs-prod.md#resolve-the-current-prod-ec2-instance-id).
+jump host. `appctl` resolves the target instance ID from the `quant-compute`
+CloudFormation stack. `SSM_TARGET_INSTANCE` in `.env` overrides only — see
+[Dev vs Prod — resolve instance ID](../architecture/dev-vs-prod.md#resolve-the-current-prod-ec2-instance-id).
 
 ---
 
