@@ -31,19 +31,19 @@ The FastAPI connection pool logs in as Postgres role `quant_app`. The human iden
 
 ## Requirement matrix
 
-| Domain | Owner column | Enforced today? | Requirement | Phase |
-|--------|--------------|-----------------|-------------|-------|
-| **Login / session** | `APP_USER_ID` in JWT | **Yes** | One session per human; `SESSION_GEN` revoke | Done |
-| **Credentials** | `CORE_ADMIN.API_CREDENTIAL.APP_USER_ID` | **Yes** | SP + API scoped; cross-user id → **404** | 1.1 |
-| **Deployments** | `TRADE.DEPLOYMENT.APP_USER_ID` | **Yes** | `SP_GET_DEPLOYMENT(IN_APP_USER_ID)`; credential must match owner | 1.2 |
-| **Job queue** | `BT.QUEUE.USER_ID` | **Yes** | List/cancel/SSE scoped; max 20 `QUEUED` per user | Done |
-| **Strategy picker (Trade read)** | `BT.STRATEGY.USER_ID` | **Yes** | `SP_GET_STRATEGY_LIST(IN_USER_ID)` — caller-owned rows only | 1.6 — Done |
-| **Strategy deploy (write)** | `BT.STRATEGY.USER_ID` | **Yes** | Create deployment validates strategy owner == caller | 1.6 — Done |
-| **Promotion / backtest (read)** | `BT.STRATEGY.USER_ID` | **No** | Shared pool — any logged-in user sees all strategies | By design |
-| **Sync backtest** | — | **No** | No per-user result isolation on `/optimize` | login Phase 2 |
-| **`BT.RESULT`** | `USER_ID` audit only | **No** | Globally readable | login Phase 2 |
-| **REFDATA / INST** | — | N/A | Shared catalog | By design (v1) |
-| **Futu OpenD** | Infra (not per user) | **Partial** | One gateway in v1; **DB** still separates by `APP_USER_ID` | v1 house account |
+| Domain | Owner column | Enforced today? | Requirement |
+|--------|--------------|-----------------|-------------|
+| **Login / session** | `APP_USER_ID` in JWT | **Yes** | One session per human; `SESSION_GEN` revoke |
+| **Credentials** | `CORE_ADMIN.API_CREDENTIAL.APP_USER_ID` | **Yes** | SP + API scoped; cross-user id → **404** |
+| **Deployments** | `TRADE.DEPLOYMENT.APP_USER_ID` | **Yes** | `SP_GET_DEPLOYMENT(IN_APP_USER_ID)`; credential must match owner |
+| **Job queue** | `BT.QUEUE.USER_ID` | **Yes** | List/cancel/SSE scoped; max 20 `QUEUED` per user |
+| **Strategy picker (Trade read)** | `BT.STRATEGY.USER_ID` | **Yes** | `SP_GET_STRATEGY_LIST(IN_USER_ID)` — caller-owned rows only |
+| **Strategy deploy (write)** | `BT.STRATEGY.USER_ID` | **Yes** | Create deployment validates strategy owner == caller |
+| **Promotion / backtest (read)** | `BT.STRATEGY.USER_ID` | **No** | Shared pool — any logged-in user sees all strategies |
+| **Sync backtest** | — | **No** | No per-user result isolation on `/optimize` |
+| **`BT.RESULT`** | `USER_ID` audit only | **No** | Globally readable |
+| **REFDATA / INST** | — | N/A | Shared catalog |
+| **Futu OpenD** | Infra (not per user) | **Partial** | One gateway in v1; **DB** still separates by `APP_USER_ID` |
 
 ---
 
@@ -87,7 +87,7 @@ Implementation: `quant/api/routers/jobs.py`, `quant/api/services/jobs.py`, `quan
 
 Credential ownership and the paper-vs-live gate are enforced. Strategy ownership is enforced too: the caller cannot deploy another user's `BT.STRATEGY` row.
 
-**Exit criteria (1.7):** deployment create validates credential ownership (done) + paper/live gate (done — `confirm_live` required) + strategy ownership (done); see [plan-to-profit §1.7](plan-to-profit.md#phase-17-live-apply).
+**Exit criteria:** deployment create validates credential ownership (done) + paper/live gate (done — `confirm_live` required) + strategy ownership (done); see [plan-to-profit §1.7](plan-to-profit.md#phase-17-live-apply).
 
 ---
 
